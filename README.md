@@ -134,6 +134,44 @@ Agentium uses a containerized microservices architecture where each component ru
 ```
 
 ---
+## Internal  Documentation
+
+### Constituion
+- Start with the base template
+- Defines The Sovereign Preference
+- Defines Rules on What to do and What not to do
+- Updated by voting of Council Members and approved by Head of Council
+- Updated everyday
+- The Constitution is updated read only for any other body then the Head of Council
+
+### Individual Agent Ethos 
+- Each Agent has its own Ethos
+- Ethos is created by the higher authority of the Agent with default template.
+- Defines Rules on What to do and What not to do
+- Updated by Individual Agent and verified and updated by Lead Agent
+- For Lead Agents, the Lead Agent Ethos is updated by Head of Council
+
+### On Creation
+- Each Head of Council/ Council Member/ Lead Agent/ Task Agent is created with a default Ethos
+- The Ethos is created by the higher authority of the Agent with default template.
+- The Created Head of Council/ Council Member/ Lead Agent/ Task Agent reads the Constitution
+- The Created Head of Council/ Council Member/ Lead Agent/ Task Agent reads its own Ethos
+
+### Termination
+- Head of Council is never Teminated
+- Council Member is terminated if it violates the Constitution
+- Lead Agent is terminated if it violates the Constitution
+- Task Agent is terminated if it violates the Constitution
+- Agents are terminated after the assigned task is completed.
+
+### Identification
+- All Agents are identified with a identification number.
+- Head of Council: 0xxxx
+- Council Member: 1xxxx
+- Lead Agent: 2xxxx 
+- Task Agent: 3xxxx
+
+---
 
 ## 🚀 Quick Start
 

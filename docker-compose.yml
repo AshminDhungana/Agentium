@@ -1,0 +1,148 @@
+version: '3.8'
+
+services:
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # Traditional Databases
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  database:
+    image: postgres:15-alpine
+    container_name: agentium-postgres
+    environment:
+      POSTGRES_DB: agentium
+      POSTGRES_USER: agentium
+      POSTGRES_PASSWORD: agentium_pass
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U agentium" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - agentium-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: agentium-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - agentium-network
+
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # Vector Database
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: agentium-qdrant
+    ports:
+      - "6333:6333" # HTTP API
+      - "6334:6334" # gRPC API
+    volumes:
+      - qdrant_data:/qdrant/storage
+      - ./config/vector/qdrant-config.yaml:/qdrant/config/production.yaml
+    environment:
+      - QDRANT__SERVICE__GRPC_PORT=6334
+      - QDRANT__SERVICE__HTTP_PORT=6333
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:6333/healthz" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - agentium-network
+
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # Backend Service
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  backend:
+    build:
+      context: ./backend
+      dockerfile: ../docker/backend/Dockerfile
+    container_name: agentium-backend
+    environment:
+      # Database
+      - DATABASE_URL=postgresql://agentium:agentium_pass@database:5432/agentium
+      - REDIS_URL=redis://redis:6379
+
+      # Vector Database
+      - QDRANT_URL=http://qdrant:6333
+      - QDRANT_API_KEY=${QDRANT_API_KEY:-}
+      - QDRANT_COLLECTION_LOGS=agentium_logs
+      - QDRANT_COLLECTION_TASKS=agentium_tasks
+      - QDRANT_COLLECTION_KNOWLEDGE=agentium_knowledge
+
+      # Embeddings
+      - EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
+      - EMBEDDING_DIMENSION=384
+
+      # AI APIs
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+
+      # RAG Configuration
+      - RAG_CHUNK_SIZE=1000
+      - RAG_CHUNK_OVERLAP=200
+      - RAG_TOP_K=5
+      - RAG_SIMILARITY_THRESHOLD=0.7
+    volumes:
+      - ./backend:/app
+      - ./config:/app/config
+      - ./vector_storage:/app/vector_storage
+    ports:
+      - "8000:8000"
+    depends_on:
+      database:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+    networks:
+      - agentium-network
+    restart: unless-stopped
+
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # Frontend Service
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: ../docker/frontend/Dockerfile
+    container_name: agentium-frontend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_API_URL=http://localhost:8000
+      - REACT_APP_WS_URL=ws://localhost:8000
+    depends_on:
+      - backend
+    networks:
+      - agentium-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  qdrant_data:
+    driver: local
+
+networks:
+  agentium-network:
+    driver: bridge
