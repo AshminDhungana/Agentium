@@ -146,10 +146,10 @@ export function ChatPage() {
 
                         <div className={`flex-1 max-w-3xl ${message.role === 'sovereign' ? 'text-right' : ''}`}>
                             <div className={`inline-block text-left px-4 py-3 rounded-2xl shadow-sm ${message.role === 'sovereign'
-                                    ? 'bg-blue-600 text-white ml-12'
-                                    : message.role === 'system'
-                                        ? 'bg-red-50 dark:bg-red-900/20 text-red-900 dark:text-red-300 mx-12'
-                                        : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 mr-12'
+                                ? 'bg-blue-600 text-white ml-12'
+                                : message.role === 'system'
+                                    ? 'bg-red-50 dark:bg-red-900/20 text-red-900 dark:text-red-300 mx-12'
+                                    : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 mr-12'
                                 }`}>
                                 <div className="whitespace-pre-wrap text-sm">{message.content}</div>
                                 {message.metadata?.task_created && (
