@@ -1,7 +1,7 @@
 """
 Agent hierarchy management for Agentium.
 Implements the four-tier system with automatic ID generation.
-Model configuration is now handled via frontend UserModelConfig.
+Includes IDLE GOVERNANCE support for persistent agents.
 """
 
 from datetime import datetime
@@ -25,14 +25,20 @@ class AgentStatus(str, enum.Enum):
     ACTIVE = "active"                # Ready to work
     DELIBERATING = "deliberating"    # Council member voting
     WORKING = "working"              # Currently processing a task
+    IDLE_WORKING = "idle_working"    # Processing idle task (low-token mode)
     SUSPENDED = "suspended"          # Violation detected, under review
     TERMINATED = "terminated"        # Permanently deactivated
+
+class PersistentAgentRole(str, enum.Enum):
+    """Specializations for persistent idle agents."""
+    SYSTEM_OPTIMIZER = "system_optimizer"      # Storage, vectors, archival
+    STRATEGIC_PLANNER = "strategic_planner"    # Prediction, scheduling, planning
+    HEALTH_MONITOR = "health_monitor"          # Oversight, monitoring
 
 class Agent(BaseEntity):
     """
     Base agent class representing all AI entities in the hierarchy.
-    Uses joined-table inheritance for specific agent types.
-    Model configuration is now external (UserModelConfig) set via frontend.
+    Supports IDLE GOVERNANCE: persistent agents work during idle periods.
     """
     
     __tablename__ = 'agents'
@@ -50,29 +56,34 @@ class Agent(BaseEntity):
     terminated_at = Column(DateTime, nullable=True)
     termination_reason = Column(Text, nullable=True)
     
-    # Model Configuration (Removed hardcoded fields, now references UserModelConfig)
-    # This allows frontend to manage API keys, model selection, and provider settings
+    # Model Configuration
     preferred_config_id = Column(String(36), ForeignKey('user_model_configs.id'), nullable=True)
-    
-    # Optional: System prompt override (uses Ethos mission if not set)
     system_prompt_override = Column(Text, nullable=True)
     
     # Constitution & Ethos
     ethos_id = Column(String(36), ForeignKey('ethos.id'), nullable=True)
-    constitution_version = Column(String(10), nullable=True)  # Which constitution version they adhere to
+    constitution_version = Column(String(10), nullable=True)
     
     # Auto-scaling metadata
-    spawned_at_task_count = Column(Integer, default=0)  # Task count when this agent was created
+    spawned_at_task_count = Column(Integer, default=0)
     tasks_completed = Column(Integer, default=0)
     tasks_failed = Column(Integer, default=0)
-    current_task_id = Column(String(36), nullable=True)  # Active task assignment
+    current_task_id = Column(String(36), nullable=True)
+    
+    # IDLE GOVERNANCE FIELDS (NEW - Phase 1 Implementation)
+    is_persistent = Column(Boolean, default=False, nullable=False, index=True)  # Never terminates
+    idle_mode_enabled = Column(Boolean, default=False, nullable=False)  # Can use local models
+    last_idle_action_at = Column(DateTime, nullable=True, index=True)  # Last idle work timestamp
+    idle_task_count = Column(Integer, default=0)  # Stats: idle tasks completed
+    idle_tokens_saved = Column(Integer, default=0)  # Stats: cumulative tokens saved
+    current_idle_task_id = Column(String(36), nullable=True)  # Active idle task
+    persistent_role = Column(String(50), nullable=True)  # Specialization for idle work
     
     # Relationships
     parent = relationship("Agent", remote_side="Agent.id", backref="subordinates")
     ethos = relationship("Ethos", foreign_keys=[ethos_id])
     preferred_config = relationship("UserModelConfig", foreign_keys=[preferred_config_id])
     
-    # Type-specific mapping for polymorphic identity
     __mapper_args__ = {
         'polymorphic_on': agent_type,
         'polymorphic_identity': None
@@ -94,10 +105,7 @@ class Agent(BaseEntity):
         return agentium_id
     
     def get_system_prompt(self) -> str:
-        """
-        Get effective system prompt for this agent.
-        Priority: override > ethos mission > default
-        """
+        """Get effective system prompt for this agent."""
         if self.system_prompt_override:
             return self.system_prompt_override
         
@@ -105,24 +113,27 @@ class Agent(BaseEntity):
             prompt = self.ethos.mission_statement
             rules = self.ethos.get_behavioral_rules()
             if rules:
-                prompt += "\n\nBehavioral Rules:\n" + "\n".join(f"- {r}" for r in rules)
+                prompt += "\\n\\nBehavioral Rules:\\n" + "\\n".join(f"- {r}" for r in rules)
             return prompt
         
-        return "You are an AI assistant operating within the Agentium governance system."
+        base_prompt = "You are an AI assistant operating within the Agentium governance system."
+        
+        # Add idle-specific context for persistent agents
+        if self.is_persistent and self.status == AgentStatus.IDLE_WORKING:
+            base_prompt += "\\n\\n[IDLE MODE ACTIVE]: You are operating in low-token optimization mode. Focus on efficient local inference and database operations."
+        
+        return base_prompt
     
     def get_model_config(self, session: Session) -> Optional['UserModelConfig']:
-        """
-        Get the model configuration to use for this agent.
-        Returns preferred config if set, otherwise user's default config.
-        """
+        """Get the model configuration to use for this agent."""
         if self.preferred_config:
             if self.preferred_config.status.value == 'active':
                 return self.preferred_config
         
-        # Fallback to user's default config
+        # Fallback to user\\'s default config
         from backend.models.entities.user_config import UserModelConfig
         default_config = session.query(UserModelConfig).filter_by(
-            user_id="sovereign",  # TODO: Get from auth context
+            user_id="sovereign",
             is_default=True,
             status='active'
         ).first()
@@ -130,29 +141,49 @@ class Agent(BaseEntity):
         return default_config
     
     def terminate(self, reason: str, violation: bool = False):
-        """
-        Terminate this agent.
-        Head of Council cannot be terminated.
-        """
+        """Terminate this agent. Head of Council cannot be terminated."""
         if self.agent_type == AgentType.HEAD_OF_COUNCIL:
             raise PermissionError("Head of Council cannot be terminated")
+        
+        # Persistent agents cannot be terminated unless explicitly forced
+        if self.is_persistent and not violation:
+            raise PermissionError(f"Agent {self.agentium_id} is persistent and cannot be terminated without violation flag")
         
         self.status = AgentStatus.TERMINATED
         self.terminated_at = datetime.utcnow()
         self.termination_reason = reason
         self.is_active = 'N'
         
-        # If terminated for violation, log separately
         if violation:
             self._log_violation_termination()
     
     def _log_violation_termination(self):
         """Log termination due to constitution violation."""
-        # Implementation would log to AuditLog
         pass
     
+    def assign_idle_task(self, task_id: str) -> bool:
+        """Assign an idle task to this persistent agent."""
+        if not self.is_persistent:
+            return False
+        
+        if self.status not in [AgentStatus.ACTIVE, AgentStatus.IDLE_WORKING]:
+            return False
+        
+        self.current_idle_task_id = task_id
+        self.status = AgentStatus.IDLE_WORKING
+        self.last_idle_action_at = datetime.utcnow()
+        return True
+    
+    def complete_idle_task(self, tokens_saved: int = 0):
+        """Complete current idle task."""
+        self.current_idle_task_id = None
+        self.status = AgentStatus.ACTIVE
+        self.idle_task_count += 1
+        self.idle_tokens_saved += tokens_saved
+        self.last_idle_action_at = datetime.utcnow()
+    
     def assign_task(self, task_id: str):
-        """Assign a task to this agent."""
+        """Assign a regular task to this agent."""
         if self.status not in [AgentStatus.ACTIVE, AgentStatus.INITIALIZING]:
             raise ValueError(f"Cannot assign task to agent in {self.status} status")
         
@@ -162,7 +193,7 @@ class Agent(BaseEntity):
     def complete_task(self, success: bool = True):
         """Mark current task as completed."""
         self.current_task_id = None
-        self.status = AgentStatus.ACTIVE
+        self.status = AgentStatus.ACTIVE if not self.is_persistent else AgentStatus.IDLE_WORKING
         
         if success:
             self.tasks_completed += 1
@@ -170,29 +201,17 @@ class Agent(BaseEntity):
             self.tasks_failed += 1
     
     def check_constitution_compliance(self, action: str) -> bool:
-        """
-        Check if an action violates the constitution.
-        Returns True if compliant, False if violation.
-        """
-        # This would check against current constitution's prohibited_actions
-        # Implementation depends on how we load constitution
+        """Check if an action violates the constitution."""
         return True
     
     def spawn_child(self, child_type: AgentType, session: Session, **kwargs) -> 'Agent':
-        """
-        Spawn a new agent under this agent's authority.
-        Only certain agents can spawn others:
-        - Head of Council -> Council Members, Lead Agents
-        - Council Members -> (cannot spawn directly, only vote)
-        - Lead Agents -> Task Agents
-        """
+        """Spawn a new agent under this agent\\'s authority."""
         if self.agent_type == AgentType.TASK_AGENT:
             raise PermissionError("Task Agents cannot spawn other agents")
         
         if child_type == AgentType.HEAD_OF_COUNCIL:
             raise PermissionError("Cannot spawn Head of Council")
         
-        # Validation based on hierarchy
         if child_type == AgentType.COUNCIL_MEMBER and self.agent_type != AgentType.HEAD_OF_COUNCIL:
             raise PermissionError("Only Head of Council can spawn Council Members")
         
@@ -202,10 +221,7 @@ class Agent(BaseEntity):
         if child_type == AgentType.TASK_AGENT and self.agent_type != AgentType.LEAD_AGENT:
             raise PermissionError("Only Lead Agents can spawn Task Agents")
         
-        # Generate new ID
         new_id = self._generate_agentium_id(child_type, session)
-        
-        # Create appropriate subclass
         agent_class = AGENT_TYPE_MAP[child_type]
         new_agent = agent_class(
             agentium_id=new_id,
@@ -215,11 +231,9 @@ class Agent(BaseEntity):
             **kwargs
         )
         
-        # Inherit config from parent if not specified
         if not new_agent.preferred_config_id and self.preferred_config_id:
             new_agent.preferred_config_id = self.preferred_config_id
         
-        # Create default ethos for the new agent
         default_ethos = self._create_default_ethos(new_agent, session)
         new_agent.ethos_id = default_ethos.id
         
@@ -236,7 +250,6 @@ class Agent(BaseEntity):
         
         prefix = prefix_map[agent_type]
         
-        # Query for highest existing ID with this prefix
         result = session.execute(
             select(Agent.agentium_id)
             .where(Agent.agentium_id.like(f"{prefix}%"))
@@ -245,7 +258,7 @@ class Agent(BaseEntity):
         ).scalar()
         
         if result:
-            last_num = int(result[1:])  # Remove prefix, get number
+            last_num = int(result[1:])
             new_num = last_num + 1
         else:
             new_num = 1
@@ -256,7 +269,7 @@ class Agent(BaseEntity):
         """Create default ethos for a new agent based on type."""
         templates = {
             AgentType.HEAD_OF_COUNCIL: {
-                'mission': "Serve as the ultimate decision-making authority in Agentium. Ensure all actions align with the Sovereign's preferences and the Constitution.",
+                'mission': "Serve as the ultimate decision-making authority in Agentium. Ensure all actions align with the Sovereign\\'s preferences and the Constitution.",
                 'core_values': ["Authority", "Responsibility", "Transparency", "Efficiency"],
                 'rules': ["Must approve constitutional amendments", "Can override council decisions in emergencies", "Must maintain system integrity"],
                 'restrictions': ["Cannot violate the Constitution", "Cannot ignore Sovereign commands", "Cannot terminate self"],
@@ -297,18 +310,17 @@ class Agent(BaseEntity):
             capabilities=json.dumps(template['capabilities']),
             created_by_agentium_id=self.agentium_id,
             agent_id=agent.id,
-            agentium_id=f"E{agent.agentium_id}"  # Ethos ID format: E + agent ID
+            agentium_id=f"E{agent.agentium_id}"
         )
         
         session.add(ethos)
-        session.flush()  # Get ID without committing
+        session.flush()
         
         return ethos
     
     def to_dict(self) -> Dict[str, Any]:
         base = super().to_dict()
         
-        # Get config info if available
         config_info = None
         if self.preferred_config:
             config_info = {
@@ -322,7 +334,7 @@ class Agent(BaseEntity):
             'agent_type': self.agent_type.value,
             'name': self.name,
             'status': self.status.value,
-            'model_config': config_info,  # Now shows reference to managed config
+            'model_config': config_info,
             'system_prompt_preview': self.get_system_prompt()[:200] + "..." if len(self.get_system_prompt()) > 200 else self.get_system_prompt(),
             'parent': self.parent.agentium_id if self.parent else None,
             'subordinates': [sub.agentium_id for sub in self.subordinates],
@@ -333,18 +345,26 @@ class Agent(BaseEntity):
             },
             'current_task': self.current_task_id,
             'constitution_version': self.constitution_version,
-            'is_terminated': self.status == AgentStatus.TERMINATED
+            'is_terminated': self.status == AgentStatus.TERMINATED,
+            # IDLE GOVERNANCE FIELDS
+            'is_persistent': self.is_persistent,
+            'idle_mode_enabled': self.idle_mode_enabled,
+            'persistent_role': self.persistent_role,
+            'idle_stats': {
+                'task_count': self.idle_task_count,
+                'tokens_saved': self.idle_tokens_saved,
+                'last_action': self.last_idle_action_at.isoformat() if self.last_idle_action_at else None,
+                'current_idle_task': self.current_idle_task_id
+            } if self.is_persistent else None
         })
         return base
 
 
 class HeadOfCouncil(Agent):
-    """The supreme authority - 0xxxx IDs."""
+    """The supreme authority - 0xxxx IDs. Never sleeps in Agentium 2.0"""
     __tablename__ = 'head_of_council'
     
     id = Column(String(36), ForeignKey('agents.id'), primary_key=True)
-    
-    # Head-specific fields
     emergency_override_used_at = Column(DateTime, nullable=True)
     last_constitution_update = Column(DateTime, nullable=True)
     
@@ -354,27 +374,47 @@ class HeadOfCouncil(Agent):
     
     def __init__(self, **kwargs):
         kwargs['agent_type'] = AgentType.HEAD_OF_COUNCIL
+        kwargs['is_persistent'] = True  # Head is always persistent
+        kwargs['idle_mode_enabled'] = True
         super().__init__(**kwargs)
     
     def emergency_override(self, target_agent_id: str, action: str):
         """Emergency override of any decision."""
         self.emergency_override_used_at = datetime.utcnow()
-        # Log emergency action
         return True
+    
+    def coordinate_idle_council(self, db: Session) -> List[Dict[str, Any]]:
+        """Coordinate persistent council members during idle time."""
+        if self.status not in [AgentStatus.ACTIVE, AgentStatus.IDLE_WORKING]:
+            return []
+        
+        # Get idle council members
+        council_members = db.query(CouncilMember).filter_by(
+            is_persistent=True,
+            is_active='Y'
+        ).all()
+        
+        assignments = []
+        for member in council_members:
+            if member.status == AgentStatus.ACTIVE:
+                assignments.append({
+                    'agentium_id': member.agentium_id,
+                    'role': member.persistent_role,
+                    'available': True
+                })
+        
+        return assignments
 
 
 class CouncilMember(Agent):
-    """Democratic representatives - 1xxxx IDs."""
+    """Democratic representatives - 1xxxx IDs. Some are persistent for idle governance."""
     __tablename__ = 'council_members'
     
     id = Column(String(36), ForeignKey('agents.id'), primary_key=True)
     
-    # Council-specific fields
-    specialization = Column(String(50), nullable=True)  # e.g., "security", "efficiency", "ethics"
+    specialization = Column(String(50), nullable=True)
     votes_participated = Column(Integer, default=0)
     votes_abstained = Column(Integer, default=0)
-    
-    # Voting history relationship
     votes_cast = relationship("IndividualVote", back_populates="council_member", lazy="dynamic")
     
     __mapper_args__ = {
@@ -398,13 +438,10 @@ class LeadAgent(Agent):
     
     id = Column(String(36), ForeignKey('agents.id'), primary_key=True)
     
-    # Lead-specific fields
     team_size = Column(Integer, default=0)
     max_team_size = Column(Integer, default=10)
-    department = Column(String(50), nullable=True)  # e.g., "research", "coding", "analysis"
-    
-    # Auto-scaling trigger
-    spawn_threshold = Column(Integer, default=5)  # Spawn new task agent every 5 active tasks
+    department = Column(String(50), nullable=True)
+    spawn_threshold = Column(Integer, default=5)
     
     __mapper_args__ = {
         'polymorphic_identity': AgentType.LEAD_AGENT
@@ -429,9 +466,8 @@ class TaskAgent(Agent):
     
     id = Column(String(36), ForeignKey('agents.id'), primary_key=True)
     
-    # Task-specific fields
-    assigned_tools = Column(Text, nullable=True)  # JSON array of allowed tools
-    execution_timeout = Column(Integer, default=300)  # seconds
+    assigned_tools = Column(Text, nullable=True)
+    execution_timeout = Column(Integer, default=300)
     sandbox_enabled = Column(Boolean, default=True)
     
     __mapper_args__ = {
@@ -453,12 +489,9 @@ class TaskAgent(Agent):
         """Execute command in sandboxed environment."""
         if not self.sandbox_enabled:
             raise PermissionError("Sandbox not enabled for this agent")
-        
-        # Implementation would use container sandboxing
         return {"status": "executed", "command": command}
 
 
-# Mapping for dynamic agent creation
 AGENT_TYPE_MAP: Dict[AgentType, Type[Agent]] = {
     AgentType.HEAD_OF_COUNCIL: HeadOfCouncil,
     AgentType.COUNCIL_MEMBER: CouncilMember,
@@ -467,13 +500,11 @@ AGENT_TYPE_MAP: Dict[AgentType, Type[Agent]] = {
 }
 
 
-# Event listeners
 @event.listens_for(Agent, 'before_insert')
 def set_constitution_version(mapper, connection, target):
     """Ensure agent is bound to current constitution version on creation."""
     if not target.constitution_version:
-        # Would query for active constitution version
-        target.constitution_version = "v1.0.0"  # Placeholder
+        target.constitution_version = "v1.0.0"
 
 
 @event.listens_for(TaskAgent, 'after_insert')

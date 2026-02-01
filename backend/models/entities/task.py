@@ -1,6 +1,6 @@
 """
-Task management and delegation system for Agentium.
-Handles task lifecycle from creation through execution to completion.
+Task management for Agentium.
+Includes IDLE TASK support for continuous background optimization.
 """
 
 from datetime import datetime
@@ -12,93 +12,103 @@ import enum
 
 class TaskPriority(str, enum.Enum):
     """Task priority levels."""
-    CRITICAL = "critical"      # Skip voting, immediate action
-    HIGH = "high"              # Expedited voting/process
-    NORMAL = "normal"          # Standard process
-    LOW = "low"                # Background/batch processing
+    CRITICAL = "critical"
+    HIGH = "high"
+    NORMAL = "normal"
+    LOW = "low"
+    IDLE = "idle"  # NEW: Background optimization priority (lowest)
 
 class TaskStatus(str, enum.Enum):
     """Task lifecycle states."""
-    PENDING = "pending"                    # Created, awaiting deliberation
-    DELIBERATING = "deliberating"          # Council voting in progress
-    APPROVED = "approved"                  # Passed deliberation
-    REJECTED = "rejected"                  # Failed deliberation
-    DELEGATING = "delegating"              # Being assigned to Lead Agent
-    ASSIGNED = "assigned"                  # Assigned to Task Agent(s)
-    IN_PROGRESS = "in_progress"            # Currently being executed
-    REVIEW = "review"                      # Completed, awaiting verification
-    COMPLETED = "completed"                # Successfully finished
-    FAILED = "failed"                      # Execution failed
-    CANCELLED = "cancelled"                # Cancelled by Sovereign
+    PENDING = "pending"
+    DELIBERATING = "deliberating"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    DELEGATING = "delegating"
+    ASSIGNED = "assigned"
+    IN_PROGRESS = "in_progress"
+    REVIEW = "review"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+    # IDLE-specific states
+    IDLE_PENDING = "idle_pending"      # Waiting for idle time
+    IDLE_RUNNING = "idle_running"      # Being processed by persistent agent
+    IDLE_PAUSED = "idle_paused"        # Interrupted by user task
+    IDLE_COMPLETED = "idle_completed"  # Successfully finished in idle mode
 
 class TaskType(str, enum.Enum):
     """Categories of tasks."""
-    CONSTITUTIONAL = "constitutional"      # Amend constitution
-    SYSTEM = "system"                      # System configuration
-    EXECUTION = "execution"                # Generic task execution
-    RESEARCH = "research"                  # Information gathering
-    AUTOMATION = "automation"              # Browser/API automation
-    ANALYSIS = "analysis"                  # Data analysis
-    COMMUNICATION = "communication"        # Send messages/emails
+    CONSTITUTIONAL = "constitutional"
+    SYSTEM = "system"
+    EXECUTION = "execution"
+    RESEARCH = "research"
+    AUTOMATION = "automation"
+    ANALYSIS = "analysis"
+    COMMUNICATION = "communication"
+    # IDLE OPTIMIZATION TASKS (NEW)
+    VECTOR_MAINTENANCE = "vector_maintenance"      # ChromaDB optimization
+    STORAGE_DEDUPE = "storage_dedupe"              # Database deduplication
+    AUDIT_ARCHIVAL = "audit_archival"              # Log compression/archival
+    PREDICTIVE_PLANNING = "predictive_planning"    # Future task prediction
+    CONSTITUTION_REFINE = "constitution_refine"    # Constitutional amendments
+    AGENT_HEALTH_SCAN = "agent_health_scan"        # Proactive health checks
+    ETHOS_OPTIMIZATION = "ethos_optimization"      # Ethos refinement
+    CACHE_OPTIMIZATION = "cache_optimization"      # Redis/vector cache tuning
+
 
 class Task(BaseEntity):
-    """
-    Central task entity representing work to be done by the Agentium system.
-    Tasks flow through the hierarchy: Sovereign → Head → Council → Lead → Task Agent
-    """
+    """Central task entity with IDLE GOVERNANCE support."""
     
     __tablename__ = 'tasks'
     
-    # Basic information
     title = Column(String(200), nullable=False)
     description = Column(Text, nullable=False)
     task_type = Column(Enum(TaskType), default=TaskType.EXECUTION, nullable=False)
     priority = Column(Enum(TaskPriority), default=TaskPriority.NORMAL, nullable=False)
     
-    # Status tracking
+    # IDLE-specific flag (NEW)
+    is_idle_task = Column(Boolean, default=False, nullable=False, index=True)
+    idle_task_category = Column(String(50), nullable=True)  # e.g., "storage", "planning", "maintenance"
+    estimated_tokens = Column(Integer, default=0)  # For token budget management
+    tokens_used = Column(Integer, default=0)  # Actual tokens consumed
+    
     status = Column(Enum(TaskStatus), default=TaskStatus.PENDING, nullable=False)
-    status_history = Column(JSON, default=list)  # Array of {status, timestamp, agent_id, note}
+    status_history = Column(JSON, default=list)
     
-    # Hierarchy ownership
-    created_by = Column(String(10), nullable=False)  # Sovereign or Agent ID
+    created_by = Column(String(10), nullable=False)
     head_of_council_id = Column(String(36), ForeignKey('agents.id'), nullable=True)
-    assigned_council_ids = Column(JSON, default=list)  # Array of Council Member IDs deliberating
+    assigned_council_ids = Column(JSON, default=list)
     lead_agent_id = Column(String(36), ForeignKey('agents.id'), nullable=True)
-    assigned_task_agent_ids = Column(JSON, default=list)  # Array of Task Agent IDs executing
+    assigned_task_agent_ids = Column(JSON, default=list)
     
-    # Deliberation & Voting
     requires_deliberation = Column(Boolean, default=True)
     deliberation_id = Column(String(36), ForeignKey('task_deliberations.id'), nullable=True)
     approved_by_council = Column(Boolean, default=False)
     approved_by_head = Column(Boolean, default=False)
     
-    # Execution details
-    execution_plan = Column(Text, nullable=True)  # JSON: steps, tools, expected outcomes
-    execution_context = Column(Text, nullable=True)  # JSON: working memory, intermediate results
-    tools_allowed = Column(JSON, default=list)  # Array of tool names
+    execution_plan = Column(Text, nullable=True)
+    execution_context = Column(Text, nullable=True)
+    tools_allowed = Column(JSON, default=list)
     sandbox_mode = Column(Boolean, default=True)
     
-    # Results
     result_summary = Column(Text, nullable=True)
-    result_data = Column(JSON, nullable=True)  # Structured result data
-    result_files = Column(JSON, nullable=True)  # Array of file paths/URLs
+    result_data = Column(JSON, nullable=True)
+    result_files = Column(JSON, nullable=True)
     completion_percentage = Column(Integer, default=0)
     
-    # Timing & Performance
     due_date = Column(DateTime, nullable=True)
     started_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
-    time_estimated = Column(Integer, default=0)  # seconds
-    time_actual = Column(Integer, default=0)  # seconds
+    time_estimated = Column(Integer, default=0)
+    time_actual = Column(Integer, default=0)
     
-    # Error handling
     error_count = Column(Integer, default=0)
     last_error = Column(Text, nullable=True)
     retry_count = Column(Integer, default=0)
     max_retries = Column(Integer, default=3)
     
-    # Relationships
-    head_of_council = relationship("Agent", foreign_keys=[head_of_council_id], lazy=" joined")
+    head_of_council = relationship("Agent", foreign_keys=[head_of_council_id], lazy="joined")
     lead_agent = relationship("Agent", foreign_keys=[lead_agent_id])
     deliberation = relationship("TaskDeliberation", back_populates="task", uselist=False)
     subtasks = relationship("SubTask", back_populates="parent_task", lazy="dynamic")
@@ -106,9 +116,25 @@ class Task(BaseEntity):
     
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        # Auto-generate task ID (T prefix + agent type + sequence)
+        # Auto-generate ID
         if not kwargs.get('agentium_id'):
             self.agentium_id = self._generate_task_id()
+        
+        # Auto-flag idle tasks based on type
+        idle_types = [
+            TaskType.VECTOR_MAINTENANCE,
+            TaskType.STORAGE_DEDUPE,
+            TaskType.AUDIT_ARCHIVAL,
+            TaskType.PREDICTIVE_PLANNING,
+            TaskType.CONSTITUTION_REFINE,
+            TaskType.AGENT_HEALTH_SCAN,
+            TaskType.ETHOS_OPTIMIZATION,
+            TaskType.CACHE_OPTIMIZATION
+        ]
+        if self.task_type in idle_types:
+            self.is_idle_task = True
+            self.priority = TaskPriority.IDLE
+            self.requires_deliberation = False  # Idle tasks skip deliberation
     
     def _generate_task_id(self) -> str:
         """Generate task ID: T + timestamp + random."""
@@ -118,13 +144,49 @@ class Task(BaseEntity):
     
     @validates('priority')
     def validate_priority(self, key, priority):
-        """Critical tasks skip deliberation."""
-        if priority == TaskPriority.CRITICAL:
+        """Critical tasks skip deliberation. Idle tasks skip deliberation."""
+        if priority in [TaskPriority.CRITICAL, TaskPriority.IDLE]:
             self.requires_deliberation = False
         return priority
     
+    def start_idle_execution(self, agent_id: str):
+        """Mark task for idle execution."""
+        if not self.is_idle_task:
+            raise ValueError("Not an idle task")
+        
+        self.status = TaskStatus.IDLE_RUNNING
+        self.started_at = datetime.utcnow()
+        self._log_status_change("idle_started", agent_id)
+    
+    def pause_for_user_task(self):
+        """Pause idle task when user task arrives."""
+        if self.status == TaskStatus.IDLE_RUNNING:
+            self.status = TaskStatus.IDLE_PAUSED
+            self._log_status_change("idle_paused", "System", "User task priority")
+    
+    def resume_idle_task(self):
+        """Resume paused idle task."""
+        if self.status == TaskStatus.IDLE_PAUSED:
+            self.status = TaskStatus.IDLE_RUNNING
+            self._log_status_change("idle_resumed", "System")
+    
+    def complete_idle(self, result_summary: str, tokens_used: int = 0):
+        """Complete idle task."""
+        self.status = TaskStatus.IDLE_COMPLETED
+        self.result_summary = result_summary
+        self.completed_at = datetime.utcnow()
+        self.tokens_used = tokens_used
+        
+        if self.started_at:
+            self.time_actual = int((self.completed_at - self.started_at).total_seconds())
+        
+        self._log_status_change("idle_completed", self.assigned_task_agent_ids[0] if self.assigned_task_agent_ids else "System")
+    
     def start_deliberation(self, council_member_ids: List[str]) -> 'TaskDeliberation':
-        """Start council deliberation on this task."""
+        """Start council deliberation."""
+        if self.is_idle_task:
+            raise ValueError("Idle tasks do not require deliberation")
+        
         if not self.requires_deliberation:
             raise ValueError("This task does not require deliberation")
         
@@ -134,7 +196,6 @@ class Task(BaseEntity):
         self.assigned_council_ids = council_member_ids
         self._log_status_change("deliberation_started", "System")
         
-        # Create deliberation session
         deliberation = TaskDeliberation(
             task_id=self.id,
             agentium_id=f"D{self.agentium_id[1:]}",
@@ -162,18 +223,14 @@ class Task(BaseEntity):
         self._log_status_change("head_approved", head_agentium_id)
     
     def delegate_to_lead(self, lead_agent_id: str):
-        """Assign task to Lead Agent for team coordination."""
+        """Assign task to Lead Agent."""
         self.lead_agent_id = lead_agent_id
         self.status = TaskStatus.ASSIGNED
         self._log_status_change("delegated_to_lead", lead_agent_id)
-        
-        # Lead Agent breaks task into subtasks
         self._auto_generate_subtasks()
     
     def _auto_generate_subtasks(self):
-        """Auto-break task into subtasks based on type."""
-        # This would use AI to break down tasks
-        # For now, create a single execution subtask
+        """Auto-break task into subtasks."""
         subtask = SubTask(
             parent_task_id=self.id,
             title=f"Execute: {self.title}",
@@ -184,7 +241,7 @@ class Task(BaseEntity):
         return [subtask]
     
     def assign_to_task_agents(self, task_agent_ids: List[str]):
-        """Assign subtasks to specific Task Agents."""
+        """Assign subtasks to Task Agents."""
         self.assigned_task_agent_ids = task_agent_ids
         self.status = TaskStatus.IN_PROGRESS
         self.started_at = datetime.utcnow()
@@ -197,7 +254,7 @@ class Task(BaseEntity):
             self._log_status_change(f"progress_{percentage}%", "System", note)
     
     def complete(self, result_summary: str, result_data: Dict = None):
-        """Mark task as successfully completed."""
+        """Mark task as completed."""
         self.status = TaskStatus.COMPLETED
         self.result_summary = result_summary
         self.result_data = result_data or {}
@@ -208,8 +265,6 @@ class Task(BaseEntity):
             self.time_actual = int((self.completed_at - self.started_at).total_seconds())
         
         self._log_status_change("completed", self.assigned_task_agent_ids[0] if self.assigned_task_agent_ids else "System")
-        
-        # Update agent stats
         self._update_agent_stats(success=True)
     
     def fail(self, error_message: str, can_retry: bool = True):
@@ -219,7 +274,7 @@ class Task(BaseEntity):
         
         if can_retry and self.retry_count < self.max_retries:
             self.retry_count += 1
-            self.status = TaskStatus.ASSIGNED  # Re-assign for retry
+            self.status = TaskStatus.ASSIGNED
             self._log_status_change("retrying", "System", f"Retry {self.retry_count}/{self.max_retries}: {error_message}")
         else:
             self.status = TaskStatus.FAILED
@@ -228,7 +283,6 @@ class Task(BaseEntity):
     
     def _update_agent_stats(self, success: bool):
         """Update statistics for assigned agents."""
-        # Would update TaskAgent and LeadAgent stats
         pass
     
     def _log_status_change(self, new_status: str, agent_id: str, note: str = None):
@@ -243,7 +297,7 @@ class Task(BaseEntity):
         self.status_history = history
     
     def cancel(self, reason: str, cancelled_by: str):
-        """Cancel task (Sovereign only)."""
+        """Cancel task."""
         if self.status in [TaskStatus.COMPLETED, TaskStatus.FAILED]:
             raise ValueError("Cannot cancel completed or failed task")
         
@@ -261,6 +315,12 @@ class Task(BaseEntity):
             'status': self.status.value,
             'progress': self.completion_percentage,
             'created_by': self.created_by,
+            'is_idle_task': self.is_idle_task,
+            'idle_category': self.idle_task_category,
+            'token_usage': {
+                'estimated': self.estimated_tokens,
+                'used': self.tokens_used
+            },
             'assigned_agents': {
                 'head': self.head_of_council_id,
                 'lead': self.lead_agent_id,
@@ -288,45 +348,35 @@ class Task(BaseEntity):
 
 
 class SubTask(BaseEntity):
-    """
-    Atomic unit of work assigned to a single Task Agent.
-    Created by Lead Agents when delegating complex tasks.
-    """
+    """Atomic unit of work."""
     
     __tablename__ = 'subtasks'
     
     parent_task_id = Column(String(36), ForeignKey('tasks.id'), nullable=False)
     assigned_agent_id = Column(String(36), ForeignKey('agents.id'), nullable=True)
     
-    # Ordering
     sequence = Column(Integer, nullable=False)
-    dependencies = Column(JSON, default=list)  # Array of subtask IDs that must complete first
+    dependencies = Column(JSON, default=list)
     
-    # Content
     title = Column(String(200), nullable=False)
     description = Column(Text, nullable=False)
     expected_output = Column(Text, nullable=True)
     
-    # Execution
     status = Column(Enum(TaskStatus), default=TaskStatus.PENDING, nullable=False)
     tools_allowed = Column(JSON, default=list)
     
-    # Results
     result = Column(Text, nullable=True)
     output_data = Column(JSON, nullable=True)
     completed_at = Column(DateTime, nullable=True)
     
-    # Timeout
-    max_duration = Column(Integer, default=300)  # seconds
+    max_duration = Column(Integer, default=300)
     started_at = Column(DateTime, nullable=True)
     
-    # Relationships
     parent_task = relationship("Task", back_populates="subtasks")
     assigned_agent = relationship("Agent")
     
     def can_start(self) -> bool:
         """Check if dependencies are satisfied."""
-        # Would check parent_task.subtasks for dependency status
         return True
     
     def start_execution(self, agent_id: str):
@@ -341,8 +391,6 @@ class SubTask(BaseEntity):
         self.result = result
         self.output_data = output_data
         self.completed_at = datetime.utcnow()
-        
-        # Check if parent task should advance
         self._check_parent_completion()
     
     def _check_parent_completion(self):
@@ -351,8 +399,7 @@ class SubTask(BaseEntity):
         all_completed = all(s.status == TaskStatus.COMPLETED for s in siblings)
         
         if all_completed:
-            # Aggregate results and complete parent
-            combined_result = "\n".join([s.result for s in siblings if s.result])
+            combined_result = "\\n".join([s.result for s in siblings if s.result])
             self.parent_task.complete(
                 result_summary=combined_result,
                 result_data={s.agentium_id: s.output_data for s in siblings}
@@ -372,22 +419,18 @@ class SubTask(BaseEntity):
 
 
 class TaskAuditLog(BaseEntity):
-    """
-    Detailed audit trail for task execution.
-    Records every action taken on a task for transparency.
-    """
+    """Detailed audit trail for task execution."""
     
     __tablename__ = 'task_audit_logs'
     
     task_id = Column(String(36), ForeignKey('tasks.id'), nullable=False)
-    agentium_id = Column(String(10), nullable=False)  # Agent performing action
+    agentium_id = Column(String(10), nullable=False)
     
-    action = Column(String(50), nullable=False)  # e.g., "viewed", "modified", "executed"
+    action = Column(String(50), nullable=False)
     action_details = Column(JSON, nullable=True)
-    ip_address = Column(String(45), nullable=True)  # For external API calls
+    ip_address = Column(String(45), nullable=True)
     user_agent = Column(String(200), nullable=True)
     
-    # Relationships
     task = relationship("Task", back_populates="audit_logs")
     
     @classmethod
@@ -398,7 +441,7 @@ class TaskAuditLog(BaseEntity):
             agentium_id=agentium_id,
             action=action,
             action_details=details or {},
-            agentium_id=f"L{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"  # Log ID format
+            agentium_id=f"L{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
         )
     
     def to_dict(self) -> Dict[str, Any]:

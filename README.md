@@ -319,7 +319,7 @@ postgresql:
 
 chromadb:
   host: chromadb
-  port: 8001
+  port: 8001Multi-user RBAC
   collection_name: "agentium_knowledge"
   embedding_model: "all-MiniLM-L6-v2"
 
@@ -329,7 +329,7 @@ redis:
   channels:
     - "agent_bus"
     - "council_chamber"
-    - "emergency_alerts"
+    - "emergency_alerts"Multi-user RBAC
 ```
 
 ### Constitutional Templates (`docs_ministry/templates/`)
@@ -399,15 +399,15 @@ POST   /api/v1/constitution/query        # Natural language query
 - [x] Docker compose setup
 
 ### Phase 1: Knowledge Infrastructure 🚧 **Current Focus**
-- [ ] ChromaDB integration
+- [ ] ChromaDB integration World Knowledge
 - [ ] Knowledge Library service
 - [ ] Initialization Protocol (Country naming)
-- [ ] RAG pipeline for Constitution
+- [ ] RAG pipeline World Knowledge
 
 ### Phase 2: Governance Core
 - [ ] Message Bus (Redis)
 - [ ] Agent Orchestrator
-- [ ] Constitutional Guard (AI + RAG)
+- [ ] Constitutional Guard 
 - [ ] Voting Service with quorum logic
 
 ### Phase 3: Lifecycle Management
@@ -420,10 +420,11 @@ POST   /api/v1/constitution/query        # Natural language query
 - [ ] Multi-model provider support
 - [] Browser automation integration
 - [ ] Advanced RAG with source citations
-- [ ] Voice interface (Whisper integration)
+- [ ] Voice interface 
 
 ### Phase 5: Ecosystem
 - [ ] Plugin marketplace
+- [ ] Scaling Workforce, Ministry, Law, Judiciary and more.
 - [ ] Multi-user RBAC (multiple Sovereigns)
 - [ ] Federation (inter-Agentium communication)
 - [ ] Mobile apps
@@ -451,6 +452,8 @@ Read our [Contributing Guide](CONTRIBUTING.md) and [Constitution Template](docs_
 - **Principle of Least Privilege**: Task agents cannot spawn other agents
 - **Constitutional Bounded**: Agents cannot override the Constitution without democratic process
 - **Emergency Brakes**: Head can halt entire system; Council can veto Head with 75% vote
+- **Individual Ethos**: Individual agents ethos must be removed after agent deletion or reassignment.
+- **World Knowledge**: World knowledge must be updated and maintained regularly.
 
 ---
 
