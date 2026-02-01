@@ -24,7 +24,7 @@
 - `backend/docker/init.sql` - Confirm initial Head 0xxxx agent seeding
 
 ### Technical Debt Warning:
-**Issue:** OpenClaw uses SQLite/Markdown for portability; you are using PostgreSQL.  
+**Issue:** Other systems uses SQLite/Markdown for portability; you are using PostgreSQL.  
 **Action:** Add database migration setup (Alembic) before Phase 1.
 ```bash
 pip install alembic
@@ -35,7 +35,7 @@ alembic init alembic
 
 ## Phase 0.5: Knowledge Infrastructure 🧠 (Priority: CRITICAL - Parallel with Phase 1)
 **Goal:** Establish the dual-storage architecture. Structured data in PostgreSQL, collective knowledge in Vector DB.  
-**OpenClaw Parallel:** They use local Markdown files for memory; you use Vector DB for shared agent memory + RAG.
+**Other systems Parallel:** They use local Markdown files for memory; you use Vector DB for shared agent memory + RAG.
 
 ### 0.1 Vector Database Setup
 **Files to Update:**
@@ -163,12 +163,12 @@ If Rejected: Archive + notify with reason
 ---
 
 ## Phase 1: The Agent Orchestration Bus 🚌 (Priority: CRITICAL)
-**Goal:** Create the central router that OpenClaw calls the "Gateway".  
+**Goal:** Create the central router that Other systems calls the "Gateway".  
 **Gap Identified:** No central message bus to route between hierarchical agents.
 
 ### 1.1 Create Message Bus Infrastructure
 **File:** `backend/services/message_bus.py`
-**Purpose:** Redis-backed pub/sub for inter-agent communication (OpenClaw uses direct Node.js; you need async processing)
+**Purpose:** Redis-backed pub/sub for inter-agent communication (Other systems uses direct Node.js; you need async processing)
 
 **Implementation Details:**
 ```python
@@ -191,7 +191,7 @@ class MessageBus:
 
 ### 1.2 Create Agent Orchestrator
 **File:** `backend/services/agent_orchestrator.py`
-**Purpose:** The "traffic cop" - OpenClaw's Gateway equivalent for multi-agent governance
+**Purpose:** The "traffic cop" - Other systems's Gateway equivalent for multi-agent governance
 
 **Key Methods:**
 ```python
@@ -216,7 +216,7 @@ class AgentOrchestrator:
 ---
 
 ## Phase 2: Constitutional Enforcement Layer ⚖️ (Priority: HIGH)
-**Goal:** Implement the "guard" that OpenClaw lacks (they're single-user; you need multi-agent law)
+**Goal:** Implement the "guard" that Other systems lacks (they're single-user; you need multi-agent law)
 
 ### 2.1 Constitutional Engine (Updated)
 **File:** `backend/core/constitutional_guard.py`
@@ -255,8 +255,8 @@ class ConstitutionalGuard:
         # 3. Calculate violation probability
 ```
 
-**OpenClaw Adaptation:**
-OpenClaw stores memory in Markdown at `~/.openclaw/memory/`.  
+**Other systems Adaptation:**
+Other systems stores memory in Markdown at `~/.Other systems/memory/`.  
 You store constitutions in **Vector DB** (semantic searchable) + **PostgreSQL** (version control).
 
 **Acceptance Criteria:**
@@ -315,7 +315,7 @@ class VotingService:
 ```
 
 **Key Feature - Dynamic Quorum:**
-Quorum adjusts based on agent availability (OpenClaw uses fixed intervals; you need adaptive governance).
+Quorum adjusts based on agent availability (Other systems uses fixed intervals; you need adaptive governance).
 
 **Acceptance Criteria:**
 - [ ] Circular voting prevented (agent can't vote twice)
@@ -347,7 +347,7 @@ Quorum adjusts based on agent availability (OpenClaw uses fixed intervals; you n
 ---
 
 ## Phase 4: Agent Lifecycle Management 🔄 (Priority: MEDIUM)
-**Goal:** Dynamic spawning/liquidation (OpenClaw has static skills; you need organic growth)
+**Goal:** Dynamic spawning/liquidation (Other systems has static skills; you need organic growth)
 
 ### 4.1 Agent Factory
 **File:** `backend/services/agent_factory.py`
@@ -388,7 +388,7 @@ class AgentFactory:
 
 ### 4.2 Capability Registry
 **File:** `backend/services/capability_registry.py`
-**Purpose:** Track what each agent type can do (OpenClaw's `skills/` equivalent)
+**Purpose:** Track what each agent type can do (Other systems's `skills/` equivalent)
 
 **Structure:**
 ```python
@@ -409,11 +409,11 @@ CAPABILITIES = {
 ---
 
 ## Phase 5: The Heartbeat (Proactive Governance) 💓 (Priority: MEDIUM)
-**Goal:** Adapt OpenClaw's "Heartbeat" for autonomous governance
+**Goal:** Adapt Other systems's "Heartbeat" for autonomous governance
 
 ### 5.1 Autonomous Monitor
 **File:** `backend/services/autonomous_monitor.py`
-**Purpose:** 24/7 background processes (OpenClaw uses this for proactive reminders; you use it for constitutional enforcement)
+**Purpose:** 24/7 background processes (Other systems uses this for proactive reminders; you use it for constitutional enforcement)
 
 **Background Tasks:**
 ```python
@@ -715,9 +715,9 @@ Head 0xxxx can now spawn Lead agents (2xxxx) who can spawn Tasks (3xxxx)
 
 ---
 
-## Notes on OpenClaw + Your Innovations
+## Notes on Other systems + Your Innovations
 
-**What to Steal from OpenClaw:**
+**What to Steal from Other systems:**
 - ✅ Markdown-based memory → **Adapt to Vector DB for semantic search**
 - ✅ Proactive Heartbeat → **Adapt for knowledge maintenance**
 - ✅ Skill system → **Adapt for Capability Registry**
