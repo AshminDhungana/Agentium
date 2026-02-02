@@ -6,6 +6,7 @@ FastAPI backend with eternal idle council (Head + 2 Council Members).
 from datetime import datetime
 import json
 import logging
+from backend.api import host_access
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -31,6 +32,7 @@ from backend.api.routes import webhooks as webhooks_router
 from backend.api.routes import models as model_routes
 from backend.api.routes import websocket as websocket_routes
 from backend.core.auth import get_current_user
+from backend.api import sovereign
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -93,6 +95,8 @@ app.include_router(chat_routes.router)
 app.include_router(channels_routes.router)
 app.include_router(webhooks_router.router)
 app.include_router(websocket_routes.router)
+app.include_router(host_access.router)
+app.include_router(sovereign.router)
 
 # CORS middleware
 app.add_middleware(

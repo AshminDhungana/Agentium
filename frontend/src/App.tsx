@@ -13,6 +13,8 @@ import { AgentsPage } from '@/pages/AgentsPage';
 import { TasksPage } from '@/pages/TasksPage';
 import { MonitoringPage } from '@/pages/MonitoringPage';
 import { ConstitutionPage } from '@/pages/ConstitutionPage';
+import { SovereignDashboard } from '@/pages/SovereignDashboard';
+import { ProtectedRoute } from '@/components/common/ProtectedRoute'; // New component
 
 export default function App() {
   const { user } = useAuthStore();
@@ -45,6 +47,17 @@ export default function App() {
             <Route path="constitution" element={<ConstitutionPage />} />
             <Route path="models" element={<ModelsPage />} />
             <Route path="channels" element={<ChannelsPage />} />
+
+            {/* Protected Sovereign Route - Only for admin/sovereign */}
+            <Route
+              path="sovereign-dashboard"
+              element={
+                <ProtectedRoute requireSovereign>
+                  <SovereignDashboard />
+                </ProtectedRoute>
+              }
+            />
+
             <Route path="monitoring" element={<MonitoringPage />} />
             <Route path="settings" element={<SettingsPage />} />
           </Route>

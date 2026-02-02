@@ -7,6 +7,7 @@ interface User {
     username: string;
     role: string;
     isAuthenticated: boolean;
+    isSovereign?: boolean;
 }
 
 interface AuthState {
@@ -27,7 +28,15 @@ export const useAuthStore = create<AuthState>()(
             error: null,
 
             login: async (username: string, password: string) => {
-                set({ isLoading: true, error: null });
+                set({
+                    user: {
+                        ...user,
+                        isAuthenticated: true,
+                        isSovereign: user.role === 'admin' || user.username === 'sovereign'
+                    },
+                    isLoading: false,
+                    error: null
+                });
 
                 try {
                     const response = await api.post('/auth/login', {

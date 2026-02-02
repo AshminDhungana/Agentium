@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from backend.models.entities.agents import Agent, HeadOfCouncil, CouncilMember, AgentType, AgentStatus, PersistentAgentRole
 from backend.models.entities.constitution import Ethos
 from backend.models.database import get_db_context
+from backend.services.host_access import HostAccessService, RestrictedHostAccess
 
 
 class PersistentCouncilService:
@@ -18,7 +19,9 @@ class PersistentCouncilService:
     Manages the lifecycle of persistent agents who never sleep.
     Ensures Head of Council (00001) and 2 Council Members (10001, 10002) exist.
     """
-    
+    def __init__(self):
+        self.host_access = {}  # Cache host access instances
+
     # Eternal Agent Specifications
     HEAD_SPEC = {
         'agentium_id': '00001',
@@ -43,6 +46,22 @@ class PersistentCouncilService:
         'persistent_role': PersistentAgentRole.STRATEGIC_PLANNER.value
     }
     
+    def get_host_access(self, agentium_id: str):
+        """Get appropriate host access level for agent."""
+        if agentium_id not in self.host_access:
+            if agentium_id.startswith('0'):  # Head of Council
+                self.host_access[agentium_id] = HostAccessService(agentium_id)
+            elif agentium_id.startswith('1'):  # Council Members
+                head = HostAccessService('00001')  # Proxy through Head
+                self.host_access[agentium_id] = RestrictedHostAccess(agentium_id, head)
+            elif agentium_id.startswith('2'):  # Lead Agents
+                head = HostAccessService('00001')
+                self.host_access[agentium_id] = RestrictedHostAccess(agentium_id, head)
+            else:  # Task Agents - no direct host access
+                self.host_access[agentium_id] = None
+        
+        return self.host_access.get(agentium_id)
+
     @staticmethod
     def initialize_persistent_council(db: Session, force_recreate: bool = False) -> Dict[str, Any]:
         results = {

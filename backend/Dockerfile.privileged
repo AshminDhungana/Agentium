@@ -1,0 +1,62 @@
+FROM python:3.11-slim-bookworm
+
+# Install system dependencies for host-level access
+RUN apt-get update && apt-get install -y \
+    # Docker CLI for container management
+    docker.io \
+    # SSH client for remote host access
+    openssh-client \
+    # Process management
+    procps \
+    htop \
+    # File system tools
+    tree \
+    rsync \
+    # Network tools
+    curl \
+    wget \
+    netcat-openbsd \
+    iputils-ping \
+    dnsutils \
+    # System monitoring
+    sysstat \
+    iotop \
+    # Text editors
+    nano \
+    vim \
+    # Git for code operations
+    git \
+    # Build tools (for compiling if needed)
+    build-essential \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create agentium user with root capabilities
+RUN useradd -m -s /bin/bash -G sudo,docker agentium && \
+    echo "agentium ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+# Set up Python environment
+WORKDIR /app
+
+# Install Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Create host mount points
+RUN mkdir -p /host /host_home /var/run/docker.sock
+
+# Copy application code
+COPY . .
+
+# Switch to agentium user (can escalate to root via sudo)
+USER agentium
+
+# Environment setup
+ENV PYTHONPATH=/app \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    HOST_ROOT_ACCESS=true
+
+EXPOSE 8000
+
+CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

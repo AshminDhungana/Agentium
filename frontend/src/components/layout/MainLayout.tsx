@@ -73,6 +73,20 @@ export function MainLayout() {
                         </NavLink>
                     ))}
                 </nav>
+                <aside className="w-64 bg-gray-900 border-r border-gray-800">
+                    <nav className="p-4 space-y-2">
+                        {/* Sovereign Dashboard - Only for admin/sovereign */}
+                        {user?.isSovereign && (
+                            <a
+                                href="/sovereign-dashboard"
+                                className="flex items-center space-x-2 px-4 py-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20"
+                            >
+                                <Shield className="w-5 h-5" />
+                                <span>Sovereign Control</span>
+                            </a>
+                        )}
+                    </nav>
+                </aside>
 
                 {/* User Section */}
                 <div className="p-4 border-t border-gray-200 dark:border-gray-700">

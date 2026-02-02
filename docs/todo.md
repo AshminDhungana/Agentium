@@ -737,6 +737,7 @@ Head 0xxxx can now spawn Lead agents (2xxxx) who can spawn Tasks (3xxxx)
 
 
 Final: 
+- Give head of council access to external system enviroment.
 - Reduce tokan usage.
 - Verify Head of Council has full system access
 - Verify Browser Control
