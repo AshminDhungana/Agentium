@@ -8,6 +8,7 @@ from typing import Optional, List, Dict, Any
 from sqlalchemy import Column, String, Text, DateTime, ForeignKey, Integer, Enum, Boolean, event, Index
 from sqlalchemy.orm import relationship, validates
 from backend.models.entities.base import BaseEntity
+from sqlalchemy.orm import remote
 import enum
 
 class DocumentType(str, enum.Enum):
@@ -35,14 +36,6 @@ class Constitution(BaseEntity):
     
     __tablename__ = 'constitutions'
     
-    # Table indexes for Phase 0 verification
-    __table_args__ = (
-        Index('idx_constitution_version', 'version'),           # Quick version lookup
-        Index('idx_constitution_version_number', 'version_number'),  # Chronological sorting
-        Index('idx_constitution_active', 'is_active'),          # Active constitution queries
-        Index('idx_constitution_effective', 'effective_date'),  # Effective date queries
-    )
-    
     # Document metadata
     version = Column(String(10), nullable=False, unique=True)  # v1.0.0 format (display)
     version_number = Column(Integer, nullable=False, unique=True)  # Sequential: 1, 2, 3...
@@ -58,26 +51,44 @@ class Constitution(BaseEntity):
     # Authority
     created_by_agentium_id = Column(String(10), nullable=False)  # Usually 00001 (Head of Council)
     
-    # Amendment tracking - PHASE 0 ENHANCEMENTS
     amendment_of = Column(String(36), ForeignKey('constitutions.id'), nullable=True)
-    replaces_version_id = Column(String(36), ForeignKey('constitutions.id'), nullable=True)  # Previous version
-    amendment_date = Column(DateTime, nullable=True)  # When amendment was ratified/voted
-    amendment_reason = Column(Text, nullable=True)
-    effective_date = Column(DateTime, default=datetime.utcnow, nullable=False)  # When it takes effect
-    archived_date = Column(DateTime, nullable=True)
-    
-    # Relationships
-    amendments = relationship("Constitution", 
-                             backref="parent", 
-                             remote_side="Constitution.id",
-                             lazy="dynamic")
-    replaces_version = relationship("Constitution", 
-                                   foreign_keys=[replaces_version_id],
-                                   remote_side="Constitution.id")
-    replaced_by = relationship("Constitution", 
-                              foreign_keys=[replaces_version_id],
-                              backref="previous_version")
-    
+    replaces_version_id = Column(String(36), ForeignKey('constitutions.id'), nullable=True)
+
+    # One → many: amendments (via amendment_of)
+    amendments = relationship(
+        "Constitution",
+        foreign_keys=[amendment_of],
+        primaryjoin=lambda: remote(Constitution.id) == Constitution.amendment_of,
+        back_populates="amended_from",
+        lazy="dynamic",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
+    amended_from = relationship(
+        "Constitution",
+        foreign_keys=[amendment_of],
+        primaryjoin=lambda: remote(Constitution.id) == Constitution.amendment_of,
+        back_populates="amendments",
+    )
+
+    # Previous version (this replaces an older one) — use string remote_side here
+    replaces_version = relationship(
+        "Constitution",
+        foreign_keys=[replaces_version_id],
+        remote_side=["Constitution.id"],           # string notation — safe, no NameError
+        # back_populates="replaced_by",            # uncomment only if you define replaced_by below
+    )
+
+    # Optional forward: newer versions that replace this one
+    # replaced_by = relationship(
+    #     "Constitution",
+    #     foreign_keys=[replaces_version_id],
+    #     remote_side=["Constitution.id"],       # string again
+    #     back_populates="replaces_version",
+    # )
+
+    # voting_sessions remains unchanged
     voting_sessions = relationship("AmendmentVoting", back_populates="constitution", lazy="dynamic")
     
     def __init__(self, **kwargs):
@@ -172,6 +183,14 @@ class Constitution(BaseEntity):
         """Archive this constitution version when new one takes effect."""
         self.archived_date = datetime.utcnow()
         self.is_active = 'N'
+
+        # Table indexes for Phase 0 verification
+    __table_args__ = (
+        Index('idx_constitution_version', 'version'),           # Quick version lookup
+        Index('idx_constitution_version_number', 'version_number'),  # Chronological sorting
+        Index('idx_constitution_active', 'is_active'),          # Active constitution queries
+        Index('idx_constitution_effective', 'effective_date'),  # Effective date queries
+    )
 
 
 class Ethos(BaseEntity):
