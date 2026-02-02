@@ -7,22 +7,18 @@ import {
     Mail,
     MessageCircle,
     Plus,
-    Power,
     Settings,
-    QrCode,
     Copy,
     CheckCircle,
-    AlertCircle,
     RefreshCw,
     Trash2,
-    ExternalLink,
     ChevronRight,
     Loader2,
     X
 } from 'lucide-react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
-import QRCode from 'qrcode.react';
+import { QRCodeSVG } from 'qrcode.react';
 
 interface Channel {
     id: string;
@@ -55,6 +51,14 @@ interface ChannelFormData {
     require_approval: boolean;
 }
 
+// Tailwind color mapping (dynamic classes don't work with purge)
+const colorMap = {
+    green: { bg: 'bg-green-100', darkBg: 'dark:bg-green-900/30', text: 'text-green-600' },
+    purple: { bg: 'bg-purple-100', darkBg: 'dark:bg-purple-900/30', text: 'text-purple-600' },
+    blue: { bg: 'bg-blue-100', darkBg: 'dark:bg-blue-900/30', text: 'text-blue-600' },
+    red: { bg: 'bg-red-100', darkBg: 'dark:bg-red-900/30', text: 'text-red-600' }
+};
+
 export function ChannelsPage() {
     const queryClient = useQueryClient();
     const [showAddModal, setShowAddModal] = useState(false);
@@ -67,7 +71,7 @@ export function ChannelsPage() {
         queryKey: ['channels'],
         queryFn: async () => {
             const response = await api.get('/channels/');
-            return response.data;
+            return response.data as Channel[];
         }
     });
 
@@ -77,11 +81,10 @@ export function ChannelsPage() {
             const response = await api.post('/channels/', data);
             return response.data;
         },
-        onSuccess: (data) => {
+        onSuccess: (data: any) => {
             queryClient.invalidateQueries({ queryKey: ['channels'] });
             toast.success('Channel created successfully');
 
-            // If WhatsApp, start QR polling
             if (data.type === 'whatsapp') {
                 setPollingChannelId(data.id);
                 pollForQR(data.id);
@@ -112,7 +115,7 @@ export function ChannelsPage() {
             const response = await api.post(`/channels/${id}/test`);
             return response.data;
         },
-        onSuccess: (data) => {
+        onSuccess: (data: any) => {
             if (data.success) {
                 toast.success('Connection successful!');
             } else {
@@ -138,7 +141,6 @@ export function ChannelsPage() {
                 return;
             }
 
-            // Continue polling
             if (pollingChannelId === channelId) {
                 setTimeout(() => pollForQR(channelId), 3000);
             }
@@ -156,61 +158,52 @@ export function ChannelsPage() {
         {
             id: 'whatsapp',
             name: 'WhatsApp Business',
-            icon: Smartphone,
-            description: 'Connect via WhatsApp Business API or WhatsApp Web',
-            color: 'green',
-            instructions: 'Scan QR code with your phone to pair',
-            fields: [
-                { name: 'phone_number', label: 'Business Phone Number', type: 'tel', placeholder: '+1234567890' }
-            ]
+            Icon: Smartphone,
+            description: 'Connect via WhatsApp Business API',
+            color: 'green' as const,
+            fields: [{ name: 'phone_number', label: 'Phone Number', type: 'tel', placeholder: '+1234567890' }]
         },
         {
             id: 'slack',
             name: 'Slack',
-            icon: Slack,
-            description: 'Slack Bot integration for workspace channels',
-            color: 'purple',
-            instructions: 'Create a Slack app and enter your Bot Token',
+            Icon: Slack,
+            description: 'Slack Bot integration',
+            color: 'purple' as const,
             fields: [
                 { name: 'bot_token', label: 'Bot Token', type: 'password', placeholder: 'xoxb-...' },
-                { name: 'signing_secret', label: 'Signing Secret', type: 'password', placeholder: 'Optional - for verification' }
+                { name: 'signing_secret', label: 'Signing Secret', type: 'password', placeholder: 'Optional' }
             ]
         },
         {
             id: 'telegram',
             name: 'Telegram',
-            icon: MessageCircle,
-            description: 'Telegram Bot API integration',
-            color: 'blue',
-            instructions: 'Create bot with @BotFather and enter the token',
-            fields: [
-                { name: 'bot_token', label: 'Bot Token', type: 'password', placeholder: '123456789:ABCdefGHI...' }
-            ]
+            Icon: MessageCircle,
+            description: 'Telegram Bot API',
+            color: 'blue' as const,
+            fields: [{ name: 'bot_token', label: 'Bot Token', type: 'password', placeholder: '123456789:ABC...' }]
         },
         {
             id: 'email',
-            name: 'Email (SMTP/IMAP)',
-            icon: Mail,
-            description: 'Send and receive emails via SMTP',
-            color: 'red',
-            instructions: 'Enter your SMTP server details',
+            name: 'Email (SMTP)',
+            Icon: Mail,
+            description: 'SMTP/IMAP integration',
+            color: 'red' as const,
             fields: [
                 { name: 'smtp_host', label: 'SMTP Host', type: 'text', placeholder: 'smtp.gmail.com' },
-                { name: 'smtp_port', label: 'SMTP Port', type: 'number', placeholder: '587' },
-                { name: 'smtp_user', label: 'Username', type: 'email', placeholder: 'your@email.com' },
-                { name: 'smtp_pass', label: 'Password', type: 'password', placeholder: 'App-specific password' },
-                { name: 'from_email', label: 'From Email', type: 'email', placeholder: 'noreply@yourdomain.com' }
+                { name: 'smtp_port', label: 'Port', type: 'number', placeholder: '587' },
+                { name: 'smtp_user', label: 'Username', type: 'email', placeholder: 'user@domain.com' },
+                { name: 'smtp_pass', label: 'Password', type: 'password', placeholder: 'password' }
             ]
         }
     ];
 
     const handleCopyWebhook = (url: string) => {
         navigator.clipboard.writeText(url);
-        toast.success('Webhook URL copied to clipboard');
+        toast.success('Webhook URL copied');
     };
 
     const getStatusColor = (status: string) => {
-        const colors = {
+        const colors: Record<string, string> = {
             active: 'bg-green-500',
             connected: 'bg-green-500',
             disconnected: 'bg-gray-400',
@@ -220,13 +213,8 @@ export function ChannelsPage() {
         return colors[status] || 'bg-gray-400';
     };
 
-    const getChannelIcon = (type: string) => {
-        const found = channelTypes.find(t => t.id === type);
-        return found?.icon || MessageCircle;
-    };
-
     return (
-        <div className="max-w-7xl mx-auto">
+        <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
                 <div>
@@ -234,7 +222,7 @@ export function ChannelsPage() {
                         Communication Channels
                     </h1>
                     <p className="text-gray-600 dark:text-gray-400">
-                        Connect WhatsApp, Slack, Email and other platforms to your AI agents
+                        Connect external platforms to your AI agents
                     </p>
                 </div>
 
@@ -247,31 +235,31 @@ export function ChannelsPage() {
                 </button>
             </div>
 
-            {/* Stats Overview */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+            {/* Stats */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                 <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700">
                     <div className="text-2xl font-bold text-gray-900 dark:text-white">
                         {channels.length}
                     </div>
-                    <div className="text-sm text-gray-500 dark:text-gray-400">Total Channels</div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400">Total</div>
                 </div>
                 <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700">
                     <div className="text-2xl font-bold text-green-600">
-                        {channels.filter(c => c.status === 'active').length}
+                        {channels.filter((c: Channel) => c.status === 'active').length}
                     </div>
                     <div className="text-sm text-gray-500 dark:text-gray-400">Active</div>
                 </div>
                 <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700">
                     <div className="text-2xl font-bold text-blue-600">
-                        {channels.reduce((acc, c) => acc + c.stats.received, 0)}
+                        {channels.reduce((acc: number, c: Channel) => acc + (c.stats?.received || 0), 0)}
                     </div>
-                    <div className="text-sm text-gray-500 dark:text-gray-400">Messages Received</div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400">Received</div>
                 </div>
                 <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700">
                     <div className="text-2xl font-bold text-purple-600">
-                        {channels.reduce((acc, c) => acc + c.stats.sent, 0)}
+                        {channels.reduce((acc: number, c: Channel) => acc + (c.stats?.sent || 0), 0)}
                     </div>
-                    <div className="text-sm text-gray-500 dark:text-gray-400">Responses Sent</div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400">Sent</div>
                 </div>
             </div>
 
@@ -288,10 +276,6 @@ export function ChannelsPage() {
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
                         No channels connected
                     </h3>
-                    <p className="text-gray-600 dark:text-gray-400 mb-6 max-w-md mx-auto">
-                        Connect external platforms like WhatsApp or Slack to allow users to interact
-                        with your AI agents outside of this dashboard.
-                    </p>
                     <button
                         onClick={() => setShowAddModal(true)}
                         className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
@@ -301,21 +285,21 @@ export function ChannelsPage() {
                 </div>
             ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {channels.map((channel) => {
-                        const Icon = getChannelIcon(channel.type);
+                    {channels.map((channel: Channel) => {
                         const typeInfo = channelTypes.find(t => t.id === channel.type);
+                        const colors = colorMap[typeInfo?.color || 'blue'];
+                        const Icon = typeInfo?.Icon || MessageCircle;
 
                         return (
                             <div
                                 key={channel.id}
-                                className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden hover:shadow-lg transition-shadow"
+                                className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden"
                             >
-                                {/* Header */}
                                 <div className="p-6 border-b border-gray-200 dark:border-gray-700">
                                     <div className="flex items-start justify-between">
                                         <div className="flex items-center gap-4">
-                                            <div className={`w-12 h-12 rounded-xl bg-${typeInfo?.color}-100 dark:bg-${typeInfo?.color}-900/30 flex items-center justify-center`}>
-                                                <Icon className={`w-6 h-6 text-${typeInfo?.color}-600`} />
+                                            <div className={`w-12 h-12 rounded-xl ${colors.bg} ${colors.darkBg} flex items-center justify-center`}>
+                                                <Icon className={`w-6 h-6 ${colors.text}`} />
                                             </div>
                                             <div>
                                                 <h3 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
@@ -332,20 +316,17 @@ export function ChannelsPage() {
                                             <button
                                                 onClick={() => testMutation.mutate(channel.id)}
                                                 disabled={testMutation.isPending}
-                                                className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
-                                                title="Test Connection"
+                                                className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg"
                                             >
                                                 <RefreshCw className={`w-5 h-5 ${testMutation.isPending ? 'animate-spin' : ''}`} />
                                             </button>
-
                                             <button
                                                 onClick={() => {
-                                                    if (confirm('Delete this channel? This cannot be undone.')) {
+                                                    if (confirm('Delete this channel?')) {
                                                         deleteMutation.mutate(channel.id);
                                                     }
                                                 }}
-                                                className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                                                title="Delete"
+                                                className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg"
                                             >
                                                 <Trash2 className="w-5 h-5" />
                                             </button>
@@ -353,12 +334,10 @@ export function ChannelsPage() {
                                     </div>
                                 </div>
 
-                                {/* Body */}
                                 <div className="p-6 space-y-4">
-                                    {/* Webhook URL */}
                                     {channel.config?.webhook_url && (
                                         <div>
-                                            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">
+                                            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1.5">
                                                 Webhook URL
                                             </label>
                                             <div className="flex gap-2">
@@ -367,8 +346,7 @@ export function ChannelsPage() {
                                                 </code>
                                                 <button
                                                     onClick={() => handleCopyWebhook(channel.config.webhook_url!)}
-                                                    className="px-3 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors"
-                                                    title="Copy"
+                                                    className="px-3 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg"
                                                 >
                                                     <Copy className="w-4 h-4 text-gray-600 dark:text-gray-400" />
                                                 </button>
@@ -376,59 +354,26 @@ export function ChannelsPage() {
                                         </div>
                                     )}
 
-                                    {/* Configuration Info */}
-                                    {channel.config?.phone_number && (
-                                        <div className="flex items-center gap-3 text-sm">
-                                            <Smartphone className="w-4 h-4 text-gray-400" />
-                                            <span className="text-gray-600 dark:text-gray-300">
-                                                {channel.config.phone_number}
-                                            </span>
-                                        </div>
-                                    )}
-
-                                    {channel.routing?.default_agent && (
-                                        <div className="flex items-center gap-3 text-sm">
-                                            <Settings className="w-4 h-4 text-gray-400" />
-                                            <span className="text-gray-600 dark:text-gray-300">
-                                                Default Agent: {channel.routing.default_agent}
-                                            </span>
-                                        </div>
-                                    )}
-
-                                    {/* Stats */}
                                     <div className="flex items-center gap-6 pt-4 border-t border-gray-100 dark:border-gray-700">
                                         <div className="text-sm">
                                             <span className="text-gray-500 dark:text-gray-400">Received: </span>
                                             <span className="font-semibold text-gray-900 dark:text-white">
-                                                {channel.stats.received}
+                                                {channel.stats?.received || 0}
                                             </span>
                                         </div>
                                         <div className="text-sm">
                                             <span className="text-gray-500 dark:text-gray-400">Sent: </span>
                                             <span className="font-semibold text-gray-900 dark:text-white">
-                                                {channel.stats.sent}
+                                                {channel.stats?.sent || 0}
                                             </span>
                                         </div>
-                                        {channel.stats.last_message && (
+                                        {channel.stats?.last_message && (
                                             <div className="text-sm text-gray-500 dark:text-gray-400 ml-auto">
-                                                Last: {format(new Date(channel.stats.last_message), 'MMM d, h:mm a')}
+                                                {format(new Date(channel.stats.last_message), 'MMM d, h:mm a')}
                                             </div>
                                         )}
                                     </div>
                                 </div>
-
-                                {/* Footer Actions */}
-                                {channel.status === 'active' && (
-                                    <div className="px-6 py-4 bg-gray-50 dark:bg-gray-700/50 border-t border-gray-200 dark:border-gray-700">
-                                        <button
-                                            onClick={() => window.open(`/channels/${channel.id}/messages`, '_blank')}
-                                            className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 font-medium"
-                                        >
-                                            View Messages
-                                            <ChevronRight className="w-4 h-4" />
-                                        </button>
-                                    </div>
-                                )}
                             </div>
                         );
                     })}
@@ -441,7 +386,7 @@ export function ChannelsPage() {
                     <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
                         <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between sticky top-0 bg-white dark:bg-gray-800">
                             <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-                                Add Communication Channel
+                                Add Channel
                             </h2>
                             <button
                                 onClick={() => {
@@ -458,19 +403,15 @@ export function ChannelsPage() {
 
                         <div className="p-6">
                             {!selectedType ? (
-                                // Channel Type Selection
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     {channelTypes.map((type) => (
                                         <button
                                             key={type.id}
                                             onClick={() => setSelectedType(type.id)}
-                                            className={`flex items-center gap-4 p-4 border-2 rounded-xl transition-all text-left hover:border-blue-500 hover:shadow-md ${selectedType === type.id
-                                                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                                                    : 'border-gray-200 dark:border-gray-700'
-                                                }`}
+                                            className="flex items-center gap-4 p-4 border-2 border-gray-200 dark:border-gray-700 rounded-xl transition-all text-left hover:border-blue-500 hover:shadow-md"
                                         >
-                                            <div className={`w-12 h-12 rounded-lg bg-${type.color}-100 dark:bg-${type.color}-900/30 flex items-center justify-center`}>
-                                                <type.icon className={`w-6 h-6 text-${type.color}-600`} />
+                                            <div className={`w-12 h-12 rounded-lg ${colorMap[type.color].bg} ${colorMap[type.color].darkBg} flex items-center justify-center`}>
+                                                <type.Icon className={`w-6 h-6 ${colorMap[type.color].text}`} />
                                             </div>
                                             <div>
                                                 <h3 className="font-semibold text-gray-900 dark:text-white">
@@ -484,205 +425,93 @@ export function ChannelsPage() {
                                     ))}
                                 </div>
                             ) : (
-                                // Configuration Form
-                                <ChannelConfigForm
-                                    type={selectedType}
-                                    typeInfo={channelTypes.find(t => t.id === selectedType)!}
-                                    qrCodeData={qrCodeData}
-                                    onSubmit={(data) => createMutation.mutate(data)}
-                                    isSubmitting={createMutation.isPending}
-                                    onBack={() => {
-                                        setSelectedType(null);
-                                        setQrCodeData(null);
-                                    }}
-                                />
+                                <div className="space-y-6">
+                                    <button
+                                        onClick={() => setSelectedType(null)}
+                                        className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 mb-4"
+                                    >
+                                        <ChevronRight className="w-4 h-4 rotate-180" />
+                                        Back
+                                    </button>
+
+                                    {selectedType === 'whatsapp' && qrCodeData && (
+                                        <div className="text-center space-y-4 p-6 bg-green-50 dark:bg-green-900/20 rounded-xl">
+                                            <div className="inline-block p-4 bg-white rounded-xl shadow-lg">
+                                                <QRCodeSVG value={qrCodeData} size={256} level="H" />
+                                            </div>
+                                            <p className="text-green-700 dark:text-green-400">
+                                                Scan with WhatsApp to connect
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    <form onSubmit={(e) => {
+                                        e.preventDefault();
+                                        const formEl = e.target as HTMLFormElement;
+                                        const formData = new FormData(formEl);
+                                        createMutation.mutate({
+                                            name: formData.get('name') as string,
+                                            type: selectedType as any,
+                                            config: Object.fromEntries(
+                                                channelTypes.find(t => t.id === selectedType)?.fields.map(f => [f.name, formData.get(f.name) || '']) || []
+                                            ),
+                                            auto_create_tasks: true,
+                                            require_approval: false
+                                        });
+                                    }} className="space-y-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                                Channel Name
+                                            </label>
+                                            <input
+                                                name="name"
+                                                type="text"
+                                                required
+                                                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                            />
+                                        </div>
+
+                                        {channelTypes.find(t => t.id === selectedType)?.fields.map((field) => (
+                                            <div key={field.name}>
+                                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                                    {field.label}
+                                                </label>
+                                                <input
+                                                    name={field.name}
+                                                    type={field.type}
+                                                    placeholder={field.placeholder}
+                                                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                                />
+                                            </div>
+                                        ))}
+
+                                        <div className="flex gap-3 pt-4">
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowAddModal(false)}
+                                                className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg"
+                                            >
+                                                Cancel
+                                            </button>
+                                            <button
+                                                type="submit"
+                                                disabled={createMutation.isPending}
+                                                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg"
+                                            >
+                                                {createMutation.isPending ? (
+                                                    <><Loader2 className="w-4 h-4 animate-spin" /> Connecting...</>
+                                                ) : (
+                                                    <><CheckCircle className="w-4 h-4" /> Connect</>
+                                                )}
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
                             )}
                         </div>
                     </div>
                 </div>
             )}
-        </div>
-    );
-}
-
-// Channel Configuration Form Component
-function ChannelConfigForm({
-    type,
-    typeInfo,
-    qrCodeData,
-    onSubmit,
-    isSubmitting,
-    onBack
-}: {
-    type: string;
-    typeInfo: any;
-    qrCodeData: string | null;
-    onSubmit: (data: any) => void;
-    isSubmitting: boolean;
-    onBack: () => void;
-}) {
-    const [formData, setFormData] = useState({
-        name: '',
-        config: {} as Record<string, string>,
-        auto_create_tasks: true,
-        require_approval: false
-    });
-
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        onSubmit({
-            ...formData,
-            type,
-            config: formData.config
-        });
-    };
-
-    return (
-        <div className="space-y-6">
-            <button
-                onClick={onBack}
-                className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 mb-4"
-            >
-                <ChevronRight className="w-4 h-4 rotate-180" />
-                Back to channel types
-            </button>
-
-            {/* QR Code Display (WhatsApp) */}
-            {type === 'whatsapp' && qrCodeData && (
-                <div className="text-center space-y-4 p-6 bg-green-50 dark:bg-green-900/20 rounded-xl border border-green-200 dark:border-green-800">
-                    <div className="inline-block p-4 bg-white rounded-xl shadow-lg">
-                        <QRCode value={qrCodeData} size={256} level="H" />
-                    </div>
-                    <div className="space-y-2">
-                        <h3 className="font-semibold text-green-900 dark:text-green-300">
-                            Scan with WhatsApp
-                        </h3>
-                        <p className="text-sm text-green-700 dark:text-green-400">
-                            Open WhatsApp on your phone → Settings → Linked Devices → Link a Device
-                        </p>
-                        <div className="flex items-center justify-center gap-2 text-sm text-green-600">
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            Waiting for connection...
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Basic Info */}
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Channel Name
-                    </label>
-                    <input
-                        type="text"
-                        required
-                        value={formData.name}
-                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                        placeholder={`My ${typeInfo.name}`}
-                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                </div>
-
-                {/* Dynamic Fields based on Channel Type */}
-                <div className="space-y-4">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                        Configuration
-                    </label>
-                    {typeInfo.fields.map((field: any) => (
-                        <div key={field.name}>
-                            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">
-                                {field.label}
-                            </label>
-                            <input
-                                type={field.type}
-                                value={formData.config[field.name] || ''}
-                                onChange={(e) => setFormData({
-                                    ...formData,
-                                    config: { ...formData.config, [field.name]: e.target.value }
-                                })}
-                                placeholder={field.placeholder}
-                                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                            />
-                        </div>
-                    ))}
-                </div>
-
-                {/* Routing Options */}
-                <div className="space-y-4 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                    <h4 className="font-medium text-gray-900 dark:text-white flex items-center gap-2">
-                        <Settings className="w-4 h-4" />
-                        Routing Options
-                    </h4>
-
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                Auto-create Tasks
-                            </p>
-                            <p className="text-xs text-gray-500 dark:text-gray-400">
-                                Automatically create tasks from incoming messages
-                            </p>
-                        </div>
-                        <label className="relative inline-flex items-center cursor-pointer">
-                            <input
-                                type="checkbox"
-                                checked={formData.auto_create_tasks}
-                                onChange={(e) => setFormData({ ...formData, auto_create_tasks: e.target.checked })}
-                                className="sr-only peer"
-                            />
-                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
-                        </label>
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                Require Approval
-                            </p>
-                            <p className="text-xs text-gray-500 dark:text-gray-400">
-                                Send sensitive messages to Council for approval first
-                            </p>
-                        </div>
-                        <label className="relative inline-flex items-center cursor-pointer">
-                            <input
-                                type="checkbox"
-                                checked={formData.require_approval}
-                                onChange={(e) => setFormData({ ...formData, require_approval: e.target.checked })}
-                                className="sr-only peer"
-                            />
-                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
-                        </label>
-                    </div>
-                </div>
-
-                <div className="flex gap-3 pt-4">
-                    <button
-                        type="button"
-                        onClick={onBack}
-                        className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        type="submit"
-                        disabled={isSubmitting}
-                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
-                    >
-                        {isSubmitting ? (
-                            <>
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                                Connecting...
-                            </>
-                        ) : (
-                            <>
-                                <CheckCircle className="w-4 h-4" />
-                                Connect {typeInfo.name}
-                            </>
-                        )}
-                    </button>
-                </div>
-            </form>
         </div>
     );
 }

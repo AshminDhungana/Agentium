@@ -9,17 +9,10 @@ import { SettingsPage } from '@/pages/SettingsPage';
 import { ChatPage } from '@/pages/ChatPage';
 import { ChannelsPage } from '@/pages/ChannelsPage';
 import { ModelsPage } from '@/pages/ModelsPage';
-
-
 import { AgentsPage } from '@/pages/AgentsPage';
-
 import { TasksPage } from '@/pages/TasksPage';
 import { MonitoringPage } from '@/pages/MonitoringPage';
-
-
 import { ConstitutionPage } from '@/pages/ConstitutionPage';
-
-
 
 export default function App() {
   const { user } = useAuthStore();
