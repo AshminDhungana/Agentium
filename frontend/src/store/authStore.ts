@@ -12,6 +12,10 @@ interface User {
     is_admin: boolean;
     is_pending: boolean;
     created_at?: string;
+    role?: "admin" | "user";
+    isAuthenticated: boolean;
+    isSovereign?: boolean;
+    agentium_id?: string;
 }
 
 interface AuthState {
@@ -71,6 +75,7 @@ export const useAuthStore = create<AuthState>()(
                             is_admin: user.is_admin,
                             is_pending: user.is_pending,
                             created_at: user.created_at,
+                            isAuthenticated: true,
                         },
                         isLoading: false,
                         error: null
@@ -134,6 +139,9 @@ export const useAuthStore = create<AuthState>()(
                                 is_admin: userData.is_admin,
                                 is_pending: userData.is_pending,
                                 created_at: userData.created_at,
+                                isAuthenticated: true,
+                                role: userData.is_admin ? "admin" : "user",
+                                isSovereign: false,
                             },
                             error: null
                         });
