@@ -253,9 +253,9 @@ class VectorStore:
         }
         
         for result in results:
-            if not result[\'ids\']:
+            if not result['ids']:
                 continue
-            for i, doc_id in enumerate(result[\'ids\'][0]):
+            for i, doc_id in enumerate(result['ids'][0]):
                 if doc_id not in seen_ids:
                     seen_ids.add(doc_id)
                     merged["ids"][0].append(doc_id)

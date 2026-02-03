@@ -32,7 +32,7 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 # Metadata for autogenerate
- target_metadata = Base.metadata
+target_metadata = Base.metadata
 
 def get_url():
     """Get database URL from environment or config."""

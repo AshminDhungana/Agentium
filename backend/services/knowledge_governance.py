@@ -45,7 +45,7 @@ class KnowledgeSubmission:
                  title: str = None,
                  description: str = None,
                  metadata: Dict[str, Any] = None):
-        self.id = f"K{datetime.utcnow().strftime(\'%Y%m%d%H%M%S%f\')}"
+        self.id = f"K{datetime.utcnow().strftime('%Y%m%d%H%M%S%f')}"
         self.content = content
         self.submitter_agentium_id = submitter_agentium_id
         self.category = category
@@ -104,7 +104,7 @@ class KnowledgeGovernanceService:
             description=description,
             metadata={
                 "submitter_type": agent.agent_type.value,
-                "submitter_specialization": getattr(agent, \'specialization\', None),
+                "submitter_specialization": getattr(agent, 'specialization', None),
                 "submitted_at": datetime.utcnow().isoformat()
             }
         )
@@ -237,12 +237,12 @@ class KnowledgeGovernanceService:
             
             # Add to archive
             archive = self.vector_store.get_collection("archive")
-            if doc[\'ids\']:
+            if doc['ids']:
                 archive.add(
-                    ids=doc[\'ids\'],
-                    documents=doc[\'documents\'],
+                    ids=doc['ids'],
+                    documents=doc['documents'],
                     metadatas=[{
-                        **doc[\'metadatas\'][0],
+                        **doc['metadatas'][0],
                         "purged_at": datetime.utcnow().isoformat(),
                         "purged_by": council_member.agentium_id,
                         "purge_reason": reason
@@ -371,12 +371,12 @@ class KnowledgeGovernanceService:
             doc = staging.get(ids=[submission.vector_doc_id])
             
             rejected = self.vector_store.client.get_or_create_collection("rejected")
-            if doc[\'ids\']:
+            if doc['ids']:
                 rejected.add(
-                    ids=doc[\'ids\'],
-                    documents=doc[\'documents\'],
+                    ids=doc['ids'],
+                    documents=doc['documents'],
                     metadatas=[{
-                        **doc[\'metadatas\'][0],
+                        **doc['metadatas'][0],
                         "rejected_at": datetime.utcnow().isoformat(),
                         "votes_for": submission.votes_for,
                         "votes_against": submission.votes_against

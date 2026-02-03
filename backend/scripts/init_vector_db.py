@@ -30,13 +30,13 @@ def main():
         stats = knowledge_svc.initialize_knowledge_base(db)
         
         print(f"\\n📚 Knowledge Base Stats:")
-        print(f"   Constitution: {stats[\\'constitution_embedded\\']}")
-        print(f"   Agent Ethos: {stats[\\'ethos_count\\']} records")
+        print(f"   Constitution: {stats['constitution_embedded']}")
+        print(f"   Agent Ethos: {stats['ethos_count']} records")
     
     # Health check
     health = vector_store.health_check()
-    print(f"\\n💚 Vector Store Health: {health[\\'status\\']}")
-    print(f"   Collections: {health[\\'collections\\']}")
+    print(f"\\n💚 Vector Store Health: {health['status']}")
+    print(f"   Collections: {health['collections']}")
     
     print("\\n✅ Initialization complete!")
     return 0

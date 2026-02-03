@@ -32,7 +32,7 @@ class KnowledgeService:
         articles = constitution.get_articles_dict()
         
         for article_num, article_data in articles.items():
-            content = f"{article_data.get(\\'title\\', \\'\\')}: {article_data.get(\\'content\\', \\'\\')}"
+            content = f"{article_data.get('title', '')}: {article_data.get('content', '')}"
             
             self.vector_store.add_constitution_article(
                 article_id=f"{constitution.version}_{article_num}",
@@ -91,13 +91,13 @@ class KnowledgeService:
                 n_results=3
             )
             
-            if const_results[\'documents\'] and const_results[\'documents\'][0]:
-                for i, doc in enumerate(const_results[\'documents\'][0]):
-                    context["knowledge_segments"].append({
+            if const_results['documents'] and const_results['documents'][0]:
+                for i, doc in enumerate(const_results['documents'][0]):
+                    context['knowledge_segments'].append({
                         "type": "constitution",
                         "content": doc,
-                        "relevance": 1.0 - (const_results[\'distances\'][0][i] if const_results[\'distances\'] else 0.5),
-                        "source": const_results[\'metadatas\'][0][i] if const_results[\'metadatas\'] else {}
+                        "relevance": 1.0 - (const_results['distances'][0][i] if const_results['distances'] else 0.5),
+                        "source": const_results['metadatas'][0][i] if const_results['metadatas'] else {}
                     })
         
         # 2. Agent\\'s own Ethos
@@ -123,13 +123,13 @@ class KnowledgeService:
                 collection_keys=["council_memory"],
                 n_results=3
             )
-            if council_context[\'documents\'] and council_context[\'documents\'][0]:
-                for i, doc in enumerate(council_context[\'documents\'][0][:2]):
-                    context["knowledge_segments"].append({
+            if council_context['documents'] and council_context['documents'][0]:
+                for i, doc in enumerate(council_context['documents'][0][:2]):
+                    context['knowledge_segments'].append({
                         "type": "precedent",
                         "content": doc,
                         "relevance": 0.9,
-                        "source": council_context[\'metadatas\'][0][i] if council_context[\'metadatas\'] else {}
+                        "source": council_context['metadatas'][0][i] if council_context['metadatas'] else {}
                     })
         
         elif agent.agent_type == AgentType.LEAD_AGENT:
@@ -138,13 +138,13 @@ class KnowledgeService:
                 query_texts=[task_description or "team coordination"],
                 n_results=3
             )
-            if patterns[\'documents\'] and patterns[\'documents\'][0]:
-                for i, doc in enumerate(patterns[\'documents\'][0][:2]):
-                    context["knowledge_segments"].append({
+            if patterns['documents'] and patterns['documents'][0]:
+                for i, doc in enumerate(patterns['documents'][0][:2]):
+                    context['knowledge_segments'].append({
                         "type": "coordination_pattern",
                         "content": doc,
                         "relevance": 0.85,
-                        "metadata": patterns[\'metadatas\'][0][i] if patterns[\'metadatas\'] else {}
+                        "metadata": patterns['metadatas'][0][i] if patterns['metadatas'] else {}
                     })
         
         elif agent.agent_type == AgentType.TASK_AGENT:
@@ -154,13 +154,13 @@ class KnowledgeService:
                 n_results=4,
                 where={"type": "execution_pattern"}
             )
-            if patterns[\'documents\'] and patterns[\'documents\'][0]:
-                for i, doc in enumerate(patterns[\'documents\'][0][:3]):
-                    context["knowledge_segments"].append({
+            if patterns['documents'] and patterns['documents'][0]:
+                for i, doc in enumerate(patterns['documents'][0][:3]):
+                    context['knowledge_segments'].append({
                         "type": "execution_pattern",
                         "content": doc,
                         "relevance": 0.8,
-                        "metadata": patterns[\'metadatas\'][0][i] if patterns[\'metadatas\'] else {}
+                        "metadata": patterns['metadatas'][0][i] if patterns['metadatas'] else {}
                     })
         
         # 4. Sovereign preferences (for all tiers)
@@ -168,13 +168,13 @@ class KnowledgeService:
             query_texts=[task_description or agent.agent_type.value],
             n_results=2
         )
-        if prefs[\'documents\'] and prefs[\'documents\'][0]:
-            for i, doc in enumerate(prefs[\'documents\'][0][:1]):
-                context["knowledge_segments"].append({
+        if prefs['documents'] and prefs['documents'][0]:
+            for i, doc in enumerate(prefs['documents'][0][:1]):
+                context['knowledge_segments'].append({
                     "type": "sovereign_preference",
                     "content": doc,
                     "relevance": 0.95,  # High priority
-                    "source": prefs[\'metadatas\'][0][i] if prefs[\'metadatas\'] else {}
+                    "source": prefs['metadatas'][0][i] if prefs['metadatas'] else {}
                 })
         
         return context
@@ -202,7 +202,7 @@ class KnowledgeService:
         success_rate = 1.0 if success else 0.0
         
         self.vector_store.add_execution_pattern(
-            pattern_id=f"{agent.agentium_id}_{task.id}_{datetime.utcnow().strftime(\\'%Y%m%d\\')}",
+            pattern_id=f"{agent.agentium_id}_{task.id}_{datetime.utcnow().strftime('%Y%m%d')}",
             description=pattern_desc,
             success_rate=success_rate,
             task_type=task.title.split()[0] if task.title else "general",
@@ -218,8 +218,8 @@ class KnowledgeService:
         results = self.vector_store.query_constitution(action_description, n_results=2)
         
         compliance_notes = []
-        if results[\'documents\'] and results[\'documents\'][0]:
-            for i, doc in enumerate(results[\'documents\'][0]):
+        if results['documents'] and results['documents'][0]:
+            for i, doc in enumerate(results['documents'][0]):
                 # Simple keyword matching (in production, use LLM to evaluate)
                 prohibited_keywords = ["violate", "ignore", "bypass", "unauthorized"]
                 if any(kw in action_description.lower() for kw in prohibited_keywords):
@@ -227,13 +227,13 @@ class KnowledgeService:
                         "relevant_article": doc,
                         "compliance_status": "QUESTIONABLE",
                         "keywords_triggered": [kw for kw in prohibited_keywords if kw in action_description.lower()],
-                        "distance": results[\'distances\'][0][i] if results[\'distances\'] else None
+                        "distance": results['distances'][0][i] if results['distances'] else None
                     })
                 else:
                     compliance_notes.append({
                         "relevant_article": doc,
                         "compliance_status": "LIKELY_COMPLIANT",
-                        "distance": results[\'distances\'][0][i] if results[\'distances\'] else None
+                        "distance": results['distances'][0][i] if results['distances'] else None
                     })
         
         return {
@@ -241,7 +241,7 @@ class KnowledgeService:
             "checked_at": datetime.utcnow().isoformat(),
             "constitution_articles_checked": compliance_notes,
             "overall_compliance_estimate": "unknown" if not compliance_notes else (
-                "compliant" if all(c[\\'compliance_status\\'] == "LIKELY_COMPLIANT" for c in compliance_notes) else "violation_suspected"
+                "compliant" if all(c['compliance_status'] == "LIKELY_COMPLIANT" for c in compliance_notes) else "violation_suspected"
             )
         }
     
@@ -253,7 +253,7 @@ class KnowledgeService:
         from sqlalchemy import func
         
         # Embed active constitution
-        active_const = db.query(Constitution).filter_by(is_active=\'Y\').order_by(
+        active_const = db.query(Constitution).filter_by(is_active='Y').order_by(
             Constitution.version_number.desc()
         ).first()
         
