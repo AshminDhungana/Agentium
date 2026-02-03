@@ -11,6 +11,7 @@ services:
       POSTGRES_PASSWORD: agentium
     volumes:
       - ./docker/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - postgres_data:/var/lib/postgresql/data # ⬅️ Added missing data mount
     ports:
       - "5432:5432"
     healthcheck:
@@ -68,12 +69,10 @@ services:
   backend:
     build:
       context: ./backend
-      dockerfile: Dockerfile.privileged # Custom Dockerfile (see below)
+      dockerfile: Dockerfile.privileged
     container_name: agentium-backend
     privileged: true
-    pid: host
-    ipc: host
-    network_mode: host
+
     cap_add:
       - ALL
     security_opt:
@@ -84,18 +83,19 @@ services:
       - chroma_data:/app/chroma_data
       - /var/run/docker.sock:/var/run/docker.sock:rw
       - /:/host:rw
-      - ${USERPROFILE:-$HOME}:/host_home:rw
+      - ${USERPROFILE}:/host_home:rw
       - /sys:/sys:rw
       - /proc:/proc:rw
       - /dev:/dev:rw
+
     environment:
-      - DATABASE_URL=postgresql://agentium:agentium@localhost:5432/agentium # host network
+      - DATABASE_URL=postgresql://agentium:agentium@postgres:5432/agentium
       - PYTHONPATH=/app
-      - CHROMA_HOST=localhost
-      - CHROMA_PORT=8001
-      - REDIS_URL=redis://localhost:6379/0
-      - CELERY_BROKER_URL=redis://localhost:6379/0
-      - CELERY_RESULT_BACKEND=redis://localhost:6379/0
+      - CHROMA_HOST=chromadb
+      - CHROMA_PORT=8000
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
       - SECRET_KEY=${SECRET_KEY:-your-super-secret-key-change-in-production}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:-generate-with-python-cryptography}
       - DEBUG=${DEBUG:-false}
@@ -112,6 +112,8 @@ services:
       - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
     restart: unless-stopped
     command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - agentium-network
 
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   # Celery Worker - PRIVILEGED
@@ -122,22 +124,20 @@ services:
       dockerfile: Dockerfile.privileged
     container_name: agentium-celery
     privileged: true
-    network_mode: host
-    pid: host
     cap_add:
       - ALL
     volumes:
       - ./backend:/app/backend
       - /var/run/docker.sock:/var/run/docker.sock:rw
       - /:/host:rw
-      - ${USERPROFILE:-$HOME}:/host_home:rw
+      - ${USERPROFILE}:/host_home:rw
     environment:
-      - DATABASE_URL=postgresql://agentium:agentium@localhost:5432/agentium
-      - CHROMA_HOST=localhost
-      - CHROMA_PORT=8001
-      - REDIS_URL=redis://localhost:6379/0
-      - CELERY_BROKER_URL=redis://localhost:6379/0
-      - CELERY_RESULT_BACKEND=redis://localhost:6379/0
+      - DATABASE_URL=postgresql://agentium:agentium@postgres:5432/agentium
+      - CHROMA_HOST=chromadb
+      - CHROMA_PORT=8000
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
       - PYTHONPATH=/app
       - HOST_ROOT_ACCESS=true
       - HOST_FS_MOUNT=/host
@@ -147,6 +147,9 @@ services:
       - chromadb
     command: celery -A backend.main.celery worker --loglevel=info --concurrency=4
     restart: unless-stopped
+    networks:
+      # ⬅️ ADDED
+      - agentium-network
 
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   # Celery Beat - PRIVILEGED
@@ -157,16 +160,17 @@ services:
       dockerfile: Dockerfile.privileged
     container_name: agentium-celery-beat
     privileged: true
-    network_mode: host
+
     volumes:
       - ./backend:/app/backend
       - /var/run/docker.sock:/var/run/docker.sock:rw
       - /:/host:rw
+      - ${USERPROFILE}:/host_home:rw
     environment:
-      - DATABASE_URL=postgresql://agentium:agentium@localhost:5432/agentium
-      - CHROMA_HOST=localhost
-      - CHROMA_PORT=8001
-      - REDIS_URL=redis://localhost:6379/0
+      - DATABASE_URL=postgresql://agentium:agentium@postgres:5432/agentium
+      - CHROMA_HOST=chromadb
+      - CHROMA_PORT=8000
+      - REDIS_URL=redis://redis:6379/0
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
       - PYTHONPATH=/app
@@ -177,6 +181,8 @@ services:
       - chromadb
     command: celery -A backend.main.celery beat --loglevel=info
     restart: unless-stopped
+    networks:
+      - agentium-network
 
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   # Frontend (React) - Standard 
@@ -189,11 +195,13 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - VITE_API_URL=http://localhost:8000
+      - VITE_API_URL=
     depends_on:
       - backend
-    network_mode: host # Connect to host network to reach backend
+
     restart: unless-stopped
+    networks:
+      - agentium-network
 
 volumes:
   postgres_data:
