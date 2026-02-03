@@ -1,15 +1,17 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { api } from '@/services/api';
-import { jwtDecode } from 'jwt-decode'; // Install this package: npm install jwt-decode
+import { jwtDecode } from 'jwt-decode';
 
+//  Proper User interface matching backend
 interface User {
-    id: string;
+    id: number;           // Database ID (integer)
     username: string;
-    role: string;
-    isAuthenticated: boolean;
-    isSovereign?: boolean;
-    agentium_id?: string; // ✅ NEW: Stores the agent ID for tier-based access
+    email: string;
+    is_active: boolean;
+    is_admin: boolean;
+    is_pending: boolean;
+    created_at?: string;
 }
 
 interface AuthState {
@@ -22,11 +24,17 @@ interface AuthState {
     checkAuth: () => Promise<boolean>;
 }
 
-// Helper to decode JWT and extract agentium_id
-const extractAgentFromToken = (token: string): string | null => {
+//  Clean helper for token decoding
+const extractUserFromToken = (token: string): Partial<User> | null => {
     try {
         const decoded = jwtDecode<any>(token);
-        return decoded.agentium_id || null;
+        return {
+            id: decoded.user_id,
+            username: decoded.sub,
+            is_admin: decoded.is_admin,
+            is_active: decoded.is_active,
+            // Note: email might not be in token, will be fetched from API
+        };
     } catch {
         return null;
     }
@@ -43,7 +51,6 @@ export const useAuthStore = create<AuthState>()(
                 set({ isLoading: true, error: null });
 
                 try {
-                    // ✅ FIXED: Changed to /api/v1/auth/login (added /api/v1 prefix)
                     const response = await api.post('/api/v1/auth/login', {
                         username,
                         password
@@ -54,15 +61,16 @@ export const useAuthStore = create<AuthState>()(
                     // Store JWT token
                     localStorage.setItem('access_token', access_token);
 
-                    // Extract agentium_id from token if not in user object
-                    const agentiumId = user.agentium_id || extractAgentFromToken(access_token);
-
+                    //  Use the user object from API response (fully populated)
                     set({
                         user: {
-                            ...user,
-                            isAuthenticated: true,
-                            agentium_id: agentiumId, // ✅ Store agentium_id
-                            isSovereign: agentiumId ? agentiumId.startsWith('0') : false // ✅ Sovereign if agentium_id starts with 0
+                            id: user.id,
+                            username: user.username,
+                            email: user.email,
+                            is_active: user.is_active,
+                            is_admin: user.is_admin,
+                            is_pending: user.is_pending,
+                            created_at: user.created_at,
                         },
                         isLoading: false,
                         error: null
@@ -87,7 +95,6 @@ export const useAuthStore = create<AuthState>()(
                 set({ isLoading: true, error: null });
 
                 try {
-                    // ✅ FIXED: Changed to /api/v1/auth/change-password
                     await api.post('/api/v1/auth/change-password', {
                         old_password: oldPassword,
                         new_password: newPassword
@@ -112,19 +119,21 @@ export const useAuthStore = create<AuthState>()(
                 }
 
                 try {
-                    // ✅ FIXED: Changed to /api/v1/auth/verify
                     const response = await api.post('/api/v1/auth/verify', { token });
 
                     if (response.data.valid) {
                         const userData = response.data.user;
-                        const agentiumId = userData.agentium_id || extractAgentFromToken(token);
 
+                        //  Use API response directly
                         set({
                             user: {
-                                ...userData,
-                                isAuthenticated: true,
-                                agentium_id: agentiumId, // ✅ Store agentium_id
-                                isSovereign: agentiumId ? agentiumId.startsWith('0') : false
+                                id: userData.id,
+                                username: userData.username,
+                                email: userData.email,
+                                is_active: userData.is_active,
+                                is_admin: userData.is_admin,
+                                is_pending: userData.is_pending,
+                                created_at: userData.created_at,
                             },
                             error: null
                         });
@@ -149,3 +158,15 @@ export const useAuthStore = create<AuthState>()(
         }
     )
 );
+
+//  Convenience hook for checking authentication
+export const useIsAuthenticated = (): boolean => {
+    const user = useAuthStore(state => state.user);
+    return user !== null;
+};
+
+// Convenience hook for checking admin
+export const useIsAdmin = (): boolean => {
+    const user = useAuthStore(state => state.user);
+    return user?.is_admin ?? false;
+};

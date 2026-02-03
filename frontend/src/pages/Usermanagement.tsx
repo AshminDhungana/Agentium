@@ -2,32 +2,32 @@ import { useState, useEffect } from 'react';
 import { Users, CheckCircle, XCircle, Trash2, Key, Shield, Clock, Loader2 } from 'lucide-react';
 import { api } from '@/services/api';
 import toast from 'react-hot-toast';
+import { useAuthStore } from '@/store/authStore'; // Adjust import path
 
-interface PendingUser {
-    id: string;
+interface User {
+    id: number; //  Fixed: should be number
     username: string;
-    created_at: string;
-    status: 'pending' | 'approved' | 'rejected';
+    email: string;
+    is_active: boolean;
+    is_admin: boolean;
+    is_pending: boolean;
+    created_at?: string;
+    updated_at?: string;
 }
 
-interface ApprovedUser {
-    id: string;
-    username: string;
-    role: string;
-    agentium_id?: string;
-    created_at: string;
-    is_active: boolean;
+interface UserListResponse {
+    users: User[];
+    total: number;
 }
 
 export default function UserManagement() {
-    const [pendingUsers, setPendingUsers] = useState<PendingUser[]>([]);
-    const [approvedUsers, setApprovedUsers] = useState<ApprovedUser[]>([]);
+    const { user: currentUser } = useAuthStore(); // Get current user
+    const [pendingUsers, setPendingUsers] = useState<User[]>([]);
+    const [approvedUsers, setApprovedUsers] = useState<User[]>([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'pending' | 'approved'>('pending');
-
-    // Change password modal state
     const [showPasswordModal, setShowPasswordModal] = useState(false);
-    const [selectedUser, setSelectedUser] = useState<ApprovedUser | null>(null);
+    const [selectedUser, setSelectedUser] = useState<User | null>(null);
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
 
@@ -35,25 +35,38 @@ export default function UserManagement() {
         fetchUsers();
     }, []);
 
+    //  Added: Admin access control
+    if (!currentUser?.is_admin) {
+        return (
+            <div className="p-8 text-center">
+                <Shield className="w-12 h-12 text-red-500 mx-auto mb-3" />
+                <p className="text-gray-600 dark:text-gray-400">
+                    Access denied. Admin privileges required.
+                </p>
+            </div>
+        );
+    }
+
     const fetchUsers = async () => {
         setLoading(true);
         try {
             const [pendingRes, approvedRes] = await Promise.all([
-                api.get('/api/v1/admin/users/pending'),
-                api.get('/api/v1/admin/users')
+                api.get<UserListResponse>('/api/v1/admin/users/pending'),
+                api.get<UserListResponse>('/api/v1/admin/users')
             ]);
 
-            setPendingUsers(pendingRes.data);
-            setApprovedUsers(approvedRes.data);
+            //  Fixed: Access the users array from response
+            setPendingUsers(pendingRes.data.users);
+            setApprovedUsers(approvedRes.data.users);
         } catch (error: any) {
-            toast.error('Failed to fetch users');
+            toast.error(error.response?.data?.detail || 'Failed to fetch users');
             console.error(error);
         } finally {
             setLoading(false);
         }
     };
 
-    const handleApprove = async (userId: string) => {
+    const handleApprove = async (userId: number) => { //  Fixed: number type
         try {
             await api.post(`/api/v1/admin/users/${userId}/approve`);
             toast.success('User approved successfully');
@@ -63,8 +76,8 @@ export default function UserManagement() {
         }
     };
 
-    const handleReject = async (userId: string) => {
-        if (!confirm('Are you sure you want to reject this user request?')) return;
+    const handleReject = async (userId: number) => { //  Fixed: number type
+        if (!confirm('Are you sure you want to reject this user?')) return;
 
         try {
             await api.post(`/api/v1/admin/users/${userId}/reject`);
@@ -75,8 +88,14 @@ export default function UserManagement() {
         }
     };
 
-    const handleDelete = async (userId: string, username: string) => {
-        if (!confirm(`Are you sure you want to delete user "${username}"? This action cannot be undone.`)) return;
+    const handleDelete = async (userId: number, username: string) => { //  Fixed: number type
+        if (!confirm(`Delete user "${username}"? This cannot be undone.`)) return;
+
+        //  Added: Prevent self-deletion
+        if (userId === currentUser.id) {
+            toast.error('You cannot delete your own account');
+            return;
+        }
 
         try {
             await api.delete(`/api/v1/admin/users/${userId}`);
@@ -88,15 +107,15 @@ export default function UserManagement() {
     };
 
     const handleChangePassword = async () => {
-        if (!selectedUser) return;
+        if (!selectedUser || !newPassword) return;
 
         if (newPassword !== confirmPassword) {
             toast.error('Passwords do not match');
             return;
         }
 
-        if (newPassword.length < 6) {
-            toast.error('Password must be at least 6 characters');
+        if (newPassword.length < 8) { //  Enforce backend minimum
+            toast.error('Password must be at least 8 characters');
             return;
         }
 
@@ -114,7 +133,8 @@ export default function UserManagement() {
         }
     };
 
-    const formatDate = (dateString: string) => {
+    const formatDate = (dateString?: string) => {
+        if (!dateString) return 'N/A';
         return new Date(dateString).toLocaleDateString('en-US', {
             year: 'numeric',
             month: 'short',
@@ -134,7 +154,7 @@ export default function UserManagement() {
 
     return (
         <div className="space-y-6">
-            {/* Header */}
+            {/* Header remains similar */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
@@ -148,6 +168,9 @@ export default function UserManagement() {
                             Manage user access and permissions
                         </p>
                     </div>
+                </div>
+                <div className="text-sm text-gray-500">
+                    Total: {activeTab === 'pending' ? pendingUsers.length : approvedUsers.length}
                 </div>
             </div>
 
@@ -184,7 +207,7 @@ export default function UserManagement() {
                     ) : (
                         <div className="divide-y divide-gray-200 dark:divide-gray-700">
                             {pendingUsers.map((user) => (
-                                <div key={user.id} className="p-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                                <div key={user.id} className="p-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50">
                                     <div className="flex items-center gap-4">
                                         <div className="w-10 h-10 rounded-full bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center">
                                             <Users className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
@@ -194,6 +217,9 @@ export default function UserManagement() {
                                                 {user.username}
                                             </p>
                                             <p className="text-sm text-gray-600 dark:text-gray-400">
+                                                Email: {user.email}
+                                            </p>
+                                            <p className="text-xs text-gray-500 dark:text-gray-500">
                                                 Requested: {formatDate(user.created_at)}
                                             </p>
                                         </div>
@@ -232,7 +258,7 @@ export default function UserManagement() {
                     ) : (
                         <div className="divide-y divide-gray-200 dark:divide-gray-700">
                             {approvedUsers.map((user) => (
-                                <div key={user.id} className="p-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                                <div key={user.id} className="p-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50">
                                     <div className="flex items-center gap-4">
                                         <div className="w-10 h-10 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
                                             <Users className="w-5 h-5 text-green-600 dark:text-green-400" />
@@ -242,17 +268,18 @@ export default function UserManagement() {
                                                 <p className="font-medium text-gray-900 dark:text-white">
                                                     {user.username}
                                                 </p>
-                                                {user.agentium_id?.startsWith('0') && (
-                                                    <Shield
-                                                        className="w-4 h-4 text-yellow-600"
-                                                        aria-label="Admin"
-                                                    />
+                                                {/*  Fixed: Use is_admin instead of agentium_id */}
+                                                {user.is_admin && (
+                                                    <Shield className="w-4 h-4 text-yellow-600" aria-label="Admin" />
                                                 )}
                                             </div>
                                             <p className="text-sm text-gray-600 dark:text-gray-400">
-                                                Role: {user.role} {user.agentium_id && `• ID: ${user.agentium_id}`}
+                                                {user.email}
                                             </p>
                                             <p className="text-xs text-gray-500 dark:text-gray-500">
+                                                {/*  Fixed: Show status from user model */}
+                                                {user.is_admin ? 'Administrator' : 'User'} •
+                                                {user.is_active ? 'Active' : 'Inactive'} •
                                                 Joined: {formatDate(user.created_at)}
                                             </p>
                                         </div>
@@ -271,6 +298,7 @@ export default function UserManagement() {
                                         <button
                                             onClick={() => handleDelete(user.id, user.username)}
                                             className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg flex items-center gap-2 transition-colors"
+                                            disabled={user.id === currentUser.id} //  Prevent self-delete
                                         >
                                             <Trash2 className="w-4 h-4" />
                                             Delete
@@ -283,7 +311,7 @@ export default function UserManagement() {
                 </div>
             )}
 
-            {/* Change Password Modal */}
+            {/* Password Modal remains similar */}
             {showPasswordModal && selectedUser && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
                     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full p-6">
@@ -294,7 +322,7 @@ export default function UserManagement() {
                         <div className="space-y-4">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                    New Password
+                                    New Password (min 8 characters)
                                 </label>
                                 <input
                                     type="password"
@@ -302,7 +330,7 @@ export default function UserManagement() {
                                     onChange={(e) => setNewPassword(e.target.value)}
                                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                                     placeholder="Enter new password"
-                                    minLength={6}
+                                    minLength={8}
                                 />
                             </div>
 
@@ -316,7 +344,7 @@ export default function UserManagement() {
                                     onChange={(e) => setConfirmPassword(e.target.value)}
                                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                                     placeholder="Confirm new password"
-                                    minLength={6}
+                                    minLength={8}
                                 />
                             </div>
                         </div>
@@ -335,7 +363,8 @@ export default function UserManagement() {
                             </button>
                             <button
                                 onClick={handleChangePassword}
-                                className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+                                disabled={!newPassword || newPassword !== confirmPassword}
+                                className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-medium rounded-lg transition-colors"
                             >
                                 Change Password
                             </button>
