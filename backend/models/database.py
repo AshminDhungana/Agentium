@@ -93,6 +93,33 @@ def init_db():
         AuditLog, ConstitutionViolation, SessionLog, HealthCheck
     )
     
+    # Drop all tables with CASCADE to handle circular dependencies
+    # Use raw SQL for more control over drop order
+    with engine.connect() as conn:
+        conn.execute(text("DROP TABLE IF EXISTS task_audit_logs CASCADE"))
+        conn.execute(text("DROP TABLE IF EXISTS sub_tasks CASCADE"))
+        conn.execute(text("DROP TABLE IF EXISTS individual_votes CASCADE"))
+        conn.execute(text("DROP TABLE IF EXISTS voting_records CASCADE"))
+        conn.execute(text("DROP TABLE IF EXISTS task_deliberations CASCADE"))
+        conn.execute(text("DROP TABLE IF EXISTS tasks CASCADE"))
+        conn.execute(text("DROP TABLE IF EXISTS audit_logs CASCADE"))
+        conn.execute(text("DROP TABLE IF EXISTS constitution_violations CASCADE"))
+        conn.execute(text("DROP TABLE IF EXISTS session_logs CASCADE"))
+        conn.execute(text("DROP TABLE IF EXISTS health_checks CASCADE"))
+        conn.execute(text("DROP TABLE IF EXISTS head_of_council CASCADE"))
+        conn.execute(text("DROP TABLE IF EXISTS council_members CASCADE"))
+        conn.execute(text("DROP TABLE IF EXISTS lead_agents CASCADE"))
+        conn.execute(text("DROP TABLE IF EXISTS task_agents CASCADE"))
+        conn.execute(text("DROP TABLE IF EXISTS ethos CASCADE")) 
+        conn.execute(text("DROP TABLE IF EXISTS agents CASCADE"))
+        conn.execute(text("DROP TABLE IF EXISTS amendment_votings CASCADE"))
+        conn.execute(text("DROP TABLE IF EXISTS ethoses CASCADE"))
+        conn.execute(text("DROP TABLE IF EXISTS constitutions CASCADE"))
+        conn.execute(text("DROP TABLE IF EXISTS user_model_configs CASCADE")) 
+        conn.execute(text("DROP TABLE IF EXISTS alembic_version CASCADE"))
+        conn.commit()
+    
+    # Create all tables with current schema
     Base.metadata.create_all(bind=engine)
     
     # Create initial data if empty

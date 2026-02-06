@@ -2,14 +2,13 @@
 User model configuration for Agentium.
 Supports ANY API provider (OpenAI, Anthropic, Groq, Mistral, Gemini, local, etc.)
 """
-
+import enum
+import random
 from datetime import datetime
 from typing import Optional, List
 from sqlalchemy import Column, String, Integer, Float, Boolean, DateTime, Enum, JSON, Text, ForeignKey
 from sqlalchemy.orm import validates
 from sqlalchemy.orm import relationship
-import enum
-
 from backend.models.entities.base import BaseEntity
 
 
@@ -122,7 +121,9 @@ class UserModelConfig(BaseEntity):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         if not self.agentium_id:
-            self.agentium_id = f"CFG{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
+            date_part = datetime.utcnow().strftime('%y%m%d')  # 6 chars: 260206
+            random_part = f"{random.randint(0, 999):03d}"  # 3 chars
+            self.agentium_id = f"C{date_part}{random_part}"  # 1+6+3 = 10 chars
     
     @validates('api_key_encrypted')
     def mask_api_key(self, key, value):

@@ -11,6 +11,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
+from backend.celery_app import celery_app as celery
 
 from backend.services.api_manager import init_api_manager, api_manager
 from backend.services.model_allocation import init_model_allocator, model_allocator
@@ -92,8 +93,10 @@ async def lifespan(app: FastAPI):
         with next(get_db()) as db:
             # Initialize API Manager (loads all available models)
             init_api_manager(db)
+            if api_manager is None:
+                raise RuntimeError("API Manager failed to initialize")
             logger.info(f"✅ API Manager initialized with {len(api_manager.models)} models")
-            
+
             # Initialize Model Allocation Service
             init_model_allocator(db)
             logger.info("✅ Model Allocator initialized")

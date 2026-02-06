@@ -34,6 +34,7 @@ class AuditCategory(str, enum.Enum):
     DATA_ACCESS = "data_access"       # database queries, file access
     EXTERNAL_API = "external_api"     # calls to external services
     SECURITY = "security"             # violations, suspicious activity
+    GOVERNANCE = "governance"
 
 class AuditLog(BaseEntity):
     """

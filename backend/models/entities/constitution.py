@@ -9,6 +9,7 @@ from sqlalchemy import Column, String, Text, DateTime, ForeignKey, Integer, Enum
 from sqlalchemy.orm import relationship, validates
 from backend.models.entities.base import BaseEntity
 from sqlalchemy.orm import remote
+from sqlalchemy.orm import remote, foreign
 import enum
 
 class DocumentType(str, enum.Enum):
@@ -50,29 +51,38 @@ class Constitution(BaseEntity):
     
     amendment_of = Column(String(36), ForeignKey('constitutions.id'), nullable=True)
     replaces_version_id = Column(String(36), ForeignKey('constitutions.id'), nullable=True)
-
-    amendments = relationship(
-        "Constitution",
-        primaryjoin=lambda: remote(Constitution.id) == Constitution.amendment_of,
-        back_populates="amended_from",
-        cascade="all",
-        passive_deletes=True,
-    )
-
-    # Many-to-one: this constitution points to its parent via amendment_of
     amended_from = relationship(
         "Constitution",
         foreign_keys=[amendment_of],
-        remote_side=lambda: Constitution.id,
+        remote_side=lambda: Constitution.id,  # Use lambda for deferred evaluation
         back_populates="amendments",
     )
 
-    # Previous version (this replaces an older one) — use string remote_side here
+    # Amendments that amend this constitution (one-to-many side) - parent pointing to children
+    amendments = relationship(
+        "Constitution",
+        foreign_keys=[amendment_of],
+        back_populates="amended_from",
+        lazy="dynamic",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
+    # Version replacement relationships
+    # This constitution replaces a previous version (many-to-one)
     replaces_version = relationship(
         "Constitution",
         foreign_keys=[replaces_version_id],
-        remote_side=["Constitution.id"],           # string notation — safe, no NameError
-        # back_populates="replaced_by",            # uncomment only if you define replaced_by below
+        remote_side=lambda: Constitution.id,  # Use lambda for deferred evaluation
+        back_populates="replaced_by",
+    )
+
+    # Newer versions that replace this one (one-to-many)
+    replaced_by = relationship(
+        "Constitution",
+        foreign_keys=[replaces_version_id],
+        back_populates="replaces_version",
+        lazy="dynamic",
     )
 
     # Optional forward: newer versions that replace this one
@@ -278,10 +288,6 @@ class Ethos(BaseEntity):
         return base
 
 
-
-
-
-# Event listeners for audit trail
 @event.listens_for(Constitution, 'after_insert')
 def log_constitution_creation(mapper, connection, target):
     """Log when a new constitution is created."""
@@ -295,7 +301,7 @@ def log_constitution_creation(mapper, connection, target):
         action="constitution_created",
         target_type="constitution",
         target_id=target.agentium_id,
-        description=f"Constitution v{target.version} (revision {target.version_number}) created",
+        action_description=f"Constitution v{target.version} (revision {target.version_number}) created",  # FIXED
         after_state={
             'version': target.version,
             'version_number': target.version_number,

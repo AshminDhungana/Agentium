@@ -209,7 +209,11 @@ class TaskDeliberation(BaseEntity):
     head_override_at = Column(DateTime, nullable=True)
     
     # Relationships
-    task = relationship("Task", back_populates="deliberation")
+    task = relationship(
+    "Task",
+    primaryjoin="Task.deliberation_id == TaskDeliberation.id",
+    back_populates="deliberation"
+    )
     individual_votes = relationship("IndividualVote", back_populates="task_deliberation", lazy="dynamic")
     
     # Discussion thread (JSON array of messages)

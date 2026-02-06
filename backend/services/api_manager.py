@@ -2,7 +2,10 @@
 APIManager - Manages multiple LLM providers and assigns best models per task.
 Supports OpenAI, Anthropic, Local Kimi, and custom models.
 """
-
+import logging
+import json
+from enum import Enum
+from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Any, TYPE_CHECKING
 from sqlalchemy.orm import Session
 from backend.models.entities.user_config import UserModelConfig
@@ -10,10 +13,9 @@ from backend.models.entities.agents import Agent
 
 if TYPE_CHECKING:
     from backend.models.entities.task import Task
-from dataclasses import dataclass, field
-from enum import Enum
-import json
 
+
+logger = logging.getLogger(__name__)
 class ModelCapability(Enum):
     """Model capabilities for task matching."""
     CODE = "code"  # Best for programming
@@ -285,4 +287,25 @@ api_manager = None  # Will be initialized with db session
 def init_api_manager(db: Session):
     """Initialize the global APIManager."""
     global api_manager
+    
+    # Check if any configurations exist
+    config_count = db.query(UserModelConfig).filter_by(is_active='Y').count()
+    
+    if config_count == 0:
+        # Create a default local configuration
+        default_config = UserModelConfig(
+            user_id="sovereign",
+            config_name="Default Local Model",
+            provider="local",
+            provider_name="Local",
+            default_model="kimi-2.5",
+            is_default=True,
+            is_active='Y',
+            status='active'
+        )
+        db.add(default_config)
+        db.commit()
+        db.refresh(default_config)
+        logger.info("Created default model configuration")
+    
     api_manager = APIManager(db)

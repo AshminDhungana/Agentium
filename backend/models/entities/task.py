@@ -112,7 +112,13 @@ class Task(BaseEntity):
     
     head_of_council = relationship("Agent", foreign_keys=[head_of_council_id], lazy="joined")
     lead_agent = relationship("Agent", foreign_keys=[lead_agent_id])
-    deliberation = relationship("TaskDeliberation", back_populates="task", uselist=False)
+    deliberation = relationship(
+    "TaskDeliberation",
+    primaryjoin="Task.deliberation_id == TaskDeliberation.id",
+    foreign_keys=[deliberation_id],
+    back_populates="task",
+    uselist=False
+    )
     subtasks = relationship("SubTask", back_populates="parent_task", lazy="dynamic")
     audit_logs = relationship("TaskAuditLog", back_populates="task", lazy="dynamic")
     

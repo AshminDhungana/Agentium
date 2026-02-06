@@ -97,6 +97,13 @@ class Agent(BaseEntity):
     parent = relationship("Agent", remote_side="Agent.id", backref="subordinates")
     ethos = relationship("Ethos", foreign_keys=[ethos_id])
     preferred_config = relationship("UserModelConfig", foreign_keys=[preferred_config_id])
+    agent_type = Column(Enum(AgentType), nullable=False)
+
+    agentium_id = Column(String(10), unique=True, nullable=False)  
+    name = Column(String(100), nullable=False)
+    description = Column(Text, nullable=True)
+    incarnation_number = Column(Integer, default=1)
+    created_by_agentium_id = Column(String(10), nullable=True)
     
     __mapper_args__ = {
         'polymorphic_on': agent_type,
