@@ -41,7 +41,7 @@ class AmendmentVoting(BaseEntity):
     
     __tablename__ = 'amendment_votings'
     
-    amendment_id = Column(String(36), ForeignKey('amendments.id'), nullable=False)
+    amendment_id = Column(String(36), ForeignKey('constitutions.id'), nullable=False)
     
     # Configuration
     eligible_voters = Column(JSON, nullable=False)  # List of Council Member IDs
@@ -60,7 +60,7 @@ class AmendmentVoting(BaseEntity):
     final_result = Column(String(20), nullable=True)
     
     # Relationships
-    amendment = relationship("Amendment", back_populates="voting_process")
+    amendment = relationship("Constitution", back_populates="voting_sessions")
     individual_votes = relationship("IndividualVote", back_populates="amendment_voting", lazy="dynamic")
     
     # Discussion
