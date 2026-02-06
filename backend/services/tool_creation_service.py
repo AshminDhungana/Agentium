@@ -5,6 +5,7 @@ from backend.models.entities.audit import AuditLog, AuditLevel, AuditCategory
 from backend.services.tool_factory import ToolFactory
 from backend.core.tool_registry import tool_registry
 from backend.models.entities.agents import Agent
+from typing import Dict, Any, List, Optional
 from datetime import datetime
 
 class ToolCreationService:

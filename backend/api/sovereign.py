@@ -12,7 +12,7 @@ import json
 
 from backend.models.database import get_db
 from backend.services.host_access import HostAccessService, RestrictedHostAccess
-from backend.core.security import get_current_user  # Use your existing auth
+from backend.api.middleware.auth import get_current_user  # Use your existing auth
 from backend.models.entities.audit import AuditLog, AuditLevel, AuditCategory
 from backend.models.entities.user import User  # Your user model
 from pydantic import BaseModel

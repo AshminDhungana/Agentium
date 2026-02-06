@@ -3,7 +3,13 @@ APIManager - Manages multiple LLM providers and assigns best models per task.
 Supports OpenAI, Anthropic, Local Kimi, and custom models.
 """
 
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, TYPE_CHECKING
+from sqlalchemy.orm import Session
+from backend.models.entities.user_config import UserModelConfig
+from backend.models.entities.agents import Agent
+
+if TYPE_CHECKING:
+    from backend.models.entities.task import Task
 from dataclasses import dataclass, field
 from enum import Enum
 import json
@@ -254,6 +260,7 @@ class APIManager:
         task_type = task.task_type.value if task else "general"
         
         # Check if idle mode - override everything
+        from backend.services.token_optimizer import token_optimizer
         if token_optimizer.idle_mode_active:
             return self._get_best_local_model()
         

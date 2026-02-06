@@ -16,14 +16,7 @@ class DocumentType(str, enum.Enum):
     CONSTITUTION = "constitution"
     ETHOS = "ethos"
 
-class AmendmentStatus(str, enum.Enum):
-    """Status of constitutional amendments."""
-    PROPOSED = "proposed"
-    VOTING = "voting"
-    APPROVED = "approved"
-    REJECTED = "rejected"
-    ACTIVE = "active"
-    ARCHIVED = "archived"
+
 
 class Constitution(BaseEntity):
     """
@@ -287,130 +280,7 @@ class Ethos(BaseEntity):
         return base
 
 
-class AmendmentVoting(BaseEntity):
-    """
-    Tracks voting sessions for constitutional amendments.
-    Council Members vote, Head of Council approves.
-    """
-    
-    __tablename__ = 'amendment_votings'
-    
-    __table_args__ = (
-        Index('idx_amendment_status', 'status'),  # Quick status filtering
-        Index('idx_amendment_constitution', 'constitution_id'),  # Constitution lookups
-    )
-    
-    constitution_id = Column(String(36), ForeignKey('constitutions.id'), nullable=False)
-    proposed_by_agentium_id = Column(String(10), nullable=False)  # Usually a Council Member
-    
-    # Proposal details
-    proposed_changes = Column(Text, nullable=False)  # JSON diff of changes
-    rationale = Column(Text, nullable=False)
-    
-    # Voting status
-    status = Column(Enum(AmendmentStatus), default=AmendmentStatus.PROPOSED, nullable=False)
-    votes_required = Column(Integer, default=3, nullable=False)  # Auto-calculated based on council size
-    votes_for = Column(Integer, default=0)
-    votes_against = Column(Integer, default=0)
-    votes_abstain = Column(Integer, default=0)
-    
-    # Timing
-    voting_started_at = Column(DateTime, nullable=True)
-    voting_ended_at = Column(DateTime, nullable=True)
-    
-    # Final approval (Head of Council)
-    approved_by_agentium_id = Column(String(10), nullable=True)
-    approved_at = Column(DateTime, nullable=True)
-    rejection_reason = Column(Text, nullable=True)
-    
-    # Relationships
-    constitution = relationship("Constitution", back_populates="voting_sessions")
-    individual_votes = relationship("IndividualVote", back_populates="amendment_voting", lazy="dynamic")
-    
-    def start_voting(self):
-        """Transition to voting phase."""
-        self.status = AmendmentStatus.VOTING
-        self.voting_started_at = datetime.utcnow()
-    
-    def cast_vote(self, vote_type: str, agentium_id: str):
-        """Record a vote from a council member."""
-        if self.status != AmendmentStatus.VOTING:
-            raise ValueError("Voting is not currently open")
-        
-        # Check for existing vote and update if needed
-        existing = self.individual_votes.filter_by(voter_agentium_id=agentium_id).first()
-        if existing:
-            # Revert old vote
-            if existing.vote == 'for':
-                self.votes_for -= 1
-            elif existing.vote == 'against':
-                self.votes_against -= 1
-            elif existing.vote == 'abstain':
-                self.votes_abstain -= 1
-            
-            existing.vote = vote_type
-            existing.voted_at = datetime.utcnow()
-        else:
-            from backend.models.entities.voting import IndividualVote
-            new_vote = IndividualVote(
-                amendment_voting_id=self.id,
-                voter_agentium_id=agentium_id,
-                vote=vote_type,
-                agentium_id=f"V{agentium_id}"  # Special ID for votes
-            )
-            # Would add to session here
-            
-        # Apply new vote
-        if vote_type == 'for':
-            self.votes_for += 1
-        elif vote_type == 'against':
-            self.votes_against += 1
-        elif vote_type == 'abstain':
-            self.votes_abstain += 1
-    
-    def check_quorum(self) -> bool:
-        """Check if voting quorum is reached."""
-        total_votes = self.votes_for + self.votes_against + self.votes_abstain
-        return total_votes >= self.votes_required
-    
-    def finalize_voting(self):
-        """Complete voting phase and determine outcome."""
-        self.voting_ended_at = datetime.utcnow()
-        
-        if self.votes_for > self.votes_against:
-            self.status = AmendmentStatus.APPROVED
-        else:
-            self.status = AmendmentStatus.REJECTED
-    
-    def approve_by_head(self, head_agentium_id: str):
-        """Final approval by Head of Council."""
-        if self.status != AmendmentStatus.APPROVED:
-            raise ValueError("Cannot approve amendment that hasn't passed council vote")
-        
-        self.approved_by_agentium_id = head_agentium_id
-        self.approved_at = datetime.utcnow()
-        self.status = AmendmentStatus.ACTIVE
-    
-    def to_dict(self) -> Dict[str, Any]:
-        base = super().to_dict()
-        base.update({
-            'constitution_version': self.constitution.version if self.constitution else None,
-            'proposed_by': self.proposed_by_agentium_id,
-            'rationale': self.rationale,
-            'status': self.status.value,
-            'votes': {
-                'for': self.votes_for,
-                'against': self.votes_against,
-                'abstain': self.votes_abstain,
-                'required': self.votes_required
-            },
-            'voting_period': {
-                'started': self.voting_started_at.isoformat() if self.voting_started_at else None,
-                'ended': self.voting_ended_at.isoformat() if self.voting_ended_at else None
-            },
-            'approved_by': self.approved_by_agentium_id
-        })
-        return base
+
 
 
 # Event listeners for audit trail

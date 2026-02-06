@@ -64,6 +64,15 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     
     return payload
 
+async def get_current_active_user(current_user: Dict[str, Any] = Depends(get_current_user)):
+    """Verify user is active."""
+    if not current_user.get("is_active"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Inactive user"
+        )
+    return current_user
+
 def verify_slack_signature(request_body: bytes, signature: str, timestamp: str, signing_secret: str) -> bool:
     """
     Verify Slack webhook signature.

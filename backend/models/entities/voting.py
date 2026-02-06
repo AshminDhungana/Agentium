@@ -5,7 +5,7 @@ Handles democratic decision-making for tasks and constitutional amendments.
 
 from datetime import datetime
 from typing import Optional, List, Dict, Any
-from sqlalchemy import Column, String, Text, DateTime, ForeignKey, Integer, Enum, Boolean, JSON, CheckConstraint
+from sqlalchemy import Column, String, Text, DateTime, ForeignKey, Integer, Enum, Boolean, JSON, CheckConstraint, Index
 from sqlalchemy.orm import relationship, validates
 from backend.models.entities.base import BaseEntity
 import enum
@@ -23,6 +23,158 @@ class DeliberationStatus(str, enum.Enum):
     QUORUM_REACHED = "quorum"     # Minimum votes received
     CONCLUDED = "concluded"       # Voting closed, result calculated
     EXECUTED = "executed"         # Decision acted upon
+
+class AmendmentStatus(str, enum.Enum):
+    """Status of a constitutional amendment voting process."""
+    PROPOSED = "proposed"
+    DELIBERATING = "deliberating"
+    VOTING = "voting"
+    PASSED = "passed"
+    REJECTED = "rejected"
+    RATIFIED = "ratified"
+
+class AmendmentVoting(BaseEntity):
+    """
+    Voting process for a constitutional amendment.
+    Requires strict quorum and supermajority.
+    """
+    
+    __tablename__ = 'amendment_votings'
+    
+    amendment_id = Column(String(36), ForeignKey('amendments.id'), nullable=False)
+    
+    # Configuration
+    eligible_voters = Column(JSON, nullable=False)  # List of Council Member IDs
+    required_votes = Column(Integer, default=3, nullable=False)
+    supermajority_threshold = Column(Integer, default=66)  # Percentage (e.g., 66%)
+    
+    # Status
+    status = Column(Enum(AmendmentStatus), default=AmendmentStatus.PROPOSED, nullable=False)
+    started_at = Column(DateTime, nullable=True)
+    ended_at = Column(DateTime, nullable=True)
+    
+    # Results
+    votes_for = Column(Integer, default=0)
+    votes_against = Column(Integer, default=0)
+    votes_abstain = Column(Integer, default=0)
+    final_result = Column(String(20), nullable=True)
+    
+    # Relationships
+    amendment = relationship("Amendment", back_populates="voting_process")
+    individual_votes = relationship("IndividualVote", back_populates="amendment_voting", lazy="dynamic")
+    
+    # Discussion
+    discussion_thread = Column(JSON, default=list)
+    
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        if not kwargs.get('agentium_id'):
+            self.agentium_id = f"AV{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
+            
+    def start_voting(self):
+        """Open voting session."""
+        self.status = AmendmentStatus.VOTING
+        self.started_at = datetime.utcnow()
+        self.add_discussion_entry("System", "Amendment voting session started.")
+        
+    def cast_vote(self, council_member_id: str, vote: VoteType, rationale: str = None) -> 'IndividualVote':
+        """Cast a vote on the amendment."""
+        if self.status != AmendmentStatus.VOTING:
+            raise ValueError("Voting is not currently open")
+            
+        if council_member_id not in self.eligible_voters:
+            raise PermissionError("Agent is not eligible to vote on this amendment")
+            
+        # Check if already voted
+        existing = self.individual_votes.filter_by(voter_agentium_id=council_member_id).first()
+        if existing:
+            # Revoke old vote logic would go here
+            self._revoke_vote(existing.vote)
+            existing.vote = vote
+            existing.rationale = rationale
+            existing.changed_at = datetime.utcnow()
+            vote_record = existing
+        else:
+            vote_record = IndividualVote(
+                amendment_voting_id=self.id,
+                voter_agentium_id=council_member_id,
+                vote=vote,
+                rationale=rationale,
+                agentium_id=f"V{council_member_id}"
+            )
+            self.individual_votes.append(vote_record)
+            
+        self._apply_vote(vote)
+        
+        # Log vote
+        if rationale:
+            self.add_discussion_entry(council_member_id, f"Voted {vote.value}. Reason: {rationale}")
+            
+        return vote_record
+
+    def _apply_vote(self, vote: VoteType):
+        """Increment counters."""
+        if vote == VoteType.FOR:
+            self.votes_for += 1
+        elif vote == VoteType.AGAINST:
+            self.votes_against += 1
+        elif vote == VoteType.ABSTAIN:
+            self.votes_abstain += 1
+            
+    def _revoke_vote(self, vote: VoteType):
+        """Decrement counters."""
+        if vote == VoteType.FOR:
+            self.votes_for -= 1
+        elif vote == VoteType.AGAINST:
+            self.votes_against -= 1
+        elif vote == VoteType.ABSTAIN:
+            self.votes_abstain -= 1
+
+    def conclude(self) -> Dict[str, Any]:
+        """Concluding the voting process."""
+        self.status = AmendmentStatus.PASSED # Logic to determine pass/fail
+        total_votes = self.votes_for + self.votes_against + self.votes_abstain
+        if total_votes == 0:
+             self.status = AmendmentStatus.REJECTED
+             self.final_result = "rejected"
+        else:
+            percent_for = (self.votes_for / total_votes) * 100
+            if percent_for >= self.supermajority_threshold:
+                 self.status = AmendmentStatus.PASSED
+                 self.final_result = "passed"
+            else:
+                 self.status = AmendmentStatus.REJECTED
+                 self.final_result = "rejected"
+                 
+        self.ended_at = datetime.utcnow()
+        self.add_discussion_entry("System", f"Voting concluded. Result: {self.final_result}")
+        
+        return {
+            "result": self.final_result,
+            "votes_for": self.votes_for, 
+            "votes_against": self.votes_against
+        }
+
+    def add_discussion_entry(self, agentium_id: str, message: str):
+        """Add entry to discussion."""
+        thread = self.discussion_thread or []
+        thread.append({
+            'timestamp': datetime.utcnow().isoformat(),
+            'agent': agentium_id,
+            'message': message
+        })
+        self.discussion_thread = thread
+        
+    def to_dict(self) -> Dict[str, Any]:
+        base = super().to_dict()
+        base.update({
+             "status": self.status.value,
+             "votes_for": self.votes_for,
+             "votes_against": self.votes_against,
+             "result": self.final_result
+        })
+        return base
+
 
 class TaskDeliberation(BaseEntity):
     """

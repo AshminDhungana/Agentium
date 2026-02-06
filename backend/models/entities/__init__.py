@@ -26,8 +26,6 @@ from backend.models.entities.scheduled_task import (
     ScheduledTaskExecutionStatus
 )
 
-
-
 from backend.models.entities.task import (
     Task,
     SubTask,
@@ -45,13 +43,13 @@ from backend.models.entities.user_config import (
 )
 
 from backend.models.entities.base import Base, BaseEntity
+
 from backend.models.entities.constitution import (
     Constitution, 
     Ethos, 
-    AmendmentVoting,
-    DocumentType,
-    AmendmentStatus
+    DocumentType
 )
+
 from backend.models.entities.agents import (
     Agent,
     HeadOfCouncil,
@@ -68,8 +66,11 @@ from backend.models.entities.voting import (
     IndividualVote,
     VotingRecord,
     VoteType,
-    DeliberationStatus
+    DeliberationStatus,
+    AmendmentVoting,
+    AmendmentStatus
 )
+
 from backend.models.entities.audit import (
     AuditLog,
     ConstitutionViolation,
@@ -78,6 +79,7 @@ from backend.models.entities.audit import (
     AuditLevel,
     AuditCategory
 )
+
 from backend.models.entities.monitoring import (
     AgentHealthReport,
     ViolationReport,
@@ -116,7 +118,7 @@ __all__ = [
     'ExternalChannel',
     'ExternalMessage', 
     'ChannelType',
-    'ChannelStatus'
+    'ChannelStatus',
     
     # Agents
     'Agent',

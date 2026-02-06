@@ -7,8 +7,9 @@ from typing import Dict, Any, Optional
 from sqlalchemy.orm import Session
 from backend.models.entities.agents import Agent
 from backend.models.entities.task import Task, TaskType, TaskPriority
-from backend.services.api_manager import api_manager, ModelCapability
-from backend.services.token_optimizer import token_optimizer, idle_budget
+from backend.models.entities.user_config import UserModelConfig
+from backend.services.api_manager import api_manager, ModelCapability, ModelConfig
+# from backend.services.token_optimizer import token_optimizer, idle_budget
 
 
 class ModelAllocationService:
@@ -45,6 +46,7 @@ class ModelAllocationService:
         """
         
         # CRITICAL: Idle mode always uses local model (lowest cost)
+        from backend.services.token_optimizer import token_optimizer
         if token_optimizer.idle_mode_active:
             return self._get_idle_model(agent)
         
@@ -113,6 +115,7 @@ class ModelAllocationService:
         config = self._ensure_agent_has_config(agent, local_model)
         
         # Record token savings
+        from backend.services.token_optimizer import token_optimizer, idle_budget
         savings = token_optimizer.calculate_token_savings(agent, "conservative")
         idle_budget.record_usage(savings)  # Track against idle budget
         
@@ -144,6 +147,7 @@ class ModelAllocationService:
         # For critical code tasks, ensure we get the absolute best
         if priority == TaskPriority.CRITICAL:
             # Check if we can afford it (budget-wise)
+            from backend.services.token_optimizer import idle_budget
             if idle_budget.check_budget(code_model.cost_per_1k_tokens * 10):  # Estimate
                 config = self._ensure_agent_has_config(agent, code_model)
                 return config.id
@@ -207,6 +211,7 @@ class ModelAllocationService:
         model = api_manager._get_best_available_model_by_capability(target_capability)
         
         # Budget check for Task agents (tier 3)
+        from backend.services.token_optimizer import idle_budget
         if agent_tier == 3 and not idle_budget.check_budget(model.cost_per_1k_tokens * 5):
             # Over budget, force to local model
             model = api_manager._get_best_local_model()

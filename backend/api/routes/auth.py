@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from typing import Optional
 
 from backend.models.database import get_db
-from backend.core.auth import create_access_token, verify_token
+from backend.core.auth import create_access_token, verify_token, get_current_active_user
 from backend.models.entities.user import User
 from backend.models.entities.audit import AuditLog, AuditLevel, AuditCategory
 
