@@ -5,7 +5,6 @@ from typing import Dict, Any
 from backend.models.schemas.tool_creation import ToolCreationRequest, ToolApprovalRequest
 from backend.services.tool_creation_service import ToolCreationService
 from backend.models.database import get_db
-from backend.core.auth import get_current_agent
 
 router = APIRouter(prefix="/tools/create", tags=["Tool Creation"])
 
