@@ -3,14 +3,14 @@ import { persist } from 'zustand/middleware';
 import { api } from '@/services/api';
 import { jwtDecode } from 'jwt-decode';
 
-//  Proper User interface matching backend
+// Proper User interface matching backend
 interface User {
-    id: number;           // Database ID (integer)
+    id?: number;           // Database ID (integer) - optional because verify doesn't return it
     username: string;
-    email: string;
-    is_active: boolean;
+    email?: string;        // Optional because verify doesn't return it
+    is_active?: boolean;
     is_admin: boolean;
-    is_pending: boolean;
+    is_pending?: boolean;
     created_at?: string;
     role?: "admin" | "user";
     isAuthenticated: boolean;
@@ -28,7 +28,7 @@ interface AuthState {
     checkAuth: () => Promise<boolean>;
 }
 
-//  Clean helper for token decoding
+// Clean helper for token decoding
 const extractUserFromToken = (token: string): Partial<User> | null => {
     try {
         const decoded = jwtDecode<any>(token);
@@ -37,7 +37,6 @@ const extractUserFromToken = (token: string): Partial<User> | null => {
             username: decoded.sub,
             is_admin: decoded.is_admin,
             is_active: decoded.is_active,
-            // Note: email might not be in token, will be fetched from API
         };
     } catch {
         return null;
@@ -65,7 +64,7 @@ export const useAuthStore = create<AuthState>()(
                     // Store JWT token
                     localStorage.setItem('access_token', access_token);
 
-                    //  Use the user object from API response (fully populated)
+                    // Use the user object from API response (fully populated)
                     set({
                         user: {
                             id: user.id,
@@ -76,6 +75,7 @@ export const useAuthStore = create<AuthState>()(
                             is_pending: user.is_pending,
                             created_at: user.created_at,
                             isAuthenticated: true,
+                            role: user.is_admin ? "admin" : "user",
                         },
                         isLoading: false,
                         error: null
@@ -118,30 +118,31 @@ export const useAuthStore = create<AuthState>()(
 
             checkAuth: async () => {
                 const token = localStorage.getItem('access_token');
+
                 if (!token) {
                     set({ user: null });
                     return false;
                 }
 
                 try {
-                    const response = await api.post('/api/v1/auth/verify', { token });
+                    // FIXED: Backend expects token as a string parameter in the body
+                    const response = await api.post('/api/v1/auth/verify', token, {
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    });
 
                     if (response.data.valid) {
                         const userData = response.data.user;
 
-                        //  Use API response directly
+                        // FIXED: Use only fields that verify endpoint returns
                         set({
                             user: {
-                                id: userData.id,
+                                id: userData.user_id,
                                 username: userData.username,
-                                email: userData.email,
-                                is_active: userData.is_active,
-                                is_admin: userData.is_admin,
-                                is_pending: userData.is_pending,
-                                created_at: userData.created_at,
+                                is_admin: userData.is_admin || false,
                                 isAuthenticated: true,
-                                role: userData.is_admin ? "admin" : "user",
-                                isSovereign: false,
+                                role: userData.role || (userData.is_admin ? "admin" : "user"),
                             },
                             error: null
                         });
@@ -152,6 +153,28 @@ export const useAuthStore = create<AuthState>()(
                         return false;
                     }
                 } catch (error) {
+                    console.error('Token verification failed:', error);
+
+                    // If verify fails, try to decode token locally as fallback
+                    try {
+                        const decoded = extractUserFromToken(token);
+                        if (decoded && decoded.username) {
+                            console.log('Using local token decode as fallback');
+                            set({
+                                user: {
+                                    ...decoded,
+                                    username: decoded.username,
+                                    is_admin: decoded.is_admin || false,
+                                    isAuthenticated: true,
+                                } as User,
+                                error: null
+                            });
+                            return true;
+                        }
+                    } catch (decodeError) {
+                        console.error('Token decode failed:', decodeError);
+                    }
+
                     localStorage.removeItem('access_token');
                     set({ user: null });
                     return false;
@@ -167,10 +190,10 @@ export const useAuthStore = create<AuthState>()(
     )
 );
 
-//  Convenience hook for checking authentication
+// Convenience hook for checking authentication
 export const useIsAuthenticated = (): boolean => {
     const user = useAuthStore(state => state.user);
-    return user !== null;
+    return user?.isAuthenticated ?? false;
 };
 
 // Convenience hook for checking admin

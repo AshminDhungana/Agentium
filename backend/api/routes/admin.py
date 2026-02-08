@@ -13,6 +13,7 @@ from backend.models.database import get_db
 from backend.api.dependencies.auth import get_current_admin_user
 from backend.models.entities.user import User
 from backend.models.entities.audit import AuditLog, AuditLevel, AuditCategory
+from backend.services.token_optimizer import idle_budget  # Import the global budget manager
 
 router = APIRouter(prefix="/api/v1/admin", tags=["Admin"])
 
@@ -38,6 +39,33 @@ class ActionResponse(BaseModel):
 class PasswordChangeRequest(BaseModel):
     new_password: str = Field(..., min_length=8)
 
+# Budget Models - Match existing BudgetControl.tsx interface
+class BudgetLimits(BaseModel):
+    daily_token_limit: int
+    daily_cost_limit: float
+
+class BudgetUsage(BaseModel):
+    tokens_used_today: int
+    tokens_remaining: int
+    cost_used_today_usd: float
+    cost_remaining_usd: float
+    cost_percentage_used: float
+    cost_percentage_tokens: float
+
+class OptimizerStatus(BaseModel):
+    idle_mode_active: bool
+    time_since_last_activity_seconds: float
+
+class BudgetStatus(BaseModel):
+    current_limits: BudgetLimits
+    usage: BudgetUsage
+    can_modify: bool
+    optimizer_status: OptimizerStatus
+
+class BudgetUpdateRequest(BaseModel):
+    daily_token_limit: int = Field(..., ge=1000, le=10000000)
+    daily_cost_limit: float = Field(..., ge=0, le=1000)
+
 # Helper function to convert User to response
 def user_to_response(user: User) -> UserResponse:
     return UserResponse(
@@ -50,6 +78,118 @@ def user_to_response(user: User) -> UserResponse:
         created_at=user.created_at.isoformat() if user.created_at else None,
         updated_at=user.updated_at.isoformat() if user.updated_at else None,
     )
+
+# Budget Endpoints
+@router.get("/budget", response_model=BudgetStatus)
+async def get_budget(
+    current_admin: dict = Depends(get_current_admin_user)
+):
+    """
+    Get current API budget status from token optimizer.
+    Matches the interface expected by BudgetControl.tsx component.
+    """
+    try:
+        # Get budget status from the global idle_budget manager
+        budget_status = idle_budget.get_status()
+        
+        # Calculate token percentage
+        token_percentage = (
+            (budget_status['tokens_used'] / budget_status['tokens_limit']) * 100
+            if budget_status['tokens_limit'] > 0 else 0
+        )
+        
+        # Calculate cost percentage
+        cost_percentage = (
+            (budget_status['cost_used'] / budget_status['cost_limit']) * 100
+            if budget_status['cost_limit'] > 0 else 0
+        )
+        
+        # Get idle mode status
+        idle_mode_active = getattr(idle_budget, 'idle_mode_active', False)
+        time_since_activity = getattr(idle_budget, 'time_since_last_activity', 0)
+        
+        return BudgetStatus(
+            current_limits=BudgetLimits(
+                daily_token_limit=budget_status['tokens_limit'],
+                daily_cost_limit=budget_status['cost_limit']
+            ),
+            usage=BudgetUsage(
+                tokens_used_today=budget_status['tokens_used'],
+                tokens_remaining=budget_status['tokens_remaining'],
+                cost_used_today_usd=budget_status['cost_used'],
+                cost_remaining_usd=budget_status['cost_remaining'],
+                cost_percentage_used=round(cost_percentage, 2),
+                cost_percentage_tokens=round(token_percentage, 2)
+            ),
+            can_modify=current_admin.get("is_admin", False),
+            optimizer_status=OptimizerStatus(
+                idle_mode_active=idle_mode_active,
+                time_since_last_activity_seconds=time_since_activity
+            )
+        )
+        
+    except Exception as e:
+        # Fallback to safe defaults if budget manager is not available
+        print(f"Budget fetch error: {e}")
+        return BudgetStatus(
+            current_limits=BudgetLimits(
+                daily_token_limit=100000,
+                daily_cost_limit=5.0
+            ),
+            usage=BudgetUsage(
+                tokens_used_today=0,
+                tokens_remaining=100000,
+                cost_used_today_usd=0.0,
+                cost_remaining_usd=5.0,
+                cost_percentage_used=0.0,
+                cost_percentage_tokens=0.0
+            ),
+            can_modify=current_admin.get("is_admin", False),
+            optimizer_status=OptimizerStatus(
+                idle_mode_active=False,
+                time_since_last_activity_seconds=0.0
+            )
+        )
+
+
+@router.post("/budget", response_model=BudgetStatus)
+async def update_budget(
+    request: BudgetUpdateRequest,
+    current_admin: dict = Depends(get_current_admin_user)
+):
+    """
+    Update daily budget limits.
+    Only accessible by admin users.
+    """
+    try:
+        # Update the budget limits
+        idle_budget.daily_token_limit = request.daily_token_limit
+        idle_budget.daily_cost_limit = request.daily_cost_limit
+        
+        # Log the change
+        AuditLog.log(
+            level=AuditLevel.INFO,
+            category=AuditCategory.CONFIGURATION,
+            actor_type="user",
+            actor_id=current_admin["username"],
+            action="budget_updated",
+            description=f"Budget limits updated: tokens={request.daily_token_limit}, cost=${request.daily_cost_limit}",
+            meta_data={
+                "daily_token_limit": request.daily_token_limit,
+                "daily_cost_limit": request.daily_cost_limit,
+                "updated_by": current_admin["username"]
+            }
+        )
+        
+        # Return updated budget status
+        return await get_budget(current_admin)
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update budget: {str(e)}"
+        )
+
 
 @router.get("/users/pending", response_model=UserListResponse)
 async def get_pending_users(
