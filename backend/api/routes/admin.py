@@ -36,6 +36,7 @@ async def get_budget(
     # Check if user can modify budget (admin or sovereign)
     can_modify = current_user.get("is_admin", False) or current_user.get("role") == "sovereign"
     
+    # Return nested structure matching frontend expectations
     return {
         "current_limits": {
             "daily_token_limit": 200000,
@@ -49,7 +50,7 @@ async def get_budget(
             "cost_percentage_used": 25.5,
             "cost_percentage_tokens": 25.0
         },
-        "can_modify": can_modify,  # Now based on is_admin, not agentium_id
+        "can_modify": can_modify,
         "optimizer_status": {
             "idle_mode_active": False,
             "time_since_last_activity_seconds": 120
@@ -59,7 +60,7 @@ async def get_budget(
 
 @router.post("/admin/budget")
 async def update_budget(
-    request: dict,  # Accept JSON body
+    request: dict,
     current_user: dict = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):

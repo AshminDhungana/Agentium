@@ -324,11 +324,12 @@ class IdleGovernanceEngine:
         cutoff = datetime.utcnow() - timedelta(days=30)
         
         # Count old records using proper parameter binding
+        # Note: Use 'COMPLETED' status with is_idle_task=true, not 'idle_completed'
         try:
             result = db.execute(text("""
                 SELECT COUNT(*) FROM tasks 
                 WHERE is_idle_task = true 
-                AND status = 'idle_completed'
+                AND status = 'COMPLETED'
                 AND completed_at < :cutoff
             """), {'cutoff': cutoff}).scalar()
         except Exception as e:

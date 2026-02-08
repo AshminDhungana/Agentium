@@ -57,6 +57,8 @@ class TaskType(str, enum.Enum):
     AGENT_HEALTH_SCAN = "agent_health_scan"        # Proactive health checks
     ETHOS_OPTIMIZATION = "ethos_optimization"      # Ethos refinement
     CACHE_OPTIMIZATION = "cache_optimization"      # Redis/vector cache tuning
+    IDLE_COMPLETED = "idle_completed"  
+    IDLE_PAUSED = "idle_paused" 
 
 
 class Task(BaseEntity):
