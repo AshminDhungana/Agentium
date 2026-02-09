@@ -1,26 +1,30 @@
 import React, { useEffect, useState } from 'react';
-import { Constitution } from '../types';
-import { constitutionService } from '../services/constitution';
-import { Shield, Book, AlertTriangle, Scale, History } from 'lucide-react';
+import { constitutionService } from '@/services/constitution';
+import { toast } from 'react-hot-toast';
+import { BookOpen, AlertTriangle, Save, RotateCcw, Check, X, Clock, Shield } from 'lucide-react';
 
-export const ConstitutionPage: React.FC = () => {
-    // ADD THESE MISSING HOOKS:
-    const [constitution, setConstitution] = useState<Constitution | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
+const DEFAULT_CONSTITUTION = {
+    id: '',
+    version: 'v1.0.0',
+    version_number: 1,
+    preamble: 'We the Sovereign...',
+    articles: {
+        'article_1': { title: 'Default', content: 'Default content' }
+    },
+    prohibited_actions: [],
+    sovereign_preferences: { transparency: 'high' },
+    effective_date: new Date().toISOString(),
+    created_by: 'system',
+    is_active: true
+};
+
+export function ConstitutionPage() {
+    const [constitution, setConstitution] = useState<any>(DEFAULT_CONSTITUTION);
+    const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-
     const [isEditing, setIsEditing] = useState(false);
-    const [editForm, setEditForm] = useState<{
-        preamble: string;
-        articles: string;
-        prohibited_actions: string;
-        sovereign_preferences: string;
-    }>({
-        preamble: '',
-        articles: '',
-        prohibited_actions: '',
-        sovereign_preferences: ''
-    });
+    const [editedConstitution, setEditedConstitution] = useState<any>(DEFAULT_CONSTITUTION);
+    const [saving, setSaving] = useState(false);
 
     useEffect(() => {
         loadConstitution();
@@ -28,60 +32,96 @@ export const ConstitutionPage: React.FC = () => {
 
     const loadConstitution = async () => {
         try {
-            setIsLoading(true);
+            setLoading(true);
             setError(null);
             const data = await constitutionService.getCurrentConstitution();
-            setConstitution(data);
 
-            // Initialize form
-            setEditForm({
-                preamble: data.preamble || '',
-                articles: JSON.stringify(data.articles, null, 2),
-                prohibited_actions: data.prohibited_actions.join('\n'),
-                sovereign_preferences: JSON.stringify(data.sovereign_preferences, null, 2)
-            });
+            // Deep merge to ensure all nested objects exist
+            const safeData = {
+                ...DEFAULT_CONSTITUTION,
+                ...data,
+                articles: data?.articles || DEFAULT_CONSTITUTION.articles,
+                prohibited_actions: Array.isArray(data?.prohibited_actions)
+                    ? data.prohibited_actions
+                    : (typeof data?.prohibited_actions === 'string'
+                        ? [data.prohibited_actions]
+                        : DEFAULT_CONSTITUTION.prohibited_actions),
+                sovereign_preferences: {
+                    ...DEFAULT_CONSTITUTION.sovereign_preferences,
+                    ...(data?.sovereign_preferences || {})
+                }
+            };
+
+            setConstitution(safeData);
+            setEditedConstitution(JSON.parse(JSON.stringify(safeData)));
         } catch (err: any) {
-            console.error(err);
-            setError(err.response?.data?.detail || 'Failed to load constitution');
+            console.error('Failed to load:', err);
+            const errorMsg = err.response?.data?.detail || err.message || 'Failed to load constitution';
+            setError(errorMsg);
+            toast.error('Failed to load constitution');
+
+            setConstitution(DEFAULT_CONSTITUTION);
+            setEditedConstitution(JSON.parse(JSON.stringify(DEFAULT_CONSTITUTION)));
         } finally {
-            setIsLoading(false);
+            setLoading(false);
         }
     };
 
     const handleSave = async () => {
         try {
-            // Validate JSON
-            const articlesJson = JSON.parse(editForm.articles);
-            const prefsJson = JSON.parse(editForm.sovereign_preferences);
+            setSaving(true);
+
+            if (!editedConstitution.preamble?.trim()) {
+                toast.error('Preamble cannot be empty');
+                return;
+            }
 
             await constitutionService.updateConstitution({
-                preamble: editForm.preamble,
-                articles: articlesJson,
-                prohibited_actions: editForm.prohibited_actions.split('\n').filter(s => s.trim().length > 0),
-                sovereign_preferences: prefsJson
+                preamble: editedConstitution.preamble,
+                articles: editedConstitution.articles,
+                prohibited_actions: Array.isArray(editedConstitution.prohibited_actions)
+                    ? editedConstitution.prohibited_actions
+                    : [],
+                sovereign_preferences: editedConstitution.sovereign_preferences
             });
 
-            await loadConstitution();
+            toast.success('Constitution updated successfully');
             setIsEditing(false);
+            await loadConstitution();
         } catch (err: any) {
-            console.error(err);
-            alert(`Failed to save: ${err.message}`);
+            toast.error(err.response?.data?.detail || 'Update failed');
+        } finally {
+            setSaving(false);
         }
     };
 
-    if (isLoading) {
-        return <div className="p-6 text-center text-gray-500">Loading constitution...</div>;
+    const handleReset = () => {
+        setEditedConstitution(JSON.parse(JSON.stringify(constitution)));
+        setIsEditing(false);
+    };
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-64">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                    <p className="text-gray-600">Loading Constitution...</p>
+                </div>
+            </div>
+        );
     }
 
-    if (error) {
+    const data = isEditing ? (editedConstitution || DEFAULT_CONSTITUTION) : (constitution || DEFAULT_CONSTITUTION);
+
+    if (!data || !data.prohibited_actions) {
         return (
-            <div className="p-6 flex flex-col items-center justify-center h-full text-red-400">
-                <AlertTriangle className="w-12 h-12 mb-4" />
-                <h2 className="text-xl font-bold">Access Denied / Error</h2>
-                <p className="mt-2 text-gray-400">{error}</p>
+            <div className="p-6 text-center">
+                <AlertTriangle className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
+                <h2 className="text-xl font-semibold mb-2">Error Loading Constitution</h2>
+                <p className="text-gray-600 mb-4">{error || 'Unknown error occurred'}</p>
                 <button
                     onClick={loadConstitution}
-                    className="mt-4 px-4 py-2 bg-gray-800 rounded hover:bg-gray-700 text-white transition-colors"
+                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
                 >
                     Retry
                 </button>
@@ -89,160 +129,220 @@ export const ConstitutionPage: React.FC = () => {
         );
     }
 
-    if (!constitution) return null;
-
     return (
-        <div className="p-6 max-w-4xl mx-auto pb-20">
-            <div className="flex items-center justify-between mb-8 border-b border-gray-700 pb-6">
-                <div className="flex items-center gap-4">
-                    <div className="p-3 bg-purple-500/10 rounded-xl">
-                        <Book className="w-8 h-8 text-purple-400" />
-                    </div>
-                    <div>
-                        <h1 className="text-3xl font-bold text-white">The Constitution of Agentium</h1>
-                        <div className="flex items-center gap-3 mt-2 text-sm text-gray-400">
-                            <span className="flex items-center gap-1">
-                                <History className="w-4 h-4" />
-                                Version {constitution.version}
-                            </span>
-                            <span>•</span>
-                            <span>Effective: {new Date(constitution.effective_date).toLocaleDateString()}</span>
+        <div className="max-w-5xl mx-auto p-6 space-y-6">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-6 shadow-sm">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                        <div className="bg-blue-600 p-3 rounded-lg">
+                            <Shield className="h-8 w-8 text-white" />
+                        </div>
+                        <div>
+                            <h1 className="text-3xl font-bold text-gray-900">The Constitution</h1>
+                            <div className="flex items-center gap-3 mt-1">
+                                <span className="text-sm text-gray-600">Version {data.version}</span>
+                                <span className="text-gray-400">•</span>
+                                <span className="text-sm text-gray-600 flex items-center gap-1">
+                                    <Clock className="h-3 w-3" />
+                                    {new Date(data.effective_date).toLocaleDateString()}
+                                </span>
+                                {data.is_active && (
+                                    <>
+                                        <span className="text-gray-400">•</span>
+                                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
+                                            <Check className="h-3 w-3" />
+                                            Active
+                                        </span>
+                                    </>
+                                )}
+                            </div>
                         </div>
                     </div>
-                </div>
 
-                <button
-                    onClick={() => isEditing ? handleSave() : setIsEditing(true)}
-                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${isEditing
-                        ? 'bg-green-600 hover:bg-green-500 text-white'
-                        : 'bg-gray-800 hover:bg-gray-700 text-gray-200'
-                        }`}
-                >
-                    {isEditing ? 'Save Changes' : 'Edit Constitution'}
-                </button>
+                    <div className="flex gap-2">
+                        {isEditing ? (
+                            <>
+                                <button
+                                    onClick={handleReset}
+                                    className="px-4 py-2 text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors flex items-center gap-2"
+                                    disabled={saving}
+                                >
+                                    <X className="h-4 w-4" />
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleSave}
+                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 disabled:opacity-50"
+                                    disabled={saving}
+                                >
+                                    {saving ? (
+                                        <>
+                                            <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                                            Saving...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Save className="h-4 w-4" />
+                                            Save Changes
+                                        </>
+                                    )}
+                                </button>
+                            </>
+                        ) : (
+                            <button
+                                onClick={() => setIsEditing(true)}
+                                className="px-4 py-2 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition-colors"
+                            >
+                                Edit Constitution
+                            </button>
+                        )}
+                    </div>
+                </div>
             </div>
 
-            {isEditing ? (
-                <div className="space-y-6">
-                    {/* Edit Preamble */}
-                    <div className="bg-gray-900/50 p-6 rounded-xl border border-gray-800">
-                        <label className="block text-sm font-medium text-gray-400 mb-2">Preamble</label>
-                        <textarea
-                            className="w-full bg-gray-800 border border-gray-700 rounded p-3 text-white h-32"
-                            value={editForm.preamble}
-                            onChange={e => setEditForm({ ...editForm, preamble: e.target.value })}
-                        />
-                    </div>
-
-                    {/* Edit Everything Else (JSON/Text) */}
-                    <div className="grid grid-cols-1 gap-6">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-400 mb-2">Articles (JSON Format)</label>
-                            <textarea
-                                className="w-full bg-gray-800 border border-gray-700 rounded p-3 text-white font-mono text-sm h-64"
-                                value={editForm.articles}
-                                onChange={e => setEditForm({ ...editForm, articles: e.target.value })}
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-400 mb-2">Prohibited Actions (One per line)</label>
-                            <textarea
-                                className="w-full bg-gray-800 border border-gray-700 rounded p-3 text-white h-48"
-                                value={editForm.prohibited_actions}
-                                onChange={e => setEditForm({ ...editForm, prohibited_actions: e.target.value })}
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-400 mb-2">Sovereign Preferences (JSON)</label>
-                            <textarea
-                                className="w-full bg-gray-800 border border-gray-700 rounded p-3 text-white font-mono text-sm h-48"
-                                value={editForm.sovereign_preferences}
-                                onChange={e => setEditForm({ ...editForm, sovereign_preferences: e.target.value })}
-                            />
-                        </div>
-                    </div>
-
-                    <div className="flex justify-end gap-3 mt-6">
-                        <button
-                            onClick={() => setIsEditing(false)}
-                            className="px-4 py-2 text-gray-400 hover:text-white"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            onClick={handleSave}
-                            className="px-6 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-bold"
-                        >
-                            Save Amendment
-                        </button>
+            {error && (
+                <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded">
+                    <div className="flex items-center gap-2">
+                        <AlertTriangle className="h-5 w-5 text-red-500" />
+                        <p className="text-red-700">{error}</p>
                     </div>
                 </div>
-            ) : (
-                <>
-                    {/* View Mode */}
-                    <section className="mb-10 text-center">
-                        <h2 className="text-xl font-serif italic text-gray-300 mb-4 leading-relaxed max-w-2xl mx-auto">
-                            "{constitution.preamble}"
-                        </h2>
-                        <div className="w-24 h-1 bg-gradient-to-r from-transparent via-purple-500/50 to-transparent mx-auto"></div>
-                    </section>
-
-                    {/* Sovereign Preferences */}
-                    <section className="mb-8 bg-gray-900/50 p-6 rounded-xl border border-gray-800">
-                        <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                            <Shield className="w-5 h-5 text-blue-400" />
-                            Sovereign Preferences
-                        </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {Object.entries(constitution.sovereign_preferences).map(([key, value]) => (
-                                <div key={key} className="bg-gray-800/50 p-3 rounded border border-gray-700/50">
-                                    <span className="text-gray-400 text-xs uppercase tracking-wider block mb-1">
-                                        {key.replace(/_/g, ' ')}
-                                    </span>
-                                    <span className="text-gray-200 font-medium">{String(value)}</span>
-                                </div>
-                            ))}
-                        </div>
-                    </section>
-
-                    {/* Articles */}
-                    <section className="space-y-6">
-                        <h3 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
-                            <Scale className="w-6 h-6 text-purple-400" />
-                            Articles
-                        </h3>
-
-                        {Object.entries(constitution.articles).map(([articleId, content]) => (
-                            <div key={articleId} className="bg-gray-800 rounded-lg p-6 border border-gray-700 hover:border-gray-600 transition-colors">
-                                <h4 className="text-lg font-bold text-white mb-3 text-purple-200">
-                                    {articleId}
-                                </h4>
-                                <p className="text-gray-300 leading-relaxed whitespace-pre-wrap">
-                                    {content as string}
-                                </p>
-                            </div>
-                        ))}
-                    </section>
-
-                    {/* Prohibited Actions */}
-                    <section className="mt-10 pt-8 border-t border-gray-800">
-                        <h3 className="text-lg font-bold text-red-400 mb-4 flex items-center gap-2">
-                            <AlertTriangle className="w-5 h-5" />
-                            Strictly Prohibited Actions
-                        </h3>
-                        <ul className="space-y-2">
-                            {constitution.prohibited_actions.map((action, index) => (
-                                <li key={index} className="flex items-start gap-3 bg-red-500/5 p-3 rounded border border-red-500/10 text-red-200/80">
-                                    <span className="text-red-500 font-bold">•</span>
-                                    {action}
-                                </li>
-                            ))}
-                        </ul>
-                    </section>
-                </>
             )}
+
+            {/* Preamble */}
+            <section className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                    <BookOpen className="h-5 w-5 text-blue-600" />
+                    Preamble
+                </h2>
+                {isEditing ? (
+                    <textarea
+                        value={data.preamble || ''}
+                        onChange={(e) => setEditedConstitution({
+                            ...editedConstitution,
+                            preamble: e.target.value
+                        })}
+                        className="w-full h-32 p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none font-serif"
+                        placeholder="Enter the preamble..."
+                    />
+                ) : (
+                    <p className="text-gray-700 leading-relaxed font-serif italic border-l-4 border-blue-600 pl-4">
+                        {data.preamble}
+                    </p>
+                )}
+            </section>
+
+            {/* Articles */}
+            <section className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <h2 className="text-xl font-semibold mb-4">Articles</h2>
+                <div className="space-y-4">
+                    {data.articles && Object.entries(data.articles).map(([key, article]: [string, any], index) => (
+                        <div key={key} className="border-l-4 border-indigo-500 pl-4 py-2 hover:bg-gray-50 rounded-r transition-colors">
+                            <h3 className="font-semibold text-gray-900 mb-2">
+                                Article {index + 1}: {article?.title || 'Untitled'}
+                            </h3>
+                            {isEditing ? (
+                                <textarea
+                                    value={article?.content || ''}
+                                    onChange={(e) => {
+                                        const newArticles = {
+                                            ...editedConstitution.articles,
+                                            [key]: { ...article, content: e.target.value }
+                                        };
+                                        setEditedConstitution({ ...editedConstitution, articles: newArticles });
+                                    }}
+                                    className="w-full mt-2 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                                    rows={3}
+                                />
+                            ) : (
+                                <p className="text-gray-600 leading-relaxed">{article?.content}</p>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            </section>
+
+            {/* Prohibited Actions */}
+            <section className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                    <AlertTriangle className="h-5 w-5 text-red-600" />
+                    Prohibited Actions
+                </h2>
+                {isEditing ? (
+                    <div>
+                        <textarea
+                            value={Array.isArray(data.prohibited_actions)
+                                ? data.prohibited_actions.join('\n')
+                                : ''}
+                            onChange={(e) => setEditedConstitution({
+                                ...editedConstitution,
+                                prohibited_actions: e.target.value
+                                    .split('\n')
+                                    .map(line => line.trim())
+                                    .filter(line => line.length > 0)
+                            })}
+                            className="w-full h-32 p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none font-mono text-sm"
+                            placeholder="One action per line..."
+                        />
+                        <p className="text-sm text-gray-500 mt-2">Enter one prohibited action per line</p>
+                    </div>
+                ) : (
+                    <ul className="space-y-2">
+                        {Array.isArray(data.prohibited_actions) && data.prohibited_actions.length > 0 ? (
+                            data.prohibited_actions.map((action: string, idx: number) => (
+                                <li key={idx} className="flex items-start gap-3 p-3 bg-red-50 rounded-lg">
+                                    <X className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />
+                                    <span className="text-gray-800">{action}</span>
+                                </li>
+                            ))
+                        ) : (
+                            <li className="text-gray-400 italic p-3 bg-gray-50 rounded-lg">
+                                No prohibited actions defined
+                            </li>
+                        )}
+                    </ul>
+                )}
+            </section>
+
+            {/* Sovereign Preferences */}
+            <section className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <h2 className="text-xl font-semibold mb-4">Sovereign Preferences</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {data.sovereign_preferences && Object.entries(data.sovereign_preferences).map(([key, value]: [string, any]) => (
+                        <div key={key} className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg p-4 border border-gray-200">
+                            <label className="text-sm font-medium text-gray-600 capitalize block mb-2">
+                                {key.replace(/_/g, ' ')}
+                            </label>
+                            {isEditing ? (
+                                <input
+                                    type="text"
+                                    value={String(value ?? '')}
+                                    onChange={(e) => {
+                                        const newPrefs = {
+                                            ...editedConstitution.sovereign_preferences,
+                                            [key]: e.target.value
+                                        };
+                                        setEditedConstitution({ ...editedConstitution, sovereign_preferences: newPrefs });
+                                    }}
+                                    className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                />
+                            ) : (
+                                <p className="text-gray-900 font-medium">{String(value ?? 'N/A')}</p>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            </section>
+
+            {/* Footer Info */}
+            <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-600 border border-gray-200">
+                <p>
+                    Created by: <span className="font-medium">{data.created_by || 'System'}</span>
+                    {' • '}
+                    Last updated: <span className="font-medium">{new Date(data.effective_date).toLocaleString()}</span>
+                </p>
+            </div>
         </div>
     );
-};
+}

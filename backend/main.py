@@ -13,6 +13,8 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, HTTPExcept
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from backend.celery_app import celery_app as celery
+from pydantic import BaseModel
+from typing import Optional, Dict, Any, List
 
 from backend.services.api_manager import init_api_manager
 import backend.services.api_manager as api_manager_module
@@ -47,6 +49,14 @@ from backend.api.routes import admin as admin_routes
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+class ConstitutionUpdateRequest(BaseModel):
+    """Constitution update request from frontend."""
+    preamble: Optional[str] = None
+    articles: Optional[Dict[str, Any]] = None
+    prohibited_actions: Optional[List[str]] = None
+    sovereign_preferences: Optional[Dict[str, Any]] = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -551,29 +561,61 @@ async def websocket_endpoint(websocket: WebSocket, db: Session = Depends(get_db)
 # ==================== Constitution ====================
 
 @app.get("/api/v1/constitution/current")
-async def get_current_constitution(db: Session = Depends(get_db)):
-    """Get current active constitution."""
+async def get_current_constitution(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)  # ✅ FIXED: using get_current_user
+):
+    """Get the currently active constitution. Creates default if none exists."""
+    import json
+    from datetime import datetime
+    
     constitution = db.query(Constitution).filter_by(
         is_active='Y'
     ).order_by(Constitution.effective_date.desc()).first()
     
     if not constitution:
-        raise HTTPException(status_code=404, detail="No active constitution found")
+        from backend.services.initialization_service import InitializationService
+        constitution = InitializationService.create_default_constitution(db)
     
-    return constitution.to_dict()
+    return {
+        'id': constitution.id,
+        'version': constitution.version,
+        'version_number': constitution.version_number,
+        'preamble': constitution.preamble or "",
+        'articles': constitution.get_articles_dict(),
+        'prohibited_actions': constitution.get_prohibited_actions_list(),
+        'sovereign_preferences': constitution.get_sovereign_preferences(),
+        'effective_date': constitution.effective_date.isoformat() if constitution.effective_date else datetime.utcnow().isoformat(),
+        'created_by': constitution.created_by_agentium_id,
+        'is_active': constitution.is_active == 'Y'
+    }
+
 
 @app.post("/api/v1/constitution/update")
 async def update_constitution(
-    preamble: str = None,
-    articles: str = None,
-    prohibited_actions: list = None,
-    sovereign_preferences: dict = None,
-    db: Session = Depends(get_db)
+    request: ConstitutionUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)  # ✅ FIXED: using get_current_user
 ):
-    """
-    Propose constitution update (requires Council voting in production).
-    For now, creates new version immediately.
-    """
+    """Update constitution - creates new version."""
+    import json
+    from datetime import datetime
+    
+    # Check permissions - adapt this based on what get_current_user returns
+    # If get_current_user returns a User object, adjust accordingly
+    if hasattr(current_user, 'is_admin'):
+        # If it's a User object
+        is_admin = current_user.is_admin
+        username = current_user.username
+    else:
+        # If it's a dict
+        is_admin = current_user.get("is_admin", False)
+        username = current_user.get("username", "sovereign")
+    
+    if not is_admin:
+        # For now, allow all authenticated users until proper permissions are set
+        pass
+    
     current = db.query(Constitution).filter_by(
         is_active='Y'
     ).order_by(Constitution.effective_date.desc()).first()
@@ -581,34 +623,78 @@ async def update_constitution(
     if not current:
         raise HTTPException(status_code=404, detail="No active constitution found")
     
-    # Deactivate current constitution
+    # Archive current
     current.is_active = 'N'
+    if hasattr(current, 'archived_date'):
+        current.archived_date = datetime.utcnow()
+    
+    # Version increment
+    try:
+        current_version_num = int(current.version.replace('v', '').split('.')[0])
+        new_version_num = current_version_num + 1
+        new_version = f"v{new_version_num}.0.0"
+    except (ValueError, AttributeError):
+        new_version = f"v{datetime.utcnow().strftime('%Y%m%d%H%M')}"
+        new_version_num = 1
+    
+    # Prepare data
+    new_preamble = request.preamble if request.preamble is not None else current.preamble
+    new_articles = json.dumps(request.articles) if request.articles is not None else current.articles
+    new_prohibited = json.dumps(request.prohibited_actions) if request.prohibited_actions is not None else current.prohibited_actions
+    new_preferences = json.dumps(request.sovereign_preferences) if request.sovereign_preferences is not None else current.sovereign_preferences
+    
+    # Changelog
+    changes = []
+    if request.preamble is not None:
+        changes.append("Updated preamble")
+    if request.articles is not None:
+        changes.append("Modified articles")
+    if request.prohibited_actions is not None:
+        changes.append("Updated prohibited actions")
+    if request.sovereign_preferences is not None:
+        changes.append("Updated preferences")
+    
+    changelog_data = [{
+        "version": new_version,
+        "changes": changes or ["Manual update"],
+        "updated_by": username,
+        "timestamp": datetime.utcnow().isoformat()
+    }]
     
     # Create new version
-    import json
-    from datetime import datetime
-    
     new_constitution = Constitution(
-        version=current.version + 1,
-        preamble=preamble or current.preamble,
-        articles=articles or current.articles,
-        prohibited_actions=prohibited_actions or (
-            json.loads(current.prohibited_actions) if isinstance(current.prohibited_actions, str) else current.prohibited_actions
-        ),
-        sovereign_preferences=sovereign_preferences or (
-            json.loads(current.sovereign_preferences) if isinstance(current.sovereign_preferences, str) else current.sovereign_preferences
-        ),
+        version=new_version,
+        version_number=new_version_num,
+        preamble=new_preamble,
+        articles=new_articles,
+        prohibited_actions=new_prohibited,
+        sovereign_preferences=new_preferences,
+        changelog=json.dumps(changelog_data),
         effective_date=datetime.utcnow(),
         is_active='Y',
-        created_by="sovereign"
+        created_by_agentium_id=username
     )
+    
+    # Only set replaces_version_id if the field exists
+    if hasattr(new_constitution, 'replaces_version_id'):
+        new_constitution.replaces_version_id = current.id
     
     db.add(new_constitution)
     db.commit()
     db.refresh(new_constitution)
     
-    return new_constitution.to_dict()
-
+    return {
+        'id': new_constitution.id,
+        'version': new_constitution.version,
+        'version_number': new_constitution.version_number,
+        'preamble': new_constitution.preamble or "",
+        'articles': new_constitution.get_articles_dict(),
+        'prohibited_actions': new_constitution.get_prohibited_actions_list(),
+        'sovereign_preferences': new_constitution.get_sovereign_preferences(),
+        'effective_date': new_constitution.effective_date.isoformat(),
+        'created_by': new_constitution.created_by_agentium_id,
+        'is_active': True
+    }
 # ==================== Monitoring & Oversight ====================
 
 @app.get("/api/v1/monitoring/agents/{agentium_id}/health")
