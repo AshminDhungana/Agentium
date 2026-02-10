@@ -12,7 +12,7 @@ import {
     DollarSign
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import BudgetControl from '@/components/BudgetControl'; // NEW: Import BudgetControl
+import BudgetControl from '@/components/BudgetControl';
 
 interface Stats {
     totalAgents: number;

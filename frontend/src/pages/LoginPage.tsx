@@ -123,7 +123,7 @@ export function LoginPage() {
                     {/* Backend Status */}
                     <div className="mt-4">
                         <p className="text-xs text-center text-gray-500 dark:text-gray-400">
-                            Backend connection required for full functionality
+                            Entrance to the New World
                         </p>
                     </div>
                 </div>

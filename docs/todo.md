@@ -737,13 +737,13 @@ Head 0xxxx can now spawn Lead agents (2xxxx) who can spawn Tasks (3xxxx)
 
 
 Final: 
-- Give head of council access to external system enviroment.
-- Reduce tokan usage.
 - Verify Head of Council has full system access
 - Verify Browser Control
 - Test and check if eveything is working well.
 - Memory Management (Database and Vector DB Memory management i.e Delete very old data record and versions of data stored, dont delete the orginal constitution.)
-- Signup feature with admin approval
+-Tools to connect to mcp server
+-System to change the agent to the next available api key if the current api key is not working.
+- Notification if none of the api key is responding. in both frontend and in running channels.
 ---
 
 *Last Updated: 2026-02-01*  

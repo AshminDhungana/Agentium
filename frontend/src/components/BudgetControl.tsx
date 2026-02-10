@@ -231,7 +231,7 @@ export default function BudgetControl() {
                                     step="0.1"
                                     className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition"
                                 />
-                                <p className="text-xs text-gray-500 dark:text-gray-500">Maximum: $1,000/day</p>
+                                <p className="text-xs text-gray-500 dark:text-gray-500">Maximum: $ As much as you want/day</p>
                             </div>
                         </div>
 
