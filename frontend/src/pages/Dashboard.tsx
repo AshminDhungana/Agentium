@@ -8,11 +8,10 @@ import {
     Activity,
     Shield,
     Cpu,
-    Coins,
-    DollarSign
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import BudgetControl from '@/components/BudgetControl';
+import { api } from '@/services/api';
 
 interface Stats {
     totalAgents: number;
@@ -30,20 +29,62 @@ export function Dashboard() {
         pendingTasks: 0,
         completedTasks: 0
     });
+    const [isLoadingStats, setIsLoadingStats] = useState(false);
 
-    // Fetch stats from backend
     useEffect(() => {
         if (status.status === 'connected') {
-            // TODO: Replace with actual API calls
-            // Mock data for now
-            setStats({
-                totalAgents: 5,
-                activeAgents: 4,
-                pendingTasks: 3,
-                completedTasks: 12
-            });
+            fetchStats();
+        } else {
+            // Reset to 0 when disconnected so numbers are never stale
+            setStats({ totalAgents: 0, activeAgents: 0, pendingTasks: 0, completedTasks: 0 });
         }
     }, [status]);
+
+    const fetchStats = async () => {
+        setIsLoadingStats(true);
+        try {
+            // Run both requests in parallel
+            const [agentsRes, tasksRes] = await Promise.allSettled([
+                api.get('/api/v1/agents'),
+                api.get('/api/v1/tasks/'),
+            ]);
+
+            // --- Agents ---
+            let totalAgents = 0;
+            let activeAgents = 0;
+            if (agentsRes.status === 'fulfilled') {
+                const agents: any[] = Array.isArray(agentsRes.value.data)
+                    ? agentsRes.value.data
+                    : agentsRes.value.data?.agents ?? [];
+                totalAgents = agents.length;
+                activeAgents = agents.filter(
+                    (a: any) => a.status === 'active' || a.status === 'working'
+                ).length;
+            }
+
+            // --- Tasks ---
+            let pendingTasks = 0;
+            let completedTasks = 0;
+            if (tasksRes.status === 'fulfilled') {
+                const tasks: any[] = Array.isArray(tasksRes.value.data)
+                    ? tasksRes.value.data
+                    : tasksRes.value.data?.tasks ?? [];
+                pendingTasks = tasks.filter(
+                    (t: any) => t.status === 'pending' || t.status === 'deliberating'
+                ).length;
+                completedTasks = tasks.filter(
+                    (t: any) => t.status === 'completed'
+                ).length;
+            }
+
+            setStats({ totalAgents, activeAgents, pendingTasks, completedTasks });
+        } catch (err) {
+            console.error('Failed to fetch dashboard stats:', err);
+        } finally {
+            setIsLoadingStats(false);
+        }
+    };
+
     const colorClasses = {
         blue: {
             bg: 'bg-blue-100 dark:bg-blue-900/30',
@@ -130,11 +171,15 @@ export function Dashboard() {
                         className="bg-white dark:bg-gray-800 p-6 rounded-xl border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-shadow"
                     >
                         <div className="flex items-center justify-between mb-4">
-                            <div className={`w-12 h-12 rounded-lg ${colorClasses[stat.color].bg} flex items-center justify-center`}>
-                                <stat.icon className={`w-6 h-6 ${colorClasses[stat.color].text}`} />
+                            <div className={`w-12 h-12 rounded-lg ${colorClasses[stat.color as keyof typeof colorClasses].bg} flex items-center justify-center`}>
+                                <stat.icon className={`w-6 h-6 ${colorClasses[stat.color as keyof typeof colorClasses].text}`} />
                             </div>
                             <span className="text-2xl font-bold text-gray-900 dark:text-white">
-                                {stat.value}
+                                {isLoadingStats ? (
+                                    <span className="inline-block w-6 h-6 rounded bg-gray-200 dark:bg-gray-700 animate-pulse" />
+                                ) : (
+                                    stat.value
+                                )}
                             </span>
                         </div>
                         <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
@@ -144,7 +189,7 @@ export function Dashboard() {
                 ))}
             </div>
 
-            {/* NEW: Budget Control Panel - Full Width */}
+            {/* Budget Control Panel */}
             <div className="mb-8">
                 <BudgetControl />
             </div>
@@ -164,8 +209,8 @@ export function Dashboard() {
                         <div className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-700">
                             <span className="text-sm text-gray-600 dark:text-gray-400">Backend Status</span>
                             <span className={`text-sm font-medium px-2 py-1 rounded-full ${status.status === 'connected'
-                                ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                                : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                                    ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                    : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
                                 }`}>
                                 {status.status === 'connected' ? 'Healthy' : 'Disconnected'}
                             </span>

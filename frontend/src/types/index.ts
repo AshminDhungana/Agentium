@@ -108,19 +108,21 @@ export interface Agent {
 
 export interface Task {
     id: string;
-    agentium_id: string;
+    agentium_id?: string;          // optional - not always returned by API
     title: string;
     description: string;
     status: string;
     priority: string;
+    task_type: string;             // added - "execution" | "research" | etc.
     progress: number;
-    created_by: string;
+    created_by?: string;           // optional - not always returned
     assigned_agents: {
-        head?: string;
-        lead?: string;
-        task_agents: string[];
+        head?: string | null;
+        lead?: string | null;
+        task_agents: string[];     // always an array, never null
     };
-    created_at: string;
+    created_at: string | null;     // ISO string or null
+    updated_at?: string | null;    // added
 }
 
 export interface Constitution {

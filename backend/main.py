@@ -45,6 +45,7 @@ from backend.core.auth import get_current_user
 from backend.api import sovereign
 from backend.api.routes import tool_creation as tool_creation_routes
 from backend.api.routes import admin as admin_routes
+from backend.api.routes import tasks as tasks_routes
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -218,6 +219,7 @@ app.include_router(host_access.router, prefix="/api/v1")
 app.include_router(sovereign.router, prefix="/api/v1")
 app.include_router(tool_creation_routes.router, prefix="/api/v1")
 app.include_router(admin_routes.router, prefix="/api/v1")
+app.include_router(tasks_routes.router, prefix="/api/v1")
 
 # CORS middleware
 app.add_middleware(
@@ -339,79 +341,7 @@ async def update_agent_status(
         raise HTTPException(status_code=400, detail=f"Invalid status: {status}")
 
 # ==================== Task Management ====================
-
-@app.post("/api/v1/tasks/create")
-async def create_task(
-    description: str,
-    task_type: str = "general",
-    priority: str = "medium",
-    assigned_to: str = None,
-    db: Session = Depends(get_db)
-):
-    """Create a new task."""
-    try:
-        task_type_enum = TaskType(task_type)
-        priority_enum = TaskPriority(priority)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    
-    # If assigned_to specified, verify agent exists
-    assigned_agent = None
-    if assigned_to:
-        assigned_agent = db.query(Agent).filter_by(agentium_id=assigned_to).first()
-        if not assigned_agent:
-            raise HTTPException(status_code=404, detail=f"Agent {assigned_to} not found")
-    
-    task = Task(
-        description=description,
-        task_type=task_type_enum,
-        priority=priority_enum,
-        status=TaskStatus.PENDING,
-        created_by="user",
-        assigned_to=assigned_agent.id if assigned_agent else None,
-        created_at=datetime.utcnow(),
-        token_budget=None,
-        estimated_tokens=None
-    )
-    
-    db.add(task)
-    db.commit()
-    db.refresh(task)
-    
-    return task.to_dict()
-
-@app.get("/api/v1/tasks")
-async def list_tasks(
-    status: str = None,
-    agent_id: str = None,
-    db: Session = Depends(get_db)
-):
-    """List tasks with optional filters."""
-    query = db.query(Task)
-    
-    if status:
-        try:
-            status_enum = TaskStatus(status)
-            query = query.filter_by(status=status_enum)
-        except ValueError:
-            raise HTTPException(status_code=400, detail=f"Invalid status: {status}")
-    
-    if agent_id:
-        agent = db.query(Agent).filter_by(agentium_id=agent_id).first()
-        if agent:
-            query = query.filter_by(assigned_to=agent.id)
-    
-    tasks = query.order_by(Task.created_at.desc()).all()
-    return [task.to_dict() for task in tasks]
-
-@app.get("/api/v1/tasks/{task_id}")
-async def get_task(task_id: int, db: Session = Depends(get_db)):
-    """Get task details."""
-    task = db.query(Task).filter_by(id=task_id).first()
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
-    
-    return task.to_dict()
+# CRUD routes handled by tasks_routes router (registered above at /api/v1/tasks)
 
 # ==================== Task Execution (MODIFIED WITH WAKE) ====================
 
