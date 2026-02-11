@@ -22,11 +22,11 @@ router = APIRouter(prefix="/models", tags=["Model Configuration"])
 
 class ModelConfigCreate(BaseModel):
     provider: ProviderType
-    provider_name: Optional[str] = None  # Custom display name
+    provider_name: Optional[str] = None
     config_name: str = Field(..., min_length=1, max_length=100)
     api_key: Optional[SecretStr] = None
     api_base_url: Optional[str] = None
-    local_server_url: Optional[str] = None  # For LOCAL type
+    local_server_url: Optional[str] = None
     default_model: str = Field(..., min_length=1)
     available_models: List[str] = Field(default_factory=list)
     is_default: bool = False
@@ -68,7 +68,7 @@ class ModelConfigResponse(BaseModel):
     status: str
     is_default: bool
     settings: Dict[str, Any] = Field(default_factory=dict)
-    last_tested: Optional[str] = None  # FIXED: Made optional
+    last_tested: Optional[str] = None
     total_usage: Dict[str, Any] = Field(default_factory=dict)
     
     class Config:
@@ -83,7 +83,6 @@ class ProviderInfo(BaseModel):
     requires_base_url: bool
     default_base_url: Optional[str] = None
     description: str
-    popular_models: List[str]
 
 
 class TestResult(BaseModel):
@@ -96,15 +95,26 @@ class TestResult(BaseModel):
 
 
 class UniversalProviderCreate(BaseModel):
-    """
-    Universal schema for ANY provider not in standard list.
-    """
-    provider_name: str  # e.g., "Groq", "My Custom API"
-    api_base_url: str   # OpenAI-compatible endpoint
+    provider_name: str
+    api_base_url: str
     api_key: Optional[SecretStr] = None
     default_model: str
     config_name: Optional[str] = None
     is_default: bool = False
+
+
+class FetchModelsRequest(BaseModel):
+    provider: ProviderType
+    api_key: Optional[str] = None
+    api_base_url: Optional[str] = None
+    local_server_url: Optional[str] = None
+
+
+class FetchModelsResponse(BaseModel):
+    provider: str
+    models: List[str]
+    count: int
+    default_recommended: Optional[str] = None
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -113,12 +123,8 @@ class UniversalProviderCreate(BaseModel):
 
 @router.get("/providers", response_model=List[ProviderInfo])
 async def list_providers():
-    """
-    List ALL available provider types including popular third-party options.
-    Frontend can also add any OpenAI-compatible provider via CUSTOM type.
-    """
+    """List ALL available provider types. Model lists fetched dynamically."""
     providers = [
-        # Major providers
         ProviderInfo(
             id=ProviderType.OPENAI.value,
             name="openai",
@@ -126,8 +132,7 @@ async def list_providers():
             requires_api_key=True,
             requires_base_url=False,
             default_base_url="https://api.openai.com/v1",
-            description="GPT-4, GPT-3.5 Turbo, and other OpenAI models",
-            popular_models=["gpt-4", "gpt-4-turbo", "gpt-3.5-turbo", "gpt-4o"]
+            description="GPT-4, GPT-3.5 Turbo, and other OpenAI models"
         ),
         ProviderInfo(
             id=ProviderType.ANTHROPIC.value,
@@ -136,8 +141,7 @@ async def list_providers():
             requires_api_key=True,
             requires_base_url=False,
             default_base_url="https://api.anthropic.com/v1",
-            description="Claude 3 Opus, Sonnet, Haiku - excellent reasoning",
-            popular_models=["claude-3-opus", "claude-3-sonnet", "claude-3-haiku"]
+            description="Claude 3 Opus, Sonnet, Haiku - excellent reasoning"
         ),
         ProviderInfo(
             id=ProviderType.GEMINI.value,
@@ -146,11 +150,8 @@ async def list_providers():
             requires_api_key=True,
             requires_base_url=False,
             default_base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
-            description="Google's multimodal models",
-            popular_models=["gemini-pro", "gemini-pro-vision", "gemini-1.5-pro"]
+            description="Google's multimodal models (Gemini 1.5 Pro, Flash, etc.)"
         ),
-        
-        # High-performance third-party
         ProviderInfo(
             id=ProviderType.GROQ.value,
             name="groq",
@@ -158,8 +159,7 @@ async def list_providers():
             requires_api_key=True,
             requires_base_url=False,
             default_base_url="https://api.groq.com/openai/v1",
-            description="Ultra-fast inference (100+ tokens/sec) with Llama 3",
-            popular_models=["llama3-70b-8192", "mixtral-8x7b-32768", "gemma-7b-it"]
+            description="Ultra-fast inference (100+ tokens/sec) with Llama 3"
         ),
         ProviderInfo(
             id=ProviderType.MISTRAL.value,
@@ -168,8 +168,7 @@ async def list_providers():
             requires_api_key=True,
             requires_base_url=False,
             default_base_url="https://api.mistral.ai/v1",
-            description="European AI with Mistral and Mixtral models",
-            popular_models=["mistral-large", "mistral-medium", "mistral-small", "codestral"]
+            description="European AI with Mistral and Mixtral models"
         ),
         ProviderInfo(
             id=ProviderType.TOGETHER.value,
@@ -178,8 +177,7 @@ async def list_providers():
             requires_api_key=True,
             requires_base_url=False,
             default_base_url="https://api.together.xyz/v1",
-            description="Access to 100+ open-source models",
-            popular_models=["meta-llama/Llama-3-70b", "mistralai/Mixtral-8x22B", "Qwen/Qwen2-72B"]
+            description="Access to 100+ open-source models"
         ),
         ProviderInfo(
             id=ProviderType.COHERE.value,
@@ -188,11 +186,8 @@ async def list_providers():
             requires_api_key=True,
             requires_base_url=False,
             default_base_url="https://api.cohere.ai/v1",
-            description="Command R+ and Embed models",
-            popular_models=["command-r", "command-r-plus", "command"]
+            description="Command R+ and Embed models"
         ),
-        
-        # Chinese/International
         ProviderInfo(
             id=ProviderType.MOONSHOT.value,
             name="moonshot",
@@ -200,8 +195,7 @@ async def list_providers():
             requires_api_key=True,
             requires_base_url=False,
             default_base_url="https://api.moonshot.cn/v1",
-            description="Kimi 2.5 - Long context (200K+ tokens), Chinese/English",
-            popular_models=["moonshot-v1-8k", "moonshot-v1-32k", "moonshot-v1-128k"]
+            description="Kimi 2.5 - Long context (200K+ tokens), Chinese/English"
         ),
         ProviderInfo(
             id=ProviderType.DEEPSEEK.value,
@@ -210,85 +204,69 @@ async def list_providers():
             requires_api_key=True,
             requires_base_url=False,
             default_base_url="https://api.deepseek.com/v1",
-            description="DeepSeek Coder and Chat models",
-            popular_models=["deepseek-chat", "deepseek-coder"]
+            description="DeepSeek Coder and Chat models"
         ),
-        
-        # Microsoft/Azure
         ProviderInfo(
             id=ProviderType.AZURE_OPENAI.value,
             name="azure_openai",
             display_name="Azure OpenAI",
             requires_api_key=True,
             requires_base_url=True,
-            default_base_url=None,  # User-specific
-            description="Enterprise OpenAI through Azure",
-            popular_models=["gpt-4", "gpt-35-turbo"]
+            default_base_url=None,
+            description="Enterprise OpenAI through Azure"
         ),
-        
-        # Local/Custom
         ProviderInfo(
             id=ProviderType.LOCAL.value,
             name="local",
-            display_name="Local Model (Ollama/lmstudio)",
+            display_name="Local (Ollama/LM Studio)",
             requires_api_key=False,
-            requires_base_url=True,
+            requires_base_url=False,
             default_base_url="http://localhost:11434/v1",
-            description="Run models locally via Ollama, LM Studio, or llama.cpp",
-            popular_models=["llama3", "mistral", "mixtral", "qwen2", "phi3"]
+            description="Run models locally with Ollama or LM Studio"
         ),
         ProviderInfo(
             id=ProviderType.CUSTOM.value,
             name="custom",
-            display_name="Custom Provider (Any OpenAI-compatible)",
+            display_name="Custom Provider",
             requires_api_key=True,
             requires_base_url=True,
             default_base_url=None,
-            description="Add any OpenAI-compatible API endpoint",
-            popular_models=["custom-model"]
+            description="Any OpenAI-compatible API endpoint"
         ),
     ]
     return providers
 
 
-@router.post("/configs", response_model=ModelConfigResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/configs", response_model=ModelConfigResponse)
 async def create_config(
     config: ModelConfigCreate,
-    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     user_id: str = "sovereign"
 ):
-    """
-    Save new model configuration from frontend.
-    Supports ANY provider including custom OpenAI-compatible endpoints.
-    """
-    # Handle default flag
+    """Create a new model configuration."""
+    
+    # If setting as default, unset other defaults
     if config.is_default:
-        db.query(UserModelConfig).filter_by(
-            user_id=user_id, 
-            is_default=True
-        ).update({"is_default": False})
-        db.commit()
+        db.query(UserModelConfig).filter_by(user_id=user_id, is_default=True).update({"is_default": False})
     
     # Encrypt API key if provided
-    encrypted_key = None
-    raw_key = None
+    api_key_encrypted = None
+    api_key_masked = None
     if config.api_key:
         raw_key = config.api_key.get_secret_value()
         if raw_key:
-            encrypted_key = encrypt_api_key(raw_key)
+            api_key_encrypted = encrypt_api_key(raw_key)
+            api_key_masked = f"...{raw_key[-4:]}"
     
-    # Determine effective base URL
-    effective_url = config.api_base_url or config.local_server_url
-    
+    # Create config
     db_config = UserModelConfig(
         user_id=user_id,
         provider=config.provider,
-        provider_name=config.provider_name or config.provider.value,
+        provider_name=config.provider_name,
         config_name=config.config_name,
-        api_key_encrypted=encrypted_key,
-        api_key_masked=f"...{raw_key[-4:]}" if (config.api_key and raw_key) else None,
-        api_base_url=effective_url,
+        api_key_encrypted=api_key_encrypted,
+        api_key_masked=api_key_masked,
+        api_base_url=config.api_base_url,
         local_server_url=config.local_server_url,
         default_model=config.default_model,
         available_models=config.available_models,
@@ -297,84 +275,55 @@ async def create_config(
         temperature=config.temperature,
         top_p=config.top_p,
         timeout_seconds=config.timeout_seconds,
-        status=ConnectionStatus.TESTING
+        status=ConnectionStatus.ACTIVE
     )
     
     db.add(db_config)
     db.commit()
     db.refresh(db_config)
     
-    # Test in background
-    background_tasks.add_task(_test_config_async, db_config.id, user_id)
-    
     return _serialize_config(db_config)
 
 
-@router.post("/configs/universal", response_model=ModelConfigResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/configs/universal", response_model=ModelConfigResponse)
 async def create_universal_config(
-    config: UniversalProviderCreate,
+    input: UniversalProviderCreate,
     db: Session = Depends(get_db),
     user_id: str = "sovereign"
 ):
-    """
-    Universal endpoint for ANY OpenAI-compatible provider not in standard list.
-    Examples: Perplexity, AI21, Anyscale, Fireworks, or your own API.
-    """
-    # Force unset other defaults
-    if config.is_default:
-        db.query(UserModelConfig).filter_by(
-            user_id=user_id, 
-            is_default=True
-        ).update({"is_default": False})
+    """Create configuration for ANY custom OpenAI-compatible provider."""
     
-    # Encrypt key
-    encrypted_key = None
-    raw_key = None
-    if config.api_key:
-        raw_key = config.api_key.get_secret_value()
-        encrypted_key = encrypt_api_key(raw_key)
+    if input.is_default:
+        db.query(UserModelConfig).filter_by(user_id=user_id, is_default=True).update({"is_default": False})
+    
+    api_key_encrypted = None
+    api_key_masked = None
+    if input.api_key:
+        raw_key = input.api_key.get_secret_value()
+        if raw_key:
+            api_key_encrypted = encrypt_api_key(raw_key)
+            api_key_masked = f"...{raw_key[-4:]}"
+    
+    config_name = input.config_name or f"{input.provider_name} Config"
     
     db_config = UserModelConfig(
         user_id=user_id,
         provider=ProviderType.CUSTOM,
-        provider_name=config.provider_name,
-        config_name=config.config_name or f"{config.provider_name} Config",
-        api_key_encrypted=encrypted_key,
-        api_base_url=config.api_base_url,
-        default_model=config.default_model,
-        is_default=config.is_default,
-        status=ConnectionStatus.TESTING
+        provider_name=input.provider_name,
+        config_name=config_name,
+        api_key_encrypted=api_key_encrypted,
+        api_key_masked=api_key_masked,
+        api_base_url=input.api_base_url,
+        default_model=input.default_model,
+        is_default=input.is_default,
+        status=ConnectionStatus.ACTIVE
     )
     
     db.add(db_config)
     db.commit()
     db.refresh(db_config)
     
-    # Test immediately (not async for universal)
-    result = await ModelService.test_connection(db_config)
-    if not result["success"]:
-        db_config.status = ConnectionStatus.ERROR
-        db_config.last_error = result.get("error")
-        db.commit()
-    else:
-        db_config.status = ConnectionStatus.ACTIVE
-        db.commit()
-    
     return _serialize_config(db_config)
-
-
-async def _test_config_async(config_id: str, user_id: str):
-    """Background task to test connection."""
-    with next(get_db()) as db:
-        config = db.query(UserModelConfig).filter_by(id=config_id, user_id=user_id).first()
-        if config:
-            result = await ModelService.test_connection(config)
-            if result["success"]:
-                config.status = ConnectionStatus.ACTIVE
-            else:
-                config.status = ConnectionStatus.ERROR
-                config.last_error = result.get("error", "Unknown error")
-            db.commit()
 
 
 def _serialize_config(config: UserModelConfig) -> Dict[str, Any]:
@@ -450,7 +399,6 @@ async def update_config(
     
     for field, value in update_data.items():
         if field in ['api_base_url', 'local_server_url'] and value:
-            # Validate URL
             if not value.startswith(('http://', 'https://')):
                 raise HTTPException(status_code=400, detail=f"Invalid URL: {value}")
         setattr(config, field, value)
@@ -508,16 +456,12 @@ async def fetch_models(
     db: Session = Depends(get_db),
     user_id: str = "sovereign"
 ):
-    """
-    Dynamically fetch available models from provider API.
-    Works for OpenAI, Groq, Together, and local Ollama.
-    """
+    """Dynamically fetch available models from provider API."""
     config = db.query(UserModelConfig).filter_by(id=config_id, user_id=user_id).first()
     if not config:
         raise HTTPException(status_code=404, detail="Configuration not found")
     
     try:
-        # Decrypt key for API call
         api_key = None
         if config.api_key_encrypted:
             api_key = decrypt_api_key(config.api_key_encrypted)
@@ -528,7 +472,6 @@ async def fetch_models(
             config.get_effective_base_url()
         )
         
-        # Update config with fetched models
         config.available_models = models
         db.commit()
         
@@ -541,6 +484,41 @@ async def fetch_models(
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch models: {str(e)}")
+
+
+@router.post("/providers/fetch-models-direct", response_model=FetchModelsResponse)
+async def fetch_provider_models_direct(request: FetchModelsRequest):
+    """
+    Fetch available models from provider WITHOUT requiring a config.
+    This is used during the configuration setup flow.
+    """
+    try:
+        models = await ModelService.list_models_for_provider(
+            provider=request.provider,
+            api_key=request.api_key,
+            base_url=request.api_base_url or request.local_server_url
+        )
+        
+        if not models:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No models found for provider {request.provider.value}"
+            )
+        
+        return FetchModelsResponse(
+            provider=request.provider.value,
+            models=models,
+            count=len(models),
+            default_recommended=models[0] if models else None
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch models from {request.provider.value}: {str(e)}"
+        )
 
 
 @router.post("/configs/{config_id}/set-default")

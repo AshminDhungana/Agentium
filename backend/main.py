@@ -2,7 +2,7 @@
 Agentium Main Application with IDLE GOVERNANCE integration.
 FastAPI backend with eternal idle council (Head + 2 Council Members).
 """
-
+import os
 from datetime import datetime
 import json
 import logging
@@ -50,7 +50,6 @@ from backend.api.routes import tasks as tasks_routes
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
 
 class ConstitutionUpdateRequest(BaseModel):
     """Constitution update request from frontend."""
@@ -208,15 +207,16 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+origins = os.getenv("ALLOWED_ORIGINS")
+
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[origins],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 
 # Include routers
 app.include_router(auth_routes.router)

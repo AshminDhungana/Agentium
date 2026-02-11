@@ -3,9 +3,10 @@ __pycache__
 *.pyo
 *.pyd
 .Python
-env/
 venv/
 .venv/
+.env
+env/
 pip-log.txt
 pip-delete-this-directory.txt
 .tox/

@@ -77,13 +77,29 @@ export const modelsApi = {
         return response.data;
     },
 
-    // Fetch available models from provider API (dynamic)
+    // Fetch available models from provider API (requires existing config)
     fetchModels: async (configId: string): Promise<{
         provider: string;
         models: string[];
         count: number;
     }> => {
         const response = await api.post(`/api/v1/models/configs/${configId}/fetch-models`);
+        return response.data;
+    },
+
+    // NEW: Fetch models directly from provider WITHOUT creating a config first
+    fetchModelsDirectly: async (params: {
+        provider: ProviderType;
+        api_key?: string;
+        api_base_url?: string;
+        local_server_url?: string;
+    }): Promise<{
+        provider: string;
+        models: string[];
+        count: number;
+        default_recommended?: string;
+    }> => {
+        const response = await api.post('/api/v1/models/providers/fetch-models-direct', params);
         return response.data;
     },
 

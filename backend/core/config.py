@@ -8,6 +8,7 @@ from typing import Optional
 
 from pydantic_settings import BaseSettings
 from pydantic import Field
+from cryptography.fernet import Fernet
 
 
 class Settings(BaseSettings):
@@ -25,7 +26,7 @@ class Settings(BaseSettings):
     
     # Database
     DATABASE_URL: str = Field(
-        default="postgresql://agentium:agentium@localhost:5432/agentium",
+        default="postgresql://agentium:agentium@postgres:5432/agentium",
         env="DATABASE_URL"
     )
     DATABASE_POOL_SIZE: int = 20
@@ -33,7 +34,7 @@ class Settings(BaseSettings):
     
     # Redis (Message Bus)
     REDIS_URL: str = Field(
-        default="redis://localhost:6379/0",
+        default="redis://redis:6379/0",
         env="REDIS_URL"
     )
     REDIS_POOL_SIZE: int = 50
@@ -57,12 +58,16 @@ class Settings(BaseSettings):
     RATE_LIMIT_TASK: int = 5       # 3xxxx
     
     # Security
-    SECRET_KEY: str = Field(default="change-me-in-production", env="SECRET_KEY")
+    SECRET_KEY: str = Field(default="7fcf37764e0d9ab783ceb7a76b71d76fda122aabeaa20062d86e2bb0dfd2d3dd", env="SECRET_KEY")
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     
-    # Encryption for API keys ( Fernet key - generate with: cryptography.fernet.Fernet.generate_key() )
-    ENCRYPTION_KEY: Optional[str] = Field(default=None, env="ENCRYPTION_KEY")
+    # Encryption for API keys - auto-generate valid key if not provided
+    # In production, set this via environment variable for persistence
+    ENCRYPTION_KEY: str = Field(
+        default_factory=lambda: Fernet.generate_key().decode(),
+        env="ENCRYPTION_KEY"
+    )
     
     # CORS
     ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:5173"
@@ -76,7 +81,7 @@ class Settings(BaseSettings):
         return [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",")]
     
     class Config:
-        env_file = ".env"
+        # env_file = ".env"  # Disabled - use Docker environment variables only
         env_file_encoding = "utf-8"
         case_sensitive = True
 

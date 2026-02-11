@@ -71,6 +71,8 @@ services:
       dockerfile: Dockerfile.privileged
     container_name: agentium-backend
     privileged: true
+    env_file:
+      - ./backend/.env
 
     cap_add:
       - ALL
@@ -95,20 +97,13 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
-      - SECRET_KEY=${SECRET_KEY:-your-super-secret-key-change-in-production}
-      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-generate-with-python-cryptography}
       - DEBUG=${DEBUG:-false}
       - APP_NAME=Agentium
       - ENVIRONMENT=${ENVIRONMENT:-development}
-      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173
       - HOST_ROOT_ACCESS=true
       - HOST_DOCKER_SOCKET=/var/run/docker.sock
       - HOST_FS_MOUNT=/host
       - HOST_HOME_MOUNT=/host_home
-      # AI Providers
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
-      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
     restart: unless-stopped
     command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
     networks:
