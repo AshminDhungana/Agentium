@@ -38,7 +38,7 @@ class ChatService:
             raise ValueError("No model provider available")
         
         # Get predecessor context if this agent recently reincarnated
-        predecessor_context = clarification_service.get_predecessor_context(head, db)
+        predecessor_context = reincarnation_service.get_predecessor_context(head, db)
         
         # Get system prompt and context
         system_prompt = head.get_system_prompt()
