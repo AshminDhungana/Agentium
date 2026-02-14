@@ -1,5 +1,5 @@
 // src/components/FlatMapAuthBackground.tsx
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import * as THREE from 'three';
 import { HealthIndicator } from './HealthIndicator';
 import earthTextureUrl from '../assets/earth-dark.jpg';
@@ -50,16 +50,115 @@ function latLngToXY(lat: number, lng: number, width: number, height: number) {
   };
 }
 
+// Singleton to track if background is already initialized
+let globalSceneInstance: {
+  scene: THREE.Scene;
+  camera: THREE.OrthographicCamera;
+  renderer: THREE.WebGLRenderer;
+  mapPlane: THREE.Mesh;
+  beamsGroup: THREE.Group;
+  particles: THREE.Points;
+  kathmanduRing: THREE.Mesh;
+  animationId: number;
+  time: number;
+  lastTime: number;
+  isSignup: boolean;
+  mapWidth: number;
+  mapHeight: number;
+} | null = null;
+
+let instanceCount = 0;
+
 export function FlatMapAuthBackground({ variant = 'login' }: FlatMapAuthBackgroundProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const kathmanduRingRef = useRef<THREE.Mesh | null>(null);
-  const beamsRef = useRef<THREE.Line[]>([]);
-  const isSignup = variant === 'signup';
   const [isLoaded, setIsLoaded] = useState(false);
+  const [isSignup, setIsSignup] = useState(variant === 'signup');
+  const instanceId = useRef(++instanceCount);
+
+  // Update beams when variant changes
+  useEffect(() => {
+    setIsSignup(variant === 'signup');
+    
+    if (globalSceneInstance) {
+      updateBeams(variant === 'signup');
+    }
+  }, [variant]);
+
+  const updateBeams = useCallback((showBeams: boolean) => {
+    if (!globalSceneInstance) return;
+    
+    const { beamsGroup, mapWidth, mapHeight } = globalSceneInstance;
+    
+    // Clear existing beams
+    while(beamsGroup.children.length > 0) {
+      const child = beamsGroup.children[0];
+      if (child instanceof THREE.Line) {
+        child.geometry.dispose();
+        if (child.material) {
+          if (Array.isArray(child.material)) {
+            child.material.forEach(m => m.dispose());
+          } else {
+            child.material.dispose();
+          }
+        }
+      }
+      beamsGroup.remove(child);
+    }
+
+    if (showBeams) {
+      const kathmandu = citiesData.find(c => c.name === 'Kathmandu')!;
+      const kathmanduPos = latLngToXY(kathmandu.lat, kathmandu.lng, mapWidth, mapHeight);
+      
+      const nearbyCities = citiesData.filter(c => {
+        if (c.name === 'Kathmandu') return false;
+        const pos = latLngToXY(c.lat, c.lng, mapWidth, mapHeight);
+        const dist = Math.sqrt(Math.pow(pos.x - kathmanduPos.x, 2) + Math.pow(pos.y - kathmanduPos.y, 2));
+        return dist < 60;
+      });
+
+      nearbyCities.forEach((city, index) => {
+        const cityPos = latLngToXY(city.lat, city.lng, mapWidth, mapHeight);
+        
+        const beamGeometry = new THREE.BufferGeometry();
+        const points = [
+          new THREE.Vector3(cityPos.x, cityPos.y, 0.05),
+          new THREE.Vector3(kathmanduPos.x, kathmanduPos.y, 0.05),
+        ];
+        beamGeometry.setFromPoints(points);
+        
+        const beamMaterial = new THREE.LineBasicMaterial({
+          color: '#DC2626',
+          transparent: true,
+          opacity: 0.6,
+        });
+        
+        const beam = new THREE.Line(beamGeometry, beamMaterial);
+        beam.userData = { 
+          delay: index * 0.5,
+          speed: 2,
+          material: beamMaterial
+        };
+        beamsGroup.add(beam);
+      });
+    }
+    
+    globalSceneInstance.isSignup = showBeams;
+  }, []);
 
   useEffect(() => {
+    // If scene already exists, just attach to this container
+    if (globalSceneInstance) {
+      if (containerRef.current && globalSceneInstance.renderer.domElement.parentNode !== containerRef.current) {
+        containerRef.current.appendChild(globalSceneInstance.renderer.domElement);
+      }
+      setIsLoaded(true);
+      updateBeams(isSignup);
+      return;
+    }
+
     if (!containerRef.current) return;
 
+    // Initialize scene once
     const scene = new THREE.Scene();
     scene.background = new THREE.Color('#0A0D12');
 
@@ -161,49 +260,15 @@ export function FlatMapAuthBackground({ variant = 'login' }: FlatMapAuthBackgrou
         const pulseRing = new THREE.Mesh(pulseGeometry, pulseMaterial);
         pulseRing.position.set(pos.x, pos.y, 0.05);
         cityLightsGroup.add(pulseRing);
-        kathmanduRingRef.current = pulseRing;
       }
     });
 
     const kathmandu = citiesData.find(c => c.name === 'Kathmandu')!;
     const kathmanduPos = latLngToXY(kathmandu.lat, kathmandu.lng, mapWidth, mapHeight);
 
-    if (isSignup) {
-      const nearbyCities = citiesData.filter(c => {
-        if (c.name === 'Kathmandu') return false;
-        const pos = latLngToXY(c.lat, c.lng, mapWidth, mapHeight);
-        const dist = Math.sqrt(Math.pow(pos.x - kathmanduPos.x, 2) + Math.pow(pos.y - kathmanduPos.y, 2));
-        return dist < 60;
-      });
-
-      const beamsGroup = new THREE.Group();
-      mapPlane.add(beamsGroup);
-
-      nearbyCities.forEach((city, index) => {
-        const cityPos = latLngToXY(city.lat, city.lng, mapWidth, mapHeight);
-        
-        const beamGeometry = new THREE.BufferGeometry();
-        const points = [
-          new THREE.Vector3(cityPos.x, cityPos.y, 0.05),
-          new THREE.Vector3(kathmanduPos.x, kathmanduPos.y, 0.05),
-        ];
-        beamGeometry.setFromPoints(points);
-        
-        const beamMaterial = new THREE.LineBasicMaterial({
-          color: '#DC2626',
-          transparent: true,
-          opacity: 0.6,
-        });
-        
-        const beam = new THREE.Line(beamGeometry, beamMaterial);
-        beam.userData = { 
-          delay: index * 0.5,
-          speed: 2,
-        };
-        beamsGroup.add(beam);
-        beamsRef.current.push(beam);
-      });
-    }
+    // Beams group (initially empty)
+    const beamsGroup = new THREE.Group();
+    mapPlane.add(beamsGroup);
 
     const particlesGeometry = new THREE.BufferGeometry();
     const particlesCount = 50;
@@ -232,26 +297,40 @@ export function FlatMapAuthBackground({ variant = 'login' }: FlatMapAuthBackgrou
     kathmanduLight.position.set(kathmanduPos.x, kathmanduPos.y, 10);
     mapPlane.add(kathmanduLight);
 
-    let animationId: number;
+    // Find kathmandu ring for animation
+    const kathmanduRing = cityLightsGroup.children.find(
+      child => child instanceof THREE.Mesh && child.geometry instanceof THREE.RingGeometry
+    ) as THREE.Mesh | undefined;
+
     let time = 0;
+    let lastTime = performance.now();
+    let animationId: number = 0; // Initialize with 0
 
     const animate = () => {
       animationId = requestAnimationFrame(animate);
-      time += 0.016;
+      
+      const currentTime = performance.now();
+      const delta = (currentTime - lastTime) / 1000;
+      lastTime = currentTime;
+      time += delta;
 
-      if (kathmanduRingRef.current) {
+      // Animate Kathmandu ring
+      if (kathmanduRing) {
         const scale = 1 + Math.sin(time * 1.5) * 0.2;
-        kathmanduRingRef.current.scale.set(scale, scale, 1);
-        const material = kathmanduRingRef.current.material as THREE.MeshBasicMaterial;
+        kathmanduRing.scale.set(scale, scale, 1);
+        const material = kathmanduRing.material as THREE.MeshBasicMaterial;
         material.opacity = 0.4 + Math.sin(time * 1.5) * 0.2;
       }
 
-      if (isSignup && beamsRef.current.length > 0) {
-        beamsRef.current.forEach((beam) => {
-          const material = beam.material as THREE.LineBasicMaterial;
-          const delay = beam.userData.delay;
-          const wave = Math.sin((time + delay) * beam.userData.speed);
-          material.opacity = 0.2 + (wave + 1) * 0.3;
+      // Animate beams if in signup mode
+      if (globalSceneInstance?.isSignup) {
+        beamsGroup.children.forEach((beam) => {
+          if (beam instanceof THREE.Line) {
+            const material = beam.material as THREE.LineBasicMaterial;
+            const delay = beam.userData.delay;
+            const wave = Math.sin((time + delay) * beam.userData.speed);
+            material.opacity = 0.2 + (wave + 1) * 0.3;
+          }
         });
       }
 
@@ -262,7 +341,29 @@ export function FlatMapAuthBackground({ variant = 'login' }: FlatMapAuthBackgrou
 
     animate();
 
+    // Store global instance
+    globalSceneInstance = {
+      scene,
+      camera,
+      renderer,
+      mapPlane,
+      beamsGroup,
+      particles: particlesMesh,
+      kathmanduRing: kathmanduRing!,
+      animationId,
+      time,
+      lastTime,
+      isSignup: false,
+      mapWidth,
+      mapHeight,
+    };
+
+    setIsLoaded(true);
+
+    // Handle resize
     const handleResize = () => {
+      if (!globalSceneInstance) return;
+      
       const newAspect = window.innerWidth / window.innerHeight;
       
       let newViewWidth: number;
@@ -285,24 +386,27 @@ export function FlatMapAuthBackground({ variant = 'login' }: FlatMapAuthBackgrou
     };
 
     window.addEventListener('resize', handleResize);
-    setIsLoaded(true);
 
+    // Cleanup only on last instance unmount
     return () => {
       window.removeEventListener('resize', handleResize);
-      cancelAnimationFrame(animationId);
-      beamsRef.current = [];
-      if (containerRef.current && renderer.domElement) {
-        containerRef.current.removeChild(renderer.domElement);
+      
+      // Only cleanup if this is the last instance
+      instanceCount--;
+      if (instanceCount === 0 && globalSceneInstance) {
+        cancelAnimationFrame(globalSceneInstance.animationId);
+        renderer.dispose();
+        renderer.forceContextLoss();
+        globalSceneInstance = null;
       }
-      renderer.dispose();
     };
-  }, [isSignup]);
+  }, [isSignup, updateBeams]);
 
   return (
     <div className="fixed inset-0 overflow-hidden z-0">
-      {/* Base Constitutional Gradient */}
+      {/* Base Constitutional Gradient - transitions smoothly */}
       <div 
-        className="absolute inset-0"
+        className="absolute inset-0 transition-all duration-700"
         style={{
           background: isSignup
             ? 'linear-gradient(135deg, #0D1117 0%, #1a1f2e 50%, #141A23 100%)'
@@ -310,11 +414,11 @@ export function FlatMapAuthBackground({ variant = 'login' }: FlatMapAuthBackgrou
         }}
       />
 
-      {/* Three.js Flat Map Container */}
+      {/* Three.js Flat Map Container - persistent */}
       <div 
         ref={containerRef} 
         className="absolute inset-0"
-        style={{ opacity: 0.95 }}
+        style={{ opacity: isLoaded ? 0.95 : 0, transition: 'opacity 0.5s ease' }}
       />
 
       {/* Constitutional Grid Overlay */}
@@ -340,15 +444,15 @@ export function FlatMapAuthBackground({ variant = 'login' }: FlatMapAuthBackgrou
         }}
       />
 
-      {/* Federal Constitutional Network Text with HealthIndicator */}
+      {/* Federal Constitutional Network Text with HealthIndicator - color transitions */}
       <div className="absolute top-6 right-8 pointer-events-none z-10">
         <div 
-          className="text-[10px] tracking-[0.3em] text-right"
+          className="text-[10px] tracking-[0.3em] text-right transition-colors duration-700"
           style={{ color: isSignup ? 'rgba(255, 255, 255, 0.6)' : 'rgba(139, 111, 71, 0.5)' }}
         >
           <div className="font-semibold">CONSTITUTIONAL NETWORK</div>
           <div 
-            className="mt-1 text-[9px] tracking-[0.2em] flex items-center justify-end gap-2" 
+            className="mt-1 text-[9px] tracking-[0.2em] flex items-center justify-end gap-2 transition-colors duration-700" 
             style={{ color: isSignup ? 'rgba(255, 255, 255, 0.4)' : 'rgba(139, 111, 71, 0.35)' }}
           >
             <span>Command Center</span>
@@ -357,23 +461,23 @@ export function FlatMapAuthBackground({ variant = 'login' }: FlatMapAuthBackgrou
         </div>
       </div>
 
-      {/* Decorative corner elements */}
+      {/* Decorative corner elements - color transitions */}
       <div className="absolute top-6 left-6 pointer-events-none">
         <div 
-          className="w-16 h-16 border-l border-t opacity-20" 
+          className="w-16 h-16 border-l border-t opacity-20 transition-colors duration-700" 
           style={{ borderColor: isSignup ? 'rgba(255, 255, 255, 0.3)' : '#8B6F47' }} 
         />
       </div>
       <div className="absolute bottom-6 right-6 pointer-events-none">
         <div 
-          className="w-16 h-16 border-r border-b opacity-20" 
+          className="w-16 h-16 border-r border-b opacity-20 transition-colors duration-700" 
           style={{ borderColor: isSignup ? 'rgba(255, 255, 255, 0.3)' : '#8B6F47' }} 
         />
       </div>
 
-      {/* Bottom line */}
+      {/* Bottom line - color transitions */}
       <div 
-        className="absolute bottom-0 left-0 right-0 h-px"
+        className="absolute bottom-0 left-0 right-0 h-px transition-all duration-700"
         style={{
           background: isSignup 
             ? 'linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.2) 50%, transparent 100%)'
