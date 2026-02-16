@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from backend.celery_app import celery_app as celery
 from pydantic import BaseModel
 from typing import Optional, Dict, Any, List
+from backend.models.entities.user import User
 
 from backend.services.api_manager import init_api_manager
 import backend.services.api_manager as api_manager_module
@@ -64,6 +65,33 @@ class ConstitutionUpdateRequest(BaseModel):
     prohibited_actions: Optional[List[str]] = None
     sovereign_preferences: Optional[Dict[str, Any]] = None
 
+def create_default_admin(db: Session):
+    """Create default admin user if not exists."""
+    admin = db.query(User).filter(User.username == "admin").first()
+    if not admin:
+        admin = User(
+            username="admin",
+            email="admin@agentium.local",
+            hashed_password=User.hash_password("admin"),  # Change in production!
+            is_active=True,
+            is_pending=False,
+            is_admin=True
+        )
+        db.add(admin)
+        db.commit()
+        db.refresh(admin)
+        logger.info(f"✅ Default admin user created (ID: {admin.id})")
+        return True
+    else:
+        # Ensure admin is active and has admin privileges
+        if not admin.is_active or not admin.is_admin:
+            admin.is_active = True
+            admin.is_pending = False
+            admin.is_admin = True
+            db.commit()
+            logger.info("✅ Admin user permissions updated")
+        return False
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
@@ -81,6 +109,12 @@ async def lifespan(app: FastAPI):
     try:
         init_db()
         logger.info("✅ Database initialized")
+        
+        # Create default admin user
+        with next(get_db()) as db:
+            admin_created = create_default_admin(db)
+            if admin_created:
+                logger.info("✅ Default admin user created")
     except Exception as e:
         logger.error(f"❌ Database initialization failed: {e}")
         raise
@@ -213,7 +247,7 @@ app.add_middleware(
 # ═══════════════════════════════════════════════════════════
 
 # Existing routes
-app.include_router(auth_routes.router)
+app.include_router(auth_routes.router, prefix="/api/v1")
 app.include_router(model_routes.router, prefix="/api/v1")
 app.include_router(chat_routes.router, prefix="/api/v1")
 app.include_router(channels_routes.router, prefix="/api/v1")

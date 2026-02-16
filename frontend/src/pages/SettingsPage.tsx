@@ -95,10 +95,21 @@ export function SettingsPage() {
                 reset();
                 setPasswordStrength(0);
             } else {
-                toast.error('Current password is incorrect');
+                // Get error from store - it should now be a string
+                const currentError = useAuthStore.getState().error;
+                toast.error(currentError || 'Failed to change password');
             }
-        } catch (error) {
-            toast.error('Failed to change password');
+        } catch (error: any) {
+            // This shouldn't happen now, but just in case
+            let message = 'Failed to change password';
+            if (error?.response?.data?.detail) {
+                if (Array.isArray(error.response.data.detail)) {
+                    message = error.response.data.detail.map((e: any) => e.msg).join(', ');
+                } else {
+                    message = String(error.response.data.detail);
+                }
+            }
+            toast.error(message);
         } finally {
             setIsSubmitting(false);
         }
@@ -324,7 +335,7 @@ export function SettingsPage() {
                                                     {...register('newPassword', {
                                                         required: 'New password is required',
                                                         minLength: {
-                                                            value: 6,
+                                                            value: 8,
                                                             message: 'Password must be at least 6 characters'
                                                         }
                                                     })}

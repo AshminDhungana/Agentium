@@ -3,6 +3,8 @@ from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 from backend.models.database import Base
 from sqlalchemy.orm import relationship 
+import hashlib
+import base64
 
 # Password hashing context
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -14,23 +16,38 @@ class User(Base):
     username = Column(String, unique=True, index=True, nullable=False)
     email = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
-    is_active = Column(Boolean, default=False)  # Changed: Users need approval
+    is_active = Column(Boolean, default=False)
     is_admin = Column(Boolean, default=False)
-    is_pending = Column(Boolean, default=True)  # New: For approval workflow
+    is_pending = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     chat_messages = relationship("ChatMessage", back_populates="user", order_by="ChatMessage.created_at.desc()")
     conversations = relationship("Conversation", back_populates="user", order_by="Conversation.updated_at.desc()")
     
     @staticmethod
+    def _prehash_password(password: str) -> str:
+        """
+        Pre-hash password with SHA256 to handle passwords longer than 72 bytes.
+        This preserves full password entropy while ensuring bcrypt compatibility.
+        """
+        # SHA256 produces a fixed 32-byte hash regardless of input length
+        sha256_hash = hashlib.sha256(password.encode('utf-8')).digest()
+        # Convert to base64 to get a string (44 chars) that bcrypt can handle
+        return base64.b64encode(sha256_hash).decode('ascii')
+    
+    @staticmethod
     def verify_password(plain_password: str, hashed_password: str) -> bool:
         """Verify a password against its hash."""
-        return pwd_context.verify(plain_password, hashed_password)
+        # Apply same pre-hashing as during storage
+        prehashed = User._prehash_password(plain_password)
+        return pwd_context.verify(prehashed, hashed_password)
     
     @staticmethod
     def hash_password(password: str) -> str:
-        """Hash a password for storage."""
-        return pwd_context.hash(password)
+        """Hash a password for storage using SHA256 pre-hash + bcrypt."""
+        # Pre-hash to handle long passwords while preserving entropy
+        prehashed = User._prehash_password(password)
+        return pwd_context.hash(prehashed)
     
     @classmethod
     def create_user(cls, db: Session, username: str, email: str, password: str) -> 'User':

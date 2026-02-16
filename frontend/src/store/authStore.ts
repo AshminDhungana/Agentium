@@ -109,8 +109,26 @@ export const useAuthStore = create<AuthState>()(
                     set({ isLoading: false, error: null });
                     return true;
                 } catch (error: any) {
+                    // Extract error message properly from FastAPI validation errors
+                    let errorMsg = 'Failed to change password';
+                    
+                    if (error.response?.data?.detail) {
+                        // Handle FastAPI validation error format (array of errors)
+                        if (Array.isArray(error.response.data.detail)) {
+                            errorMsg = error.response.data.detail
+                                .map((err: any) => err.msg || String(err))
+                                .join(', ');
+                        } else if (typeof error.response.data.detail === 'string') {
+                            errorMsg = error.response.data.detail;
+                        } else if (typeof error.response.data.detail === 'object') {
+                            errorMsg = error.response.data.detail.msg || JSON.stringify(error.response.data.detail);
+                        }
+                    } else if (error.message) {
+                        errorMsg = error.message;
+                    }
+                    
                     set({
-                        error: error.response?.data?.detail || 'Failed to change password',
+                        error: errorMsg,
                         isLoading: false
                     });
                     return false;

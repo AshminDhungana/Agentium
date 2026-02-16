@@ -62,7 +62,17 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    return payload
+    # Normalize the payload to ensure consistent field names
+    # Map "sub" to "username" for easier access
+    normalized_payload = {
+        "user_id": payload.get("user_id"),
+        "username": payload.get("sub"),  # "sub" is the standard JWT subject claim
+        "is_admin": payload.get("is_admin", False),
+        "is_active": payload.get("is_active", True),
+        "role": payload.get("role", "user"),
+    }
+    
+    return normalized_payload
 
 async def get_current_active_user(current_user: Dict[str, Any] = Depends(get_current_user)):
     """Verify user is active."""

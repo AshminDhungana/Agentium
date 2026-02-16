@@ -15,7 +15,18 @@ export function LoginPage() {
         e.preventDefault();
         const success = await login(username, password);
         if (success) {
-            toast.success('Welcome, Sovereign');
+            const user = useAuthStore.getState().user;
+            let welcomeMsg = 'Welcome';
+            
+            if (user?.username === 'sovereign' && user?.is_admin) {
+                welcomeMsg = 'Welcome, Sovereign';
+            } else if (user?.is_admin) {
+                welcomeMsg = 'Welcome, Administrator';
+            } else {
+                welcomeMsg = `Welcome, ${user?.username}`;
+            }
+            
+            toast.success(welcomeMsg);
             navigate('/');
         } else {
             toast.error('Invalid credentials');
