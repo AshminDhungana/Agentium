@@ -22,10 +22,27 @@ import {
 import { hostAccessApi } from '@/services/hostAccessApi';
 
 interface SystemStatus {
-    cpu: number;
-    memory: number;
-    disk: number;
-    uptime: number;
+    cpu: {
+        usage: number;
+        cores: number;
+        load: number[];
+    };
+    memory: {
+        total: number;
+        used: number;
+        free: number;
+        percentage: number;
+    };
+    disk: {
+        total: number;
+        used: number;
+        free: number;
+        percentage: number;
+    };
+    uptime: {
+        seconds: number;
+        formatted: string;
+    };
 }
 
 interface Container {
@@ -222,7 +239,7 @@ export function SovereignDashboard() {
                                 <Cpu className={`w-6 h-6 ${colorClasses.blue.text}`} />
                             </div>
                             <span className="text-2xl font-bold text-gray-900 dark:text-white">
-                                {systemStatus.cpu.toFixed(1)}%
+                                {systemStatus.cpu.usage.toFixed(1)}%
                             </span>
                         </div>
                         <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-3">
@@ -230,8 +247,8 @@ export function SovereignDashboard() {
                         </p>
                         <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                             <div
-                                className={`${getResourceColor(systemStatus.cpu)} h-2 rounded-full transition-all`}
-                                style={{ width: `${systemStatus.cpu}%` }}
+                                className={`${getResourceColor(systemStatus.cpu.usage)} h-2 rounded-full transition-all`}
+                                style={{ width: `${systemStatus.cpu.usage}%` }}
                             />
                         </div>
                     </div>
@@ -243,7 +260,7 @@ export function SovereignDashboard() {
                                 <Server className={`w-6 h-6 ${colorClasses.purple.text}`} />
                             </div>
                             <span className="text-2xl font-bold text-gray-900 dark:text-white">
-                                {systemStatus.memory.toFixed(1)}%
+                                {systemStatus.memory.percentage.toFixed(1)}%
                             </span>
                         </div>
                         <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-3">
@@ -251,8 +268,8 @@ export function SovereignDashboard() {
                         </p>
                         <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                             <div
-                                className={`${getResourceColor(systemStatus.memory)} h-2 rounded-full transition-all`}
-                                style={{ width: `${systemStatus.memory}%` }}
+                                className={`${getResourceColor(systemStatus.memory.percentage)} h-2 rounded-full transition-all`}
+                                style={{ width: `${systemStatus.memory.percentage}%` }}
                             />
                         </div>
                     </div>
@@ -264,7 +281,7 @@ export function SovereignDashboard() {
                                 <HardDrive className={`w-6 h-6 ${colorClasses.green.text}`} />
                             </div>
                             <span className="text-2xl font-bold text-gray-900 dark:text-white">
-                                {systemStatus.disk.toFixed(1)}%
+                                {systemStatus.disk.percentage.toFixed(1)}%
                             </span>
                         </div>
                         <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-3">
@@ -272,8 +289,8 @@ export function SovereignDashboard() {
                         </p>
                         <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                             <div
-                                className={`${getResourceColor(systemStatus.disk)} h-2 rounded-full transition-all`}
-                                style={{ width: `${systemStatus.disk}%` }}
+                                className={`${getResourceColor(systemStatus.disk.percentage)} h-2 rounded-full transition-all`}
+                                style={{ width: `${systemStatus.disk.percentage}%` }}
                             />
                         </div>
                     </div>
@@ -285,14 +302,14 @@ export function SovereignDashboard() {
                                 <Zap className={`w-6 h-6 ${colorClasses.orange.text}`} />
                             </div>
                             <span className="text-2xl font-bold text-gray-900 dark:text-white">
-                                {Math.floor(systemStatus.uptime / 3600)}h
+                                {Math.floor(systemStatus.uptime.seconds / 3600)}h
                             </span>
                         </div>
                         <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-3">
                             System Uptime
                         </p>
                         <div className="text-xs text-gray-500 dark:text-gray-400">
-                            {Math.floor((systemStatus.uptime % 3600) / 60)} minutes running
+                            {Math.floor((systemStatus.uptime.seconds % 3600) / 60)} minutes running
                         </div>
                     </div>
                 </div>

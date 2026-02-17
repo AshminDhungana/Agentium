@@ -122,7 +122,8 @@ async def get_voice_status(
     Check if voice features are available for current user.
     Frontend should call this to show appropriate UI.
     """
-    return check_voice_available(db, str(current_user.id))
+    user_id = current_user.id if hasattr(current_user, 'id') else current_user.get('id')
+    return check_voice_available(db, str(user_id))
 
 
 @router.post("/transcribe")

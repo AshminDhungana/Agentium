@@ -17,7 +17,8 @@ from backend.models.entities.audit import AuditLog, AuditLevel, AuditCategory
 from backend.models.entities.user import User  # Your user model
 from pydantic import BaseModel
 
-router = APIRouter(prefix="/api/v1/sovereign", tags=["sovereign"])
+
+router = APIRouter(prefix="/sovereign", tags=["sovereign"])
 
 # Pydantic models for requests
 class SovereignCommandRequest(BaseModel):
@@ -60,7 +61,10 @@ async def get_system_status(
     
     # Get CPU info
     cpu_result = head.execute_command(["sh", "-c", "grep 'cpu ' /proc/stat | awk '{usage=($2+$4)*100/($2+$4+$5)} END {print usage}'"])
-    cpu_usage = float(cpu_result['stdout'].strip()) if cpu_result['success'] else 0
+    try:
+        cpu_usage = float(cpu_result['stdout'].strip()) if cpu_result['success'] else 0.0
+    except (ValueError, TypeError):
+        cpu_usage = 0.0
     
     # Get memory info
     mem_result = head.execute_command(["cat", "/proc/meminfo"])
@@ -70,23 +74,42 @@ async def get_system_status(
     disk_result = head.execute_command(["df", "-B1", "/"])
     disk_info = parse_df(disk_result['stdout']) if disk_result['success'] else {}
     
+    # Get uptime in seconds
+    uptime_result = head.execute_command(["cat", "/proc/uptime"])
+    uptime_seconds = 0.0
+    if uptime_result['success']:
+        try:
+            uptime_seconds = float(uptime_result['stdout'].strip().split()[0])
+        except (ValueError, IndexError):
+            uptime_seconds = 0.0
+    
+    # Ensure all values are numeric
+    mem_total = float(memory_info.get('MemTotal', 0))
+    mem_available = float(memory_info.get('MemAvailable', 0))
+    mem_used = mem_total - mem_available
+    mem_percentage = round((mem_used / mem_total) * 100, 1) if mem_total > 0 else 0.0
+    
     return {
         "cpu": {
-            "usage": round(cpu_usage, 1),
-            "cores": 8,  # You might want to detect this dynamically
-            "load": [0.5, 0.3, 0.2]  # Load average
+            "usage": float(round(cpu_usage, 1)),
+            "cores": 8,
+            "load": [0.5, 0.3, 0.2]
         },
         "memory": {
-            "total": memory_info.get('MemTotal', 0),
-            "used": memory_info.get('MemTotal', 0) - memory_info.get('MemAvailable', 0),
-            "free": memory_info.get('MemAvailable', 0),
-            "percentage": round((memory_info.get('MemTotal', 0) - memory_info.get('MemAvailable', 0)) / memory_info.get('MemTotal', 1) * 100, 1)
+            "total": int(mem_total),
+            "used": int(mem_used),
+            "free": int(mem_available),
+            "percentage": float(mem_percentage)
         },
         "disk": {
-            "total": disk_info.get('total', 0),
-            "used": disk_info.get('used', 0),
-            "free": disk_info.get('available', 0),
-            "percentage": disk_info.get('percentage', 0)
+            "total": int(disk_info.get('total', 0)),
+            "used": int(disk_info.get('used', 0)),
+            "free": int(disk_info.get('available', 0)),
+            "percentage": float(disk_info.get('percentage', 0.0))
+        },
+        "uptime": {
+            "seconds": int(uptime_seconds),
+            "formatted": f"{int(uptime_seconds // 3600)}h {int((uptime_seconds % 3600) // 60)}m"
         },
         "network": {
             "interfaces": [],
@@ -305,35 +328,85 @@ async def list_directory(
     head = HostAccessService("00001")
     return head.list_directory(path)
 
-@router.websocket("/ws/sovereign")
-async def sovereign_websocket(websocket: WebSocket):
+@router.websocket("/ws")
+async def sovereign_websocket(
+    websocket: WebSocket,
+    token: Optional[str] = Query(None),
+    db: Session = Depends(get_db)
+):
     """WebSocket endpoint for real-time sovereign notifications."""
-    await websocket.accept()
     
-    # Verify token from query params (simplified)
-    token = websocket.query_params.get("token")
+    # Validate token presence
     if not token:
         await websocket.close(code=4001, reason="Missing token")
         return
     
+    # Validate JWT and check admin privileges
     try:
-        # Verify token logic here (reuse your JWT verification)
-        # For now, accept connection
-        active_connections.append(websocket)
+        from jose import jwt, JWTError
+        from backend.core.config import settings
         
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+        username = payload.get("sub")
+        if not username:
+            await websocket.close(code=4001, reason="Invalid token: no subject")
+            return
+        
+        # Verify user exists and is admin
+        user = db.query(User).filter(User.username == username).first()
+        if not user or not user.is_admin:
+            await websocket.close(code=4003, reason="Forbidden: admin access required")
+            return
+            
+    except JWTError as e:
+        await websocket.close(code=4001, reason=f"Invalid authentication: {str(e)}")
+        return
+    except Exception as e:
+        await websocket.close(code=1011, reason=f"Authentication error: {str(e)}")
+        return
+    
+    # Accept connection only after successful auth
+    await websocket.accept()
+    active_connections.append(websocket)
+    print(f"[Sovereign WebSocket] ✅ Admin connected: {username}")
+    
+    try:
         while True:
             data = await websocket.receive_text()
             message = json.loads(data)
             
             if message.get("action") == "ping":
-                await websocket.send_json({"type": "pong"})
+                await websocket.send_json({
+                    "type": "pong",
+                    "timestamp": datetime.utcnow().isoformat()
+                })
             elif message.get("action") == "subscribe":
-                await websocket.send_json({"type": "subscribed", "channel": message.get("channel")})
+                await websocket.send_json({
+                    "type": "subscribed",
+                    "channel": message.get("channel"),
+                    "timestamp": datetime.utcnow().isoformat()
+                })
+            else:
+                await websocket.send_json({
+                    "type": "error",
+                    "content": f"Unknown action: {message.get('action')}",
+                    "timestamp": datetime.utcnow().isoformat()
+                })
                 
     except WebSocketDisconnect:
-        pass
+        print(f"[Sovereign WebSocket] ❌ Disconnected: {username}")
+    except json.JSONDecodeError:
+        await websocket.send_json({
+            "type": "error",
+            "content": "Invalid JSON format",
+            "timestamp": datetime.utcnow().isoformat()
+        })
     except Exception as e:
-        print(f"WebSocket error: {e}")
+        print(f"[Sovereign WebSocket] Error: {e}")
+        try:
+            await websocket.close(code=1011, reason=f"Server error: {str(e)}")
+        except:
+            pass
     finally:
         if websocket in active_connections:
             active_connections.remove(websocket)
@@ -383,3 +456,17 @@ def parse_df(content: str) -> dict:
         "available": available,
         "percentage": round(used / total * 100, 1) if total > 0 else 0
     }
+
+@router.get("/commands")
+async def get_command_history(
+    limit: int = Query(50, le=1000),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_sovereign_user)
+):
+    """Get sovereign command history."""
+    logs = db.query(AuditLog).filter(
+        AuditLog.actor_type == "sovereign",
+        AuditLog.action.in_(["sovereign_command", "container_start", "container_stop", "container_restart"])
+    ).order_by(AuditLog.created_at.desc()).limit(limit).all()
+    
+    return [log.to_dict() for log in logs]

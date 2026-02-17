@@ -27,6 +27,7 @@ from backend.models.entities import Agent, HeadOfCouncil
 from backend.services.chat_service import ChatService
 from backend.core.config import settings
 from backend.core.auth import get_current_active_user
+from backend.models.entities.user import User
 
 router = APIRouter()
 
@@ -375,38 +376,34 @@ async def websocket_chat_endpoint(
                 })
 
                 try:
-                    from backend.models.database import SessionLocal
-                    msg_db = SessionLocal()
-                    try:
-                        head = msg_db.query(HeadOfCouncil).filter_by(
-                            id=user_info["head_agent_id"]
-                        ).first()
+                    # Use the injected 'db' session - DO NOT create a new one
+                    head = db.query(HeadOfCouncil).filter_by(
+                        id=user_info["head_agent_id"]
+                    ).first()
 
-                        if not head:
-                            await websocket.send_json({
-                                "type":      "error",
-                                "content":   "Head of Council not available",
-                                "timestamp": datetime.utcnow().isoformat(),
-                            })
-                            continue
-
-                        response = await ChatService.process_message(head, content, msg_db)
-
+                    if not head:
                         await websocket.send_json({
-                            "type":    "message",
-                            "role":    "head_of_council",
-                            "content": response.get("content", "No response"),
-                            "metadata": {
-                                "agent_id":    user_info["head_agentium_id"],
-                                "model":       response.get("model"),
-                                "task_created": response.get("task_created"),
-                                "task_id":     response.get("task_id"),
-                                "tokens_used": response.get("tokens_used"),
-                            },
+                            "type":      "error",
+                            "content":   "Head of Council not available",
                             "timestamp": datetime.utcnow().isoformat(),
                         })
-                    finally:
-                        msg_db.close()
+                        continue
+
+                    response = await ChatService.process_message(head, content, db)
+
+                    await websocket.send_json({
+                        "type":    "message",
+                        "role":    "head_of_council",
+                        "content": response.get("content", "No response"),
+                        "metadata": {
+                            "agent_id":    user_info["head_agentium_id"],
+                            "model":       response.get("model"),
+                            "task_created": response.get("task_created"),
+                            "task_id":     response.get("task_id"),
+                            "tokens_used": response.get("tokens_used"),
+                        },
+                        "timestamp": datetime.utcnow().isoformat(),
+                    })
 
                 except Exception as e:
                     print(f"[WebSocket] ChatService error: {e}")
@@ -440,13 +437,11 @@ async def websocket_chat_endpoint(
         except Exception:
             pass
 
-
 # ═══════════════════════════════════════════════════════════
 # REST stats endpoint
 # ═══════════════════════════════════════════════════════════
-
 @router.get("/ws/stats")
-async def get_websocket_stats(current_user: dict = Depends(get_current_active_user)):
+async def get_websocket_stats(current_user: User = Depends(get_current_active_user)):
     """Get WebSocket connection statistics (admin only)."""
     return {
         "active_connections": manager.get_connection_count(),
