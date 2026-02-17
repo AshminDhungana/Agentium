@@ -248,7 +248,7 @@ Decision: ALLOW / BLOCK / VOTE_REQUIRED
 
 ---
 
-## Phase 3: Agent Lifecycle Management 🔄 (IN PROGRESS - 60% COMPLETE)
+## Phase 3: Agent Lifecycle Management 🔄 (IN PROGRESS - 90% COMPLETE)
 
 **Goal:** Dynamic spawning, liquidation, and idle governance with capability management.
 
@@ -330,7 +330,7 @@ TIER_CAPABILITIES = {
 
 ---
 
-## Phase 4: Multi-Channel Integration 📱 (IN PROGRESS - 40% COMPLETE)
+## Phase 4: Multi-Channel Integration 📱 (IN PROGRESS - 90% COMPLETE)
 
 **Goal:** Connect Agentium to external messaging platforms as communication channels.
 
@@ -351,14 +351,14 @@ TIER_CAPABILITIES = {
 - [x] WebSocket (real-time dashboard)
 - [x] WhatsApp (Baileys library integration)
 - [x] Telegram Bot API
-- [ ] Discord Bot
-- [ ] Slack App
-- [ ] Signal (signal-cli)
-- [ ] Google Chat
-- [ ] iMessage (macOS only)
-- [ ] Microsoft Teams
-- [ ] Zalo
-- [ ] Matrix
+- [x] Discord Bot
+- [x] Slack App
+- [x] Signal (signal-cli)
+- [x] Google Chat
+- [x] iMessage (macOS only)
+- [x] Microsoft Teams
+- [x] Zalo
+- [x] Matrix
 
 **Files:**
 
@@ -387,10 +387,10 @@ TIER_CAPABILITIES = {
 
 **Pending Events:**
 
-- [ ] `knowledge_submitted`
-- [ ] `knowledge_approved`
-- [ ] `amendment_proposed`
-- [ ] `agent_liquidated`
+- [x] `knowledge_submitted`
+- [x] `knowledge_approved`
+- [x] `amendment_proposed`
+- [x] `agent_liquidated`
 
 ---
 

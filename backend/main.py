@@ -27,6 +27,7 @@ from backend.models.entities import Agent, Task, Constitution, UserModelConfig, 
 from backend.services.model_provider import ModelService
 from backend.services.chat_service import ChatService
 from backend.services.monitoring_service import MonitoringService
+from backend.services.channel_manager import ChannelManager, WhatsAppAdapter, SlackAdapter
 
 # IDLE GOVERNANCE IMPORTS
 from backend.services.persistent_council import persistent_council
