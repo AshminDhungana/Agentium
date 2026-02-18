@@ -5,14 +5,14 @@ import { jwtDecode } from 'jwt-decode';
 
 // Proper User interface matching backend
 interface User {
-    id?: number;           // Database ID (integer) - optional because verify doesn't return it
+    id?: number;
     username: string;
-    email?: string;        // Optional because verify doesn't return it
+    email?: string;
     is_active?: boolean;
     is_admin: boolean;
     is_pending?: boolean;
     created_at?: string;
-    role?: "admin" | "user";
+    role?: 'admin' | 'user';
     isAuthenticated: boolean;
     isSovereign?: boolean;
     agentium_id?: string;
@@ -20,15 +20,18 @@ interface User {
 
 interface AuthState {
     user: User | null;
+    // isInitialized: true once checkAuth() has run for the first time.
+    // The app MUST NOT make any routing decisions until this is true.
+    // It is intentionally NOT persisted so it always resets to false on page load.
+    isInitialized: boolean;
+    isLoading: boolean;
+    error: string | null;
     login: (username: string, password: string) => Promise<boolean>;
     logout: () => void;
     changePassword: (oldPassword: string, newPassword: string) => Promise<boolean>;
-    isLoading: boolean;
-    error: string | null;
     checkAuth: () => Promise<boolean>;
 }
 
-// Clean helper for token decoding
 const extractUserFromToken = (token: string): Partial<User> | null => {
     try {
         const decoded = jwtDecode<any>(token);
@@ -47,6 +50,7 @@ export const useAuthStore = create<AuthState>()(
     persist(
         (set, get) => ({
             user: null,
+            isInitialized: false, // always starts false on page load — never persisted
             isLoading: false,
             error: null,
 
@@ -56,15 +60,12 @@ export const useAuthStore = create<AuthState>()(
                 try {
                     const response = await api.post('/api/v1/auth/login', {
                         username,
-                        password
+                        password,
                     });
 
                     const { access_token, user } = response.data;
-
-                    // Store JWT token
                     localStorage.setItem('access_token', access_token);
 
-                    // Use the user object from API response (fully populated)
                     set({
                         user: {
                             id: user.id,
@@ -75,18 +76,20 @@ export const useAuthStore = create<AuthState>()(
                             is_pending: user.is_pending,
                             created_at: user.created_at,
                             isAuthenticated: true,
-                            role: user.is_admin ? "admin" : "user",
+                            role: user.is_admin ? 'admin' : 'user',
                             isSovereign: user.is_admin,
                         },
                         isLoading: false,
-                        error: null
+                        isInitialized: true,
+                        error: null,
                     });
 
                     return true;
                 } catch (error: any) {
                     set({
                         error: error.response?.data?.detail || 'Invalid credentials',
-                        isLoading: false
+                        isLoading: false,
+                        isInitialized: true,
                     });
                     return false;
                 }
@@ -94,7 +97,7 @@ export const useAuthStore = create<AuthState>()(
 
             logout: () => {
                 localStorage.removeItem('access_token');
-                set({ user: null, error: null });
+                set({ user: null, error: null, isInitialized: true });
             },
 
             changePassword: async (oldPassword: string, newPassword: string) => {
@@ -103,17 +106,14 @@ export const useAuthStore = create<AuthState>()(
                 try {
                     await api.post('/api/v1/auth/change-password', {
                         old_password: oldPassword,
-                        new_password: newPassword
+                        new_password: newPassword,
                     });
-
                     set({ isLoading: false, error: null });
                     return true;
                 } catch (error: any) {
-                    // Extract error message properly from FastAPI validation errors
                     let errorMsg = 'Failed to change password';
-                    
+
                     if (error.response?.data?.detail) {
-                        // Handle FastAPI validation error format (array of errors)
                         if (Array.isArray(error.response.data.detail)) {
                             errorMsg = error.response.data.detail
                                 .map((err: any) => err.msg || String(err))
@@ -121,16 +121,15 @@ export const useAuthStore = create<AuthState>()(
                         } else if (typeof error.response.data.detail === 'string') {
                             errorMsg = error.response.data.detail;
                         } else if (typeof error.response.data.detail === 'object') {
-                            errorMsg = error.response.data.detail.msg || JSON.stringify(error.response.data.detail);
+                            errorMsg =
+                                error.response.data.detail.msg ||
+                                JSON.stringify(error.response.data.detail);
                         }
                     } else if (error.message) {
                         errorMsg = error.message;
                     }
-                    
-                    set({
-                        error: errorMsg,
-                        isLoading: false
-                    });
+
+                    set({ error: errorMsg, isLoading: false });
                     return false;
                 }
             },
@@ -139,25 +138,19 @@ export const useAuthStore = create<AuthState>()(
                 const token = localStorage.getItem('access_token');
 
                 if (!token) {
-                    // No token — clear user without touching isLoading
-                    set({ user: null });
+                    set({ user: null, isInitialized: true });
                     return false;
                 }
 
-                // If we already have a persisted user from zustand-persist,
-                // don't show a loading spinner — just verify silently in background.
-                // This prevents the flash-to-login on refresh.
-                const currentUser = get().user;
-                const hasPersistedUser = currentUser?.isAuthenticated === true;
-
+                // If persisted user exists, skip the loading spinner but still verify server-side
+                const hasPersistedUser = get().user?.isAuthenticated === true;
                 if (!hasPersistedUser) {
-                    // No persisted user — we must wait for verify before showing app
                     set({ isLoading: true });
                 }
 
                 try {
-                    const response = await api.post('/api/v1/auth/verify', token, {
-                        headers: { 'Content-Type': 'application/json' }
+                    const response = await api.post('/api/v1/auth/verify', null, {
+                        params: { token }
                     });
 
                     if (response.data.valid) {
@@ -172,20 +165,19 @@ export const useAuthStore = create<AuthState>()(
                                 isSovereign: userData.is_admin || false,
                             },
                             isLoading: false,
-                            error: null
+                            isInitialized: true,
+                            error: null,
                         });
                         return true;
                     } else {
-                        // Token invalid — clear everything and redirect
                         localStorage.removeItem('access_token');
-                        set({ user: null, isLoading: false });
+                        set({ user: null, isLoading: false, isInitialized: true });
                         return false;
                     }
                 } catch (error) {
                     console.error('Token verification failed:', error);
 
-                    // Fallback: decode token locally so we don't kick user out
-                    // just because the verify endpoint is temporarily down
+                    // Fallback: decode locally if server is temporarily down
                     try {
                         const decoded = extractUserFromToken(token);
                         if (decoded && decoded.username) {
@@ -198,7 +190,8 @@ export const useAuthStore = create<AuthState>()(
                                     isSovereign: decoded.is_admin || false,
                                 } as User,
                                 isLoading: false,
-                                error: null
+                                isInitialized: true,
+                                error: null,
                             });
                             return true;
                         }
@@ -206,35 +199,41 @@ export const useAuthStore = create<AuthState>()(
                         console.error('Token decode failed:', decodeError);
                     }
 
-                    // Only clear user if we had no persisted session to fall back on
                     if (!hasPersistedUser) {
                         localStorage.removeItem('access_token');
-                        set({ user: null, isLoading: false });
+                        set({ user: null, isLoading: false, isInitialized: true });
                     } else {
-                        // Keep the persisted user — verify might be temporarily down
-                        set({ isLoading: false });
+                        set({ isLoading: false, isInitialized: true });
                     }
                     return hasPersistedUser;
                 }
-            }
+            },
         }),
         {
             name: 'auth-storage',
-            partialize: (state) => ({
-                user: state.user
-            })
+            // IMPORTANT: only persist `user`. Never persist isInitialized or isLoading —
+            // isInitialized must always be false on a fresh page load.
+            partialize: (state) => ({ user: state.user }),
+
+            // onRehydrateStorage fires immediately after localStorage is read,
+            // BEFORE any React component renders. This is the key fix:
+            // by calling checkAuth() here we eliminate the race condition where
+            // isInitialized was false but the router already made a redirect decision.
+            onRehydrateStorage: () => (state) => {
+                if (state) {
+                    state.checkAuth();
+                }
+            },
         }
     )
 );
 
-// Convenience hook for checking authentication
 export const useIsAuthenticated = (): boolean => {
-    const user = useAuthStore(state => state.user);
+    const user = useAuthStore((state) => state.user);
     return user?.isAuthenticated ?? false;
 };
 
-// Convenience hook for checking admin
 export const useIsAdmin = (): boolean => {
-    const user = useAuthStore(state => state.user);
+    const user = useAuthStore((state) => state.user);
     return user?.is_admin ?? false;
 };

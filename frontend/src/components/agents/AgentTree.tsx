@@ -16,60 +16,94 @@ export const AgentTree: React.FC<AgentTreeProps> = ({
     agentsMap,
     onSpawn,
     onTerminate,
-    level = 0
+    level = 0,
 }) => {
     const [isExpanded, setIsExpanded] = useState(true);
 
-    // SAFETY: Ensure subordinates exists and is an array
-    const subordinateIds = Array.isArray(agent?.subordinates) ? agent.subordinates : [];
+    if (!agent) return null;
 
-    // Find children in the map based on IDs
+    const subordinateIds = Array.isArray(agent?.subordinates) ? agent.subordinates : [];
     const children = subordinateIds
         .map(id => agentsMap.get(id))
         .filter((a): a is Agent => a !== undefined);
-
     const hasChildren = children.length > 0;
-
-    // SAFETY: Don't render if agent is undefined
-    if (!agent) {
-        return null;
-    }
 
     return (
         <div className="relative">
-            {/* Connector line for tree structure */}
+            {/* Vertical connector line - Dark in light mode, light in dark mode */}
             {level > 0 && (
                 <div
-                    className="absolute border-l-2 border-gray-700 -left-6 top-0 h-full"
-                    style={{ left: '-24px', height: '100%' }}
+                    className="
+                        absolute 
+                        border-l-2 
+                        border-slate-400 
+                        dark:border-slate-500
+                    "
+                    style={{ left: '-24px', height: '100%', top: 0 }}
                 />
             )}
 
             <div className="flex items-start gap-2 mb-4 relative">
+                {/* Horizontal connector line */}
                 {level > 0 && (
                     <div
-                        className="absolute w-6 border-t-2 border-gray-700"
+                        className="
+                            absolute 
+                            w-6 
+                            border-t-2 
+                            border-slate-400 
+                            dark:border-slate-500
+                        "
                         style={{ left: '-24px', top: '24px' }}
                     />
                 )}
 
-                {hasChildren && (
+                {hasChildren ? (
                     <button
                         onClick={() => setIsExpanded(!isExpanded)}
-                        className="mt-3 p-1 rounded hover:bg-gray-700 text-gray-400"
+                        className="
+                            mt-3 
+                            p-1 
+                            rounded-lg 
+                            hover:bg-slate-200 
+                            dark:hover:bg-slate-700
+                            text-slate-600 
+                            dark:text-slate-300
+                            transition-colors 
+                            duration-150 
+                            flex-shrink-0
+                        "
                     >
-                        {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                        {isExpanded
+                            ? <ChevronDown className="w-4 h-4" />
+                            : <ChevronRight className="w-4 h-4" />
+                        }
                     </button>
+                ) : (
+                    <div className="w-6 flex-shrink-0" />
                 )}
-                {!hasChildren && <div className="w-6" />} {/* Spacer */}
 
                 <AgentCard agent={agent} onSpawn={onSpawn} onTerminate={onTerminate} />
             </div>
 
             {/* Recursively render children */}
             {isExpanded && hasChildren && (
-                <div className="ml-12 border-l-2 border-gray-700 pl-6 space-y-4">
-                    <div className="border-l border-gray-700/50 -ml-6 pl-6 pt-2">
+                <div className="
+                    ml-12 
+                    pl-6 
+                    space-y-0 
+                    border-l-2 
+                    border-slate-400 
+                    dark:border-slate-500
+                ">
+                    <div className="
+                        border-l 
+                        border-slate-300 
+                        dark:border-slate-600
+                        -ml-6 
+                        pl-6 
+                        pt-2
+                    ">
                         {children.map(child => (
                             <AgentTree
                                 key={child.id || child.agentium_id}

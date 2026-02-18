@@ -22,17 +22,29 @@ import { SovereignRoute } from '@/components/SovereignRoute';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Shield, Loader2 } from 'lucide-react';
 
-// Auth layout that keeps background and header persistent
+// Full-screen spinner shown while checkAuth() is in-flight on page load
+function AppLoader() {
+  return (
+    <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+      <div className="flex flex-col items-center gap-3">
+        <div className="w-12 h-12 rounded-2xl bg-blue-600 flex items-center justify-center">
+          <Shield className="w-6 h-6 text-white" />
+        </div>
+        <Loader2 className="w-6 h-6 animate-spin text-blue-400" />
+      </div>
+    </div>
+  );
+}
+
+// Auth layout — keeps background and header persistent across login/signup
 function AuthLayout() {
   const location = useLocation();
   const isSignup = location.pathname === '/signup';
 
   return (
     <div className="min-h-screen relative flex flex-col items-center justify-center p-4">
-      {/* Background persists across auth pages */}
       <FlatMapAuthBackground variant={isSignup ? 'signup' : 'login'} />
-      
-      {/* Static Header - doesn't animate */}
+
       <div className="text-center mb-8 relative z-10">
         <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-blue-600 text-white mb-4 transition-transform duration-500 hover:scale-110">
           <Shield className="w-8 h-8" />
@@ -41,24 +53,19 @@ function AuthLayout() {
         <p className="text-white">AI Agent Governance System</p>
       </div>
 
-      {/* Animated content switch - only the form card */}
       <AnimatePresence mode="wait" initial={false}>
         <motion.div
           key={location.pathname}
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -15 }}
-          transition={{ 
-            duration: 0.25, 
-            ease: [0.4, 0, 0.2, 1]
-          }}
+          transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
           className="w-full max-w-md relative z-10"
         >
           <Outlet />
         </motion.div>
       </AnimatePresence>
 
-      {/* Static Footer - doesn't animate */}
       <p className="text-center text-sm text-white mt-8 relative z-10">
         Secure AI Governance Platform v1.0.0
       </p>
@@ -67,17 +74,27 @@ function AuthLayout() {
 }
 
 export default function App() {
-  const { user, checkAuth, isLoading } = useAuthStore();
+  const { user, isInitialized, isLoading } = useAuthStore();
   const { startPolling, stopPolling } = useBackendStore();
 
-  useEffect(() => {
-    checkAuth();
-  }, [checkAuth]);
+  // NOTE: We no longer call checkAuth() here.
+  // It is now triggered automatically inside authStore via onRehydrateStorage,
+  // which fires before any React component renders — eliminating the race condition.
 
   useEffect(() => {
     startPolling();
     return () => stopPolling();
   }, [startPolling, stopPolling]);
+
+  // Block the entire app until checkAuth() has finished at least once.
+  // This prevents ANY routing decision from being made before we know
+  // whether the user's token is valid, which was the root cause of the
+  // "refresh → redirect to login" bug.
+  if (!isInitialized) {
+    return <AppLoader />;
+  }
+
+  const isAuthenticated = user?.isAuthenticated === true;
 
   return (
     <Router>
@@ -86,23 +103,20 @@ export default function App() {
         toastOptions={{
           duration: 4000,
           className: 'dark:bg-gray-800 dark:text-white',
-          style: {
-            background: '#1f2937',
-            color: '#fff',
-          },
+          style: { background: '#1f2937', color: '#fff' },
         }}
       />
 
       <Routes>
-        {/* Auth Routes - Shared layout with persistent background */}
+        {/* Auth Routes */}
         <Route element={<AuthLayout />}>
           <Route
             path="/login"
-            element={isLoading ? null : (!user?.isAuthenticated ? <LoginPage /> : <Navigate to="/" replace />)}
+            element={isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />}
           />
           <Route
             path="/signup"
-            element={isLoading ? null : (!user?.isAuthenticated ? <SignupPage /> : <Navigate to="/" replace />)}
+            element={isAuthenticated ? <Navigate to="/" replace /> : <SignupPage />}
           />
         </Route>
 
@@ -111,15 +125,9 @@ export default function App() {
           path="/"
           element={
             isLoading ? (
-              <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-                <div className="flex flex-col items-center gap-3">
-                  <div className="w-12 h-12 rounded-2xl bg-blue-600 flex items-center justify-center">
-                    <Shield className="w-6 h-6 text-white" />
-                  </div>
-                  <Loader2 className="w-6 h-6 animate-spin text-blue-400" />
-                </div>
-              </div>
-            ) : user?.isAuthenticated ? (
+              // isLoading covers background re-verification (e.g. after login form submit)
+              <AppLoader />
+            ) : isAuthenticated ? (
               <MainLayout />
             ) : (
               <Navigate to="/login" replace />

@@ -41,7 +41,7 @@ interface UploadedFile {
     id: string;
     file: File;
     preview?: string;
-    apiFile?: ApiUploadedFile;  
+    apiFile?: ApiUploadedFile;
     isUploading?: boolean;
     uploadError?: string;
 }
@@ -129,7 +129,6 @@ export function ChatPage() {
     const loadChatHistory = async () => {
         try {
             const history = await chatApi.getHistory(50);
-            
             const formattedMessages: Message[] = history.messages.map(msg => ({
                 id: msg.id,
                 role: msg.role,
@@ -138,7 +137,6 @@ export function ChatPage() {
                 metadata: msg.metadata,
                 attachments: msg.attachments
             }));
-            
             setMessages(formattedMessages);
         } catch (error) {
             console.error('Failed to load chat history:', error);
@@ -183,7 +181,7 @@ export function ChatPage() {
             content: input.trim(),
             attachments: attachments
         }));
-        
+
         if (!sent) {
             toast.error('Failed to send message - not connected');
         }
@@ -201,13 +199,13 @@ export function ChatPage() {
             file,
             isUploading: true
         }));
-        
+
         setUploadedFiles(prev => [...prev, ...newFiles]);
         setShowFileMenu(false);
 
         try {
             const response = await fileApi.uploadFiles(files);
-            
+
             setUploadedFiles(prev => {
                 const updated = [...prev];
                 response.files.forEach((apiFile, index) => {
@@ -218,13 +216,13 @@ export function ChatPage() {
                             apiFile,
                             isUploading: false
                         };
-                        
+
                         if (apiFile.category === 'image' && files[index]) {
                             const reader = new FileReader();
                             reader.onload = (e) => {
-                                setUploadedFiles(current => 
-                                    current.map(f => 
-                                        f.id === updated[localIndex].id 
+                                setUploadedFiles(current =>
+                                    current.map(f =>
+                                        f.id === updated[localIndex].id
                                             ? { ...f, preview: e.target?.result as string }
                                             : f
                                     )
@@ -239,8 +237,8 @@ export function ChatPage() {
 
             toast.success(`${response.total_uploaded} file(s) uploaded`);
         } catch (error: any) {
-            setUploadedFiles(prev => 
-                prev.map(f => 
+            setUploadedFiles(prev =>
+                prev.map(f =>
                     newFiles.find(nf => nf.id === f.id)
                         ? { ...f, isUploading: false, uploadError: error.message }
                         : f
@@ -289,9 +287,7 @@ export function ChatPage() {
         }
 
         const isAvailable = await voiceApi.checkAvailability();
-        if (!isAvailable) {
-            return;
-        }
+        if (!isAvailable) return;
 
         startRecording();
     };
@@ -299,73 +295,61 @@ export function ChatPage() {
     const startRecording = async () => {
         try {
             const { recorder, stream } = await voiceApi.startRecording();
-            
             const chunks: BlobPart[] = [];
-            
+
             recorder.ondataavailable = (e) => {
-                if (e.data.size > 0) {
-                    chunks.push(e.data);
-                }
+                if (e.data.size > 0) chunks.push(e.data);
             };
-            
+
             recorder.onstop = async () => {
                 const audioBlob = new Blob(chunks, { type: recorder.mimeType });
                 stream.getTracks().forEach(track => track.stop());
-                
+
                 toast.loading('Transcribing voice...', { id: 'transcribing' });
-                
+
                 try {
                     const result = await voiceApi.transcribe(audioBlob);
-                    
                     setInput(prev => {
                         const separator = prev && !prev.endsWith(' ') ? ' ' : '';
                         return prev + separator + result.text;
                     });
-                    
                     toast.success('Voice transcribed', { id: 'transcribing' });
                 } catch (error: any) {
                     if (!error.message?.includes('OpenAI provider')) {
                         toast.error(`Transcription failed: ${error.message}`, { id: 'transcribing' });
                     }
                 }
-                
+
                 setIsRecording(false);
                 setRecordingTime(0);
             };
-            
+
             recorder.onerror = () => {
                 toast.error('Recording error');
                 setIsRecording(false);
                 stream.getTracks().forEach(track => track.stop());
             };
-            
+
             recorder.start();
             setMediaRecorder(recorder);
             setAudioStream(stream);
             setIsRecording(true);
             setRecordingTime(0);
-            
+
             recordingIntervalRef.current = setInterval(() => {
                 setRecordingTime(prev => prev + 1);
             }, 1000);
-            
+
             toast.success('Recording started');
-            
         } catch (error: any) {
             toast.error(`Microphone access denied: ${error.message}`);
         }
     };
 
     const stopRecording = () => {
-        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-            mediaRecorder.stop();
-        }
-        if (audioStream) {
-            audioStream.getTracks().forEach(track => track.stop());
-        }
-        if (recordingIntervalRef.current) {
-            clearInterval(recordingIntervalRef.current);
-        }
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+        if (audioStream) audioStream.getTracks().forEach(track => track.stop());
+        if (recordingIntervalRef.current) clearInterval(recordingIntervalRef.current);
         setMediaRecorder(null);
         setAudioStream(null);
     };
@@ -406,11 +390,10 @@ export function ChatPage() {
     const renderAttachment = (attachment: Attachment, isUser: boolean) => {
         const isImage = attachment.type?.startsWith('image/') || attachment.category === 'image';
         const isVideo = attachment.type?.startsWith('video/') || attachment.category === 'video';
-        
+
         if (isImage) {
             const imageUrl = attachment.url || attachment.data;
             if (!imageUrl) return null;
-            
             return (
                 <div className="mt-2 relative group/img">
                     <img
@@ -419,7 +402,7 @@ export function ChatPage() {
                         className="rounded-2xl max-w-sm max-h-80 object-cover cursor-pointer shadow-sm hover:shadow-md transition-shadow"
                         onClick={() => setImagePreview({ url: imageUrl, name: attachment.name })}
                     />
-                    <button
+                    <button aria-label="Download File"
                         onClick={(e) => { e.stopPropagation(); downloadFile(attachment); }}
                         className="absolute top-2 right-2 p-2 bg-black/50 hover:bg-black/70 text-white rounded-lg opacity-0 group-hover/img:opacity-100 transition-opacity backdrop-blur-sm"
                     >
@@ -442,22 +425,22 @@ export function ChatPage() {
         return (
             <div className="mt-2">
                 <div className={`flex items-center gap-3 p-3 rounded-xl max-w-sm ${
-                    isUser ? 'bg-white/10' : 'bg-gray-100 dark:bg-gray-700/50'
+                    isUser ? 'bg-white/10' : 'bg-gray-100 dark:bg-[#1e2535]'
                 }`}>
-                    <div className={`p-2 rounded-lg ${isUser ? 'bg-white/20' : 'bg-gray-200 dark:bg-gray-600'}`}>
+                    <div className={`p-2 rounded-lg ${isUser ? 'bg-white/20' : 'bg-gray-200 dark:bg-[#2a3347]'}`}>
                         {getFileIcon(attachment.type || '')}
                     </div>
                     <div className="flex-1 min-w-0">
-                        <div className={`text-sm font-medium truncate ${isUser ? 'text-white' : 'text-gray-900 dark:text-white'}`}>
+                        <div className={`text-sm font-medium truncate ${isUser ? 'text-white' : 'text-gray-900 dark:text-gray-100'}`}>
                             {attachment.name}
                         </div>
                         <div className={`text-xs ${isUser ? 'text-white/70' : 'text-gray-500 dark:text-gray-400'}`}>
                             {formatFileSize(attachment.size || 0)}
                         </div>
                     </div>
-                    <button
+                    <button aria-label="Download File"
                         onClick={() => downloadFile(attachment)}
-                        className={`p-1.5 rounded-lg ${isUser ? 'hover:bg-white/20' : 'hover:bg-gray-200 dark:hover:bg-gray-600'} transition-colors`}
+                        className={`p-1.5 rounded-lg transition-colors ${isUser ? 'hover:bg-white/20' : 'hover:bg-gray-200 dark:hover:bg-[#2a3347]'}`}
                     >
                         <Download className="w-4 h-4" />
                     </button>
@@ -468,15 +451,15 @@ export function ChatPage() {
 
     if (!isAuthenticated) {
         return (
-            <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-6">
+            <div className="min-h-screen bg-gray-50 dark:bg-[#0f1117] flex items-center justify-center p-6 transition-colors duration-200">
                 <div className="text-center max-w-md">
-                    <div className="w-20 h-20 bg-red-100 dark:bg-red-900/30 rounded-3xl flex items-center justify-center mx-auto mb-6">
+                    <div className="w-20 h-20 bg-red-100 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-3xl flex items-center justify-center mx-auto mb-6">
                         <AlertCircle className="w-10 h-10 text-red-600 dark:text-red-400" />
                     </div>
                     <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">
                         Authentication Required
                     </h2>
-                    <p className="text-gray-600 dark:text-gray-400">
+                    <p className="text-gray-500 dark:text-gray-400">
                         Please log in to access the Command Interface
                     </p>
                 </div>
@@ -485,53 +468,59 @@ export function ChatPage() {
     }
 
     return (
-        <div className="h-full bg-gray-50 dark:bg-gray-900 flex flex-col overflow-hidden">
+        <div className="h-full bg-gray-50 dark:bg-[#0f1117] flex flex-col overflow-hidden transition-colors duration-200">
             <div className="w-full h-full flex flex-col">
-                {/* Premium Header */}
-                <div className="flex-shrink-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-                    <div className="px-6 py-5 max-w-6xl mx-auto">
+
+                {/* ── Header ─────────────────────────────────────────────────── */}
+                <div className="flex-shrink-0 bg-white dark:bg-[#161b27] border-b border-gray-200 dark:border-[#1e2535] shadow-sm dark:shadow-none">
+                    <div className="px-6 py-4 max-w-6xl mx-auto">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-4">
                                 <div className="relative">
-                                    <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/25">
+                                    <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/25 dark:shadow-blue-900/40">
                                         <Crown className="w-5 h-5 text-white" />
                                     </div>
-                                    <div className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white dark:border-gray-800 ${
-                                        isConnected ? 'bg-green-500' : 'bg-gray-400'
-                                    }`}></div>
+                                    {/* Connection status dot */}
+                                    <div className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white dark:border-[#161b27] transition-colors duration-300 ${
+                                        isConnected ? 'bg-green-500' : 'bg-gray-400 dark:bg-gray-600'
+                                    }`} />
                                 </div>
                                 <div>
-                                    <h1 className="text-lg font-semibold text-gray-900 dark:text-white">
+                                    <h1 className="text-base font-semibold text-gray-900 dark:text-white leading-tight">
                                         Head of Council
                                     </h1>
-                                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                                        {isConnected ? 'Active now' : isConnecting ? 'Connecting...' : 'Offline'}
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
+                                        {isConnected ? (
+                                            <span className="text-green-600 dark:text-green-400 font-medium">Active now</span>
+                                        ) : isConnecting ? (
+                                            'Connecting...'
+                                        ) : (
+                                            <span className="text-gray-400 dark:text-gray-500">Offline</span>
+                                        )}
                                         {connectionStats.latencyMs && isConnected && (
-                                            <span className="ml-2 text-xs text-green-600">
-                                                ({connectionStats.latencyMs}ms)
-                                            </span>
+                                            <span className="text-green-600 dark:text-green-500">· {connectionStats.latencyMs}ms</span>
                                         )}
                                     </p>
                                 </div>
                             </div>
-                            
+
                             <div className="flex items-center gap-3">
                                 {error && (
-                                    <span className="text-sm text-red-600 dark:text-red-400 max-w-xs truncate">
+                                    <span className="text-sm text-red-600 dark:text-red-400 max-w-xs truncate hidden sm:block">
                                         {error}
                                     </span>
                                 )}
                                 {!isConnected && !isConnecting && (
                                     <button
                                         onClick={reconnect}
-                                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-xl transition-colors flex items-center gap-2"
+                                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 dark:hover:bg-blue-500 text-white text-sm font-medium rounded-xl transition-all duration-150 flex items-center gap-2 shadow-sm dark:shadow-blue-900/30"
                                     >
                                         <RefreshCw className="w-4 h-4" />
                                         Reconnect
                                     </button>
                                 )}
                                 {isConnecting && (
-                                    <div className="flex items-center gap-2 text-sm text-gray-500">
+                                    <div className="flex items-center gap-2 text-sm text-gray-400 dark:text-gray-500">
                                         <Loader2 className="w-4 h-4 animate-spin" />
                                         Connecting...
                                     </div>
@@ -541,153 +530,161 @@ export function ChatPage() {
                     </div>
                 </div>
 
-                {/* Messages Area */}
-                <div className="flex-1 overflow-y-auto min-h-0">
+                {/* ── Messages Area ──────────────────────────────────────────── */}
+                <div className="flex-1 overflow-y-auto min-h-0 bg-gray-50 dark:bg-[#0f1117]">
                     <div className="px-6 py-6 max-w-6xl mx-auto">
-                    {messages.length === 0 && (
-                        <div className="flex items-center justify-center h-full">
-                            <div className="text-center max-w-md">
-                                <div className="w-16 h-16 bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-3xl flex items-center justify-center mx-auto mb-6">
-                                    <Sparkles className="w-8 h-8 text-blue-600 dark:text-blue-400" />
-                                </div>
-                                <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-                                    Start a Conversation
-                                </h2>
-                                <p className="text-gray-600 dark:text-gray-400 mb-8">
-                                    Chat with the AI to manage tasks, spawn agents, and control your system
-                                </p>
-                                <div className="flex flex-wrap gap-2 justify-center">
-                                    {['System status', 'Create task', 'List agents', 'Help'].map((suggestion) => (
-                                        <button
-                                            key={suggestion}
-                                            onClick={() => setInput(suggestion)}
-                                            className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600 rounded-xl text-sm text-gray-700 dark:text-gray-300 transition-colors"
-                                        >
-                                            {suggestion}
-                                        </button>
-                                    ))}
+
+                        {/* Empty state */}
+                        {messages.length === 0 && (
+                            <div className="flex items-center justify-center h-full min-h-[400px]">
+                                <div className="text-center max-w-md">
+                                    <div className="w-16 h-16 bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-500/10 dark:to-purple-500/10 border border-blue-100 dark:border-blue-500/20 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-sm">
+                                        <Sparkles className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+                                    </div>
+                                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+                                        Start a Conversation
+                                    </h2>
+                                    <p className="text-gray-500 dark:text-gray-400 text-sm mb-8">
+                                        Chat with the AI to manage tasks, spawn agents, and control your system
+                                    </p>
+                                    <div className="flex flex-wrap gap-2 justify-center">
+                                        {['System status', 'Create task', 'List agents', 'Help'].map((suggestion) => (
+                                            <button
+                                                key={suggestion}
+                                                onClick={() => setInput(suggestion)}
+                                                className="px-4 py-2 bg-white dark:bg-[#161b27] border border-gray-200 dark:border-[#1e2535] hover:border-blue-300 dark:hover:border-blue-500/50 hover:bg-blue-50/30 dark:hover:bg-blue-500/5 rounded-xl text-sm text-gray-700 dark:text-gray-300 transition-all duration-150 shadow-sm dark:shadow-none"
+                                            >
+                                                {suggestion}
+                                            </button>
+                                        ))}
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    )}
+                        )}
 
-                    <div className="space-y-6 max-w-4xl mx-auto">
-                        {messages.map((message, index) => {
-                            const isUser = message.role === 'sovereign';
-                            const showAvatar = index === 0 || messages[index - 1].role !== message.role;
-                            
-                            return (
-                                <div key={message.id} className="group">
-                                    <div className={`flex items-start gap-3 ${isUser ? 'flex-row-reverse' : ''}`}>
-                                        {/* Avatar */}
-                                        <div className={`flex-shrink-0 ${showAvatar ? 'visible' : 'invisible'}`}>
-                                            <div className={`w-9 h-9 rounded-2xl flex items-center justify-center ${
-                                                isUser 
-                                                    ? 'bg-gradient-to-br from-blue-500 to-blue-600 shadow-lg shadow-blue-500/25'
-                                                    : message.role === 'system'
-                                                    ? 'bg-red-100 dark:bg-red-900/30'
-                                                    : 'bg-purple-100 dark:bg-purple-900/30'
-                                            }`}>
-                                                {isUser ? (
-                                                    <Crown className="w-4 h-4 text-white" />
-                                                ) : message.role === 'system' ? (
-                                                    <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400" />
-                                                ) : (
-                                                    <Bot className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                                                )}
-                                            </div>
-                                        </div>
+                        {/* Messages */}
+                        <div className="space-y-6 max-w-4xl mx-auto">
+                            {messages.map((message, index) => {
+                                const isUser = message.role === 'sovereign';
+                                const showAvatar = index === 0 || messages[index - 1].role !== message.role;
 
-                                        {/* Message Bubble */}
-                                        <div className={`flex-1 ${isUser ? 'flex justify-end' : ''}`}>
-                                            <div className={`inline-block max-w-xl ${isUser ? 'ml-12' : 'mr-12'}`}>
-                                                <div className={`px-4 py-3 rounded-2xl ${
+                                return (
+                                    <div key={message.id} className="group">
+                                        <div className={`flex items-start gap-3 ${isUser ? 'flex-row-reverse' : ''}`}>
+
+                                            {/* Avatar */}
+                                            <div className={`flex-shrink-0 ${showAvatar ? 'visible' : 'invisible'}`}>
+                                                <div className={`w-9 h-9 rounded-2xl flex items-center justify-center shadow-sm ${
                                                     isUser
-                                                        ? 'bg-gradient-to-br from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/25'
+                                                        ? 'bg-gradient-to-br from-blue-500 to-blue-600 shadow-blue-500/25 dark:shadow-blue-900/40'
                                                         : message.role === 'system'
-                                                        ? 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-900 dark:text-red-300'
-                                                        : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white shadow-sm'
+                                                        ? 'bg-red-100 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20'
+                                                        : 'bg-purple-100 dark:bg-purple-500/10 border border-purple-200 dark:border-purple-500/20'
                                                 }`}>
-                                                    <p className="text-[15px] leading-relaxed whitespace-pre-wrap">
-                                                        {message.content}
-                                                    </p>
-                                                    
-                                                    {message.attachments?.map((attachment, i) => (
-                                                        <div key={i}>{renderAttachment(attachment, isUser)}</div>
-                                                    ))}
-
-                                                    {message.metadata?.task_created && (
-                                                        <div className="mt-3 pt-3 border-t border-white/20 flex items-center gap-2 text-xs">
-                                                            <CheckCircle className="w-3.5 h-3.5" />
-                                                            Task {message.metadata.task_id} created
-                                                        </div>
+                                                    {isUser ? (
+                                                        <Crown className="w-4 h-4 text-white" />
+                                                    ) : message.role === 'system' ? (
+                                                        <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400" />
+                                                    ) : (
+                                                        <Bot className="w-4 h-4 text-purple-600 dark:text-purple-400" />
                                                     )}
                                                 </div>
+                                            </div>
 
-                                                {/* Timestamp & Actions */}
-                                                <div className={`flex items-center gap-2 mt-1.5 px-1 ${isUser ? 'justify-end' : ''}`}>
-                                                    <span className="text-xs text-gray-500 dark:text-gray-400">
-                                                        {formatMessageTime(message.timestamp)}
-                                                    </span>
-                                                    {message.role !== 'system' && (
-                                                        <button
-                                                            onClick={() => copyMessage(message.content)}
-                                                            className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-all"
-                                                        >
-                                                            <Copy className="w-3 h-3 text-gray-500 dark:text-gray-400" />
-                                                        </button>
-                                                    )}
+                                            {/* Bubble */}
+                                            <div className={`flex-1 ${isUser ? 'flex justify-end' : ''}`}>
+                                                <div className={`inline-block max-w-xl ${isUser ? 'ml-12' : 'mr-12'}`}>
+                                                    <div className={`px-4 py-3 rounded-2xl ${
+                                                        isUser
+                                                            ? 'bg-gradient-to-br from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/20 dark:shadow-blue-900/40'
+                                                            : message.role === 'system'
+                                                            ? 'bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-900 dark:text-red-300'
+                                                            : 'bg-white dark:bg-[#161b27] border border-gray-200 dark:border-[#1e2535] text-gray-900 dark:text-gray-100 shadow-sm dark:shadow-[0_2px_12px_rgba(0,0,0,0.2)]'
+                                                    }`}>
+                                                        <p className="text-[15px] leading-relaxed whitespace-pre-wrap">
+                                                            {message.content}
+                                                        </p>
+
+                                                        {message.attachments?.map((attachment, i) => (
+                                                            <div key={i}>{renderAttachment(attachment, isUser)}</div>
+                                                        ))}
+
+                                                        {message.metadata?.task_created && (
+                                                            <div className="mt-3 pt-3 border-t border-white/20 flex items-center gap-2 text-xs">
+                                                                <CheckCircle className="w-3.5 h-3.5" />
+                                                                Task {message.metadata.task_id} created
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Timestamp & copy */}
+                                                    <div className={`flex items-center gap-2 mt-1.5 px-1 ${isUser ? 'justify-end' : ''}`}>
+                                                        <span className="text-xs text-gray-400 dark:text-gray-500">
+                                                            {formatMessageTime(message.timestamp)}
+                                                        </span>
+                                                        {message.role !== 'system' && (
+                                                            <button aria-label="Copy Message"
+                                                                onClick={() => copyMessage(message.content)}
+                                                                className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-200 dark:hover:bg-[#1e2535] rounded-lg transition-all duration-150"
+                                                            >
+                                                                <Copy className="w-3 h-3 text-gray-400 dark:text-gray-500" />
+                                                            </button>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                    
-                    <div ref={messagesEndRef} />
+                                );
+                            })}
+                        </div>
+
+                        <div ref={messagesEndRef} />
                     </div>
                 </div>
 
-                {/* Premium Input Area */}
-                <div className="flex-shrink-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
+                {/* ── Input Area ─────────────────────────────────────────────── */}
+                <div className="flex-shrink-0 bg-white dark:bg-[#161b27] border-t border-gray-200 dark:border-[#1e2535] shadow-sm dark:shadow-[0_-4px_20px_rgba(0,0,0,0.2)]">
                     <div className="px-6 py-4 max-w-6xl mx-auto">
-                        {/* Connection Error Banner */}
+
+                        {/* Connection error banner */}
                         {error && !isConnected && (
-                            <div className="mb-3 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl flex items-center justify-between">
-                                <div className="flex items-center gap-2 text-sm text-red-700 dark:text-red-300">
-                                    <WifiOff className="w-4 h-4" />
+                            <div className="mb-3 p-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-xl flex items-center justify-between">
+                                <div className="flex items-center gap-2 text-sm text-red-700 dark:text-red-400">
+                                    <WifiOff className="w-4 h-4 flex-shrink-0" />
                                     <span>{error}</span>
                                 </div>
                                 <button
                                     onClick={reconnect}
-                                    className="text-sm text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-200 font-medium"
+                                    className="text-sm text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 font-medium transition-colors"
                                 >
                                     Try Again
                                 </button>
                             </div>
                         )}
 
-                        {/* File Attachments */}
+                        {/* File attachments preview */}
                         {uploadedFiles.length > 0 && (
                             <div className="mb-3 flex flex-wrap gap-2">
                                 {uploadedFiles.map((file) => (
                                     <div key={file.id} className="relative group/file">
-                                        <div className="flex items-center gap-2 pl-3 pr-2 py-2 bg-gray-100 dark:bg-gray-700 rounded-xl border border-gray-200 dark:border-gray-600">
+                                        <div className="flex items-center gap-2 pl-3 pr-2 py-2 bg-gray-100 dark:bg-[#0f1117] border border-gray-200 dark:border-[#1e2535] rounded-xl">
                                             {file.preview && file.file.type.startsWith('image/') ? (
                                                 <img src={file.preview} alt="" className="w-8 h-8 rounded-lg object-cover" />
                                             ) : (
-                                                <div className="w-8 h-8 rounded-lg bg-gray-200 dark:bg-gray-600 flex items-center justify-center">
+                                                <div className="w-8 h-8 rounded-lg bg-gray-200 dark:bg-[#1e2535] flex items-center justify-center text-gray-500 dark:text-gray-400">
                                                     {getFileIcon(file.file.type)}
                                                 </div>
                                             )}
                                             <span className="text-sm text-gray-700 dark:text-gray-300 max-w-[120px] truncate">
                                                 {file.file.name}
                                             </span>
-                                            <button
+                                            {file.isUploading && (
+                                                <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-500" />
+                                            )}
+                                            <button aria-label="Remove File"
                                                 onClick={() => removeFile(file.id)}
-                                                className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors"
+                                                className="p-1 hover:bg-gray-200 dark:hover:bg-[#1e2535] rounded-lg transition-colors text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
                                             >
                                                 <X className="w-3.5 h-3.5" />
                                             </button>
@@ -697,17 +694,17 @@ export function ChatPage() {
                             </div>
                         )}
 
-                        {/* Recording UI */}
+                        {/* Recording indicator */}
                         {isRecording && (
-                            <div className="mb-3 flex items-center justify-between p-3 bg-gradient-to-r from-red-50 to-orange-50 dark:from-red-900/20 dark:to-orange-900/20 border border-red-200 dark:border-red-800 rounded-xl">
+                            <div className="mb-3 flex items-center justify-between p-3 bg-gradient-to-r from-red-50 to-orange-50 dark:from-red-500/10 dark:to-orange-500/10 border border-red-200 dark:border-red-500/20 rounded-xl">
                                 <div className="flex items-center gap-3">
                                     <div className="flex items-center gap-2">
-                                        <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-                                        <span className="text-sm font-medium text-red-900 dark:text-red-300">
+                                        <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                                        <span className="text-sm font-medium text-red-900 dark:text-red-400">
                                             Recording
                                         </span>
                                     </div>
-                                    <span className="text-sm font-mono font-semibold text-red-900 dark:text-red-300">
+                                    <span className="text-sm font-mono font-semibold text-red-900 dark:text-red-400">
                                         {formatRecordingTime(recordingTime)}
                                     </span>
                                 </div>
@@ -720,63 +717,53 @@ export function ChatPage() {
                             </div>
                         )}
 
-                        {/* Input Row */}
+                        {/* Input row */}
                         <div className="flex items-end gap-2">
-                            {/* Attach Button */}
+
+                            {/* Attach button */}
                             <div className="relative">
-                                <button
+                                <button aria-label="Attach Files"
                                     type="button"
                                     onClick={() => setShowFileMenu(!showFileMenu)}
                                     disabled={isRecording || !isConnected}
-                                    className="p-2.5 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl transition-colors disabled:opacity-50"
+                                    className="p-2.5 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#1e2535] rounded-xl transition-all duration-150 disabled:opacity-40"
                                 >
                                     <Plus className="w-5 h-5" />
                                 </button>
                                 {showFileMenu && (
                                     <>
-                                        <div className="fixed inset-0 z-10" onClick={() => setShowFileMenu(false)}></div>
-                                        <div className="absolute bottom-full left-0 mb-2 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg overflow-hidden z-20">
+                                        <div className="fixed inset-0 z-10" onClick={() => setShowFileMenu(false)} />
+                                        <div className="absolute bottom-full left-0 mb-2 w-48 bg-white dark:bg-[#161b27] border border-gray-200 dark:border-[#1e2535] rounded-xl shadow-lg dark:shadow-[0_8px_32px_rgba(0,0,0,0.4)] overflow-hidden z-20">
                                             <button
                                                 onClick={() => { fileInputRef.current?.click(); setShowFileMenu(false); }}
-                                                className="w-full px-4 py-3 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors"
+                                                className="w-full px-4 py-3 text-left text-sm hover:bg-gray-50 dark:hover:bg-[#1e2535] flex items-center gap-3 transition-colors duration-150"
                                             >
-                                                <ImageIcon className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                                                <ImageIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" />
                                                 <span className="text-gray-700 dark:text-gray-300">Upload Files</span>
                                             </button>
                                         </div>
                                     </>
                                 )}
-                                <input
-                                    ref={fileInputRef}
-                                    type="file"
-                                    multiple
-                                    onChange={handleFileSelect}
-                                    className="hidden"
-                                    accept="image/*,.pdf,.doc,.docx,.txt,.mp4,.mp3"
-                                />
+                                <input aria-label="Upload Files" ref={fileInputRef} type="file" multiple onChange={handleFileSelect} className="hidden" accept="image/*,.pdf,.doc,.docx,.txt,.mp4,.mp3" />
                             </div>
 
-                            {/* Text Input */}
-                            <div className="flex-1 bg-gray-100 dark:bg-gray-700 rounded-2xl border border-transparent focus-within:border-blue-500 focus-within:bg-white dark:focus-within:bg-gray-800 transition-all">
-                                <textarea
-                                    ref={textareaRef}
-                                    value={input}
-                                    onChange={(e) => setInput(e.target.value)}
-                                    onKeyDown={(e) => {
+                            {/* Text input */}
+                            <div className="flex-1 bg-gray-100 dark:bg-[#0f1117] rounded-2xl border border-transparent dark:border-[#1e2535] focus-within:border-blue-500 dark:focus-within:border-blue-500/60 focus-within:bg-white dark:focus-within:bg-[#161b27] transition-all duration-150 shadow-none focus-within:shadow-sm dark:focus-within:shadow-[0_0_0_1px_rgba(59,130,246,0.15)]">
+                                <textarea aria-label="Message" ref={textareaRef} value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => {
                                         if (e.key === 'Enter' && !e.shiftKey) {
                                             e.preventDefault();
                                             handleSubmit(e);
                                         }
                                     }}
-                                    placeholder={isConnected ? "Type a message..." : "Reconnecting..."}
+                                    placeholder={isConnected ? 'Type a message...' : 'Reconnecting...'}
                                     disabled={isRecording || !isConnected}
-                                    className="w-full px-4 py-3 bg-transparent border-0 resize-none text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none disabled:opacity-50"
+                                    className="w-full px-4 py-3 bg-transparent border-0 resize-none text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-600 focus:outline-none disabled:opacity-50 text-[15px]"
                                     rows={1}
                                     style={{ maxHeight: '150px' }}
                                 />
                             </div>
 
-                            {/* Voice Button with Availability Indicator */}
+                            {/* Voice button */}
                             <div className="relative">
                                 <button
                                     type="button"
@@ -784,35 +771,34 @@ export function ChatPage() {
                                     disabled={!isConnected}
                                     onMouseEnter={() => voiceAvailable === false && setShowVoiceTooltip(true)}
                                     onMouseLeave={() => setShowVoiceTooltip(false)}
-                                    className={`p-2.5 rounded-xl transition-all ${
+                                    className={`p-2.5 rounded-xl transition-all duration-150 disabled:opacity-40 ${
                                         isRecording
-                                            ? 'bg-red-600 hover:bg-red-700 text-white'
+                                            ? 'bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-500/30'
                                             : voiceAvailable === false
-                                                ? 'text-orange-500 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20'
-                                                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
-                                    } disabled:opacity-50`}
+                                            ? 'text-orange-500 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-500/10'
+                                            : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#1e2535]'
+                                    }`}
                                 >
-                                    {isRecording ? <MicOff className="w-5 h-5" /> : 
-                                     voiceAvailable === false ? <AlertCircle className="w-5 h-5" /> : 
+                                    {isRecording ? <MicOff className="w-5 h-5" /> :
+                                     voiceAvailable === false ? <AlertCircle className="w-5 h-5" /> :
                                      <Mic className="w-5 h-5" />}
                                 </button>
-                                
-                                {/* Tooltip for voice unavailable */}
+
+                                {/* Voice unavailable tooltip */}
                                 {showVoiceTooltip && voiceAvailable === false && (
-                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg whitespace-nowrap z-50 shadow-lg">
+                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2.5 bg-gray-900 dark:bg-[#0f1117] border border-transparent dark:border-[#1e2535] text-white text-xs rounded-xl whitespace-nowrap z-50 shadow-xl">
                                         <div className="font-medium mb-0.5">Voice features unavailable</div>
-                                        <div className="text-gray-300">Add OpenAI provider in Models page</div>
-                                        <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900 dark:border-t-gray-800"></div>
+                                        <div className="text-gray-300 dark:text-gray-400">Add OpenAI provider in Models page</div>
+                                        <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900 dark:border-t-[#0f1117]" />
                                     </div>
                                 )}
                             </div>
 
-                            {/* Send Button */}
-                            <button
-                                type="button"
+                            {/* Send button */}
+                            <button aria-label="Send" 
                                 onClick={handleSubmit}
                                 disabled={(!input.trim() && uploadedFiles.length === 0) || isRecording || !isConnected}
-                                className="p-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed text-white rounded-xl transition-all shadow-lg shadow-blue-500/25 disabled:shadow-none"
+                                className="p-2.5 bg-blue-600 hover:bg-blue-700 dark:hover:bg-blue-500 disabled:bg-gray-200 dark:disabled:bg-[#1e2535] disabled:cursor-not-allowed text-white disabled:text-gray-400 dark:disabled:text-gray-600 rounded-xl transition-all duration-150 shadow-md shadow-blue-500/25 dark:shadow-blue-900/30 disabled:shadow-none"
                             >
                                 <Send className="w-5 h-5" />
                             </button>
@@ -821,14 +807,13 @@ export function ChatPage() {
                 </div>
             </div>
 
-            {/* Image Preview Modal */}
+            {/* ── Image Preview Modal ─────────────────────────────────────── */}
             {imagePreview && (
-                <div 
-                    className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-6 backdrop-blur-sm"
+                <div
+                    className="fixed inset-0 bg-black/90 dark:bg-black/95 z-50 flex items-center justify-center p-6 backdrop-blur-sm"
                     onClick={() => setImagePreview(null)}
                 >
-                    <button
-                        onClick={() => setImagePreview(null)}
+                    <button aria-label="Preview" onClick={() => setImagePreview(null)}
                         className="absolute top-6 right-6 p-2.5 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-colors"
                     >
                         <X className="w-6 h-6" />
@@ -840,7 +825,7 @@ export function ChatPage() {
                             className="max-w-full max-h-[90vh] object-contain rounded-2xl shadow-2xl"
                         />
                         <div className="mt-4 text-center">
-                            <p className="text-white text-sm mb-3">{imagePreview.name}</p>
+                            <p className="text-white/80 text-sm mb-3">{imagePreview.name}</p>
                             <button
                                 onClick={() => {
                                     const a = document.createElement('a');
@@ -848,7 +833,7 @@ export function ChatPage() {
                                     a.download = imagePreview.name;
                                     a.click();
                                 }}
-                                className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-colors"
+                                className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-sm rounded-xl transition-colors border border-white/10"
                             >
                                 Download
                             </button>

@@ -100,18 +100,18 @@ interface ChannelTypeDefinition {
 
 type ColorKey = 'green' | 'purple' | 'blue' | 'red' | 'indigo' | 'gray' | 'cyan' | 'teal' | 'orange' | 'pink' | 'slate';
 
-const colorMap: Record<ColorKey, { bg: string; darkBg: string; text: string }> = {
-    green:  { bg: 'bg-green-100',  darkBg: 'dark:bg-green-900/30',  text: 'text-green-600'  },
-    purple: { bg: 'bg-purple-100', darkBg: 'dark:bg-purple-900/30', text: 'text-purple-600' },
-    blue:   { bg: 'bg-blue-100',   darkBg: 'dark:bg-blue-900/30',   text: 'text-blue-600'   },
-    red:    { bg: 'bg-red-100',    darkBg: 'dark:bg-red-900/30',    text: 'text-red-600'    },
-    indigo: { bg: 'bg-indigo-100', darkBg: 'dark:bg-indigo-900/30', text: 'text-indigo-600' },
-    gray:   { bg: 'bg-gray-100',   darkBg: 'dark:bg-gray-700/50',   text: 'text-gray-600'   },
-    cyan:   { bg: 'bg-cyan-100',   darkBg: 'dark:bg-cyan-900/30',   text: 'text-cyan-600'   },
-    teal:   { bg: 'bg-teal-100',   darkBg: 'dark:bg-teal-900/30',   text: 'text-teal-600'   },
-    orange: { bg: 'bg-orange-100', darkBg: 'dark:bg-orange-900/30', text: 'text-orange-600' },
-    pink:   { bg: 'bg-pink-100',   darkBg: 'dark:bg-pink-900/30',   text: 'text-pink-600'   },
-    slate:  { bg: 'bg-slate-100',  darkBg: 'dark:bg-slate-700/50',  text: 'text-slate-600'  },
+const colorMap: Record<ColorKey, { bg: string; darkBg: string; text: string; darkText: string }> = {
+    green:  { bg: 'bg-green-100',  darkBg: 'dark:bg-green-500/10',  text: 'text-green-600',  darkText: 'dark:text-green-400'  },
+    purple: { bg: 'bg-purple-100', darkBg: 'dark:bg-purple-500/10', text: 'text-purple-600', darkText: 'dark:text-purple-400' },
+    blue:   { bg: 'bg-blue-100',   darkBg: 'dark:bg-blue-500/10',   text: 'text-blue-600',   darkText: 'dark:text-blue-400'   },
+    red:    { bg: 'bg-red-100',    darkBg: 'dark:bg-red-500/10',    text: 'text-red-600',    darkText: 'dark:text-red-400'    },
+    indigo: { bg: 'bg-indigo-100', darkBg: 'dark:bg-indigo-500/10', text: 'text-indigo-600', darkText: 'dark:text-indigo-400' },
+    gray:   { bg: 'bg-gray-100',   darkBg: 'dark:bg-gray-500/10',   text: 'text-gray-600',   darkText: 'dark:text-gray-400'   },
+    cyan:   { bg: 'bg-cyan-100',   darkBg: 'dark:bg-cyan-500/10',   text: 'text-cyan-600',   darkText: 'dark:text-cyan-400'   },
+    teal:   { bg: 'bg-teal-100',   darkBg: 'dark:bg-teal-500/10',   text: 'text-teal-600',   darkText: 'dark:text-teal-400'   },
+    orange: { bg: 'bg-orange-100', darkBg: 'dark:bg-orange-500/10', text: 'text-orange-600', darkText: 'dark:text-orange-400' },
+    pink:   { bg: 'bg-pink-100',   darkBg: 'dark:bg-pink-500/10',   text: 'text-pink-600',   darkText: 'dark:text-pink-400'   },
+    slate:  { bg: 'bg-slate-100',  darkBg: 'dark:bg-slate-500/10',  text: 'text-slate-600',  darkText: 'dark:text-slate-400'  },
 };
 
 // ─── Channel type definitions ─────────────────────────────────────────────────
@@ -183,8 +183,8 @@ const channelTypes: ChannelTypeDefinition[] = [
         color: 'gray',
         note: 'Requires signal-cli installed and registered on the server.',
         fields: [
-            { name: 'number',    label: 'Registered Number', type: 'tel',  placeholder: '+14155552671', required: true },
-            { name: 'rpc_host', label: 'RPC Host',           type: 'text', placeholder: '127.0.0.1' },
+            { name: 'number',    label: 'Registered Number', type: 'tel',    placeholder: '+14155552671', required: true },
+            { name: 'rpc_host', label: 'RPC Host',           type: 'text',   placeholder: '127.0.0.1' },
             { name: 'rpc_port', label: 'RPC Port',           type: 'number', placeholder: '7583' },
         ],
     },
@@ -207,10 +207,10 @@ const channelTypes: ChannelTypeDefinition[] = [
         description: 'Teams Incoming Webhook or Bot Framework',
         color: 'teal',
         fields: [
-            { name: 'webhook_url',   label: 'Incoming Webhook URL', type: 'text', placeholder: 'https://xxxxx.webhook.office.com/webhookb2/...' },
-            { name: 'tenant_id',     label: 'Tenant ID (Bot only)', type: 'text', placeholder: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx' },
-            { name: 'client_id',     label: 'Client ID (Bot only)', type: 'text', placeholder: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx' },
-            { name: 'client_secret', label: 'Client Secret (Bot only)', type: 'password', placeholder: '••••••••' },
+            { name: 'webhook_url',   label: 'Incoming Webhook URL',      type: 'text',     placeholder: 'https://xxxxx.webhook.office.com/webhookb2/...' },
+            { name: 'tenant_id',     label: 'Tenant ID (Bot only)',      type: 'text',     placeholder: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx' },
+            { name: 'client_id',     label: 'Client ID (Bot only)',      type: 'text',     placeholder: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx' },
+            { name: 'client_secret', label: 'Client Secret (Bot only)',  type: 'password', placeholder: '••••••••' },
         ],
     },
     {
@@ -244,28 +244,32 @@ const channelTypes: ChannelTypeDefinition[] = [
         color: 'slate',
         note: '⚠️ Requires macOS server with Messages.app (AppleScript) or BlueBubbles.',
         fields: [
-            { name: 'backend',     label: 'Backend',           type: 'text',     placeholder: 'applescript  or  bluebubbles' },
-            { name: 'bb_url',      label: 'BlueBubbles URL',   type: 'text',     placeholder: 'http://localhost:1234' },
-            { name: 'bb_password', label: 'BlueBubbles Pass',  type: 'password', placeholder: '••••••••' },
+            { name: 'backend',     label: 'Backend',          type: 'text',     placeholder: 'applescript  or  bluebubbles' },
+            { name: 'bb_url',      label: 'BlueBubbles URL',  type: 'text',     placeholder: 'http://localhost:1234' },
+            { name: 'bb_password', label: 'BlueBubbles Pass', type: 'password', placeholder: '••••••••' },
         ],
     },
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const getStatusColor = (s: string) =>
-    ({ active: 'bg-green-500', connected: 'bg-green-500', disconnected: 'bg-gray-400', error: 'bg-red-500', pending: 'bg-yellow-500' }[s] ?? 'bg-gray-400');
+const statusConfig: Record<string, { dot: string; badge: string; label: string }> = {
+    active:       { dot: 'bg-green-500',  badge: 'bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-400',       label: 'Active'       },
+    connected:    { dot: 'bg-green-500',  badge: 'bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-400',       label: 'Connected'    },
+    disconnected: { dot: 'bg-gray-400',   badge: 'bg-gray-100 text-gray-600 dark:bg-gray-500/15 dark:text-gray-400',           label: 'Disconnected' },
+    error:        { dot: 'bg-red-500',    badge: 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400',               label: 'Error'        },
+    pending:      { dot: 'bg-yellow-500', badge: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-500/15 dark:text-yellow-400',   label: 'Pending'      },
+};
 
-const getStatusLabel = (s: string) =>
-    ({ active: 'Active', connected: 'Connected', disconnected: 'Disconnected', error: 'Error', pending: 'Pending' }[s] ?? s);
+const getStatus = (s: string) => statusConfig[s] ?? { dot: 'bg-gray-400', badge: 'bg-gray-100 text-gray-600 dark:bg-gray-500/15 dark:text-gray-400', label: s };
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function ChannelsPage() {
     const queryClient = useQueryClient();
-    const [showAddModal, setShowAddModal]   = useState(false);
-    const [selectedType, setSelectedType]   = useState<ChannelTypeSlug | null>(null);
-    const [qrCodeData, setQrCodeData]       = useState<string | null>(null);
+    const [showAddModal, setShowAddModal]         = useState(false);
+    const [selectedType, setSelectedType]         = useState<ChannelTypeSlug | null>(null);
+    const [qrCodeData, setQrCodeData]             = useState<string | null>(null);
     const [pollingChannelId, setPollingChannelId] = useState<string | null>(null);
 
     // ── fetch ─────────────────────────────────────────────────────────────────
@@ -382,30 +386,30 @@ export function ChannelsPage() {
 
     // ─── Render ───────────────────────────────────────────────────────────────
     return (
-        <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+        <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 transition-colors duration-200">
 
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
                 <div>
-                    <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+                    <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-1">
                         Communication Channels
                     </h1>
-                    <p className="text-gray-600 dark:text-gray-400">
+                    <p className="text-gray-500 dark:text-gray-400 text-sm">
                         Connect external platforms to your AI agents
                     </p>
                 </div>
                 <button
                     onClick={() => setShowAddModal(true)}
-                    className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                    className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors duration-150 shadow-sm dark:shadow-blue-900/30"
                 >
-                    <Plus className="w-5 h-5" /> Add Channel
+                    <Plus className="w-4 h-4" /> Add Channel
                 </button>
             </div>
 
             {/* Error banner */}
             {error && (
-                <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl">
-                    <p className="text-red-700 dark:text-red-400">
+                <div className="mb-6 p-4 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-xl">
+                    <p className="text-red-700 dark:text-red-400 text-sm">
                         Error loading channels. Please try refreshing the page.
                     </p>
                 </div>
@@ -414,14 +418,17 @@ export function ChannelsPage() {
             {/* Stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                 {[
-                    { label: 'Total',    value: channels.length, color: 'text-gray-900 dark:text-white' },
-                    { label: 'Active',   value: activeCount,     color: 'text-green-600' },
-                    { label: 'Received', value: totalReceived,   color: 'text-blue-600' },
-                    { label: 'Sent',     value: totalSent,       color: 'text-purple-600' },
+                    { label: 'Total Channels', value: channels.length,  valueClass: 'text-gray-900 dark:text-white'    },
+                    { label: 'Active',          value: activeCount,      valueClass: 'text-green-600 dark:text-green-400' },
+                    { label: 'Received',        value: totalReceived,    valueClass: 'text-blue-600 dark:text-blue-400'   },
+                    { label: 'Sent',            value: totalSent,        valueClass: 'text-purple-600 dark:text-purple-400' },
                 ].map(stat => (
-                    <div key={stat.label} className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700">
-                        <div className={`text-2xl font-bold ${stat.color}`}>{stat.value}</div>
-                        <div className="text-sm text-gray-500 dark:text-gray-400">{stat.label}</div>
+                    <div
+                        key={stat.label}
+                        className="bg-white dark:bg-[#161b27] p-5 rounded-xl border border-gray-200 dark:border-[#1e2535] shadow-sm dark:shadow-none transition-colors duration-200"
+                    >
+                        <div className={`text-2xl font-bold ${stat.valueClass}`}>{stat.value}</div>
+                        <div className="text-xs font-medium text-gray-500 dark:text-gray-500 mt-0.5 uppercase tracking-wide">{stat.label}</div>
                     </div>
                 ))}
             </div>
@@ -429,88 +436,98 @@ export function ChannelsPage() {
             {/* Channel grid */}
             {isLoading ? (
                 <div className="flex items-center justify-center h-64">
-                    <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+                    <Loader2 className="w-8 h-8 animate-spin text-blue-600 dark:text-blue-400" />
                 </div>
+
             ) : channels.length === 0 ? (
-                <div className="text-center py-16 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-dashed border-gray-300 dark:border-gray-700">
-                    <div className="w-16 h-16 mx-auto rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mb-4">
-                        <Plus className="w-8 h-8 text-blue-600" />
+                <div className="text-center py-16 bg-gray-50 dark:bg-[#161b27] rounded-2xl border border-dashed border-gray-300 dark:border-[#1e2535] transition-colors duration-200">
+                    <div className="w-16 h-16 mx-auto rounded-full bg-blue-100 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 flex items-center justify-center mb-4">
+                        <Plus className="w-8 h-8 text-blue-600 dark:text-blue-400" />
                     </div>
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
                         No channels connected
                     </h3>
-                    <p className="text-gray-500 dark:text-gray-400 mb-4">
+                    <p className="text-gray-500 dark:text-gray-400 text-sm mb-5">
                         Connect WhatsApp, Slack, Discord, Signal and more
                     </p>
                     <button
                         onClick={() => setShowAddModal(true)}
-                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
+                        className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 dark:hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors duration-150"
                     >
                         Add Your First Channel
                     </button>
                 </div>
+
             ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                     {channels.map(channel => {
                         const typeDef = channelTypes.find(t => t.id === channel.type);
                         const colors  = colorMap[typeDef?.color ?? 'blue'];
                         const Icon    = typeDef?.Icon ?? MessageCircle;
+                        const status  = getStatus(channel.status);
 
                         return (
-                            <div key={channel.id} className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+                            <div
+                                key={channel.id}
+                                className="bg-white dark:bg-[#161b27] rounded-xl border border-gray-200 dark:border-[#1e2535] overflow-hidden shadow-sm dark:shadow-[0_2px_16px_rgba(0,0,0,0.25)] hover:border-gray-300 dark:hover:border-[#2a3347] transition-all duration-150"
+                            >
                                 {/* Card header */}
-                                <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+                                <div className="p-5 border-b border-gray-100 dark:border-[#1e2535]">
                                     <div className="flex items-start justify-between">
-                                        <div className="flex items-center gap-4">
-                                            <div className={`w-12 h-12 rounded-xl ${colors.bg} ${colors.darkBg} flex items-center justify-center`}>
-                                                <Icon className={`w-6 h-6 ${colors.text}`} />
+                                        <div className="flex items-center gap-3">
+                                            {/* Icon */}
+                                            <div className={`w-11 h-11 rounded-xl ${colors.bg} ${colors.darkBg} flex items-center justify-center flex-shrink-0`}>
+                                                <Icon className={`w-5 h-5 ${colors.text} ${colors.darkText}`} />
                                             </div>
                                             <div>
-                                                <h3 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                                                <h3 className="font-semibold text-gray-900 dark:text-gray-100 leading-snug">
                                                     {channel.name}
-                                                    <span className={`w-2 h-2 rounded-full ${getStatusColor(channel.status)}`} />
                                                 </h3>
-                                                <p className="text-sm text-gray-500 dark:text-gray-400 capitalize">
-                                                    {typeDef?.name ?? channel.type} • {getStatusLabel(channel.status)}
-                                                </p>
+                                                <div className="flex items-center gap-1.5 mt-0.5">
+                                                    <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${status.dot}`} />
+                                                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                                                        {typeDef?.name ?? channel.type} · {status.label}
+                                                    </p>
+                                                </div>
                                             </div>
                                         </div>
 
-                                        <div className="flex gap-2">
+                                        {/* Action buttons */}
+                                        <div className="flex gap-1">
                                             <button
                                                 onClick={() => testMutation.mutate(channel.id)}
                                                 disabled={testMutation.isPending}
                                                 title="Test connection"
-                                                className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+                                                className="p-2 text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition-all duration-150"
                                             >
-                                                <RefreshCw className={`w-5 h-5 ${testMutation.isPending ? 'animate-spin' : ''}`} />
+                                                <RefreshCw className={`w-4 h-4 ${testMutation.isPending ? 'animate-spin' : ''}`} />
                                             </button>
                                             <button
                                                 onClick={() => { if (confirm(`Delete "${channel.name}"?`)) deleteMutation.mutate(channel.id); }}
                                                 title="Delete channel"
-                                                className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                                                className="p-2 text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-all duration-150"
                                             >
-                                                <Trash2 className="w-5 h-5" />
+                                                <Trash2 className="w-4 h-4" />
                                             </button>
                                         </div>
                                     </div>
                                 </div>
 
                                 {/* Card body */}
-                                <div className="p-6 space-y-4">
-                                    {/* Credentials badge */}
-                                    <div className="flex items-center gap-2">
+                                <div className="p-5 space-y-4 bg-white dark:bg-[#161b27]">
+                                    {/* Badges */}
+                                    <div className="flex flex-wrap items-center gap-2">
                                         {channel.config?.has_credentials ? (
-                                            <span className="inline-flex items-center gap-1 text-xs px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full">
+                                            <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 bg-green-100 dark:bg-green-500/10 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-500/20 rounded-full font-medium">
                                                 <CheckCircle className="w-3 h-3" /> Credentials configured
                                             </span>
                                         ) : (
-                                            <span className="text-xs px-2 py-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 rounded-full">
+                                            <span className="text-xs px-2.5 py-1 bg-yellow-100 dark:bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border border-yellow-200 dark:border-yellow-500/20 rounded-full font-medium">
                                                 ⚠ No credentials
                                             </span>
                                         )}
                                         {channel.routing?.require_approval && (
-                                            <span className="text-xs px-2 py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 rounded-full">
+                                            <span className="text-xs px-2.5 py-1 bg-orange-100 dark:bg-orange-500/10 text-orange-700 dark:text-orange-400 border border-orange-200 dark:border-orange-500/20 rounded-full font-medium">
                                                 Requires approval
                                             </span>
                                         )}
@@ -519,53 +536,54 @@ export function ChannelsPage() {
                                     {/* Webhook URL */}
                                     {channel.config?.webhook_url && (
                                         <div>
-                                            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1.5">
+                                            <label className="block text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-2">
                                                 Webhook URL
                                             </label>
                                             <div className="flex gap-2">
-                                                <code className="flex-1 text-xs bg-gray-100 dark:bg-gray-900 px-3 py-2 rounded-lg text-gray-600 dark:text-gray-400 truncate font-mono">
+                                                <code className="flex-1 text-xs bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-[#1e2535] px-3 py-2 rounded-lg text-gray-600 dark:text-gray-400 truncate font-mono">
                                                     {channel.config.webhook_url}
                                                 </code>
                                                 <button
                                                     onClick={() => handleCopyWebhook(channel.config.webhook_url!)}
-                                                    className="px-3 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors"
+                                                    title="Copy webhook URL"
+                                                    className="px-3 py-2 bg-gray-100 dark:bg-[#1e2535] hover:bg-gray-200 dark:hover:bg-[#2a3347] border border-gray-200 dark:border-[#1e2535] rounded-lg transition-all duration-150"
                                                 >
-                                                    <Copy className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                                                    <Copy className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400" />
                                                 </button>
                                             </div>
                                         </div>
                                     )}
 
-                                    {/* Extra info for specific channel types */}
+                                    {/* Extra info */}
                                     {channel.type === 'signal' && channel.config?.number && (
-                                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                                            Number: <span className="font-mono">{channel.config.number}</span>
+                                        <p className="text-xs text-gray-500 dark:text-gray-500">
+                                            Number: <span className="font-mono text-gray-700 dark:text-gray-300">{channel.config.number}</span>
                                         </p>
                                     )}
                                     {channel.type === 'matrix' && channel.config?.homeserver_url && (
-                                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                                            Homeserver: <span className="font-mono">{channel.config.homeserver_url}</span>
+                                        <p className="text-xs text-gray-500 dark:text-gray-500">
+                                            Homeserver: <span className="font-mono text-gray-700 dark:text-gray-300">{channel.config.homeserver_url}</span>
                                         </p>
                                     )}
                                     {channel.type === 'imessage' && (
-                                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                                            Backend: <span className="font-mono">{channel.config?.backend ?? 'applescript'}</span>
-                                            {channel.config?.bb_url && ` · ${channel.config.bb_url}`}
+                                        <p className="text-xs text-gray-500 dark:text-gray-500">
+                                            Backend: <span className="font-mono text-gray-700 dark:text-gray-300">{channel.config?.backend ?? 'applescript'}</span>
+                                            {channel.config?.bb_url && <span className="text-gray-400 dark:text-gray-600"> · {channel.config.bb_url}</span>}
                                         </p>
                                     )}
 
                                     {/* Stats */}
-                                    <div className="flex items-center gap-6 pt-4 border-t border-gray-100 dark:border-gray-700">
+                                    <div className="flex items-center gap-5 pt-3 border-t border-gray-100 dark:border-[#1e2535]">
                                         <div className="text-sm">
-                                            <span className="text-gray-500 dark:text-gray-400">Received: </span>
-                                            <span className="font-semibold text-gray-900 dark:text-white">{channel.stats?.received ?? 0}</span>
+                                            <span className="text-gray-400 dark:text-gray-500 text-xs uppercase tracking-wide font-medium">Received </span>
+                                            <span className="font-semibold text-gray-900 dark:text-gray-100">{channel.stats?.received ?? 0}</span>
                                         </div>
                                         <div className="text-sm">
-                                            <span className="text-gray-500 dark:text-gray-400">Sent: </span>
-                                            <span className="font-semibold text-gray-900 dark:text-white">{channel.stats?.sent ?? 0}</span>
+                                            <span className="text-gray-400 dark:text-gray-500 text-xs uppercase tracking-wide font-medium">Sent </span>
+                                            <span className="font-semibold text-gray-900 dark:text-gray-100">{channel.stats?.sent ?? 0}</span>
                                         </div>
                                         {channel.stats?.last_message && (
-                                            <div className="text-sm text-gray-500 dark:text-gray-400 ml-auto">
+                                            <div className="text-xs text-gray-400 dark:text-gray-500 ml-auto">
                                                 {format(new Date(channel.stats.last_message), 'MMM d, h:mm a')}
                                             </div>
                                         )}
@@ -577,41 +595,43 @@ export function ChannelsPage() {
                 </div>
             )}
 
-            {/* Add Channel Modal */}
+            {/* ── Add Channel Modal ─────────────────────────────────────────── */}
             {showAddModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
-                    <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+                <div className="fixed inset-0 bg-black/60 dark:bg-black/75 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
+                    <div className="bg-white dark:bg-[#161b27] rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl dark:shadow-[0_24px_64px_rgba(0,0,0,0.6)] border border-gray-200 dark:border-[#1e2535]">
 
                         {/* Modal header */}
-                        <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between sticky top-0 bg-white dark:bg-gray-800 z-10">
-                            <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                        <div className="p-6 border-b border-gray-200 dark:border-[#1e2535] flex items-center justify-between sticky top-0 bg-white dark:bg-[#161b27] z-10 rounded-t-2xl">
+                            <h2 className="text-lg font-bold text-gray-900 dark:text-white">
                                 {selectedType
                                     ? `Configure ${channelTypes.find(t => t.id === selectedType)?.name}`
                                     : 'Add Channel'}
                             </h2>
-                            <button onClick={closeModal} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
-                                <X className="w-5 h-5 text-gray-500" />
+                            <button aria-label="Close" onClick={closeModal}
+                                className="p-2 hover:bg-gray-100 dark:hover:bg-[#1e2535] rounded-lg transition-colors duration-150"
+                            >
+                                <X className="w-4 h-4 text-gray-500 dark:text-gray-400" />
                             </button>
                         </div>
 
                         <div className="p-6">
                             {/* Step 1: pick type */}
                             {!selectedType ? (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                                     {channelTypes.map(type => {
                                         const colors = colorMap[type.color];
                                         return (
                                             <button
                                                 key={type.id}
                                                 onClick={() => setSelectedType(type.id)}
-                                                className="flex items-center gap-4 p-4 border-2 border-gray-200 dark:border-gray-700 rounded-xl transition-all text-left hover:border-blue-500 hover:shadow-md"
+                                                className="flex items-center gap-3 p-4 border border-gray-200 dark:border-[#1e2535] bg-white dark:bg-[#0f1117] hover:border-blue-400 dark:hover:border-blue-500/50 hover:bg-blue-50/30 dark:hover:bg-blue-500/5 rounded-xl transition-all duration-150 text-left group"
                                             >
                                                 <div className={`w-10 h-10 rounded-lg ${colors.bg} ${colors.darkBg} flex items-center justify-center flex-shrink-0`}>
-                                                    <type.Icon className={`w-5 h-5 ${colors.text}`} />
+                                                    <type.Icon className={`w-5 h-5 ${colors.text} ${colors.darkText}`} />
                                                 </div>
                                                 <div className="min-w-0">
-                                                    <h3 className="font-semibold text-gray-900 dark:text-white text-sm truncate">{type.name}</h3>
-                                                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{type.description}</p>
+                                                    <h3 className="font-semibold text-gray-900 dark:text-gray-100 text-sm truncate">{type.name}</h3>
+                                                    <p className="text-xs text-gray-400 dark:text-gray-500 truncate">{type.description}</p>
                                                 </div>
                                             </button>
                                         );
@@ -619,28 +639,28 @@ export function ChannelsPage() {
                                 </div>
                             ) : (
                                 /* Step 2: configure */
-                                <div className="space-y-6">
+                                <div className="space-y-5">
                                     <button
                                         onClick={() => { setSelectedType(null); setQrCodeData(null); }}
-                                        className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                                        className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors duration-150"
                                     >
                                         <ChevronRight className="w-4 h-4 rotate-180" /> Back
                                     </button>
 
                                     {/* Channel note */}
                                     {channelTypes.find(t => t.id === selectedType)?.note && (
-                                        <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg text-sm text-amber-700 dark:text-amber-400">
+                                        <div className="p-3.5 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-lg text-sm text-amber-700 dark:text-amber-400">
                                             {channelTypes.find(t => t.id === selectedType)!.note}
                                         </div>
                                     )}
 
-                                    {/* WhatsApp QR code display */}
+                                    {/* WhatsApp QR */}
                                     {selectedType === 'whatsapp' && qrCodeData && (
-                                        <div className="text-center space-y-4 p-6 bg-green-50 dark:bg-green-900/20 rounded-xl">
-                                            <div className="inline-block p-4 bg-white rounded-xl shadow-lg">
+                                        <div className="text-center space-y-4 p-6 bg-green-50 dark:bg-green-500/5 border border-green-200 dark:border-green-500/20 rounded-xl">
+                                            <div className="inline-block p-4 bg-white rounded-xl shadow-md">
                                                 <QRCodeSVG value={qrCodeData} size={256} level="H" />
                                             </div>
-                                            <p className="text-green-700 dark:text-green-400 text-sm">
+                                            <p className="text-green-700 dark:text-green-400 text-sm font-medium">
                                                 Scan with WhatsApp to connect
                                             </p>
                                         </div>
@@ -649,7 +669,7 @@ export function ChannelsPage() {
                                     <form onSubmit={handleSubmit} className="space-y-4">
                                         {/* Channel name */}
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                                                 Channel Name <span className="text-red-500">*</span>
                                             </label>
                                             <input
@@ -657,7 +677,7 @@ export function ChannelsPage() {
                                                 type="text"
                                                 required
                                                 placeholder={`e.g. "Support ${channelTypes.find(t => t.id === selectedType)?.name}"`}
-                                                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                                className="w-full px-4 py-2.5 border border-gray-300 dark:border-[#1e2535] rounded-lg bg-white dark:bg-[#0f1117] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-600 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-500/50 focus:border-transparent outline-none transition-all duration-150 text-sm"
                                             />
                                         </div>
 
@@ -666,7 +686,7 @@ export function ChannelsPage() {
                                             .find(t => t.id === selectedType)
                                             ?.fields.map(field => (
                                                 <div key={field.name}>
-                                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                                                         {field.label}
                                                         {field.required && <span className="text-red-500 ml-1">*</span>}
                                                     </label>
@@ -675,24 +695,24 @@ export function ChannelsPage() {
                                                         type={field.type}
                                                         required={field.required}
                                                         placeholder={field.placeholder}
-                                                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                                        className="w-full px-4 py-2.5 border border-gray-300 dark:border-[#1e2535] rounded-lg bg-white dark:bg-[#0f1117] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-600 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-500/50 focus:border-transparent outline-none transition-all duration-150 text-sm"
                                                     />
                                                 </div>
                                             ))}
 
                                         {/* Actions */}
-                                        <div className="flex gap-3 pt-4">
+                                        <div className="flex gap-3 pt-2">
                                             <button
                                                 type="button"
                                                 onClick={closeModal}
-                                                className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                                                className="px-4 py-2.5 border border-gray-300 dark:border-[#1e2535] text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-[#1e2535] transition-all duration-150 text-sm font-medium"
                                             >
                                                 Cancel
                                             </button>
                                             <button
                                                 type="submit"
                                                 disabled={createMutation.isPending}
-                                                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg transition-colors"
+                                                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 dark:hover:bg-blue-500 disabled:opacity-50 text-white rounded-lg transition-all duration-150 text-sm font-medium shadow-sm dark:shadow-blue-900/30"
                                             >
                                                 {createMutation.isPending ? (
                                                     <><Loader2 className="w-4 h-4 animate-spin" /> Connecting...</>

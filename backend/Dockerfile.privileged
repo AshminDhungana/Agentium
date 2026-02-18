@@ -1,7 +1,11 @@
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Agentium Backend Dockerfile (Privileged)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 FROM python:3.11-slim-bookworm
 
 # Install system dependencies for host-level access
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     # Docker CLI for container management
     docker.io \
     # SSH client for remote host access
@@ -29,6 +33,12 @@ RUN apt-get update && apt-get install -y \
     # Build tools (for compiling if needed)
     build-essential \
     gcc \
+    g++ \
+    # Python dev headers for psycopg2 and other compiled deps
+    libpq-dev \
+    python3-dev \
+    libffi-dev \
+    libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Create agentium user with root capabilities
@@ -40,16 +50,19 @@ RUN useradd -m -s /bin/bash -G sudo,docker agentium && \
 WORKDIR /app
 
 # Create necessary directories before copying/mounting
-RUN mkdir -p /app/backend /host /host_home
+RUN mkdir -p /app/backend /host /host_home /tmp/agentium_uploads/files /tmp/agentium_uploads/voice && \
+    chmod -R 777 /tmp/agentium_uploads
 
 # Install Python dependencies (with retry for hash failures)
 COPY requirements.txt .
-RUN pip install --upgrade pip && \
-    (pip install --no-cache-dir --default-timeout=600 --retries=5 -r requirements.txt || \
-    pip install --no-cache-dir --default-timeout=600 --retries=5 -r requirements.txt)
+RUN pip install --upgrade pip setuptools wheel && \
+    pip install --no-cache-dir --default-timeout=600 --retries=5 -r requirements.txt
 
 # Copy application code
 COPY . .
+
+# Set proper ownership
+RUN chown -R agentium:agentium /app
 
 # Switch to agentium user (can escalate to root via sudo)
 USER agentium
@@ -58,8 +71,16 @@ USER agentium
 ENV PYTHONPATH=/app \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    HOST_ROOT_ACCESS=true
+    HOST_ROOT_ACCESS=true \
+    HOST_DOCKER_SOCKET=/var/run/docker.sock \
+    HOST_FS_MOUNT=/host \
+    HOST_HOME_MOUNT=/host_home
 
 EXPOSE 8000
 
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=5 \
+    CMD python -c "import http.client; conn = http.client.HTTPConnection('localhost', 8000); conn.request('GET', '/api/health'); exit(0 if conn.getresponse().status == 200 else 1)" || exit 1
+
+# Run application with reload for development
 CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

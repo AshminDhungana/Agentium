@@ -14,7 +14,7 @@ services:
     ports:
       - "5432:5432"
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U agentium" ]
+      test: ["CMD-SHELL", "pg_isready -U agentium"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -38,7 +38,7 @@ services:
     networks:
       - agentium-network
     healthcheck:
-      test: [ "CMD", "chroma", "help" ]
+      test: ["CMD", "chroma", "help"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -57,7 +57,7 @@ services:
       - agentium-network
     command: redis-server --appendonly yes
     healthcheck:
-      test: [ "CMD", "redis-cli", "ping" ]
+      test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 3s
       retries: 5
@@ -69,11 +69,11 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile.privileged
+    image: agentium-backend:latest
     container_name: agentium-backend
     privileged: true
     env_file:
       - ./backend/.env
-
     cap_add:
       - ALL
     security_opt:
@@ -88,7 +88,6 @@ services:
       - /sys:/sys:rw
       - /proc:/proc:rw
       - /dev:/dev:rw
-
     environment:
       - DATABASE_URL=postgresql://agentium:agentium@postgres:5432/agentium
       - PYTHONPATH=/app
@@ -108,23 +107,34 @@ services:
     command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
     networks:
       - agentium-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import http.client; conn = http.client.HTTPConnection('localhost', 8000); conn.request('GET', '/api/health'); exit(0 if conn.getresponse().status == 200 else 1)"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 5
 
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   # Celery Worker - PRIVILEGED
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   celery-worker:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile.privileged
+    image: agentium-backend:latest
     container_name: agentium-celery
     privileged: true
     cap_add:
       - ALL
+    security_opt:
+      - seccomp:unconfined
+      - apparmor:unconfined
     volumes:
       - ./backend:/app/backend
+      - chroma_data:/app/chroma_data
       - /var/run/docker.sock:/var/run/docker.sock:rw
       - /:/host:rw
-      - ${USERPROFILE}:/host_home:rw
+      - ${USERPROFILE:-~}:/host_home:rw
+      - /sys:/sys:rw
+      - /proc:/proc:rw
+      - /dev:/dev:rw
     environment:
       - DATABASE_URL=postgresql://agentium:agentium@postgres:5432/agentium
       - CHROMA_HOST=chromadb
@@ -134,11 +144,18 @@ services:
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
       - PYTHONPATH=/app
       - HOST_ROOT_ACCESS=true
+      - HOST_DOCKER_SOCKET=/var/run/docker.sock
       - HOST_FS_MOUNT=/host
+      - HOST_HOME_MOUNT=/host_home
     depends_on:
-      - redis
-      - postgres
-      - chromadb
+      backend:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      chromadb:
+        condition: service_healthy
     command: celery -A backend.main.celery worker --loglevel=info --concurrency=4
     restart: unless-stopped
     networks:
@@ -148,17 +165,20 @@ services:
   # Celery Beat - PRIVILEGED
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   celery-beat:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile.privileged
+    image: agentium-backend:latest
     container_name: agentium-celery-beat
     privileged: true
-
+    cap_add:
+      - ALL
+    security_opt:
+      - seccomp:unconfined
+      - apparmor:unconfined
     volumes:
       - ./backend:/app/backend
+      - chroma_data:/app/chroma_data
       - /var/run/docker.sock:/var/run/docker.sock:rw
       - /:/host:rw
-      - ${USERPROFILE}:/host_home:rw
+      - ${USERPROFILE:-~}:/host_home:rw
     environment:
       - DATABASE_URL=postgresql://agentium:agentium@postgres:5432/agentium
       - CHROMA_HOST=chromadb
@@ -168,10 +188,17 @@ services:
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
       - PYTHONPATH=/app
       - HOST_ROOT_ACCESS=true
+      - HOST_DOCKER_SOCKET=/var/run/docker.sock
+      - HOST_FS_MOUNT=/host
     depends_on:
-      - redis
-      - postgres
-      - chromadb
+      backend:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      chromadb:
+        condition: service_healthy
     command: celery -A backend.main.celery beat --loglevel=info
     restart: unless-stopped
     networks:
@@ -186,12 +213,12 @@ services:
       dockerfile: Dockerfile
     container_name: agentium-frontend
     ports:
-      - "3000:3000"
+      - "3000:80"
     environment:
-      - VITE_API_URL=
+      - VITE_API_URL=http://localhost:8000
     depends_on:
-      - backend
-
+      backend:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - agentium-network
@@ -207,3 +234,4 @@ volumes:
 networks:
   agentium-network:
     driver: bridge
+    

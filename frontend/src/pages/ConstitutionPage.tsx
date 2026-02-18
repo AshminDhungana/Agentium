@@ -38,16 +38,16 @@ function Section({
 }) {
     const [open, setOpen] = useState(true);
 
-    const accentMap: Record<string, { bar: string; icon: string; ring: string }> = {
-        blue: { bar: 'bg-blue-500', icon: 'text-blue-400', ring: 'ring-blue-500/20' },
-        red: { bar: 'bg-red-500', icon: 'text-red-400', ring: 'ring-red-500/20' },
-        purple: { bar: 'bg-purple-500', icon: 'text-purple-400', ring: 'ring-purple-500/20' },
-        amber: { bar: 'bg-amber-500', icon: 'text-amber-400', ring: 'ring-amber-500/20' },
+    const accentMap: Record<string, { bar: string; iconText: string; iconBg: string }> = {
+        blue:   { bar: 'bg-blue-500',   iconText: 'text-blue-600 dark:text-blue-400',   iconBg: 'bg-blue-100 dark:bg-blue-500/15'   },
+        red:    { bar: 'bg-red-500',    iconText: 'text-red-600 dark:text-red-400',     iconBg: 'bg-red-100 dark:bg-red-500/15'     },
+        purple: { bar: 'bg-purple-500', iconText: 'text-purple-600 dark:text-purple-400', iconBg: 'bg-purple-100 dark:bg-purple-500/15' },
+        amber:  { bar: 'bg-amber-500',  iconText: 'text-amber-600 dark:text-amber-400', iconBg: 'bg-amber-100 dark:bg-amber-500/15'  },
     };
     const a = accentMap[accent];
 
     return (
-        <div className={`relative bg-white dark:bg-gray-800/60 backdrop-blur-sm rounded-2xl border border-gray-200 dark:border-gray-700/60 overflow-hidden ring-1 ${a.ring} shadow-sm`}>
+        <div className="relative bg-white dark:bg-[#161b27] rounded-2xl border border-gray-200 dark:border-[#1e2535] overflow-hidden shadow-sm dark:shadow-[0_2px_16px_rgba(0,0,0,0.25)] transition-colors duration-200">
             {/* left accent stripe */}
             <div className={`absolute left-0 top-0 bottom-0 w-1 ${a.bar}`} />
 
@@ -58,7 +58,7 @@ function Section({
                     className={`w-full flex items-center justify-between ${collapsible ? 'cursor-pointer' : 'cursor-default'}`}
                 >
                     <div className="flex items-center gap-3">
-                        <span className={`p-2 rounded-lg bg-gray-100 dark:bg-gray-700/60 ${a.icon}`}>
+                        <span className={`p-2 rounded-lg ${a.iconBg} ${a.iconText} transition-colors duration-200`}>
                             <Icon className="h-4 w-4" />
                         </span>
                         <h2 className="text-base font-semibold tracking-tight text-gray-900 dark:text-white">
@@ -67,8 +67,8 @@ function Section({
                     </div>
                     {collapsible && (
                         open
-                            ? <ChevronUp className="h-4 w-4 text-gray-400" />
-                            : <ChevronDown className="h-4 w-4 text-gray-400" />
+                            ? <ChevronUp className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+                            : <ChevronDown className="h-4 w-4 text-gray-400 dark:text-gray-500" />
                     )}
                 </button>
 
@@ -99,26 +99,26 @@ function ArticleCard({
     return (
         <div className="group relative">
             <div className="absolute -left-px top-0 bottom-0 w-px bg-gradient-to-b from-blue-500/60 via-indigo-400/30 to-transparent" />
-            <div className="pl-5 py-4 rounded-r-xl transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/30">
+            <div className="pl-5 py-4 rounded-r-xl transition-colors duration-150 hover:bg-gray-50 dark:hover:bg-white/[0.03]">
                 <div className="flex items-start gap-3">
-                    <span className="mt-0.5 flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 text-xs font-bold flex items-center justify-center">
+                    <span className="mt-0.5 flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400 text-xs font-bold flex items-center justify-center border border-blue-200 dark:border-blue-500/20">
                         {index + 1}
                     </span>
                     <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-1">
+                        <p className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-1">
                             {article?.title || 'Untitled'}
                         </p>
                         {isEditing ? (
                             <textarea
                                 value={article?.content || ''}
                                 onChange={e => onContentChange(articleKey, e.target.value)}
-                                className="w-full mt-1 p-3 text-sm rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-gray-700 dark:text-gray-300 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 resize-none transition"
+                                className="w-full mt-1 p-3 text-sm rounded-xl border border-gray-300 dark:border-[#1e2535] bg-white dark:bg-[#0f1117] text-gray-700 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500/40 dark:focus:ring-blue-500/30 focus:border-blue-500 dark:focus:border-blue-500/50 resize-none transition duration-150"
                                 rows={3}
                                 placeholder="Article content…"
                             />
                         ) : (
                             <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
-                                {article?.content || <span className="italic text-gray-400">No content defined.</span>}
+                                {article?.content || <span className="italic text-gray-400 dark:text-gray-600">No content defined.</span>}
                             </p>
                         )}
                     </div>
@@ -207,9 +207,9 @@ export function ConstitutionPage() {
             <div className="flex items-center justify-center h-80">
                 <div className="text-center space-y-4">
                     <div className="relative mx-auto w-14 h-14">
-                        <div className="absolute inset-0 rounded-full border-4 border-gray-200 dark:border-gray-700" />
+                        <div className="absolute inset-0 rounded-full border-4 border-gray-200 dark:border-[#1e2535]" />
                         <div className="absolute inset-0 rounded-full border-4 border-blue-500 border-t-transparent animate-spin" />
-                        <Shield className="absolute inset-0 m-auto h-5 w-5 text-blue-500" />
+                        <Shield className="absolute inset-0 m-auto h-5 w-5 text-blue-500 dark:text-blue-400" />
                     </div>
                     <p className="text-sm font-medium text-gray-500 dark:text-gray-400 tracking-wide uppercase">
                         Loading Constitution…
@@ -224,9 +224,9 @@ export function ConstitutionPage() {
     // ── Error Fallback ─────────────────────────────────────────────────────
     if (!data || !data.prohibited_actions) {
         return (
-            <div className="max-w-lg mx-auto mt-20 p-8 rounded-2xl border border-red-200 dark:border-red-800/50 bg-red-50 dark:bg-red-900/10 text-center">
-                <div className="mx-auto mb-4 w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
-                    <AlertTriangle className="h-6 w-6 text-red-500" />
+            <div className="max-w-lg mx-auto mt-20 p-8 rounded-2xl border border-red-200 dark:border-red-500/20 bg-red-50 dark:bg-red-500/5 text-center shadow-sm dark:shadow-[0_2px_16px_rgba(0,0,0,0.25)]">
+                <div className="mx-auto mb-4 w-12 h-12 rounded-full bg-red-100 dark:bg-red-500/15 border border-red-200 dark:border-red-500/20 flex items-center justify-center">
+                    <AlertTriangle className="h-6 w-6 text-red-500 dark:text-red-400" />
                 </div>
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
                     Failed to Load Constitution
@@ -236,7 +236,7 @@ export function ConstitutionPage() {
                 </p>
                 <button
                     onClick={loadConstitution}
-                    className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-xl transition-colors"
+                    className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 dark:hover:bg-blue-500 text-white text-sm font-medium rounded-xl transition-colors duration-150"
                 >
                     Try Again
                 </button>
@@ -244,13 +244,13 @@ export function ConstitutionPage() {
         );
     }
 
-    const articleCount = data.articles ? Object.keys(data.articles).length : 0;
+    const articleCount    = data.articles ? Object.keys(data.articles).length : 0;
     const prohibitedCount = Array.isArray(data.prohibited_actions) ? data.prohibited_actions.length : 0;
-    const prefCount = data.sovereign_preferences ? Object.keys(data.sovereign_preferences).length : 0;
+    const prefCount       = data.sovereign_preferences ? Object.keys(data.sovereign_preferences).length : 0;
 
     // ── Render ─────────────────────────────────────────────────────────────
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 px-6 py-8">
+        <div className="min-h-screen bg-gray-50 dark:bg-[#0f1117] px-6 py-8 transition-colors duration-200">
             <div className="max-w-4xl mx-auto space-y-6">
 
                 {/* ── Page Header ─────────────────────────────────────────── */}
@@ -258,11 +258,11 @@ export function ConstitutionPage() {
                     {/* Title block */}
                     <div className="flex items-center gap-4">
                         <div className="relative flex-shrink-0">
-                            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center shadow-lg shadow-blue-500/25">
+                            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center shadow-lg shadow-blue-500/25 dark:shadow-blue-900/40">
                                 <Shield className="h-7 w-7 text-white" />
                             </div>
                             {data.is_active && (
-                                <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-emerald-400 rounded-full border-2 border-white dark:border-gray-900" />
+                                <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-emerald-400 rounded-full border-2 border-white dark:border-[#0f1117]" />
                             )}
                         </div>
                         <div>
@@ -270,7 +270,7 @@ export function ConstitutionPage() {
                                 The Constitution
                             </h1>
                             <div className="flex flex-wrap items-center gap-2 mt-1">
-                                <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-md bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">
+                                <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-md bg-blue-100 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-500/20">
                                     {data.version}
                                 </span>
                                 <span className="inline-flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
@@ -278,7 +278,7 @@ export function ConstitutionPage() {
                                     {new Date(data.effective_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                                 </span>
                                 {data.is_active && (
-                                    <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300">
+                                    <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/20">
                                         <Check className="h-3 w-3" />
                                         Active
                                     </span>
@@ -293,7 +293,7 @@ export function ConstitutionPage() {
                             <>
                                 <button
                                     onClick={handleReset}
-                                    className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                                    className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 bg-white dark:bg-[#161b27] border border-gray-200 dark:border-[#1e2535] rounded-xl hover:bg-gray-50 dark:hover:bg-[#1e2535] transition-all duration-150"
                                 >
                                     <RotateCcw className="h-4 w-4" />
                                     Discard
@@ -301,7 +301,7 @@ export function ConstitutionPage() {
                                 <button
                                     onClick={handleSave}
                                     disabled={saving}
-                                    className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-60 rounded-xl transition-colors shadow-sm shadow-blue-500/20"
+                                    className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 dark:hover:bg-blue-500 disabled:opacity-60 rounded-xl transition-all duration-150 shadow-sm shadow-blue-500/20 dark:shadow-blue-900/30"
                                 >
                                     {saving ? (
                                         <div className="h-4 w-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
@@ -314,7 +314,7 @@ export function ConstitutionPage() {
                         ) : (
                             <button
                                 onClick={() => setIsEditing(true)}
-                                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-[#161b27] border border-gray-200 dark:border-[#1e2535] rounded-xl hover:bg-gray-50 dark:hover:bg-[#1e2535] transition-all duration-150 shadow-sm dark:shadow-none"
                             >
                                 <Edit3 className="h-4 w-4" />
                                 Edit Constitution
@@ -325,7 +325,7 @@ export function ConstitutionPage() {
 
                 {/* ── Edit Mode Banner ─────────────────────────────────────── */}
                 {isEditing && (
-                    <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/50 text-sm text-amber-800 dark:text-amber-300">
+                    <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 text-sm text-amber-800 dark:text-amber-300 transition-colors duration-200">
                         <Edit3 className="h-4 w-4 flex-shrink-0" />
                         <span>You are currently editing the constitution. Changes are not saved until you click <strong>Save Changes</strong>.</span>
                     </div>
@@ -333,7 +333,7 @@ export function ConstitutionPage() {
 
                 {/* ── Error Banner ─────────────────────────────────────────── */}
                 {error && (
-                    <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 text-sm text-red-700 dark:text-red-400">
+                    <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-sm text-red-700 dark:text-red-400">
                         <AlertTriangle className="h-4 w-4 flex-shrink-0" />
                         {error}
                     </div>
@@ -342,19 +342,19 @@ export function ConstitutionPage() {
                 {/* ── Stats Row ────────────────────────────────────────────── */}
                 <div className="grid grid-cols-3 gap-4">
                     {[
-                        { label: 'Articles', value: articleCount, icon: FileText, color: 'blue' },
-                        { label: 'Prohibitions', value: prohibitedCount, icon: Lock, color: 'red' },
-                        { label: 'Preferences', value: prefCount, icon: Sliders, color: 'purple' },
+                        { label: 'Articles',     value: articleCount,    icon: FileText, color: 'blue'   },
+                        { label: 'Prohibitions', value: prohibitedCount, icon: Lock,     color: 'red'    },
+                        { label: 'Preferences',  value: prefCount,       icon: Sliders,  color: 'purple' },
                     ].map(({ label, value, icon: Icon, color }) => {
                         const colorMap: Record<string, string> = {
-                            blue: 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-blue-100 dark:border-blue-800/50',
-                            red: 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border-red-100 dark:border-red-800/50',
-                            purple: 'bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 border-purple-100 dark:border-purple-800/50',
+                            blue:   'bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-100 dark:border-blue-500/20',
+                            red:    'bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 border-red-100 dark:border-red-500/20',
+                            purple: 'bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-100 dark:border-purple-500/20',
                         };
                         return (
                             <div
                                 key={label}
-                                className={`flex items-center gap-3 px-4 py-3.5 rounded-xl border ${colorMap[color]} transition-all`}
+                                className={`flex items-center gap-3 px-4 py-3.5 rounded-xl border ${colorMap[color]} transition-colors duration-200`}
                             >
                                 <Icon className="h-5 w-5 flex-shrink-0" />
                                 <div>
@@ -372,11 +372,11 @@ export function ConstitutionPage() {
                         <textarea
                             value={data.preamble || ''}
                             onChange={e => setEditedConstitution({ ...editedConstitution, preamble: e.target.value })}
-                            className="w-full h-36 p-4 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-sm text-gray-700 dark:text-gray-300 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 resize-none font-serif leading-relaxed transition"
+                            className="w-full h-36 p-4 rounded-xl border border-gray-300 dark:border-[#1e2535] bg-white dark:bg-[#0f1117] text-sm text-gray-700 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500/40 dark:focus:ring-blue-500/30 focus:border-blue-500 dark:focus:border-blue-500/50 resize-none font-serif leading-relaxed transition duration-150"
                             placeholder="Enter the preamble…"
                         />
                     ) : (
-                        <blockquote className="relative pl-5 border-l-2 border-blue-400 dark:border-blue-500">
+                        <blockquote className="relative pl-5 border-l-2 border-blue-400 dark:border-blue-500/60">
                             <p className="font-serif italic text-gray-700 dark:text-gray-300 leading-relaxed text-sm">
                                 {data.preamble}
                             </p>
@@ -386,7 +386,7 @@ export function ConstitutionPage() {
 
                 {/* ── Articles ─────────────────────────────────────────────── */}
                 <Section icon={FileText} title="Articles" accent="blue" collapsible>
-                    <div className="relative ml-3 space-y-1 border-l border-gray-200 dark:border-gray-700">
+                    <div className="relative ml-3 space-y-1 border-l border-gray-200 dark:border-[#1e2535]">
                         {data.articles && Object.entries(data.articles).map(([key, article]: [string, any], index) => (
                             <ArticleCard
                                 key={key}
@@ -419,7 +419,7 @@ export function ConstitutionPage() {
                                         .map((l: string) => l.trim())
                                         .filter((l: string) => l.length > 0)
                                 })}
-                                className="w-full h-32 p-4 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-sm font-mono text-gray-700 dark:text-gray-300 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500/40 focus:border-red-500 resize-none transition"
+                                className="w-full h-32 p-4 rounded-xl border border-gray-300 dark:border-[#1e2535] bg-white dark:bg-[#0f1117] text-sm font-mono text-gray-700 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-red-500/40 dark:focus:ring-red-500/25 focus:border-red-500 dark:focus:border-red-500/50 resize-none transition duration-150"
                                 placeholder="One prohibited action per line…"
                             />
                             <p className="text-xs text-gray-400 dark:text-gray-500">Enter one prohibited action per line.</p>
@@ -430,17 +430,17 @@ export function ConstitutionPage() {
                                 data.prohibited_actions.map((action: string, idx: number) => (
                                     <div
                                         key={idx}
-                                        className="flex items-start gap-3 px-4 py-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800/40"
+                                        className="flex items-start gap-3 px-4 py-3 rounded-xl bg-red-50 dark:bg-red-500/8 border border-red-100 dark:border-red-500/15 transition-colors duration-200"
                                     >
-                                        <div className="flex-shrink-0 mt-0.5 w-5 h-5 rounded-full bg-red-100 dark:bg-red-900/50 flex items-center justify-center">
-                                            <X className="h-3 w-3 text-red-500" />
+                                        <div className="flex-shrink-0 mt-0.5 w-5 h-5 rounded-full bg-red-100 dark:bg-red-500/20 border border-red-200 dark:border-red-500/25 flex items-center justify-center">
+                                            <X className="h-3 w-3 text-red-500 dark:text-red-400" />
                                         </div>
                                         <span className="text-sm text-gray-800 dark:text-gray-200 leading-relaxed">{action}</span>
                                     </div>
                                 ))
                             ) : (
-                                <div className="px-4 py-6 text-center rounded-xl border border-dashed border-gray-200 dark:border-gray-700">
-                                    <p className="text-sm text-gray-400 italic">No prohibited actions defined.</p>
+                                <div className="px-4 py-6 text-center rounded-xl border border-dashed border-gray-200 dark:border-[#1e2535]">
+                                    <p className="text-sm text-gray-400 dark:text-gray-500 italic">No prohibited actions defined.</p>
                                 </div>
                             )}
                         </div>
@@ -453,13 +453,13 @@ export function ConstitutionPage() {
                         {data.sovereign_preferences && Object.entries(data.sovereign_preferences).map(([key, value]: [string, any]) => (
                             <div
                                 key={key}
-                                className="px-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-700/30 border border-gray-200 dark:border-gray-700/50"
+                                className="px-4 py-3 rounded-xl bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-[#1e2535] transition-colors duration-200"
                             >
-                                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 capitalize mb-1.5">
+                                <label className="block text-xs font-medium text-gray-500 dark:text-gray-500 tracking-wide capitalize mb-1.5">
                                     {key.replace(/_/g, ' ')}
                                 </label>
                                 {isEditing ? (
-                                    <input
+                                    <input aria-label="Sovereign Preference"
                                         type="text"
                                         value={String(value ?? '')}
                                         onChange={e => {
@@ -469,7 +469,7 @@ export function ConstitutionPage() {
                                             };
                                             setEditedConstitution({ ...editedConstitution, sovereign_preferences: newPrefs });
                                         }}
-                                        className="w-full px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-500 transition"
+                                        className="w-full px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-[#1e2535] bg-white dark:bg-[#161b27] text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-purple-500/40 dark:focus:ring-purple-500/25 focus:border-purple-500 dark:focus:border-purple-500/50 transition duration-150"
                                     />
                                 ) : (
                                     <p className="text-sm font-semibold text-gray-900 dark:text-white">
@@ -482,7 +482,7 @@ export function ConstitutionPage() {
                 </Section>
 
                 {/* ── Footer ───────────────────────────────────────────────── */}
-                <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-4 rounded-xl bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/60 text-xs text-gray-500 dark:text-gray-400">
+                <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-4 rounded-xl bg-white dark:bg-[#161b27] border border-gray-200 dark:border-[#1e2535] text-xs text-gray-500 dark:text-gray-500 transition-colors duration-200">
                     <span>
                         Created by <span className="font-medium text-gray-700 dark:text-gray-300">{data.created_by || 'System'}</span>
                     </span>

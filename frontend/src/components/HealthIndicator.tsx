@@ -15,23 +15,17 @@ export function HealthIndicator({ showTooltip = true }: HealthIndicatorProps) {
 
     const getStatusColor = () => {
         switch (status.status) {
-            case 'connected':
-                return 'bg-green-500';
-            case 'connecting':
-                return 'bg-yellow-500 animate-pulse';
-            case 'disconnected':
-                return 'bg-red-500';
+            case 'connected':    return 'bg-green-500';
+            case 'connecting':   return 'bg-yellow-500 animate-pulse';
+            case 'disconnected': return 'bg-red-500';
         }
     };
 
     const getTooltipText = () => {
         switch (status.status) {
-            case 'connected':
-                return `Connected${status.latency ? ` (${status.latency}ms)` : ''}`;
-            case 'connecting':
-                return 'Connecting...';
-            case 'disconnected':
-                return 'Disconnected';
+            case 'connected':    return `Connected${status.latency ? ` (${status.latency}ms)` : ''}`;
+            case 'connecting':   return 'Connecting…';
+            case 'disconnected': return 'Disconnected';
         }
     };
 
@@ -42,7 +36,7 @@ export function HealthIndicator({ showTooltip = true }: HealthIndicatorProps) {
                 aria-label={getTooltipText()}
             />
             {showTooltip && (
-                <div className="absolute right-0 top-full mt-2 px-2 py-1 bg-gray-900 text-white text-xs rounded whitespace-nowrap opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                <div className="absolute right-0 top-full mt-2 px-2.5 py-1 bg-gray-900 dark:bg-[#0f1117] dark:border dark:border-[#1e2535] text-white text-xs rounded-lg whitespace-nowrap opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 shadow-lg">
                     {getTooltipText()}
                 </div>
             )}
