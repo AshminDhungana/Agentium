@@ -162,7 +162,7 @@ export function MainLayout() {
             {/* Main Content - Scrollable */}
             <main className="flex-1 relative overflow-hidden">
                 {/* Health Indicator - Top Right */}
-                <div className="absolute top-6 right-6 z-10">
+                <div className="absolute top-3 right-6 z-10">
                     <HealthIndicator />
                 </div>
 
