@@ -29,6 +29,7 @@ celery_app.conf.update(
     result_expires=3600,
     beat_schedule_filename='/tmp/celerybeat-schedule',
     beat_scheduler='celery.beat.PersistentScheduler',
+    broker_connection_retry_on_startup=True,
 )
 
 # Beat schedule - ALL tasks in one place
