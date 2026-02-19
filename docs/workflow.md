@@ -79,7 +79,8 @@ When new knowledge or skills are generated:
 
 1. The agent first searches **ChromaDB** (Vector Database):
    - If similar knowledge exists → retrieve, revise, and update.
-   - If not → create a new semantic entry.
+   - Agent can also use self knowledge, web search to verify and update the knowledge.
+   - If not → create a new semantic entry can use any means for researching about it.
 2. Updated or new knowledge is embedded and stored.
 3. The institutional memory remains deduplicated and curated.
 
