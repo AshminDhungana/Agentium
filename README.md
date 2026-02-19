@@ -196,7 +196,7 @@ Agents auto-spawn when load increases, auto-terminate when tasks complete, and c
 
 ```bash
 # Clone the repository
-git clone https://github.com/AshminDhungana/agentium.git
+git clone https://github.com/AshminDhungana/Agentium.git
 cd agentium
 
 # Launch the stack

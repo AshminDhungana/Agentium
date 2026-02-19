@@ -47,11 +47,24 @@ This ensures all actions are constitutionally aligned before execution begins.
 
 ### 2. Task Reception & Planning
 
-Upon receiving a task:
+Upon receiving a task: 0. The Head of Council will use its ethos as well as the chat content (That is recent chat history of last 2 days or the last 20 messages) if required can view entire chat history but that should be the last set of actions for better understanding of the task.
 
 1. The agent generates a structured execution plan.
-2. The plan is written into its Ethos.
-3. If updating Ethos fails (conflict, corruption, inconsistency):
+2. If anything is unclear the agent will ask for clarification from the above.
+3. The hierarchy of clarification is as follows:
+   - User The Soverigin
+   - Head of Council
+   - Council Members
+   - Lead Agents
+   - Task Agents
+   - Code Critic Agents
+   - Output Critic Agents
+   - Plan Critic Agents
+     Clarification follows the command structure of the agent.
+     for example: If Council Member is not clear about something it will ask for clarification from Head of Council, And if Head of Council is not clear about something it will ask for clarification from User The Soverigin.
+     Only the necessary Clarification will be asked from the user.
+4. The plan is written into its Ethos.
+5. If updating Ethos fails (conflict, corruption, inconsistency):
    - The planning phase is retried.
    - Ethos is corrected before proceeding.
 

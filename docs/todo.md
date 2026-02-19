@@ -1485,3 +1485,12 @@ _Status: Active Development - Phase 2 & 6 In Progress_
 - Ensure that the **Ethos content is always included** in every API request.
 
 **End of Roadmap**
+
+Memory optimization:
+
+1. Older chats will be removed after a certain period of time. i.e 7 days
+2. A database of all tasks that were assigned by user and what were complited will be stored in database
+3. The database of all tasks that are complited will be removed after a certain period of time. i.e 7 days (expection: The orginal constitution that was stored will not be removed in any way)
+4. The vector database will be optimized, old knowledge will be viewed and kept uptodate and dublicated will be removed.
+5. New tasks will not be assigned to the agent if the agent is not available.
+6. Optimizatin of all system without loos of functionality, and loss of imported information.
