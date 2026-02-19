@@ -45,7 +45,6 @@ class Constitution(BaseEntity):
     effective_date = Column(DateTime, default=datetime.utcnow, nullable=False)
     amendment_date = Column(DateTime, nullable=True)
     archived_date = Column(DateTime, nullable=True)
-    is_active = Column(String(1), default='Y', nullable=False)
     # Authority
     created_by_agentium_id = Column(String(10), nullable=False)  # Usually 00001 (Head of Council)
     
@@ -208,7 +207,7 @@ class Ethos(BaseEntity):
     
     # Identification
     agent_type = Column(String(20), nullable=False)  # head_of_council, council_member, lead_agent, task_agent
-    agentium_id = Column(String(10), nullable=True)  # E0xxxx, E1xxxx format for ethos identification
+    # agentium_id inherited from BaseEntity (NOT NULL). Format: E0xxxx, E1xxxx for ethos
     
     # Content
     mission_statement = Column(Text, nullable=False)

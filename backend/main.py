@@ -383,30 +383,79 @@ async def update_constitution(
     current_user: dict = Depends(get_current_user)
 ):
     """Update the constitution (sovereign only)."""
-    # Get current constitution
+    import json as _json
+
     current = db.query(Constitution).filter_by(is_active='Y').first()
     if not current:
         raise HTTPException(status_code=404, detail="No active constitution found")
-    
-    # Create new version
+
+    def _to_json_str(value, fallback_str):
+        if value is None:
+            return fallback_str
+        if isinstance(value, (dict, list)):
+            return _json.dumps(value)
+        return value  # already a JSON string
+
+    def _normalize_articles(articles_dict):
+        """Normalize all article shapes to { title, content } and repair corruption."""
+        if not isinstance(articles_dict, dict):
+            return articles_dict
+        fixed = {}
+        for key, val in articles_dict.items():
+            pretty_title = key.replace("_", " ").title()
+            if isinstance(val, str):
+                # Plain string — articles 2-10 stored this way historically
+                fixed[key] = {"title": pretty_title, "content": val}
+            elif isinstance(val, dict):
+                keys = list(val.keys())
+                is_char_indexed = keys and all(k.isdigit() or k == 'content' for k in keys)
+                if is_char_indexed:
+                    # Character-indexed corruption — reconstruct original string
+                    numeric_keys = sorted((k for k in keys if k.isdigit()), key=int)
+                    fixed[key] = {"title": pretty_title, "content": "".join(val[k] for k in numeric_keys)}
+                else:
+                    # Already correct { title, content } shape
+                    fixed[key] = {"title": val.get("title", pretty_title), "content": val.get("content", "")}
+            else:
+                fixed[key] = {"title": pretty_title, "content": ""}
+        return fixed
+
+    # Get articles: use updates if provided, else parse from current DB row
+    raw_articles = updates.articles
+    if raw_articles is None:
+        try:
+            raw_articles = _json.loads(current.articles or "{}")
+        except (_json.JSONDecodeError, TypeError):
+            raw_articles = {}
+
+    # Normalize and repair, then serialize back to JSON string for Text column
+    raw_articles = _normalize_articles(raw_articles)
+    new_articles   = _to_json_str(raw_articles, current.articles)
+    new_prohibited = _to_json_str(updates.prohibited_actions, current.prohibited_actions)
+    new_prefs      = _to_json_str(updates.sovereign_preferences, current.sovereign_preferences)
+
+    # agentium_id pattern: "C{version_number:04d}" matching "C0001" from persistent_council
+    new_version_number = (current.version_number or 1) + 1
+    new_agentium_id    = f"C{new_version_number:04d}"
+
     new_version = Constitution(
-        version=current.version + 1,
+        agentium_id=new_agentium_id,
+        version=f"v{new_version_number}.0.0",
+        version_number=new_version_number,
         preamble=updates.preamble or current.preamble,
-        articles=updates.articles or current.articles,
-        prohibited_actions=updates.prohibited_actions or current.prohibited_actions,
-        sovereign_preferences=updates.sovereign_preferences or current.sovereign_preferences,
+        articles=new_articles,
+        prohibited_actions=new_prohibited,
+        sovereign_preferences=new_prefs,
         is_active='Y',
-        created_by=current_user.get("username", "sovereign"),
+        created_by_agentium_id=current_user.get("username", "sovereign"),
         effective_date=datetime.utcnow()
     )
-    
-    # Deactivate old version
+
     current.is_active = 'N'
-    
     db.add(new_version)
     db.commit()
     db.refresh(new_version)
-    
+
     return {
         "status": "success",
         "message": f"Constitution updated to version {new_version.version}",
@@ -577,3 +626,4 @@ if __name__ == "__main__":
         reload=True,
         log_level="info"
     )
+    

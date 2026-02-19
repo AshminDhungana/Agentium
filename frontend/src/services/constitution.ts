@@ -13,9 +13,15 @@ export const constitutionService = {
         prohibited_actions: string[];
         sovereign_preferences: Record<string, any>;
     }): Promise<Constitution> => {
+        // Parse articles if it arrives as a string; backend expects a plain object (Dict)
+        const parsedArticles =
+            typeof data.articles === 'string'
+                ? JSON.parse(data.articles)
+                : data.articles;
+
         const payload = {
             ...data,
-            articles: typeof data.articles === 'string' ? data.articles : JSON.stringify(data.articles),
+            articles: parsedArticles,
             prohibited_actions: Array.isArray(data.prohibited_actions) ? data.prohibited_actions : [],
             sovereign_preferences: data.sovereign_preferences || {}
         };

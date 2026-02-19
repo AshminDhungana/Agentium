@@ -96,6 +96,18 @@ function ArticleCard({
     isEditing: boolean;
     onContentChange: (key: string, content: string) => void;
 }) {
+    // Always derive a clean Title Case title from the key (e.g. "article_3" → "Article 3").
+    // Never trust article.title from the DB — it may be the raw lowercase key.
+    const displayTitle = articleKey
+        .split('_')
+        .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+        .join(' ');
+
+    // Derive content safely — article may be a string, { title, content }, or undefined
+    const displayContent = typeof article === 'string'
+        ? article
+        : article?.content ?? '';
+
     return (
         <div className="group relative">
             <div className="absolute -left-px top-0 bottom-0 w-px bg-gradient-to-b from-blue-500/60 via-indigo-400/30 to-transparent" />
@@ -106,11 +118,11 @@ function ArticleCard({
                     </span>
                     <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-1">
-                            {article?.title || 'Untitled'}
+                            {displayTitle}
                         </p>
                         {isEditing ? (
                             <textarea
-                                value={article?.content || ''}
+                                value={displayContent}
                                 onChange={e => onContentChange(articleKey, e.target.value)}
                                 className="w-full mt-1 p-3 text-sm rounded-xl border border-gray-300 dark:border-[#1e2535] bg-white dark:bg-[#0f1117] text-gray-700 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500/40 dark:focus:ring-blue-500/30 focus:border-blue-500 dark:focus:border-blue-500/50 resize-none transition duration-150"
                                 rows={3}
@@ -118,7 +130,7 @@ function ArticleCard({
                             />
                         ) : (
                             <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
-                                {article?.content || <span className="italic text-gray-400 dark:text-gray-600">No content defined.</span>}
+                                {displayContent || <span className="italic text-gray-400 dark:text-gray-600">No content defined.</span>}
                             </p>
                         )}
                     </div>
@@ -144,10 +156,17 @@ export function ConstitutionPage() {
             setLoading(true);
             setError(null);
             const data = await constitutionService.getCurrentConstitution();
+            // Parse articles if the backend returns it as a JSON string
+            const rawArticles = data?.articles;
+            const parsedArticles: Record<string, { title: string; content: string }> =
+                typeof rawArticles === 'string'
+                    ? (() => { try { return JSON.parse(rawArticles); } catch { return DEFAULT_CONSTITUTION.articles; } })()
+                    : (rawArticles && typeof rawArticles === 'object' ? rawArticles : DEFAULT_CONSTITUTION.articles);
+
             const safeData = {
                 ...DEFAULT_CONSTITUTION,
                 ...data,
-                articles: data?.articles || DEFAULT_CONSTITUTION.articles,
+                articles: parsedArticles,
                 prohibited_actions: Array.isArray(data?.prohibited_actions)
                     ? data.prohibited_actions
                     : (typeof data?.prohibited_actions === 'string'

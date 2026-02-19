@@ -29,12 +29,14 @@ ChromaDB is long-term institutional memory.
 
 When an agent is instantiated:
 
-1. It is initialized with a **base Ethos** containing:
+1. First Startup, Constitution is created and stored in ChromaDB
+2. Then three Agents are created Head of Council - 1 Nos and Council Members - 2 Nos
+3. All Agents are initialized with a **base Ethos** containing:
    - Core operational rules
    - Role-based instructions
    - Hierarchical authority level
-2. It immediately reads the **Constitution**.
-3. It updates its Ethos with:
+4. It immediately reads the **Constitution**.
+5. It updates its Ethos with:
    - A summarized constitutional interpretation  
      OR
    - A reference pointer to relevant constitutional sections.
