@@ -128,7 +128,7 @@ services:
     build:  
       context: ./backend
       dockerfile: Dockerfile.privileged
-    # image: agentium-backend:latest # celery-worker
+    image: ghcr.io/AshminDhungana/Agentium/backend:main
     container_name: agentium-celery
     privileged: true
     cap_add:
@@ -178,7 +178,7 @@ services:
     build:  
       context: ./backend
       dockerfile: Dockerfile.privileged
-    # image: agentium-backend:latest # celery-beat
+    image: ghcr.io/AshminDhungana/Agentium/backend:main
     container_name: agentium-celery-beat
     privileged: true
     cap_add:
