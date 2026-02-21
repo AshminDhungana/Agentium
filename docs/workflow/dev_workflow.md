@@ -403,7 +403,7 @@ For any step that involves real code changes or significant decisions, start a f
 
 #### Phase 5 — Resume with Context in the New Session
 
-If you started a new session, your first message is always a context load — not a task prompt. Do not assume the new session knows anything.
+If you started a new session, your first message should be is always load the appropriate skills and then a context load — not a task prompt. Do not assume the new session knows anything.
 
 **Opening message template:**
 
@@ -416,8 +416,6 @@ If you started a new session, your first message is always a context load — no
 > _Please confirm you understand the current state and constraints before we proceed."_
 
 Ask the agent to confirm its understanding before it begins. This surfaces any misinterpretation of the handoff document before it results in a bad code change.
-
-Once confirmed, loop back to Phase 2 and continue.
 
 ---
 
@@ -448,7 +446,7 @@ These are the most common ways agent sessions go wrong. Recognize them early.
 [ ] 4. Read the full diff or output before accepting
 [ ] 5. Create a handoff document capturing decisions, changes, and next-step context
 [ ] 6. Start a new session for the next step (unless continuation is clearly appropriate)
-[ ] 7. Open the new session with an explicit context load from the handoff document
+[ ] 7. Open the new session, load the appropriate skills and start with an explicit context load from the handoff document
 [ ] 8. Ask the agent to confirm understanding before proceeding
 ```
 
