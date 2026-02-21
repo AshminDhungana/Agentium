@@ -78,8 +78,9 @@ class ExternalChannel(BaseEntity):
             'status': self.status.value,
             'config': {
                 'phone_number': self.config.get('phone_number'),
-                'has_credentials': bool(self.config.get('api_key')),
-                'webhook_url': self.config.get('webhook_url_display')
+                'has_credentials': bool(self.config.get('api_key') or self.config.get('access_token')),
+                'webhook_url': self.config.get('webhook_url_display'),
+                'provider': self.config.get('provider', 'cloud_api'),
             },
             'routing': {
                 'default_agent': self.default_agent.agentium_id if self.default_agent else None,

@@ -275,21 +275,20 @@ class UnifiedWhatsAppAdapter(BaseChannelAdapter):
         
         while True:
             try:
+                # Append token as query param — bridge authenticates on WebSocket upgrade
+                connect_url = bridge_url
+                if bridge_token:
+                    separator = "&" if "?" in bridge_url else "?"
+                    connect_url = f"{bridge_url}{separator}token={bridge_token}"
+
                 print(f"[WhatsApp Bridge {channel_id}] Connecting to {bridge_url}...")
-                
-                async with websockets.connect(bridge_url) as ws:
+
+                async with websockets.connect(connect_url) as ws:
                     conn = self._bridge_connections.get(channel_id)
                     if conn:
                         conn.ws = ws
                         conn.connected = True
                         conn.last_ping = datetime.utcnow()
-                    
-                    # Send auth if token configured
-                    if bridge_token:
-                        await ws.send(json.dumps({
-                            "type": "auth",
-                            "token": bridge_token
-                        }))
                     
                     print(f"[WhatsApp Bridge {channel_id}] Connected")
                     
@@ -324,33 +323,70 @@ class UnifiedWhatsAppAdapter(BaseChannelAdapter):
             print(f"[WhatsApp Bridge] Invalid JSON: {raw_message[:200]}")
             return
         
-        msg_type = data.get("type")
+        # Bridge sends "event" key (not "type")
+        msg_type = data.get("event") or data.get("type")
         channel_id = self.channel.id
         conn = self._bridge_connections.get(channel_id)
-        
+
         if msg_type == "qr":
-            # QR code received - store for polling
             if conn:
-                conn.qr_code = data.get("qr")
+                conn.qr_code = data.get("qr_code") or data.get("qr")
                 conn.qr_expires_at = datetime.utcnow() + timedelta(minutes=5)
                 conn.authenticated = False
             print(f"[WhatsApp Bridge {channel_id}] QR code received")
-            
-        elif msg_type == "status":
-            status = data.get("status")
+
+        elif msg_type in ("authenticated", "status"):
+            connected = data.get("connected", False) or data.get("authenticated", False)
             if conn:
-                conn.authenticated = (status == "connected")
-                if status == "connected":
-                    conn.qr_code = None  # Clear QR on success
-            print(f"[WhatsApp Bridge {channel_id}] Status: {status}")
-            
+                conn.authenticated = connected
+                if connected:
+                    conn.qr_code = None
+                    await self._set_channel_status("active")
+                else:
+                    # Initial status snapshot may carry a QR code already
+                    qr = data.get("qr_code") or data.get("qr")
+                    if qr:
+                        conn.qr_code = qr
+                        conn.qr_expires_at = datetime.utcnow() + timedelta(minutes=5)
+                        print(f"[WhatsApp Bridge {channel_id}] QR extracted from status snapshot")
+            print(f"[WhatsApp Bridge {channel_id}] Status: {msg_type} connected={connected}")
+
+        elif msg_type == "disconnected":
+            if conn:
+                conn.connected = False
+                conn.authenticated = False
+                conn.qr_code = None
+            await self._set_channel_status("pending")
+            print(f"[WhatsApp Bridge {channel_id}] Disconnected from WhatsApp — status reset to pending")
+
         elif msg_type == "message":
-            # Incoming WhatsApp message
             await self._process_bridge_incoming(data)
-            
+
         elif msg_type == "error":
-            print(f"[WhatsApp Bridge {channel_id}] Error: {data.get('error')}")
+            print(f"[WhatsApp Bridge {channel_id}] Error: {data.get('message') or data.get('error')}")
     
+    async def _set_channel_status(self, status: str) -> None:
+        """Update channel status in the database."""
+        try:
+            from backend.database import get_db_context
+            from backend.models.entities.channels import ChannelStatus
+            status_map = {
+                "active": ChannelStatus.ACTIVE,
+                "pending": ChannelStatus.PENDING,
+                "error": ChannelStatus.ERROR,
+                "disconnected": ChannelStatus.DISCONNECTED,
+            }
+            new_status = status_map.get(status, ChannelStatus.PENDING)
+            with get_db_context() as db:
+                from backend.models.entities.channels import ExternalChannel
+                channel = db.query(ExternalChannel).filter_by(id=self.channel.id).first()
+                if channel:
+                    channel.status = new_status
+                    db.commit()
+                    print(f"[WhatsApp Bridge {self.channel.id}] DB status → {status}")
+        except Exception as e:
+            print(f"[WhatsApp Bridge {self.channel.id}] Failed to update DB status: {e}")
+
     async def _process_bridge_incoming(self, data: Dict[str, Any]) -> None:
         """Process incoming message from bridge and route to ChannelManager."""
         from backend.services.channel_manager import ChannelManager

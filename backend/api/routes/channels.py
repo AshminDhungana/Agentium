@@ -129,12 +129,6 @@ async def create_channel(
     Create and register a new external channel.
     Generates a unique inbound webhook path automatically.
     """
-    # ── Resolve env:// sentinels for web_bridge ──────────────────────────────
-    if config.get('provider') == 'web_bridge':
-        if config.get('bridge_url', '').startswith('env://'):
-            config['bridge_url'] = os.environ.get('WHATSAPP_BRIDGE_URL', 'ws://whatsapp-bridge:3001')
-        if config.get('bridge_token', '').startswith('env://'):
-            config['bridge_token'] = os.environ.get('WHATSAPP_BRIDGE_TOKEN', '')    
     try:
         ctype = ChannelType(request.type)
     except ValueError:
@@ -152,8 +146,20 @@ async def create_channel(
     config = dict(request.config)
     config['webhook_url_display'] = webhook_url_display
 
+    # ── Resolve env:// sentinels for web_bridge ──────────────────────────────
+    if config.get('provider') == 'web_bridge':
+        if config.get('bridge_url', '').startswith('env://'):
+            config['bridge_url'] = os.environ.get('WHATSAPP_BRIDGE_URL', 'ws://whatsapp-bridge:3001')
+        if config.get('bridge_token', '').startswith('env://'):
+            config['bridge_token'] = os.environ.get('WHATSAPP_BRIDGE_TOKEN', '')
+
+    # Generate agentium_id for the channel (e.g. CH0001, CH0002, ...)
+    channel_count = db.query(ExternalChannel).count()
+    agentium_id = f"CH{channel_count + 1:04d}"
+
     # Create channel
     channel = ExternalChannel(
+        agentium_id=agentium_id,
         name=request.name,
         channel_type=ctype,
         status=ChannelStatus.PENDING,
@@ -162,7 +168,6 @@ async def create_channel(
         auto_create_tasks=request.auto_create_tasks,
         require_approval=request.require_approval,
         webhook_path=webhook_path,
-        created_by=current_user.get('username', 'system')
     )
 
     db.add(channel)

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/services/api';
 import {
@@ -291,6 +291,7 @@ export function ChannelsPage() {
     const [whatsappProvider, setWhatsappProvider] = useState<WhatsAppProvider>('cloud_api');
     const [qrCodeData, setQrCodeData]             = useState<string | null>(null);
     const [pollingChannelId, setPollingChannelId] = useState<string | null>(null);
+    const pollingChannelIdRef = useRef<string | null>(null); // ref survives re-renders
     const [showProviderSwitch, setShowProviderSwitch] = useState<string | null>(null);
     const [qrStep, setQrStep]                             = useState(false);   // true = show QR screen
 
@@ -326,6 +327,8 @@ export function ChannelsPage() {
             // If WhatsApp Web Bridge, start polling for QR
             if (data.type === 'whatsapp' && data.config?.provider === 'web_bridge') {
                 setPollingChannelId(data.id);
+                pollingChannelIdRef.current = data.id;
+                setQrStep(true);
                 pollForQR(data.id);
             } else {
                 closeModal();
@@ -362,6 +365,7 @@ export function ChannelsPage() {
                 setSelectedType('whatsapp');
                 setWhatsappProvider('web_bridge');
                 setPollingChannelId(data.channel_id);
+                pollingChannelIdRef.current = data.channel_id;
                 pollForQR(data.channel_id);
             }
         },
@@ -386,15 +390,16 @@ export function ChannelsPage() {
                 setQrStep(true);   // transition to QR screen
             }
 
-            // Keep polling while channel is pending and not yet authenticated
-            if (pollingChannelId === channelId) {
-                setTimeout(() => pollForQR(channelId), 3000);
+            // Keep polling while channel is pending and not yet authenticated.
+            // Use ref (not state) to avoid stale closure bug on re-renders.
+            if (pollingChannelIdRef.current === channelId) {
+                setTimeout(() => pollForQR(channelId), 10000);
             }
         } catch (err) {
             console.error('QR polling error:', err);
             // Retry on error — bridge may not have the QR ready yet
-            if (pollingChannelId === channelId) {
-                setTimeout(() => pollForQR(channelId), 4000);
+            if (pollingChannelIdRef.current === channelId) {
+                setTimeout(() => pollForQR(channelId), 10000);
             }
         }
     };
@@ -406,6 +411,7 @@ export function ChannelsPage() {
         setSelectedType(null);
         setQrCodeData(null);
         setPollingChannelId(null);
+        pollingChannelIdRef.current = null;
         setWhatsappProvider('cloud_api');
         setQrStep(false);
     };
@@ -778,7 +784,7 @@ export function ChannelsPage() {
 
                                     <div className="flex items-center gap-2 text-xs text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-500/10 border border-orange-200 dark:border-orange-500/20 rounded-lg px-3 py-2 w-full max-w-xs">
                                         <Loader2 className="w-3.5 h-3.5 animate-spin flex-shrink-0" />
-                                        Waiting for scan… refreshes every 3 s
+                                        Waiting for scan… refreshes every 10 s
                                     </div>
 
                                     <button
