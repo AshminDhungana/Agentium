@@ -69,7 +69,7 @@ services:
     build:
       context: ./bridges/whatsapp
       dockerfile: Dockerfile
-    # image: agentium-whatsapp-bridge:latest
+    image: ghcr.io/ashmindhungana/agentium/whatsapp-bridge:main
     container_name: agentium-whatsapp-bridge
     environment:
       - PORT=3001
