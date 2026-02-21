@@ -268,7 +268,7 @@ class EnhancedIdleGovernanceEngine:
         idle_agents = db.query(Agent).filter(
             and_(
                 Agent.is_active == True,
-                Agent.status == AgentStatus.ACTIVE,
+                Agent.status == 'active',  # lowercase string
                 Agent.is_persistent == False,  # Don't auto-terminate persistent agents
                 Agent.last_idle_action_at < threshold
             )
@@ -309,7 +309,7 @@ class EnhancedIdleGovernanceEngine:
         idle_agents = db.query(Agent).filter(
             and_(
                 Agent.is_active == True,
-                Agent.status == AgentStatus.ACTIVE,
+                Agent.status == 'active',  # lowercase string
                 Agent.is_persistent == False,
                 Agent.last_idle_action_at < threshold
             )
@@ -329,7 +329,7 @@ class EnhancedIdleGovernanceEngine:
             # Check if agent has any active tasks
             active_tasks = db.query(Task).filter(
                 Task.assigned_task_agent_ids.contains([agent.agentium_id]),
-                Task.status.in_([TaskStatus.PENDING, TaskStatus.IN_PROGRESS, TaskStatus.DELIBERATING]),
+                Task.status.in_(['pending', 'in_progress', 'deliberating']),  # lowercase strings
                 Task.is_active == True
             ).count()
             
@@ -392,7 +392,7 @@ class EnhancedIdleGovernanceEngine:
         # Get all active agents (excluding persistent ones)
         agents = db.query(Agent).filter(
             Agent.is_active == True,
-            Agent.status == AgentStatus.ACTIVE,
+            Agent.status == 'active',  # lowercase string
             Agent.is_persistent == False
         ).all()
         
@@ -409,7 +409,7 @@ class EnhancedIdleGovernanceEngine:
         for agent in agents:
             active_tasks = db.query(Task).filter(
                 Task.assigned_task_agent_ids.contains([agent.agentium_id]),
-                Task.status.in_([TaskStatus.PENDING, TaskStatus.IN_PROGRESS, TaskStatus.DELIBERATING]),
+                Task.status.in_(['pending', 'in_progress', 'deliberating']),  # lowercase strings
                 Task.is_active == True
             ).count()
             
@@ -455,7 +455,7 @@ class EnhancedIdleGovernanceEngine:
             # Get this agent's tasks
             tasks = db.query(Task).filter(
                 Task.assigned_task_agent_ids.contains([overloaded_agent.agentium_id]),
-                Task.status.in_([TaskStatus.PENDING, TaskStatus.DELIBERATING]),  # Only pending/deliberating
+                Task.status.in_(['pending', 'deliberating']),  # lowercase strings - only pending/deliberating
                 Task.is_active == True
             ).limit(2).all()  # Move max 2 tasks per agent
             
@@ -519,9 +519,9 @@ class EnhancedIdleGovernanceEngine:
         return db.query(Task).filter(
             Task.is_idle_task == False,
             Task.status.in_([
-                TaskStatus.PENDING,
-                TaskStatus.DELIBERATING,
-                TaskStatus.IN_PROGRESS
+                'pending',           # lowercase
+                'deliberating',      # lowercase
+                'in_progress'        # lowercase
             ]),
             Task.is_active == True
         ).all()
@@ -531,7 +531,7 @@ class EnhancedIdleGovernanceEngine:
         return db.query(Agent).filter(
             Agent.is_persistent == True,
             Agent.is_active == True,
-            Agent.status.in_([AgentStatus.ACTIVE, AgentStatus.IDLE_WORKING])
+            Agent.status.in_(['active', 'idle_working'])  # lowercase strings
         ).order_by(Agent.last_idle_action_at).all()
     
     async def _assign_idle_work(self, db: Session, agent: Agent):
@@ -592,15 +592,13 @@ class EnhancedIdleGovernanceEngine:
         Monitor queue depth and trigger auto-scaling if needed.
         If pending tasks exceed threshold, request Council micro-vote to spawn additional agents.
         """
-        from backend.models.entities.task import TaskStatus
-        
         # Count pending tasks
         pending_count = db.query(Task).filter(
             Task.status.in_([
-                TaskStatus.PENDING,
-                TaskStatus.DELIBERATING,
-                TaskStatus.APPROVED,
-                TaskStatus.ASSIGNED
+                'pending',           # lowercase
+                'deliberating',      # lowercase
+                'approved',          # lowercase
+                'assigned'           # lowercase
             ]),
             Task.is_active == True
         ).count()
@@ -674,7 +672,7 @@ class EnhancedIdleGovernanceEngine:
             # Get task stats
             completed_idle = db.query(Task).filter_by(
                 is_idle_task=True,
-                status=TaskStatus.IDLE_COMPLETED
+                status='idle_completed'  # lowercase
             ).count()
             
             # Get capacity info

@@ -65,23 +65,23 @@ class APIManager:
     def _initialize_models(self):
         """Load model configurations from database."""
         try:
-            configs = self.db.query(UserModelConfig).filter_by(is_active='Y').all()
+            configs = self.db.query(UserModelConfig).filter_by(is_active=True).all()
             
             # CRITICAL FIX: If no configs exist, create a default local config
             if not configs:
                 print("⚠️ No model configurations found. Creating default local config...")
                 try:
                     default_config = UserModelConfig(
-                        user_id="system",
+                        user_id=None,
                         config_name="Default Local Model",
-                        provider=ProviderType.LOCAL,  # Use enum, not string
+                        provider=ProviderType.LOCAL,
                         api_key_encrypted=None,
                         default_model="kimi-2.5-7b",
-                        base_url="http://localhost:11434",
+                        local_server_url="http://localhost:11434",
                         temperature=0.7,
                         max_tokens=4000,
                         is_default=True,
-                        status=ConnectionStatus.ACTIVE  # Use enum
+                        status=ConnectionStatus.ACTIVE
                     )
                     self.db.add(default_config)
                     self.db.commit()  # COMMIT the transaction!
@@ -364,14 +364,14 @@ def init_api_manager(db: Session) -> APIManager:
             # Create a default local configuration
             logger.info("Creating default model configuration")
             default_config = UserModelConfig(
-                user_id="sovereign",
+                user_id=None,
                 config_name="Default Local Model",
-                provider="local",
+                provider=ProviderType.LOCAL,
                 provider_name="Local",
                 default_model="kimi-2.5",
                 is_default=True,
                 is_active=True,
-                status='active',
+                status=ConnectionStatus.ACTIVE,
                 rate_limit=60
             )
             db.add(default_config)
