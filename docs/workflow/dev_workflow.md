@@ -403,7 +403,7 @@ For any step that involves real code changes or significant decisions, start a f
 
 #### Phase 5 — Resume with Context in the New Session
 
-If you started a new session, your first message should be is always load the appropriate skills and then a context load — not a task prompt. Do not assume the new session knows anything.
+If you started a new session, your first message should always be to load the appropriate skills and then a context load — not a task prompt. Do not assume the new session knows anything.
 
 **Opening message template:**
 
@@ -416,6 +416,10 @@ If you started a new session, your first message should be is always load the ap
 > _Please confirm you understand the current state and constraints before we proceed."_
 
 Ask the agent to confirm its understanding before it begins. This surfaces any misinterpretation of the handoff document before it results in a bad code change.
+
+Loop back to Phase 2, if you have already loaded skills skip that step in Phase 2. 
+You should continue till the sub-task complition.
+For a new sub-task Start again from Phase 1. 
 
 ---
 
