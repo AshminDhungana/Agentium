@@ -40,6 +40,7 @@ from sqlalchemy.orm import Session
 
 from backend.models.database import get_db_context
 from backend.models.entities.channels import ExternalChannel, ExternalMessage, ChannelType, ChannelStatus
+from backend.services.channels.whatsapp_unified import UnifiedWhatsAppAdapter
 from backend.models.entities import Agent, HeadOfCouncil, Task, TaskType, TaskPriority
 from backend.models.entities.audit import AuditLog, AuditLevel, AuditCategory
 from backend.services.model_provider import ModelService
@@ -781,9 +782,26 @@ class ChannelManager:
 
     @staticmethod
     async def initialize_channel(db: Session, channel: ExternalChannel):
-        """Initialize channel with rate limiting and circuit breaker."""
+        """Initialize channel with rate limiting and circuit breaker.
+
+        Additional provider-specific initialisation:
+        - WhatsApp ``web_bridge``: starts the WebSocket bridge connection so the
+          QR code is available as soon as the channel is created.
+        - Email with IMAP: starts the background IMAP polling / IDLE task.
+        """
         circuit_breaker.register_channel(channel.id)
-        
+
+        # WhatsApp — start bridge connection for web_bridge provider
+        if channel.channel_type == ChannelType.WHATSAPP:
+            provider = (channel.config or {}).get("provider", "cloud_api")
+            if provider == "web_bridge":
+                try:
+                    adapter = UnifiedWhatsAppAdapter(channel)
+                    await adapter.initialize()
+                    print(f"[ChannelManager] WhatsApp web_bridge initialised for {channel.id}")
+                except Exception as exc:
+                    print(f"[ChannelManager] WhatsApp web_bridge init failed for {channel.id}: {exc}")
+
         # Start IMAP for email channels
         if channel.channel_type == ChannelType.EMAIL:
             if channel.config.get('imap_host') or channel.config.get('enable_imap'):
@@ -791,9 +809,30 @@ class ChannelManager:
                 print(f"[ChannelManager] Started IMAP receiver for {channel.id}")
 
     @staticmethod
-    async def shutdown_channel(channel_id: str):
-        """Shutdown channel resources."""
+    async def shutdown_channel(channel_id: str, db: Session = None):
+        """Shutdown channel resources.
+
+        Stops the IMAP receiver (email channels) and, for WhatsApp ``web_bridge``
+        channels, gracefully closes the WebSocket bridge connection.
+        """
+        # Stop IMAP if running
         await imap_receiver.stop_channel(channel_id)
+
+        # Teardown WhatsApp bridge if applicable
+        if db is not None:
+            channel = db.query(ExternalChannel).filter_by(id=channel_id).first()
+            if (
+                channel is not None
+                and channel.channel_type == ChannelType.WHATSAPP
+                and (channel.config or {}).get("provider") == "web_bridge"
+            ):
+                try:
+                    adapter = UnifiedWhatsAppAdapter(channel)
+                    await adapter.shutdown()
+                    print(f"[ChannelManager] WhatsApp web_bridge shut down for {channel_id}")
+                except Exception as exc:
+                    print(f"[ChannelManager] WhatsApp web_bridge shutdown error for {channel_id}: {exc}")
+
         print(f"[ChannelManager] Shutdown channel {channel_id}")
 
     @staticmethod
@@ -1165,9 +1204,30 @@ class ChannelManager:
 
     @staticmethod
     async def _send_plain_text(channel_type: ChannelType, config: Dict, recipient: str, content: str) -> bool:
-        """Send plain text message to specific channel type."""
+        """Send plain text message to specific channel type.
+
+        For WhatsApp channels the :class:`UnifiedWhatsAppAdapter` is used so that
+        both ``cloud_api`` and ``web_bridge`` providers are handled transparently.
+        The adapter requires an :class:`ExternalChannel` instance; a lightweight
+        temporary object is constructed from the supplied *config* dict.
+        """
         if channel_type == ChannelType.WHATSAPP:
-            return await WhatsAppAdapter.send_message(config, recipient, content)
+            # Build a minimal ExternalChannel-like object for the unified adapter
+            temp_channel = ExternalChannel(
+                config=config,
+                channel_type=channel_type,
+                status=ChannelStatus.ACTIVE,
+            )
+            adapter = UnifiedWhatsAppAdapter(temp_channel)
+
+            # Wrap the bare text in a minimal ExternalMessage so the adapter can
+            # read sender_id and content from a consistent interface.
+            temp_message = ExternalMessage(
+                sender_id=recipient,
+                content=content,
+                raw_payload={},
+            )
+            return await adapter.send_message(temp_message)
         elif channel_type == ChannelType.SLACK:
             return await SlackAdapter.send_message(config, recipient, content)
         elif channel_type == ChannelType.TELEGRAM:

@@ -20,6 +20,9 @@ import {
     Users,
     Send,
     Grid,
+    QrCode,
+    Server,
+    AlertTriangle,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
@@ -41,6 +44,7 @@ type ChannelTypeSlug =
     | 'imessage';
 
 type ChannelStatus = 'pending' | 'active' | 'error' | 'disconnected';
+type WhatsAppProvider = 'cloud_api' | 'web_bridge';
 
 interface Channel {
     id: string;
@@ -56,6 +60,8 @@ interface Channel {
         backend?: string;
         number?: string;
         bb_url?: string;
+        provider?: WhatsAppProvider;
+        bridge_url?: string;
     };
     routing: {
         default_agent?: string;
@@ -84,6 +90,7 @@ interface ChannelField {
     type: string;
     placeholder: string;
     required?: boolean;
+    help?: string;
 }
 
 interface ChannelTypeDefinition {
@@ -94,6 +101,7 @@ interface ChannelTypeDefinition {
     color: ColorKey;
     fields: ChannelField[];
     note?: string;
+    providerSelector?: boolean; // For WhatsApp dual-mode
 }
 
 // ─── Color palette ────────────────────────────────────────────────────────────
@@ -114,20 +122,31 @@ const colorMap: Record<ColorKey, { bg: string; darkBg: string; text: string; dar
     slate:  { bg: 'bg-slate-100',  darkBg: 'dark:bg-slate-500/10',  text: 'text-slate-600',  darkText: 'dark:text-slate-400'  },
 };
 
+// ─── WhatsApp Provider Fields ────────────────────────────────────────────────
+
+const whatsAppCloudFields: ChannelField[] = [
+    { name: 'phone_number_id', label: 'Phone Number ID', type: 'text',     placeholder: '123456789012345', required: true, help: 'From Meta Business Manager' },
+    { name: 'access_token',    label: 'Access Token',    type: 'password', placeholder: 'EAAxxxxx...',     required: true, help: 'Permanent token from Meta' },
+    { name: 'verify_token',    label: 'Verify Token',    type: 'text',     placeholder: 'my_verify_secret', help: 'Custom secret for webhook verification' },
+    { name: 'app_secret',      label: 'App Secret',      type: 'password', placeholder: 'Optional', help: 'For webhook signature verification' },
+];
+
+// web_bridge needs no user-supplied fields — bridge_url and bridge_token
+// are injected from the backend env (WHATSAPP_BRIDGE_URL / WHATSAPP_BRIDGE_TOKEN).
+const whatsAppBridgeFields: ChannelField[] = [];
+
 // ─── Channel type definitions ─────────────────────────────────────────────────
 
 const channelTypes: ChannelTypeDefinition[] = [
     {
         id: 'whatsapp',
-        name: 'WhatsApp Business',
+        name: 'WhatsApp',
         Icon: Smartphone,
-        description: 'Meta Cloud API integration',
+        description: 'Cloud API or Web Bridge (QR)',
         color: 'green',
-        fields: [
-            { name: 'phone_number_id', label: 'Phone Number ID', type: 'text',     placeholder: '123456789012345', required: true },
-            { name: 'access_token',    label: 'Access Token',    type: 'password', placeholder: 'EAAxxxxx...',     required: true },
-            { name: 'verify_token',    label: 'Verify Token',    type: 'text',     placeholder: 'my_verify_secret' },
-        ],
+        providerSelector: true,
+        fields: [], // Dynamic based on provider selection
+        note: 'Choose between official Meta Cloud API (business) or Web Bridge (personal/development)',
     },
     {
         id: 'slack',
@@ -269,8 +288,11 @@ export function ChannelsPage() {
     const queryClient = useQueryClient();
     const [showAddModal, setShowAddModal]         = useState(false);
     const [selectedType, setSelectedType]         = useState<ChannelTypeSlug | null>(null);
+    const [whatsappProvider, setWhatsappProvider] = useState<WhatsAppProvider>('cloud_api');
     const [qrCodeData, setQrCodeData]             = useState<string | null>(null);
     const [pollingChannelId, setPollingChannelId] = useState<string | null>(null);
+    const [showProviderSwitch, setShowProviderSwitch] = useState<string | null>(null);
+    const [qrStep, setQrStep]                             = useState(false);   // true = show QR screen
 
     // ── fetch ─────────────────────────────────────────────────────────────────
     const { data: channelsData, isLoading, error } = useQuery({
@@ -300,7 +322,9 @@ export function ChannelsPage() {
         onSuccess: (data: Channel & { webhook_url?: string }) => {
             queryClient.invalidateQueries({ queryKey: ['channels'] });
             toast.success('Channel created successfully');
-            if (data.type === 'whatsapp') {
+            
+            // If WhatsApp Web Bridge, start polling for QR
+            if (data.type === 'whatsapp' && data.config?.provider === 'web_bridge') {
                 setPollingChannelId(data.id);
                 pollForQR(data.id);
             } else {
@@ -325,23 +349,53 @@ export function ChannelsPage() {
         onError: (err: any) => toast.error(err.response?.data?.detail || 'Test failed'),
     });
 
-    // ── QR polling (WhatsApp) ─────────────────────────────────────────────────
+    const switchProviderMutation = useMutation({
+        mutationFn: ({ id, provider }: { id: string; provider: WhatsAppProvider }) => 
+            api.post(`/api/v1/channels/${id}/whatsapp/switch-provider?new_provider=${provider}`).then(r => r.data),
+        onSuccess: (data) => {
+            toast.success(`Switched to ${data.provider === 'cloud_api' ? 'Cloud API' : 'Web Bridge'}`);
+            queryClient.invalidateQueries({ queryKey: ['channels'] });
+            setShowProviderSwitch(null);
+            // If switched to web_bridge, open the QR modal for this channel
+            if (data.provider === 'web_bridge' && data.channel_id) {
+                setShowAddModal(true);
+                setSelectedType('whatsapp');
+                setWhatsappProvider('web_bridge');
+                setPollingChannelId(data.channel_id);
+                pollForQR(data.channel_id);
+            }
+        },
+        onError: (err: any) => toast.error(err.response?.data?.detail || 'Failed to switch provider'),
+    });
+
+    // ── QR polling (WhatsApp Web Bridge) ─────────────────────────────────────
     const pollForQR = async (channelId: string) => {
         try {
             const response = await api.get(`/api/v1/channels/${channelId}/qr`);
-            if (response.data.qr_code) {
-                setQrCodeData(response.data.qr_code);
-            } else if (response.data.status === 'active') {
+            const data = response.data;
+
+            if (data.authenticated || data.connected || data.status === 'active') {
                 toast.success('WhatsApp connected successfully!');
                 closeModal();
                 queryClient.invalidateQueries({ queryKey: ['channels'] });
                 return;
             }
+
+            if (data.qr_code) {
+                setQrCodeData(data.qr_code);
+                setQrStep(true);   // transition to QR screen
+            }
+
+            // Keep polling while channel is pending and not yet authenticated
             if (pollingChannelId === channelId) {
                 setTimeout(() => pollForQR(channelId), 3000);
             }
         } catch (err) {
             console.error('QR polling error:', err);
+            // Retry on error — bridge may not have the QR ready yet
+            if (pollingChannelId === channelId) {
+                setTimeout(() => pollForQR(channelId), 4000);
+            }
         }
     };
 
@@ -352,19 +406,44 @@ export function ChannelsPage() {
         setSelectedType(null);
         setQrCodeData(null);
         setPollingChannelId(null);
+        setWhatsappProvider('cloud_api');
+        setQrStep(false);
     };
 
     const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         if (!selectedType) return;
+        
         const formEl = e.target as HTMLFormElement;
         const fd = new FormData(formEl);
-        const typeDef = channelTypes.find(t => t.id === selectedType)!;
+        
+        // Get fields based on type
+        let fields: ChannelField[] = [];
+        if (selectedType === 'whatsapp') {
+            fields = whatsappProvider === 'cloud_api' ? whatsAppCloudFields : whatsAppBridgeFields;
+        } else {
+            const typeDef = channelTypes.find(t => t.id === selectedType);
+            fields = typeDef?.fields || [];
+        }
+        
         const config: Record<string, string> = {};
-        typeDef.fields.forEach(f => {
+        
+        // Add provider for WhatsApp
+        if (selectedType === 'whatsapp') {
+            config.provider = whatsappProvider;
+            if (whatsappProvider === 'web_bridge') {
+                // bridge_url & bridge_token come from backend env vars —
+                // signal the backend to use its defaults by passing the sentinel.
+                config.bridge_url   = 'env://whatsapp-bridge';
+                config.bridge_token = 'env://WHATSAPP_BRIDGE_TOKEN';
+            }
+        }
+
+        fields.forEach(f => {
             const val = (fd.get(f.name) || '').toString();
             if (val) config[f.name] = val;
         });
+        
         createMutation.mutate({
             name: fd.get('name') as string,
             type: selectedType,
@@ -465,6 +544,11 @@ export function ChannelsPage() {
                         const colors  = colorMap[typeDef?.color ?? 'blue'];
                         const Icon    = typeDef?.Icon ?? MessageCircle;
                         const status  = getStatus(channel.status);
+                        
+                        // WhatsApp provider badge
+                        const isWhatsApp = channel.type === 'whatsapp';
+                        const provider = channel.config?.provider || 'cloud_api';
+                        const isBridge = provider === 'web_bridge';
 
                         return (
                             <div
@@ -483,17 +567,35 @@ export function ChannelsPage() {
                                                 <h3 className="font-semibold text-gray-900 dark:text-gray-100 leading-snug">
                                                     {channel.name}
                                                 </h3>
-                                                <div className="flex items-center gap-1.5 mt-0.5">
+                                                <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                                                     <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${status.dot}`} />
                                                     <p className="text-xs text-gray-500 dark:text-gray-400">
                                                         {typeDef?.name ?? channel.type} · {status.label}
                                                     </p>
+                                                    {isWhatsApp && (
+                                                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                                                            isBridge 
+                                                                ? 'bg-orange-100 text-orange-700 dark:bg-orange-500/10 dark:text-orange-400' 
+                                                                : 'bg-blue-100 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400'
+                                                        }`}>
+                                                            {isBridge ? 'Bridge' : 'Cloud API'}
+                                                        </span>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>
 
                                         {/* Action buttons */}
                                         <div className="flex gap-1">
+                                            {isWhatsApp && (
+                                                <button
+                                                    onClick={() => setShowProviderSwitch(channel.id)}
+                                                    title="Switch provider"
+                                                    className="p-2 text-gray-400 dark:text-gray-500 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-500/10 rounded-lg transition-all duration-150"
+                                                >
+                                                    <Server className="w-4 h-4" />
+                                                </button>
+                                            )}
                                             <button
                                                 onClick={() => testMutation.mutate(channel.id)}
                                                 disabled={testMutation.isPending}
@@ -531,7 +633,37 @@ export function ChannelsPage() {
                                                 Requires approval
                                             </span>
                                         )}
+                                        {isWhatsApp && isBridge && channel.status === 'pending' && (
+                                            <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 bg-purple-100 dark:bg-purple-500/10 text-purple-700 dark:text-purple-400 border border-purple-200 dark:border-purple-500/20 rounded-full font-medium">
+                                                <QrCode className="w-3 h-3" /> QR Required
+                                            </span>
+                                        )}
                                     </div>
+
+                                    {/* Provider-specific info */}
+                                    {isWhatsApp && (
+                                        <div className="p-3 bg-gray-50 dark:bg-[#0f1117] rounded-lg border border-gray-200 dark:border-[#1e2535]">
+                                            <div className="flex items-center justify-between mb-2">
+                                                <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                                                    Provider
+                                                </span>
+                                                <span className={`text-xs font-semibold ${
+                                                    isBridge ? 'text-orange-600 dark:text-orange-400' : 'text-blue-600 dark:text-blue-400'
+                                                }`}>
+                                                    {isBridge ? 'Web Bridge (QR)' : 'Cloud API (Meta)'}
+                                                </span>
+                                            </div>
+                                            {isBridge ? (
+                                                <p className="text-xs text-gray-500 dark:text-gray-500">
+                                                    Uses WebSocket bridge with QR authentication. Good for personal use.
+                                                </p>
+                                            ) : (
+                                                <p className="text-xs text-gray-500 dark:text-gray-500">
+                                                    Official Meta Business API. Required for production/business use.
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
 
                                     {/* Webhook URL */}
                                     {channel.config?.webhook_url && (
@@ -603,9 +735,11 @@ export function ChannelsPage() {
                         {/* Modal header */}
                         <div className="p-6 border-b border-gray-200 dark:border-[#1e2535] flex items-center justify-between sticky top-0 bg-white dark:bg-[#161b27] z-10 rounded-t-2xl">
                             <h2 className="text-lg font-bold text-gray-900 dark:text-white">
-                                {selectedType
-                                    ? `Configure ${channelTypes.find(t => t.id === selectedType)?.name}`
-                                    : 'Add Channel'}
+                                {qrStep
+                                    ? 'Scan QR Code'
+                                    : selectedType
+                                        ? `Configure ${channelTypes.find(t => t.id === selectedType)?.name}`
+                                        : 'Add Channel'}
                             </h2>
                             <button aria-label="Close" onClick={closeModal}
                                 className="p-2 hover:bg-gray-100 dark:hover:bg-[#1e2535] rounded-lg transition-colors duration-150"
@@ -615,8 +749,47 @@ export function ChannelsPage() {
                         </div>
 
                         <div className="p-6">
-                            {/* Step 1: pick type */}
-                            {!selectedType ? (
+                            {/* Step 3: QR Code — shown after form submit for web_bridge */}
+                            {qrStep ? (
+                                <div className="flex flex-col items-center gap-6 py-4">
+                                    <div className="text-center">
+                                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                                            Scan this QR code with your WhatsApp app to link the account.
+                                        </p>
+                                    </div>
+
+                                    {qrCodeData ? (
+                                        <div className="p-5 bg-white rounded-2xl shadow-lg border border-orange-200 dark:border-orange-500/30">
+                                            <QRCodeSVG value={qrCodeData} size={240} level="H" includeMargin />
+                                        </div>
+                                    ) : (
+                                        <div className="w-[250px] h-[250px] rounded-2xl bg-gray-100 dark:bg-[#0f1117] border border-gray-200 dark:border-[#1e2535] flex flex-col items-center justify-center gap-3">
+                                            <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+                                            <p className="text-xs text-gray-500 dark:text-gray-400">Waiting for QR code…</p>
+                                        </div>
+                                    )}
+
+                                    <ol className="text-sm text-gray-600 dark:text-gray-400 space-y-1.5 text-left w-full max-w-xs list-decimal list-inside">
+                                        <li>Open <strong className="text-gray-800 dark:text-gray-200">WhatsApp</strong> on your phone</li>
+                                        <li>Go to <strong className="text-gray-800 dark:text-gray-200">Settings → Linked Devices</strong></li>
+                                        <li>Tap <strong className="text-gray-800 dark:text-gray-200">Link a Device</strong></li>
+                                        <li>Scan the QR code above</li>
+                                    </ol>
+
+                                    <div className="flex items-center gap-2 text-xs text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-500/10 border border-orange-200 dark:border-orange-500/20 rounded-lg px-3 py-2 w-full max-w-xs">
+                                        <Loader2 className="w-3.5 h-3.5 animate-spin flex-shrink-0" />
+                                        Waiting for scan… refreshes every 3 s
+                                    </div>
+
+                                    <button
+                                        type="button"
+                                        onClick={closeModal}
+                                        className="px-4 py-2 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            ) : !selectedType ? (
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                                     {channelTypes.map(type => {
                                         const colors = colorMap[type.color];
@@ -654,15 +827,70 @@ export function ChannelsPage() {
                                         </div>
                                     )}
 
-                                    {/* WhatsApp QR */}
-                                    {selectedType === 'whatsapp' && qrCodeData && (
-                                        <div className="text-center space-y-4 p-6 bg-green-50 dark:bg-green-500/5 border border-green-200 dark:border-green-500/20 rounded-xl">
-                                            <div className="inline-block p-4 bg-white rounded-xl shadow-md">
-                                                <QRCodeSVG value={qrCodeData} size={256} level="H" />
+                                    {/* WhatsApp Provider Selector */}
+                                    {selectedType === 'whatsapp' && (
+                                        <div className="p-4 bg-gray-50 dark:bg-[#0f1117] rounded-xl border border-gray-200 dark:border-[#1e2535]">
+                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                                                Select Provider <span className="text-red-500">*</span>
+                                            </label>
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setWhatsappProvider('cloud_api')}
+                                                    className={`p-3 rounded-lg border-2 text-left transition-all ${
+                                                        whatsappProvider === 'cloud_api'
+                                                            ? 'border-blue-500 bg-blue-50 dark:bg-blue-500/10'
+                                                            : 'border-gray-200 dark:border-[#1e2535] hover:border-gray-300'
+                                                    }`}
+                                                >
+                                                    <div className="flex items-center gap-2 mb-1">
+                                                        <Server className={`w-4 h-4 ${whatsappProvider === 'cloud_api' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500'}`} />
+                                                        <span className={`font-medium text-sm ${whatsappProvider === 'cloud_api' ? 'text-blue-900 dark:text-blue-100' : 'text-gray-700 dark:text-gray-300'}`}>
+                                                            Cloud API
+                                                        </span>
+                                                    </div>
+                                                    <p className="text-xs text-gray-500 dark:text-gray-500">
+                                                        Official Meta API for business use
+                                                    </p>
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setWhatsappProvider('web_bridge')}
+                                                    className={`p-3 rounded-lg border-2 text-left transition-all ${
+                                                        whatsappProvider === 'web_bridge'
+                                                            ? 'border-orange-500 bg-orange-50 dark:bg-orange-500/10'
+                                                            : 'border-gray-200 dark:border-[#1e2535] hover:border-gray-300'
+                                                    }`}
+                                                >
+                                                    <div className="flex items-center gap-2 mb-1">
+                                                        <QrCode className={`w-4 h-4 ${whatsappProvider === 'web_bridge' ? 'text-orange-600 dark:text-orange-400' : 'text-gray-500'}`} />
+                                                        <span className={`font-medium text-sm ${whatsappProvider === 'web_bridge' ? 'text-orange-900 dark:text-orange-100' : 'text-gray-700 dark:text-gray-300'}`}>
+                                                            Web Bridge
+                                                        </span>
+                                                    </div>
+                                                    <p className="text-xs text-gray-500 dark:text-gray-500">
+                                                        QR-based for personal/development
+                                                    </p>
+                                                </button>
                                             </div>
-                                            <p className="text-green-700 dark:text-green-400 text-sm font-medium">
-                                                Scan with WhatsApp to connect
-                                            </p>
+                                            
+                                            {/* web_bridge info */}
+                                            {whatsappProvider === 'web_bridge' && (
+                                                <div className="mt-3 space-y-2">
+                                                    <div className="p-2.5 bg-green-50 dark:bg-green-500/5 border border-green-200 dark:border-green-500/20 rounded-lg flex items-start gap-2">
+                                                        <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
+                                                        <p className="text-xs text-green-700 dark:text-green-400">
+                                                            Bridge is running in Docker. Just give this channel a name and click Connect — a QR code will appear instantly.
+                                                        </p>
+                                                    </div>
+                                                    <div className="p-2.5 bg-orange-50 dark:bg-orange-500/5 border border-orange-200 dark:border-orange-500/20 rounded-lg flex items-start gap-2">
+                                                        <AlertTriangle className="w-4 h-4 text-orange-500 dark:text-orange-400 flex-shrink-0 mt-0.5" />
+                                                        <p className="text-xs text-orange-700 dark:text-orange-400">
+                                                            Web Bridge uses unofficial methods. Use only for personal accounts, not business.
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     )}
 
@@ -681,10 +909,10 @@ export function ChannelsPage() {
                                             />
                                         </div>
 
-                                        {/* Channel-specific fields */}
-                                        {channelTypes
-                                            .find(t => t.id === selectedType)
-                                            ?.fields.map(field => (
+                                        {/* Dynamic fields based on type/provider */}
+                                        {selectedType === 'whatsapp' ? (
+                                            // WhatsApp fields based on provider
+                                            (whatsappProvider === 'cloud_api' ? whatsAppCloudFields : whatsAppBridgeFields).map(field => (
                                                 <div key={field.name}>
                                                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                                                         {field.label}
@@ -697,8 +925,31 @@ export function ChannelsPage() {
                                                         placeholder={field.placeholder}
                                                         className="w-full px-4 py-2.5 border border-gray-300 dark:border-[#1e2535] rounded-lg bg-white dark:bg-[#0f1117] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-600 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-500/50 focus:border-transparent outline-none transition-all duration-150 text-sm"
                                                     />
+                                                    {field.help && (
+                                                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-500">{field.help}</p>
+                                                    )}
                                                 </div>
-                                            ))}
+                                            ))
+                                        ) : (
+                                            // Other channel types
+                                            channelTypes
+                                                .find(t => t.id === selectedType)
+                                                ?.fields.map(field => (
+                                                    <div key={field.name}>
+                                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                                                            {field.label}
+                                                            {field.required && <span className="text-red-500 ml-1">*</span>}
+                                                        </label>
+                                                        <input
+                                                            name={field.name}
+                                                            type={field.type}
+                                                            required={field.required}
+                                                            placeholder={field.placeholder}
+                                                            className="w-full px-4 py-2.5 border border-gray-300 dark:border-[#1e2535] rounded-lg bg-white dark:bg-[#0f1117] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-600 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-500/50 focus:border-transparent outline-none transition-all duration-150 text-sm"
+                                                        />
+                                                    </div>
+                                                ))
+                                        )}
 
                                         {/* Actions */}
                                         <div className="flex gap-3 pt-2">
@@ -715,15 +966,71 @@ export function ChannelsPage() {
                                                 className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 dark:hover:bg-blue-500 disabled:opacity-50 text-white rounded-lg transition-all duration-150 text-sm font-medium shadow-sm dark:shadow-blue-900/30"
                                             >
                                                 {createMutation.isPending ? (
-                                                    <><Loader2 className="w-4 h-4 animate-spin" /> Connecting...</>
+                                                    <><Loader2 className="w-4 h-4 animate-spin" /> {whatsappProvider === 'web_bridge' && selectedType === 'whatsapp' ? 'Generating QR…' : 'Connecting…'}</>
                                                 ) : (
-                                                    <><CheckCircle className="w-4 h-4" /> Connect</>
+                                                    <><CheckCircle className="w-4 h-4" /> {whatsappProvider === 'web_bridge' && selectedType === 'whatsapp' ? 'Connect & Show QR' : 'Connect'}</>
                                                 )}
                                             </button>
                                         </div>
                                     </form>
                                 </div>
                             )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Provider Switch Modal ─────────────────────────────────────── */}
+            {showProviderSwitch && (
+                <div className="fixed inset-0 bg-black/60 dark:bg-black/75 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
+                    <div className="bg-white dark:bg-[#161b27] rounded-2xl max-w-md w-full shadow-2xl border border-gray-200 dark:border-[#1e2535]">
+                        <div className="p-6 border-b border-gray-200 dark:border-[#1e2535]">
+                            <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                                Switch WhatsApp Provider
+                            </h3>
+                            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                                This will disconnect the current session and switch authentication methods.
+                            </p>
+                        </div>
+                        <div className="p-6 space-y-3">
+                            <button
+                                onClick={() => switchProviderMutation.mutate({ id: showProviderSwitch, provider: 'cloud_api' })}
+                                disabled={switchProviderMutation.isPending}
+                                className="w-full p-4 border-2 border-blue-200 dark:border-blue-500/30 hover:border-blue-500 dark:hover:border-blue-400 rounded-xl text-left transition-all group"
+                            >
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="font-semibold text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400">
+                                        Switch to Cloud API
+                                    </span>
+                                    <Server className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                                </div>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">
+                                    Official Meta Business API. Best for production use.
+                                </p>
+                            </button>
+                            
+                            <button
+                                onClick={() => switchProviderMutation.mutate({ id: showProviderSwitch, provider: 'web_bridge' })}
+                                disabled={switchProviderMutation.isPending}
+                                className="w-full p-4 border-2 border-orange-200 dark:border-orange-500/30 hover:border-orange-500 dark:hover:border-orange-400 rounded-xl text-left transition-all group"
+                            >
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="font-semibold text-gray-900 dark:text-white group-hover:text-orange-600 dark:group-hover:text-orange-400">
+                                        Switch to Web Bridge
+                                    </span>
+                                    <QrCode className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+                                </div>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">
+                                    QR-based authentication. For personal/development use.
+                                </p>
+                            </button>
+                            
+                            <button
+                                onClick={() => setShowProviderSwitch(null)}
+                                className="w-full px-4 py-2.5 border border-gray-300 dark:border-[#1e2535] text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-[#1e2535] transition-all duration-150 text-sm font-medium"
+                            >
+                                Cancel
+                            </button>
                         </div>
                     </div>
                 </div>

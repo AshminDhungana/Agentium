@@ -63,13 +63,39 @@ services:
       retries: 5
 
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # WhatsApp Web Bridge (Baileys)
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  whatsapp-bridge:
+    build:
+      context: ./bridges/whatsapp
+      dockerfile: Dockerfile
+    container_name: agentium-whatsapp-bridge
+    environment:
+      - PORT=3001
+      - BRIDGE_TOKEN=${WHATSAPP_BRIDGE_TOKEN:-changeme}
+      - AUTH_DIR=/app/auth_info
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    ports:
+      - "3001:3001"          # expose for debugging; remove in production
+    volumes:
+      - whatsapp_auth:/app/auth_info   # persists QR auth — survives restarts
+    restart: unless-stopped
+    networks:
+      - agentium-network
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001/health"]
+      interval: 15s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   # Backend API (FastAPI) - PRIVILEGED
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile.privileged
-    # image: agentium-backend:latest 
     container_name: agentium-backend
     privileged: true
     env_file:
@@ -103,6 +129,9 @@ services:
       - HOST_DOCKER_SOCKET=/var/run/docker.sock
       - HOST_FS_MOUNT=/host
       - HOST_HOME_MOUNT=/host_home
+      # WhatsApp bridge — used as the default bridge_url when creating channels
+      - WHATSAPP_BRIDGE_URL=ws://whatsapp-bridge:3001
+      - WHATSAPP_BRIDGE_TOKEN=${WHATSAPP_BRIDGE_TOKEN:-changeme}
     restart: unless-stopped
     command: uvicorn backend.main:app --host 0.0.0.0 --port 8000
     depends_on:
@@ -111,6 +140,8 @@ services:
       redis:
         condition: service_healthy
       chromadb:
+        condition: service_healthy
+      whatsapp-bridge:
         condition: service_healthy
     networks:
       - agentium-network
@@ -128,7 +159,6 @@ services:
     build:  
       context: ./backend
       dockerfile: Dockerfile.privileged
-    #image: ghcr.io/ashmindhungana/agentium/backend:main
     container_name: agentium-celery
     privileged: true
     cap_add:
@@ -157,6 +187,8 @@ services:
       - HOST_DOCKER_SOCKET=/var/run/docker.sock
       - HOST_FS_MOUNT=/host
       - HOST_HOME_MOUNT=/host_home
+      - WHATSAPP_BRIDGE_URL=ws://whatsapp-bridge:3001
+      - WHATSAPP_BRIDGE_TOKEN=${WHATSAPP_BRIDGE_TOKEN:-changeme}
     depends_on:
       backend:
         condition: service_healthy
@@ -178,7 +210,6 @@ services:
     build:  
       context: ./backend
       dockerfile: Dockerfile.privileged
-    #image: ghcr.io/ashmindhungana/agentium/backend:main
     container_name: agentium-celery-beat
     privileged: true
     cap_add:
@@ -192,6 +223,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:rw
       - /:/host:rw
       - ${USERPROFILE:-~}:/host_home:rw
+      - /sys:/sys:rw
     environment:
       - DATABASE_URL=postgresql://agentium:agentium@postgres:5432/agentium
       - CHROMA_HOST=chromadb
@@ -203,6 +235,8 @@ services:
       - HOST_ROOT_ACCESS=true
       - HOST_DOCKER_SOCKET=/var/run/docker.sock
       - HOST_FS_MOUNT=/host
+      - WHATSAPP_BRIDGE_URL=ws://whatsapp-bridge:3001
+      - WHATSAPP_BRIDGE_TOKEN=${WHATSAPP_BRIDGE_TOKEN:-changeme}
     depends_on:
       backend:
         condition: service_healthy
@@ -218,7 +252,7 @@ services:
       - agentium-network
 
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  # Frontend (React) - Standard 
+  # Frontend (React) - Standard
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   frontend:
     build:
@@ -242,6 +276,8 @@ volumes:
   chroma_data:
     driver: local
   redis_data:
+    driver: local
+  whatsapp_auth:         
     driver: local
 
 networks:

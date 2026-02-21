@@ -17,6 +17,7 @@ Endpoints:
 """
 
 import secrets
+import os
 from datetime import datetime
 from typing import Optional, List, Any, Dict
 
@@ -33,6 +34,7 @@ from backend.services.channel_manager import (
     circuit_breaker, rate_limiter, PLATFORM_RATE_LIMITS, imap_receiver,
     RichMediaContent, CircuitState, RateLimitConfig  # FIXED: Added missing imports
 )
+from backend.services.channels.whatsapp_unified import UnifiedWhatsAppAdapter, WhatsAppProvider
 from backend.core.auth import get_current_active_user
 from backend.core.config import settings
 
@@ -127,6 +129,12 @@ async def create_channel(
     Create and register a new external channel.
     Generates a unique inbound webhook path automatically.
     """
+    # ── Resolve env:// sentinels for web_bridge ──────────────────────────────
+    if config.get('provider') == 'web_bridge':
+        if config.get('bridge_url', '').startswith('env://'):
+            config['bridge_url'] = os.environ.get('WHATSAPP_BRIDGE_URL', 'ws://whatsapp-bridge:3001')
+        if config.get('bridge_token', '').startswith('env://'):
+            config['bridge_token'] = os.environ.get('WHATSAPP_BRIDGE_TOKEN', '')    
     try:
         ctype = ChannelType(request.type)
     except ValueError:
@@ -175,11 +183,20 @@ def _get_setup_instructions(channel_type: ChannelType, webhook_url: str) -> Dict
     """Get platform-specific setup instructions."""
     instructions = {
         ChannelType.WHATSAPP: {
-            "step_1": "Go to Meta for Developers → Your App → WhatsApp → Configuration",
-            "step_2": f"Set webhook URL to: {webhook_url}",
-            "step_3": "Set verify token to the value you provided",
-            "step_4": "Subscribe to 'messages' webhook fields",
-            "docs": "https://developers.facebook.com/docs/whatsapp/cloud-api/guides/set-up-webhooks"
+            "cloud_api": {
+                "step_1": "Go to Meta for Developers → Your App → WhatsApp → Configuration",
+                "step_2": f"Set webhook URL to: {webhook_url}",
+                "step_3": "Set verify token to the value you provided in config",
+                "step_4": "Subscribe to 'messages' webhook fields",
+                "docs": "https://developers.facebook.com/docs/whatsapp/cloud-api/guides/set-up-webhooks",
+            },
+            "web_bridge": {
+                "step_1": "Deploy the Node.js Baileys bridge service",
+                "step_2": "Set bridge_url and bridge_token in channel config",
+                "step_3": f"Point the bridge's outbound webhook to: {webhook_url}",
+                "step_4": "Call GET /channels/{id}/qr to scan the QR code with WhatsApp",
+                "docs": "https://github.com/WhiskeySockets/Baileys",
+            },
         },
         ChannelType.SLACK: {
             "step_1": "Go to Slack API → Your App → Event Subscriptions",
@@ -284,7 +301,7 @@ async def delete_channel(
     channel = _get_channel_or_404(channel_id, db)
     
     # Cleanup resources
-    background_tasks.add_task(ChannelManager.shutdown_channel, channel_id)
+    background_tasks.add_task(ChannelManager.shutdown_channel, channel_id, db)
     
     # Delete messages and channel
     db.query(ExternalMessage).filter_by(channel_id=channel_id).delete()
@@ -348,24 +365,50 @@ async def test_channel(
         ct = channel.channel_type
 
         if ct == ChannelType.WHATSAPP:
-            # Test by getting phone number info
-            import httpx
-            access_token = cfg.get('access_token')
-            phone_number_id = cfg.get('phone_number_id')
-            
-            if not access_token or not phone_number_id:
-                raise ValueError("Missing access_token or phone_number_id")
-            
-            async with httpx.AsyncClient() as client:
-                r = await client.get(
-                    f"https://graph.facebook.com/v17.0/{phone_number_id}",
-                    headers={"Authorization": f"Bearer {access_token}"}
-                )
-            data = r.json()
-            success = 'id' in data
-            if success:
-                test_details['phone_number'] = data.get('display_phone_number')
-                test_details['verified'] = data.get('is_valid_number')
+            provider = cfg.get("provider", "cloud_api")
+            test_details["provider"] = provider
+
+            if provider == "web_bridge":
+                # Test Web Bridge connection via unified adapter
+                adapter = UnifiedWhatsAppAdapter(channel)
+                status = await adapter.get_status()
+                success = status.get("connected", False)
+
+                if not success:
+                    error_msg = (
+                        "Bridge not connected. "
+                        "Ensure the Node.js Baileys bridge is running and the "
+                        "bridge_url / bridge_token are correct."
+                    )
+                else:
+                    test_details["authenticated"] = status.get("authenticated", False)
+                    test_details["bridge_url"] = cfg.get("bridge_url")
+                    test_details["qr_available"] = status.get("qr_code") is not None
+            else:
+                # Test Cloud API — validate phone number via Meta Graph API
+                import httpx
+                access_token = cfg.get("access_token")
+                phone_number_id = cfg.get("phone_number_id")
+
+                if not access_token or not phone_number_id:
+                    raise ValueError(
+                        "Missing access_token or phone_number_id for Cloud API provider"
+                    )
+
+                async with httpx.AsyncClient() as client:
+                    r = await client.get(
+                        f"https://graph.facebook.com/v18.0/{phone_number_id}",
+                        headers={"Authorization": f"Bearer {access_token}"},
+                    )
+                data = r.json()
+                success = "id" in data
+                if success:
+                    test_details["phone_number"] = data.get("display_phone_number")
+                    test_details["verified"] = data.get("is_valid_number")
+                else:
+                    error_msg = data.get("error", {}).get(
+                        "message", "Cloud API validation failed"
+                    )
 
         elif ct == ChannelType.SLACK:
             import httpx
@@ -591,7 +634,12 @@ async def get_channel_qr(
 ):
     """
     Poll for a WhatsApp QR code while pairing is in progress.
-    Returns qr_code string when pending, or status='active' when connected.
+
+    - For ``web_bridge`` provider: delegates to :class:`UnifiedWhatsAppAdapter`
+      which holds live bridge state (QR string, expiry, auth status).
+    - For ``cloud_api`` provider: returns status='active' once connected; QR is
+      not applicable.
+    - Returns ``status='active'`` immediately if the channel is already active.
     """
     channel = _get_channel_or_404(channel_id, db)
 
@@ -601,14 +649,136 @@ async def get_channel_qr(
     if channel.status == ChannelStatus.ACTIVE:
         return {"status": "active", "qr_code": None, "connected": True}
 
-    # Check for QR in config (would be set by external WhatsApp library if using Baileys)
-    qr_data = (channel.config or {}).get('qr_code_data')
-    
+    provider = (channel.config or {}).get("provider", "cloud_api")
+
+    if provider != "web_bridge":
+        # Cloud API channels do not use QR codes
+        return {
+            "status": channel.status.value,
+            "provider": "cloud_api",
+            "qr_code": None,
+            "connected": channel.status == ChannelStatus.ACTIVE,
+            "message": "QR codes are only used for the web_bridge provider.",
+        }
+
+    # Delegate to the unified adapter for live bridge state
+    adapter = UnifiedWhatsAppAdapter(channel)
+    bridge_status = await adapter.get_status()
+
     return {
         "status": channel.status.value,
-        "qr_code": qr_data,
-        "connected": False,
-        "expires_at": (channel.config or {}).get('qr_expires_at')
+        "provider": "web_bridge",
+        "qr_code": bridge_status.get("qr_code"),
+        "qr_expires_at": bridge_status.get("qr_expires_at"),
+        "connected": bridge_status.get("connected", False),
+        "authenticated": bridge_status.get("authenticated", False),
+    }
+
+
+# ═══════════════════════════════════════════════════════════
+# WHATSAPP PROVIDER-SPECIFIC ENDPOINTS
+# ═══════════════════════════════════════════════════════════
+
+@router.get("/channels/{channel_id}/whatsapp/status")
+async def get_whatsapp_detailed_status(
+    channel_id: str,
+    current_user: dict = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get detailed WhatsApp connection status including provider-specific fields.
+    Works for both ``cloud_api`` and ``web_bridge`` providers.
+    """
+    channel = _get_channel_or_404(channel_id, db)
+
+    if channel.channel_type != ChannelType.WHATSAPP:
+        raise HTTPException(status_code=400, detail="Not a WhatsApp channel")
+
+    adapter = UnifiedWhatsAppAdapter(channel)
+    provider_status = await adapter.get_status()
+
+    return {
+        "channel_id": channel_id,
+        "name": channel.name,
+        "provider": channel.config.get("provider", "cloud_api"),
+        "channel_status": channel.status.value,
+        "connection": provider_status,
+        "config_present": {
+            "cloud_api": {
+                "phone_number_id": bool(channel.config.get("phone_number_id")),
+                "access_token": bool(channel.config.get("access_token")),
+                "app_secret": bool(channel.config.get("app_secret")),
+            },
+            "web_bridge": {
+                "bridge_url": bool(channel.config.get("bridge_url")),
+                "bridge_token": bool(channel.config.get("bridge_token")),
+            },
+        },
+    }
+
+
+@router.post("/channels/{channel_id}/whatsapp/switch-provider")
+async def switch_whatsapp_provider(
+    channel_id: str,
+    new_provider: str,
+    current_user: dict = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Switch a WhatsApp channel between ``cloud_api`` and ``web_bridge`` providers.
+
+    .. warning::
+        This tears down the current provider session before initialising the new one.
+        Any in-flight messages may be lost.
+
+    Query param ``new_provider``: ``"cloud_api"`` or ``"web_bridge"``.
+    """
+    channel = _get_channel_or_404(channel_id, db)
+
+    if channel.channel_type != ChannelType.WHATSAPP:
+        raise HTTPException(status_code=400, detail="Not a WhatsApp channel")
+
+    if new_provider not in ("cloud_api", "web_bridge"):
+        raise HTTPException(
+            status_code=400,
+            detail="provider must be 'cloud_api' or 'web_bridge'",
+        )
+
+    old_provider = (channel.config or {}).get("provider", "cloud_api")
+
+    if old_provider == new_provider:
+        return {
+            "success": False,
+            "message": f"Already using {new_provider}",
+            "provider": new_provider,
+        }
+
+    # Gracefully shut down the existing adapter
+    try:
+        old_adapter = UnifiedWhatsAppAdapter(channel)
+        await old_adapter.shutdown()
+    except Exception:
+        pass  # Best-effort; continue regardless
+
+    # Persist the new provider choice and reset status
+    merged_config = dict(channel.config or {})
+    merged_config["provider"] = new_provider
+    channel.config = merged_config
+    channel.status = ChannelStatus.PENDING
+    channel.error_message = None
+    db.commit()
+
+    # Initialise the new adapter (starts bridge handshake if web_bridge)
+    new_adapter = UnifiedWhatsAppAdapter(channel)
+    await new_adapter.initialize()
+
+    return {
+        "success": True,
+        "message": f"Switched from {old_provider} to {new_provider}",
+        "channel_id": channel_id,
+        "provider": new_provider,
+        "setup_required": new_provider == "cloud_api",
+        "qr_required": new_provider == "web_bridge",
     }
 
 
@@ -678,4 +848,3 @@ async def reset_channel(
         "channel_id": channel_id,
         "new_status": ChannelStatus.PENDING.value
     }
-

@@ -417,9 +417,9 @@ If you started a new session, your first message should always be to load the ap
 
 Ask the agent to confirm its understanding before it begins. This surfaces any misinterpretation of the handoff document before it results in a bad code change.
 
-Now, loop back to Phase 2, if you have already loaded the required skills skip that step in Phase 2. 
+Now, loop back to Phase 2, if you have already loaded the required skills skip that step in Phase 2.
 You should continue till the task complition.
-For a new task start again from Phase 1. 
+For a new task start again from Phase 1.
 
 ---
 
@@ -488,13 +488,13 @@ This gives you a full audit trail of every decision made during the AI-assisted 
 
 **Per-step agent loop (apply within every step above):**
 
-| Phase          | Action                                            |
-| -------------- | ------------------------------------------------- |
-| 1. Load Skill  | Identify and use the right tool for the task type |
-| 2. Execute     | One step, one scoped prompt, one bounded scope    |
-| 3. Document    | Create a handoff markdown file                    |
-| 4. New Session | Start fresh for the next step                     |
-| 5. Resume      | Load context from handoff doc before proceeding   |
+| Phase          | Action                                             |
+| -------------- | -------------------------------------------------- |
+| 1. Load Skill  | Identify and use the right tool for the task type  |
+| 2. Execute     | One step, one scoped prompt, one bounded scope     |
+| 3. Document    | Create a handoff markdown file                     |
+| 4. New Session | Start fresh for the next step, load requied skills |
+| 5. Resume      | Load context from handoff doc before proceeding    |
 
 ---
 

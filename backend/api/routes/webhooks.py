@@ -74,7 +74,7 @@ def verify_signature(secret: str, body: bytes, signature: str, algorithm: str = 
 
 
 # ═══════════════════════════════════════════════════════════
-# WhatsApp Webhook (Meta Graph API)
+# WhatsApp Webhook (Supports both Cloud API and Web Bridge)
 # ═══════════════════════════════════════════════════════════
 
 @router.get("/whatsapp/{webhook_path}")
@@ -85,9 +85,10 @@ async def whatsapp_verify(
 ):
     """
     WhatsApp verification endpoint (GET).
-    Meta sends challenge here to verify webhook.
+    For Cloud API: Meta sends challenge here to verify webhook.
+    For Web Bridge: Returns status info.
     """
-    # Find channel even if pending (for initial setup)
+    # Find channel
     channel = db.query(ExternalChannel).filter_by(
         channel_type='whatsapp',
         webhook_path=webhook_path
@@ -96,19 +97,27 @@ async def whatsapp_verify(
     if not channel:
         raise HTTPException(status_code=404, detail="Channel not found")
     
-    params = dict(request.query_params)
-    hub_mode = params.get("hub.mode")
-    hub_verify_token = params.get("hub.verify_token")
-    hub_challenge = params.get("hub.challenge")
+    # Check if Cloud API (has verify_token) or Bridge
+    is_cloud = 'verify_token' in (channel.config or {})
     
-    if hub_mode == "subscribe" and hub_verify_token == channel.config.get("verify_token"):
-        # Update status to active on successful verification
-        if channel.status == ChannelStatus.PENDING:
-            channel.status = ChannelStatus.ACTIVE
-            db.commit()
-        return int(hub_challenge) if hub_challenge else "OK"
-    
-    raise HTTPException(status_code=403, detail="Verification failed")
+    if is_cloud:
+        # Meta Cloud API verification
+        params = dict(request.query_params)
+        hub_mode = params.get("hub.mode")
+        hub_verify_token = params.get("hub.verify_token")
+        hub_challenge = params.get("hub.challenge")
+        
+        if hub_mode == "subscribe" and hub_verify_token == channel.config.get("verify_token"):
+            # Update status to active on successful verification
+            if channel.status == ChannelStatus.PENDING:
+                channel.status = ChannelStatus.ACTIVE
+                db.commit()
+            return int(hub_challenge) if hub_challenge else "OK"
+        
+        raise HTTPException(status_code=403, detail="Verification failed")
+    else:
+        # Web Bridge - just return OK
+        return {"status": "webhook_active", "provider": "web_bridge"}
 
 
 @router.post("/whatsapp/{webhook_path}")
@@ -120,64 +129,83 @@ async def whatsapp_webhook(
     db: Session = Depends(get_db)
 ):
     """
-    Receive WhatsApp messages with signature verification.
+    Receive WhatsApp messages.
+    Supports both Cloud API (with signature) and Web Bridge (plain JSON).
     """
     body = await request.body()
     
-    # Verify signature if app_secret configured
-    if channel.config.get('app_secret'):
-        signature = request.headers.get('X-Hub-Signature-256', '')
-        if not verify_signature(channel.config['app_secret'], body, signature, 'sha256'):
-            circuit_breaker.record_failure(channel.id)
-            raise HTTPException(status_code=401, detail="Invalid signature")
+    # Detect provider type from config
+    provider = channel.config.get("provider", "cloud_api")
+    is_cloud = provider == "cloud_api"
     
+    if is_cloud:
+        # Cloud API: Verify signature if app_secret configured
+        if channel.config.get('app_secret'):
+            signature = request.headers.get('X-Hub-Signature-256', '')
+            
+            from backend.services.channels.whatsapp_unified import UnifiedWhatsAppAdapter
+            if not UnifiedWhatsAppAdapter.verify_cloud_signature(
+                channel.config['app_secret'], body, signature
+            ):
+                circuit_breaker.record_failure(channel.id)
+                raise HTTPException(status_code=401, detail="Invalid signature")
+        
+        # Parse Cloud API payload
+        try:
+            payload = json.loads(body)
+            
+            from backend.services.channels.whatsapp_unified import UnifiedWhatsAppAdapter
+            parsed = UnifiedWhatsAppAdapter.parse_cloud_webhook(payload)
+            
+        except (json.JSONDecodeError, ValueError) as e:
+            raise HTTPException(status_code=400, detail=f"Invalid payload: {e}")
+            
+    else:
+        # Web Bridge: Plain JSON, no signature
+        try:
+            payload = json.loads(body)
+            
+            # Bridge format is simpler
+            parsed = {
+                'sender_id': payload.get('sender', '').split('@')[0],
+                'sender_name': payload.get('pushName') or payload.get('sender', '').split('@')[0],
+                'content': payload.get('content', ''),
+                'message_type': payload.get('messageType', 'text'),
+                'media_url': payload.get('mediaUrl'),
+                'timestamp': payload.get('timestamp'),
+                'message_id': payload.get('id'),
+                'raw_payload': payload
+            }
+            
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=400, detail="Invalid JSON")
+    
+    # Skip if no content
+    if not parsed.get('content') and not parsed.get('media_url'):
+        return {"status": "ignored", "reason": "no_content"}
+    
+    # Process message
     try:
-        payload = json.loads(body)
+        background_tasks.add_task(
+            ChannelManager.receive_message,
+            channel_id=channel.id,
+            sender_id=parsed['sender_id'],
+            sender_name=parsed.get('sender_name'),
+            content=parsed['content'],
+            message_type=parsed.get('message_type', 'text'),
+            media_url=parsed.get('media_url'),
+            raw_payload=parsed.get('raw_payload', payload)
+        )
         
-        # Handle different webhook types
-        entry = payload.get('entry', [{}])[0]
-        changes = entry.get('changes', [{}])[0]
-        value = changes.get('value', {})
+        return {
+            "status": "received",
+            "provider": provider,
+            "sender": parsed['sender_id']
+        }
         
-        # Skip if no messages (e.g., status updates)
-        if 'messages' not in value:
-            return {"status": "ignored", "reason": "no_messages"}
-        
-        messages = value.get('messages', [])
-        contacts = value.get('contacts', [{}])
-        
-        for msg in messages:
-            # Skip non-text messages that aren't supported
-            msg_type = msg.get('type', 'text')
-            if msg_type not in ['text', 'image', 'document', 'audio', 'video', 'location', 'contacts']:
-                continue
-            
-            # Find sender info
-            sender_id = msg.get('from')
-            contact = next((c for c in contacts if c.get('wa_id') == sender_id), {})
-            profile = contact.get('profile', {})
-            
-            # Parse with rich media support
-            parsed = WhatsAppAdapter.parse_webhook({'entry': [{'changes': [{'value': {'messages': [msg], 'contacts': [contact]}}]}]})
-            
-            background_tasks.add_task(
-                ChannelManager.receive_message,
-                channel_id=channel.id,
-                sender_id=parsed['sender_id'],
-                sender_name=parsed['sender_name'],
-                content=parsed['content'],
-                message_type=parsed['message_type'],
-                media_url=parsed.get('media_url'),
-                raw_payload={'entry': [{'changes': [{'value': {'messages': [msg], 'contacts': [contact]}}]}]}
-            )
-        
-        return {"status": "received", "messages_processed": len(messages)}
-        
-    except json.JSONDecodeError:
-        raise HTTPException(status_code=400, detail="Invalid JSON")
     except Exception as e:
         circuit_breaker.record_failure(channel.id)
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ═══════════════════════════════════════════════════════════
