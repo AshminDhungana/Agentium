@@ -1,4 +1,4 @@
-# Full Stack Developer Workflow
+# AI Developer Workflow
 
 > A professional, repeatable pattern for building features and fixing bugs using AI agents and AI chatbots — without losing control of quality, correctness, or your codebase.
 
@@ -417,9 +417,9 @@ If you started a new session, your first message should always be to load the ap
 
 Ask the agent to confirm its understanding before it begins. This surfaces any misinterpretation of the handoff document before it results in a bad code change.
 
-Loop back to Phase 2, if you have already loaded skills skip that step in Phase 2. 
-You should continue till the sub-task complition.
-For a new sub-task Start again from Phase 1. 
+Now, loop back to Phase 2, if you have already loaded the required skills skip that step in Phase 2. 
+You should continue till the task complition.
+For a new task start again from Phase 1. 
 
 ---
 
