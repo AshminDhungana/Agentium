@@ -21,4 +21,6 @@ venv/
 .venv/
 
 # Legacy
-#docs/helper_skills
+docs/helper_skills
+CLAUDE.md
+.claude/
