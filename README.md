@@ -220,6 +220,14 @@ open http://localhost:3000
 
 ---
 
+## 🏠 Self-Hosting Guide
+
+For detailed self-hosting instructions, see:
+
+👉 [Self-Hosting Documentation](./docs/selfhost.md)
+
+---
+
 ## 📖 Usage Guide
 
 ### 1. The Genesis (First Run)

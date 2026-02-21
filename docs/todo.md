@@ -881,13 +881,13 @@ mcp==1.0.0    # Official MCP Python SDK
 - ✅ `ChatPage.tsx` - WebSocket chat with Head of Council
 - ✅ `SettingsPage.tsx` - Password management
 - ✅ `MonitoringPage.tsx` - System health metrics
+- ✅ `ConstitutionPage.tsx` - Full Markdown viewer/editor
+- ✅ `ChannelsPage.tsx` - Multi-channel management
+- ✅ `ModelsPage.tsx` - AI provider configuration
 
 **Pending:**
 
-- [ ] `ConstitutionPage.tsx` - Full Markdown viewer/editor
 - [ ] `VotingPage.tsx` - Active votes and history
-- [ ] `ChannelsPage.tsx` - Multi-channel management
-- [ ] `ModelsPage.tsx` - AI provider configuration
 
 ### 7.2 Agent Tree Visualization ✅
 
@@ -929,7 +929,7 @@ mcp==1.0.0    # Official MCP Python SDK
 
 **Features:**
 
-- [ ] Render Markdown with article navigation
+- ✅ Render Markdown with article navigation
 - [ ] Highlight recently amended sections (last 7 days)
 - [ ] Semantic search across constitution (Vector DB)
 - [ ] "Propose Amendment" button → opens modal with diff editor
