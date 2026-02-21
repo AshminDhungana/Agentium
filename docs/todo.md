@@ -627,56 +627,72 @@ class CritiqueReview(BaseEntity):
 - [x] Critic decisions logged in audit trail
 - [x] Critics use different AI models than executors (orthogonal failure modes)
 
-### 6.3 Pre-Declared Acceptance Criteria 🆕 (PENDING - HIGH PRIORITY) (HERE)
+### 6.3 Pre-Declared Acceptance Criteria 🆕 ✅
 
 **Goal:** Define success criteria BEFORE work begins
 
 **Implementation:**
 
-- [ ] Add `acceptance_criteria` JSON field to task proposals
-- [ ] Council votes on BOTH plan AND success criteria
-- [ ] Store as structured, machine-validatable JSON
+- [x] Add `acceptance_criteria` JSON field to task proposals
+- [x] Council votes on BOTH plan AND success criteria
+- [x] Store as structured, machine-validatable JSON
 
 **Database Migration:**
 
 ```python
-# Add to existing Task model (non-breaking)
+# Added to existing Task model (non-breaking)
 class Task:
     # ... existing fields ...
-    acceptance_criteria: Optional[JSON] = None  # NEW
-    veto_authority: Optional[str] = None  # Which critic validates
+    acceptance_criteria = Column(JSON, nullable=True)  # ✅
+    veto_authority = Column(String(20), nullable=True)  # ✅
 ```
 
 **Criterion Structure:**
 
 ```python
+@dataclass
 class AcceptanceCriterion:
     metric: str  # "sql_syntax_valid", "result_schema_matches"
     threshold: Any  # Expected value or range
-    validator: str  # Which critic agent validates
-    is_mandatory: bool
+    validator: CriterionValidator  # code | output | plan
+    is_mandatory: bool = True
+    description: str = ""
 ```
+
+**Implementation Details:**
+
+- ✅ `acceptance_criteria.py` — `AcceptanceCriterion`, `CriterionResult`, `AcceptanceCriteriaService`
+- ✅ `AcceptanceCriteriaService.parse_and_validate()` — validates raw JSON from API
+- ✅ `AcceptanceCriteriaService.evaluate_criteria()` — rule-based checks (sql_syntax, result_not_empty, length, contains, boolean, generic)
+- ✅ `AcceptanceCriteriaService.aggregate()` — counts + mandatory-failure flag
+- ✅ `api/schemas/task.py` — Pydantic `AcceptanceCriterionSchema` with validators (unique metrics, valid validator values)
+- ✅ `api/routes/tasks.py` — validates + stores on create and update, veto_authority validation
+- ✅ `critic_agents.py` — loads criteria from Task, runs deterministic checks before AI review, fast-rejects on mandatory failures
+- ✅ `CritiqueReview` entity stores `criteria_results`, `criteria_evaluated`, `criteria_passed`
+- ✅ DB migration (`001_schema.py`) includes `acceptance_criteria` column
+
+**Tests:** ✅ 42 unit tests in `backend/tests/test_acceptance_criteria.py` (all passing)
 
 **Acceptance Criteria:**
 
-- [ ] All new tasks require explicit acceptance criteria
-- [ ] Criteria are machine-validatable where possible
-- [ ] Human-readable criteria displayed in dashboard
-- [ ] Criteria stored in task metadata
+- [x] All new tasks require explicit acceptance criteria
+- [x] Criteria are machine-validatable where possible
+- [x] Human-readable criteria displayed in dashboard
+- [x] Criteria stored in task metadata
 
-### 6.4 Context Ray Tracing - Selective Information Flow 🆕 (PENDING)
+### 6.4 Context Ray Tracing - Selective Information Flow 🆕 ✅
 
-**File:** `backend/services/message_bus.py` (Enhancement)
+**File:** `backend/services/message_bus.py` (Enhancement) ✅
 
 **Problem:** Current system shares full context across all agents
-**Solution:** Role-based context visibility
+**Solution:** Role-based context visibility via `ContextRayTracer` class
 
 **Message Visibility Controls:**
 
-- **Planners** (Head/Council): User intent, constraints, high-level goals
-- **Executors** (Lead/Task): Step-by-step plan, prior step outputs ONLY
-- **Critics** (4xxxx/5xxxx/6xxxx): Execution results + acceptance criteria ONLY
-- **Siblings**: NO visibility into each other's work
+- ✅ **Planners** (Head/Council): User intent, constraints, high-level goals
+- ✅ **Executors** (Lead/Task): Step-by-step plan, prior step outputs ONLY
+- ✅ **Critics** (4xxxx/5xxxx/6xxxx): Execution results + acceptance criteria ONLY
+- ✅ **Siblings**: NO visibility into each other's work (via `visible_to` patterns)
 
 **Enhanced Message Schema:**
 
@@ -684,16 +700,31 @@ class AcceptanceCriterion:
 class AgentMessage:
     content: str
     visible_to: List[str]  # Agent ID patterns: ["2*", "3*"]
-    message_type: str  # "PLAN", "EXECUTION", "CRITIQUE"
-    context_scope: str  # "FULL", "SUMMARY", "SCHEMA_ONLY"  # NEW
+    message_type: str  # "plan", "execution", "critique", "critique_result"
+    context_scope: str  # "FULL", "SUMMARY", "SCHEMA_ONLY"
 ```
+
+**Implementation Details:**
+
+- ✅ `ContextRayTracer` class in `message_bus.py` (stateless, all `@classmethod`)
+- ✅ `get_agent_role()` — maps prefix → PLANNER / EXECUTOR / CRITIC
+- ✅ `is_visible_to()` — dual check: glob pattern match + role-based type filter
+- ✅ `filter_messages()` — filters + applies `context_scope` automatically
+- ✅ `apply_scope()` — FULL / SUMMARY (truncate to 200 chars) / SCHEMA_ONLY
+- ✅ `build_context()` — convenience wrapper for filter + scope
+- ✅ Schema extended: `visible_to`, `context_scope`, critic IDs (4-6), new message types
+- ✅ `HierarchyValidator` extended with critic tiers 4/5/6
+- ✅ Wired into `consume_stream()` for automatic filtering on message consumption
+
+**Tests:** ✅ 57 unit tests in `backend/tests/test_context_ray_tracing.py` (all passing)
 
 **Acceptance Criteria:**
 
-- [ ] Agents only receive context relevant to their role
-- [ ] Sibling task isolation enforced
-- [ ] Context window optimization (reduced token usage)
-- [ ] No cross-contamination between execution branches
+- [x] Agents only receive context relevant to their role
+- [x] Sibling task isolation enforced
+- [x] Context window optimization (reduced token usage)
+- [x] No cross-contamination between execution branches
+
 
 ### 6.5 Checkpointing & Time-Travel Recovery 🆕 (PENDING)
 

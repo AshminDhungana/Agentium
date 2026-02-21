@@ -1,11 +1,17 @@
 """
 Message Bus for Agentium - Redis-backed hierarchical routing.
 Enforces: Task(3xxxx) -> Lead(2xxxx) -> Council(1xxxx) -> Head(0xxxx)
+
+Section 6.4 – Context Ray Tracing:
+  Adds role-based context visibility so each agent tier only
+  receives messages relevant to its function (Planner / Executor / Critic).
+  Sibling agents are mutually blind to each other's work.
 """
 
 import os
 import json
 import asyncio
+import fnmatch
 import redis.asyncio as redis
 from typing import Optional, Dict, Any, List, Callable, Set
 from datetime import datetime
@@ -36,6 +42,9 @@ class HierarchyValidator:
         '1': 1,  # Council
         '2': 2,  # Lead
         '3': 3,  # Task
+        '4': 4,  # Code Critic    (Section 6.4)
+        '5': 5,  # Output Critic  (Section 6.4)
+        '6': 6,  # Plan Critic    (Section 6.4)
     }
     
     @classmethod
@@ -96,6 +105,155 @@ class HierarchyValidator:
         if tier in prefix_map:
             return f"{prefix_map[tier]}xxxx"
         return "00000"
+
+
+class ContextRayTracer:
+    """
+    Section 6.4 – Selective Information Flow.
+
+    Stateless helper that determines which messages an agent may see
+    based on its *role* (Planner / Executor / Critic) and per-message
+    ``visible_to`` patterns.  Sibling isolation is enforced by checking
+    that the consuming agent matches at least one ``visible_to`` glob.
+
+    Usage::
+
+        tracer = ContextRayTracer()
+        visible = tracer.filter_messages(all_msgs, "30001")
+    """
+
+    # ── Role constants ──────────────────────────────────────────────
+    ROLE_PLANNER = "PLANNER"
+    ROLE_EXECUTOR = "EXECUTOR"
+    ROLE_CRITIC = "CRITIC"
+
+    # ── Message-type allow-lists per role ────────────────────────────
+    ROLE_VISIBILITY: Dict[str, Set[str]] = {
+        ROLE_PLANNER: {
+            "intent", "vote_proposal", "vote_cast",
+            "constitution_query", "escalation", "notification",
+            "liquidation", "knowledge_share", "heartbeat",
+            "plan", "idle_task",
+        },
+        ROLE_EXECUTOR: {
+            "delegation", "plan", "execution",
+            "escalation", "notification", "heartbeat",
+            "idle_task",
+        },
+        ROLE_CRITIC: {
+            "execution", "critique", "critique_result",
+            "notification", "heartbeat",
+        },
+    }
+
+    # Prefix → role mapping
+    _PREFIX_ROLE: Dict[str, str] = {
+        '0': ROLE_PLANNER,
+        '1': ROLE_PLANNER,
+        '2': ROLE_EXECUTOR,
+        '3': ROLE_EXECUTOR,
+        '4': ROLE_CRITIC,
+        '5': ROLE_CRITIC,
+        '6': ROLE_CRITIC,
+    }
+
+    # ── Public API ──────────────────────────────────────────────────
+
+    @classmethod
+    def get_agent_role(cls, agent_id: str) -> str:
+        """Map an agentium ID to its role category.
+
+        Returns one of ROLE_PLANNER, ROLE_EXECUTOR, ROLE_CRITIC.
+        """
+        if not agent_id or agent_id == "broadcast":
+            return cls.ROLE_PLANNER  # broadcast is Head-only
+        return cls._PREFIX_ROLE.get(agent_id[0], cls.ROLE_EXECUTOR)
+
+    @classmethod
+    def is_visible_to(cls, message: AgentMessage, agent_id: str) -> bool:
+        """Decide whether *agent_id* is allowed to see *message*.
+
+        Two independent checks must BOTH pass:
+        1. The message's ``visible_to`` patterns include the agent.
+        2. The message's ``message_type`` is in the agent role's allow-list.
+        """
+        # 1. visible_to glob check
+        patterns = message.visible_to or ["*"]
+        glob_match = any(
+            fnmatch.fnmatch(agent_id, pat) for pat in patterns
+        )
+        if not glob_match:
+            return False
+
+        # 2. Role-based message-type check
+        role = cls.get_agent_role(agent_id)
+        allowed_types = cls.ROLE_VISIBILITY.get(role, set())
+        return message.message_type in allowed_types
+
+    @classmethod
+    def filter_messages(
+        cls,
+        messages: List[AgentMessage],
+        agent_id: str,
+    ) -> List[AgentMessage]:
+        """Return only the messages that *agent_id* is permitted to see.
+
+        Each surviving message also has its ``context_scope`` applied via
+        :meth:`apply_scope`.
+        """
+        visible: List[AgentMessage] = []
+        for msg in messages:
+            if cls.is_visible_to(msg, agent_id):
+                visible.append(cls.apply_scope(msg, msg.context_scope))
+
+        total = len(messages)
+        kept = len(visible)
+        if total > 0 and kept < total:
+            print(
+                f"[ContextRayTracer] Agent {agent_id}: "
+                f"{kept}/{total} messages visible"
+            )
+        return visible
+
+    @classmethod
+    def apply_scope(
+        cls,
+        message: AgentMessage,
+        scope: str,
+    ) -> AgentMessage:
+        """Return a (potentially) reduced copy of *message* based on *scope*.
+
+        * ``FULL``        – original message, unchanged.
+        * ``SUMMARY``     – content truncated to 200 characters.
+        * ``SCHEMA_ONLY`` – content cleared; only metadata/structure kept.
+        """
+        if scope == "FULL":
+            return message
+
+        scoped = message.model_copy()
+        if scope == "SUMMARY":
+            if len(scoped.content) > 200:
+                scoped.content = scoped.content[:200] + "…"
+        elif scope == "SCHEMA_ONLY":
+            scoped.content = ""
+            scoped.payload = {
+                k: type(v).__name__
+                for k, v in (message.payload or {}).items()
+            }
+        return scoped
+
+    @classmethod
+    def build_context(
+        cls,
+        messages: List[AgentMessage],
+        agent_id: str,
+    ) -> List[AgentMessage]:
+        """High-level convenience: filter + scope in one call.
+
+        Identical to :meth:`filter_messages` (scope is applied inside
+        ``filter_messages`` already), provided for semantic clarity.
+        """
+        return cls.filter_messages(messages, agent_id)
 
 
 class MessageBus:
@@ -305,10 +463,20 @@ class MessageBus:
         except Exception as e:
             print(f"Pub/Sub listen error for {agent_id}: {e}")
     
-    async def consume_stream(self, agent_id: str, count: int = 1) -> List[AgentMessage]:
+    async def consume_stream(
+        self,
+        agent_id: str,
+        count: int = 1,
+        apply_ray_tracing: bool = True,
+    ) -> List[AgentMessage]:
         """
         Consume messages from agent's inbox (non-blocking).
         Used for polling pattern or batch processing.
+
+        Section 6.4: When *apply_ray_tracing* is ``True`` (default),
+        the returned list is filtered through :class:`ContextRayTracer`
+        so that only messages the agent's role is permitted to see are
+        included, and each message's ``context_scope`` is applied.
         """
         stream_key = f"agent:{agent_id}:inbox"
         group_name = f"group:{agent_id}"
@@ -328,8 +496,18 @@ class MessageBus:
                         # Convert back to AgentMessage
                         msg_data = dict(fields)
                         msg_data['message_id'] = msg_data.get('message_id', msg_id)
+                        # Deserialise visible_to from JSON string
+                        if 'visible_to' in msg_data and isinstance(msg_data['visible_to'], str):
+                            try:
+                                msg_data['visible_to'] = json.loads(msg_data['visible_to'])
+                            except (json.JSONDecodeError, TypeError):
+                                msg_data['visible_to'] = ['*']
                         results.append(AgentMessage(**msg_data))
-            
+
+            # Section 6.4: apply role-based context filtering
+            if apply_ray_tracing and results:
+                results = ContextRayTracer.filter_messages(results, agent_id)
+
             return results
         except Exception as e:
             print(f"Stream consume error: {e}")
@@ -399,7 +577,10 @@ class MessageBus:
             )
             
             # Get hierarchical context based on sender tier
-            tier_map = {'0': 'head', '1': 'council', '2': 'lead', '3': 'task'}
+            tier_map = {
+                '0': 'head', '1': 'council', '2': 'lead', '3': 'task',
+                '4': 'critic', '5': 'critic', '6': 'critic',
+            }
             agent_type = tier_map.get(message.sender_id[0], 'task')
             
             context = store.query_hierarchical_context(
