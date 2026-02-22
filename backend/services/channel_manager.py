@@ -43,6 +43,8 @@ from backend.models.entities.channels import ExternalChannel, ExternalMessage, C
 from backend.services.channels.whatsapp_unified import UnifiedWhatsAppAdapter
 from backend.models.entities import Agent, HeadOfCouncil, Task, TaskType, TaskPriority
 from backend.models.entities.audit import AuditLog, AuditLevel, AuditCategory
+from backend.models.entities.chat_message import ChatMessage, Conversation
+from backend.models.entities.user import User
 from backend.services.model_provider import ModelService
 
 
@@ -949,8 +951,72 @@ class ChannelManager:
             db.add(message)
             channel.messages_received += 1
             channel.last_message_at = datetime.utcnow()
+            
+            # --- UNIFIED INBOX SYNCHRONISATION ---
+            # Create parallel unified ChatMessage for the web interface
+            user_id = channel.user_id
+            
+            # Fallback to first active admin if channel has no owner
+            if not user_id:
+                fallback_user = db.query(User).filter_by(is_admin=True, is_active=True).first()
+                if fallback_user:
+                    user_id = fallback_user.id
+                    
+            if user_id:
+                # Find or create active conversation for this user
+                conversation = db.query(Conversation).filter_by(
+                    user_id=user_id, 
+                    is_active=True
+                ).order_by(Conversation.updated_at.desc()).first()
+                
+                if not conversation:
+                    conversation = Conversation(
+                        user_id=user_id,
+                        title=f"{channel.name} Conversation",
+                        is_active=True
+                    )
+                    db.add(conversation)
+                    db.flush()
+                
+                # Create the unified message
+                unified_msg = ChatMessage.create_user_message(
+                    user_id=user_id,
+                    content=content,
+                    conversation_id=conversation.id,
+                    attachments=rich_media.attachments if rich_media else None,
+                    sender_channel=channel.channel_type.value,
+                    message_type=message_type,
+                    media_url=media_url,
+                    external_message_id=message.id
+                )
+                db.add(unified_msg)
+                
+                # Update conversation
+                conversation.last_message_at = datetime.utcnow()
+                
+                # Defer websocket broadcast until after commit
+                has_unified_msg = True
+            else:
+                has_unified_msg = False
+            
             db.commit()
             db.refresh(message)
+            
+            if has_unified_msg:
+                # Broadcast the new message to web clients
+                try:
+                    from backend.api.routes.websocket import manager as ws_manager
+                    # Re-fetch the message to get its generated ID and timestamps
+                    db.refresh(unified_msg)
+                    asyncio.create_task(
+                        ws_manager.broadcast({
+                            "type": "message_created",
+                            "message": unified_msg.to_dict()
+                        })
+                    )
+                except Exception as eval_err:
+                    print(f"[ChannelManager] WebSocket Unified Inbox broadcast failed: {eval_err}")
+            # -------------------------------------
 
             # Record success
             circuit_breaker.record_success(channel_id)
@@ -1170,6 +1236,34 @@ class ChannelManager:
                     circuit_breaker.record_success(channel.id)
                     message.mark_responded(response_content, agent_id)
                     
+                    # --- UNIFIED INBOX SYNCHRONISATION ---
+                    # Record the outgoing response as a system/agent ChatMessage
+                    if channel.user_id:
+                        # Find the active conversation for this user
+                        conversation = db.query(Conversation).filter_by(
+                            user_id=channel.user_id, 
+                            is_active=True
+                        ).order_by(Conversation.updated_at.desc()).first()
+                        
+                        if conversation:
+                            # We create a ChatMessage from the agent
+                            agent_msg = ChatMessage(
+                                user_id=channel.user_id,
+                                role="head_of_council",  # Assume head of council or system
+                                content=response_content,
+                                conversation_id=conversation.id,
+                                agent_id=agent_id,
+                                attachments=rich_media.attachments if rich_media else None,
+                                sender_channel=channel.channel_type.value,
+                                message_type="rich_text" if rich_media else "text",
+                                media_url=None,
+                                external_message_id=message_id,
+                                message_metadata={"source": "agent", "type": "outbound_sync"}
+                            )
+                            db.add(agent_msg)
+                            conversation.last_message_at = datetime.utcnow()
+                    # -------------------------------------
+                    
                     AuditLog.log(
                         level=AuditLevel.INFO,
                         category=AuditCategory.COMMUNICATION,
@@ -1302,6 +1396,48 @@ class ChannelManager:
             'overall_status': 'healthy' if circuit_metrics['circuit_state'] == 'closed' and 
                               circuit_metrics['success_rate'] > 0.8 else 'degraded'
         }
+
+    @staticmethod
+    async def broadcast_to_channels(user_id: int, content: str, db: Session, is_silent: bool = True) -> int:
+        """
+        Broadcast a Web-Dashboard-originated message out to all active external channels 
+        owned by the user. Supports silent delivery to avoid notification duplication loops.
+        """
+        channels = db.query(ExternalChannel).filter_by(
+            user_id=user_id,
+            status=ChannelStatus.ACTIVE
+        ).all()
+        
+        broadcast_count = 0
+        
+        for channel in channels:
+            try:
+                # Basic implementations. In the future, richer payload mapping can occur here.
+                # Silent delivery would require platform-specific flags inside the adapters
+                # (e.g. disable_notification=True for Telegram). 
+                # For now, we reuse the generic send logic and pass along content.
+                # In a robust implementation, the adapter is updated to accept an `is_silent` flag.
+                
+                # Fetch last conversing partner from that channel (simplified approach)
+                # In a real scenario we need the specific recipient ID.
+                last_msg = db.query(ExternalMessage).filter_by(
+                    channel_id=channel.id
+                ).order_by(ExternalMessage.created_at.desc()).first()
+                
+                if last_msg:
+                    success = await ChannelManager._send_plain_text(
+                        channel.channel_type, 
+                        channel.config, 
+                        last_msg.sender_id, # Re-use the last known sender ID
+                        content
+                    )
+                    if success:
+                        broadcast_count += 1
+                        
+            except Exception as e:
+                print(f"[ChannelManager] Broadcast failed for channel {channel.id}: {e}")
+                
+        return broadcast_count
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

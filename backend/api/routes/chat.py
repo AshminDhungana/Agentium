@@ -325,6 +325,26 @@ You are speaking directly to the Sovereign. Address them respectfully and provid
             }
         })}\n\n"""
         
+        # --- UNIFIED INBOX BROADCAST ---
+        # Broadcast streaming response to user's external channels
+        from backend.models.entities.user import User
+        from backend.services.channel_manager import ChannelManager
+        
+        # We need the user so we can broadcast to their channels.
+        # Find an active admin user (in multi-user this comes from the connection/auth context)
+        sovereign_user = db.query(User).filter_by(is_admin=True, is_active=True).first()
+        if sovereign_user:
+            import asyncio
+            asyncio.create_task(
+                ChannelManager.broadcast_to_channels(
+                    user_id=sovereign_user.id,
+                    content=full_text,
+                    db=db,
+                    is_silent=True
+                )
+            )
+        # -------------------------------
+        
         # Log the interaction
         await ChatService.log_interaction(
             head_agentium_id,

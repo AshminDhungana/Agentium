@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Optional, Dict, Any
 import uuid
 
-from sqlalchemy import Column, String, DateTime, Text, ForeignKey, JSON, Integer, Index
+from sqlalchemy import Column, String, DateTime, Text, ForeignKey, JSON, Integer, Index, Boolean
 from sqlalchemy.orm import relationship
 
 from backend.models.entities.base import Base   
@@ -32,6 +32,13 @@ class ChatMessage(Base):
     
     # Optional attachments (files, images, etc.)
     attachments = Column(JSON, nullable=True)
+    
+    # --- Unified Inbox Fields ---
+    sender_channel = Column(String(50), nullable=True)    # 'web', 'whatsapp', 'slack', etc.
+    message_type = Column(String(50), default="text", nullable=True) # 'text', 'image', 'video', etc.
+    media_url = Column(Text, nullable=True)               # Canonical URL if media
+    silent_delivery = Column(Boolean, default=False, nullable=True)  # True = do not push notification
+    external_message_id = Column(String(100), nullable=True)         # ID from external system to prevent loops
     
     # Additional metadata
     message_metadata = Column(JSON, nullable=True)
@@ -68,6 +75,11 @@ class ChatMessage(Base):
             "attachments": self.attachments,
             "metadata": self.message_metadata,
             "agent_id": self.agent_id,
+            "sender_channel": self.sender_channel,
+            "message_type": self.message_type,
+            "media_url": self.media_url,
+            "silent_delivery": self.silent_delivery,
+            "external_message_id": self.external_message_id,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
@@ -78,7 +90,12 @@ class ChatMessage(Base):
         user_id: str,
         content: str,
         conversation_id: Optional[str] = None,
-        attachments: Optional[list] = None
+        attachments: Optional[list] = None,
+        # Unified Inbox params
+        sender_channel: str = "web",
+        message_type: str = "text",
+        media_url: Optional[str] = None,
+        external_message_id: Optional[str] = None
     ) -> "ChatMessage":
         """Factory method for user messages."""
         return cls(
@@ -87,7 +104,11 @@ class ChatMessage(Base):
             content=content,
             conversation_id=conversation_id,
             attachments=attachments,
-            message_metadata={"source": "web"}
+            message_metadata={"source": sender_channel},
+            sender_channel=sender_channel,
+            message_type=message_type,
+            media_url=media_url,
+            external_message_id=external_message_id
         )
     
     @classmethod
@@ -145,6 +166,9 @@ class Conversation(Base):
     updated_at = Column(DateTime, onupdate=datetime.utcnow)
     last_message_at = Column(DateTime, default=datetime.utcnow)
     
+    # Unified Inbox status
+    is_active = Column(Boolean, default=True, nullable=False)
+    
     # Soft delete
     is_deleted = Column(String(1), default='N')
     is_archived = Column(String(1), default='N')
@@ -166,6 +190,7 @@ class Conversation(Base):
             "user_id": self.user_id,
             "title": self.title,
             "context": self.context,
+            "is_active": self.is_active,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
             "last_message_at": self.last_message_at.isoformat() if self.last_message_at else None,

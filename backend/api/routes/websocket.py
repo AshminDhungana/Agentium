@@ -183,6 +183,17 @@ class ConnectionManager:
             "timestamp":        datetime.utcnow().isoformat(),
         })
 
+    async def emit_message_created(self, message_data: Dict[str, Any]) -> None:
+        """
+        Fired when a new unified `ChatMessage` is created, typically arriving from an external channel.
+        This forces the Web Dashboard to append the new message instantly.
+        """
+        await self.broadcast({
+            "type": "message_created",
+            "message": message_data,
+            "timestamp": datetime.utcnow().isoformat(),
+        })
+
     # ── NEW events ───────────────────────────────────────────────────────────
 
     async def emit_knowledge_submitted(

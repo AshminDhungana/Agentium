@@ -40,6 +40,9 @@ class ExternalChannel(BaseEntity):
     
     __tablename__ = 'external_channels'
     
+    # Multi-User Isolation
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=True)
+    
     # Basic info
     name = Column(String(100), nullable=False)
     channel_type = Column(Enum(ChannelType), nullable=False)
@@ -74,6 +77,7 @@ class ExternalChannel(BaseEntity):
         base = super().to_dict()
         base.update({
             'name': self.name,
+            'user_id': self.user_id,
             'type': self.channel_type.value,
             'status': self.status.value,
             'config': {
