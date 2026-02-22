@@ -14,6 +14,17 @@ import {
     CheckCircle,
     XCircle,
     Download,
+    Brain,
+    BrainCircuit,
+    Cpu,
+    Bot,
+    Atom,
+    Wand2,
+    Network,
+    Layers3,
+    DatabaseZap,
+    Workflow,
+    SlidersHorizontal,
 } from 'lucide-react';
 import { modelsApi } from '../../services/models';
 import type { ModelConfig, ProviderInfo, ProviderType } from '../../types';
@@ -225,20 +236,38 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({ initialConfig,
         }
     };
 
+    // Normalise provider ID for fuzzy matching — handles any casing or separator style
+    const normaliseId = (id: string) => (id || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+    const ProviderIcon = ({ providerId, className = "w-5 h-5 text-white" }: { providerId: string; className?: string }) => {
+        const id = normaliseId(providerId);
+        if (id.includes('openai')   || id.includes('gpt'))      return <Sparkles     className={className} />;
+        if (id.includes('anthropic')|| id.includes('claude'))   return <Brain        className={className} />;
+        if (id.includes('gemini')   || id.includes('google'))   return <Atom         className={className} />;
+        if (id.includes('groq'))                                 return <Zap          className={className} />;
+        if (id.includes('mistral'))                              return <BrainCircuit className={className} />;
+        if (id.includes('together'))                             return <Layers3      className={className} />;
+        if (id.includes('moonshot'))                             return <Wand2        className={className} />;
+        if (id.includes('deepseek'))                             return <DatabaseZap  className={className} />;
+        if (id.includes('local')    || id.includes('ollama'))   return <Server       className={className} />;
+        if (id.includes('custom')   || id.includes('universal'))return <Globe        className={className} />;
+        console.warn(`⚠️ No icon match for provider id: "${providerId}" (normalised: "${id}")`);
+        return <Cpu className={className} />;
+    };
+
     const getProviderGradient = (provider: string) => {
-        const colors: Record<string, string> = {
-            openai:    'from-emerald-500 to-teal-600',
-            anthropic: 'from-orange-500 to-amber-600',
-            gemini:    'from-blue-500 to-indigo-600',
-            groq:      'from-purple-500 to-fuchsia-600',
-            mistral:   'from-rose-500 to-pink-600',
-            together:  'from-cyan-500 to-sky-600',
-            moonshot:  'from-violet-500 to-purple-600',
-            deepseek:  'from-red-500 to-rose-600',
-            local:     'from-slate-500 to-gray-600',
-            custom:    'from-yellow-500 to-orange-600',
-        };
-        return colors[provider] || 'from-gray-500 to-slate-600';
+        const id = normaliseId(provider);
+        if (id.includes('openai')   || id.includes('gpt'))      return 'from-emerald-400 to-teal-600';
+        if (id.includes('anthropic')|| id.includes('claude'))   return 'from-amber-400 to-orange-600';
+        if (id.includes('gemini')   || id.includes('google'))   return 'from-blue-400 to-violet-600';
+        if (id.includes('groq'))                                 return 'from-fuchsia-500 to-purple-700';
+        if (id.includes('mistral'))                              return 'from-sky-400 to-cyan-600';
+        if (id.includes('together'))                             return 'from-rose-400 to-pink-600';
+        if (id.includes('moonshot'))                             return 'from-indigo-400 to-blue-700';
+        if (id.includes('deepseek'))                             return 'from-red-400 to-rose-700';
+        if (id.includes('local')    || id.includes('ollama'))   return 'from-slate-400 to-gray-600';
+        if (id.includes('custom')   || id.includes('universal'))return 'from-yellow-400 to-orange-500';
+        return 'from-gray-500 to-slate-600';
     };
 
     /* ── Shared input class ── */
@@ -291,20 +320,21 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({ initialConfig,
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                             {providers && providers.length > 0 ? (
-                                providers.filter(p => p && p.id !== 'custom').map((provider) => (
+                                providers.filter(p => p && p.id !== 'custom').map((provider) => {
+                                    console.log(`🔍 provider.id="${provider.id}"  normalised="${normaliseId(provider.id)}"  display="${provider.display_name}"`);
+                                    return (
                                     <button
                                         key={provider.id}
                                         onClick={() => selectProvider(provider)}
+                                        data-provider-id={provider.id}
                                         className="group relative bg-white dark:bg-[#161b27] rounded-xl p-5 border border-gray-200 dark:border-[#1e2535] hover:border-gray-300 dark:hover:border-[#2a3347] hover:shadow-md dark:hover:shadow-[0_4px_20px_rgba(0,0,0,0.35)] transition-all duration-150 text-left overflow-hidden"
                                     >
                                         {/* Subtle gradient glow on hover */}
                                         <div className={`absolute inset-0 bg-gradient-to-br ${getProviderGradient(provider.id)} opacity-0 group-hover:opacity-[0.04] transition-opacity duration-300 pointer-events-none`} />
 
                                         {/* Provider icon */}
-                                        <div className={`w-11 h-11 rounded-lg bg-gradient-to-br ${getProviderGradient(provider.id)} flex items-center justify-center mb-4`}>
-                                            {provider.id === 'openai' && <Sparkles className="w-5 h-5 text-white" />}
-                                            {provider.id === 'groq'   && <Zap      className="w-5 h-5 text-white" />}
-                                            {!['openai', 'groq'].includes(provider.id) && <Settings className="w-5 h-5 text-white" />}
+                                        <div className={`w-11 h-11 rounded-lg bg-gradient-to-br ${getProviderGradient(provider.id)} flex items-center justify-center mb-4 shadow-lg`}>
+                                            <ProviderIcon providerId={provider.id} />
                                         </div>
 
                                         <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-1">
@@ -327,7 +357,8 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({ initialConfig,
                                             </div>
                                         )}
                                     </button>
-                                ))
+                                    );
+                                })
                             ) : (
                                 <div className="col-span-full text-center py-16 text-sm text-gray-500 dark:text-gray-400">
                                     No providers available. Please check your connection.
@@ -375,13 +406,20 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({ initialConfig,
                 </button>
 
                 {/* Header */}
-                <div className="mb-8">
-                    <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-1">
-                        Configure {selectedProvider?.display_name || 'Custom Provider'}
-                    </h1>
-                    <p className="text-gray-500 dark:text-gray-400 text-sm">
-                        Set up your API credentials and model preferences.
-                    </p>
+                <div className="mb-8 flex items-center gap-4">
+                    {(selectedProvider || isUniversal) && (
+                        <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${getProviderGradient(selectedProvider?.id || 'custom')} flex items-center justify-center shadow-lg flex-shrink-0`}>
+                            <ProviderIcon providerId={selectedProvider?.id || 'custom'} />
+                        </div>
+                    )}
+                    <div>
+                        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-1">
+                            Configure {selectedProvider?.display_name || 'Custom Provider'}
+                        </h1>
+                        <p className="text-gray-500 dark:text-gray-400 text-sm">
+                            Set up your API credentials and model preferences.
+                        </p>
+                    </div>
                 </div>
 
                 {/* Form card */}

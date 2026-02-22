@@ -110,13 +110,16 @@ export function MainLayout() {
                 </div>
 
                 {/* Navigation */}
-                <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+                <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
                     {navItems.map((item) => (
+                        <div key={item.path}>
+                            {item.variant === 'danger' && (
+                                <div className="my-2 border-t border-gray-200 dark:border-[#1e2535]" />
+                            )}
                         <NavLink
-                            key={item.path}
                             to={item.path}
                             className={({ isActive }) =>
-                                `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
+                                `flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
                                     item.variant === 'danger'
                                         ? isActive
                                             ? 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300 border border-red-200 dark:border-red-500/20'
@@ -127,14 +130,15 @@ export function MainLayout() {
                                 }`
                             }
                         >
-                            <item.icon className={`w-5 h-5 flex-shrink-0 ${item.variant === 'danger' ? 'text-red-500' : ''}`} />
+                            <item.icon className={`w-4 h-4 flex-shrink-0 ${item.variant === 'danger' ? 'text-red-500' : ''}`} />
                             <span className="flex-1">{item.label}</span>
                             {item.badge && (
-                                <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full min-w-[20px] text-center">
+                                <span className="bg-red-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
                                     {item.badge > 9 ? '9+' : item.badge}
                                 </span>
                             )}
                         </NavLink>
+                        </div>
                     ))}
                 </nav>
 

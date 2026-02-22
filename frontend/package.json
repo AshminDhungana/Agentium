@@ -18,7 +18,7 @@
     "date-fns": "^3.0.6",
     "framer-motion": "^12.34.0",
     "jwt-decode": "^4.0.0",
-    "lucide-react": "^0.303.0",
+    "lucide-react": "^0.575.0",
     "postcss": "^8.4.32",
     "qrcode.react": "^4.2.0",
     "react": "^18.2.0",

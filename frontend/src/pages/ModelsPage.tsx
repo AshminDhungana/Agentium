@@ -121,8 +121,22 @@ const PROVIDER_META: Record<
     },
 };
 
-const getProviderMeta = (provider: string) =>
-    PROVIDER_META[provider] ?? {
+const normaliseId = (id: string) => (id || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+const getProviderMeta = (provider: string) => {
+    const id = normaliseId(provider);
+    if (id.includes('openai')    || id.includes('gpt'))      return PROVIDER_META.openai;
+    if (id.includes('anthropic') || id.includes('claude'))   return PROVIDER_META.anthropic;
+    if (id.includes('gemini')    || id.includes('google'))   return PROVIDER_META.gemini;
+    if (id.includes('groq'))                                  return PROVIDER_META.groq;
+    if (id.includes('mistral'))                               return PROVIDER_META.mistral;
+    if (id.includes('together'))                              return PROVIDER_META.together;
+    if (id.includes('moonshot'))                              return PROVIDER_META.moonshot;
+    if (id.includes('deepseek'))                              return PROVIDER_META.deepseek;
+    if (id.includes('local')     || id.includes('ollama'))   return PROVIDER_META.local;
+    if (id.includes('custom')    || id.includes('universal'))return PROVIDER_META.custom;
+    console.warn(`⚠️ No provider meta match for: "${provider}" (normalised: "${id}")`);
+    return {
         label: provider,
         color: 'text-blue-600 dark:text-blue-400',
         bg: 'bg-blue-100 dark:bg-blue-500/10',
@@ -130,6 +144,7 @@ const getProviderMeta = (provider: string) =>
         gradient: 'from-blue-500 to-indigo-600',
         icon: <Cpu className="w-5 h-5" />,
     };
+};
 
 /* ─── Status badge ──────────────────────────────────────────────────────── */
 const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
