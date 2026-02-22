@@ -75,6 +75,14 @@ class Settings(BaseSettings):
     # Monitoring
     HEALTH_CHECK_INTERVAL: int = 300  # seconds
     
+    # Remote Executor (Phase 6.6)
+    REMOTE_EXECUTOR_ENABLED: bool = Field(default=True, env="REMOTE_EXECUTOR_ENABLED")
+    SANDBOX_TIMEOUT_SECONDS: int = Field(default=300, env="SANDBOX_TIMEOUT_SECONDS")
+    SANDBOX_MEMORY_MB: int = Field(default=512, env="SANDBOX_MEMORY_MB")
+    SANDBOX_CPU_LIMIT: float = Field(default=1.0, env="SANDBOX_CPU_LIMIT")
+    MAX_CONCURRENT_SANDBOXES: int = Field(default=10, env="MAX_CONCURRENT_SANDBOXES")
+    SANDBOX_NETWORK_ENABLED: bool = Field(default=False, env="SANDBOX_NETWORK_ENABLED")
+    
     @property
     def cors_origins(self) -> list:
         """Parse CORS origins string to list."""

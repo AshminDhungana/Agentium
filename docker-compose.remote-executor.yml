@@ -1,0 +1,53 @@
+# Docker Compose extension for Remote Executor service
+# Usage: docker compose -f docker-compose.yml -f docker-compose.remote-executor.yml up
+version: '3.8'
+
+services:
+  remote-executor:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.remote-executor
+    container_name: agentium-remote-executor
+    privileged: false  # Minimal privileges
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETUID
+      - SETGID
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:noexec,nosuid,size=100m
+      - /var/tmp:noexec,nosuid,size=50m
+    volumes:
+      # Read-only access to execution scripts
+      - ./backend/services/remote_executor:/app/executor:ro
+      # Temporary execution volume (ephemeral)
+      - execution-data:/tmp/executions
+    environment:
+      - EXECUTOR_MODE=sandbox
+      - MAX_EXECUTION_TIME=300
+      - MAX_MEMORY_MB=512
+      - ALLOW_NETWORK=false
+    networks:
+      - agentium-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "print('healthy')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+volumes:
+  execution-data:
+    driver: local

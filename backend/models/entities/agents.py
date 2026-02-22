@@ -103,6 +103,7 @@ class Agent(BaseEntity):
     parent = relationship("Agent", remote_side="Agent.id", backref="subordinates")
     ethos = relationship("Ethos", foreign_keys=[ethos_id])
     preferred_config = relationship("UserModelConfig", foreign_keys=[preferred_config_id])
+    remote_executions = relationship("RemoteExecutionRecord", back_populates="agent", lazy="dynamic")
     __mapper_args__ = {
         'polymorphic_on': agent_type,
         'polymorphic_identity': None

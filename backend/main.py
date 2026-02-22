@@ -58,6 +58,7 @@ from backend.api.routes import capability_routes
 from backend.api.routes import lifecycle_routes
 from backend.api.routes import critics as critics_routes  # Phase 6.2: Critic Agents
 from backend.api.routes import checkpoints as checkpoints_routes  # Phase 6.5: Time-Travel Recovery
+from backend.api.routes import remote_executor as remote_executor_routes  # Phase 6.6: Remote Execution
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -302,6 +303,7 @@ app.include_router(monitoring_router.router, prefix="/api/v1")
 app.include_router(api_keys_routes.router, prefix="/api/v1")
 app.include_router(critics_routes.router, prefix="/api/v1")  # Phase 6.2: Critic Agents
 app.include_router(checkpoints_routes.router, prefix="/api/v1")  # Phase 6.5: Time-Travel Recovery
+app.include_router(remote_executor_routes.router, prefix="/api/v1")  # Phase 6.6: Remote Execution
 
 # ==================== Health Check ====================
 

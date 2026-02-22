@@ -169,6 +169,8 @@ class Task(BaseEntity):
     audit_logs = relationship("TaskAuditLog", back_populates="task", lazy="dynamic")
     # NEW: Event sourcing relationship
     events = relationship("TaskEvent", back_populates="task", lazy="dynamic", order_by="TaskEvent.created_at")
+    # Phase 6.6: Remote code executions
+    remote_executions = relationship("RemoteExecutionRecord", back_populates="task", lazy="dynamic")
     
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

@@ -1,0 +1,36 @@
+# Dockerfile for Remote Executor service
+# Minimal, hardened container for code execution
+
+FROM python:3.11-slim-bookworm
+
+# Security: Create non-root user
+RUN groupadd -r executor && useradd -r -g executor -s /bin/false executor
+
+# Install minimal dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    python3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python packages (minimal set for data processing)
+RUN pip install --no-cache-dir \
+    pandas==2.1.4 \
+    numpy==1.26.3 \
+    polars==0.20.3 \
+    pyarrow==14.0.2
+
+# Set up execution directory
+RUN mkdir -p /tmp/executions && chown executor:executor /tmp/executions
+
+# Copy executor scripts
+COPY services/remote_executor/ /app/executor/
+RUN chown -R executor:executor /app/executor
+
+# Switch to non-root user
+USER executor
+
+# Set working directory
+WORKDIR /tmp/executions
+
+# Default command (health check)
+CMD ["python", "-c", "print('Remote Executor Ready')"]

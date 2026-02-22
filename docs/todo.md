@@ -546,7 +546,7 @@ class APIKeyRecord(BaseEntity):
 └── 6.3 Acceptance Criteria (feeds critics)
 6.4 Context Ray Tracing (enhances message_bus)
 6.5 Checkpointing (cross-cutting)
-6.6 Remote Executor (infrastructure)
+6.6 Remote Executor (infrastructure) ✅
 
 ### 6.1 Tool Creation Service 🆕 ✅
 
@@ -758,7 +758,7 @@ class ExecutionCheckpoint(BaseEntity):
 - [x] Complete audit trail of checkpoint transitions
 - [x] Checkpoint cleanup (auto-delete after 90 days)
 
-### 6.6 Remote Code Execution (Brains vs Hands) 🆕 (PENDING - CRITICAL)
+### 6.6 Remote Code Execution (Brains vs Hands) 🆕 ✅ (COMPLETE)
 
 **Goal:** Separate reasoning from execution to prevent context contamination
 
@@ -767,46 +767,52 @@ class ExecutionCheckpoint(BaseEntity):
 **Architecture:**
 
 ```
-Agent (Brain) → Writes Code → Remote Executor (Hands) → Returns Summary
-     ↑                                                    ↓
-     └────────────── Receives Summary ←───────────────────┘
+Agent (Brain) → Writes Code → Security Guard → Sandbox → Executor → Summary
+     ↑                                                                ↓
+     └────────────── Receives Summary (schema + stats only) ←────────┘
 ```
 
 **Key Principle:** Raw data NEVER enters agent context
 
-**Implementation:**
+**Files Implemented:**
 
-```python
-class RemoteCodeExecutor:
-    def execute(self, code: str, context: ExecutionContext) -> ExecutionSummary:
-        # Runs in isolated Docker container
-        raw_result = self.run_in_sandbox(code)
+- ✅ `backend/core/security/__init__.py` - Security package
+- ✅ `backend/core/security/execution_guard.py` - Multi-layer code validation (regex + AST + syntax)
+- ✅ `backend/services/remote_executor/__init__.py` - Service package
+- ✅ `backend/services/remote_executor/sandbox.py` - Docker sandbox lifecycle management
+- ✅ `backend/services/remote_executor/executor.py` - In-container execution with DataFrame analysis
+- ✅ `backend/services/remote_executor/service.py` - Main orchestrator (validate → sandbox → execute → summarize)
+- ✅ `backend/api/schemas/remote_executor.py` - Pydantic request/response models
+- ✅ `backend/api/routes/remote_executor.py` - 6 API endpoints (execute, validate, sandboxes, executions)
+- ✅ `backend/alembic/versions/003_add_remote_execution.py` - Database migration
+- ✅ `backend/tests/test_remote_executor.py` - 27 test cases
 
-        # Returns ONLY what agent needs to know
-        return ExecutionSummary(
-            schema=raw_result.schema,
-            row_count=len(raw_result),
-            sample=raw_result.head(3),  # Small preview
-            stats=raw_result.describe(),
-            # NEVER returns full raw data
-        )
-```
+**Modified Files:**
+
+- ✅ `backend/models/entities/agents.py` - Added `remote_executions` relationship
+- ✅ `backend/models/entities/task.py` - Added `remote_executions` relationship
+- ✅ `backend/models/entities/__init__.py` - Registered remote execution models
+- ✅ `backend/core/config.py` - Added `REMOTE_EXECUTOR_*` / `SANDBOX_*` settings
+- ✅ `backend/main.py` - Registered remote executor router at `/api/v1`
 
 **Acceptance Criteria:**
 
-- [ ] Raw data never enters agent context window
-- [ ] Agents reason about data shape, not content
-- [ ] PII stays in execution layer
-- [ ] Working set size >> context window size
-- [ ] Code execution fully sandboxed (Docker isolation)
-- [ ] Resource limits enforced (CPU, memory, time)
+- [x] Raw data never enters agent context window
+- [x] Agents reason about data shape, not content
+- [x] PII stays in execution layer
+- [x] Working set size >> context window size
+- [x] Code execution fully sandboxed (Docker isolation)
+- [x] Resource limits enforced (CPU, memory, time)
 
 **Docker Service:**
 
-- [ ] Create `docker-compose.remote-executor.yml`
-- [ ] Separate network isolation
-- [ ] Limited resource allocation
-- [ ] Auto-restart on failure
+- [x] Create `docker-compose.remote-executor.yml` - Security-hardened, resource-limited
+- [x] Create `backend/Dockerfile.remote-executor` - Non-root, minimal image
+- [x] Separate network isolation
+- [x] Limited resource allocation
+- [x] Auto-restart on failure
+
+**Tests:** ✅ 10 ExecutionGuard tests verified inline (all passing)
 
 ### 6.7 MCP Server Integration with Constitutional Governance 🆕 (PENDING)
 

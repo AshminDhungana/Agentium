@@ -111,6 +111,14 @@ from backend.models.entities.checkpoint import (
     CheckpointPhase
 )
 
+from backend.models.entities.remote_execution import (
+    RemoteExecutionRecord,
+    SandboxRecord,
+    ExecutionSummary,
+    ExecutionStatus,
+    SandboxStatus
+)
+
 # All models for Alembic/database creation
 __all__ = [
     # Base
@@ -198,4 +206,11 @@ __all__ = [
     # Checkpointing (Time-Travel)
     'ExecutionCheckpoint',
     'CheckpointPhase',
+
+    # Remote Execution (Brains vs Hands)
+    'RemoteExecutionRecord',
+    'SandboxRecord',
+    'ExecutionSummary',
+    'ExecutionStatus',
+    'SandboxStatus',
 ]
