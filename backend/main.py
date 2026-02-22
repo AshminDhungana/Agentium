@@ -1,6 +1,8 @@
 """
 Agentium Main Application.
 FastAPI backend with eternal idle council + capability registry + lifecycle management.
+
+Phase 6.7: MCP Server Integration — bridge initialised in lifespan step 8.
 """
 import os
 from datetime import datetime
@@ -22,7 +24,7 @@ import backend.services.api_manager as api_manager_module
 from backend.services.model_allocation import init_model_allocator, model_allocator
 from backend.services.token_optimizer import init_token_optimizer, token_optimizer, idle_budget
 
-from backend.models.database import init_db, get_db, check_health
+from backend.models.database import init_db, get_db, check_health, SessionLocal
 from backend.models.entities import Agent, Task, Constitution, UserModelConfig, AgentHealthReport, ViolationReport
 from backend.services.model_provider import ModelService
 from backend.services.chat_service import ChatService
@@ -35,6 +37,10 @@ from backend.services.idle_governance import idle_governance
 from backend.services.token_optimizer import token_optimizer, idle_budget
 from backend.models.entities.task import TaskType, TaskPriority, TaskStatus
 from backend.models.entities.agents import AgentStatus
+
+# Phase 6.7 — MCP Bridge
+from backend.services.mcp_tool_bridge import init_bridge
+from backend.core.tool_registry import tool_registry
 
 # API Routes
 from backend.api.routes import chat as chat_routes
@@ -54,10 +60,12 @@ from backend.api.routes import voice as voice_routes
 from backend.api.routes import monitoring_routes as monitoring_router
 from backend.services.api_key_manager import init_api_key_manager, api_key_manager
 from backend.api.routes import api_keys as api_keys_routes
+from backend.api.routes.mcp_tools import router as mcp_tools_router
+from backend.api.routes import tools as tools_routes  # Phase 6.7: updated tools route
 
 from backend.api.routes import capability_routes
 from backend.api.routes import lifecycle_routes
-from backend.api.routes import critics as critics_routes  # Phase 6.2: Critic Agents
+from backend.api.routes import critics as critics_routes          # Phase 6.2: Critic Agents
 from backend.api.routes import checkpoints as checkpoints_routes  # Phase 6.5: Time-Travel Recovery
 from backend.api.routes import remote_executor as remote_executor_routes  # Phase 6.6: Remote Execution
 
@@ -66,13 +74,14 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 celery = celery_app
 
-class ConstitutionUpdateRequest(BaseModel):
 
+class ConstitutionUpdateRequest(BaseModel):
     """Constitution update request from frontend."""
     preamble: Optional[str] = None
     articles: Optional[Dict[str, Any]] = None
     prohibited_actions: Optional[List[str]] = None
     sovereign_preferences: Optional[Dict[str, Any]] = None
+
 
 def create_default_admin(db: Session):
     """Create default admin user if not exists."""
@@ -101,6 +110,7 @@ def create_default_admin(db: Session):
             logger.info("✅ Admin user permissions updated")
         return False
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
@@ -110,16 +120,17 @@ async def lifespan(app: FastAPI):
     - API Manager & Model Allocation
     - Enhanced Token Optimizer
     - Idle Governance Engine
+    - Capability Registry
+    - MCP Tool Bridge (Phase 6.7)
     """
-    
+
     # ─────────────────────────────────────────────────────────────
     # 1. Initialize Database
     # ─────────────────────────────────────────────────────────────
     try:
         init_db()
         logger.info("✅ Database initialized")
-        
-        # Create default admin user
+
         db = next(get_db())
         try:
             admin_created = create_default_admin(db)
@@ -130,7 +141,7 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"❌ Database initialization failed: {e}")
         raise
-    
+
     # ─────────────────────────────────────────────────────────────
     # 2. Initialize Persistent Council (IDLE GOVERNANCE)
     # ─────────────────────────────────────────────────────────────
@@ -138,11 +149,10 @@ async def lifespan(app: FastAPI):
         db = next(get_db())
         try:
             council_status = persistent_council.initialize_persistent_council(db)
-            
-            # Get the initialized persistent agents for token optimizer
+
             persistent_agents = persistent_council.get_persistent_agents(db)
             agent_list = list(persistent_agents.values())
-            
+
             logger.info(f"✅ Persistent Council initialized: {council_status}")
             logger.info(f"   - Head: {len([a for a in agent_list if a.agentium_id.startswith('0')])}")
             logger.info(f"   - Council: {len([a for a in agent_list if a.agentium_id.startswith('1')])}")
@@ -150,8 +160,8 @@ async def lifespan(app: FastAPI):
             db.close()
     except Exception as e:
         logger.error(f"❌ Persistent Council initialization failed: {e}")
-        # Continue anyway - council can be initialized later
-    
+        # Continue anyway — council can be initialized later
+
     # ─────────────────────────────────────────────────────────────
     # 3. Initialize API Manager (Universal Provider Support)
     # ─────────────────────────────────────────────────────────────
@@ -164,7 +174,7 @@ async def lifespan(app: FastAPI):
             db.close()
     except Exception as e:
         logger.error(f"❌ API Manager initialization failed: {e}")
-    
+
     # ─────────────────────────────────────────────────────────────
     # 4. Initialize Model Allocator
     # ─────────────────────────────────────────────────────────────
@@ -177,7 +187,7 @@ async def lifespan(app: FastAPI):
             db.close()
     except Exception as e:
         logger.error(f"❌ Model Allocator initialization failed: {e}")
-    
+
     # ─────────────────────────────────────────────────────────────
     # 5. Initialize Token Optimizer with Idle Budget
     # ─────────────────────────────────────────────────────────────
@@ -187,7 +197,7 @@ async def lifespan(app: FastAPI):
             persistent_agents = persistent_council.get_persistent_agents(db)
             agent_list = list(persistent_agents.values())
             init_token_optimizer(db, agent_list)
-            
+
             logger.info("✅ Token Optimizer initialized")
             logger.info(f"   - Idle Budget: ${idle_budget.daily_idle_budget_usd:.2f}/day")
             logger.info(f"   - Active Mode Budget: ${token_optimizer.active_budget.daily_cost_limit_usd:.2f}/day")
@@ -195,15 +205,17 @@ async def lifespan(app: FastAPI):
             db.close()
     except Exception as e:
         logger.error(f"❌ Token Optimizer initialization failed: {e}")
-    
-    # Initialize API Key Manager (moved outside try block to match original, but fixed)
+
+    # ─────────────────────────────────────────────────────────────
+    # Initialize API Key Manager
+    # ─────────────────────────────────────────────────────────────
     db = next(get_db())
     try:
         init_api_key_manager(db)
         logger.info("✅ API Key Manager initialized with resilience")
     finally:
         db.close()
-    
+
     # ─────────────────────────────────────────────────────────────
     # 6. Start Idle Governance Engine
     # ─────────────────────────────────────────────────────────────
@@ -218,9 +230,9 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"⚠️ Idle Governance Engine start failed: {e}")
         logger.error("   System will continue without idle governance")
-    
+
     # ─────────────────────────────────────────────────────────────
-    # 🆕 7. Initialize Capability Registry (Phase 3)
+    # 7. Initialize Capability Registry (Phase 3)
     # ─────────────────────────────────────────────────────────────
     try:
         logger.info("✅ Capability Registry loaded")
@@ -228,22 +240,42 @@ async def lifespan(app: FastAPI):
         logger.info("   - Runtime permission enforcement active")
     except Exception as e:
         logger.error(f"❌ Capability Registry initialization failed: {e}")
-    
+
+    # ─────────────────────────────────────────────────────────────
+    # 8. Initialize MCP Tool Bridge (Phase 6.7)
+    #    Syncs all approved MCP tools from the database into the
+    #    in-memory ToolRegistry so agents can discover and invoke
+    #    them through the standard /tools/ endpoints.
+    # ─────────────────────────────────────────────────────────────
+    try:
+        db = next(get_db())
+        try:
+            bridge = init_bridge(tool_registry, SessionLocal)
+            count = bridge.sync_all(db)
+            logger.info(f"✅ MCP Tool Bridge initialized — {count} approved tool(s) loaded")
+            logger.info("   Agents can now discover MCP tools via GET /tools/")
+            logger.info("   MCP tools also visible at GET /tools/mcp")
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error(f"⚠️ MCP Tool Bridge initialization failed: {e}")
+        logger.error("   System will continue — MCP tools can be synced manually via approve endpoint")
+
     logger.info("🎉 Agentium startup complete!")
-    
-    yield  # Application runs here
-    
+
+    yield  # ── Application runs here ──────────────────────────────
+
     # ─────────────────────────────────────────────────────────────
     # Shutdown Sequence
     # ─────────────────────────────────────────────────────────────
     logger.info("🛑 Shutting down Agentium...")
-    
+
     try:
         await idle_governance.stop()
         logger.info("✅ Idle Governance Engine stopped")
     except Exception as e:
         logger.error(f"❌ Error stopping Idle Governance: {e}")
-    
+
     # Final statistics
     try:
         db = next(get_db())
@@ -261,11 +293,13 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"❌ Could not generate final statistics: {e}")
 
-# Create FastAPI app    
+
+# ── Create FastAPI app ─────────────────────────────────────────────────────────
+
 app = FastAPI(
     title="Agentium",
-    description="AI Agent Governance System with Phase 3: Lifecycle Management & Capability Registry",
-    version="3.0.0-phase3",
+    description="AI Agent Governance System — Phase 6.7: MCP Server Integration",
+    version="3.0.0-phase6.7",
     lifespan=lifespan
 )
 
@@ -280,47 +314,54 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 # ═══════════════════════════════════════════════════════════
 # REGISTER ROUTERS
 # ═══════════════════════════════════════════════════════════
 
-# Existing routes
-app.include_router(auth_routes.router, prefix="/api/v1")
-app.include_router(model_routes.router, prefix="/api/v1")
-app.include_router(chat_routes.router, prefix="/api/v1")
-app.include_router(channels_routes.router, prefix="/api/v1")
-app.include_router(webhooks_router.router, prefix="/api/v1")
-app.include_router(inbox_routes.router, prefix="/api/v1")
-app.include_router(websocket_routes.router, prefix="/ws")
-app.include_router(host_access.router, prefix="/api/v1")
-app.include_router(sovereign.router, prefix="/api/v1")
-app.include_router(tool_creation_routes.router, prefix="/api/v1")
-app.include_router(admin_routes.router, prefix="/api/v1")
-app.include_router(tasks_routes.router, prefix="/api/v1")
+app.include_router(auth_routes.router,              prefix="/api/v1")
+app.include_router(model_routes.router,             prefix="/api/v1")
+app.include_router(chat_routes.router,              prefix="/api/v1")
+app.include_router(channels_routes.router,          prefix="/api/v1")
+app.include_router(webhooks_router.router,          prefix="/api/v1")
+app.include_router(inbox_routes.router,             prefix="/api/v1")
+app.include_router(websocket_routes.router,         prefix="/ws")
+app.include_router(host_access.router,              prefix="/api/v1")
+app.include_router(sovereign.router,                prefix="/api/v1")
+app.include_router(tool_creation_routes.router,     prefix="/api/v1")
+app.include_router(admin_routes.router,             prefix="/api/v1")
+app.include_router(tasks_routes.router,             prefix="/api/v1")
 app.include_router(files_routes.router)
-app.include_router(voice_routes.router, prefix="/api/v1")
-app.include_router(capability_routes.router)      
-app.include_router(lifecycle_routes.router) 
-app.include_router(monitoring_router.router, prefix="/api/v1")   
-app.include_router(api_keys_routes.router, prefix="/api/v1")
-app.include_router(critics_routes.router, prefix="/api/v1")  # Phase 6.2: Critic Agents
-app.include_router(checkpoints_routes.router, prefix="/api/v1")  # Phase 6.5: Time-Travel Recovery
-app.include_router(remote_executor_routes.router, prefix="/api/v1")  # Phase 6.6: Remote Execution
+app.include_router(voice_routes.router,             prefix="/api/v1")
+app.include_router(capability_routes.router)
+app.include_router(lifecycle_routes.router)
+app.include_router(monitoring_router.router,        prefix="/api/v1")
+app.include_router(api_keys_routes.router,          prefix="/api/v1")
+app.include_router(critics_routes.router,           prefix="/api/v1")   # Phase 6.2
+app.include_router(checkpoints_routes.router,       prefix="/api/v1")   # Phase 6.5
+app.include_router(remote_executor_routes.router,   prefix="/api/v1")   # Phase 6.6
+app.include_router(mcp_tools_router)                                     # Phase 6.7: admin/governance
+app.include_router(tools_routes.router,             prefix="/api/v1")   # Phase 6.7: agent tool access
 
-# ==================== Health Check ====================
+
+# ══════════════════════════════════════════════════════════════════════════════
+# INLINE ENDPOINTS
+# ══════════════════════════════════════════════════════════════════════════════
+
+# ── Health Check ──────────────────────────────────────────────────────────────
 
 @app.get("/api/health")
 async def health_check_api():
-    """Health check endpoint - API prefix."""
+    """Health check endpoint."""
     db_status = check_health()
-    
     return {
         "status": "healthy" if db_status["status"] == "healthy" else "unhealthy",
         "database": db_status,
         "timestamp": datetime.utcnow().isoformat()
     }
 
-# ==================== Agent Management ====================
+
+# ── Agent Management ──────────────────────────────────────────────────────────
 
 @app.post("/api/v1/agents/create")
 async def create_agent(
@@ -330,16 +371,13 @@ async def create_agent(
     db: Session = Depends(get_db)
 ):
     """Create a new agent with governance compliance."""
-    # Validate tier
     if tier not in [0, 1, 2, 3]:
         raise HTTPException(status_code=400, detail="Tier must be 0 (Head), 1 (Council), 2 (Lead), or 3 (Task)")
-    
-    # Get current constitution
+
     constitution = db.query(Constitution).filter_by(is_active=True).order_by(Constitution.effective_date.desc()).first()
     if not constitution:
         raise HTTPException(status_code=500, detail="No active constitution found")
-    
-    # Create agent
+
     agent = Agent(
         role=role,
         status=AgentStatus.ACTIVE,
@@ -349,7 +387,7 @@ async def create_agent(
         tier=tier,
         agentium_id=f"{tier}{len(db.query(Agent).filter_by(tier=tier).all()) + 1:04d}",
         constitution_version=constitution.version,
-        supervised_by=None,  # Set by orchestrator
+        supervised_by=None,
         total_tasks_completed=0,
         successful_tasks=0,
         failed_tasks=0,
@@ -358,12 +396,13 @@ async def create_agent(
         responsibilities=json.dumps(responsibilities),
         is_persistent=False
     )
-    
+
     db.add(agent)
     db.commit()
     db.refresh(agent)
-    
+
     return agent.to_dict()
+
 
 @app.get("/api/v1/agents")
 async def list_agents(
@@ -373,19 +412,20 @@ async def list_agents(
 ):
     """List all agents with optional filters."""
     query = db.query(Agent)
-    
+
     if tier is not None:
         query = query.filter(Agent.tier == tier)
-    
+
     if status:
         try:
             status_enum = AgentStatus(status.lower())
             query = query.filter(Agent.status == status_enum)
         except ValueError:
             raise HTTPException(status_code=400, detail=f"Invalid status: {status}")
-    
+
     agents = query.all()
     return {"agents": [agent.to_dict() for agent in agents]}
+
 
 @app.get("/api/v1/agents/{agentium_id}")
 async def get_agent(
@@ -394,14 +434,12 @@ async def get_agent(
 ):
     """Get specific agent by Agentium ID."""
     agent = db.query(Agent).filter_by(agentium_id=agentium_id).first()
-    
     if not agent:
         raise HTTPException(status_code=404, detail=f"Agent {agentium_id} not found")
-    
     return agent.to_dict()
 
 
-# ==================== Constitution Management ====================
+# ── Constitution Management ───────────────────────────────────────────────────
 
 @app.get("/api/v1/constitution")
 async def get_constitution(db: Session = Depends(get_db)):
@@ -409,10 +447,10 @@ async def get_constitution(db: Session = Depends(get_db)):
     constitution = db.query(Constitution).filter_by(
         is_active=True
     ).order_by(Constitution.effective_date.desc()).first()
-    
+
     if not constitution:
         raise HTTPException(status_code=404, detail="No active constitution found")
-    
+
     return constitution.to_dict()
 
 
@@ -434,7 +472,7 @@ async def update_constitution(
             return fallback_str
         if isinstance(value, (dict, list)):
             return _json.dumps(value)
-        return value  # already a JSON string
+        return value
 
     def _normalize_articles(articles_dict):
         """Normalize all article shapes to { title, content } and repair corruption."""
@@ -444,23 +482,19 @@ async def update_constitution(
         for key, val in articles_dict.items():
             pretty_title = key.replace("_", " ").title()
             if isinstance(val, str):
-                # Plain string — articles 2-10 stored this way historically
                 fixed[key] = {"title": pretty_title, "content": val}
             elif isinstance(val, dict):
                 keys = list(val.keys())
                 is_char_indexed = keys and all(k.isdigit() or k == 'content' for k in keys)
                 if is_char_indexed:
-                    # Character-indexed corruption — reconstruct original string
                     numeric_keys = sorted((k for k in keys if k.isdigit()), key=int)
                     fixed[key] = {"title": pretty_title, "content": "".join(val[k] for k in numeric_keys)}
                 else:
-                    # Already correct { title, content } shape
                     fixed[key] = {"title": val.get("title", pretty_title), "content": val.get("content", "")}
             else:
                 fixed[key] = {"title": pretty_title, "content": ""}
         return fixed
 
-    # Get articles: use updates if provided, else parse from current DB row
     raw_articles = updates.articles
     if raw_articles is None:
         try:
@@ -468,13 +502,11 @@ async def update_constitution(
         except (_json.JSONDecodeError, TypeError):
             raw_articles = {}
 
-    # Normalize and repair, then serialize back to JSON string for Text column
-    raw_articles = _normalize_articles(raw_articles)
+    raw_articles   = _normalize_articles(raw_articles)
     new_articles   = _to_json_str(raw_articles, current.articles)
     new_prohibited = _to_json_str(updates.prohibited_actions, current.prohibited_actions)
     new_prefs      = _to_json_str(updates.sovereign_preferences, current.sovereign_preferences)
 
-    # agentium_id pattern: "C{version_number:04d}" matching "C0001" from persistent_council
     new_version_number = (current.version_number or 1) + 1
     new_agentium_id    = f"C{new_version_number:04d}"
 
@@ -503,7 +535,7 @@ async def update_constitution(
     }
 
 
-# ==================== Monitoring & Health ====================
+# ── Monitoring & Health ───────────────────────────────────────────────────────
 
 @app.get("/api/v1/monitoring/health")
 async def get_system_health(db: Session = Depends(get_db)):
@@ -511,7 +543,7 @@ async def get_system_health(db: Session = Depends(get_db)):
     return await MonitoringService.get_system_health(db)
 
 
-# ==================== Task Management ====================
+# ── Task Management ───────────────────────────────────────────────────────────
 
 @app.get("/api/v1/tasks/active")
 async def get_active_tasks(db: Session = Depends(get_db)):
@@ -519,23 +551,15 @@ async def get_active_tasks(db: Session = Depends(get_db)):
     tasks = db.query(Task).filter(
         Task.status.in_([TaskStatus.PENDING, TaskStatus.IN_PROGRESS, TaskStatus.DELIBERATING])
     ).all()
-    
-    return {
-        "tasks": [task.to_dict() for task in tasks],
-        "total": len(tasks)
-    }
+    return {"tasks": [task.to_dict() for task in tasks], "total": len(tasks)}
 
 
-# ==================== IDLE GOVERNANCE ENDPOINTS ====================
+# ── Idle Governance ───────────────────────────────────────────────────────────
 
 @app.get("/api/v1/governance/idle/status")
 async def get_idle_governance_status():
-    """
-    Get current status of idle governance engine.
-    Shows if idle mode is active, what the persistent council is doing, and stats.
-    """
+    """Get current status of idle governance engine."""
     stats = idle_governance.get_statistics()
-    
     return {
         "status": "running" if idle_governance.is_running else "stopped",
         "idle_mode_active": token_optimizer.idle_mode_active,
@@ -554,8 +578,7 @@ async def pause_idle_governance():
     if idle_governance.is_running:
         await idle_governance.stop()
         return {"status": "success", "message": "Idle governance paused"}
-    else:
-        return {"status": "already_stopped", "message": "Idle governance was not running"}
+    return {"status": "already_stopped", "message": "Idle governance was not running"}
 
 
 @app.post("/api/v1/governance/idle/resume")
@@ -564,18 +587,16 @@ async def resume_idle_governance(db: Session = Depends(get_db)):
     if not idle_governance.is_running:
         await idle_governance.start(db)
         return {"status": "success", "message": "Idle governance resumed"}
-    else:
-        return {"status": "already_running", "message": "Idle governance is already active"}
+    return {"status": "already_running", "message": "Idle governance is already active"}
 
 
-# ==================== Model & Token Status ====================
+# ── Model & Token Status ──────────────────────────────────────────────────────
 
 @app.get("/api/v1/status/tokens")
 async def get_token_status():
     """Get token optimizer and budget status."""
     optimizer_status = token_optimizer.get_status()
     idle_budget_status = idle_budget.get_status()
-    
     return {
         "optimizer": optimizer_status,
         "idle_budget": idle_budget_status,
@@ -588,40 +609,27 @@ async def get_model_status():
     """Get model allocation status."""
     if not model_allocator:
         return {"status": "not_initialized"}
-    
     report = model_allocator.get_allocation_report()
-    return {
-        "status": "active",
-        "report": report
-    }
+    return {"status": "active", "report": report}
 
 
-# ==================== PHASE 3 DASHBOARD ENDPOINTS ====================
+# ── Phase 3 Dashboard ─────────────────────────────────────────────────────────
 
 @app.get("/api/v1/phase3/dashboard")
 async def get_phase3_dashboard(db: Session = Depends(get_db)):
-    """
-    Get comprehensive dashboard data.
-    Shows lifecycle stats, capacity, capability distribution, etc.
-    """
+    """Get comprehensive dashboard data."""
     from backend.services.reincarnation_service import reincarnation_service
     from backend.services.capability_registry import capability_registry
-    
-    # Get capacity info
+
     capacity = reincarnation_service.get_available_capacity(db)
-    
-    # Get capability audit
     capability_audit = capability_registry.capability_audit_report(db)
-    
-    # Get idle governance stats
     idle_stats = idle_governance.get_statistics()
-    
-    # Get lifecycle stats from last 30 days
+
     from backend.models.entities.audit import AuditLog
     from datetime import timedelta
-    
+
     thirty_days_ago = datetime.utcnow() - timedelta(days=30)
-    
+
     lifecycle_events = {
         "spawned": db.query(AuditLog).filter(
             AuditLog.action.in_(["agent_spawned", "lead_spawned"]),
@@ -640,7 +648,7 @@ async def get_phase3_dashboard(db: Session = Depends(get_db)):
             AuditLog.created_at >= thirty_days_ago
         ).count()
     }
-    
+
     return {
         "phase": "Phase 3: Agent Lifecycle Management",
         "completion": "100%",
@@ -655,7 +663,29 @@ async def get_phase3_dashboard(db: Session = Depends(get_db)):
     }
 
 
-# ==================== Run Server ====================
+# ── MCP Tool Registry Status (convenience summary endpoint) ───────────────────
+
+@app.get("/api/v1/mcp/status")
+async def get_mcp_status():
+    """
+    Quick summary of MCP tool bridge status.
+    Shows how many MCP tools are live in the ToolRegistry.
+    """
+    try:
+        from backend.services.mcp_tool_bridge import mcp_bridge
+        if not mcp_bridge:
+            return {"status": "not_initialized", "registered_tools": 0}
+        keys = mcp_bridge.list_mcp_registry_keys()
+        return {
+            "status": "active",
+            "registered_tools": len(keys),
+            "tool_keys": keys,
+        }
+    except Exception as e:
+        return {"status": "error", "error": str(e), "registered_tools": 0}
+
+
+# ── Run Server ────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "8000"))

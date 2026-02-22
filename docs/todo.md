@@ -814,7 +814,7 @@ Agent (Brain) → Writes Code → Security Guard → Sandbox → Executor → Su
 
 **Tests:** ✅ 10 ExecutionGuard tests verified inline (all passing)
 
-### 6.7 MCP Server Integration with Constitutional Governance 🆕 (PENDING)
+### 6.7 MCP Server Integration with Constitutional Governance 🆕 (To TEST)
 
 **File:** `backend/services/mcp_governance.py` (new)
 
@@ -869,19 +869,19 @@ class MCPTool(BaseEntity):
 
 **Implementation:**
 
-- [ ] `backend/services/mcp_governance.py` - Core MCP client + constitutional wrapper
-- [ ] `propose_mcp_server(url, description)` - Council member proposes new MCP server
-- [ ] `audit_tool_invocation(tool_id, agent_id, action)` - Constitutional Guard hook
-- [ ] `get_approved_tools(agent_tier)` - Returns tools accessible to agent's tier
-- [ ] `revoke_mcp_tool(tool_id, reason)` - Emergency revocation without vote
-- [ ] MCP tool wrapper auto-generates constitutional compliance layer
+- [x] `backend/services/mcp_governance.py` - Core MCP client + constitutional wrapper
+- [x] `propose_mcp_server(url, description)` - Council member proposes new MCP server
+- [x] `audit_tool_invocation(tool_id, agent_id, action)` - Constitutional Guard hook
+- [x] `get_approved_tools(agent_tier)` - Returns tools accessible to agent's tier
+- [x] `revoke_mcp_tool(tool_id, reason)` - Emergency revocation without vote
+- [x] MCP tool wrapper auto-generates constitutional compliance layer
 
 **Frontend:**
 
-- [ ] `frontend/src/components/mcp/ToolRegistry.tsx` - Browse available MCP tools
-- [ ] Filter by tier, approval status, usage stats
-- [ ] "Propose new MCP server" modal → triggers Council vote
-- [ ] Per-tool invocation audit log viewer
+- [x] `frontend/src/components/mcp/ToolRegistry.tsx` - Browse available MCP tools
+- [x] Filter by tier, approval status, usage stats
+- [x] "Propose new MCP server" modal → triggers Council vote
+- [x] Per-tool invocation audit log viewer
 
 **Acceptance Criteria:**
 
@@ -949,6 +949,7 @@ mcp==1.0.0    # Official MCP Python SDK
 **Needs Implementation:**
 
 **New Component:** `frontend/src/components/council/VotingInterface.tsx`
+Display inside monitoring page tab switching to voting page inside monitoring page.
 
 **Features:**
 

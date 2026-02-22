@@ -11,6 +11,7 @@ Hierarchy:
 - Voting: Democratic deliberation system
 - Audit: Transparency and compliance logging
 - Monitoring: Hierarchical oversight and agent health tracking
+- MCP Tools: Constitutional MCP server registry (Phase 6.7)
 """
 from backend.models.entities.channels import (
     ExternalChannel,
@@ -119,6 +120,10 @@ from backend.models.entities.remote_execution import (
     SandboxStatus
 )
 
+# Phase 6.7 — MCP Server Integration
+from backend.models.entities.mcp_tool import MCPTool
+
+
 # All models for Alembic/database creation
 __all__ = [
     # Base
@@ -213,4 +218,7 @@ __all__ = [
     'ExecutionSummary',
     'ExecutionStatus',
     'SandboxStatus',
+
+    # MCP Tools (Constitutional Tool Registry — Phase 6.7)
+    'MCPTool',
 ]

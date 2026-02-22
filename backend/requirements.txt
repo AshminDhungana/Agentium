@@ -1,5 +1,6 @@
 croniter==3.0.3
 docker==7.1.0
+mcp>=1.0.0
 
 # NOTE: PyTorch installed separately in Dockerfile with CPU index
 
