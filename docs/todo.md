@@ -1776,75 +1776,247 @@ _Status: Active Development - Phase 5 In Progress | Phase 6 Critic Agents Done_
 
 # ✅ Final Verification & System Checklist
 
-## 0. Rough Ideas (What to do and What to check)
+---
 
-1. Multi-Channel Integration (Messaging Platforms)
-   Add support for WhatsApp, Telegram, Slack, Discord, Signal, Google Chat, iMessage, Microsoft Teams, Zalo, and Matrix to enable local-first AI agents across communication platforms.
-   Priority order:
-   Easy: Telegram, Discord, Slack (API-first)
-   Moderate: WhatsApp (Baileys), Signal (signal-cli), Google Chat, Matrix
-   Hard: iMessage (macOS only), Microsoft Teams (enterprise complexity), Zalo (limited API)
-   Architecture: Map each channel to Task Agents (3xxxx) under a "Communications Council" Lead Agent (2xxxx).
+## 0. Strategic Overview (Scope & Validation Objectives)
+
+### Multi-Channel Integration (Messaging Platforms)
+
+Implement support for the following communication platforms to enable **local-first AI agents** across distributed messaging environments:
+
+- WhatsApp
+- Telegram
+- Slack
+- Discord
+- Signal
+- Google Chat
+- iMessage
+- Microsoft Teams
+- Zalo
+- Matrix
+
+### Priority Classification
+
+**Easy (API-First Platforms)**
+
+- Telegram
+- Discord
+- Slack
+
+**Moderate Complexity**
+
+- WhatsApp (Baileys)
+- Signal (signal-cli)
+- Google Chat
+- Matrix
+
+**High Complexity**
+
+- iMessage (macOS-only limitations)
+- Microsoft Teams (enterprise-level integration complexity)
+- Zalo (limited API exposure)
+
+### Architectural Design
+
+- Each communication channel must be mapped to dedicated **Task Agents (3xxxx)**.
+- All communication agents must operate under a centralized supervisory agent:  
+  **“Communications Council” Lead Agent (2xxxx)**.
+- Clear delegation and traceable task routing must be enforced.
+
+---
 
 ## 1. Access & Permissions
 
-- Verify that the **Head of Council** has full system access.
-- Verify **Browser Control** functionality.
+- Verify that the **Head of Council** possesses full system-level access.
+- Confirm full functionality of **Browser Control** capabilities.
+- Ensure privilege boundaries are correctly enforced across all user roles.
+
+---
 
 ## 2. System Testing
 
-- Perform complete system testing.
-- Ensure all modules and workflows are functioning correctly.
+- Conduct comprehensive end-to-end system testing.
+- Validate all modules, workflows, routing logic, and fallback systems.
+- Confirm no cross-system contamination between reasoning and execution layers.
+- Ensure stability under load and multi-agent concurrency.
+
+---
 
 ## 3. Memory Management
 
-### Database & Vector Database
+### 3.1 Database & Vector Database Governance
 
-- Implement proper memory management.
-- Delete very old data records and outdated data versions.
-- **Do NOT delete the original constitution.**
+- Implement structured memory lifecycle management.
+- Remove obsolete records and outdated data versions.
+- Maintain strict version control policies.
+- **The Original Constitution must never be deleted under any circumstances.**
 
-### Additional Requirements
+### 3.2 Required System Enhancements
 
-- Tools to connect to the MCP server.
-- Automatic fallback system:
-  - Switch to the next available API key if the current API key fails.
-- Send notifications if **none of the API keys** respond:
-  - In the frontend.
-  - In running/background channels.
+- Provide secure tools to connect to the MCP server.
+- Implement automatic API key failover:
+  - If one API key fails, automatically switch to the next available key.
+- If **no API keys respond**, generate system alerts:
+  - Visible notification in the frontend.
+  - Background channel alerts for monitoring systems.
+
+---
 
 ## 4. Ethos & Message History Management
 
-- Verify that message history is stored and accessed correctly.
-- The message history represents the **Ethos** and must:
-  - Be updated
-  - Be editable
-  - Be minimized/summarized for efficiency
+### 4.1 Ethos Governance
 
-### Ethos Update Workflow
+The message history represents the operational **Ethos** of the system and must:
+
+- Be properly stored.
+- Be accessible.
+- Be editable.
+- Be minimized/summarized for efficiency.
+- Remain consistent with the Constitution.
+
+### 4.2 Ethos Update Workflow
+
+All agents must follow this standardized workflow:
 
 1. Read the Constitution.
-2. Update individual Ethos.
-3. While working:
-   - Log what the agent is doing.
-   - Log what has been completed.
-   - Log what remains.
-4. Apply this workflow to all agents.
+2. Update the individual Ethos.
+3. During task execution:
+   - Log current actions.
+   - Log completed actions.
+   - Log pending actions.
+4. Apply this workflow universally across all agents.
+
+---
 
 ## 5. API Request Validation
 
-- Ensure that the **Ethos content is always included** in every API request.
+- Ensure that **Ethos content is included in every API request** without exception.
+- Validate payload structure before dispatch.
+- Enforce consistency across providers.
 
-**End of Roadmap**
+---
 
-Memory optimization:
+# Memory Optimization Framework
 
-1. Older chats will be removed after a certain period of time. i.e 7 days, last 50 message kept and will not be removed.
-   2 Chats message with the user should be small and precise.
-2. A database of all tasks that were assigned by user and what were complited will be stored in database
-3. The database of all tasks that are complited will be removed after a certain period of time. i.e 7 days (expection: The orginal constitution that was stored will not be removed in any way)
-4. in vector database, Need to Improve on Skills creation a unified structure for skills should be setup and the format should be same.
-5. The vector database will be optimized, old knowledge will be viewed and kept uptodate and dublicated will be removed.
-6. New tasks will not be assigned to the agent if the agent is not available.
-7. Optimizatin of all system without loos of functionality, and loss of imported information.
-8. Optimization inside contaner should be priority. Outside contaner should be done carefully and deletion of files should be taken seriously. outside container and for that the Sovereign (User) should be asked for permission.
+## 1. Chat Retention Policy
+
+- Chats older than a defined period (e.g., 7 days) will be removed.
+- The last 50 messages must always be retained and protected.
+- Conversations must remain concise and precise.
+
+## 2. Task Database Management
+
+- Maintain a structured database of:
+  - All user-assigned tasks.
+  - Completion status of each task.
+- Completed tasks will be removed after a defined retention period (e.g., 7 days).
+- **Exception:** The Original Constitution must never be removed.
+
+## 3. Vector Database Optimization
+
+- Establish a unified and standardized structure for skill creation.
+- Ensure consistent formatting across all skills.
+- Review and update outdated knowledge.
+- Remove duplicate embeddings.
+- Maintain optimized retrieval performance.
+
+## 4. Agent Availability Control
+
+- New tasks must not be assigned to unavailable agents.
+- Enforce agent availability checks before task allocation.
+
+## 5. System-Wide Optimization
+
+Perform optimization without loss of:
+
+- Functionality
+- Imported information
+- Core operational logic
+
+Optimization areas include:
+
+- Agent lifecycle management (remove idle agents)
+- Memory usage
+- Storage allocation
+- Database indexing
+- Log retention (remove very old logs)
+- Resource allocation efficiency
+
+---
+
+## 6. Container & Infrastructure Governance
+
+- Optimization inside the container environment must be prioritized.
+- External (outside container) optimization must be handled with extreme caution.
+- File deletions outside the container require explicit approval from the Sovereign (User).
+- No irreversible action outside the container without authorization.
+
+---
+
+## 7. Access Control Policy
+
+- **Admin Users**
+  - Full system access.
+  - Can view all tasks across the system.
+
+- **Standard Users**
+  - Can view only tasks they created.
+  - Can interact with the system regarding their own tasks (chat + task interface).
+
+---
+
+## 8. API Key Redundancy Verification
+
+- Verify (or implement if missing):
+  - Multiple API keys per provider.
+  - Automatic rotation and fallback usage.
+  - Provider-level load balancing where applicable.
+
+---
+
+## 9. Agent Optimization & Emergency Protocol
+
+### Normal Optimization
+
+If all agents are occupied:
+
+- The Head of Council must initiate agent optimization.
+- Identify and terminate idle agents.
+- Free up capacity for new task allocation.
+
+### Emergency Protocol
+
+If:
+
+- No agents are available
+- No entity can receive a task
+
+Then:
+
+- The Head of Council may create a temporary emergency agent.
+- Only one Head of Council may exist at any time.
+- Emergency agent must use an available ID from the reserved Head-of-Council ID space (1xxxx).
+- Upon task completion, the emergency agent must be terminated.
+
+Strict enforcement:
+
+- Only one active Head of Council at any time.
+
+---
+
+## 10. Future Scalability Plan
+
+Prepare the system for scaling from:
+
+**50,000 agents → 50,000,000+ agents**
+
+Required changes:
+
+- Expand agent ID length in the database.
+- Update frontend display logic for large-scale agent rendering.
+- Optimize indexing and retrieval structures.
+- Ensure horizontal scalability readiness.
+
+---
+
+# End of Roadmap
