@@ -27,6 +27,7 @@ export function MainLayout() {
         }
         return false;
     });
+    const isSovereign = user?.isSovereign || user?.is_admin || false;
 
     const handleLogout = () => {
         // Dispatch logout event for WebSocket cleanup
@@ -48,6 +49,14 @@ export function MainLayout() {
         }
     };
 
+    type NavItem = {
+    path: string;
+    label: string;
+    icon: React.ComponentType<{ className?: string }>;
+    badge?: number;
+    variant?: 'default' | 'danger';
+    };
+
     const navItems = [
         { path: '/', label: 'Dashboard', icon: LayoutDashboard },
         {
@@ -63,6 +72,7 @@ export function MainLayout() {
         { path: '/models', label: 'Models', icon: Cpu },
         { path: '/channels', label: 'Channels', icon: Radio },
         { path: '/settings', label: 'Settings', icon: Settings },
+        ...(isSovereign ? [{ path: '/sovereign', label: 'Sovereign Control', icon: Shield, variant: 'danger' }] : []),
     ];
 
     return (
@@ -104,13 +114,18 @@ export function MainLayout() {
                             key={item.path}
                             to={item.path}
                             className={({ isActive }) =>
-                                `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${isActive
-                                    ? 'bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300'
-                                    : 'text-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5'
+                                `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
+                                    item.variant === 'danger'
+                                        ? isActive
+                                            ? 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300 border border-red-200 dark:border-red-500/20'
+                                            : 'text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 bg-red-50/50 dark:bg-red-500/5'
+                                        : isActive
+                                            ? 'bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300'
+                                            : 'text-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5'
                                 }`
                             }
                         >
-                            <item.icon className="w-5 h-5 flex-shrink-0" />
+                            <item.icon className={`w-5 h-5 flex-shrink-0 ${item.variant === 'danger' ? 'text-red-500' : ''}`} />
                             <span className="flex-1">{item.label}</span>
                             {item.badge && (
                                 <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full min-w-[20px] text-center">

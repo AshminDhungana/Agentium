@@ -1,5 +1,4 @@
 // src/pages/SovereignDashboard.tsx
-// Updated: Phase 6.7 — added MCP Tool Registry tab
 
 import { useEffect, useState } from 'react';
 import { useAuthStore } from '@/store/authStore';
@@ -246,7 +245,7 @@ export function SovereignDashboard() {
                                             : 'bg-blue-100 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400'
                                         }
                                     `}>
-                                        6.7
+                                        1.0
                                     </span>
                                 )}
                             </button>
