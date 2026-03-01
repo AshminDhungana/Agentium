@@ -79,7 +79,7 @@ class VoiceBridgeService {
   // ── Private ─────────────────────────────────────────────────────────────────
 
   private async _fetchVoiceToken(): Promise<string> {
-    const res = await fetch('/api/auth/voice-token', {
+    const res = await fetch('/api/v1/auth/voice-token', {
       method:  'POST',
       headers: {
         'Content-Type':  'application/json',

@@ -2,6 +2,7 @@
 Authentication API for frontend.
 Database-backed with user approval workflow.
 """
+import os 
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr, Field
