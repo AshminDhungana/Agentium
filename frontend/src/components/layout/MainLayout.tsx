@@ -19,6 +19,8 @@ import {
     FlaskConical,
 } from 'lucide-react';
 import { useState } from 'react';
+// ── Voice Bridge addition ─────────────────────────────────────────────────────
+import { VoiceIndicator } from '@/components/VoiceIndicator';
 
 export function MainLayout() {
     const { user, logout } = useAuthStore();
@@ -162,6 +164,12 @@ export function MainLayout() {
                             </p>
                         </div>
                     </div>
+
+                    {/* ── Voice Bridge status indicator ── */}
+                    <div className="mb-2 px-1">
+                        <VoiceIndicator />
+                    </div>
+
                     <button
                         onClick={handleLogout}
                         className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors"

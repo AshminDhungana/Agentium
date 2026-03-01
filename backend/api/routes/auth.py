@@ -12,6 +12,7 @@ from backend.models.database import get_db
 from backend.core.auth import create_access_token, create_refresh_token, verify_token, get_current_active_user
 from backend.models.entities.user import User
 from backend.models.entities.audit import AuditLog, AuditLevel, AuditCategory
+from backend.core.voice_auth import create_voice_token, verify_voice_token
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -397,3 +398,66 @@ async def change_password(
         "status": "success",
         "message": "Password updated successfully"
     }
+
+
+class VoiceTokenResponse(BaseModel):
+    voice_token: str
+    expires_in_minutes: int
+
+
+@router.post("/voice-token", response_model=VoiceTokenResponse)
+async def get_voice_token(
+    current_user: dict = Depends(get_current_active_user),
+):
+    """
+    Issue a short-lived voice-scoped JWT for the host-native voice bridge.
+
+    The token is separate from the main session JWT so a leaked voice token
+    cannot be used to access any other API.  Returns HTTP 503 if
+    VOICE_JWT_SECRET is not configured in the environment.
+    """
+    try:
+        token = create_voice_token(
+            username=current_user.get("username", "unknown"),
+            user_id=current_user.get("user_id"),
+        )
+    except RuntimeError as exc:
+        # VOICE_JWT_SECRET not set — degrade gracefully
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        )
+
+    duration = int(os.getenv("VOICE_TOKEN_DURATION_MINUTES", "30"))
+
+    AuditLog.log(
+        level=AuditLevel.INFO,
+        category=AuditCategory.AUTHENTICATION,
+        actor_type="user",
+        actor_id=current_user.get("username", "unknown"),
+        action="voice_token_issued",
+        description="Voice bridge token issued",
+        meta_data={"expires_in_minutes": duration},
+    )
+
+    return VoiceTokenResponse(voice_token=token, expires_in_minutes=duration)
+
+
+@router.get("/verify-session", response_model=VerifyResponse)
+async def verify_session(
+    current_user: dict = Depends(get_current_active_user),
+):
+    """
+    Lightweight session check used by the voice bridge after connecting.
+    Returns the authenticated user's basic profile if the bearer token is
+    still valid, without requiring a separate token parameter.
+    """
+    return VerifyResponse(
+        valid=True,
+        user={
+            "username": current_user.get("username"),
+            "user_id": current_user.get("user_id"),
+            "is_admin": current_user.get("is_admin", False),
+            "role": current_user.get("role", "user"),
+        },
+    )

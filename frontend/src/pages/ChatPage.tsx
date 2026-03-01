@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { useWebSocketStore } from '@/store/websocketStore';
 import { inboxApi, UnifiedConversation, UnifiedMessage } from '@/services/inboxApi';
@@ -55,6 +55,9 @@ import { fileApi, UploadedFile as ApiUploadedFile } from '@/services/fileApi';
 import { voiceApi } from '@/services/voiceApi';
 import { chatApi } from '@/services/chatApi';
 import { localVoice } from '@/services/localVoice';
+// ── Voice Bridge additions ────────────────────────────────────────────────────
+import { useVoiceBridge } from '@/hooks/useVoiceBridge';
+import { VoiceInteractionEvent } from '@/services/voiceBridge';
 
 interface UploadedFile {
     id: string;
@@ -162,6 +165,44 @@ export function ChatPage() {
         messageHistory,
         lastMessage,
     } = useWebSocketStore();
+
+    // ── Voice Bridge integration ───────────────────────────────────────────────
+    const handleVoiceInteraction = useCallback(
+        (event: VoiceInteractionEvent) => {
+            try {
+                const ts = new Date(event.ts * 1000);
+
+                // Append the user's spoken message
+                setMessages(prev => [
+                    ...prev,
+                    {
+                        id:        `voice-user-${event.ts}`,
+                        role:      'sovereign' as const,
+                        content:   event.user,
+                        timestamp: ts,
+                        metadata:  { source: 'voice' },
+                    },
+                ]);
+
+                // Append the Head of Council's reply
+                setMessages(prev => [
+                    ...prev,
+                    {
+                        id:        `voice-reply-${event.ts}`,
+                        role:      'head_of_council' as const,
+                        content:   event.reply,
+                        timestamp: ts,
+                        metadata:  { source: 'voice' },
+                    },
+                ]);
+            } catch (err) {
+                console.warn('[ChatPage] Failed to append voice interaction:', err);
+            }
+        },
+        [],
+    );
+
+    const { status: bridgeStatus } = useVoiceBridge(handleVoiceInteraction);
 
     // ── AI Chat effects ────────────────────────────────────────────────────────
     useEffect(() => {
@@ -710,8 +751,6 @@ export function ChatPage() {
     };
 
     const openBrowserPreview = (file: BrowserFile) => {
-        const token = localStorage.getItem('access_token');
-        // Build preview URL (uses the /preview/ endpoint)
         const previewUrl = file.url.replace('/download/', '/preview/');
         setFilePreview({ url: previewUrl, name: file.filename, type: file.category });
     };
@@ -943,6 +982,25 @@ export function ChatPage() {
                                     </div>
                                 )}
 
+                                {/* Voice Bridge status pill — shown only on AI tab */}
+                                {activeTab === 'ai' && (
+                                    <div className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border ${
+                                        bridgeStatus === 'connected'
+                                            ? 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-500/10 border-green-200 dark:border-green-500/20'
+                                            : bridgeStatus === 'connecting'
+                                            ? 'text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-500/10 border-yellow-200 dark:border-yellow-500/20'
+                                            : 'text-gray-400 dark:text-gray-500 bg-gray-50 dark:bg-[#1e2535] border-gray-200 dark:border-[#1e2535]'
+                                    }`} title={`Voice bridge: ${bridgeStatus}`}>
+                                        {bridgeStatus === 'connecting'
+                                            ? <Loader2 className="w-3 h-3 animate-spin" />
+                                            : bridgeStatus === 'connected'
+                                            ? <Mic className="w-3 h-3" />
+                                            : <MicOff className="w-3 h-3" />
+                                        }
+                                        <span className="capitalize">{bridgeStatus === 'connected' ? 'Voice' : bridgeStatus}</span>
+                                    </div>
+                                )}
+
                                 {/* Tab switcher pill */}
                                 <div className="flex items-center bg-gray-100 dark:bg-[#0f1117] rounded-xl p-1 border border-gray-200 dark:border-[#1e2535]">
                                     <button
@@ -1030,6 +1088,7 @@ export function ChatPage() {
                                         const isUser = message.role === 'sovereign';
                                         const showAvatar = index === 0 || messages[index - 1].role !== message.role;
                                         const isError = message.metadata?.error || message.content?.includes('⚠️');
+                                        const isVoiceMessage = message.metadata?.source === 'voice';
 
                                         return (
                                             <div key={message.id} className="group">
@@ -1082,6 +1141,13 @@ export function ChatPage() {
                                                                 <span className="text-xs text-gray-400 dark:text-gray-500">
                                                                     {formatMessageTime(message.timestamp)}
                                                                 </span>
+                                                                {/* Voice source badge */}
+                                                                {isVoiceMessage && (
+                                                                    <span className="flex items-center gap-0.5 text-[10px] text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-[#1e2535] px-1.5 py-0.5 rounded-md">
+                                                                        <Mic className="w-2.5 h-2.5" />
+                                                                        voice
+                                                                    </span>
+                                                                )}
                                                                 {message.role !== 'system' && (
                                                                     <button aria-label="Copy Message"
                                                                         onClick={() => copyMessage(message.content)}

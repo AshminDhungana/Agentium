@@ -1,0 +1,22 @@
+# Agentium Voice Bridge — host-side Python dependencies
+# Install inside the venv created by install-voice-bridge.sh:
+#   pip install -r requirements.txt
+
+# WebSocket server (browser sync)
+websockets>=12.0
+
+# Speech Recognition (Google STT + mic capture)
+SpeechRecognition>=3.10.4
+PyAudio>=0.2.14          # mic hardware access
+
+# Offline STT fallback (optional — skip if no model downloaded)
+# vosk>=0.3.45
+
+# TTS
+pyttsx3>=2.90
+
+# JWT verification (same library used by the backend)
+python-jose[cryptography]>=3.3.0
+
+# Requests (fallback HTTP — stdlib urllib is used by default)
+# requests>=2.31.0

@@ -3765,3 +3765,104 @@ Every layer has its own error boundary. The table below shows what happens in ea
 
 > **Summary of install flow:**
 > `make install-voice` → `docker compose --profile voice up host-setup` → `detect-host.sh` → `install-voice-bridge.sh` → `register-service.sh` → service starts on host → user opens browser → logs in → `voiceBridgeService.connect()` → voice token issued → bridge activated → say **"Agentium"** → talk to the Head of Council → hear the reply.
+
+Check working for windows:
+
+What Needs to Change for Windows 10/11
+
+1. detect-host.sh → detect-host.ps1 or extend bash
+   Your detect-host.sh uses uname, /proc/version, /etc/os-release — none exist on native Windows.
+   Need to add Windows detection:
+   powershell# detect-host.ps1
+   $OS = "windows"
+$PKG_MGR = "winget" # or choco
+   $SVC_MGR = "windows_service"  # or task_scheduler
+$PYTHON_BIN = (Get-Command python).Source
+   $CONF_DIR = "$env:USERPROFILE\.agentium"
+   Or in bash (if keeping one script), add to detect_os_family():
+   bashMINGW*|CYGWIN*|MSYS*) echo "windows" ;;
+   Your code already has MINGW*|CYGWIN\* → maps to wsl2 which is wrong for native Windows.
+
+2. install-voice-bridge.sh → Add Windows branch
+   System audio packages — instead of apt/brew:
+   powershell# Option A: winget
+   winget install -e --id Python.Python.3.11
+
+# Option B: choco
+
+choco install python portaudio
+PyAudio is the hardest part on Windows:
+powershell# Pre-built wheel is easiest
+pip install pipwin
+pipwin install pyaudio
+
+# OR download wheel directly from:
+
+# https://www.lfd.uci.edu/~gohlke/pythonlibs/#pyaudio
+
+pip install PyAudio‑0.2.14‑cp311‑cp311‑win_amd64.whl
+
+3. Service Registration — Replace systemd/launchd
+   Windows has two options:
+   Option A: Task Scheduler (simplest, no admin needed)
+   powershell$action = New-ScheduledTaskAction -Execute "python" `
+  -Argument "C:\Users\$env:USERNAME\.agentium\voice-bridge\main.py"
+$trigger = New-ScheduledTaskTrigger -AtLogOn
+   Register-ScheduledTask -TaskName "AgentiumVoiceBridge" `
+   -Action $action -Trigger $trigger -RunLevel Limited
+   Option B: Windows Service via NSSM (recommended)
+   powershell# Install NSSM first
+   choco install nssm
+   nssm install AgentiumVoiceBridge python
+   nssm set AgentiumVoiceBridge AppParameters "C:\path\to\main.py"
+   nssm start AgentiumVoiceBridge
+
+4. Path Issues in main.py and scripts
+   Current (Unix)Windows equivalentPath.home() / ".agentium"✅ Works — pathlib is cross-platform~/.agentium/env.conf%USERPROFILE%\.agentium\env.conf#!/usr/bin/env bash❌ Doesn't exist natively$CONF_DIR/voice-venv/bin/python%CONF_DIR%\voice-venv\Scripts\python.exe
+main.py is mostly fine — pathlib.Path works on Windows. The one fix needed:
+python# Current - breaks on Windows:
+VENV_PYTHON = "$VENV_DIR/bin/python"
+
+# Fix - detect platform:
+
+import platform
+VENV_PYTHON = (
+Path.home() / ".agentium" / "voice-venv" / "Scripts" / "python.exe"
+if platform.system() == "Windows"
+else Path.home() / ".agentium" / "voice-venv" / "bin" / "python"
+)
+
+5. TTS on Windows
+   pyttsx3 works on Windows out of the box (uses SAPI5) — no changes needed.
+6. Microphone on Windows
+   SpeechRecognition + PyAudio work on Windows once installed. No ALSA needed — Windows uses its own audio stack.
+   Add to detect-host.sh Windows branch:
+   bash# Skip arecord check on Windows — use a Python check instead
+   HAS_MIC="true" # Let PyAudio handle it at runtime
+
+```
+
+---
+
+## Recommended Approach: Two Files
+
+Rather than rewriting everything, the cleanest path is:
+```
+
+scripts/
+detect-host.sh ← Linux/macOS/WSL2 (current)
+detect-host.ps1 ← Windows NEW
+install-voice-bridge.sh ← Linux/macOS/WSL2 (current)  
+ install-voice-bridge.ps1← Windows NEW
+uninstall-voice-bridge.sh
+uninstall-voice-bridge.ps1 ← Windows NEW
+And a single entry-point that detects and routes:
+powershell# setup.ps1 — Windows entry point
+Write-Host "=== Agentium Voice Bridge Windows Installer ==="
+& "$PSScriptRoot\scripts\detect-host.ps1"
+& "$PSScriptRoot\scripts\install-voice-bridge.ps1"
+
+Summary of Work Required
+TaskEffortdetect-host.ps1~50 linesinstall-voice-bridge.ps1~80 linesuninstall-voice-bridge.ps1~30 linesFix venv path in scripts~5 linesPyAudio install workaround~10 linesService via Task Scheduler or NSSM~20 linesmain.py path fix~5 lines
+Total: ~200 lines of new PowerShell + minor Python fix. main.py needs almost no changes since pathlib and asyncio are cross-platform. The bulk of the work is the installer/detector scripts.
+Want me to write these PowerShell scripts?
