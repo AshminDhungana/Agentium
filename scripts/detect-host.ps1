@@ -64,30 +64,109 @@ if (Get-Command winget -ErrorAction SilentlyContinue) {
 Write-Conf "PKG_MGR" $PKG_MGR
 Write-Log "  PKG_MGR=$PKG_MGR"
 
-# Step 1.4 - Python
+# Step 1.4 - Python (real executable, Store stub detection)
 Write-Log "Step 1.4 - Locating Python 3.10 or newer"
-$PYTHON_BIN = $null
-$candidates = @("python3.13","python3.12","python3.11","python3.10","python3","python")
+
+$PYTHON_BIN     = $null
+$IS_STORE_PYTHON = "false"
+
+# Helper: test if a path is the Windows Store stub
+function Test-IsStorePython($path) {
+    if (-not $path) { return $false }
+    # Store stubs live under WindowsApps or contain the Store package name
+    if ($path -like "*WindowsApps*")               { return $true }
+    if ($path -like "*PythonSoftwareFoundation*")   { return $true }
+    return $false
+}
+
+# Helper: verify a python binary is >= 3.10 and actually executable
+function Test-PythonOk($bin) {
+    if (-not $bin -or -not (Test-Path $bin -ErrorAction SilentlyContinue)) { return $false }
+    try {
+        $ver = & $bin -c "import sys; print(sys.version_info >= (3,10))" 2>$null
+        return ($ver -eq "True")
+    } catch { return $false }
+}
+
+# Candidate list — real install locations first, Store stub last
+$candidates = @(
+    # Explicit version-named commands (real installs usually register these)
+    "python3.13","python3.12","python3.11","python3.10",
+    # Generic names
+    "python3","python"
+)
+
+# First pass: prefer non-Store Python
 foreach ($candidate in $candidates) {
     $cmd = Get-Command $candidate -ErrorAction SilentlyContinue
-    if ($cmd) {
+    if (-not $cmd) { continue }
+    $exePath = $cmd.Source
+
+    # Resolve the real executable path (handles aliases/shims)
+    try {
+        $resolved = & $exePath -c "import sys; print(sys.executable)" 2>$null
+        if ($resolved -and (Test-Path $resolved)) { $exePath = $resolved }
+    } catch {}
+
+    if (Test-IsStorePython $exePath) { continue }   # skip Store stubs in first pass
+    if (Test-PythonOk $exePath) {
+        $PYTHON_BIN = $exePath
+        break
+    }
+}
+
+# Second pass: also check common real-install directories directly
+if (-not $PYTHON_BIN) {
+    $directPaths = @(
+        "$env:LOCALAPPDATA\Programs\Python\Python313\python.exe",
+        "$env:LOCALAPPDATA\Programs\Python\Python312\python.exe",
+        "$env:LOCALAPPDATA\Programs\Python\Python311\python.exe",
+        "$env:LOCALAPPDATA\Programs\Python\Python310\python.exe",
+        "C:\Python313\python.exe",
+        "C:\Python312\python.exe",
+        "C:\Python311\python.exe",
+        "C:\Python310\python.exe",
+        "$env:ProgramFiles\Python313\python.exe",
+        "$env:ProgramFiles\Python312\python.exe"
+    )
+    foreach ($p in $directPaths) {
+        if (Test-PythonOk $p) {
+            $PYTHON_BIN = $p
+            break
+        }
+    }
+}
+
+# Third pass: fall back to Store Python if nothing else found
+if (-not $PYTHON_BIN) {
+    foreach ($candidate in $candidates) {
+        $cmd = Get-Command $candidate -ErrorAction SilentlyContinue
+        if (-not $cmd) { continue }
+        $exePath = $cmd.Source
         try {
-            $verCheck = & $cmd.Source -c "import sys; print(sys.version_info >= (3,10))" 2>$null
-            if ($verCheck -eq "True") {
-                $PYTHON_BIN = $cmd.Source
-                break
-            }
-        } catch { continue }
+            $resolved = & $exePath -c "import sys; print(sys.executable)" 2>$null
+            if ($resolved -and (Test-Path $resolved)) { $exePath = $resolved }
+        } catch {}
+        if (Test-PythonOk $exePath) {
+            $PYTHON_BIN     = $exePath
+            $IS_STORE_PYTHON = "true"
+            Write-Warn "Only Windows Store Python found — will use VBScript launcher instead of scheduled task"
+            break
+        }
     }
 }
 
 if (-not $PYTHON_BIN) {
-    Write-Warn "No Python 3.10+ found -- voice bridge venv will not be created"
+    Write-Warn "No Python 3.10+ found — voice bridge venv will not be created"
+    Write-Warn "Install Python from https://www.python.org/downloads/ then re-run setup.ps1"
     Write-Conf "PYTHON_BIN" "python3_missing"
+    Write-Conf "IS_STORE_PYTHON" "false"
 } else {
     $verStr = & $PYTHON_BIN --version 2>&1
     Write-Conf "PYTHON_BIN" $PYTHON_BIN
+    Write-Conf "IS_STORE_PYTHON" $IS_STORE_PYTHON
     Write-Log "  PYTHON_BIN=$PYTHON_BIN ($verStr)"
+    Write-Log "  IS_STORE_PYTHON=$IS_STORE_PYTHON"
 }
 
 # Step 1.5 - Microphone
@@ -96,13 +175,8 @@ Write-Conf "HAS_MIC" "true"
 Write-Log "  HAS_MIC=true"
 
 # Step 1.6 - Docker / backend URL
-# FIX: On Docker Desktop for Windows the backend is reachable via host.docker.internal
-# or 127.0.0.1 (since ports are forwarded to the host).
-# The docker bridge gateway (172.17.0.1) is NOT reachable from the Windows host.
 Write-Log "Step 1.6 - Detecting backend URL"
 $BACKEND_URL = "http://127.0.0.1:8000"
-
-# Verify the backend is actually reachable before committing to a URL
 $urlsToTry = @("http://127.0.0.1:8000", "http://localhost:8000", "http://host.docker.internal:8000")
 foreach ($url in $urlsToTry) {
     try {
@@ -114,20 +188,25 @@ foreach ($url in $urlsToTry) {
         }
     } catch { }
 }
-
 Write-Conf "BACKEND_URL" $BACKEND_URL
 Write-Log "  BACKEND_URL=$BACKEND_URL"
 
 # Step 1.7 - Service manager
+# If Store Python detected, override to vbs_startup so installer knows to use VBScript method
 Write-Log "Step 1.7 - Detecting service manager"
-Write-Conf "SVC_MGR" "task_scheduler"
-Write-Log "  SVC_MGR=task_scheduler"
+if ($IS_STORE_PYTHON -eq "true") {
+    Write-Conf "SVC_MGR" "vbs_startup"
+    Write-Log "  SVC_MGR=vbs_startup (Store Python detected — scheduled task won't work)"
+} else {
+    Write-Conf "SVC_MGR" "task_scheduler"
+    Write-Log "  SVC_MGR=task_scheduler"
+}
 
 # Step 1.8 - WS port and wake word
 Write-Conf "WS_PORT"   "9999"
 Write-Conf "WAKE_WORD" "agentium"
 
-# Write REPO_ROOT so install script can find it even when run from TEMP
+# Write REPO_ROOT
 if (-not [string]::IsNullOrWhiteSpace($RepoRoot)) {
     Write-Conf "REPO_ROOT" $RepoRoot
     Write-Log "  REPO_ROOT=$RepoRoot"

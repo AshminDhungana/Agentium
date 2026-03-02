@@ -115,9 +115,9 @@ function InstallNotification({ info, onClose }: InstallNotificationProps) {
     <div
       className="
         fixed bottom-20 left-4 z-50 w-[340px]
-        bg-gray-900 dark:bg-[#0d1117]
-        border border-gray-700 dark:border-gray-600
-        rounded-xl shadow-2xl
+        bg-white dark:bg-[#0d1117]
+        border border-gray-200 dark:border-gray-700
+        rounded-xl shadow-lg dark:shadow-2xl
         animate-in slide-in-from-bottom-4 fade-in duration-300
       "
       role="alert"
@@ -125,16 +125,16 @@ function InstallNotification({ info, onClose }: InstallNotificationProps) {
       {/* Header */}
       <div className="flex items-start justify-between px-4 pt-4 pb-2">
         <div className="flex items-center gap-2">
-          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-orange-500/20">
-            <Terminal className="h-3.5 w-3.5 text-orange-400" />
+          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-orange-100 dark:bg-orange-500/20">
+            <Terminal className="h-3.5 w-3.5 text-orange-500 dark:text-orange-400" />
           </span>
-          <p className="text-sm font-semibold text-white leading-tight">
+          <p className="text-sm font-semibold text-gray-900 dark:text-white leading-tight">
             Voice Bridge Not Running
           </p>
         </div>
         <button
           onClick={onClose}
-          className="ml-2 mt-0.5 text-gray-500 hover:text-gray-300 transition-colors flex-shrink-0"
+          className="ml-2 mt-0.5 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors flex-shrink-0"
           aria-label="Dismiss"
         >
           <X className="h-4 w-4" />
@@ -143,28 +143,28 @@ function InstallNotification({ info, onClose }: InstallNotificationProps) {
 
       {/* Body */}
       <div className="px-4 pb-2">
-        <p className="text-xs text-gray-400 leading-relaxed mb-3">
+        <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed mb-3">
           The local voice bridge isn't running on your{' '}
-          <span className="text-gray-200 font-medium">{info.label}</span> machine.
+          <span className="text-gray-800 dark:text-gray-200 font-medium">{info.label}</span> machine.
           Start it with the command below:
         </p>
 
         {info.commands.map((item, idx) => (
           <div key={idx} className="mb-2 last:mb-0">
-            <p className="text-[10px] text-gray-500 mb-1 uppercase tracking-wide">
+            <p className="text-[10px] text-gray-400 dark:text-gray-500 mb-1 uppercase tracking-wide">
               {item.caption}
             </p>
-            <div className="group flex items-center gap-2 bg-black/50 border border-gray-700 rounded-lg px-3 py-2">
-              <code className="flex-1 text-[11px] text-green-400 font-mono break-all leading-relaxed">
+            <div className="group flex items-center gap-2 bg-gray-50 dark:bg-black/50 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2">
+              <code className="flex-1 text-[11px] text-green-600 dark:text-green-400 font-mono break-all leading-relaxed">
                 {item.cmd}
               </code>
               <button
                 onClick={() => handleCopy(item.cmd, idx)}
-                className="flex-shrink-0 text-gray-600 hover:text-gray-300 transition-colors"
+                className="flex-shrink-0 text-gray-400 hover:text-gray-600 dark:text-gray-600 dark:hover:text-gray-300 transition-colors"
                 aria-label="Copy command"
               >
                 {copied === idx
-                  ? <Check className="h-3.5 w-3.5 text-green-400" />
+                  ? <Check className="h-3.5 w-3.5 text-green-500 dark:text-green-400" />
                   : <Copy className="h-3.5 w-3.5" />
                 }
               </button>
@@ -174,13 +174,13 @@ function InstallNotification({ info, onClose }: InstallNotificationProps) {
       </div>
 
       {/* Footer */}
-      <div className="px-4 py-3 border-t border-gray-800 flex items-center justify-between">
-        <p className="text-[10px] text-gray-600">
+      <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between">
+        <p className="text-[10px] text-gray-400 dark:text-gray-600">
           After running, click the mic icon to reconnect.
         </p>
         <button
           onClick={onClose}
-          className="text-[11px] text-blue-400 hover:text-blue-300 font-medium transition-colors"
+          className="text-[11px] text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 font-medium transition-colors"
         >
           Got it
         </button>
