@@ -145,6 +145,7 @@ async def upload_files(
         # Determine MIME type
         mime_type = file.content_type or mimetypes.guess_type(file.filename)[0] or 'application/octet-stream'
         category = get_file_category(file.filename)
+        safe_filename = generate_safe_filename(file.filename)
 
         # Build S3 Object Key
         object_name = f"files/{current_user.id}/{safe_filename}"

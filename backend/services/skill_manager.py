@@ -276,20 +276,21 @@ class SkillManager:
     
     def _build_access_filter(self, agent_tier: str, min_success_rate: float) -> Dict:
         """Build ChromaDB filter based on agent tier."""
-        base_filter = {
-            "success_rate": {"$gte": min_success_rate},
-            "constitution_compliant": True
-        }
-        
+        # ChromaDB requires multiple conditions to be combined with $and
+        conditions = [
+            {"success_rate": {"$gte": min_success_rate}},
+            {"constitution_compliant": {"$eq": True}},
+        ]
+
         # Tier-based access control
         if agent_tier == "task":
             # Task agents only see verified skills
-            base_filter["verification_status"] = "verified"
+            conditions.append({"verification_status": {"$eq": "verified"}})
         elif agent_tier in ["lead", "council", "head"]:
             # Higher tiers can see pending for review/improvement
-            base_filter["verification_status"] = {"$in": ["verified", "pending"]}
-        
-        return base_filter
+            conditions.append({"verification_status": {"$in": ["verified", "pending"]}})
+
+        return {"$and": conditions}
     
     def get_skill_by_id(self, skill_id: str, db: Session) -> Optional[SkillSchema]:
         """Retrieve full skill by ID."""

@@ -506,7 +506,7 @@ class MonitoringService:
             try:
                 from backend.services.idle_governance import idle_governance
                 with get_db_context() as db:
-                    result = idle_governance.resource_rebalancing(db)
+                    result = await idle_governance.resource_rebalancing(db)
                     if result and result.get("tasks_redistributed", 0) > 0:
                         logger.info(
                             f"Resource rebalancing: redistributed "

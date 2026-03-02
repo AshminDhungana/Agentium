@@ -164,13 +164,13 @@ async def transcribe_audio(
     user_id = str(current_user.id)
     
     # Check voice availability first
-    status = check_voice_available(db, user_id)
-    if not status["available"]:
+    voice_status = check_voice_available(db, user_id)
+    if not voice_status["available"]:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail={
-                "message": status["message"],
-                "action_required": status.get("action_required"),
+                "message": voice_status["message"],
+                "action_required": voice_status.get("action_required"),
                 "needs_provider": True
             }
         )
@@ -273,13 +273,13 @@ async def text_to_speech(
     user_id = str(current_user.id)
     
     # Check voice availability first
-    status = check_voice_available(db, user_id)
-    if not status["available"]:
+    voice_status = check_voice_available(db, user_id)
+    if not voice_status["available"]:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail={
-                "message": status["message"],
-                "action_required": status.get("action_required"),
+                "message": voice_status["message"],
+                "action_required": voice_status.get("action_required"),
                 "needs_provider": True
             }
         )
@@ -332,22 +332,25 @@ async def text_to_speech(
         audio_filename = f"{audio_id}.mp3"
         
         with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp_file:
-            response.stream_to_file(tmp_file.name)
+            tmp_path = tmp_file.name
+        
+        try:
+            # Write audio to temp file (must be closed first on Windows/some Linux fs)
+            response.stream_to_file(tmp_path)
             
             # Upload to StorageService
             object_name = f"voice/{user_id}/{audio_filename}"
-            with open(tmp_file.name, "rb") as f:
+            with open(tmp_path, "rb") as f:
                 url = storage_service.upload_file(f, object_name=object_name, content_type="audio/mpeg")
                 
             if not url:
                 raise Exception("StorageService returned None")
-                
-        # Cleanup
-        if os.path.exists(tmp_file.name):
-            try:
-                os.remove(tmp_file.name)
-            except:
-                pass
+        finally:
+            if os.path.exists(tmp_path):
+                try:
+                    os.remove(tmp_path)
+                except:
+                    pass
         
         return {
             "success": True,

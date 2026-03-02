@@ -197,27 +197,58 @@ class DatabaseMaintenanceService:
         """
         Background task: Weekly REINDEX and ANALYZE on key tables.
         Phase 9.2 requirement.
+
+        Table list is read from db_maintenance_config so it stays in sync
+        with schema changes.  Falls back to a hardcoded default if the config
+        row is absent (e.g. during initial setup).
+
+        Each ANALYZE runs in its own autocommit connection so that a failure
+        on one table never aborts the remaining tables.
         """
         while True:
             try:
                 from backend.models.database import engine
 
-                key_tables = [
-                    "agents", "tasks", "audit_logs", "votes",
+                # --- resolve table list from config, with safe fallback ---
+                default_tables = [
+                    "agents", "tasks", "audit_logs", "individual_votes",
                     "constitutions", "monitoring_alerts",
                 ]
-                with engine.connect() as conn:
-                    for table in key_tables:
-                        try:
-                            conn.execute(
-                                text(f"ANALYZE {table}")
-                            )
-                        except Exception as tbl_err:
-                            logger.warning(
-                                f"ANALYZE skipped for {table}: {tbl_err}"
-                            )
-                    conn.commit()
-                logger.info("Index maintenance: ANALYZE completed.")
+                try:
+                    with engine.connect() as cfg_conn:
+                        row = cfg_conn.execute(text(
+                            "SELECT config_value FROM db_maintenance_config "
+                            "WHERE config_key = 'analyze_tables'"
+                        )).fetchone()
+                    import json as _json
+                    key_tables = _json.loads(row[0]) if row else default_tables
+                except Exception as cfg_err:
+                    logger.warning(
+                        f"Could not read analyze_tables config, "
+                        f"using defaults: {cfg_err}"
+                    )
+                    key_tables = default_tables
+
+                # --- run each ANALYZE in its own autocommit connection so a
+                #     single failure cannot abort the remaining tables ----------
+                analyzed, skipped = [], []
+                for table in key_tables:
+                    try:
+                        with engine.connect() as conn:
+                            conn.execute(text("COMMIT"))          # exit any implicit txn
+                            conn.execute(text(f"ANALYZE {table}"))
+                        analyzed.append(table)
+                    except Exception as tbl_err:
+                        skipped.append(table)
+                        logger.warning(
+                            f"ANALYZE skipped for {table}: {tbl_err}"
+                        )
+
+                logger.info(
+                    f"Index maintenance: ANALYZE completed "
+                    f"({len(analyzed)} tables). "
+                    + (f"Skipped: {skipped}" if skipped else "")
+                )
             except Exception as e:
                 logger.error(f"Error in index_maintenance: {e}")
 

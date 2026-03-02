@@ -10,55 +10,6 @@
 
 ## 🔴 Critical Issues (Require Immediate Attention)
 
-### 1. Database Schema Mismatches
-
----
-
-Table Issue Impact Location
-
----
-
-`individual_votes` Missing `updated_at` SQLAlchemy individual_votes table
-column queries fail,  
- monitoring  
- service errors
-
-`experiments` Invalid enum value A/B testing stats experiments table
-`COMPLETED` for API fails  
- `experiment_status`
-
----
-
-**Log Evidence:**
-
-```plain
-ERROR: column individual_votes.updated_at does not exist at character 736
-HINT: Perhaps you meant to reference the column "individual_votes.created_at"
-
-ERROR: invalid input value for enum experiment_status: "COMPLETED"
-```
-
----
-
-### 2. Runtime Errors
-
----
-
-Issue Impact Component
-
----
-
-Coroutine attribute error Resource rebalancing monitoring_service.py
-loop crashes
-
-Missing module Vector DB db_maintenance.py
-`backend.core.vector_db` optimization fails
-
-ChromaDB query syntax Skill search skill_manager.py
-error functionality broken
-
----
-
 **Log Evidence:**
 
 ```plain
