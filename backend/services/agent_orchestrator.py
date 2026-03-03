@@ -33,6 +33,7 @@ from backend.models.schemas.tool_creation import ToolCreationRequest
 from backend.services.host_access import HostAccessService
 from backend.services.clarification_service import ClarificationService
 from backend.tools.browser_router import should_use_stealth_browser_with_runtime, register_stealth_domain
+from backend.services.prompt_template_manager import prompt_template_manager
 
 logger = logging.getLogger(__name__)
 
@@ -99,11 +100,27 @@ class AgentOrchestrator:
         model_key = f"{agent.preferred_config.provider}:{agent.preferred_config.default_model}"
         model = api_manager.models.get(model_key)
 
-        # Execute with allocated model
+        # Build a provider- and task-aware system prompt using the agent's ethos.
+        # agent_tier is derived from the ID prefix: 0xxxx→0, 1xxxx→1, 2xxxx→2, 3xxxx→3.
+        agent_tier = int(agent.agentium_id[0]) if agent.agentium_id[0].isdigit() else 3
+        system_prompt, max_tokens_multiplier, requires_cot = (
+            prompt_template_manager.build_system_prompt(
+                provider=agent.preferred_config.provider,
+                model_name=agent.preferred_config.default_model,
+                task_description=task.description,
+                agent_ethos=agent.ethos,
+                agent_tier=agent_tier,
+            )
+        )
+
+        # Execute with allocated model and the template-built system prompt.
         result = await ModelService.generate_with_agent(
             agent=agent,
             user_message=task.description,
-            config_id=config_id
+            config_id=config_id,
+            system_prompt_override=system_prompt,
+            max_tokens_multiplier=max_tokens_multiplier,
+            chain_of_thought=requires_cot,
         )
 
         # Record usage

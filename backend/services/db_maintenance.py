@@ -140,30 +140,30 @@ class DatabaseMaintenanceService:
         """
         while True:
             try:
-                from backend.core.vector_db import VectorStore
-                vs = VectorStore()
+                # Import from the correct module path.
+                # vector_store.py lives at backend.services.vector_store and
+                # exposes VectorStore + get_vector_store().
+                from backend.services.vector_store import get_vector_store
+                vs = get_vector_store()
                 optimized_count = 0
 
-                for collection_name in [
-                    "constitution", "task_learnings",
-                    "domain_knowledge", "execution_patterns",
-                    "rejected",
-                ]:
+                # Iterate over canonical collection keys defined in
+                # VectorStore.COLLECTIONS so this list never drifts out of sync.
+                for collection_key, collection_name in vs.COLLECTIONS.items():
                     try:
                         col = vs.client.get_or_create_collection(
                             name=collection_name
                         )
-                        before_count = col.count()
-                        if before_count == 0:
+                        if col.count() == 0:
                             continue
 
-                        # Get all docs and remove exact duplicates
+                        # Fetch all docs and remove exact-text duplicates
                         all_docs = col.get(include=["documents"])
                         if not all_docs or not all_docs.get("ids"):
                             continue
 
-                        seen = {}
-                        to_delete = []
+                        seen: dict = {}
+                        to_delete: list = []
                         for i, doc in enumerate(
                             all_docs.get("documents", [])
                         ):
@@ -178,17 +178,25 @@ class DatabaseMaintenanceService:
 
                     except Exception as col_err:
                         logger.warning(
-                            f"Vector optimization skipped "
-                            f"{collection_name}: {col_err}"
+                            "Vector optimization skipped '%s': %s",
+                            collection_name, col_err,
                         )
 
                 if optimized_count > 0:
                     logger.info(
-                        f"Vector DB optimization: removed "
-                        f"{optimized_count} duplicate entries."
+                        "Vector DB optimization: removed %d duplicate entries.",
+                        optimized_count,
                     )
+                else:
+                    logger.debug("Vector DB optimization: no duplicates found.")
+
+            except ImportError as e:
+                # ChromaDB or sentence-transformers not installed — skip silently.
+                logger.warning(
+                    "Vector DB optimization skipped (missing dependency): %s", e
+                )
             except Exception as e:
-                logger.error(f"Error in vector_db_optimization: {e}")
+                logger.error("Error in vector_db_optimization: %s", e)
 
             await asyncio.sleep(604800)  # Weekly
 
