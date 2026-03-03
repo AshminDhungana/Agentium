@@ -60,6 +60,37 @@ services:
       retries: 5
 
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # MinIO Object Storage
+  # Primary store for file uploads.
+  # If this service is unreachable the
+  # backend falls back to local disk at
+  # STORAGE_LOCAL_PATH automatically.
+  # Console → http://localhost:9001
+  #   login: minioadmin / minioadmin
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  minio:
+    image: minio/minio:latest
+    container_name: agentium-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # Web console
+    volumes:
+      - minio_data:/data
+    restart: unless-stopped
+    networks:
+      - agentium-network
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 15s
+      timeout: 5s
+      start_period: 20s
+      retries: 5
+
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   # WhatsApp Web Bridge (Baileys)
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   whatsapp-bridge:
@@ -175,6 +206,28 @@ services:
       - WHATSAPP_BRIDGE_TOKEN=${WHATSAPP_BRIDGE_TOKEN:-changeme}
       - DISPLAY=:99
       - XVFB_RESOLUTION=1920x1080x24
+      # ── Storage (MinIO primary / local fallback) ──────────────────────────
+      # MinIO credentials — must match MINIO_ROOT_USER / MINIO_ROOT_PASSWORD above.
+      - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER:-minioadmin}
+      - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD:-minioadmin}
+      - S3_ENDPOINT=http://minio:9000
+      - S3_BUCKET_NAME=${S3_BUCKET_NAME:-agentium-media}
+      - S3_FORCE_PATH_STYLE=true
+      # Local fallback path — used automatically when MinIO is unreachable.
+      # Backed by the named volume below so files survive container restarts.
+      - STORAGE_LOCAL_PATH=/app/data/uploads
+      - APP_BASE_URL=${APP_BASE_URL:-http://localhost:8000}
+    volumes:
+      - ./backend:/app/backend
+      - chroma_data:/app/chroma_data
+      - /var/run/docker.sock:/var/run/docker.sock:rw
+      - /:/host:rw
+      - ${USERPROFILE:-~}:/host_home:rw
+      - /sys:/sys:rw
+      - /proc:/proc:rw
+      - /dev:/dev:rw
+      # Persistent local file storage (fallback when MinIO is unavailable)
+      - uploads_data:/app/data/uploads
     restart: unless-stopped
     command: uvicorn backend.main:app --host 0.0.0.0 --port 8000
     depends_on:
@@ -185,6 +238,8 @@ services:
       chromadb:
         condition: service_healthy
       whatsapp-bridge:
+        condition: service_healthy
+      minio:
         condition: service_healthy
     networks:
       - agentium-network
@@ -234,6 +289,25 @@ services:
       - WHATSAPP_BRIDGE_TOKEN=${WHATSAPP_BRIDGE_TOKEN:-changeme}
       - DISPLAY=:99
       - XVFB_RESOLUTION=1920x1080x24
+      # ── Storage (MinIO primary / local fallback) ──────────────────────────
+      - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER:-minioadmin}
+      - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD:-minioadmin}
+      - S3_ENDPOINT=http://minio:9000
+      - S3_BUCKET_NAME=${S3_BUCKET_NAME:-agentium-media}
+      - S3_FORCE_PATH_STYLE=true
+      - STORAGE_LOCAL_PATH=/app/data/uploads
+      - APP_BASE_URL=${APP_BASE_URL:-http://localhost:8000}
+    volumes:
+      - ./backend:/app/backend
+      - chroma_data:/app/chroma_data
+      - /var/run/docker.sock:/var/run/docker.sock:rw
+      - /:/host:rw
+      - ${USERPROFILE:-~}:/host_home:rw
+      - /sys:/sys:rw
+      - /proc:/proc:rw
+      - /dev:/dev:rw
+      # Same persistent uploads volume as the backend
+      - uploads_data:/app/data/uploads
     depends_on:
       backend:
         condition: service_healthy
@@ -325,6 +399,13 @@ volumes:
   redis_data:
     driver: local
   whatsapp_auth:
+    driver: local
+  # MinIO object storage — primary file store
+  minio_data:
+    driver: local
+  # Local filesystem fallback — used when MinIO is unavailable.
+  # Shared between backend and celery-worker so both can read/write uploads.
+  uploads_data:
     driver: local
 
 networks:

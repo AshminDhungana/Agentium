@@ -283,6 +283,10 @@ async def download_file(
     """
     Download a specific file.
     Users can only access their own files unless they're admin.
+
+    Behaviour differs by active storage backend:
+      - S3/MinIO: redirects to a presigned URL.
+      - Local:    streams the file directly from disk.
     """
     # Security check - users can only access their own files
     if str(current_user.id) != user_id and not current_user.is_admin:
@@ -292,14 +296,31 @@ async def download_file(
         )
 
     object_name = f"files/{user_id}/{filename}"
+
+    # ── Local filesystem backend: serve the file directly ────────────────────
+    if storage_service.backend_name == "local":
+        import os as _os
+        local_root = _os.getenv("STORAGE_LOCAL_PATH", "./data/uploads")
+        local_path = Path(local_root).resolve() / object_name
+        if not local_path.exists():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="File not found"
+            )
+        media_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
+        return FileResponse(
+            path=str(local_path),
+            media_type=media_type,
+            filename=filename,
+        )
+
+    # ── S3/MinIO backend: redirect to presigned URL ───────────────────────────
     url = storage_service.generate_presigned_url(object_name, expiration=3600)
-    
     if not url:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="File not found or failed to generate URL"
         )
-
     return RedirectResponse(url=url)
 
 
@@ -360,6 +381,24 @@ async def preview_file(
         )
 
     object_name = f"files/{user_id}/{filename}"
+
+    # ── Local filesystem backend: serve inline directly ───────────────────────
+    if storage_service.backend_name == "local":
+        import os as _os
+        local_root = _os.getenv("STORAGE_LOCAL_PATH", "./data/uploads")
+        local_path = Path(local_root).resolve() / object_name
+        if not local_path.exists():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="File not found"
+            )
+        return FileResponse(
+            path=str(local_path),
+            media_type=media_type,
+            filename=filename,
+        )
+
+    # ── S3/MinIO backend: redirect to presigned URL ───────────────────────────
     url = storage_service.generate_presigned_url(object_name, expiration=3600)
     
     if not url:
