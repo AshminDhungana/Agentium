@@ -206,6 +206,7 @@ services:
       - WHATSAPP_BRIDGE_TOKEN=${WHATSAPP_BRIDGE_TOKEN:-changeme}
       - DISPLAY=:99
       - XVFB_RESOLUTION=1920x1080x24
+      - TOKENIZERS_PARALLELISM=false
       # ── Storage (MinIO primary / local fallback) ──────────────────────────
       # MinIO credentials — must match MINIO_ROOT_USER / MINIO_ROOT_PASSWORD above.
       - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER:-minioadmin}
@@ -289,6 +290,7 @@ services:
       - WHATSAPP_BRIDGE_TOKEN=${WHATSAPP_BRIDGE_TOKEN:-changeme}
       - DISPLAY=:99
       - XVFB_RESOLUTION=1920x1080x24
+      - TOKENIZERS_PARALLELISM=false
       # ── Storage (MinIO primary / local fallback) ──────────────────────────
       - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER:-minioadmin}
       - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD:-minioadmin}
@@ -358,6 +360,7 @@ services:
       - WHATSAPP_BRIDGE_TOKEN=${WHATSAPP_BRIDGE_TOKEN:-changeme}
       - DISPLAY=:99
       - XVFB_RESOLUTION=1920x1080x24
+      - TOKENIZERS_PARALLELISM=false
     depends_on:
       backend:
         condition: service_healthy

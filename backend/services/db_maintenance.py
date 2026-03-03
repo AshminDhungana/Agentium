@@ -238,12 +238,18 @@ class DatabaseMaintenanceService:
                     key_tables = default_tables
 
                 # --- run each ANALYZE in its own autocommit connection so a
-                #     single failure cannot abort the remaining tables ----------
+                #     single failure cannot abort the remaining tables.
+                #     ANALYZE is DDL and cannot run inside a transaction;
+                #     using isolation_level="AUTOCOMMIT" is the correct fix —
+                #     the previous bare COMMIT on a connection with no open
+                #     transaction was causing the PG warning
+                #     "there is no transaction in progress". ----------
                 analyzed, skipped = [], []
                 for table in key_tables:
                     try:
-                        with engine.connect() as conn:
-                            conn.execute(text("COMMIT"))          # exit any implicit txn
+                        with engine.connect().execution_options(
+                            isolation_level="AUTOCOMMIT"
+                        ) as conn:
                             conn.execute(text(f"ANALYZE {table}"))
                         analyzed.append(table)
                     except Exception as tbl_err:

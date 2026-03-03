@@ -113,6 +113,12 @@ function stopKeepalive() {
 async function startWhatsApp() {
     clearTimeout(reconnectTimer);
 
+    // Prevent a second concurrent initialisation (e.g. rapid reconnect calls)
+    if (sock) {
+        logger.warn('[Bridge] startWhatsApp called while socket already exists — skipping');
+        return;
+    }
+
     const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
     const { version }          = await fetchLatestBaileysVersion();
 
@@ -162,6 +168,7 @@ async function startWhatsApp() {
         if (connection === 'close') {
             isConnected     = false;
             isAuthenticated = false;
+            sock            = null;   // allow startWhatsApp guard to reset
             stopKeepalive();
 
             const statusCode = (lastDisconnect?.error instanceof Boom)
@@ -266,6 +273,25 @@ wss.on('connection', (ws, req) => {
             return;
         }
 
+        // ── action: connect — initiate WhatsApp (triggers QR if no saved creds) ──
+        if (cmd.action === 'connect') {
+            if (isConnected || isAuthenticated) {
+                ws.send(JSON.stringify({ event: 'error', message: 'Already connected' }));
+                return;
+            }
+            if (sock) {
+                ws.send(JSON.stringify({ event: 'error', message: 'Connection already in progress' }));
+                return;
+            }
+            logger.info('[Bridge] Explicit connect requested by backend');
+            startWhatsApp().catch((err) => {
+                logger.error({ err }, '[Bridge] startWhatsApp error');
+                ws.send(JSON.stringify({ event: 'error', message: `Connect failed: ${err.message}` }));
+            });
+            ws.send(JSON.stringify({ event: 'connecting' }));
+            return;
+        }
+
         // ── action: send — send a WhatsApp message ─────────────────────────
         if (cmd.action === 'send') {
             if (!sock || !isAuthenticated) {
@@ -317,10 +343,19 @@ app.get('/status', (_req, res) => {
 
 const server = app.listen(PORT, () => {
     logger.info(`[Bridge] Listening on port ${PORT}`);
-    startWhatsApp().catch((err) => {
-        logger.error({ err }, '[Bridge] Fatal startup error');
-        process.exit(1);
-    });
+
+    if (hasSavedCreds()) {
+        // Saved session found — resume silently (no QR will be generated)
+        logger.info('[Bridge] Saved credentials found — resuming existing session');
+        startWhatsApp().catch((err) => {
+            logger.error({ err }, '[Bridge] Fatal startup error');
+            process.exit(1);
+        });
+    } else {
+        // No credentials — stay idle until the backend sends a `connect` action
+        logger.info('[Bridge] No saved credentials — waiting for explicit connect request');
+        broadcast('status', statusSnapshot());
+    }
 });
 
 // Upgrade HTTP → WebSocket
