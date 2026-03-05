@@ -24,12 +24,17 @@ def generate_secrets():
         secrets.choice(string.ascii_letters + string.digits) 
         for _ in range(32)
     )
-    
+
+    # FEDERATION_SHARED_SECRET: 64-character hex string (32 bytes)
+    # Shared between two Agentium instances to authenticate cross-instance requests
+    federation_shared_secret = secrets.token_hex(32)
+
     return {
         'SECRET_KEY': secret_key,
         'ENCRYPTION_KEY': encryption_key,
         'VOICE_JWT_SECRET': voice_jwt_secret,
-        'VOICE_TOKEN_DURATION_MINUTES': '30'
+        'VOICE_TOKEN_DURATION_MINUTES': '30',
+        'FEDERATION_SHARED_SECRET': federation_shared_secret,
     }
 
 
@@ -112,8 +117,9 @@ def main():
     
     # Remove quotes if requested
     if args.no_quotes and args.format == 'env':
+        no_strip = {'VOICE_TOKEN_DURATION_MINUTES'}
         for key in secrets_dict:
-            if key != 'VOICE_TOKEN_DURATION_MINUTES':
+            if key not in no_strip:
                 secrets_dict[key] = secrets_dict[key].strip('"')
     
     # Print to console
