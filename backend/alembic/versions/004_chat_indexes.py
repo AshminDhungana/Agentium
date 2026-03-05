@@ -5,7 +5,7 @@ import sqlalchemy as sa
 
 # revision identifiers
 revision = '004_chat_indexes'
-down_revision = '003_user_preferences'
+down_revision = '003_reasoning_trace'
 branch_labels = None
 depends_on = None
 

@@ -184,7 +184,7 @@ export const AgentsPage: React.FC = () => {
 
         const { type, content, metadata } = lastMessage;
 
-        if (type === 'system' && isAgentEvent(content)) {
+        if (type === 'system' && content && isAgentEvent(content)) {
             loadAgents(true);
             return;
         }

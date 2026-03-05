@@ -449,11 +449,11 @@ export function ChatPage() {
                     if (result.isFinal) {
                         setInput((prev) => {
                             const sep = prev && !prev.endsWith(' ') ? ' ' : '';
-                            return prev + sep + result.transcript;
+                            return prev + sep + (result.text ?? '');
                         });
                         setInterimTranscript('');
                     } else {
-                        setInterimTranscript(result.transcript);
+                        setInterimTranscript(result.text ?? '');
                     }
                 },
                 () => stopRecording(),
@@ -520,14 +520,18 @@ export function ChatPage() {
         const toastId = toast.loading('Generating speech…');
         try {
             setIsSpeaking(messageId);
-            const audioBlob = await voiceApi.speak(content, selectedVoice);
+            const result = await voiceApi.synthesize(content, selectedVoice);
             toast.dismiss(toastId);
-            const audioUrl = URL.createObjectURL(audioBlob);
-            const audio = new Audio(audioUrl);
-            audioPlayerRef.current = audio;
-            audio.onended = () => { setIsSpeaking(null); URL.revokeObjectURL(audioUrl); };
-            audio.onerror = () => { setIsSpeaking(null); toast.error('Audio playback failed'); };
-            audio.play();
+            if (result.audio_url) {
+                const audio = new Audio(result.audio_url);
+                audioPlayerRef.current = audio;
+                audio.onended = () => { setIsSpeaking(null); };
+                audio.onerror = () => { setIsSpeaking(null); toast.error('Audio playback failed'); };
+                audio.play();
+            } else {
+                // Local browser TTS — synthesize already played it
+                setIsSpeaking(null);
+            }
         } catch (error: any) {
             toast.dismiss(toastId);
             toast.error(error.message || 'Speech synthesis failed');
@@ -552,7 +556,8 @@ export function ChatPage() {
                 { id, file, preview, isUploading: true },
             ]);
             try {
-                const apiFile = await fileApi.upload(file);
+                const response = await fileApi.uploadFiles([file]);
+                const apiFile = response.files[0];
                 setUploadedFiles((prev) =>
                     prev.map((f) => f.id === id ? { ...f, apiFile, isUploading: false } : f),
                 );
@@ -640,7 +645,7 @@ export function ChatPage() {
         if (!files) return;
         for (const file of Array.from(files)) {
             try {
-                await fileApi.upload(file);
+                await fileApi.uploadFiles([file]);
                 toast.success(`${file.name} uploaded`);
             } catch (e: any) {
                 toast.error(`Failed: ${e.message}`);
@@ -949,7 +954,7 @@ export function ChatPage() {
                                                     : <div className="text-gray-500 dark:text-gray-400">{getFileIcon(uf.file.type)}</div>}
                                                 <span className="text-gray-700 dark:text-gray-300 max-w-[120px] truncate text-xs">{uf.file.name}</span>
                                                 {uf.isUploading && <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-500" />}
-                                                {uf.uploadError && <AlertCircle className="w-3.5 h-3.5 text-red-500" title={uf.uploadError} />}
+                                                {uf.uploadError && <span title={uf.uploadError}><AlertCircle className="w-3.5 h-3.5 text-red-500" /></span>}
                                                 {!uf.isUploading && !uf.uploadError && <CheckCircle className="w-3.5 h-3.5 text-green-500" />}
                                                 <button onClick={() => removeFile(uf.id)}
                                                     className="ml-1 p-0.5 rounded-full hover:bg-gray-200 dark:hover:bg-[#2a3347] text-gray-400">
