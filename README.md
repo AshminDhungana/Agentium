@@ -396,6 +396,7 @@ Results aggregated → Head → You (2–3 line response only)
 - [x] Advanced RAG with source attribution, confidence scoring, and contradiction detection
 - [x] Voice interface (OpenAI Whisper STT + TTS with WebSocket streaming)
 - [x] Autonomous learning — best practice and anti-pattern extraction from critic reviews
+- [ ] Testing and refinement of all the above features
 
 ### Phase 11–12: Federation & SDK 🔮 FUTURE
 

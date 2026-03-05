@@ -935,7 +935,7 @@ function VersionsTab() {
           <div className="grid grid-cols-2 gap-3 mb-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Version A</label>
-              <input
+              <input aria-label="Version A"
                 type="number"
                 className="w-full px-4 py-2 bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all"
                 value={diffA}
@@ -944,7 +944,7 @@ function VersionsTab() {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Version B</label>
-              <input
+              <input aria-label="Version B"
                 type="number"
                 className="w-full px-4 py-2 bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all"
                 value={diffB}
@@ -981,7 +981,7 @@ function VersionsTab() {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                 New Code
               </label>
-              <textarea
+              <textarea aria-label="New Code"
                 className="w-full px-4 py-2 bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all resize-none font-mono"
                 rows={4}
                 value={proposeUpd.new_code}
@@ -992,7 +992,7 @@ function VersionsTab() {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                 Change Summary
               </label>
-              <input
+              <input aria-label="Change Summary"
                 className="w-full px-4 py-2 bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all"
                 value={proposeUpd.change_summary}
                 onChange={(e) => setProposeUpd((p) => ({ ...p, change_summary: e.target.value }))}
@@ -1021,7 +1021,7 @@ function VersionsTab() {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                 Pending Version ID
               </label>
-              <input
+              <input aria-label="Pending Version ID"
                 className="w-full px-4 py-2 bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all"
                 value={approveUpd.pending_version_id}
                 onChange={(e) => setApproveUpd((a) => ({ ...a, pending_version_id: e.target.value }))}
@@ -1031,7 +1031,7 @@ function VersionsTab() {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                 Voting ID (optional)
               </label>
-              <input
+              <input aria-label="Voting ID (optional)"
                 className="w-full px-4 py-2 bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all"
                 value={approveUpd.approved_by_voting_id}
                 onChange={(e) => setApproveUpd((a) => ({ ...a, approved_by_voting_id: e.target.value }))}
@@ -1060,7 +1060,7 @@ function VersionsTab() {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                 Target Version Number
               </label>
-              <input
+              <input aria-label="Target Version Number"
                 type="number"
                 className="w-full px-4 py-2 bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all"
                 value={rollback.target_version_number}
@@ -1071,7 +1071,7 @@ function VersionsTab() {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                 Reason
               </label>
-              <input
+              <input aria-label="Reason"
                 className="w-full px-4 py-2 bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all"
                 value={rollback.reason}
                 onChange={(e) => setRollback((r) => ({ ...r, reason: e.target.value }))}
@@ -1134,7 +1134,7 @@ function SunsetTab() {
             <h3 className="text-lg font-bold text-gray-900 dark:text-white">Deprecated & Sunset Tools</h3>
           </div>
           <div className="flex gap-3">
-            <button
+            <button aria-label="Refresh"
               onClick={refresh}
               className="px-3 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-[#1e2535] rounded-lg transition-colors"
             >
@@ -1197,7 +1197,7 @@ function SunsetTab() {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                 Tool Name
               </label>
-              <input
+              <input aria-label="Tool Name"
                 className="w-full px-4 py-2 bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all"
                 value={toolName}
                 onChange={(e) => setToolName(e.target.value)}
@@ -1207,7 +1207,7 @@ function SunsetTab() {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                 Sunset Days (min 7)
               </label>
-              <input
+              <input aria-label="Sunset Days (min 7)"
                 type="number"
                 min={7}
                 className="w-full px-4 py-2 bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all"
@@ -1240,7 +1240,7 @@ function SunsetTab() {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                 Tool Name
               </label>
-              <input
+              <input aria-label="Tool Name"
                 className="w-full px-4 py-2 bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all"
                 value={toolName}
                 onChange={(e) => setToolName(e.target.value)}
@@ -1326,7 +1326,7 @@ function AnalyticsTab() {
           <div className="flex gap-3 items-center">
             <div className="flex items-center gap-2">
               <span className="text-sm text-gray-500 dark:text-gray-400">Days:</span>
-              <input
+              <input aria-label="Days"
                 type="number"
                 className="w-20 px-3 py-1.5 bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                 value={days}
@@ -1387,7 +1387,7 @@ function AnalyticsTab() {
               value={errorTool}
               onChange={(e) => setErrorTool(e.target.value)}
             />
-            <input
+            <input aria-label="Error Limit"
               type="number"
               className="w-20 px-3 py-2 bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
               value={errorLimit}
@@ -1466,7 +1466,7 @@ function AnalyticsTab() {
               value={perTool}
               onChange={(e) => setPerTool(e.target.value)}
             />
-            <input
+            <input aria-label="Days"
               type="number"
               className="w-20 px-3 py-2 bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
               value={days}

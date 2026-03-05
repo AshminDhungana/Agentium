@@ -576,7 +576,7 @@ export function FederationPage() {
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                                     Trust Level
                                 </label>
-                                <select
+                                <select aria-label="Trust Level"
                                     value={newPeer.trust_level}
                                     onChange={(e) => setNewPeer({ ...newPeer, trust_level: e.target.value })}
                                     className="w-full px-4 py-2.5 border border-gray-200 dark:border-[#1e2535] rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-[#0f1117] text-gray-900 dark:text-white text-sm transition-colors duration-150"
@@ -645,7 +645,7 @@ export function FederationPage() {
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                                     Target Peer
                                 </label>
-                                <select
+                                <select aria-label="Target Peer"
                                     value={delegateForm.target_peer_id}
                                     onChange={(e) => setDelegateForm({ ...delegateForm, target_peer_id: e.target.value })}
                                     className="w-full px-4 py-2.5 border border-gray-200 dark:border-[#1e2535] rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-[#0f1117] text-gray-900 dark:text-white text-sm transition-colors duration-150"
