@@ -10,8 +10,8 @@ pattern = re.compile(r'(?:api|axios|fetch)\.?(?:get|post|put|delete|patch)?\s*\(
 # Let's use a simpler pattern to just find all strings that look like API paths and the HTTP method next to it if possible.
 # Actually, let's just find things that look like URL paths starting with /api/ or being called by api.xxx.
 
-# Matches api.get, axios.post, etc. with ', ", or `
-pattern_method_path = re.compile(r'(?:api|axios)\.(get|post|put|delete|patch)\s*\(\s*[\'"`](/?api/[^\'"`]+|/[^\'"`]+)[\'"`]')
+# Matches api.get, axios.post, etc. with optional TypeScript generics <...>, and string literal quotes
+pattern_method_path = re.compile(r'(?:api|axios)\.(get|post|put|delete|patch)[^(\n]*\(\s*[\'"`](/?api/[^\'"`]+|/[^\'"`]+)[\'"`]')
 
 for root, _, files in os.walk(frontend_dir):
     for file in files:
@@ -30,7 +30,7 @@ for root, _, files in os.walk(frontend_dir):
                         
                     routes.append(f"{method} {path} (in {os.path.relpath(os.path.join(root, file), frontend_dir)})")
 
-with open(r"e:\Agentium\frontend_routes.txt", "w", encoding='utf-8') as f:
+with open(r"e:\Agentium\test\frontend_routes.txt", "w", encoding='utf-8') as f:
     for r in sorted(set(routes)):
         f.write(r + "\n")
 print(f"Found {len(set(routes))} frontend API calls.")

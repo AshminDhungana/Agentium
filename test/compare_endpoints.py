@@ -17,7 +17,7 @@ def normalize_path(path):
     return path.lower()
 
 backend_routes = []
-with open(r"e:\Agentium\backend_routes.txt", "r", encoding='utf-8') as f:
+with open(r"e:\Agentium\test\backend_routes.txt", "r", encoding='utf-8') as f:
     for line in f:
         if line.strip():
             parts = line.split(' ')
@@ -27,7 +27,7 @@ with open(r"e:\Agentium\backend_routes.txt", "r", encoding='utf-8') as f:
                 backend_routes.append((method, path, line.strip()))
 
 frontend_routes = []
-with open(r"e:\Agentium\frontend_routes.txt", "r", encoding='utf-8') as f:
+with open(r"e:\Agentium\test\frontend_routes.txt", "r", encoding='utf-8') as f:
     for line in f:
         if line.strip():
             parts = line.split(' ')
@@ -76,7 +76,7 @@ for m, p, orig in backend_routes:
         missing_in_frontend.append(orig)
 
 # Output results to a markdown file
-with open(r"C:\Users\Lenovo\.gemini\antigravity\brain\bb0d592e-df82-4c3d-ae66-ddbd55007d65\disconnected_endpoints.md", "w", encoding='utf-8') as f:
+with open(r"e:\Agentium\test\disconnected_endpoints.md", "w", encoding='utf-8') as f:
     f.write("# Disconnected Backend Endpoints\n\n")
     f.write(f"Total backend endpoints: {len(backend_routes)}\n")
     f.write(f"Total frontend endpoints: {len(frontend_routes)}\n")

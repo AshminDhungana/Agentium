@@ -20,7 +20,7 @@ for root, _, files in os.walk(backend_dir):
                     # For simplicity we'll just capture what is defined.
                     routes.append(f"{method} {path} (in {os.path.relpath(os.path.join(root, file), backend_dir)})")
 
-with open(r"e:\Agentium\backend_routes.txt", "w", encoding='utf-8') as f:
+with open(r"e:\Agentium\test\backend_routes.txt", "w", encoding='utf-8') as f:
     for r in sorted(set(routes)):
         f.write(r + "\n")
 print(f"Found {len(set(routes))} routes.")

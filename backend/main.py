@@ -385,22 +385,22 @@ app.include_router(capability_routes.router)
 app.include_router(lifecycle_routes.router)
 app.include_router(monitoring_router.router,        prefix="/api/v1")
 app.include_router(api_keys_routes.router,          prefix="/api/v1")
-app.include_router(critics_routes.router,           prefix="/api/v1")   # Phase 6.2
-app.include_router(checkpoints_routes.router,       prefix="/api/v1")   # Phase 6.5
-app.include_router(remote_executor_routes.router,   prefix="/api/v1")   # Phase 6.6
-app.include_router(voting_routes.router,            prefix="/api/v1")   # Phase 7: Voting & Deliberations
-app.include_router(mcp_tools_router)                                     # Phase 6.7: admin/governance
-app.include_router(tools_routes.router,             prefix="/api/v1")   # Phase 6.7: agent tool access
+app.include_router(critics_routes.router,           prefix="/api/v1")   
+app.include_router(checkpoints_routes.router,       prefix="/api/v1")  
+app.include_router(remote_executor_routes.router,   prefix="/api/v1")   
+app.include_router(voting_routes.router,            prefix="/api/v1")   
+app.include_router(mcp_tools_router)                                     
+app.include_router(tools_routes.router,             prefix="/api/v1")   
 app.include_router(user_preferences_routes.router, prefix="/api/v1")
 app.include_router(ab_testing_router, prefix="/api/v1")
 app.include_router(provider_analytics_routes.router, prefix="/api/v1")
 app.include_router(skills_routes.router, prefix="/api/v1")
-app.include_router(browser_routes.router, prefix="/api/v1")  # Phase 10.1
-app.include_router(audio_routes.router, prefix="/api/v1")    # Phase 10.3
-app.include_router(rbac_routes.router, prefix="/api/v1")     # Phase 11.1
-app.include_router(federation_routes.router, prefix="/api/v1") # Phase 11.2
-app.include_router(plugins_routes.router, prefix="/api/v1")    # Phase 11.3
-app.include_router(mobile_routes.router, prefix="/api/v1")     # Phase 11.4
+app.include_router(browser_routes.router, prefix="/api/v1") 
+app.include_router(audio_routes.router, prefix="/api/v1")    
+app.include_router(rbac_routes.router, prefix="/api/v1")     
+app.include_router(federation_routes.router, prefix="/api/v1") 
+app.include_router(plugins_routes.router, prefix="/api/v1")    
+app.include_router(mobile_routes.router, prefix="/api/v1")     
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -669,59 +669,6 @@ async def get_model_status():
         return {"status": "not_initialized"}
     report = model_allocator.get_allocation_report()
     return {"status": "active", "report": report}
-
-
-# ── Phase 3 Dashboard ─────────────────────────────────────────────────────────
-
-@app.get("/api/v1/phase3/dashboard")
-async def get_phase3_dashboard(db: Session = Depends(get_db)):
-    """Get comprehensive dashboard data."""
-    from backend.services.reincarnation_service import reincarnation_service
-    from backend.services.capability_registry import capability_registry
-    from backend.services.api_key_manager import api_key_manager
-
-    capacity = reincarnation_service.get_available_capacity(db)
-    capability_audit = capability_registry.capability_audit_report(db)
-    idle_stats = idle_governance.get_statistics()
-    api_key_health = api_key_manager.get_key_health_report(db=db)
-
-    from backend.models.entities.audit import AuditLog
-    from datetime import timedelta
-
-    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
-
-    lifecycle_events = {
-        "spawned": db.query(AuditLog).filter(
-            AuditLog.action.in_(["agent_spawned", "lead_spawned"]),
-            AuditLog.created_at >= thirty_days_ago
-        ).count(),
-        "promoted": db.query(AuditLog).filter(
-            AuditLog.action == "agent_promoted",
-            AuditLog.created_at >= thirty_days_ago
-        ).count(),
-        "liquidated": db.query(AuditLog).filter(
-            AuditLog.action == "agent_liquidated",
-            AuditLog.created_at >= thirty_days_ago
-        ).count(),
-        "reincarnated": db.query(AuditLog).filter(
-            AuditLog.action == "agent_birth",
-            AuditLog.created_at >= thirty_days_ago
-        ).count()
-    }
-
-    return {
-        "phase": "Phase 3: Agent Lifecycle Management",
-        "completion": "100%",
-        "capacity": capacity,
-        "capability_distribution": capability_audit,
-        "lifecycle_events_30d": lifecycle_events,
-        "idle_governance": {
-            "active": idle_governance.is_running,
-            "metrics": idle_stats.get("metrics", {})
-        },
-        "api_key_health": api_key_health,
-        "warnings": []
-    }
 
 
 # ── MCP Tool Registry Status (convenience summary endpoint) ───────────────────
