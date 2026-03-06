@@ -3,13 +3,30 @@
 
 import { api } from './api';
 
+// ── Typed status enums (prevents passing invalid strings to the API) ───────────
+
+export type ExperimentStatus =
+  | 'draft'
+  | 'pending'
+  | 'running'
+  | 'completed'
+  | 'failed'
+  | 'cancelled';
+
+export type RunStatus = 'pending' | 'running' | 'completed' | 'failed';
+
+// ── Response types ────────────────────────────────────────────────────────────
+
 export interface ExperimentSummary {
   id: string;
   name: string;
   description: string;
-  status: 'draft' | 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
+  status: ExperimentStatus;
   models_tested: number;
   progress: number;
+  total_runs: number;
+  completed_runs: number;
+  failed_runs: number;
   created_at: string | null;
   started_at: string | null;
   completed_at: string | null;
@@ -20,7 +37,7 @@ export interface ExperimentRun {
   model: string;
   config_id: string;
   iteration: number;
-  status: 'pending' | 'running' | 'completed' | 'failed';
+  status: RunStatus;
   tokens: number | null;
   latency_ms: number | null;
   cost_usd: number | null;
@@ -44,6 +61,8 @@ export interface ModelComparison {
   avg_quality_score: number;
   success_rate: number;
   total_runs: number;
+  completed_runs: number;
+  failed_runs: number;
 }
 
 export interface ExperimentDetail extends ExperimentSummary {
@@ -91,31 +110,65 @@ export interface ABTestingStats {
   cached_recommendations: number;
 }
 
+export interface PaginatedExperiments {
+  items: ExperimentSummary[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+// ── API error normalizer ───────────────────────────────────────────────────────
+
+function normalizeError(err: unknown): never {
+  if (err && typeof err === 'object' && 'response' in err) {
+    const axiosErr = err as { response?: { data?: { detail?: string }; status?: number } };
+    const detail = axiosErr.response?.data?.detail;
+    const status = axiosErr.response?.status;
+    throw new Error(detail ?? `Request failed with status ${status}`);
+  }
+  throw err;
+}
+
+// ── API client ────────────────────────────────────────────────────────────────
+
 const BASE = '/api/v1/ab-testing';
 
-// FIX: All methods now extract .data from Axios response
 export const abTestingApi = {
   createExperiment: (data: CreateExperimentPayload): Promise<ExperimentSummary> =>
-    api.post(`${BASE}/experiments`, data).then(r => r.data),
+    api.post(`${BASE}/experiments`, data).then(r => r.data).catch(normalizeError),
 
-  listExperiments: (status?: string): Promise<ExperimentSummary[]> =>
-    api.get(`${BASE}/experiments${status ? `?status=${status}` : ''}`).then(r => r.data),
+  listExperiments: (
+    status?: ExperimentStatus,
+    limit = 50,
+    offset = 0,
+  ): Promise<PaginatedExperiments> => {
+    const params = new URLSearchParams();
+    if (status) params.set('status', status);
+    params.set('limit', String(limit));
+    params.set('offset', String(offset));
+    return api.get(`${BASE}/experiments?${params}`).then(r => r.data).catch(normalizeError);
+  },
 
   getExperiment: (id: string): Promise<ExperimentDetail> =>
-    api.get(`${BASE}/experiments/${id}`).then(r => r.data),
+    api.get(`${BASE}/experiments/${id}`).then(r => r.data).catch(normalizeError),
 
   cancelExperiment: (id: string): Promise<{ message: string }> =>
-    api.post(`${BASE}/experiments/${id}/cancel`, {}).then(r => r.data),
+    api.post(`${BASE}/experiments/${id}/cancel`, {}).then(r => r.data).catch(normalizeError),
 
   deleteExperiment: (id: string): Promise<{ message: string }> =>
-    api.delete(`${BASE}/experiments/${id}`).then(r => r.data),
+    api.delete(`${BASE}/experiments/${id}`).then(r => r.data).catch(normalizeError),
 
-  getRecommendations: (taskCategory?: string): Promise<{ recommendations: Recommendation[]; total_categories: number }> =>
-    api.get(`${BASE}/recommendations${taskCategory ? `?task_category=${taskCategory}` : ''}`).then(r => r.data),
+  getRecommendations: (
+    taskCategory?: string,
+  ): Promise<{ recommendations: Recommendation[]; total_categories: number }> => {
+    const params = taskCategory ? `?task_category=${encodeURIComponent(taskCategory)}` : '';
+    return api.get(`${BASE}/recommendations${params}`).then(r => r.data).catch(normalizeError);
+  },
 
-  quickTest: (task: string, configIds: string[]): Promise<ExperimentDetail> =>
-    api.post(`${BASE}/quick-test`, { task, config_ids: configIds }).then(r => r.data),
+  // Quick test now returns a summary immediately; client polls for completion
+  quickTest: (task: string, configIds: string[]): Promise<ExperimentSummary> =>
+    api.post(`${BASE}/quick-test`, { task, config_ids: configIds }).then(r => r.data).catch(normalizeError),
 
   getStats: (): Promise<ABTestingStats> =>
-    api.get(`${BASE}/stats`).then(r => r.data),
+    api.get(`${BASE}/stats`).then(r => r.data).catch(normalizeError),
 };

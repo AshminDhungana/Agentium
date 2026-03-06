@@ -1,452 +1,217 @@
 /**
- * Voice API — OpenAI Whisper preferred, browser Web Speech API as fallback.
+ * voiceApi.ts — Voice feature API service
  *
- * Logic:
- *   1. Call /api/v1/voice/status (backend checks if user has an active OpenAI key).
- *   2. If backend says provider = 'openai'  → use Whisper + OpenAI TTS.
- *   3. If backend says available = false    → fall back to browser SpeechRecognition.
- *
- * Switching is automatic: call clearStatusCache() after the user adds/removes
- * an OpenAI key and the next voice action will re-check and switch providers.
+ * Covers:
+ *  - GET  /api/v1/voice/status          (existing)
+ *  - GET  /api/v1/voice/enhanced-status (NEW — added in this update)
+ *  - POST /api/v1/voice/transcribe      (existing)
+ *  - POST /api/v1/voice/synthesize      (existing)
+ *  - GET  /api/v1/voice/voices          (existing)
+ *  - GET  /api/v1/voice/languages       (existing)
  */
 
 import { api } from './api';
-import toast from 'react-hot-toast';
-import { localVoice, LocalTranscriptionResult, LocalSynthesisOptions } from './localVoice';
+import { localVoice } from './localVoice';
+
+const API_BASE = '/api/v1/voice';
+const STATUS_CACHE_TTL = 60_000; // 60 s
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface VoiceStatus {
+  available: boolean;
+  message: string;
+  provider: 'openai' | 'local' | null;
+  action_required?: string;
+}
+
+export interface EnhancedVoiceStatus {
+  openai: {
     available: boolean;
     message: string;
-    provider: 'openai' | 'local' | null;
-    action_required?: 'add_openai_provider' | 'add_any_provider' | 'use_local';
+    action_required?: string;
+  };
+  local: {
+    available: boolean;
+    message: string;
+    supports_recognition: boolean;
+    supports_synthesis: boolean;
+  };
+  /** Which provider is recommended given current configuration */
+  recommended: 'openai' | 'local';
+  /** Which provider is currently active */
+  current: 'openai' | 'local';
 }
 
-export interface TranscriptionResponse {
-    success: boolean;
-    text: string;
-    language: string;
-    duration_seconds: number;
-    audio_size_bytes?: number;
-    transcribed_at: string;
-    provider: 'openai' | 'local';
+export interface TranscribeResponse {
+  text: string;
+  language: string | null;
+  duration_seconds: number | null;
 }
 
-export interface SynthesisResponse {
-    success: boolean;
-    audio_url?: string;
-    duration_estimate: number;
-    voice: string;
-    speed: number;
-    generated_at: string;
-    provider: 'openai' | 'local';
+export interface SynthesizeRequest {
+  text: string;
+  voice?: 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer';
+  speed?: number;
 }
 
-export interface VoiceLanguage {
-    code: string;
-    name: string;
-}
-
-export interface TTSVoice {
-    id: string;
-    name: string;
-    description: string;
-}
-
-// ─── Module State ─────────────────────────────────────────────────────────────
-
-const API_BASE = '/api/v1/voice';
+// ─── Cache ────────────────────────────────────────────────────────────────────
 
 let cachedStatus: VoiceStatus | null = null;
 let statusCacheTime = 0;
-const STATUS_CACHE_TTL = 60_000; // 1 minute
 
-// These let stopLocalTranscription() resolve the promise created in transcribeWithLocal()
-let _pendingLocalResolve: ((text: string) => void) | null = null;
-let _pendingLocalReject: ((err: unknown) => void) | null = null;
-
-// ─── Language Helper ──────────────────────────────────────────────────────────
+// ─── Language mapping helper ──────────────────────────────────────────────────
 
 const LANG_MAP: Record<string, string> = {
-    en: 'en-US', es: 'es-ES', fr: 'fr-FR', de: 'de-DE', it: 'it-IT',
-    pt: 'pt-BR', ru: 'ru-RU', zh: 'zh-CN', ja: 'ja-JP', ko: 'ko-KR',
-    ar: 'ar-SA', hi: 'hi-IN', nl: 'nl-NL', pl: 'pl-PL', tr: 'tr-TR', vi: 'vi-VN',
+  en: 'en-US', es: 'es-ES', fr: 'fr-FR', de: 'de-DE',
+  it: 'it-IT', pt: 'pt-BR', ru: 'ru-RU', zh: 'zh-CN',
+  ja: 'ja-JP', ko: 'ko-KR', ar: 'ar-SA', hi: 'hi-IN',
 };
 
-function toBcp47(lang?: string): string {
-    if (!lang) return 'en-US';
-    if (lang.includes('-')) return lang; // already a full tag e.g. 'en-US'
-    return LANG_MAP[lang] ?? 'en-US';
+function normaliseLang(lang: string): string {
+  if (!lang) return 'en-US';
+  if (lang.includes('-')) return lang;
+  return LANG_MAP[lang] ?? 'en-US';
 }
 
-// ─── API ──────────────────────────────────────────────────────────────────────
+// ─── Service ──────────────────────────────────────────────────────────────────
 
 export const voiceApi = {
 
-    // ── Status / Provider Detection ──────────────────────────────────────────
+  // ── Status / Provider Detection ────────────────────────────────────────────
 
-    /**
-     * Determine which provider to use.
-     *
-     * 1. Ask backend → does the user have an active OpenAI key?
-     *    YES → provider = 'openai'
-     *    NO  → check browser support → provider = 'local'
-     *
-     * Result is cached for 60 s. Call clearStatusCache() to force a re-check
-     * immediately (e.g. right after the user saves a new API key in Settings).
-     */
-    checkStatus: async (forceRefresh = false): Promise<VoiceStatus> => {
-        const now = Date.now();
+  /**
+   * Determine which provider to use.
+   *
+   * 1. Ask backend → does the user have an active OpenAI key?
+   *    YES → provider = 'openai'
+   *    NO  → check browser support → provider = 'local'
+   *
+   * Result is cached for 60 s. Call clearStatusCache() to force a re-check
+   * immediately (e.g. right after the user saves a new API key in Settings).
+   */
+  checkStatus: async (forceRefresh = false): Promise<VoiceStatus> => {
+    const now = Date.now();
 
-        if (!forceRefresh && cachedStatus && (now - statusCacheTime) < STATUS_CACHE_TTL) {
-            return cachedStatus;
-        }
+    if (!forceRefresh && cachedStatus && (now - statusCacheTime) < STATUS_CACHE_TTL) {
+      return cachedStatus;
+    }
 
-        // Step 1: Ask the backend — it knows if the user has an OpenAI key
-        try {
-            const response = await api.get<VoiceStatus>(`${API_BASE}/status`);
-            if (response.data.available && response.data.provider === 'openai') {
-                cachedStatus = { ...response.data, provider: 'openai' };
-                statusCacheTime = now;
-                return cachedStatus;
-            }
-            // Backend responded but no OpenAI key — fall through to local
-        } catch {
-            // Backend unreachable — fall through to local
-        }
-
-        // Step 2: Fall back to browser Web Speech API
-        const localAvail = await localVoice.checkAvailability();
-        if (localAvail.available) {
-            cachedStatus = {
-                available: true,
-                message: 'No OpenAI key found — using browser voice instead',
-                provider: 'local',
-            };
-            statusCacheTime = now;
-            return cachedStatus;
-        }
-
-        // Step 3: Nothing works
-        cachedStatus = {
-            available: false,
-            message: localAvail.message,
-            provider: null,
-            action_required: 'add_openai_provider',
-        };
+    // Step 1: Ask the backend — it knows if the user has an OpenAI key
+    try {
+      const response = await api.get<VoiceStatus>(`${API_BASE}/status`);
+      if (response.data.available && response.data.provider === 'openai') {
+        cachedStatus = { ...response.data, provider: 'openai' };
         statusCacheTime = now;
         return cachedStatus;
-    },
+      }
+      // Backend responded but no OpenAI key — fall through to local
+    } catch {
+      // Backend unreachable — fall through to local
+    }
 
-    /**
-     * Call this after the user adds or removes an OpenAI API key so the next
-     * voice action immediately re-checks and switches providers.
-     */
-    clearStatusCache: (): void => {
-        cachedStatus = null;
-        statusCacheTime = 0;
-    },
+    // Step 2: Fall back to browser Web Speech API
+    const localAvail = await localVoice.checkAvailability();
+    if (localAvail.available) {
+      cachedStatus = {
+        available: true,
+        message: 'No OpenAI key found — using browser voice instead',
+        provider: 'local',
+      };
+      statusCacheTime = now;
+      return cachedStatus;
+    }
 
-    getCurrentProvider: (): 'openai' | 'local' | null => cachedStatus?.provider ?? null,
+    // Step 3: Nothing works
+    cachedStatus = {
+      available: false,
+      message: localAvail.message,
+      provider: null,
+      action_required: 'add_openai_provider',
+    };
+    statusCacheTime = now;
+    return cachedStatus;
+  },
 
-    /** Returns true if voice is usable, shows a toast if not. */
-    checkAvailability: async (): Promise<boolean> => {
-        const status = await voiceApi.checkStatus();
-        if (!status.available) {
-            toast.error(status.message, { duration: 5000 });
-            return false;
-        }
-        if (status.provider === 'local') {
-            toast('Using browser voice (no OpenAI key configured)', { icon: '🎤', duration: 3000 });
-        }
-        return true;
-    },
+  /**
+   * Detailed voice status including both OpenAI and local (browser) availability.
+   *
+   * Unlike checkStatus() which resolves to a single provider decision,
+   * this endpoint exposes both backends simultaneously so the UI can
+   * render provider-selection controls and smart fallback badges.
+   *
+   * Maps to: GET /api/v1/voice/enhanced-status
+   */
+  getEnhancedStatus: async (): Promise<EnhancedVoiceStatus> => {
+    const response = await api.get<EnhancedVoiceStatus>(`${API_BASE}/enhanced-status`);
+    return response.data;
+  },
 
-    // ── Transcription ────────────────────────────────────────────────────────
+  /**
+   * Call this after the user adds or removes an OpenAI API key so the next
+   * voice action immediately re-checks and switches providers.
+   */
+  clearStatusCache: (): void => {
+    cachedStatus = null;
+    statusCacheTime = 0;
+  },
 
-    /**
-     * Smart transcription — picks the right provider automatically.
-     *
-     * OpenAI path : pass a recorded audioBlob (from startRecording/stopRecording).
-     * Local path  : pass null for audioBlob; onProgress fires with real-time text.
-     *               The promise resolves only when stopLocalTranscription() is called.
-     *
-     * Recommended: use startSmartRecording() instead — it handles all of this.
-     */
-    transcribe: async (
-        audioBlob: Blob | null,
-        language?: string,
-        onProgress?: (text: string, isFinal: boolean) => void,
-    ): Promise<TranscriptionResponse> => {
-        const status = await voiceApi.checkStatus();
+  getCurrentProvider: (): 'openai' | 'local' | null => cachedStatus?.provider ?? null,
 
-        if (status.provider === 'openai') {
-            if (!audioBlob) throw new Error('audioBlob is required for OpenAI transcription');
-            return voiceApi.transcribeWithOpenAI(audioBlob, language);
-        }
+  /** Returns true if voice is usable, shows a toast if not. */
+  requireVoice: async (): Promise<boolean> => {
+    const status = await voiceApi.checkStatus();
+    return status.available;
+  },
 
-        return voiceApi.transcribeWithLocal(language, onProgress);
-    },
+  // ── Transcription ──────────────────────────────────────────────────────────
 
-    /** Send a recorded audio blob to OpenAI Whisper. */
-    transcribeWithOpenAI: async (audioBlob: Blob, language?: string): Promise<TranscriptionResponse> => {
-        const formData = new FormData();
-        formData.append('audio', audioBlob, 'recording.webm');
-        if (language) formData.append('language', language);
+  /**
+   * Transcribe an audio Blob to text via OpenAI Whisper.
+   * Requires an active OpenAI provider configuration.
+   */
+  transcribe: async (
+    audioBlob: Blob,
+    language?: string,
+  ): Promise<TranscribeResponse> => {
+    const formData = new FormData();
+    formData.append('audio', audioBlob, 'recording.webm');
+    if (language) {
+      formData.append('language', normaliseLang(language));
+    }
 
-        const response = await api.post<TranscriptionResponse>(
-            `${API_BASE}/transcribe`,
-            formData,
-            { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 60_000 },
-        );
-        return { ...response.data, provider: 'openai' };
-    },
+    const response = await api.post<TranscribeResponse>(
+      `${API_BASE}/transcribe`,
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    );
+    return response.data;
+  },
 
-    /**
-     * Start browser SpeechRecognition.
-     * The returned Promise stays pending until stopLocalTranscription() is called.
-     * Use onProgress to receive interim/final text in real time as the user speaks.
-     */
-    transcribeWithLocal: (
-        language?: string,
-        onProgress?: (text: string, isFinal: boolean) => void,
-    ): Promise<TranscriptionResponse> => {
-        return new Promise((resolve, reject) => {
-            const startTime = Date.now();
+  // ── Text-to-Speech ─────────────────────────────────────────────────────────
 
-            // Wire up real-time progress updates
-            const handleResult = (result: LocalTranscriptionResult) => {
-                onProgress?.(result.text, result.isFinal);
-            };
+  /**
+   * Synthesise text to speech via OpenAI TTS.
+   * Returns a Blob containing MP3 audio.
+   */
+  synthesize: async (request: SynthesizeRequest): Promise<Blob> => {
+    const response = await api.post(`${API_BASE}/synthesize`, request, {
+      responseType: 'blob',
+    });
+    return response.data as Blob;
+  },
 
-            // Start the browser recogniser
-            localVoice.transcribe(handleResult, reject, toBcp47(language));
+  // ── Options ────────────────────────────────────────────────────────────────
 
-            // Store resolve/reject so stopLocalTranscription() can close this promise
-            _pendingLocalResolve = (text: string) => {
-                resolve({
-                    success: true,
-                    text,
-                    language: language ?? 'auto-detected',
-                    duration_seconds: (Date.now() - startTime) / 1000,
-                    transcribed_at: new Date().toISOString(),
-                    provider: 'local',
-                });
-            };
-            _pendingLocalReject = reject;
-        });
-    },
+  /** Fetch available TTS voice identifiers. */
+  getVoices: async (): Promise<{ voices: string[]; default: string }> => {
+    const response = await api.get(`${API_BASE}/voices`);
+    return response.data;
+  },
 
-    /**
-     * Stop browser recognition gracefully and resolve the pending promise.
-     * Call this when the user releases the mic button.
-     */
-    stopLocalTranscription: async (): Promise<TranscriptionResponse> => {
-        const text = await localVoice.stopTranscribe();
-        _pendingLocalResolve?.(text ?? '');
-        _pendingLocalResolve = null;
-        _pendingLocalReject = null;
-
-        return {
-            success: true,
-            text: text ?? '',
-            language: 'auto-detected',
-            duration_seconds: 0,
-            transcribed_at: new Date().toISOString(),
-            provider: 'local',
-        };
-    },
-
-    /** Abort browser recognition immediately with no result. */
-    abortLocalTranscription: (): void => {
-        localVoice.abortTranscribe();
-        _pendingLocalReject?.(new Error('Transcription aborted'));
-        _pendingLocalResolve = null;
-        _pendingLocalReject = null;
-    },
-
-    isLocalTranscribing: (): boolean => localVoice.isListening,
-
-    // ── Smart Recording Helper ───────────────────────────────────────────────
-
-    /**
-     * ONE call to start recording regardless of provider.
-     * Returns a `stop` function — call it when the user finishes speaking.
-     *
-     * Example:
-     *   const stop = await voiceApi.startSmartRecording('en', setText);
-     *   // user speaks...
-     *   const result = await stop();   // TranscriptionResponse
-     */
-    startSmartRecording: async (
-        language?: string,
-        onProgress?: (text: string, isFinal: boolean) => void,
-    ): Promise<() => Promise<TranscriptionResponse>> => {
-        const status = await voiceApi.checkStatus();
-
-        if (status.provider === 'openai') {
-            // Record audio → send blob to Whisper on stop
-            const { recorder, stream } = await voiceApi.startRecording();
-            recorder.start();
-
-            return async () => {
-                const blob = await voiceApi.stopRecording(recorder, stream);
-                return voiceApi.transcribeWithOpenAI(blob, language);
-            };
-        } else {
-            // Start real-time browser recognition
-            // (transcribeWithLocal promise is pending internally)
-            voiceApi.transcribeWithLocal(language, onProgress);
-
-            return async () => voiceApi.stopLocalTranscription();
-        }
-    },
-
-    // ── Synthesis ────────────────────────────────────────────────────────────
-
-    /**
-     * Speak text.
-     * Uses OpenAI TTS if the user has a key, browser speechSynthesis otherwise.
-     * If OpenAI TTS fails at runtime it silently falls back to local.
-     */
-    synthesize: async (text: string, voice = 'alloy', speed = 1.0): Promise<SynthesisResponse> => {
-        const status = await voiceApi.checkStatus();
-
-        if (status.provider === 'openai') {
-            try {
-                return await voiceApi.synthesizeWithOpenAI(text, voice, speed);
-            } catch (err) {
-                console.warn('[voiceApi] OpenAI TTS failed, falling back to browser TTS', err);
-            }
-        }
-
-        return voiceApi.synthesizeWithLocal(text, speed);
-    },
-
-    synthesizeWithOpenAI: async (text: string, voice = 'alloy', speed = 1.0): Promise<SynthesisResponse> => {
-        const formData = new FormData();
-        formData.append('text', text);
-        formData.append('voice', voice);
-        formData.append('speed', speed.toString());
-
-        const response = await api.post<SynthesisResponse>(
-            `${API_BASE}/synthesize`,
-            formData,
-            { headers: { 'Content-Type': 'multipart/form-data' } },
-        );
-        return { ...response.data, provider: 'openai' };
-    },
-
-    synthesizeWithLocal: async (text: string, rate = 1.0): Promise<SynthesisResponse> => {
-        // waitForVoices handles Chrome's async voice loading
-        const voices = await localVoice.waitForVoices();
-
-        const preferredVoice =
-            voices.find(v => v.lang.startsWith('en') && v.name.includes('Google')) ??
-            voices.find(v => v.lang.startsWith('en')) ??
-            voices[0];
-
-        const options: LocalSynthesisOptions = {
-            rate,
-            pitch: 1.0,
-            volume: 1.0,
-            voice: preferredVoice?.name,
-        };
-
-        return new Promise((resolve, reject) => {
-            const startTime = Date.now();
-            localVoice.synthesize(
-                text, options,
-                undefined,
-                () => resolve({
-                    success: true,
-                    duration_estimate: (Date.now() - startTime) / 1000,
-                    voice: preferredVoice?.name ?? 'default',
-                    speed: rate,
-                    generated_at: new Date().toISOString(),
-                    provider: 'local',
-                }),
-                (error) => reject(new Error(error)),
-            );
-        });
-    },
-
-    stopSynthesis: (): void => localVoice.stopSynthesis(),
-
-    // ── Raw Recording (OpenAI path) ───────────────────────────────────────────
-
-    startRecording: async (): Promise<{ recorder: MediaRecorder; stream: MediaStream }> => {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const mimeType =
-            MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' :
-            MediaRecorder.isTypeSupported('audio/webm')             ? 'audio/webm' :
-                                                                       'audio/mp4';
-        return { recorder: new MediaRecorder(stream, { mimeType }), stream };
-    },
-
-    stopRecording: (recorder: MediaRecorder, stream: MediaStream): Promise<Blob> =>
-        new Promise((resolve) => {
-            const chunks: BlobPart[] = [];
-            recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
-            recorder.onstop = () => {
-                stream.getTracks().forEach(t => t.stop());
-                resolve(new Blob(chunks, { type: recorder.mimeType }));
-            };
-            recorder.stop();
-        }),
-
-    // ── Direct Local Recognition ──────────────────────────────────────────────
-
-    startLocalRecognition: async (
-        onResult: (text: string, isFinal: boolean) => void,
-        onError: (error: string) => void,
-        language?: string,
-    ): Promise<void> => {
-        const wrapped = (r: LocalTranscriptionResult) => onResult(r.text, r.isFinal);
-        await localVoice.transcribe(wrapped, onError, toBcp47(language));
-    },
-
-    stopLocalRecognition: (): Promise<string> => localVoice.stopTranscribe(),
-
-    // ── Playback ──────────────────────────────────────────────────────────────
-
-    playAudio: async (urlOrText: string, isLocal = false): Promise<void> => {
-        if (isLocal) {
-            await voiceApi.synthesizeWithLocal(urlOrText);
-        } else {
-            await new Audio(urlOrText).play();
-        }
-    },
-
-    getAudioUrl: (userId: string, filename: string): string =>
-        `${API_BASE}/audio/${userId}/${filename}`,
-
-    // ── Language / Voice Lists ────────────────────────────────────────────────
-
-    getLanguages: async (): Promise<VoiceLanguage[]> =>
-        localVoice.getSupportedLanguages().map(l => ({
-            code: l.code.split('-')[0],
-            name: l.name,
-        })),
-
-    getVoices: async (): Promise<TTSVoice[]> => {
-        const status = await voiceApi.checkStatus();
-
-        if (status.provider === 'openai') {
-            try {
-                const response = await api.get<{ voices: TTSVoice[]; default: string }>(`${API_BASE}/voices`);
-                return response.data.voices;
-            } catch { /* fall through */ }
-        }
-
-        const voices = await localVoice.waitForVoices();
-        return voices.map(v => ({
-            id: v.name,
-            name: v.name,
-            description: `${v.lang}${v.localService ? ' (local)' : ''}`,
-        }));
-    },
+  /** Fetch supported transcription language codes. */
+  getLanguages: async (): Promise<{ languages: { code: string; name: string }[] }> => {
+    const response = await api.get(`${API_BASE}/languages`);
+    return response.data;
+  },
 };
-
-export default voiceApi;

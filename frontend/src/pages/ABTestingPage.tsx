@@ -1,60 +1,78 @@
 // frontend/src/pages/ABTestingPage.tsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import toast from 'react-hot-toast';
 import {
   FlaskConical, Plus, X, Play, BarChart3, Clock, DollarSign,
   Trophy, ChevronRight, RefreshCw, Trash2, StopCircle,
   TrendingUp, Zap, CheckCircle2, AlertCircle, Loader2,
-  Target, Layers, Activity, Shield
+  Target, Layers, Activity, Shield, AlertTriangle,
 } from 'lucide-react';
 import {
-  RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
-  Radar, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, Legend
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer, Legend, RadarChart, PolarGrid,
+  PolarAngleAxis, Radar,
 } from 'recharts';
 import { useAuthStore } from '@/store/authStore';
+import { useWebSocketStore } from '@/store/websocketStore';
 import { api } from '@/services/api';
-import { abTestingApi, ExperimentSummary, ExperimentDetail, ModelComparison } from '@/services/abTesting';
+import {
+  abTestingApi,
+  ExperimentSummary,
+  ExperimentDetail,
+  ModelComparison,
+  ExperimentStatus,
+  PaginatedExperiments,
+} from '@/services/abTesting';
 
 // ── Colour palette ────────────────────────────────────────────────────────────
-const STATUS_STYLES: Record<string, { bg: string; text: string; dot: string; darkBg?: string; darkText?: string; darkDot?: string }> = {
-  draft:     { bg: 'bg-slate-100',  text: 'text-slate-600',  dot: 'bg-slate-400', darkBg: 'dark:bg-slate-800', darkText: 'dark:text-slate-400', darkDot: 'dark:bg-slate-500' },
-  pending:   { bg: 'bg-amber-50',   text: 'text-amber-700',  dot: 'bg-amber-400', darkBg: 'dark:bg-amber-500/10', darkText: 'dark:text-amber-400', darkDot: 'dark:bg-amber-400' },
-  running:   { bg: 'bg-blue-50',    text: 'text-blue-700',   dot: 'bg-blue-500 animate-pulse', darkBg: 'dark:bg-blue-500/10', darkText: 'dark:text-blue-400', darkDot: 'dark:bg-blue-400' },
-  completed: { bg: 'bg-emerald-50', text: 'text-emerald-700',dot: 'bg-emerald-500', darkBg: 'dark:bg-emerald-500/10', darkText: 'dark:text-emerald-400', darkDot: 'dark:bg-emerald-400' },
-  failed:    { bg: 'bg-red-50',     text: 'text-red-700',    dot: 'bg-red-500', darkBg: 'dark:bg-red-500/10', darkText: 'dark:text-red-400', darkDot: 'dark:bg-red-400' },
-  cancelled: { bg: 'bg-slate-100',  text: 'text-slate-500',  dot: 'bg-slate-300', darkBg: 'dark:bg-slate-800', darkText: 'dark:text-slate-400', darkDot: 'dark:bg-slate-600' },
+
+const STATUS_STYLES: Record<string, {
+  bg: string; text: string; dot: string;
+  darkBg: string; darkText: string; darkDot: string;
+}> = {
+  draft:     { bg: 'bg-slate-100',  text: 'text-slate-600',   dot: 'bg-slate-400',           darkBg: 'dark:bg-slate-800',       darkText: 'dark:text-slate-400',   darkDot: 'dark:bg-slate-500' },
+  pending:   { bg: 'bg-amber-50',   text: 'text-amber-700',   dot: 'bg-amber-400',            darkBg: 'dark:bg-amber-500/10',    darkText: 'dark:text-amber-400',   darkDot: 'dark:bg-amber-400' },
+  running:   { bg: 'bg-blue-50',    text: 'text-blue-700',    dot: 'bg-blue-500 animate-pulse', darkBg: 'dark:bg-blue-500/10',   darkText: 'dark:text-blue-400',    darkDot: 'dark:bg-blue-400' },
+  completed: { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500',          darkBg: 'dark:bg-emerald-500/10',  darkText: 'dark:text-emerald-400', darkDot: 'dark:bg-emerald-400' },
+  failed:    { bg: 'bg-red-50',     text: 'text-red-700',     dot: 'bg-red-500',              darkBg: 'dark:bg-red-500/10',      darkText: 'dark:text-red-400',     darkDot: 'dark:bg-red-400' },
+  cancelled: { bg: 'bg-slate-100',  text: 'text-slate-500',   dot: 'bg-slate-300',            darkBg: 'dark:bg-slate-800',       darkText: 'dark:text-slate-400',   darkDot: 'dark:bg-slate-600' },
 };
 
 const MODEL_COLORS = ['#6366f1', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6', '#06b6d4'];
+const FILTERS: Array<ExperimentStatus | ''> = ['', 'running', 'completed', 'failed', 'pending', 'cancelled'];
+const PAGE_SIZE = 18;
 
-// ── Sub-components ────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function StatusBadge({ status }: { status: string }) {
   const s = STATUS_STYLES[status] ?? STATUS_STYLES.draft;
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${s.bg} ${s.text} ${s.darkBg || ''} ${s.darkText || ''}`}>
-      <span className={`w-1.5 h-1.5 rounded-full ${s.dot} ${s.darkDot || ''}`} />
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium
+      ${s.bg} ${s.text} ${s.darkBg} ${s.darkText}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${s.dot} ${s.darkDot}`} />
       {status}
     </span>
   );
 }
 
-function ScorePill({ score, label }: { score: number | undefined; label?: string }) {
-  const safeScore = score ?? 0;
-  const color = safeScore >= 80 ? 'text-emerald-600 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/10' :
-                safeScore >= 60 ? 'text-amber-600 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/10' :
-                'text-red-600 bg-red-50 dark:text-red-400 dark:bg-red-500/10';
+function ScorePill({ score, label }: { score: number | null | undefined; label?: string }) {
+  const v = score ?? 0;
+  const color =
+    v >= 80 ? 'text-emerald-600 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/10' :
+    v >= 60 ? 'text-amber-600 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/10' :
+              'text-red-600 bg-red-50 dark:text-red-400 dark:bg-red-500/10';
   return (
     <span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold ${color}`}>
       {label && <span className="font-normal mr-1">{label}</span>}
-      {safeScore.toFixed(1)}
+      {v.toFixed(1)}
     </span>
   );
 }
 
 function MetricCard({ icon: Icon, label, value, sub }: {
-  icon: React.ElementType; label: string; value: string; sub?: string
+  icon: React.ElementType; label: string; value: string; sub?: string;
 }) {
   return (
     <div className="bg-white dark:bg-[#161b27] rounded-xl border border-slate-100 dark:border-[#1e2535] p-4 flex items-center gap-3 shadow-sm dark:shadow-[0_2px_8px_rgba(0,0,0,0.2)]">
@@ -70,14 +88,162 @@ function MetricCard({ icon: Icon, label, value, sub }: {
   );
 }
 
-// ── Create Experiment Modal ───────────────────────────────────────────────────
+// ── Delete confirm modal (replaces window.confirm) ────────────────────────────
 
-interface CreateModalProps {
-  onClose: () => void;
-  onCreated: () => void;
+function DeleteConfirmModal({
+  name,
+  onConfirm,
+  onCancel,
+}: {
+  name: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  return createPortal(
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      <div className="bg-white dark:bg-[#161b27] rounded-2xl shadow-2xl border border-slate-100 dark:border-[#1e2535] w-full max-w-sm p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-xl bg-red-50 dark:bg-red-500/10 flex items-center justify-center">
+            <AlertTriangle className="w-5 h-5 text-red-500 dark:text-red-400" />
+          </div>
+          <div>
+            <h3 className="font-bold text-slate-900 dark:text-white text-sm">Delete Experiment</h3>
+            <p className="text-xs text-slate-400 dark:text-slate-500">This action cannot be undone</p>
+          </div>
+        </div>
+        <p className="text-sm text-slate-600 dark:text-slate-400 mb-5">
+          Are you sure you want to delete <span className="font-semibold text-slate-800 dark:text-white">"{name}"</span>?
+        </p>
+        <div className="flex gap-2 justify-end">
+          <button
+            onClick={onCancel}
+            className="px-4 py-2 text-sm text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#1e2535] rounded-lg transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="px-4 py-2 text-sm font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
 }
 
-function CreateExperimentModal({ onClose, onCreated }: CreateModalProps) {
+// ── Experiment Card ───────────────────────────────────────────────────────────
+
+function ExperimentCard({
+  experiment,
+  onClick,
+  onDelete,
+}: {
+  experiment: ExperimentSummary;
+  onClick: () => void;
+  onDelete: () => void;
+}) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const isDeletable = experiment.status !== 'running' && experiment.status !== 'pending';
+
+  return (
+    <>
+      <div
+        onClick={onClick}
+        className="bg-white dark:bg-[#161b27] border border-slate-100 dark:border-[#1e2535] rounded-2xl p-5 cursor-pointer
+          hover:shadow-md dark:hover:shadow-[0_4px_20px_rgba(0,0,0,0.3)] hover:border-indigo-100
+          dark:hover:border-indigo-500/30 transition-all group"
+      >
+        <div className="flex items-start justify-between mb-3">
+          <StatusBadge status={experiment.status} />
+          {isDeletable && (
+            <button
+              onClick={e => { e.stopPropagation(); setConfirmDelete(true); }}
+              className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-red-400" />
+            </button>
+          )}
+        </div>
+
+        <h3 className="font-semibold text-slate-900 dark:text-white text-sm leading-tight mb-3">
+          {experiment.name}
+        </h3>
+
+        <div className="flex items-center gap-4 text-xs text-slate-400 dark:text-slate-500 mb-3">
+          <span className="flex items-center gap-1">
+            <Layers className="w-3.5 h-3.5" />
+            {experiment.models_tested} models
+          </span>
+          {experiment.created_at && (
+            <span className="flex items-center gap-1">
+              <Clock className="w-3.5 h-3.5" />
+              {new Date(experiment.created_at).toLocaleDateString()}
+            </span>
+          )}
+        </div>
+
+        {/* Run counts */}
+        {experiment.total_runs > 0 && (
+          <div className="flex items-center gap-2 text-xs mb-3">
+            <span className="text-emerald-600 dark:text-emerald-400">
+              ✓ {experiment.completed_runs}
+            </span>
+            {experiment.failed_runs > 0 && (
+              <span className="text-red-500 dark:text-red-400">
+                ✗ {experiment.failed_runs}
+              </span>
+            )}
+            <span className="text-slate-400">/ {experiment.total_runs} runs</span>
+          </div>
+        )}
+
+        {/* Progress bar */}
+        <div>
+          <div className="flex justify-between text-xs text-slate-400 dark:text-slate-500 mb-1">
+            <span>Progress</span>
+            <span>{experiment.progress}%</span>
+          </div>
+          <div className="h-1.5 bg-slate-100 dark:bg-[#0f1117] rounded-full overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-500 ${
+                experiment.status === 'completed' ? 'bg-emerald-400 dark:bg-emerald-500' :
+                experiment.status === 'failed'    ? 'bg-red-400 dark:bg-red-500' :
+                experiment.status === 'running'   ? 'bg-indigo-500 dark:bg-indigo-400' :
+                                                    'bg-slate-300 dark:bg-slate-600'
+              }`}
+              style={{ width: `${experiment.progress}%` }}
+            />
+          </div>
+        </div>
+
+        <div className="mt-3 flex items-center text-xs text-indigo-500 dark:text-indigo-400 font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+          View details <ChevronRight className="w-3.5 h-3.5 ml-0.5" />
+        </div>
+      </div>
+
+      {confirmDelete && (
+        <DeleteConfirmModal
+          name={experiment.name}
+          onConfirm={() => { setConfirmDelete(false); onDelete(); }}
+          onCancel={() => setConfirmDelete(false)}
+        />
+      )}
+    </>
+  );
+}
+
+// ── Create Experiment Modal ───────────────────────────────────────────────────
+
+function CreateExperimentModal({
+  onClose,
+  onCreated,
+}: {
+  onClose: () => void;
+  onCreated: () => void;
+}) {
   const [name, setName] = useState('');
   const [taskTemplate, setTaskTemplate] = useState('');
   const [systemPrompt, setSystemPrompt] = useState('');
@@ -86,15 +252,11 @@ function CreateExperimentModal({ onClose, onCreated }: CreateModalProps) {
 
   const { data: modelsData } = useQuery({
     queryKey: ['model-configs'],
-    queryFn: async () => {
-      const res = await api.get('/api/v1/models/configs');
-      return res.data;
-    },
+    queryFn: () => api.get('/api/v1/models/configs').then(r => r.data),
   });
-  
   const models = Array.isArray(modelsData) ? modelsData : [];
 
-  const { mutate: create, isPending } = useMutation({
+  const { mutate: create, isPending, error } = useMutation({
     mutationFn: () => abTestingApi.createExperiment({
       name,
       task_template: taskTemplate,
@@ -104,22 +266,23 @@ function CreateExperimentModal({ onClose, onCreated }: CreateModalProps) {
       iterations,
     }),
     onSuccess: () => { onCreated(); onClose(); },
+    onError: (err: Error) => toast.error(err.message),
   });
 
   const toggleConfig = (id: string) =>
     setSelectedConfigs(prev =>
-      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id],
     );
 
   const isValid = name.trim() && taskTemplate.trim() && selectedConfigs.length >= 2;
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 dark:bg-black/80 backdrop-blur-sm">
       <div className="bg-white dark:bg-[#161b27] rounded-2xl shadow-2xl dark:shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] w-full max-w-2xl max-h-[90vh] overflow-y-auto border border-slate-100 dark:border-[#1e2535]">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-slate-100 dark:border-[#1e2535]">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-indigo-600 dark:bg-indigo-500 flex items-center justify-center shadow-lg shadow-indigo-500/25 dark:shadow-indigo-500/20">
+            <div className="w-10 h-10 rounded-xl bg-indigo-600 dark:bg-indigo-500 flex items-center justify-center shadow-lg shadow-indigo-500/25">
               <FlaskConical className="w-5 h-5 text-white" />
             </div>
             <div>
@@ -128,102 +291,108 @@ function CreateExperimentModal({ onClose, onCreated }: CreateModalProps) {
             </div>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-slate-100 dark:hover:bg-[#1e2535] rounded-lg transition-colors">
-            <X className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+            <X className="w-4 h-4 text-slate-400" />
           </button>
         </div>
 
         <div className="p-6 space-y-5">
+          {/* Error banner */}
+          {error && (
+            <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-lg text-sm text-red-700 dark:text-red-400">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              {error.message}
+            </div>
+          )}
+
           {/* Name */}
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Experiment Name</label>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+              Experiment Name <span className="text-red-400">*</span>
+            </label>
             <input
               value={name}
               onChange={e => setName(e.target.value)}
-              placeholder="e.g. GPT-4 vs Claude Sonnet - Code Quality"
-              className="w-full px-3 py-2.5 bg-white dark:bg-[#0f1117] border border-slate-200 dark:border-[#1e2535] rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent dark:focus:ring-indigo-400"
+              placeholder="e.g. GPT-4o vs Claude 3.5 — Summarisation"
+              className="w-full px-3.5 py-2.5 text-sm bg-slate-50 dark:bg-[#0f1117] border border-slate-200 dark:border-[#1e2535] rounded-xl text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
             />
           </div>
 
-          {/* Task Template */}
+          {/* Task template */}
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Task / Prompt</label>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+              Task / Prompt <span className="text-red-400">*</span>
+            </label>
             <textarea
               value={taskTemplate}
               onChange={e => setTaskTemplate(e.target.value)}
-              placeholder="Write the task or prompt to test across all models..."
               rows={4}
-              className="w-full px-3 py-2.5 bg-white dark:bg-[#0f1117] border border-slate-200 dark:border-[#1e2535] rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none dark:focus:ring-indigo-400"
+              placeholder="The exact prompt that will be sent to each model..."
+              className="w-full px-3.5 py-2.5 text-sm bg-slate-50 dark:bg-[#0f1117] border border-slate-200 dark:border-[#1e2535] rounded-xl text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
             />
           </div>
 
-          {/* System Prompt (optional) */}
+          {/* System prompt */}
           <div>
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-              System Prompt <span className="text-slate-400 dark:text-slate-500 font-normal">(optional)</span>
+              System Prompt <span className="text-slate-400 font-normal">(optional)</span>
             </label>
             <textarea
               value={systemPrompt}
               onChange={e => setSystemPrompt(e.target.value)}
-              placeholder="Optional system context for all models..."
               rows={2}
-              className="w-full px-3 py-2.5 bg-white dark:bg-[#0f1117] border border-slate-200 dark:border-[#1e2535] rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none dark:focus:ring-indigo-400"
+              placeholder="Override the default system prompt..."
+              className="w-full px-3.5 py-2.5 text-sm bg-slate-50 dark:bg-[#0f1117] border border-slate-200 dark:border-[#1e2535] rounded-xl text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
             />
           </div>
 
-          {/* Model Selection */}
+          {/* Model selection */}
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-              Select Models to Compare <span className="text-slate-400 dark:text-slate-500">(pick 2+)</span>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              Models to compare <span className="text-red-400">*</span>
+              <span className="ml-1 text-xs text-slate-400 font-normal">(select at least 2)</span>
             </label>
-              {!Array.isArray(models) || models.length === 0 ? (
-                <p className="text-sm text-slate-400 dark:text-slate-500 italic">No model configs found. Add models in the Models page first.</p>
-              ) : (
-                <div className="grid grid-cols-2 gap-2">
-                  {models.map((m: any, i: number) => {
-                  const selected = selectedConfigs.includes(m.id);
-                  return (
-                    <button
-                      key={m.id}
-                      onClick={() => toggleConfig(m.id)}
-                      className={`flex items-center gap-2.5 p-3 rounded-xl border-2 text-left transition-all ${
-                        selected
-                          ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-500/10'
-                          : 'border-slate-200 dark:border-[#1e2535] hover:border-slate-300 dark:hover:border-[#2a3347] bg-white dark:bg-[#0f1117]'
-                      }`}
-                    >
-                      <div
-                        className="w-3 h-3 rounded-full shrink-0"
-                        style={{ backgroundColor: MODEL_COLORS[i % MODEL_COLORS.length] }}
-                      />
-                      <div className="min-w-0">
-                        <p className={`text-sm font-medium truncate ${selected ? 'text-indigo-700 dark:text-indigo-400' : 'text-slate-700 dark:text-slate-300'}`}>
-                          {m.default_model || m.name || m.provider}
-                        </p>
-                        <p className="text-xs text-slate-400 dark:text-slate-500 truncate">{m.provider}</p>
-                      </div>
-                      {selected && <CheckCircle2 className="w-4 h-4 text-indigo-600 dark:text-indigo-400 ml-auto shrink-0" />}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+            <div className="grid grid-cols-2 gap-2">
+              {models.map((m: { id: string; name?: string; default_model?: string }) => {
+                const selected = selectedConfigs.includes(m.id);
+                return (
+                  <button
+                    key={m.id}
+                    onClick={() => toggleConfig(m.id)}
+                    className={`px-3 py-2.5 rounded-xl text-xs font-medium border transition-all text-left ${
+                      selected
+                        ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-300'
+                        : 'border-slate-200 dark:border-[#1e2535] text-slate-600 dark:text-slate-400 hover:border-indigo-300 dark:hover:border-indigo-500/50'
+                    }`}
+                  >
+                    <span className="block font-semibold">{m.name || m.default_model || m.id}</span>
+                    {m.default_model && m.name && (
+                      <span className="text-slate-400 dark:text-slate-500 font-normal">{m.default_model}</span>
+                    )}
+                  </button>
+                );
+              })}
+              {models.length === 0 && (
+                <p className="col-span-2 text-xs text-slate-400 dark:text-slate-500 py-3 text-center">
+                  No model configurations found. Add one in the Models page.
+                </p>
+              )}
+            </div>
           </div>
 
           {/* Iterations */}
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-              Iterations per Model
-              <span className="text-slate-400 dark:text-slate-500 font-normal ml-1.5">(more = better stats, slower)</span>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              Iterations per model
             </label>
             <div className="flex gap-2">
               {[1, 2, 3, 5].map(n => (
                 <button
                   key={n}
                   onClick={() => setIterations(n)}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium border-2 transition-all ${
+                  className={`px-4 py-2 rounded-xl text-sm font-medium border transition-all ${
                     iterations === n
-                      ? 'border-indigo-500 bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-400 dark:border-indigo-400'
-                      : 'border-slate-200 text-slate-600 dark:border-[#1e2535] dark:text-slate-400 hover:border-slate-300 dark:hover:border-[#2a3347]'
+                      ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400'
+                      : 'border-slate-200 dark:border-[#1e2535] text-slate-600 dark:text-slate-400 hover:border-indigo-300 dark:hover:border-indigo-500/50'
                   }`}
                 >
                   {n}×
@@ -249,384 +418,16 @@ function CreateExperimentModal({ onClose, onCreated }: CreateModalProps) {
             <button
               onClick={() => create()}
               disabled={!isValid || isPending}
-              className="flex items-center gap-2 px-5 py-2 bg-indigo-600 dark:bg-indigo-500 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 dark:hover:bg-indigo-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-md shadow-indigo-500/25 dark:shadow-indigo-500/20"
+              className="flex items-center gap-2 px-5 py-2 bg-indigo-600 dark:bg-indigo-500 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 dark:hover:bg-indigo-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-md shadow-indigo-500/25"
             >
               {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-              {isPending ? 'Starting...' : 'Run Experiment'}
+              {isPending ? 'Starting…' : 'Run Experiment'}
             </button>
           </div>
         </div>
       </div>
-    </div>
-  );
-}
-
-// ── Experiment Detail Panel ───────────────────────────────────────────────────
-
-function ExperimentDetailPanel({
-  experimentId,
-  onClose,
-}: {
-  experimentId: string;
-  onClose: () => void;
-}) {
-  const { data: exp, isLoading, refetch } = useQuery({
-    queryKey: ['experiment', experimentId],
-    queryFn: () => abTestingApi.getExperiment(experimentId),
-    refetchInterval: (query) => {
-      const d = query.state.data;
-      if (!d || d.status === 'running' || d.status === 'pending') return 3000;
-      return false;
-    },
-  });
-
-  const queryClient = useQueryClient();
-  const { mutate: cancelExp } = useMutation({
-    mutationFn: () => abTestingApi.cancelExperiment(experimentId),
-    onSuccess: () => { refetch(); queryClient.invalidateQueries({ queryKey: ['experiments'] }); },
-  });
-
-  if (isLoading || !exp) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-6 h-6 animate-spin text-indigo-500" />
-      </div>
-    );
-  }
-
-  const models = exp.comparison?.model_comparisons?.models ?? [];
-
-  const radarData = models.length > 0
-    ? ['Quality', 'Cost Efficiency', 'Speed', 'Reliability'].map(metric => {
-        const entry: Record<string, any> = { metric };
-        models.forEach((m, i) => {
-          const maxCost = Math.max(...models.map(x => x.avg_cost_usd || 0.0001));
-          const maxLat = Math.max(...models.map(x => x.avg_latency_ms || 1));
-          if (metric === 'Quality') entry[m.model_name] = m.avg_quality_score ?? 0;
-          if (metric === 'Cost Efficiency') entry[m.model_name] = (1 - ((m.avg_cost_usd ?? 0) / maxCost)) * 100;
-          if (metric === 'Speed') entry[m.model_name] = (1 - ((m.avg_latency_ms ?? 0) / maxLat)) * 100;
-          if (metric === 'Reliability') entry[m.model_name] = m.success_rate ?? 0;
-        });
-        return entry;
-      })
-    : [];
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 dark:bg-black/80 backdrop-blur-sm">
-      <div className="bg-white dark:bg-[#161b27] w-full sm:rounded-2xl shadow-2xl dark:shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] max-w-4xl max-h-[92vh] overflow-y-auto border border-slate-100 dark:border-[#1e2535]">
-        {/* Header */}
-        <div className="sticky top-0 bg-white dark:bg-[#161b27] border-b border-slate-100 dark:border-[#1e2535] px-6 py-4 flex items-center justify-between z-10">
-          <div className="flex items-center gap-3">
-            <StatusBadge status={exp.status} />
-            <h2 className="font-bold text-slate-900 dark:text-white">{exp.name}</h2>
-          </div>
-          <div className="flex items-center gap-2">
-            {(exp.status === 'running' || exp.status === 'pending') && (
-              <button
-                onClick={() => cancelExp()}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg border border-red-200 dark:border-red-500/20 transition-colors"
-              >
-                <StopCircle className="w-3.5 h-3.5" />
-                Cancel
-              </button>
-            )}
-            <button
-              onClick={() => refetch()}
-              className="p-2 hover:bg-slate-100 dark:hover:bg-[#1e2535] rounded-lg transition-colors"
-            >
-              <RefreshCw className="w-4 h-4 text-slate-400 dark:text-slate-500" />
-            </button>
-            <button onClick={onClose} className="p-2 hover:bg-slate-100 dark:hover:bg-[#1e2535] rounded-lg transition-colors">
-              <X className="w-4 h-4 text-slate-400 dark:text-slate-500" />
-            </button>
-          </div>
-        </div>
-
-        <div className="p-6 space-y-6">
-          {/* Progress bar while running */}
-          {(exp.status === 'running' || exp.status === 'pending') && (
-            <div>
-              <div className="flex justify-between text-xs text-slate-400 dark:text-slate-500 mb-1.5">
-                <span>Running models...</span>
-                <span>{exp.progress}%</span>
-              </div>
-              <div className="h-2 bg-slate-100 dark:bg-[#0f1117] rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-indigo-500 dark:bg-indigo-400 rounded-full transition-all duration-500"
-                  style={{ width: `${exp.progress}%` }}
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Winner banner */}
-          {exp.comparison?.winner && (
-            <div className="relative overflow-hidden bg-gradient-to-r from-indigo-600 to-violet-600 dark:from-indigo-500 dark:to-violet-500 rounded-2xl p-5 text-white shadow-lg shadow-indigo-500/25 dark:shadow-indigo-500/20">
-              <div className="absolute inset-0 opacity-10">
-                <div className="absolute -right-8 -top-8 w-40 h-40 rounded-full bg-white" />
-                <div className="absolute -left-4 -bottom-4 w-24 h-24 rounded-full bg-white" />
-              </div>
-              <div className="relative flex items-start justify-between">
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <Trophy className="w-4 h-4 text-amber-300" />
-                    <span className="text-sm font-medium text-indigo-200">Winner</span>
-                  </div>
-                  <p className="text-2xl font-bold">{exp.comparison.winner.model ?? 'Unknown'}</p>
-                  <p className="text-sm text-indigo-200 mt-1 max-w-lg">{exp.comparison.winner.reason ?? ''}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-xs text-indigo-300">Confidence</p>
-                  <p className="text-3xl font-black">{(exp.comparison.winner.confidence ?? 0).toFixed(0)}%</p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Charts */}
-          {models.length >= 2 && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {/* Radar */}
-              <div className="bg-slate-50 dark:bg-[#0f1117] rounded-xl p-4 border border-slate-100 dark:border-[#1e2535]">
-                <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3 flex items-center gap-2">
-                  <Activity className="w-4 h-4 text-indigo-500 dark:text-indigo-400" />
-                  Performance Radar
-                </h3>
-                <ResponsiveContainer width="100%" height={240}>
-                  <RadarChart data={radarData}>
-                    <PolarGrid stroke="#e2e8f0" />
-                    <PolarAngleAxis dataKey="metric" tick={{ fontSize: 11, fill: '#64748b' }} />
-                    <PolarRadiusAxis domain={[0, 100]} tick={false} axisLine={false} />
-                    {models.map((m, i) => (
-                      <Radar
-                        key={m.model_name}
-                        name={m.model_name}
-                        dataKey={m.model_name}
-                        stroke={MODEL_COLORS[i % MODEL_COLORS.length]}
-                        fill={MODEL_COLORS[i % MODEL_COLORS.length]}
-                        fillOpacity={0.15}
-                        strokeWidth={2}
-                      />
-                    ))}
-                    <Legend wrapperStyle={{ fontSize: 11 }} />
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: 'rgba(255, 255, 255, 0.95)', 
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '8px',
-                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-                      }}
-                    />
-                  </RadarChart>
-                </ResponsiveContainer>
-              </div>
-
-              {/* Cost & Latency Bar */}
-              <div className="bg-slate-50 dark:bg-[#0f1117] rounded-xl p-4 border border-slate-100 dark:border-[#1e2535]">
-                <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3 flex items-center gap-2">
-                  <BarChart3 className="w-4 h-4 text-indigo-500 dark:text-indigo-400" />
-                  Cost & Latency
-                </h3>
-                <ResponsiveContainer width="100%" height={240}>
-                  <BarChart data={models} margin={{ left: -15 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                    <XAxis dataKey="model_name" tick={{ fontSize: 10, fill: '#94a3b8' }} />
-                    <YAxis yAxisId="left" tick={{ fontSize: 10, fill: '#94a3b8' }} />
-                    <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10, fill: '#94a3b8' }} />
-                    <Tooltip
-                      formatter={((value: number | undefined, name: string | undefined) => [
-                        name === 'avg_cost_usd'
-                          ? `$${(value ?? 0).toFixed(6)}`
-                          : `${value ?? 0}ms`,
-                        name === 'avg_cost_usd' ? 'Avg Cost' : 'Avg Latency',
-                      ]) as any}
-                      contentStyle={{ 
-                        backgroundColor: 'rgba(255, 255, 255, 0.95)', 
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '8px'
-                      }}
-                    />
-                    <Bar yAxisId="left" dataKey="avg_cost_usd" fill="#6366f1" name="avg_cost_usd" radius={[4, 4, 0, 0]} />
-                    <Bar yAxisId="right" dataKey="avg_latency_ms" fill="#f59e0b" name="avg_latency_ms" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          )}
-
-          {/* Comparison Table */}
-          {models.length > 0 && (
-            <div>
-              <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3 flex items-center gap-2">
-                <Layers className="w-4 h-4 text-indigo-500 dark:text-indigo-400" />
-                Detailed Comparison
-              </h3>
-              <div className="overflow-x-auto rounded-xl border border-slate-100 dark:border-[#1e2535]">
-                <table className="min-w-full text-sm">
-                  <thead>
-                    <tr className="bg-slate-50 dark:bg-[#0f1117]">
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Model</th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Quality</th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Cost</th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Latency</th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Tokens</th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Success</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50 dark:divide-[#1e2535]">
-                    {[...models]
-                      .sort((a, b) => (b.avg_quality_score ?? 0) - (a.avg_quality_score ?? 0))
-                      .map((m, i) => {
-                        const isWinner = m.model_name === exp.comparison?.winner?.model;
-                        return (
-                          <tr key={m.config_id} className={isWinner ? 'bg-indigo-50/50 dark:bg-indigo-500/5' : 'bg-white dark:bg-[#161b27] hover:bg-slate-50 dark:hover:bg-[#1e2535]'}>
-                            <td className="px-4 py-3">
-                              <div className="flex items-center gap-2">
-                                <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: MODEL_COLORS[i % MODEL_COLORS.length] }} />
-                                <span className={`font-medium ${isWinner ? 'text-indigo-700 dark:text-indigo-400' : 'text-slate-800 dark:text-slate-200'}`}>{m.model_name}</span>
-                                {isWinner && <Trophy className="w-3.5 h-3.5 text-amber-500" />}
-                              </div>
-                            </td>
-                            <td className="px-4 py-3 text-right">
-                              <ScorePill score={m.avg_quality_score} />
-                            </td>
-                            <td className="px-4 py-3 text-right text-slate-600 dark:text-slate-400 font-mono text-xs">
-                              ${m.avg_cost_usd?.toFixed(6) ?? '—'}
-                            </td>
-                            <td className="px-4 py-3 text-right text-slate-600 dark:text-slate-400">
-                              {m.avg_latency_ms?.toLocaleString() ?? '—'}ms
-                            </td>
-                            <td className="px-4 py-3 text-right text-slate-600 dark:text-slate-400">
-                              {m.avg_tokens ? Math.round(m.avg_tokens).toLocaleString() : '—'}
-                            </td>
-                            <td className="px-4 py-3 text-right">
-                              <span className={`text-xs font-semibold ${(m.success_rate ?? 0) >= 80 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
-                                {(m.success_rate ?? 0).toFixed(0)}%
-                              </span>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {/* Individual Runs */}
-          <div>
-            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3 flex items-center gap-2">
-              <Target className="w-4 h-4 text-indigo-500 dark:text-indigo-400" />
-              Individual Runs ({exp.runs?.length ?? 0})
-            </h3>
-            <div className="space-y-2">
-              {exp.runs?.map((run, i) => (
-                <div key={run.id} className="bg-slate-50 dark:bg-[#0f1117] rounded-xl p-4 border border-slate-100 dark:border-[#1e2535]">
-                  <div className="flex flex-wrap items-center gap-2 mb-2">
-                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: MODEL_COLORS[i % MODEL_COLORS.length] }} />
-                    <span className="font-medium text-sm text-slate-800 dark:text-slate-200">{run.model}</span>
-                    <StatusBadge status={run.status} />
-                    {run.quality_score != null && <ScorePill score={run.quality_score} label="Q" />}
-                    {run.latency_ms != null && (
-                      <span className="text-xs text-slate-400 dark:text-slate-500">{run.latency_ms.toLocaleString()}ms</span>
-                    )}
-                    {run.cost_usd != null && (
-                      <span className="text-xs text-slate-400 dark:text-slate-500">${run.cost_usd.toFixed(6)}</span>
-                    )}
-                  </div>
-                  {run.output_preview && (
-                    <p className="text-xs text-slate-500 dark:text-slate-400 font-mono leading-relaxed bg-white dark:bg-[#161b27] rounded-lg p-2.5 border border-slate-100 dark:border-[#1e2535] line-clamp-3">
-                      {run.output_preview}
-                    </p>
-                  )}
-                  {run.error_message && (
-                    <p className="text-xs text-red-500 dark:text-red-400 mt-1">{run.error_message}</p>
-                  )}
-                </div>
-              ))}
-              {(!exp.runs || exp.runs.length === 0) && (
-                <p className="text-sm text-slate-400 dark:text-slate-500 text-center py-6">No runs yet.</p>
-              )}
-            </div>
-          </div>
-
-          {/* Task preview */}
-          <div>
-            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Task Template</h3>
-            <div className="bg-slate-50 dark:bg-[#0f1117] rounded-xl p-4 text-sm text-slate-600 dark:text-slate-400 font-mono whitespace-pre-wrap border border-slate-100 dark:border-[#1e2535]">
-              {exp.task_template}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Experiment Card ───────────────────────────────────────────────────────────
-
-function ExperimentCard({
-  experiment,
-  onClick,
-  onDelete,
-}: {
-  experiment: ExperimentSummary;
-  onClick: () => void;
-  onDelete: (e: React.MouseEvent) => void;
-}) {
-  return (
-    <div
-      onClick={onClick}
-      className="bg-white dark:bg-[#161b27] border border-slate-100 dark:border-[#1e2535] rounded-2xl p-5 cursor-pointer hover:shadow-md dark:hover:shadow-[0_4px_20px_rgba(0,0,0,0.3)] hover:border-indigo-100 dark:hover:border-indigo-500/30 transition-all group"
-    >
-      <div className="flex items-start justify-between mb-3">
-        <StatusBadge status={experiment.status} />
-        <button
-          onClick={onDelete}
-          className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all"
-        >
-          <Trash2 className="w-3.5 h-3.5 text-red-400 dark:text-red-400" />
-        </button>
-      </div>
-
-      <h3 className="font-semibold text-slate-900 dark:text-white text-sm leading-tight mb-3">{experiment.name}</h3>
-
-      <div className="flex items-center gap-4 text-xs text-slate-400 dark:text-slate-500 mb-3">
-        <span className="flex items-center gap-1">
-          <Layers className="w-3.5 h-3.5" />
-          {experiment.models_tested} models
-        </span>
-        {experiment.created_at && (
-          <span className="flex items-center gap-1">
-            <Clock className="w-3.5 h-3.5" />
-            {new Date(experiment.created_at).toLocaleDateString()}
-          </span>
-        )}
-      </div>
-
-      {/* Progress */}
-      <div>
-        <div className="flex justify-between text-xs text-slate-400 dark:text-slate-500 mb-1">
-          <span>Progress</span>
-          <span>{experiment.progress}%</span>
-        </div>
-        <div className="h-1.5 bg-slate-100 dark:bg-[#0f1117] rounded-full overflow-hidden">
-          <div
-            className={`h-full rounded-full transition-all duration-500 ${
-              experiment.status === 'completed' ? 'bg-emerald-400 dark:bg-emerald-500' :
-              experiment.status === 'failed' ? 'bg-red-400 dark:bg-red-500' :
-              experiment.status === 'running' ? 'bg-indigo-500 dark:bg-indigo-400' :
-              'bg-slate-300 dark:bg-slate-600'
-            }`}
-            style={{ width: `${experiment.progress}%` }}
-          />
-        </div>
-      </div>
-
-      <div className="mt-3 flex items-center text-xs text-indigo-500 dark:text-indigo-400 font-medium opacity-0 group-hover:opacity-100 transition-opacity">
-        View details <ChevronRight className="w-3.5 h-3.5 ml-0.5" />
-      </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -635,41 +436,57 @@ function ExperimentCard({
 function QuickTestModal({ onClose }: { onClose: () => void }) {
   const [task, setTask] = useState('');
   const [selectedConfigs, setSelectedConfigs] = useState<string[]>([]);
-  const [result, setResult] = useState<ExperimentDetail | null>(null);
+  const [launchedId, setLaunchedId] = useState<string | null>(null);
+
+  const queryClient = useQueryClient();
 
   const { data: modelsData } = useQuery({
     queryKey: ['model-configs'],
-    queryFn: async () => {
-      const res = await api.get('/api/v1/models/configs');
-      return res.data;
-    },
+    queryFn: () => api.get('/api/v1/models/configs').then(r => r.data),
   });
   const models = Array.isArray(modelsData) ? modelsData : [];
 
-  const { mutate: runTest, isPending } = useMutation({
+  // Poll the experiment detail once we have an ID
+  const { data: resultExp } = useQuery({
+    queryKey: ['experiment', launchedId],
+    queryFn: () => abTestingApi.getExperiment(launchedId!),
+    enabled: !!launchedId,
+    refetchInterval: query => {
+      const d = query.state.data;
+      if (!d || d.status === 'running' || d.status === 'pending') return 2000;
+      return false;
+    },
+  });
+
+  const { mutate: runTest, isPending, error } = useMutation({
     mutationFn: () => abTestingApi.quickTest(task, selectedConfigs),
-    onSuccess: (data) => setResult(data),
+    onSuccess: data => {
+      setLaunchedId(data.id);
+      queryClient.invalidateQueries({ queryKey: ['experiments'] });
+    },
+    onError: (err: Error) => toast.error(err.message),
   });
 
   const toggleConfig = (id: string) =>
     setSelectedConfigs(prev =>
-      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id],
     );
 
   const isValid = task.trim() && selectedConfigs.length >= 2;
+  const isDone = resultExp && resultExp.status !== 'running' && resultExp.status !== 'pending';
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 dark:bg-black/80 backdrop-blur-sm">
       <div className="bg-white dark:bg-[#161b27] rounded-2xl shadow-2xl dark:shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] w-full max-w-2xl max-h-[90vh] overflow-y-auto border border-slate-100 dark:border-[#1e2535]">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-slate-100 dark:border-[#1e2535]">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-500 dark:bg-amber-400 flex items-center justify-center shadow-lg shadow-amber-500/25">
+            <div className="w-10 h-10 rounded-xl bg-amber-500 flex items-center justify-center shadow-lg shadow-amber-500/25">
               <Zap className="w-5 h-5 text-white" />
             </div>
             <div>
               <h2 className="text-lg font-bold text-slate-900 dark:text-white">Quick A/B Test</h2>
-              <p className="text-xs text-slate-400 dark:text-slate-500">Synchronous — results returned immediately</p>
+              <p className="text-xs text-slate-400 dark:text-slate-500">Fires in background — results shown when ready</p>
             </div>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-slate-100 dark:hover:bg-[#1e2535] rounded-lg transition-colors">
@@ -677,139 +494,391 @@ function QuickTestModal({ onClose }: { onClose: () => void }) {
           </button>
         </div>
 
-        {!result ? (
+        {launchedId ? (
+          <div className="p-6 space-y-4">
+            {!isDone ? (
+              <div className="flex flex-col items-center py-10 gap-4">
+                <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+                <p className="text-sm text-slate-500 dark:text-slate-400">Running experiment…</p>
+                <StatusBadge status={resultExp?.status ?? 'pending'} />
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center gap-2 text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                  <CheckCircle2 className="w-4 h-4" />
+                  Experiment completed
+                </div>
+
+                {resultExp?.comparison?.winner && (
+                  <div className="bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-100 dark:border-indigo-500/20 rounded-xl p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Trophy className="w-4 h-4 text-amber-500" />
+                      <span className="text-sm font-semibold text-slate-800 dark:text-white">
+                        Winner: {resultExp.comparison.winner.model}
+                      </span>
+                      <ScorePill score={resultExp.comparison.winner.confidence} label="conf" />
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      {resultExp.comparison.winner.reason}
+                    </p>
+                  </div>
+                )}
+
+                {(resultExp?.comparison?.model_comparisons?.models ?? []).length > 0 && (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="text-slate-400 dark:text-slate-500 border-b border-slate-100 dark:border-[#1e2535]">
+                          <th className="text-left py-2 pr-4">Model</th>
+                          <th className="text-right pr-4">Quality</th>
+                          <th className="text-right pr-4">Success</th>
+                          <th className="text-right pr-4">Cost</th>
+                          <th className="text-right">Latency</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {resultExp.comparison!.model_comparisons.models.map(m => (
+                          <tr key={m.config_id} className="border-b border-slate-50 dark:border-[#1e2535]">
+                            <td className="py-2 pr-4 font-medium text-slate-800 dark:text-white">{m.model_name}</td>
+                            <td className="py-2 pr-4 text-right"><ScorePill score={m.avg_quality_score} /></td>
+                            <td className="py-2 pr-4 text-right text-slate-500">{m.success_rate.toFixed(0)}%</td>
+                            <td className="py-2 pr-4 text-right text-slate-500">${m.avg_cost_usd.toFixed(5)}</td>
+                            <td className="py-2 text-right text-slate-500">{m.avg_latency_ms?.toLocaleString() ?? '—'}ms</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                <div className="flex justify-end gap-2 pt-2">
+                  <button
+                    onClick={() => { setLaunchedId(null); setTask(''); setSelectedConfigs([]); }}
+                    className="flex items-center gap-2 px-4 py-2 text-sm bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    Run Another
+                  </button>
+                  <button
+                    onClick={onClose}
+                    className="px-4 py-2 text-sm bg-slate-100 dark:bg-[#1e2535] text-slate-600 dark:text-slate-300 rounded-lg hover:bg-slate-200 dark:hover:bg-[#2a3347] transition-colors"
+                  >
+                    Close
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        ) : (
           <div className="p-6 space-y-5">
-            <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-xl p-3 flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
-              <p className="text-xs text-amber-700 dark:text-amber-400">Quick tests run synchronously. Best for 2–3 models with simple tasks. Use "New Experiment" for large tests.</p>
-            </div>
+            {error && (
+              <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-lg text-sm text-red-700 dark:text-red-400">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                {(error as Error).message}
+              </div>
+            )}
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Task / Prompt</label>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Task Prompt</label>
               <textarea
                 value={task}
                 onChange={e => setTask(e.target.value)}
-                placeholder="Write a brief task to test across models..."
                 rows={3}
-                className="w-full px-3 py-2.5 bg-white dark:bg-[#0f1117] border border-slate-200 dark:border-[#1e2535] rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-amber-500 resize-none"
+                placeholder="Enter the prompt to test across models..."
+                className="w-full px-3.5 py-2.5 text-sm bg-slate-50 dark:bg-[#0f1117] border border-slate-200 dark:border-[#1e2535] rounded-xl text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-                Select Models <span className="text-slate-400 font-normal">(pick 2–3)</span>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                Models <span className="text-xs text-slate-400 font-normal">(select at least 2)</span>
               </label>
-              {models.length === 0 ? (
-                <p className="text-sm text-slate-400 italic">No model configs found.</p>
-              ) : (
-                <div className="grid grid-cols-2 gap-2">
-                  {models.map((m: any, i: number) => {
-                    const selected = selectedConfigs.includes(m.id);
-                    return (
-                      <button
-                        key={m.id}
-                        onClick={() => toggleConfig(m.id)}
-                        className={`flex items-center gap-2.5 p-3 rounded-xl border-2 text-left transition-all ${
-                          selected
-                            ? 'border-amber-400 bg-amber-50 dark:bg-amber-500/10'
-                            : 'border-slate-200 dark:border-[#1e2535] hover:border-slate-300 bg-white dark:bg-[#0f1117]'
-                        }`}
-                      >
-                        <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: MODEL_COLORS[i % MODEL_COLORS.length] }} />
-                        <div className="min-w-0">
-                          <p className={`text-sm font-medium truncate ${selected ? 'text-amber-700 dark:text-amber-400' : 'text-slate-700 dark:text-slate-300'}`}>
-                            {m.default_model || m.name || m.provider}
-                          </p>
-                          <p className="text-xs text-slate-400 truncate">{m.provider}</p>
-                        </div>
-                        {selected && <CheckCircle2 className="w-4 h-4 text-amber-500 ml-auto shrink-0" />}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
+              <div className="grid grid-cols-2 gap-2">
+                {models.map((m: { id: string; name?: string; default_model?: string }) => {
+                  const selected = selectedConfigs.includes(m.id);
+                  return (
+                    <button
+                      key={m.id}
+                      onClick={() => toggleConfig(m.id)}
+                      className={`px-3 py-2 rounded-xl text-xs font-medium border transition-all text-left ${
+                        selected
+                          ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-300'
+                          : 'border-slate-200 dark:border-[#1e2535] text-slate-600 dark:text-slate-400 hover:border-indigo-300'
+                      }`}
+                    >
+                      {m.name || m.default_model || m.id}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
-            <div className="flex items-center justify-between pt-2">
+            <div className="flex justify-end gap-2">
               <button onClick={onClose} className="px-4 py-2 text-sm text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#1e2535] rounded-lg transition-colors">
                 Cancel
               </button>
               <button
                 onClick={() => runTest()}
                 disabled={!isValid || isPending}
-                className="flex items-center gap-2 px-5 py-2 bg-amber-500 text-white text-sm font-medium rounded-lg hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-md shadow-amber-500/25"
+                className="flex items-center gap-2 px-5 py-2 bg-amber-500 text-white text-sm font-medium rounded-lg hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
-                {isPending ? 'Running...' : 'Run Now'}
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="p-6 space-y-5">
-            <div className="flex items-center gap-2 mb-2">
-              <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-              <span className="font-semibold text-slate-800 dark:text-white">Test Complete</span>
-              <StatusBadge status={result.status} />
-            </div>
-
-            {result.comparison?.winner && (
-              <div className="bg-gradient-to-r from-amber-500 to-orange-500 rounded-2xl p-5 text-white shadow-lg shadow-amber-500/25">
-                <div className="flex items-center gap-2 mb-1">
-                  <Trophy className="w-4 h-4 text-yellow-200" />
-                  <span className="text-sm font-medium text-amber-100">Winner</span>
-                </div>
-                <p className="text-2xl font-bold">{result.comparison.winner.model}</p>
-                <p className="text-sm text-amber-100 mt-1">{result.comparison.winner.reason}</p>
-                <p className="text-xs text-amber-200 mt-2">Confidence: {(result.comparison.winner.confidence ?? 0).toFixed(0)}%</p>
-              </div>
-            )}
-
-            {result.comparison?.model_comparisons?.models && (
-              <div className="overflow-x-auto rounded-xl border border-slate-100 dark:border-[#1e2535]">
-                <table className="min-w-full text-sm">
-                  <thead>
-                    <tr className="bg-slate-50 dark:bg-[#0f1117]">
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Model</th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Quality</th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Cost</th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Latency</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50 dark:divide-[#1e2535]">
-                    {result.comparison.model_comparisons.models.map((m: ModelComparison, i: number) => (
-                      <tr key={m.config_id} className="bg-white dark:bg-[#161b27]">
-                        <td className="px-4 py-3 flex items-center gap-2">
-                          <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: MODEL_COLORS[i % MODEL_COLORS.length] }} />
-                          <span className="font-medium text-slate-800 dark:text-slate-200">{m.model_name}</span>
-                          {m.model_name === result.comparison?.winner?.model && <Trophy className="w-3.5 h-3.5 text-amber-500" />}
-                        </td>
-                        <td className="px-4 py-3 text-right"><ScorePill score={m.avg_quality_score} /></td>
-                        <td className="px-4 py-3 text-right font-mono text-xs text-slate-500">${m.avg_cost_usd?.toFixed(6) ?? '—'}</td>
-                        <td className="px-4 py-3 text-right text-slate-500">{m.avg_latency_ms?.toLocaleString() ?? '—'}ms</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            <div className="flex justify-end gap-2">
-              <button onClick={onClose} className="px-4 py-2 text-sm bg-slate-100 dark:bg-[#1e2535] text-slate-600 dark:text-slate-300 rounded-lg hover:bg-slate-200 dark:hover:bg-[#2a3347] transition-colors">
-                Close
-              </button>
-              <button
-                onClick={() => setResult(null)}
-                className="flex items-center gap-2 px-4 py-2 text-sm bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors"
-              >
-                <RefreshCw className="w-3.5 h-3.5" />
-                Run Another
+                {isPending ? 'Launching…' : 'Run Quick Test'}
               </button>
             </div>
           </div>
         )}
       </div>
+    </div>,
+    document.body,
+  );
+}
+
+// ── Experiment Detail Panel (portal) ─────────────────────────────────────────
+
+function ExperimentDetailPanel({
+  experimentId,
+  onClose,
+}: {
+  experimentId: string;
+  onClose: () => void;
+}) {
+  const queryClient = useQueryClient();
+
+  const { data: exp, isLoading, refetch } = useQuery({
+    queryKey: ['experiment', experimentId],
+    queryFn: () => abTestingApi.getExperiment(experimentId),
+    refetchInterval: query => {
+      const d = query.state.data;
+      if (!d || d.status === 'running' || d.status === 'pending') return 3000;
+      return false;
+    },
+  });
+
+  const { mutate: cancelExp, isPending: isCancelling } = useMutation({
+    mutationFn: () => abTestingApi.cancelExperiment(experimentId),
+    onSuccess: () => {
+      refetch();
+      queryClient.invalidateQueries({ queryKey: ['experiments'] });
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+
+  // Build radar data from model comparisons
+  const models = exp?.comparison?.model_comparisons?.models ?? [];
+  const radarData = models.length > 0
+    ? [
+        { metric: 'Quality',      ...Object.fromEntries(models.map(m => [m.model_name, m.avg_quality_score])) },
+        { metric: 'Cost Eff.',    ...Object.fromEntries(models.map(m => [m.model_name, Math.max(0, 100 - m.avg_cost_usd * 10000)])) },
+        { metric: 'Speed',        ...Object.fromEntries(models.map(m => [m.model_name, Math.max(0, 100 - m.avg_latency_ms / 100)])) },
+        { metric: 'Reliability',  ...Object.fromEntries(models.map(m => [m.model_name, m.success_rate])) },
+      ]
+    : [];
+
+  const panel = (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 dark:bg-black/80 backdrop-blur-sm">
+      <div className="bg-white dark:bg-[#161b27] rounded-t-2xl sm:rounded-2xl shadow-2xl border border-slate-100 dark:border-[#1e2535] w-full sm:max-w-4xl max-h-[92vh] flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-slate-100 dark:border-[#1e2535] shrink-0">
+          {isLoading || !exp ? (
+            <div className="h-6 w-48 bg-slate-100 dark:bg-[#1e2535] rounded animate-pulse" />
+          ) : (
+            <div className="flex items-center gap-3">
+              <StatusBadge status={exp.status} />
+              <h2 className="font-bold text-slate-900 dark:text-white">{exp.name}</h2>
+            </div>
+          )}
+          <div className="flex items-center gap-2">
+            {exp && (exp.status === 'running' || exp.status === 'pending') && (
+              <button
+                onClick={() => cancelExp()}
+                disabled={isCancelling}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-600 dark:text-red-400 border border-red-200 dark:border-red-500/30 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors disabled:opacity-50"
+              >
+                <StopCircle className="w-3.5 h-3.5" />
+                Cancel
+              </button>
+            )}
+            <button onClick={onClose} className="p-2 hover:bg-slate-100 dark:hover:bg-[#1e2535] rounded-lg transition-colors">
+              <X className="w-4 h-4 text-slate-400" />
+            </button>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="overflow-y-auto flex-1 p-6 space-y-6">
+          {isLoading || !exp ? (
+            <div className="flex items-center justify-center py-20">
+              <Loader2 className="w-6 h-6 animate-spin text-indigo-500" />
+            </div>
+          ) : (
+            <>
+              {/* Winner */}
+              {exp.comparison?.winner && (
+                <div className="bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-500/10 dark:to-purple-500/10 border border-indigo-100 dark:border-indigo-500/20 rounded-2xl p-5">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Trophy className="w-5 h-5 text-amber-500" />
+                    <span className="font-bold text-slate-900 dark:text-white">
+                      Winner: {exp.comparison.winner.model}
+                    </span>
+                    <ScorePill score={exp.comparison.winner.confidence} label="confidence" />
+                  </div>
+                  <p className="text-sm text-slate-600 dark:text-slate-400">{exp.comparison.winner.reason}</p>
+                </div>
+              )}
+
+              {/* Radar + bar charts */}
+              {models.length > 0 && radarData.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Radar */}
+                  <div className="bg-slate-50 dark:bg-[#0f1117] rounded-xl p-4 border border-slate-100 dark:border-[#1e2535]">
+                    <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-3 uppercase tracking-wide">
+                      Performance Radar
+                    </h3>
+                    <ResponsiveContainer width="100%" height={220}>
+                      <RadarChart data={radarData}>
+                        <PolarGrid stroke="#e2e8f0" />
+                        <PolarAngleAxis dataKey="metric" tick={{ fontSize: 11, fill: '#94a3b8' }} />
+                        {models.map((m, i) => (
+                          <Radar
+                            key={m.config_id}
+                            name={m.model_name}
+                            dataKey={m.model_name}
+                            stroke={MODEL_COLORS[i % MODEL_COLORS.length]}
+                            fill={MODEL_COLORS[i % MODEL_COLORS.length]}
+                            fillOpacity={0.12}
+                          />
+                        ))}
+                      </RadarChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  {/* Latency bar */}
+                  <div className="bg-slate-50 dark:bg-[#0f1117] rounded-xl p-4 border border-slate-100 dark:border-[#1e2535]">
+                    <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-3 uppercase tracking-wide">
+                      Avg Latency (ms)
+                    </h3>
+                    <ResponsiveContainer width="100%" height={220}>
+                      <BarChart data={models.map((m, i) => ({ name: m.model_name, latency: m.avg_latency_ms, fill: MODEL_COLORS[i % MODEL_COLORS.length] }))}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                        <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#94a3b8' }} />
+                        <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} />
+                        <Tooltip
+                          contentStyle={{ background: '#1e2535', border: 'none', borderRadius: 8, fontSize: 12 }}
+                          labelStyle={{ color: '#e2e8f0' }}
+                        />
+                        <Bar dataKey="latency" radius={[4, 4, 0, 0]}>
+                          {models.map((_, i) => (
+                            <rect key={i} fill={MODEL_COLORS[i % MODEL_COLORS.length]} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              )}
+
+              {/* Comparison table */}
+              {models.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3 flex items-center gap-2">
+                    <BarChart3 className="w-4 h-4 text-indigo-500" />
+                    Model Comparison
+                  </h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="text-slate-400 dark:text-slate-500 border-b border-slate-100 dark:border-[#1e2535]">
+                          <th className="text-left py-2 pr-4 font-medium">Model</th>
+                          <th className="text-right pr-4 font-medium">Quality</th>
+                          <th className="text-right pr-4 font-medium">Success</th>
+                          <th className="text-right pr-4 font-medium">Tokens</th>
+                          <th className="text-right pr-4 font-medium">Cost</th>
+                          <th className="text-right font-medium">Latency</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {models.map((m, i) => (
+                          <tr key={m.config_id} className="border-b border-slate-50 dark:border-[#1e2535] hover:bg-slate-50 dark:hover:bg-[#1e2535]/50">
+                            <td className="py-2.5 pr-4">
+                              <div className="flex items-center gap-1.5">
+                                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: MODEL_COLORS[i % MODEL_COLORS.length] }} />
+                                <span className="font-medium text-slate-800 dark:text-slate-200">{m.model_name}</span>
+                                {exp.comparison?.winner.config_id === m.config_id && (
+                                  <Trophy className="w-3 h-3 text-amber-500" />
+                                )}
+                              </div>
+                            </td>
+                            <td className="py-2.5 pr-4 text-right"><ScorePill score={m.avg_quality_score} /></td>
+                            <td className={`py-2.5 pr-4 text-right font-medium ${m.success_rate >= 80 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                              {m.success_rate.toFixed(0)}%
+                            </td>
+                            <td className="py-2.5 pr-4 text-right text-slate-500">{m.avg_tokens?.toLocaleString() ?? '—'}</td>
+                            <td className="py-2.5 pr-4 text-right text-slate-500">${m.avg_cost_usd?.toFixed(5) ?? '—'}</td>
+                            <td className="py-2.5 text-right text-slate-500">{m.avg_latency_ms?.toLocaleString() ?? '—'}ms</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Individual Runs */}
+              <div>
+                <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3 flex items-center gap-2">
+                  <Target className="w-4 h-4 text-indigo-500" />
+                  Individual Runs ({exp.runs?.length ?? 0})
+                </h3>
+                <div className="space-y-2">
+                  {exp.runs?.map((run, i) => (
+                    <div key={run.id} className="bg-slate-50 dark:bg-[#0f1117] rounded-xl p-4 border border-slate-100 dark:border-[#1e2535]">
+                      <div className="flex flex-wrap items-center gap-2 mb-2">
+                        <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: MODEL_COLORS[i % MODEL_COLORS.length] }} />
+                        <span className="font-medium text-sm text-slate-800 dark:text-slate-200">{run.model}</span>
+                        <StatusBadge status={run.status} />
+                        {run.quality_score != null && <ScorePill score={run.quality_score} label="Q" />}
+                        {run.latency_ms != null && (
+                          <span className="text-xs text-slate-400 dark:text-slate-500">{run.latency_ms.toLocaleString()}ms</span>
+                        )}
+                        {run.cost_usd != null && (
+                          <span className="text-xs text-slate-400 dark:text-slate-500">${run.cost_usd.toFixed(6)}</span>
+                        )}
+                      </div>
+                      {run.output_preview && (
+                        <p className="text-xs text-slate-500 dark:text-slate-400 font-mono leading-relaxed bg-white dark:bg-[#161b27] rounded-lg p-2.5 border border-slate-100 dark:border-[#1e2535] line-clamp-3">
+                          {run.output_preview}
+                        </p>
+                      )}
+                      {run.error_message && (
+                        <p className="text-xs text-red-500 dark:text-red-400 mt-1 flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3 shrink-0" />
+                          {run.error_message}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                  {(!exp.runs || exp.runs.length === 0) && (
+                    <p className="text-sm text-slate-400 dark:text-slate-500 text-center py-6">No runs yet.</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Task template */}
+              <div>
+                <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Task Template</h3>
+                <div className="bg-slate-50 dark:bg-[#0f1117] rounded-xl p-4 text-sm text-slate-600 dark:text-slate-400 font-mono whitespace-pre-wrap border border-slate-100 dark:border-[#1e2535]">
+                  {exp.task_template}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
+
+  return createPortal(panel, document.body);
 }
 
 // ── Recommendations Panel ─────────────────────────────────────────────────────
@@ -820,7 +889,7 @@ function RecommendationsPanel() {
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['ab-recommendations', taskFilter],
     queryFn: () => abTestingApi.getRecommendations(taskFilter || undefined),
-    refetchInterval: 60000,
+    refetchInterval: 60_000,
   });
 
   const recommendations = data?.recommendations ?? [];
@@ -839,7 +908,7 @@ function RecommendationsPanel() {
           <input
             value={taskFilter}
             onChange={e => setTaskFilter(e.target.value)}
-            placeholder="Filter by category..."
+            placeholder="Filter by category…"
             className="px-3 py-1.5 text-xs bg-slate-50 dark:bg-[#0f1117] border border-slate-200 dark:border-[#1e2535] rounded-lg text-slate-700 dark:text-slate-300 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 w-40"
           />
           <button onClick={() => refetch()} className="p-1.5 hover:bg-slate-100 dark:hover:bg-[#1e2535] rounded-lg transition-colors">
@@ -853,39 +922,33 @@ function RecommendationsPanel() {
           <Loader2 className="w-5 h-5 animate-spin text-indigo-500" />
         </div>
       ) : recommendations.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-center px-6">
-          <div className="w-14 h-14 rounded-2xl bg-indigo-50 dark:bg-indigo-500/10 flex items-center justify-center mb-4">
-            <TrendingUp className="w-6 h-6 text-indigo-400" />
-          </div>
-          <h3 className="font-semibold text-slate-700 dark:text-slate-300 mb-1 text-sm">No recommendations yet</h3>
-          <p className="text-xs text-slate-400 dark:text-slate-500">Complete some experiments to build model recommendations</p>
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <TrendingUp className="w-8 h-8 text-slate-300 dark:text-slate-600 mb-3" />
+          <p className="text-sm text-slate-400 dark:text-slate-500">No recommendations yet.</p>
+          <p className="text-xs text-slate-300 dark:text-slate-600 mt-1">Complete experiments to generate recommendations.</p>
         </div>
       ) : (
         <div className="divide-y divide-slate-50 dark:divide-[#1e2535]">
-          {recommendations.map((rec, i) => (
-            <div key={`${rec.task_category}-${i}`} className="p-4 hover:bg-slate-50 dark:hover:bg-[#1e2535]/50 transition-colors">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide truncate">{rec.task_category}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <Trophy className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                    <span className="font-semibold text-slate-800 dark:text-white text-sm">{rec.recommended_model}</span>
+          {recommendations.map(rec => (
+            <div key={rec.task_category} className="p-5 hover:bg-slate-50 dark:hover:bg-[#0f1117]/50 transition-colors">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wide mb-1">
+                    {rec.task_category}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Trophy className="w-3.5 h-3.5 text-amber-500" />
+                    <span className="font-semibold text-sm text-slate-800 dark:text-white">{rec.recommended_model}</span>
                   </div>
                 </div>
-                <div className="flex items-center gap-3 shrink-0 text-right">
-                  <div>
+                <div className="flex items-center gap-3 shrink-0">
+                  <div className="text-right">
                     <p className="text-xs text-slate-400 dark:text-slate-500">Quality</p>
                     <ScorePill score={rec.avg_quality_score} />
                   </div>
-                  <div>
-                    <p className="text-xs text-slate-400 dark:text-slate-500">Avg Cost</p>
-                    <p className="text-xs font-mono text-slate-600 dark:text-slate-400">${rec.avg_cost_usd?.toFixed(5) ?? '—'}</p>
-                  </div>
-                  <div>
+                  <div className="text-right">
                     <p className="text-xs text-slate-400 dark:text-slate-500">Success</p>
-                    <p className={`text-xs font-semibold ${rec.success_rate >= 80 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                    <p className={`text-sm font-bold ${rec.success_rate >= 80 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
                       {rec.success_rate.toFixed(0)}%
                     </p>
                   </div>
@@ -893,6 +956,8 @@ function RecommendationsPanel() {
               </div>
               <div className="mt-2 flex items-center gap-3 text-xs text-slate-400 dark:text-slate-500">
                 <span>{rec.avg_latency_ms?.toLocaleString() ?? '—'}ms avg latency</span>
+                <span>·</span>
+                <span>${rec.avg_cost_usd?.toFixed(5) ?? '—'} avg cost</span>
                 <span>·</span>
                 <span>{rec.sample_size} samples</span>
                 {rec.last_updated && (
@@ -910,71 +975,92 @@ function RecommendationsPanel() {
   );
 }
 
+// ── Access Denied ─────────────────────────────────────────────────────────────
+
+function AccessDenied() {
+  return (
+    <div className="min-h-screen bg-slate-50 dark:bg-[#0f1117] flex items-center justify-center p-6">
+      <div className="text-center">
+        <div className="w-20 h-20 bg-red-100 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-2xl flex items-center justify-center mx-auto mb-5">
+          <Shield className="w-9 h-9 text-red-600 dark:text-red-400" />
+        </div>
+        <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Access Denied</h2>
+        <p className="text-slate-500 dark:text-slate-400 text-sm">Only admin users can access A/B Testing.</p>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export function ABTestingPage() {
   const { user } = useAuthStore();
+  const queryClient = useQueryClient();
+
+  // ── All hooks must be declared before any conditional return ────────────────
   const [showCreate, setShowCreate] = useState(false);
   const [showQuickTest, setShowQuickTest] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState<string>('');
+  const [statusFilter, setStatusFilter] = useState<ExperimentStatus | ''>('');
   const [activeTab, setActiveTab] = useState<'experiments' | 'recommendations'>('experiments');
+  const [page, setPage] = useState(0);
 
-  const queryClient = useQueryClient();
-
-  // ── Access Control ─────────────────────────────────────────────────────────
   const isAdmin = user?.isSovereign || user?.is_admin || false;
-  
-  if (!isAdmin) {
-    return (
-      <div className="min-h-screen bg-slate-50 dark:bg-[#0f1117] flex items-center justify-center p-6">
-        <div className="text-center">
-          <div className="w-20 h-20 bg-red-100 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-sm dark:shadow-[0_2px_16px_rgba(0,0,0,0.25)]">
-            <Shield className="w-9 h-9 text-red-600 dark:text-red-400" />
-          </div>
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Access Denied</h2>
-          <p className="text-slate-500 dark:text-slate-400 text-sm">
-            Only admin users can access A/B Testing.
-          </p>
-        </div>
-      </div>
-    );
-  }
 
-  const { data: experimentsData, isLoading, refetch } = useQuery({
-    queryKey: ['experiments', statusFilter],
-    queryFn: async () => {
-      const res = await abTestingApi.listExperiments(statusFilter || undefined);
-      return res;
-    },
-    refetchInterval: (query) => {
-      const d = query.state.data;
-      const hasRunning = Array.isArray(d) && d.some(
-        (e: ExperimentSummary) => e.status === 'running' || e.status === 'pending'
-      );
-      return hasRunning ? 4000 : 30000;
+  // WebSocket-driven cache invalidation (replaces most polling)
+  const lastMessage = useWebSocketStore(s => s.lastMessage);
+  useEffect(() => {
+    if (!lastMessage) return;
+    if (
+      lastMessage.type === 'ab_test_update' ||
+      lastMessage.type === 'experiment_status_changed'
+    ) {
+      queryClient.invalidateQueries({ queryKey: ['experiments'] });
+      queryClient.invalidateQueries({ queryKey: ['ab-stats'] });
+      if (lastMessage.metadata?.experiment_id) {
+        queryClient.invalidateQueries({
+          queryKey: ['experiment', lastMessage.metadata.experiment_id],
+        });
+      }
+    }
+  }, [lastMessage, queryClient]);
+
+  const { data: pageData, isLoading, refetch } = useQuery({
+    queryKey: ['experiments', statusFilter, page],
+    queryFn: () => abTestingApi.listExperiments(statusFilter || undefined, PAGE_SIZE, page * PAGE_SIZE),
+    enabled: isAdmin,
+    // Only poll as fallback when no WS message arrives; slow interval since WS handles it
+    refetchInterval: query => {
+      const items = (query.state.data as PaginatedExperiments | undefined)?.items ?? [];
+      const hasActive = items.some(e => e.status === 'running' || e.status === 'pending');
+      return hasActive ? 8000 : 60_000;
     },
   });
 
-  const experiments = Array.isArray(experimentsData) ? experimentsData : [];
+  const experiments = pageData?.items ?? [];
+  const totalExperiments = pageData?.total ?? 0;
+  const totalPages = Math.ceil(totalExperiments / PAGE_SIZE);
 
   const { data: statsData } = useQuery({
     queryKey: ['ab-stats'],
-    queryFn: async () => {
-      const res = await abTestingApi.getStats();
-      return res;
-    },
-    refetchInterval: 30000,
+    queryFn: () => abTestingApi.getStats(),
+    enabled: isAdmin,
+    refetchInterval: 60_000,
   });
-
-  const stats = statsData || null;
 
   const { mutate: deleteExp } = useMutation({
     mutationFn: (id: string) => abTestingApi.deleteExperiment(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['experiments'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['experiments'] });
+      toast.success('Experiment deleted');
+    },
+    onError: (err: Error) => toast.error(err.message),
   });
 
-  const FILTERS = ['', 'running', 'completed', 'failed'];
+  // ── Conditional render AFTER all hooks ─────────────────────────────────────
+  if (!isAdmin) return <AccessDenied />;
+
+  const stats = statsData ?? null;
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-[#0f1117]">
@@ -1012,105 +1098,120 @@ export function ABTestingPage() {
         {/* Stats row */}
         {stats && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <MetricCard icon={FlaskConical} label="Total Experiments" value={String(stats.total_experiments)} />
-            <MetricCard icon={CheckCircle2} label="Completed" value={String(stats.completed_experiments)} />
-            <MetricCard icon={Activity} label="Model Runs" value={(stats.total_model_runs ?? 0).toLocaleString()} />
-            <MetricCard icon={TrendingUp} label="Recommendations" value={String(stats.cached_recommendations)} />
+            <MetricCard icon={FlaskConical}  label="Total Experiments" value={String(stats.total_experiments)} />
+            <MetricCard icon={CheckCircle2} label="Completed"          value={String(stats.completed_experiments)} />
+            <MetricCard icon={Activity}     label="Model Runs"         value={(stats.total_model_runs ?? 0).toLocaleString()} />
+            <MetricCard icon={TrendingUp}   label="Recommendations"    value={String(stats.cached_recommendations)} />
           </div>
         )}
 
         {/* Tabs */}
         <div className="flex items-center gap-1 bg-slate-100 dark:bg-[#161b27] rounded-xl p-1 w-fit border border-slate-200 dark:border-[#1e2535]">
-          <button
-            onClick={() => setActiveTab('experiments')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-              activeTab === 'experiments'
-                ? 'bg-white dark:bg-[#0f1117] text-slate-800 dark:text-white shadow-sm'
-                : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
-            }`}
-          >
-            Experiments
-          </button>
-          <button
-            onClick={() => setActiveTab('recommendations')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-              activeTab === 'recommendations'
-                ? 'bg-white dark:bg-[#0f1117] text-slate-800 dark:text-white shadow-sm'
-                : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
-            }`}
-          >
-            Recommendations
-          </button>
+          {(['experiments', 'recommendations'] as const).map(tab => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all capitalize ${
+                activeTab === tab
+                  ? 'bg-white dark:bg-[#0f1117] text-slate-800 dark:text-white shadow-sm'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
+              }`}
+            >
+              {tab}
+            </button>
+          ))}
         </div>
 
         {activeTab === 'recommendations' ? (
           <RecommendationsPanel />
-        ) : (<>
-        {/* Filters */}
-        <div className="flex items-center gap-2">
-          {FILTERS.map(f => (
-            <button
-              key={f || 'all'}
-              onClick={() => setStatusFilter(f)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                statusFilter === f
-                  ? 'bg-indigo-600 dark:bg-indigo-500 text-white'
-                  : 'bg-white dark:bg-[#161b27] text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-[#1e2535] hover:border-slate-300 dark:hover:border-[#2a3347]'
-              }`}
-            >
-              {f || 'All'}
-            </button>
-          ))}
-          <button
-            onClick={() => refetch()}
-            className="ml-auto p-2 hover:bg-white dark:hover:bg-[#161b27] rounded-lg border border-transparent hover:border-slate-200 dark:hover:border-[#1e2535] transition-all"
-          >
-            <RefreshCw className="w-4 h-4 text-slate-400 dark:text-slate-500" />
-          </button>
-        </div>
-
-        {/* Grid */}
-        {isLoading ? (
-          <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-6 h-6 animate-spin text-indigo-500" />
-          </div>
-        ) : experiments.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-24 text-center">
-            <div className="w-16 h-16 rounded-2xl bg-indigo-50 dark:bg-indigo-500/10 flex items-center justify-center mb-4">
-              <FlaskConical className="w-7 h-7 text-indigo-400 dark:text-indigo-400" />
-            </div>
-            <h3 className="font-semibold text-slate-700 dark:text-slate-300 mb-1">No experiments yet</h3>
-            <p className="text-sm text-slate-400 dark:text-slate-500 mb-5">Create your first A/B test to compare models</p>
-            <button
-              onClick={() => setShowCreate(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 dark:bg-indigo-500 text-white text-sm rounded-xl hover:bg-indigo-700 dark:hover:bg-indigo-400 transition-colors shadow-md shadow-indigo-200 dark:shadow-indigo-500/20"
-            >
-              <Plus className="w-4 h-4" />
-              New Experiment
-            </button>
-          </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {experiments.map(exp => (
-              <ExperimentCard
-                key={exp.id}
-                experiment={exp}
-                onClick={() => setSelectedId(exp.id)}
-                onDelete={(e) => {
-                  e.stopPropagation();
-                  if (window.confirm('Delete this experiment?')) deleteExp(exp.id);
-                }}
-              />
-            ))}
-          </div>
+          <>
+            {/* Filters */}
+            <div className="flex items-center gap-2 flex-wrap">
+              {FILTERS.map(f => (
+                <button
+                  key={f || 'all'}
+                  onClick={() => { setStatusFilter(f); setPage(0); }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all capitalize ${
+                    statusFilter === f
+                      ? 'bg-indigo-600 dark:bg-indigo-500 text-white'
+                      : 'bg-white dark:bg-[#161b27] text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-[#1e2535] hover:border-slate-300 dark:hover:border-[#2a3347]'
+                  }`}
+                >
+                  {f || 'All'}
+                </button>
+              ))}
+              <button
+                onClick={() => refetch()}
+                className="ml-auto p-2 hover:bg-white dark:hover:bg-[#161b27] rounded-lg border border-transparent hover:border-slate-200 dark:hover:border-[#1e2535] transition-all"
+              >
+                <RefreshCw className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+              </button>
+            </div>
+
+            {/* Grid */}
+            {isLoading ? (
+              <div className="flex items-center justify-center py-20">
+                <Loader2 className="w-6 h-6 animate-spin text-indigo-500" />
+              </div>
+            ) : experiments.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-24 text-center">
+                <div className="w-16 h-16 rounded-2xl bg-indigo-50 dark:bg-indigo-500/10 flex items-center justify-center mb-4">
+                  <FlaskConical className="w-7 h-7 text-indigo-400" />
+                </div>
+                <h3 className="font-semibold text-slate-700 dark:text-slate-300 mb-1">No experiments yet</h3>
+                <p className="text-sm text-slate-400 dark:text-slate-500 mb-5">Create your first A/B test to compare models</p>
+                <button
+                  onClick={() => setShowCreate(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-indigo-600 dark:bg-indigo-500 text-white text-sm rounded-xl hover:bg-indigo-700 dark:hover:bg-indigo-400 transition-colors shadow-md"
+                >
+                  <Plus className="w-4 h-4" />
+                  New Experiment
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {experiments.map(exp => (
+                    <ExperimentCard
+                      key={exp.id}
+                      experiment={exp}
+                      onClick={() => setSelectedId(exp.id)}
+                      onDelete={() => deleteExp(exp.id)}
+                    />
+                  ))}
+                </div>
+
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-center gap-2 pt-2">
+                    <button
+                      onClick={() => setPage(p => Math.max(0, p - 1))}
+                      disabled={page === 0}
+                      className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 dark:border-[#1e2535] disabled:opacity-40 hover:bg-slate-100 dark:hover:bg-[#1e2535] transition-colors"
+                    >
+                      ← Prev
+                    </button>
+                    <span className="text-sm text-slate-500 dark:text-slate-400">
+                      Page {page + 1} of {totalPages}
+                    </span>
+                    <button
+                      onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+                      disabled={page >= totalPages - 1}
+                      className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 dark:border-[#1e2535] disabled:opacity-40 hover:bg-slate-100 dark:hover:bg-[#1e2535] transition-colors"
+                    >
+                      Next →
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </>
         )}
-      </>)}
       </div>
 
-      {/* Modals */}
-      {showQuickTest && (
-        <QuickTestModal onClose={() => setShowQuickTest(false)} />
-      )}
+      {/* Modals (all portal-mounted inside their own components) */}
+      {showQuickTest && <QuickTestModal onClose={() => setShowQuickTest(false)} />}
 
       {showCreate && (
         <CreateExperimentModal

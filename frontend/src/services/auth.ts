@@ -15,6 +15,18 @@ export interface LoginResponse {
     };
 }
 
+export interface SessionUser {
+    username: string;
+    user_id: string;
+    is_admin: boolean;
+    role: string;
+}
+
+export interface VerifySessionResponse {
+    valid: boolean;
+    user: SessionUser;
+}
+
 export const authService = {
     async login(credentials: LoginCredentials): Promise<LoginResponse> {
         const response = await api.post('/api/v1/auth/login', credentials);
@@ -45,6 +57,23 @@ export const authService = {
             console.warn('Token verification failed:', error);
             return false;
         }
+    },
+
+    /**
+     * Lightweight session check that returns the authenticated user profile.
+     *
+     * Unlike verifyToken() (which only returns a boolean), this endpoint
+     * returns the full user context — useful for restoring session state on
+     * page load, voice-bridge handshake, and any component that needs to
+     * confirm identity without a full re-login.
+     *
+     * Maps to: GET /api/v1/auth/verify-session
+     */
+    async verifySession(): Promise<VerifySessionResponse> {
+        const response = await api.get<VerifySessionResponse>(
+            '/api/v1/auth/verify-session',
+        );
+        return response.data;
     },
 
     logout(): void {
