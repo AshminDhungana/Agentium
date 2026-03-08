@@ -1,45 +1,47 @@
 import { api } from './api';
 import { Agent } from '../types';
 
+// ─── Request / Response types ─────────────────────────────────────────────────
+
 export interface PromoteAgentRequest {
-    task_agentium_id: string;
+    task_agentium_id:        string;
     promoted_by_agentium_id: string;
-    reason: string;
+    reason:                  string;
 }
 
 export interface PromotionResult {
-    success: boolean;
-    old_agentium_id: string;
-    new_agentium_id: string;
-    promoted_by: string;
-    reason: string;
+    success:           boolean;
+    old_agentium_id:   string;
+    new_agentium_id:   string;
+    promoted_by:       string;
+    reason:            string;
     tasks_transferred: number;
-    message: string;
+    message:           string;
 }
 
 export interface CapacityTier {
-    used: number;
-    available: number;
-    total: number;
+    used:       number;
+    available:  number;
+    total:      number;
     percentage: number;
-    warning: boolean;
-    critical: boolean;
+    warning:    boolean;
+    critical:   boolean;
 }
 
 export interface CapacityData {
-    head: CapacityTier;
-    council: CapacityTier;
-    lead: CapacityTier;
-    task: CapacityTier;
+    head:     CapacityTier;
+    council:  CapacityTier;
+    lead:     CapacityTier;
+    task:     CapacityTier;
     warnings: string[];
 }
 
 export interface LifecycleStats {
     period_days: number;
     lifecycle_events: {
-        spawned: number;
-        promoted: number;
-        liquidated: number;
+        spawned:      number;
+        promoted:     number;
+        liquidated:   number;
         reincarnated: number;
     };
     active_agents_by_tier: {
@@ -49,40 +51,57 @@ export interface LifecycleStats {
         tier_3: number;
     };
     capacity: {
-        head: CapacityTier;
+        head:    CapacityTier;
         council: CapacityTier;
-        lead: CapacityTier;
-        task: CapacityTier;
+        lead:    CapacityTier;
+        task:    CapacityTier;
     };
 }
 
 export interface BulkLiquidateDryRunResult {
-    dry_run: true;
+    dry_run:           true;
     idle_agents_found: number;
-    idle_agents: { agentium_id: string; name: string; idle_days: number }[];
-    message: string;
+    idle_agents:       { agentium_id: string; name: string; idle_days: number }[];
+    message:           string;
 }
 
 export interface BulkLiquidateResult {
-    dry_run: false;
+    dry_run:         false;
     liquidated_count: number;
-    liquidated: { agentium_id: string; name: string }[];
-    skipped_count: number;
-    skipped: { agentium_id: string; reason: string }[];
-    message: string;
+    liquidated:       { agentium_id: string; name: string }[];
+    skipped_count:    number;
+    skipped:          { agentium_id: string; reason: string }[];
+    message:          string;
 }
 
 export interface SpawnAgentRequest {
-    child_type: 'council_member' | 'lead_agent' | 'task_agent';
-    name: string;
-    description: string;
+    child_type:        'council_member' | 'lead_agent' | 'task_agent';
+    name:              string;
+    description:       string;
     parent_agentium_id: string;
 }
+
+export interface ReassignAgentRequest {
+    new_parent_id: string;
+    reason?:       string;
+}
+
+export interface CapabilityProfile {
+    tier:                    string;
+    agentium_id:             string;
+    base_capabilities:       string[];
+    granted_capabilities:    string[];
+    revoked_capabilities:    string[];
+    effective_capabilities:  string[];
+    total_count:             number;
+}
+
+// ─── Agents service ───────────────────────────────────────────────────────────
 
 export const agentsService = {
     getAgents: async (filters?: { type?: string; status?: string }): Promise<Agent[]> => {
         const params = new URLSearchParams();
-        if (filters?.type) params.append('agent_type', filters.type);
+        if (filters?.type)   params.append('agent_type', filters.type);
         if (filters?.status) params.append('status', filters.status);
 
         const response = await api.get<{ agents: Agent[] }>(`/api/v1/agents?${params.toString()}`);
@@ -96,37 +115,51 @@ export const agentsService = {
 
     spawnAgent: async (parentId: string, data: SpawnAgentRequest): Promise<Agent> => {
         // Backend has two separate spawn endpoints: /spawn/task and /spawn/lead.
-        // task_agent -> POST /spawn/task  (parent must be Lead 2xxxx or Council 1xxxx)
-        // lead_agent / council_member -> POST /spawn/lead  (parent must be Council 1xxxx or Head 0xxxx)
+        // task_agent              → POST /spawn/task  (parent: Lead 2xxxx or Council 1xxxx)
+        // lead_agent/council_member → POST /spawn/lead  (parent: Council 1xxxx or Head 0xxxx)
         const endpoint = data.child_type === 'task_agent'
             ? '/api/v1/agents/lifecycle/spawn/task'
             : '/api/v1/agents/lifecycle/spawn/lead';
 
         const response = await api.post<{ agent: Agent }>(endpoint, {
             parent_agentium_id: data.parent_agentium_id,
-            name: data.name,
-            description: data.description,
+            name:               data.name,
+            description:        data.description,
         });
         return response.data.agent;
     },
 
-    terminateAgent: async (id: string, reason: string, authorizedById: string): Promise<void> => {
-        // Backend uses "liquidate" (not terminate) — POST /liquidate does full cleanup:
-        // cancels tasks, notifies child agents, revokes capabilities.
+    /**
+     * Terminate an agent.
+     * reason must be >= 20 chars (backend LiquidateAgentRequest constraint).
+     * authorizedById must be a Head (0xxxx) or Council (1xxxx) agent.
+     */
+    terminateAgent: async (
+        id:             string,
+        reason:         string,
+        authorizedById: string,
+    ): Promise<void> => {
         await api.post('/api/v1/agents/lifecycle/liquidate', {
-            target_agentium_id: id,
+            target_agentium_id:        id,
             liquidated_by_agentium_id: authorizedById,
             reason,
             force: false,
         });
-    }
+    },
+
+    reassignAgent: async (agentId: string, data: ReassignAgentRequest): Promise<Agent> => {
+        const response = await api.post<{ agent: Agent }>(
+            `/api/v1/agents/lifecycle/${agentId}/reassign`,
+            data,
+        );
+        return response.data.agent;
+    },
 };
 
+// ─── Lifecycle service ────────────────────────────────────────────────────────
+
 export const lifecycleService = {
-    /**
-     * Promote a Task Agent (3xxxx) to Lead Agent (2xxxx).
-     * promoted_by must be Council (1xxxx) or Head (0xxxx).
-     */
+    /** Promote a Task Agent (3xxxx) to Lead Agent (2xxxx). */
     promoteAgent: async (data: PromoteAgentRequest): Promise<PromotionResult> => {
         const response = await api.post<PromotionResult>(
             '/api/v1/agents/lifecycle/promote',
@@ -137,8 +170,10 @@ export const lifecycleService = {
 
     /**
      * Bulk-liquidate idle agents.
-     * @param idleDaysThreshold  Days without activity to consider idle (default 7)
-     * @param dryRun             When true, only detects — does NOT liquidate
+     * dry_run=true (default) only detects — does NOT liquidate.
+     *
+     * Note: params sent as query params to match current backend signature.
+     * Backend improvement (moving to request body) can be adopted transparently here.
      */
     bulkLiquidateIdle: async (
         idleDaysThreshold = 7,
@@ -146,7 +181,7 @@ export const lifecycleService = {
     ): Promise<BulkLiquidateDryRunResult | BulkLiquidateResult> => {
         const params = new URLSearchParams({
             idle_days_threshold: String(idleDaysThreshold),
-            dry_run: String(dryRun),
+            dry_run:             String(dryRun),
         });
         const response = await api.post<BulkLiquidateDryRunResult | BulkLiquidateResult>(
             `/api/v1/agents/lifecycle/bulk/liquidate-idle?${params}`,
@@ -154,33 +189,18 @@ export const lifecycleService = {
         return response.data;
     },
 
-    /** Get ID-pool capacity for each agent tier. */
     getCapacity: async (): Promise<CapacityData> => {
         const response = await api.get<CapacityData>('/api/v1/agents/lifecycle/capacity');
         return response.data;
     },
 
-    /** Get 30-day lifecycle event stats and active-agent counts by tier. */
     getLifecycleStats: async (): Promise<LifecycleStats> => {
         const response = await api.get<LifecycleStats>('/api/v1/agents/lifecycle/stats/lifecycle');
         return response.data;
     },
 };
 
-export interface ReassignAgentRequest {
-    new_parent_id: string;
-    reason?: string;
-}
-
-export interface CapabilityProfile {
-    tier: string;
-    agentium_id: string;
-    base_capabilities: string[];
-    granted_capabilities: string[];
-    revoked_capabilities: string[];
-    effective_capabilities: string[];
-    total_count: number;
-}
+// ─── Capabilities service ─────────────────────────────────────────────────────
 
 export const capabilitiesService = {
     getAgentCapabilities: async (agentiumId: string): Promise<CapabilityProfile> => {
@@ -196,36 +216,46 @@ export const capabilitiesService = {
         return response.data.has_capability;
     },
 
-    validateReassignment: async (agentiumId: string, newParentId: string): Promise<{ valid: boolean; reason?: string }> => {
-        // An agent can be reassigned if its type is compatible with the new parent's tier.
-        // task_agent -> lead_agent (tier 2)
-        // lead_agent -> council_member (tier 1) or head_of_council (tier 0)
-        // We validate by checking spawn capability on new parent.
-        const agentTier = agentiumId[0];
+    /**
+     * Validate whether an agent can be reassigned to a new parent.
+     * Performs a local tier-based check first, then hits the backend
+     * /validate-reassignment endpoint for a capability check.
+     */
+    validateReassignment: async (
+        agentiumId:  string,
+        newParentId: string,
+    ): Promise<{ valid: boolean; reason?: string }> => {
+        const agentTier  = agentiumId[0];
         const parentTier = newParentId[0];
 
-        const capabilityNeeded =
-            agentTier === '3' ? 'spawn_task_agent' :
-            agentTier === '2' ? 'spawn_lead' :
-            agentTier === '1' ? 'spawn_lead' : null;
+        // Quick local guard — head cannot be reassigned
+        if (!agentTier || agentTier === '0') {
+            return { valid: false, reason: 'Head of Council cannot be reassigned.' };
+        }
+        // Parent must outrank agent (lower prefix number)
+        if (parentTier >= agentTier) {
+            return { valid: false, reason: 'New parent must outrank the agent.' };
+        }
 
-        if (!capabilityNeeded) return { valid: false, reason: 'Head of Council cannot be reassigned.' };
-        if (parentTier >= agentTier) return { valid: false, reason: 'New parent must outrank the agent.' };
+        // Hit backend for capability check
+        try {
+            const response = await api.post<{ valid: boolean; reason?: string }>(
+                '/api/v1/capabilities/validate-reassignment',
+                { agent_agentium_id: agentiumId, new_parent_agentium_id: newParentId },
+            );
+            return response.data;
+        } catch {
+            // Fall back to local capability inference if endpoint doesn't exist yet
+            const capabilityNeeded =
+                agentTier === '3' ? 'spawn_task_agent' :
+                agentTier === '2' ? 'spawn_lead'       : null;
 
-        const hasCapability = await capabilitiesService.checkCapability(newParentId, capabilityNeeded);
-        return hasCapability
-            ? { valid: true }
-            : { valid: false, reason: `New parent lacks '${capabilityNeeded}' capability.` };
+            if (!capabilityNeeded) return { valid: false, reason: 'Cannot reassign this agent type.' };
+
+            const hasCapability = await capabilitiesService.checkCapability(newParentId, capabilityNeeded);
+            return hasCapability
+                ? { valid: true }
+                : { valid: false, reason: `New parent lacks '${capabilityNeeded}' capability.` };
+        }
     },
 };
-
-// Add reassign to agentsService
-Object.assign(agentsService, {
-    reassignAgent: async (agentId: string, data: ReassignAgentRequest): Promise<Agent> => {
-        const response = await api.post<{ agent: Agent }>(
-            `/api/v1/agents/lifecycle/${agentId}/reassign`,
-            data
-        );
-        return response.data.agent;
-    },
-});

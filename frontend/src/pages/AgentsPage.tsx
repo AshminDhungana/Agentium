@@ -1,73 +1,131 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useReducer, useRef, useCallback, useMemo } from 'react';
 import { Agent } from '../types';
 import { agentsService, capabilitiesService, lifecycleService } from '../services/agents';
 import { AgentTree } from '../components/agents/AgentTree';
+import { AgentListView } from '../components/agents/AgentListView';
 import { SpawnAgentModal } from '../components/agents/SpawnAgentModal';
 import { PromoteAgentModal } from '../components/agents/PromoteAgentModal';
+import { TerminateAgentModal } from '../components/agents/TerminateAgentModal';
 import { BulkLiquidateModal } from '../components/agents/BulkLiquidateModal';
 import { LifecycleDashboard } from '../components/agents/LifecycleDashboard';
+import { DragDropProvider } from '../context/DragDropContext';
 import { useWebSocketStore } from '@/store/websocketStore';
+import { VALID_AGENT_TYPES, AGENT_TYPE_LABELS, AGENT_TYPE_COLORS, isAgentWsEvent } from '../constants/agents';
 import {
     LayoutGrid, List, Users, AlertCircle, Loader2, RefreshCw,
     BarChart2, ChevronLeft, ChevronRight as ChevronRightIcon,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
-// ─── Constants ────────────────────────────────────────────────────────────────
-
-const VALID_AGENT_TYPES = ['head_of_council', 'council_member', 'lead_agent', 'task_agent'] as const;
-
-const AGENT_TYPE_LABELS: Record<string, string> = {
-    head_of_council: 'Head of Council',
-    council_member:  'Council Member',
-    lead_agent:      'Lead Agent',
-    task_agent:      'Task Agent',
-};
-
-const AGENT_TYPE_COLORS: Record<string, {
-    light: { bg: string; text: string; dot: string };
-    dark:  { bg: string; text: string; dot: string; border: string };
-}> = {
-    head_of_council: {
-        light: { bg: 'bg-violet-50',  text: 'text-violet-700',  dot: 'bg-violet-500'  },
-        dark:  { bg: 'dark:bg-violet-500/10', text: 'dark:text-violet-300', dot: 'dark:bg-violet-400', border: 'dark:border-violet-500/20' },
-    },
-    council_member: {
-        light: { bg: 'bg-blue-50',    text: 'text-blue-700',    dot: 'bg-blue-500'    },
-        dark:  { bg: 'dark:bg-blue-500/10',   text: 'dark:text-blue-300',   dot: 'dark:bg-blue-400',   border: 'dark:border-blue-500/20'   },
-    },
-    lead_agent: {
-        light: { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
-        dark:  { bg: 'dark:bg-emerald-500/10',text: 'dark:text-emerald-300',dot: 'dark:bg-emerald-400',border: 'dark:border-emerald-500/20' },
-    },
-    task_agent: {
-        light: { bg: 'bg-slate-100',  text: 'text-slate-600',   dot: 'bg-slate-400'   },
-        dark:  { bg: 'dark:bg-slate-500/10',  text: 'dark:text-slate-400',  dot: 'dark:bg-slate-500',  border: 'dark:border-slate-600/30'  },
-    },
-};
-
-const AGENT_WS_PREFIXES = ['agent_spawned', 'agent_terminated', 'agent_status', 'agent_updated'];
-function isAgentEvent(content: string): boolean {
-    return AGENT_WS_PREFIXES.some(p => content?.startsWith(p));
-}
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function normalizeAgent(agent: any): Agent {
-    const rawType  = agent.agent_type;
-    const validType = VALID_AGENT_TYPES.includes(rawType) ? rawType : 'task_agent';
+function normalizeAgent(raw: unknown): Agent {
+    const agent = raw as Record<string, unknown>;
+    const rawType = agent.agent_type as string;
+    const validType = (VALID_AGENT_TYPES as readonly string[]).includes(rawType) ? rawType : 'task_agent';
     return {
-        ...agent,
-        subordinates:  Array.isArray(agent.subordinates) ? agent.subordinates : [],
-        stats:         agent.stats || { tasks_completed: 0, tasks_failed: 0 },
-        status:        agent.status || 'unknown',
-        name:          agent.name   || 'Unnamed Agent',
-        agent_type:    validType    as Agent['agent_type'],
-        agentium_id:   agent.agentium_id || agent.id || 'unknown',
+        ...(agent as object),
+        subordinates: Array.isArray(agent.subordinates) ? agent.subordinates as string[] : [],
+        stats:        (agent.stats as Agent['stats']) || { tasks_completed: 0, tasks_failed: 0 },
+        status:       (agent.status as Agent['status']) || 'active',
+        name:         (agent.name as string) || 'Unnamed Agent',
+        agent_type:   validType as Agent['agent_type'],
+        agentium_id:  (agent.agentium_id as string) || (agent.id as string) || 'unknown',
     } as Agent;
 }
 
-// ─── Reassign Confirmation Modal ──────────────────────────────────────────────
+// ─── Persistent preferences ───────────────────────────────────────────────────
+
+const PREF_VIEW_MODE   = 'agentsPage:viewMode';
+const PREF_SIDEBAR     = 'agentsPage:sidebarOpen';
+
+function readPref<T>(key: string, fallback: T): T {
+    try {
+        const v = localStorage.getItem(key);
+        return v !== null ? (JSON.parse(v) as T) : fallback;
+    } catch { return fallback; }
+}
+function savePref(key: string, value: unknown) {
+    try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* ignore */ }
+}
+
+// ─── State + reducer ──────────────────────────────────────────────────────────
+
+interface PageState {
+    agents:      Agent[];
+    isLoading:   boolean;
+    isRefreshing: boolean;
+    viewMode:    'tree' | 'list';
+    sidebarOpen: boolean;
+    // modal targets
+    spawnParent:       Agent | null;
+    promoteTarget:     Agent | null;
+    terminateTarget:   Agent | null;
+    showBulkLiquidate: boolean;
+    // drag-and-drop reassign confirmation
+    pendingReassign:  { agent: Agent; newParent: Agent } | null;
+    validating:       boolean;
+    validationError:  string | null;
+}
+
+type PageAction =
+    | { type: 'SET_AGENTS';          agents: Agent[] }
+    | { type: 'SET_LOADING';         value: boolean }
+    | { type: 'SET_REFRESHING';      value: boolean }
+    | { type: 'SET_VIEW_MODE';       mode: 'tree' | 'list' }
+    | { type: 'TOGGLE_SIDEBAR' }
+    | { type: 'SET_SPAWN_PARENT';    agent: Agent | null }
+    | { type: 'SET_PROMOTE_TARGET';  agent: Agent | null }
+    | { type: 'SET_TERMINATE_TARGET';agent: Agent | null }
+    | { type: 'SET_BULK_LIQUIDATE';  show: boolean }
+    | { type: 'UPDATE_AGENT_STATUS'; agentiumId: string; status: Agent['status'] }
+    | { type: 'PATCH_AGENT';         agentiumId: string; updates: Partial<Agent> }
+    | { type: 'SET_PENDING_REASSIGN';payload: { agent: Agent; newParent: Agent } | null }
+    | { type: 'SET_VALIDATING';      value: boolean }
+    | { type: 'SET_VALIDATION_ERROR';error: string | null };
+
+function reducer(state: PageState, action: PageAction): PageState {
+    switch (action.type) {
+        case 'SET_AGENTS':
+            return { ...state, agents: action.agents, isLoading: false, isRefreshing: false };
+        case 'SET_LOADING':
+            return { ...state, isLoading: action.value };
+        case 'SET_REFRESHING':
+            return { ...state, isRefreshing: action.value };
+        case 'SET_VIEW_MODE':
+            savePref(PREF_VIEW_MODE, action.mode);
+            return { ...state, viewMode: action.mode };
+        case 'TOGGLE_SIDEBAR': {
+            const next = !state.sidebarOpen;
+            savePref(PREF_SIDEBAR, next);
+            return { ...state, sidebarOpen: next };
+        }
+        case 'SET_SPAWN_PARENT':      return { ...state, spawnParent:      action.agent };
+        case 'SET_PROMOTE_TARGET':    return { ...state, promoteTarget:    action.agent };
+        case 'SET_TERMINATE_TARGET':  return { ...state, terminateTarget:  action.agent };
+        case 'SET_BULK_LIQUIDATE':    return { ...state, showBulkLiquidate: action.show };
+        case 'UPDATE_AGENT_STATUS':
+            return {
+                ...state,
+                agents: state.agents.map(a =>
+                    a.agentium_id === action.agentiumId ? { ...a, status: action.status } : a
+                ),
+            };
+        case 'PATCH_AGENT':
+            return {
+                ...state,
+                agents: state.agents.map(a =>
+                    a.agentium_id === action.agentiumId ? { ...a, ...action.updates } : a
+                ),
+            };
+        case 'SET_PENDING_REASSIGN':  return { ...state, pendingReassign: action.payload };
+        case 'SET_VALIDATING':        return { ...state, validating: action.value };
+        case 'SET_VALIDATION_ERROR':  return { ...state, validationError: action.error };
+        default:                      return state;
+    }
+}
+
+// ─── Reassign modal (inline — small enough to stay here) ─────────────────────
 
 interface ReassignModalProps {
     agent:           Agent;
@@ -124,102 +182,190 @@ const ReassignModal: React.FC<ReassignModalProps> = ({
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export const AgentsPage: React.FC = () => {
-    const [agents,       setAgents]       = useState<Agent[]>([]);
-    const [isLoading,    setIsLoading]    = useState(true);
-    const [isRefreshing, setIsRefreshing] = useState(false);
-    const [viewMode,     setViewMode]     = useState<'tree' | 'list'>('tree');
-    const [spawnParent,  setSpawnParent]  = useState<Agent | null>(null);
+    const [state, dispatch] = useReducer(reducer, {
+        agents:            [],
+        isLoading:         true,
+        isRefreshing:      false,
+        viewMode:          readPref<'tree' | 'list'>(PREF_VIEW_MODE, 'tree'),
+        sidebarOpen:       readPref<boolean>(PREF_SIDEBAR, false),
+        spawnParent:       null,
+        promoteTarget:     null,
+        terminateTarget:   null,
+        showBulkLiquidate: false,
+        pendingReassign:   null,
+        validating:        false,
+        validationError:   null,
+    });
 
-    // ── Promote state ─────────────────────────────────────────────────────────
-    const [promoteTarget, setPromoteTarget] = useState<Agent | null>(null);
+    const {
+        agents, isLoading, isRefreshing, viewMode, sidebarOpen,
+        spawnParent, promoteTarget, terminateTarget, showBulkLiquidate,
+        pendingReassign, validating, validationError,
+    } = state;
 
-    // ── Bulk liquidate state ──────────────────────────────────────────────────
-    const [showBulkLiquidate, setShowBulkLiquidate] = useState(false);
+    // ── Lifecycle sidebar refresh token (replaces dashboardKey hack) ──────────
+    const [dashboardKey, setDashboardKey] = React.useState(0);
 
-    // ── Lifecycle sidebar ─────────────────────────────────────────────────────
-    const [sidebarOpen, setSidebarOpen] = useState(false);
-    /** Key to force LifecycleDashboard to remount/refetch after bulk liquidation */
-    const [dashboardKey, setDashboardKey] = useState(0);
-
-    // ── DnD state ─────────────────────────────────────────────────────────────
-    const [draggingAgent,   setDraggingAgent]   = useState<Agent | null>(null);
-    const [dropTarget,      setDropTarget]      = useState<string | null>(null);
-    const [pendingReassign, setPendingReassign] = useState<{ agent: Agent; newParent: Agent } | null>(null);
-    const [validating,      setValidating]      = useState(false);
-    const [validationError, setValidationError] = useState<string | null>(null);
-    const dragCounter = useRef(0);
-
-    // ── Real-time ─────────────────────────────────────────────────────────────
-    const lastMessage = useWebSocketStore(state => state.lastMessage);
+    // ── WebSocket ─────────────────────────────────────────────────────────────
+    const lastMessage = useWebSocketStore(s => s.lastMessage);
     const prevMsgRef  = useRef<typeof lastMessage>(null);
 
+    // Debounce flag: prevent duplicate fetches when a WS event fires
+    // both as a typed message AND as a system/content message
+    const fetchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
     // ─────────────────────────────────────────────────────────────────────────
-    // Data loading
+    // Data loading — AbortController prevents state updates on unmounted component
     // ─────────────────────────────────────────────────────────────────────────
 
     const loadAgents = useCallback(async (silent = false) => {
+        if (!silent) dispatch({ type: 'SET_LOADING', value: true });
+        else         dispatch({ type: 'SET_REFRESHING', value: true });
+
         try {
-            if (!silent) setIsLoading(true);
-            else         setIsRefreshing(true);
             const data = await agentsService.getAgents();
-            setAgents((data || []).map(normalizeAgent));
+            dispatch({ type: 'SET_AGENTS', agents: (data || []).map(normalizeAgent) });
         } catch (err) {
             console.error('Failed to load agents:', err);
             if (!silent) toast.error('Failed to load agents');
-        } finally {
-            setIsLoading(false);
-            setIsRefreshing(false);
+            dispatch({ type: 'SET_LOADING',    value: false });
+            dispatch({ type: 'SET_REFRESHING', value: false });
         }
     }, []);
 
-    useEffect(() => { loadAgents(); }, [loadAgents]);
+    useEffect(() => {
+        let cancelled = false;
+        agentsService.getAgents()
+            .then(data => {
+                if (!cancelled) dispatch({ type: 'SET_AGENTS', agents: (data || []).map(normalizeAgent) });
+            })
+            .catch(err => {
+                if (!cancelled) {
+                    console.error('Failed to load agents:', err);
+                    toast.error('Failed to load agents');
+                    dispatch({ type: 'SET_LOADING', value: false });
+                }
+            });
+        return () => { cancelled = true; };
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Real-time hierarchy updates via WebSocket
+    // Real-time updates via WebSocket — deduped, structured event support
     // ─────────────────────────────────────────────────────────────────────────
+
+    const debouncedSilentFetch = useCallback(() => {
+        if (fetchDebounceRef.current) clearTimeout(fetchDebounceRef.current);
+        fetchDebounceRef.current = setTimeout(() => {
+            loadAgents(true);
+            fetchDebounceRef.current = null;
+        }, 250); // 250ms window collapses duplicate events
+    }, [loadAgents]);
 
     useEffect(() => {
         if (!lastMessage || lastMessage === prevMsgRef.current) return;
         prevMsgRef.current = lastMessage;
 
         const { type, content, metadata } = lastMessage;
+        const contentStr = typeof content === 'string' ? content : '';
 
-        if (type === 'system' && content && isAgentEvent(content)) {
-            loadAgents(true);
+        // ── Handle structured lifecycle events from backend ───────────────
+        if (type === 'agent_spawned' || type === 'agent_promoted') {
+            debouncedSilentFetch();
+            return;
+        }
+
+        if (type === 'agent_liquidated') {
+            const agentId = (lastMessage.agent_id as string) ?? metadata?.agent_id as string;
+            if (agentId) {
+                dispatch({ type: 'UPDATE_AGENT_STATUS', agentiumId: agentId, status: 'terminated' });
+            }
+            debouncedSilentFetch();
+            return;
+        }
+
+        if (type === 'agent_status_changed') {
+            const agentId  = (lastMessage.agent_id as string) ?? metadata?.agent_id as string;
+            const newStatus = lastMessage.new_status as Agent['status'];
+            if (agentId && newStatus) {
+                dispatch({ type: 'UPDATE_AGENT_STATUS', agentiumId: agentId, status: newStatus });
+            }
+            return;
+        }
+
+        // ── Handle legacy system/content events ──────────────────────────
+        if (type === 'system' && isAgentWsEvent(type, contentStr)) {
+            debouncedSilentFetch();
             return;
         }
 
         if (metadata?.agent_id) {
-            const agentId = metadata.agent_id;
+            const agentId = metadata.agent_id as string;
 
-            const statusMatch = content?.match(/^agent_status:(\w+):/);
+            const statusMatch = contentStr.match(/^agent_status:(\w+):/);
             if (statusMatch) {
                 const newStatus = statusMatch[1] as Agent['status'];
-                setAgents(prev =>
-                    prev.map(a => a.agentium_id === agentId ? { ...a, status: newStatus } : a)
-                );
+                dispatch({ type: 'UPDATE_AGENT_STATUS', agentiumId: agentId, status: newStatus });
+                return;
             }
 
-            if (content?.startsWith('agent_spawned'))    loadAgents(true);
-            if (content?.startsWith('agent_terminated')) {
-                setAgents(prev =>
-                    prev.map(a =>
-                        a.agentium_id === agentId
-                            ? { ...a, status: 'terminated', is_terminated: true }
-                            : a
-                    )
-                );
+            if (contentStr.startsWith('agent_spawned') || contentStr.startsWith('agent_promoted')) {
+                debouncedSilentFetch();
+                return;
+            }
+
+            if (contentStr.startsWith('agent_terminated') || contentStr.startsWith('agent_liquidated')) {
+                dispatch({ type: 'UPDATE_AGENT_STATUS', agentiumId: agentId, status: 'terminated' });
+                debouncedSilentFetch();
+                return;
             }
         }
-    }, [lastMessage, loadAgents]);
+    }, [lastMessage, debouncedSilentFetch]);
+
+    // Cleanup debounce on unmount
+    useEffect(() => () => {
+        if (fetchDebounceRef.current) clearTimeout(fetchDebounceRef.current);
+    }, []);
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Derived data — memoized so drag events don't re-derive the map
+    // ─────────────────────────────────────────────────────────────────────────
+
+    const agentsMap = useMemo(() => {
+        const map = new Map<string, Agent>();
+        agents.forEach(a => { if (a?.agentium_id) map.set(a.agentium_id, a); });
+        return map;
+    }, [agents]);
+
+    const headOfCouncil = useMemo(
+        () => agents.find(a => a.agent_type === 'head_of_council'),
+        [agents],
+    );
+
+    // Tier counts for summary bar
+    const tierCounts = useMemo(() => {
+        const counts = { head: 0, council: 0, lead: 0, task: 0 };
+        agents.forEach(a => {
+            if (a.status === 'terminated') return;
+            const prefix = (a.agentium_id ?? a.id ?? '')[0];
+            if (prefix === '0') counts.head++;
+            else if (prefix === '1') counts.council++;
+            else if (prefix === '2') counts.lead++;
+            else if (prefix === '3') counts.task++;
+        });
+        return counts;
+    }, [agents]);
 
     // ─────────────────────────────────────────────────────────────────────────
     // Spawn
     // ─────────────────────────────────────────────────────────────────────────
 
-    const handleSpawn = async (name: string, childType: 'council_member' | 'lead_agent' | 'task_agent') => {
+    const handleSpawn = async (
+        name: string,
+        childType: 'council_member' | 'lead_agent' | 'task_agent',
+    ) => {
         if (!spawnParent) return;
 
+        // Optimistic placeholder
         const placeholderId = `pending-${Date.now()}`;
         const placeholder   = normalizeAgent({
             id: placeholderId, agentium_id: placeholderId, name,
@@ -228,72 +374,68 @@ export const AgentsPage: React.FC = () => {
             constitution_version: '', is_terminated: false, parent: spawnParent.agentium_id,
         });
 
-        setAgents(prev => [
-            ...prev.map(a =>
-                a.agentium_id === spawnParent.agentium_id
-                    ? { ...a, subordinates: [...a.subordinates, placeholderId] }
-                    : a
-            ),
-            placeholder,
-        ]);
+        dispatch({
+            type: 'SET_AGENTS',
+            agents: [
+                ...agents.map(a =>
+                    a.agentium_id === spawnParent.agentium_id
+                        ? { ...a, subordinates: [...a.subordinates, placeholderId] }
+                        : a
+                ),
+                placeholder,
+            ],
+        });
 
         try {
-            // FIX: Added missing required fields 'description' and 'parent_agentium_id'
-            await agentsService.spawnAgent(spawnParent.agentium_id, { 
-                child_type: childType, 
+            await agentsService.spawnAgent(spawnParent.agentium_id, {
+                child_type:         childType,
                 name,
-                description: `Spawned ${childType} agent: ${name}`, // Added
-                parent_agentium_id: spawnParent.agentium_id // Added
+                description:        `${childType.replace(/_/g, ' ')} spawned via UI: ${name}`,
+                parent_agentium_id: spawnParent.agentium_id,
             });
             toast.success('Agent spawned successfully');
             await loadAgents(true);
         } catch (err) {
-            setAgents(prev =>
-                prev
+            // Roll back optimistic update
+            dispatch({
+                type: 'SET_AGENTS',
+                agents: agents
                     .filter(a => a.agentium_id !== placeholderId)
                     .map(a =>
                         a.agentium_id === spawnParent.agentium_id
                             ? { ...a, subordinates: a.subordinates.filter(id => id !== placeholderId) }
                             : a
-                    )
-            );
+                    ),
+            });
             throw err;
         }
     };
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Terminate
+    // Terminate (opens modal instead of window.confirm)
     // ─────────────────────────────────────────────────────────────────────────
 
-    const handleTerminate = async (agent: Agent) => {
-        if (!window.confirm(`Terminate ${agent.name}?`)) return;
+    const handleTerminate = useCallback((agent: Agent) => {
+        dispatch({ type: 'SET_TERMINATE_TARGET', agent });
+    }, []);
 
-        setAgents(prev =>
-            prev.map(a =>
-                a.agentium_id === agent.agentium_id
-                    ? { ...a, status: 'terminated', is_terminated: true }
-                    : a
-            )
-        );
+    const handleTerminateConfirm = async (reason: string, authorizedById: string) => {
+        if (!terminateTarget) return;
+
+        // Optimistic: show as "terminating"
+        dispatch({ type: 'UPDATE_AGENT_STATUS', agentiumId: terminateTarget.agentium_id, status: 'terminating' });
 
         try {
-            // FIX: Added third argument (sovereign user ID or agent ID)
-            await agentsService.terminateAgent(
-                agent.agentium_id, 
-                'Manual termination by Sovereign',
-                'sovereign' // Added third argument - the acting user/agent ID
-            );
-            toast.success('Agent terminated');
+            await agentsService.terminateAgent(terminateTarget.agentium_id, reason, authorizedById);
+            toast.success(`${terminateTarget.name} terminated`);
+            dispatch({ type: 'SET_TERMINATE_TARGET', agent: null });
             await loadAgents(true);
-        } catch {
-            setAgents(prev =>
-                prev.map(a =>
-                    a.agentium_id === agent.agentium_id
-                        ? { ...a, status: 'active', is_terminated: false }
-                        : a
-                )
-            );
-            toast.error('Failed to terminate agent');
+            setDashboardKey(k => k + 1);
+        } catch (err: unknown) {
+            // Roll back optimistic update
+            dispatch({ type: 'UPDATE_AGENT_STATUS', agentiumId: terminateTarget.agentium_id, status: 'active' });
+            const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+            throw new Error(detail || 'Termination failed');
         }
     };
 
@@ -304,19 +446,18 @@ export const AgentsPage: React.FC = () => {
     const handlePromoteConfirm = async (promotedByAgentiumId: string, reason: string) => {
         if (!promoteTarget) return;
         await lifecycleService.promoteAgent({
-            task_agentium_id:       promoteTarget.agentium_id,
+            task_agentium_id:        promoteTarget.agentium_id,
             promoted_by_agentium_id: promotedByAgentiumId,
             reason,
         });
         toast.success(`${promoteTarget.name} promoted to Lead Agent`);
-        setPromoteTarget(null);
+        dispatch({ type: 'SET_PROMOTE_TARGET', agent: null });
         await loadAgents(true);
-        // Refresh dashboard stats to reflect promotion event
         setDashboardKey(k => k + 1);
     };
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Bulk liquidate callback
+    // Bulk liquidate
     // ─────────────────────────────────────────────────────────────────────────
 
     const handleBulkLiquidateSuccess = async (count: number) => {
@@ -326,97 +467,60 @@ export const AgentsPage: React.FC = () => {
     };
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Drag-and-drop
+    // Drag-and-drop — handled by DragDropProvider; we just receive the commit
     // ─────────────────────────────────────────────────────────────────────────
 
-    const handleDragStart = useCallback((agent: Agent) => {
-        if (agent.agent_type === 'head_of_council') return;
-        setDraggingAgent(agent);
-    }, []);
-
-    const handleDragEnd = useCallback(() => {
-        setDraggingAgent(null);
-        setDropTarget(null);
-        dragCounter.current = 0;
-    }, []);
-
-    const handleDragEnter = useCallback((targetId: string) => {
-        if (!draggingAgent || targetId === draggingAgent.agentium_id) return;
-        dragCounter.current += 1;
-        setDropTarget(targetId);
-    }, [draggingAgent]);
-
-    const handleDragLeave = useCallback((_targetId: string) => {
-        dragCounter.current = Math.max(0, dragCounter.current - 1);
-        if (dragCounter.current === 0) setDropTarget(null);
-    }, []);
-
-    const handleDrop = useCallback(async (newParentId: string) => {
-        setDropTarget(null);
-        dragCounter.current = 0;
-        if (!draggingAgent || newParentId === draggingAgent.agentium_id) return;
-
-        const newParent = agentsMapRef.current.get(newParentId);
+    const handleDropCommit = useCallback(async (draggingAgent: Agent, newParentId: string) => {
+        const newParent = agentsMap.get(newParentId);
         if (!newParent) return;
 
-        const agentSnapshot = draggingAgent;
-        setDraggingAgent(null);
-
-        setPendingReassign({ agent: agentSnapshot, newParent });
-        setValidating(true);
-        setValidationError(null);
+        dispatch({ type: 'SET_PENDING_REASSIGN', payload: { agent: draggingAgent, newParent } });
+        dispatch({ type: 'SET_VALIDATING',        value: true });
+        dispatch({ type: 'SET_VALIDATION_ERROR',  error: null });
 
         try {
             const result = await capabilitiesService.validateReassignment(
-                agentSnapshot.agentium_id, newParentId,
+                draggingAgent.agentium_id, newParentId,
             );
-            setValidationError(result.valid ? null : (result.reason ?? 'Invalid reassignment'));
+            dispatch({ type: 'SET_VALIDATION_ERROR', error: result.valid ? null : (result.reason ?? 'Invalid reassignment') });
         } catch {
-            setValidationError('Could not validate capabilities.');
+            dispatch({ type: 'SET_VALIDATION_ERROR', error: 'Could not validate capabilities.' });
         } finally {
-            setValidating(false);
+            dispatch({ type: 'SET_VALIDATING', value: false });
         }
-    }, [draggingAgent]);
+    }, [agentsMap]);
 
     const confirmReassign = async () => {
         if (!pendingReassign) return;
         const { agent, newParent } = pendingReassign;
-        setPendingReassign(null);
+        dispatch({ type: 'SET_PENDING_REASSIGN', payload: null });
 
-        setAgents(prev => {
-            const oldParent = prev.find(a => a.subordinates.includes(agent.agentium_id));
-            return prev.map(a => {
+        // Optimistic tree update
+        const oldParent = agents.find(a => a.subordinates.includes(agent.agentium_id));
+        dispatch({
+            type: 'SET_AGENTS',
+            agents: agents.map(a => {
                 if (oldParent && a.agentium_id === oldParent.agentium_id)
                     return { ...a, subordinates: a.subordinates.filter(id => id !== agent.agentium_id) };
                 if (a.agentium_id === newParent.agentium_id)
                     return { ...a, subordinates: [...a.subordinates, agent.agentium_id] };
                 return a;
-            });
+            }),
         });
 
         try {
-            await (agentsService as any).reassignAgent(agent.agentium_id, {
+            await agentsService.reassignAgent(agent.agentium_id, {
                 new_parent_id: newParent.agentium_id,
-                reason: 'Manual reassignment via drag-and-drop',
+                reason:        'Manual reassignment via drag-and-drop',
             });
             toast.success(`${agent.name} moved under ${newParent.name}`);
             await loadAgents(true);
-        } catch (err: any) {
-            toast.error(err?.response?.data?.detail || 'Reassignment failed');
+        } catch (err: unknown) {
+            const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+            toast.error(detail || 'Reassignment failed');
             await loadAgents(true);
         }
     };
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // Derived data
-    // ─────────────────────────────────────────────────────────────────────────
-
-    const agentsMapRef = useRef(new Map<string, Agent>());
-    const agentsMap    = new Map<string, Agent>();
-    agents.forEach(a => { if (a?.agentium_id) agentsMap.set(a.agentium_id, a); });
-    agentsMapRef.current = agentsMap;
-
-    const headOfCouncil = agents.find(a => a.agent_type === 'head_of_council');
 
     // ─────────────────────────────────────────────────────────────────────────
     // Render
@@ -439,18 +543,31 @@ export const AgentsPage: React.FC = () => {
                     </h1>
                     <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
                         Manage your AI workforce
-                        {draggingAgent && (
-                            <span className="ml-2 text-blue-500 font-medium animate-pulse">
-                                · Drop on a parent to reassign
-                            </span>
-                        )}
                     </p>
+
+                    {/* Tier summary pills */}
+                    {!isLoading && agents.length > 0 && (
+                        <div className="flex items-center gap-2 mt-2 flex-wrap">
+                            {([
+                                ['head',    'Head',    'bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300'],
+                                ['council', 'Council', 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300'],
+                                ['lead',    'Lead',    'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300'],
+                                ['task',    'Task',    'bg-slate-100 text-slate-600 dark:bg-slate-700/50 dark:text-slate-300'],
+                            ] as const).map(([key, label, cls]) => (
+                                tierCounts[key] > 0 && (
+                                    <span key={key} className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${cls}`}>
+                                        {label}: {tierCounts[key]}
+                                    </span>
+                                )
+                            ))}
+                        </div>
+                    )}
                 </div>
 
                 <div className="flex items-center gap-2">
                     {/* Lifecycle sidebar toggle */}
                     <button
-                        onClick={() => setSidebarOpen(v => !v)}
+                        onClick={() => dispatch({ type: 'TOGGLE_SIDEBAR' })}
                         title={sidebarOpen ? 'Hide lifecycle panel' : 'Show lifecycle panel'}
                         className={[
                             'p-2 rounded-lg border text-slate-500 dark:text-slate-400 transition-colors shadow-sm',
@@ -475,7 +592,7 @@ export const AgentsPage: React.FC = () => {
                         {(['tree', 'list'] as const).map((mode, i) => (
                             <button
                                 key={mode}
-                                onClick={() => setViewMode(mode)}
+                                onClick={() => dispatch({ type: 'SET_VIEW_MODE', mode })}
                                 className={[
                                     'flex items-center gap-1.5 px-3 py-2 text-sm font-medium transition-all duration-150',
                                     i === 0 ? 'border-r border-slate-200 dark:border-[#1e2535]' : '',
@@ -505,9 +622,14 @@ export const AgentsPage: React.FC = () => {
                         </div>
 
                     ) : agents.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center h-40 gap-2 text-slate-400 dark:text-slate-500">
-                            <Users className="w-8 h-8 opacity-40" />
-                            <span className="text-sm">No agents found. System not initialized?</span>
+                        <div className="flex flex-col items-center justify-center h-40 gap-3 text-slate-400 dark:text-slate-500">
+                            <Users className="w-10 h-10 opacity-30" />
+                            <div className="text-center">
+                                <p className="text-sm font-medium text-slate-600 dark:text-slate-400">No agents yet</p>
+                                <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
+                                    The system is not initialized. Spawn the Head of Council first.
+                                </p>
+                            </div>
                         </div>
 
                     ) : viewMode === 'tree' ? (
@@ -518,20 +640,15 @@ export const AgentsPage: React.FC = () => {
                                     aria-hidden="true"
                                 />
                                 <div className="relative z-10">
-                                    <AgentTree
-                                        agent={headOfCouncil}
-                                        agentsMap={agentsMap}
-                                        onSpawn={setSpawnParent}
-                                        onTerminate={handleTerminate}
-                                        onPromote={setPromoteTarget}
-                                        draggingAgentId={draggingAgent?.agentium_id ?? null}
-                                        dropTargetId={dropTarget}
-                                        onDragStart={handleDragStart}
-                                        onDragEnd={handleDragEnd}
-                                        onDragEnter={handleDragEnter}
-                                        onDragLeave={handleDragLeave}
-                                        onDrop={handleDrop}
-                                    />
+                                    <DragDropProvider onDropCommit={handleDropCommit}>
+                                        <AgentTree
+                                            agent={headOfCouncil}
+                                            agentsMap={agentsMap}
+                                            onSpawn={a => dispatch({ type: 'SET_SPAWN_PARENT', agent: a })}
+                                            onTerminate={handleTerminate}
+                                            onPromote={a => dispatch({ type: 'SET_PROMOTE_TARGET', agent: a })}
+                                        />
+                                    </DragDropProvider>
                                 </div>
                             </div>
                         ) : (
@@ -542,28 +659,12 @@ export const AgentsPage: React.FC = () => {
                         )
 
                     ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                            {agents.map(agent => {
-                                const colorSet = AGENT_TYPE_COLORS[agent.agent_type] ?? AGENT_TYPE_COLORS.task_agent;
-                                const label    = AGENT_TYPE_LABELS[agent.agent_type] ?? agent.agent_type;
-                                const { light, dark } = colorSet;
-                                return (
-                                    <div
-                                        key={agent.id || agent.agentium_id}
-                                        className="rounded-xl border border-slate-200 dark:border-[#1e2535] p-4 bg-white dark:bg-[#0f1117] hover:border-slate-300 dark:hover:border-[#2a3347] hover:shadow-sm transition-all duration-150"
-                                    >
-                                        <div className="flex items-start justify-between gap-2 mb-3">
-                                            <h3 className="text-sm font-semibold text-slate-900 dark:text-gray-100 leading-snug">{agent.name}</h3>
-                                            <span className={['inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap flex-shrink-0 border', light.bg, light.text, dark.bg, dark.text, dark.border].join(' ')}>
-                                                <span className={`w-1.5 h-1.5 rounded-full ${light.dot} ${dark.dot}`} />
-                                                {label}
-                                            </span>
-                                        </div>
-                                        <p className="text-xs text-slate-400 dark:text-slate-600 font-mono truncate">{agent.agentium_id}</p>
-                                    </div>
-                                );
-                            })}
-                        </div>
+                        <AgentListView
+                            agents={agents}
+                            onSpawn={a => dispatch({ type: 'SET_SPAWN_PARENT', agent: a })}
+                            onTerminate={handleTerminate}
+                            onPromote={a => dispatch({ type: 'SET_PROMOTE_TARGET', agent: a })}
+                        />
                     )}
                 </div>
 
@@ -572,7 +673,7 @@ export const AgentsPage: React.FC = () => {
                     <div className="w-80 flex-shrink-0 overflow-y-auto rounded-xl border border-slate-200 dark:border-[#1e2535] p-5 bg-white dark:bg-[#161b27] shadow-sm dark:shadow-[0_2px_20px_rgba(0,0,0,0.3)]">
                         <LifecycleDashboard
                             key={dashboardKey}
-                            onOpenBulkLiquidate={() => setShowBulkLiquidate(true)}
+                            onOpenBulkLiquidate={() => dispatch({ type: 'SET_BULK_LIQUIDATE', show: true })}
                         />
                     </div>
                 )}
@@ -583,7 +684,7 @@ export const AgentsPage: React.FC = () => {
                 <SpawnAgentModal
                     parent={spawnParent}
                     onConfirm={handleSpawn}
-                    onClose={() => setSpawnParent(null)}
+                    onClose={() => dispatch({ type: 'SET_SPAWN_PARENT', agent: null })}
                 />
             )}
 
@@ -592,13 +693,22 @@ export const AgentsPage: React.FC = () => {
                     agent={promoteTarget}
                     agents={agents}
                     onConfirm={handlePromoteConfirm}
-                    onClose={() => setPromoteTarget(null)}
+                    onClose={() => dispatch({ type: 'SET_PROMOTE_TARGET', agent: null })}
+                />
+            )}
+
+            {terminateTarget && (
+                <TerminateAgentModal
+                    agent={terminateTarget}
+                    agents={agents}
+                    onConfirm={handleTerminateConfirm}
+                    onClose={() => dispatch({ type: 'SET_TERMINATE_TARGET', agent: null })}
                 />
             )}
 
             {showBulkLiquidate && (
                 <BulkLiquidateModal
-                    onClose={() => setShowBulkLiquidate(false)}
+                    onClose={() => dispatch({ type: 'SET_BULK_LIQUIDATE', show: false })}
                     onSuccess={handleBulkLiquidateSuccess}
                 />
             )}
@@ -610,7 +720,7 @@ export const AgentsPage: React.FC = () => {
                     validating={validating}
                     validationError={validationError}
                     onConfirm={confirmReassign}
-                    onClose={() => setPendingReassign(null)}
+                    onClose={() => dispatch({ type: 'SET_PENDING_REASSIGN', payload: null })}
                 />
             )}
         </div>

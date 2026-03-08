@@ -1,25 +1,18 @@
 /**
- * AgentTree — Phase 7.2 + Phase 7 DnD + Promote action
- *
- * Changes vs previous:
- *  - onPromote callback threaded through every tree level
- *  - DraggableCard passes onPromote to AgentCard
+ * AgentTree — uses DragDropContext instead of prop-drilling 7 DnD props.
+ * React.memo on all heavy sub-components to stop re-renders on drag events.
  */
 
 import React, { useState } from 'react';
 import { Agent } from '../../types';
 import { AgentCard } from './AgentCard';
 import { ChevronRight, ChevronDown, ShieldAlert } from 'lucide-react';
+import { useDragDrop } from '../../context/DragDropContext';
+import { isCriticAgentId } from '../../utils/agentIds';
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── DragDropProps — kept for external backward-compat but no longer used internally ──
 
-function isCriticAgent(agent: Agent): boolean {
-    const id = agent.agentium_id ?? agent.id ?? '';
-    return /^[456]/.test(String(id));
-}
-
-// ─── DnD prop bundle ──────────────────────────────────────────────────────────
-
+/** @deprecated Pass DnD state via DragDropProvider wrapping AgentTree instead. */
 export interface DragDropProps {
     draggingAgentId: string | null;
     dropTargetId:    string | null;
@@ -32,29 +25,26 @@ export interface DragDropProps {
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
-interface AgentTreeProps extends DragDropProps {
+interface AgentTreeProps {
     agent:           Agent;
     agentsMap:       Map<string, Agent>;
     onSpawn:         (agent: Agent) => void;
     onTerminate:     (agent: Agent) => void;
-    /** Optional — triggers the promote flow for task_agents */
     onPromote?:      (agent: Agent) => void;
     level?:          number;
     includeCritics?: boolean;
 }
 
-// ─── Draggable/droppable card wrapper ─────────────────────────────────────────
+// ─── Draggable / droppable card wrapper ───────────────────────────────────────
 
-const DraggableCard: React.FC<DragDropProps & {
+const DraggableCard: React.FC<{
     agent:       Agent;
     onSpawn:     (agent: Agent) => void;
     onTerminate: (agent: Agent) => void;
     onPromote?:  (agent: Agent) => void;
-}> = ({
-    agent, onSpawn, onTerminate, onPromote,
-    draggingAgentId, dropTargetId,
-    onDragStart, onDragEnd, onDragEnter, onDragLeave, onDrop,
-}) => {
+}> = React.memo(({ agent, onSpawn, onTerminate, onPromote }) => {
+    const { draggingAgentId, dropTargetId, onDragStart, onDragEnd, onDragEnter, onDragLeave, onDrop } = useDragDrop();
+
     const isDraggable       = agent.agent_type !== 'head_of_council';
     const isDragging        = draggingAgentId === agent.agentium_id;
     const isDropTarget      = dropTargetId    === agent.agentium_id;
@@ -70,7 +60,6 @@ const DraggableCard: React.FC<DragDropProps & {
                 requestAnimationFrame(() => onDragStart(agent));
             }}
             onDragEnd={onDragEnd}
-
             onDragOver={e => {
                 if (somethingDragging && draggingAgentId !== agent.agentium_id) {
                     e.preventDefault();
@@ -83,9 +72,7 @@ const DraggableCard: React.FC<DragDropProps & {
                     onDragEnter(agent.agentium_id);
                 }
             }}
-            onDragLeave={() => {
-                onDragLeave(agent.agentium_id);
-            }}
+            onDragLeave={() => onDragLeave(agent.agentium_id)}
             onDrop={e => {
                 e.preventDefault();
                 if (somethingDragging && draggingAgentId !== agent.agentium_id) {
@@ -100,7 +87,7 @@ const DraggableCard: React.FC<DragDropProps & {
                 isDropTarget && !isDragging
                     ? 'ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-slate-900 scale-[1.02] shadow-lg'
                     : '',
-            ].join(' ')}
+            ].filter(Boolean).join(' ')}
         >
             <AgentCard
                 agent={agent}
@@ -118,15 +105,21 @@ const DraggableCard: React.FC<DragDropProps & {
             )}
         </div>
     );
-};
+});
+
+DraggableCard.displayName = 'DraggableCard';
+
+// ─── Critic helper function ───────────────────────────────────────────────────
+
+function isCriticAgent(agent: Agent): boolean {
+    return isCriticAgentId(agent.agentium_id ?? agent.id);
+}
 
 // ─── Recursive tree node ──────────────────────────────────────────────────────
 
-export const AgentTree: React.FC<AgentTreeProps> = ({
+export const AgentTree: React.FC<AgentTreeProps> = React.memo(({
     agent, agentsMap, onSpawn, onTerminate, onPromote,
     level = 0, includeCritics = false,
-    draggingAgentId, dropTargetId,
-    onDragStart, onDragEnd, onDragEnter, onDragLeave, onDrop,
 }) => {
     const [isExpanded,     setIsExpanded]     = useState(true);
     const [criticExpanded, setCriticExpanded] = useState(true);
@@ -134,37 +127,37 @@ export const AgentTree: React.FC<AgentTreeProps> = ({
     if (!agent) return null;
 
     const subordinateIds = Array.isArray(agent?.subordinates) ? agent.subordinates : [];
-    const allChildren = subordinateIds
+    const allChildren    = subordinateIds
         .map(id => agentsMap.get(id))
         .filter((a): a is Agent => a !== undefined);
 
-    const isRoot = level === 0 && !includeCritics;
-
-    const mainChildren = isRoot ? allChildren.filter(a => !isCriticAgent(a)) : allChildren;
-    const criticAgents = isRoot ? [...agentsMap.values()].filter(isCriticAgent) : [];
-
+    const isRoot         = level === 0 && !includeCritics;
+    const mainChildren   = isRoot ? allChildren.filter(a => !isCriticAgent(a)) : allChildren;
+    const criticAgents   = isRoot ? [...agentsMap.values()].filter(isCriticAgent) : [];
     const hasMainChildren = mainChildren.length > 0;
     const hasCritics      = criticAgents.length > 0;
 
-    const dndProps: DragDropProps = {
-        draggingAgentId, dropTargetId,
-        onDragStart, onDragEnd, onDragEnter, onDragLeave, onDrop,
-    };
-
     return (
-        <div className="relative">
+        <div className="relative" role="tree" aria-label={level === 0 ? 'Agent hierarchy' : undefined}>
             {level > 0 && (
-                <div className="absolute border-l-2 border-slate-400 dark:border-slate-500" style={{ left: '-24px', height: '100%', top: 0 }} />
+                <div
+                    className="absolute border-l-2 border-slate-400 dark:border-slate-500"
+                    style={{ left: '-24px', height: '100%', top: 0 }}
+                />
             )}
 
-            <div className="flex items-start gap-2 mb-4 relative">
+            <div className="flex items-start gap-2 mb-4 relative" role="treeitem" aria-expanded={hasMainChildren ? isExpanded : undefined}>
                 {level > 0 && (
-                    <div className="absolute w-6 border-t-2 border-slate-400 dark:border-slate-500" style={{ left: '-24px', top: '24px' }} />
+                    <div
+                        className="absolute w-6 border-t-2 border-slate-400 dark:border-slate-500"
+                        style={{ left: '-24px', top: '24px' }}
+                    />
                 )}
 
                 {hasMainChildren ? (
                     <button
-                        onClick={() => setIsExpanded(!isExpanded)}
+                        onClick={() => setIsExpanded(v => !v)}
+                        aria-label={isExpanded ? 'Collapse' : 'Expand'}
                         className="mt-3 p-1 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors duration-150 flex-shrink-0"
                     >
                         {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
@@ -178,7 +171,6 @@ export const AgentTree: React.FC<AgentTreeProps> = ({
                     onSpawn={onSpawn}
                     onTerminate={onTerminate}
                     onPromote={onPromote}
-                    {...dndProps}
                 />
             </div>
 
@@ -195,17 +187,19 @@ export const AgentTree: React.FC<AgentTreeProps> = ({
                                 onPromote={onPromote}
                                 level={level + 1}
                                 includeCritics={false}
-                                {...dndProps}
                             />
                         ))}
                     </div>
                 </div>
             )}
 
-            {/* ── Critic branch (root only) ──────────────────────────────────── */}
+            {/* ── Critic branch (root level only) ─────────────────────── */}
             {isRoot && hasCritics && (
                 <div className="mt-8">
-                    <button onClick={() => setCriticExpanded(x => !x)} className="flex items-center gap-2 mb-4">
+                    <button
+                        onClick={() => setCriticExpanded(x => !x)}
+                        className="flex items-center gap-2 mb-4 w-full"
+                    >
                         <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/20 text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-500/20 transition-colors">
                             <ShieldAlert className="w-4 h-4" />
                             <span className="text-sm font-semibold">Critic Agents</span>
@@ -224,7 +218,7 @@ export const AgentTree: React.FC<AgentTreeProps> = ({
                             <div className="relative z-10 flex flex-wrap gap-4">
                                 {criticAgents.map(critic => (
                                     <div key={critic.id || critic.agentium_id} className="flex-shrink-0">
-                                        {/* Critics intentionally not drag sources or drop targets */}
+                                        {/* Critics are intentionally NOT drag sources or drop targets */}
                                         <AgentCard agent={critic} onSpawn={onSpawn} onTerminate={onTerminate} />
                                     </div>
                                 ))}
@@ -235,4 +229,6 @@ export const AgentTree: React.FC<AgentTreeProps> = ({
             )}
         </div>
     );
-};
+});
+
+AgentTree.displayName = 'AgentTree';

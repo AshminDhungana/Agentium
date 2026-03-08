@@ -1,5 +1,6 @@
 /**
  * websocketStore.ts
+ *
  */
 
 import { create } from 'zustand';
@@ -11,10 +12,34 @@ export interface WebSocketMessage {
     type: string;
     role?: string;
     content?: string;
-    /** FIX #2: server-generated stable ID — use this for dedup, not timestamp */
+    /** Server-generated stable ID — use for dedup, NOT timestamp */
     message_id?: string;
     timestamp?: string;
     metadata?: Record<string, unknown>;
+
+    // ── Structured lifecycle event fields ──────────────────────────────────
+    /** Present on: agent_spawned, agent_liquidated, agent_promoted, agent_status_changed */
+    agent_id?:   string;
+    /** Present on: agent_spawned, agent_liquidated, agent_promoted, agent_status_changed */
+    agent_name?: string;
+    /** Present on: agent_spawned */
+    agent_type?: string;
+    /** Present on: agent_spawned */
+    parent_id?:  string;
+    /** Present on: agent_status_changed */
+    new_status?: string;
+    /** Present on: agent_status_changed */
+    old_status?: string;
+    /** Present on: agent_promoted */
+    old_agentium_id?: string;
+    /** Present on: agent_promoted */
+    new_agentium_id?: string;
+    /** Present on: agent_promoted, agent_liquidated */
+    promoted_by?:  string;
+    liquidated_by?: string;
+    /** Present on: agent_liquidated */
+    tasks_reassigned?: number;
+
     [key: string]: unknown;
 }
 
@@ -42,8 +67,10 @@ interface WebSocketState {
     _isManualDisconnect: boolean;
     _lastPingTime: string | null;
     _messageQueue: Array<{ content: string; timestamp: number }>;
-    /** FIX #12: capped dedup set lives here so it survives re-renders */
+    /** Capped dedup set — prevents duplicate toast stacking */
     _processedIds: Set<string>;
+    /** Toast dedup: tracks IDs of active council-message toasts */
+    _activeToastId: string | null;
 
     // Public actions
     connect: () => void;
@@ -66,7 +93,6 @@ interface WebSocketState {
     _stopHeartbeat: () => void;
     _startHeartbeat: () => void;
     _handlePong: (timestamp: string) => void;
-    /** FIX #12: add an ID to the bounded dedup set */
     _trackProcessedId: (id: string) => void;
 }
 
@@ -80,7 +106,7 @@ const WS_CONFIG = {
     PONG_TIMEOUT_MS:          10_000,
     CONNECTION_TIMEOUT_MS:    10_000,
     MAX_HISTORY_SIZE:         100,
-    /** FIX #12: cap the dedup set so it doesn't grow forever */
+    /** Cap the dedup set so it doesn't grow forever */
     MAX_PROCESSED_IDS:        500,
 } as const;
 
@@ -96,9 +122,9 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
         lastPingTime:      null,
         latencyMs:         null,
     },
-    lastMessage:    null,
-    unreadCount:    0,
-    messageHistory: [],
+    lastMessage:     null,
+    unreadCount:     0,
+    messageHistory:  [],
 
     _ws:                 null,
     _reconnectTimeout:   null,
@@ -110,23 +136,23 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
     _lastPingTime:       null,
     _messageQueue:       [],
     _processedIds:       new Set<string>(),
+    _activeToastId:      null,
 
     // ── Internal setters ───────────────────────────────────────────────────
     _setConnected:   (connected)  => set({ isConnected: connected }),
     _setConnecting:  (connecting) => set({ isConnecting: connecting }),
     _setError:       (error)      => set({ error }),
-    _updateStats:    (stats)      => set((s) => ({ connectionStats: { ...s.connectionStats, ...stats } })),
+    _updateStats:    (stats)      => set(s => ({ connectionStats: { ...s.connectionStats, ...stats } })),
     _setLastMessage: (message)    => set({ lastMessage: message }),
-    _incrementUnread: ()          => set((s) => ({ unreadCount: s.unreadCount + 1 })),
+    _incrementUnread: ()          => set(s => ({ unreadCount: s.unreadCount + 1 })),
     markAsRead:      ()           => set({ unreadCount: 0 }),
     clearError:      ()           => set({ error: null }),
 
-    /** FIX #12: keep the set bounded */
+    /** Keep the dedup set bounded to MAX_PROCESSED_IDS */
     _trackProcessedId: (id: string) => {
         const ids = get()._processedIds;
         if (ids.size >= WS_CONFIG.MAX_PROCESSED_IDS) {
-            // Remove the oldest quarter to make room
-            const arr = Array.from(ids);
+            const arr     = Array.from(ids);
             const trimmed = arr.slice(Math.floor(WS_CONFIG.MAX_PROCESSED_IDS / 4));
             set({ _processedIds: new Set(trimmed) });
         }
@@ -134,7 +160,7 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
     },
 
     addMessageToHistory: (message) =>
-        set((s) => {
+        set(s => {
             const next = [...s.messageHistory, message];
             if (next.length > WS_CONFIG.MAX_HISTORY_SIZE) next.shift();
             return { messageHistory: next };
@@ -143,10 +169,10 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
     // ── Timers ─────────────────────────────────────────────────────────────
     _clearAllTimers: () => {
         const s = get();
-        if (s._reconnectTimeout)  { clearTimeout(s._reconnectTimeout);   set({ _reconnectTimeout: null }); }
-        if (s._pingInterval)      { clearInterval(s._pingInterval);       set({ _pingInterval: null }); }
-        if (s._pongTimeout)       { clearTimeout(s._pongTimeout);         set({ _pongTimeout: null }); }
-        if (s._connectionTimeout) { clearTimeout(s._connectionTimeout);   set({ _connectionTimeout: null }); }
+        if (s._reconnectTimeout)  { clearTimeout(s._reconnectTimeout);  set({ _reconnectTimeout: null }); }
+        if (s._pingInterval)      { clearInterval(s._pingInterval);      set({ _pingInterval: null }); }
+        if (s._pongTimeout)       { clearTimeout(s._pongTimeout);        set({ _pongTimeout: null }); }
+        if (s._connectionTimeout) { clearTimeout(s._connectionTimeout);  set({ _connectionTimeout: null }); }
     },
 
     _stopHeartbeat: () => {
@@ -195,7 +221,7 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
         get()._setError(null);
         set({ _isManualDisconnect: false });
 
-        // FIX #11: NO token in the URL — connect cleanly, send auth as first message
+        // NO token in URL — connect cleanly, send auth as first message
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const wsUrl    = `${protocol}//${window.location.host}/ws/chat`;
 
@@ -217,7 +243,6 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
             ws.onopen = () => {
                 console.log('[WebSocket] ✅ Connected — sending auth handshake');
                 get()._clearAllTimers();
-                // FIX #11: send auth as the FIRST message
                 ws.send(JSON.stringify({ type: 'auth', token }));
             };
 
@@ -241,8 +266,12 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
                         // Flush queued messages
                         const queued = get()._messageQueue;
                         if (queued.length > 0) {
-                            queued.forEach((msg) =>
-                                ws.send(JSON.stringify({ type: 'message', content: msg.content, timestamp: new Date(msg.timestamp).toISOString() }))
+                            queued.forEach(msg =>
+                                ws.send(JSON.stringify({
+                                    type:      'message',
+                                    content:   msg.content,
+                                    timestamp: new Date(msg.timestamp).toISOString(),
+                                }))
                             );
                             set({ _messageQueue: [] });
                         }
@@ -250,7 +279,6 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
                     }
 
                     if (data.type === 'auth_required') {
-                        // Server is asking for auth (should have been sent in onopen already)
                         console.warn('[WebSocket] Received auth_required — resending auth');
                         ws.send(JSON.stringify({ type: 'auth', token }));
                         return;
@@ -259,11 +287,18 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
                     get()._setLastMessage(data);
                     get().addMessageToHistory(data);
 
+                    // ── Toast deduplication for Head of Council messages ──
                     if (data.type === 'message' && data.role === 'head_of_council') {
                         get()._incrementUnread();
                         const currentPath = window.location.pathname;
                         if (currentPath !== '/chat') {
-                            toast.success('New message from Head of Council', { duration: 5_000, icon: '👑' });
+                            const existingToastId = get()._activeToastId;
+                            if (existingToastId) toast.dismiss(existingToastId);
+                            const toastId = toast.success('New message from Head of Council', {
+                                duration: 5_000,
+                                icon: '👑',
+                            });
+                            set({ _activeToastId: toastId });
                         }
                     }
                 } catch (e) {
@@ -356,7 +391,11 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
         const s = get();
         if (s._ws?.readyState === WebSocket.OPEN) {
             try {
-                s._ws.send(JSON.stringify({ type: 'message', content: content.trim(), timestamp: new Date().toISOString() }));
+                s._ws.send(JSON.stringify({
+                    type:      'message',
+                    content:   content.trim(),
+                    timestamp: new Date().toISOString(),
+                }));
                 return true;
             } catch (e) {
                 console.error('[WebSocket] Send error:', e);

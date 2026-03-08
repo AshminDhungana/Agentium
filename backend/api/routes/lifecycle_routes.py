@@ -1,8 +1,10 @@
 """
 API routes for Agent Lifecycle Management.
 Provides endpoints for spawning, promoting, and liquidating agents.
+
 """
 
+from datetime import datetime
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from pydantic import BaseModel, Field
@@ -46,6 +48,12 @@ class LiquidateAgentRequest(BaseModel):
     force: bool = Field(default=False, description="Force liquidation (bypass safety checks)")
 
 
+class BulkLiquidateRequest(BaseModel):
+    """Request body for bulk liquidation. Query-param fallback still supported."""
+    idle_days_threshold: int = Field(default=7, ge=1, le=365)
+    dry_run: bool = Field(default=True)
+
+
 class AgentSpawnResponse(BaseModel):
     success: bool
     agentium_id: str
@@ -86,6 +94,17 @@ class CapacityResponse(BaseModel):
     warnings: List[str]
 
 
+# ── WebSocket manager (imported lazily to avoid circular imports) ──────────────
+
+def _get_ws_manager():
+    """Lazy import of the singleton WebSocket manager to avoid circular imports."""
+    try:
+        from backend.api.routes.websocket import manager
+        return manager
+    except Exception:
+        return None
+
+
 # ═══════════════════════════════════════════════════════════
 # SPAWNING ENDPOINTS
 # ═══════════════════════════════════════════════════════════
@@ -93,31 +112,30 @@ class CapacityResponse(BaseModel):
 @router.post("/spawn/task", response_model=AgentSpawnResponse)
 async def spawn_task_agent(
     request: SpawnTaskAgentRequest,
+    background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """
     Spawn a new Task Agent (3xxxx).
     Parent must be a Lead Agent or Council Member.
+    Broadcasts agent_spawned WebSocket event on success.
     """
-    # Get parent agent
     parent = db.query(Agent).filter_by(agentium_id=request.parent_agentium_id).first()
-    
+
     if not parent:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Parent agent {request.parent_agentium_id} not found"
         )
-    
-    # Verify parent is Lead (2xxxx) or Council (1xxxx)
+
     if not request.parent_agentium_id.startswith(('1', '2')):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Parent must be a Lead Agent (2xxxx) or Council Member (1xxxx)"
         )
-    
+
     try:
-        # Spawn the Task Agent
         task_agent = reincarnation_service.spawn_task_agent(
             parent=parent,
             name=request.name,
@@ -125,33 +143,37 @@ async def spawn_task_agent(
             capabilities=request.capabilities,
             db=db
         )
-        
+
         db.commit()
-        
-        # Get effective capabilities
+
         from backend.services.capability_registry import CapabilityRegistry
         caps_profile = CapabilityRegistry.get_agent_capabilities(task_agent)
-        
+
+        # ── Broadcast WS event ──────────────────────────────────────────────
+        ws_manager = _get_ws_manager()
+        if ws_manager:
+            background_tasks.add_task(
+                ws_manager.emit_agent_spawned,
+                agent_id=task_agent.agentium_id,
+                agent_name=task_agent.name,
+                agent_type="task_agent",
+                parent_id=request.parent_agentium_id,
+            )
+
         return AgentSpawnResponse(
             success=True,
             agentium_id=task_agent.agentium_id,
             name=task_agent.name,
-            agent_type="task",
+            agent_type="task_agent",
             parent_agentium_id=request.parent_agentium_id,
             capabilities=caps_profile["effective_capabilities"],
             message=f"Task Agent {task_agent.agentium_id} spawned successfully"
         )
-        
+
     except PermissionError as e:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
     except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
         db.rollback()
         raise HTTPException(
@@ -163,64 +185,67 @@ async def spawn_task_agent(
 @router.post("/spawn/lead", response_model=AgentSpawnResponse)
 async def spawn_lead_agent(
     request: SpawnLeadAgentRequest,
+    background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """
     Spawn a new Lead Agent (2xxxx).
     Parent must be a Council Member or Head of Council.
+    Broadcasts agent_spawned WebSocket event on success.
     """
-    # Get parent agent
     parent = db.query(Agent).filter_by(agentium_id=request.parent_agentium_id).first()
-    
+
     if not parent:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Parent agent {request.parent_agentium_id} not found"
         )
-    
-    # Verify parent is Council (1xxxx) or Head (0xxxx)
+
     if not request.parent_agentium_id.startswith(('0', '1')):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Parent must be a Council Member (1xxxx) or Head of Council (0xxxx)"
         )
-    
+
     try:
-        # Spawn the Lead Agent
         lead_agent = reincarnation_service.spawn_lead_agent(
             parent=parent,
             name=request.name,
             description=request.description,
             db=db
         )
-        
+
         db.commit()
-        
-        # Get effective capabilities
+
         from backend.services.capability_registry import CapabilityRegistry
         caps_profile = CapabilityRegistry.get_agent_capabilities(lead_agent)
-        
+
+        # ── Broadcast WS event ──────────────────────────────────────────────
+        ws_manager = _get_ws_manager()
+        if ws_manager:
+            background_tasks.add_task(
+                ws_manager.emit_agent_spawned,
+                agent_id=lead_agent.agentium_id,
+                agent_name=lead_agent.name,
+                agent_type="lead_agent",
+                parent_id=request.parent_agentium_id,
+            )
+
         return AgentSpawnResponse(
             success=True,
             agentium_id=lead_agent.agentium_id,
             name=lead_agent.name,
-            agent_type="lead",
+            agent_type="lead_agent",
             parent_agentium_id=request.parent_agentium_id,
             capabilities=caps_profile["effective_capabilities"],
             message=f"Lead Agent {lead_agent.agentium_id} spawned successfully"
         )
-        
+
     except PermissionError as e:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
     except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
         db.rollback()
         raise HTTPException(
@@ -236,49 +261,59 @@ async def spawn_lead_agent(
 @router.post("/promote", response_model=PromotionResponse)
 async def promote_task_to_lead(
     request: PromoteAgentRequest,
+    background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """
     Promote a Task Agent (3xxxx) to Lead Agent (2xxxx).
     Requires Council or Head authorization.
+    Broadcasts agent_promoted WebSocket event on success.
     """
-    # Get promoter agent
     promoter = db.query(Agent).filter_by(agentium_id=request.promoted_by_agentium_id).first()
-    
+
     if not promoter:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Promoter agent {request.promoted_by_agentium_id} not found"
         )
-    
-    # Verify task agent exists
+
     if not request.task_agentium_id.startswith('3'):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Only Task Agents (3xxxx) can be promoted to Lead"
         )
-    
+
     try:
-        # Execute promotion
         lead_agent = reincarnation_service.promote_to_lead(
             agent_id=request.task_agentium_id,
             promoted_by=promoter,
             reason=request.reason,
             db=db
         )
-        
-        # Get tasks transferred count from audit
+
         from backend.models.entities.audit import AuditLog
         promotion_audit = db.query(AuditLog).filter_by(
             action="agent_promoted",
             target_id=lead_agent.agentium_id
         ).order_by(AuditLog.created_at.desc()).first()
-        
+
         tasks_transferred = 0
         if promotion_audit and promotion_audit.meta_data:
             tasks_transferred = promotion_audit.meta_data.get("tasks_transferred", 0)
-        
+
+        # ── Broadcast WS event ──────────────────────────────────────────────
+        ws_manager = _get_ws_manager()
+        if ws_manager:
+            background_tasks.add_task(
+                ws_manager.emit_agent_promoted,
+                old_agentium_id=request.task_agentium_id,
+                new_agentium_id=lead_agent.agentium_id,
+                agent_name=lead_agent.name,
+                promoted_by=request.promoted_by_agentium_id,
+                reason=request.reason,
+            )
+
         return PromotionResponse(
             success=True,
             old_agentium_id=request.task_agentium_id,
@@ -288,17 +323,11 @@ async def promote_task_to_lead(
             tasks_transferred=tasks_transferred,
             message=f"Agent {request.task_agentium_id} promoted to {lead_agent.agentium_id}"
         )
-        
+
     except PermissionError as e:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
     except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
         db.rollback()
         raise HTTPException(
@@ -314,31 +343,34 @@ async def promote_task_to_lead(
 @router.post("/liquidate", response_model=LiquidationResponse)
 async def liquidate_agent(
     request: LiquidateAgentRequest,
+    background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """
     Liquidate (terminate) an agent with full cleanup.
     Requires appropriate authorization based on tier hierarchy.
+    Broadcasts agent_liquidated WebSocket event on success.
     """
-    # Get liquidator agent
     liquidator = db.query(Agent).filter_by(agentium_id=request.liquidated_by_agentium_id).first()
-    
+
     if not liquidator:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Liquidator agent {request.liquidated_by_agentium_id} not found"
         )
-    
-    # Protection: Cannot liquidate Head 00001
+
     if request.target_agentium_id == "00001" and not request.force:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Cannot liquidate Head of Council (00001)"
         )
-    
+
+    # Capture agent name before liquidation for WS event
+    target_agent = db.query(Agent).filter_by(agentium_id=request.target_agentium_id).first()
+    target_name  = target_agent.name if target_agent else request.target_agentium_id
+
     try:
-        # Execute liquidation
         summary = reincarnation_service.liquidate_agent(
             agent_id=request.target_agentium_id,
             liquidated_by=liquidator,
@@ -346,7 +378,19 @@ async def liquidate_agent(
             db=db,
             force=request.force
         )
-        
+
+        # ── Broadcast WS event ──────────────────────────────────────────────
+        ws_manager = _get_ws_manager()
+        if ws_manager:
+            background_tasks.add_task(
+                ws_manager.emit_agent_liquidated,
+                agent_id=request.target_agentium_id,
+                agent_name=target_name,
+                liquidated_by=request.liquidated_by_agentium_id,
+                reason=request.reason,
+                tasks_reassigned=summary.get("tasks_reassigned", 0),
+            )
+
         return LiquidationResponse(
             success=True,
             agentium_id=summary["agent_id"],
@@ -358,17 +402,11 @@ async def liquidate_agent(
             capabilities_revoked=summary["capabilities_revoked"],
             message=f"Agent {request.target_agentium_id} liquidated successfully"
         )
-        
+
     except PermissionError as e:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
     except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
         db.rollback()
         raise HTTPException(
@@ -386,20 +424,16 @@ async def get_capacity(
     current_user: dict = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """
-    Get available ID pool capacity for each agent tier.
-    Shows warnings for tiers approaching capacity limits.
-    """
+    """Get available ID pool capacity for each agent tier."""
     capacity = reincarnation_service.get_available_capacity(db)
-    
-    # Generate warnings
+
     warnings = []
     for tier_name, tier_data in capacity.items():
         if tier_data["critical"]:
             warnings.append(f"CRITICAL: {tier_name.upper()} tier at {tier_data['percentage']}% capacity")
         elif tier_data["warning"]:
             warnings.append(f"WARNING: {tier_name.upper()} tier at {tier_data['percentage']}% capacity")
-    
+
     return CapacityResponse(
         head=capacity["head"],
         council=capacity["council"],
@@ -415,6 +449,8 @@ async def get_capacity(
 
 @router.post("/bulk/liquidate-idle")
 async def bulk_liquidate_idle_agents(
+    body: Optional[BulkLiquidateRequest] = None,
+    # Query-param fallback for backward-compat
     idle_days_threshold: int = 7,
     dry_run: bool = True,
     current_user: dict = Depends(get_current_active_user),
@@ -422,29 +458,27 @@ async def bulk_liquidate_idle_agents(
 ):
     """
     Bulk liquidate idle agents.
-    Set dry_run=false to actually execute.
-    Admin/Sovereign only.
+    Accepts params as JSON body (preferred) or query params (legacy).
+    Set dry_run=false to actually execute. Admin/Sovereign only.
     """
-    # Check permissions
     if not current_user.get("is_admin") and current_user.get("role") != "sovereign":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Admin or Sovereign privileges required"
         )
-    
-    # Use the enhanced idle governance auto-liquidation
+
+    # Body takes precedence over query params
+    effective_threshold = body.idle_days_threshold if body else idle_days_threshold
+    effective_dry_run   = body.dry_run if body else dry_run
+
     from backend.services.idle_governance_enhanced import enhanced_idle_governance
-    from datetime import timedelta
-    
-    # Temporarily adjust threshold
+
     original_threshold = enhanced_idle_governance.IDLE_THRESHOLD_DAYS
-    enhanced_idle_governance.IDLE_THRESHOLD_DAYS = idle_days_threshold
-    
+    enhanced_idle_governance.IDLE_THRESHOLD_DAYS = effective_threshold
+
     try:
-        if dry_run:
-            # Just detect, don't liquidate
+        if effective_dry_run:
             idle_agents = await enhanced_idle_governance.detect_idle_agents(db)
-            
             return {
                 "dry_run": True,
                 "idle_agents_found": len(idle_agents),
@@ -452,9 +486,7 @@ async def bulk_liquidate_idle_agents(
                 "message": "Dry run complete. Set dry_run=false to execute liquidation."
             }
         else:
-            # Actually liquidate
             summary = await enhanced_idle_governance.auto_liquidate_expired(db)
-            
             return {
                 "dry_run": False,
                 "liquidated_count": summary["liquidated_count"],
@@ -463,48 +495,46 @@ async def bulk_liquidate_idle_agents(
                 "skipped": summary["skipped"],
                 "message": f"Liquidated {summary['liquidated_count']} idle agents"
             }
-            
     finally:
-        # Restore original threshold
         enhanced_idle_governance.IDLE_THRESHOLD_DAYS = original_threshold
 
+
+# ═══════════════════════════════════════════════════════════
+# LIFECYCLE STATS
+# ═══════════════════════════════════════════════════════════
 
 @router.get("/stats/lifecycle")
 async def get_lifecycle_stats(
     current_user: dict = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """
-    Get comprehensive lifecycle statistics.
-    """
+    """Get comprehensive lifecycle statistics (last 30 days)."""
     from backend.models.entities.audit import AuditLog
     from datetime import timedelta
-    
-    # Count lifecycle events from audit log (last 30 days)
+    from sqlalchemy import func
+
     thirty_days_ago = datetime.utcnow() - timedelta(days=30)
-    
+
     spawned = db.query(AuditLog).filter(
         AuditLog.action.in_(["agent_spawned", "lead_spawned"]),
         AuditLog.created_at >= thirty_days_ago
     ).count()
-    
+
     promoted = db.query(AuditLog).filter(
         AuditLog.action == "agent_promoted",
         AuditLog.created_at >= thirty_days_ago
     ).count()
-    
+
     liquidated = db.query(AuditLog).filter(
         AuditLog.action == "agent_liquidated",
         AuditLog.created_at >= thirty_days_ago
     ).count()
-    
+
     reincarnated = db.query(AuditLog).filter(
         AuditLog.action == "agent_birth",
         AuditLog.created_at >= thirty_days_ago
     ).count()
-    
-    # Get current active agents by tier
-    from sqlalchemy import func
+
     active_by_tier = {}
     for prefix in ['0', '1', '2', '3']:
         count = db.query(func.count(Agent.id)).filter(
@@ -512,14 +542,14 @@ async def get_lifecycle_stats(
             Agent.is_active == True
         ).scalar()
         active_by_tier[f"tier_{prefix}"] = count
-    
+
     return {
         "period_days": 30,
         "lifecycle_events": {
-            "spawned": spawned,
-            "promoted": promoted,
-            "liquidated": liquidated,
-            "reincarnated": reincarnated
+            "spawned":      spawned,
+            "promoted":     promoted,
+            "liquidated":   liquidated,
+            "reincarnated": reincarnated,
         },
         "active_agents_by_tier": active_by_tier,
         "capacity": reincarnation_service.get_available_capacity(db)

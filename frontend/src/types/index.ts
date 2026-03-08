@@ -136,12 +136,19 @@ export interface UniversalProviderInput {
     is_default?: boolean;
 }
 
+export interface AgentStats {
+    tasks_completed: number;
+    tasks_failed: number;
+    /** Optional — percentage 0–100 */
+    success_rate?: number;
+}
+
 export interface Agent {
     id: string;
     agentium_id: string;
     agent_type: 'head_of_council' | 'council_member' | 'lead_agent' | 'task_agent';
     name: string;
-    status: 'initializing' | 'active' | 'deliberating' | 'working' | 'suspended' | 'terminated';
+    status: 'initializing' | 'active' | 'deliberating' | 'working' | 'suspended' | 'terminated' | 'terminating';
     model_config?: {
         config_id: string;
         config_name: string;
@@ -150,11 +157,24 @@ export interface Agent {
     };
     parent?: string;
     subordinates: string[];
-    stats: {
-        tasks_completed: number;
-        tasks_failed: number;
-    };
+    stats: AgentStats;
+
+    // Extended fields — populated by backend when available
+    /** Title of the task the agent is currently executing */
+    current_task_title?: string;
+    /** Legacy field — may contain task ID or title */
     current_task?: string;
+    /** Pre-computed health score 0–100 from backend */
+    health_score?: number;
+    /** Number of tasks currently assigned and running */
+    active_task_count?: number;
+    /** ISO timestamp of last activity */
+    last_active_at?: string;
+    /** Days without activity (used for idle detection) */
+    idle_days?: number;
+    /** Free-text description of the agent's purpose */
+    description?: string;
+
     constitution_version: string;
     is_terminated: boolean;
 }
@@ -204,7 +224,7 @@ export interface Constitution {
     preamble: string;
     articles: Record<string, string>;
     prohibited_actions: string[];
-    sovereign_preferences: Record<string, any>;
+    sovereign_preferences: Record<string, unknown>;
     effective_date: string;
 }
 
@@ -254,7 +274,7 @@ export type CheckpointPhase =
 export interface UserPreference {
     agentium_id: string;
     key: string;
-    value: any;
+    value: unknown;
     category: string;
     scope: string;
     data_type: string;
@@ -265,8 +285,8 @@ export interface UserPreference {
 }
 
 export interface PreferenceHistoryEntry {
-    previous_value: any;
-    new_value: any;
+    previous_value: unknown;
+    new_value: unknown;
     changed_by?: string;
     change_reason?: string;
     timestamp: string;
@@ -279,5 +299,5 @@ export interface PreferenceCategory {
 }
 
 export interface SystemDefaults {
-    [key: string]: any;
+    [key: string]: unknown;
 }

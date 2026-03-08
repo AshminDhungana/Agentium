@@ -2,15 +2,17 @@
 WebSocket endpoint for real-time chat with authentication.
 
 Broadcast events emitted:
-  agent_spawned          — new agent created
-  task_escalated         — task promoted to council
-  vote_initiated         — deliberation vote started
+  agent_spawned            — new agent created
+  agent_liquidated         — agent terminated / decommissioned
+  agent_promoted           — task agent promoted to lead
+  agent_status_changed     — agent status updated (active/working/deliberating/…)
+  task_escalated           — task promoted to council
+  vote_initiated           — deliberation vote started
   constitutional_violation — rule breach detected
-  message_routed         — external channel message dispatched to agent
-  knowledge_submitted    — agent submitted knowledge to the KB
-  knowledge_approved     — council approved a knowledge submission
-  amendment_proposed     — constitutional amendment proposed
-  agent_liquidated       — agent terminated / decommissioned
+  message_routed           — external channel message dispatched to agent
+  knowledge_submitted      — agent submitted knowledge to the KB
+  knowledge_approved       — council approved a knowledge submission
+  amendment_proposed       — constitutional amendment proposed
 """
 
 import json
@@ -170,10 +172,10 @@ class ConnectionManager:
 
     async def emit_agent_spawned(
         self,
-        agent_id: str,
+        agent_id:   str,
         agent_name: str,
         agent_type: str,
-        parent_id: Optional[str] = None,
+        parent_id:  Optional[str] = None,
     ) -> None:
         await self.broadcast({
             "type":       "agent_spawned",
@@ -186,10 +188,10 @@ class ConnectionManager:
 
     async def emit_task_escalated(
         self,
-        task_id: str,
-        task_title: str,
+        task_id:      str,
+        task_title:   str,
         escalated_by: str,
-        reason: str,
+        reason:       str,
     ) -> None:
         await self.broadcast({
             "type":         "task_escalated",
@@ -202,9 +204,9 @@ class ConnectionManager:
 
     async def emit_vote_initiated(
         self,
-        vote_id: str,
-        subject: str,
-        initiated_by: str,
+        vote_id:         str,
+        subject:         str,
+        initiated_by:    str,
         quorum_required: int,
     ) -> None:
         await self.broadcast({
@@ -218,90 +220,86 @@ class ConnectionManager:
 
     async def emit_constitutional_violation(
         self,
-        agent_id: str,
-        violation_type: str,
-        description: str,
-        severity: str = "medium",
+        violator_id:  str,
+        article:      str,
+        severity:     str,
+        description:  str,
+        requires_vote: bool = False,
     ) -> None:
         await self.broadcast({
-            "type":           "constitutional_violation",
-            "agent_id":       agent_id,
-            "violation_type": violation_type,
-            "description":    description,
-            "severity":       severity,
-            "timestamp":      datetime.utcnow().isoformat(),
+            "type":         "constitutional_violation",
+            "violator_id":  violator_id,
+            "article":      article,
+            "severity":     severity,
+            "description":  description,
+            "requires_vote": requires_vote,
+            "timestamp":    datetime.utcnow().isoformat(),
         })
 
     async def emit_message_routed(
         self,
-        message_id: str,
-        channel: str,
-        routed_to: str,
-        content_preview: str,
+        channel:      str,
+        sender:       str,
+        task_id:      str,
+        requires_approval: bool = False,
     ) -> None:
         await self.broadcast({
-            "type":            "message_routed",
-            "message_id":      message_id,
-            "channel":         channel,
-            "routed_to":       routed_to,
-            "content_preview": content_preview,
-            "timestamp":       datetime.utcnow().isoformat(),
+            "type":              "message_routed",
+            "channel":           channel,
+            "sender":            sender,
+            "task_id":           task_id,
+            "requires_approval": requires_approval,
+            "timestamp":         datetime.utcnow().isoformat(),
         })
 
     async def emit_knowledge_submitted(
         self,
-        knowledge_id: str,
-        submitted_by: str,
-        knowledge_type: str,
-        title: str,
+        agent_id:    str,
+        topic:       str,
+        requires_vote: bool = True,
     ) -> None:
         await self.broadcast({
-            "type":           "knowledge_submitted",
-            "knowledge_id":   knowledge_id,
-            "submitted_by":   submitted_by,
-            "knowledge_type": knowledge_type,
-            "title":          title,
-            "timestamp":      datetime.utcnow().isoformat(),
+            "type":          "knowledge_submitted",
+            "agent_id":      agent_id,
+            "topic":         topic,
+            "requires_vote": requires_vote,
+            "timestamp":     datetime.utcnow().isoformat(),
         })
 
     async def emit_knowledge_approved(
         self,
-        knowledge_id: str,
+        topic:       str,
         approved_by: str,
-        title: str,
     ) -> None:
         await self.broadcast({
-            "type":         "knowledge_approved",
-            "knowledge_id": knowledge_id,
-            "approved_by":  approved_by,
-            "title":        title,
-            "timestamp":    datetime.utcnow().isoformat(),
+            "type":        "knowledge_approved",
+            "topic":       topic,
+            "approved_by": approved_by,
+            "timestamp":   datetime.utcnow().isoformat(),
         })
 
     async def emit_amendment_proposed(
         self,
-        amendment_id: str,
-        proposed_by: str,
-        article: str,
-        summary: str,
+        proposer_id: str,
+        article:     str,
+        description: str,
         requires_vote: bool = True,
     ) -> None:
         await self.broadcast({
             "type":          "amendment_proposed",
-            "amendment_id":  amendment_id,
-            "proposed_by":   proposed_by,
+            "proposer_id":   proposer_id,
             "article":       article,
-            "summary":       summary,
+            "description":   description,
             "requires_vote": requires_vote,
             "timestamp":     datetime.utcnow().isoformat(),
         })
 
     async def emit_agent_liquidated(
         self,
-        agent_id: str,
-        agent_name: str,
-        liquidated_by: str,
-        reason: str,
+        agent_id:         str,
+        agent_name:       str,
+        liquidated_by:    str,
+        reason:           str,
         tasks_reassigned: int = 0,
     ) -> None:
         await self.broadcast({
@@ -312,6 +310,42 @@ class ConnectionManager:
             "reason":           reason,
             "tasks_reassigned": tasks_reassigned,
             "timestamp":        datetime.utcnow().isoformat(),
+        })
+
+    async def emit_agent_promoted(
+        self,
+        old_agentium_id: str,
+        new_agentium_id: str,
+        agent_name:      str,
+        promoted_by:     str,
+        reason:          str,
+    ) -> None:
+        """Broadcast when a Task Agent is promoted to Lead Agent."""
+        await self.broadcast({
+            "type":            "agent_promoted",
+            "old_agentium_id": old_agentium_id,
+            "new_agentium_id": new_agentium_id,
+            "agent_name":      agent_name,
+            "promoted_by":     promoted_by,
+            "reason":          reason,
+            "timestamp":       datetime.utcnow().isoformat(),
+        })
+
+    async def emit_agent_status_changed(
+        self,
+        agent_id:   str,
+        agent_name: str,
+        old_status: str,
+        new_status: str,
+    ) -> None:
+        """Broadcast when an agent's status changes (active/working/deliberating/…)."""
+        await self.broadcast({
+            "type":       "agent_status_changed",
+            "agent_id":   agent_id,
+            "agent_name": agent_name,
+            "old_status": old_status,
+            "new_status": new_status,
+            "timestamp":  datetime.utcnow().isoformat(),
         })
 
 
@@ -367,49 +401,33 @@ async def websocket_chat_endpoint(
             "timestamp": datetime.utcnow().isoformat(),
         })
 
-    # ── New: wait for auth message ────────────────────────────────────────────
-    else:
-        await websocket.send_json({
-            "type":      "auth_required",
-            "content":   'Send {"type":"auth","token":"<JWT>"} to authenticate.',
-            "timestamp": datetime.utcnow().isoformat(),
-        })
-
     # ── Main message loop ─────────────────────────────────────────────────────
     try:
         while True:
             raw = await websocket.receive_text()
 
             try:
-                message_data = json.loads(raw)
+                data = json.loads(raw)
             except json.JSONDecodeError:
-                await websocket.send_json({
-                    "type":      "error",
-                    "content":   "Invalid JSON",
-                    "timestamp": datetime.utcnow().isoformat(),
-                })
+                await websocket.send_json({"type": "error", "content": "Invalid JSON"})
                 continue
 
-            message_type = message_data.get("type", "")
+            msg_type = data.get("type", "")
 
-            # ── Auth handshake (new flow) ─────────────────────────────────────
-            if message_type == "auth":
-                if user_info:
+            # ── Auth message (new preferred flow) ─────────────────────────
+            if msg_type == "auth":
+                if user_info is not None:
                     await websocket.send_json({
-                        "type":      "system",
-                        "content":   "Already authenticated.",
+                        "type":    "system",
+                        "content": "Already authenticated.",
                         "timestamp": datetime.utcnow().isoformat(),
                     })
                     continue
 
-                msg_token = message_data.get("token", "")
-                if not msg_token:
-                    await websocket.close(code=4001, reason="Token required in auth message")
-                    return
-
-                user_info = await manager.authenticate(websocket, msg_token)
+                auth_token = data.get("token", "")
+                user_info  = await manager.authenticate(websocket, auth_token)
                 if not user_info:
-                    return  # authenticate() closed the socket
+                    return  # socket closed inside authenticate()
 
                 await websocket.send_json({
                     "type":      "system",
@@ -422,81 +440,52 @@ async def websocket_chat_endpoint(
                 })
                 continue
 
-            # ── Guard: reject all non-auth messages until authenticated ───────
-            if not user_info:
+            # ── Require authentication for all subsequent messages ─────────
+            if user_info is None:
                 await websocket.send_json({
-                    "type":      "error",
-                    "content":   "Not authenticated. Send auth message first.",
+                    "type":    "auth_required",
+                    "content": "Please send an auth message first.",
                     "timestamp": datetime.utcnow().isoformat(),
                 })
                 continue
 
-            # ── Ping / heartbeat ──────────────────────────────────────────────
-            if message_type == "ping":
+            # ── Ping / heartbeat ──────────────────────────────────────────
+            if msg_type == "ping":
                 await websocket.send_json({
                     "type":      "pong",
-                    "timestamp": message_data.get("timestamp", datetime.utcnow().isoformat()),
+                    "timestamp": data.get("timestamp", datetime.utcnow().isoformat()),
                 })
                 continue
 
-            # ── Chat message ──────────────────────────────────────────────────
-            if message_type == "message":
-                content = message_data.get("content", "").strip()
+            # ── Chat message ──────────────────────────────────────────────
+            if msg_type == "message":
+                content = data.get("content", "").strip()
                 if not content:
-                    await websocket.send_json({
-                        "type":      "error",
-                        "content":   "Empty message content",
-                        "timestamp": datetime.utcnow().isoformat(),
-                    })
                     continue
 
+                with get_fresh_db() as db:
+                    chat_service = ChatService(db)
+                    response = await chat_service.process_message(
+                        user_message=content,
+                        head_agent_id=user_info["head_agent_id"],
+                        user_id=user_info.get("user_id"),
+                    )
+
                 await websocket.send_json({
-                    "type":      "status",
-                    "role":      "system",
-                    "content":   "Processing your command...",
+                    "type":      "message",
+                    "role":      "head_of_council",
+                    "content":   response.get("response", ""),
+                    "metadata":  response.get("metadata", {}),
                     "timestamp": datetime.utcnow().isoformat(),
                 })
+                continue
 
-                # FIX #4: fresh DB session per message — never reuse long-lived session
-                try:
-                    with get_fresh_db() as db:
-                        head = db.query(HeadOfCouncil).filter_by(
-                            id=user_info["head_agent_id"]
-                        ).first()
-
-                        if not head:
-                            await websocket.send_json({
-                                "type":      "error",
-                                "content":   "Head of Council not available",
-                                "timestamp": datetime.utcnow().isoformat(),
-                            })
-                            continue
-
-                        response = await ChatService.process_message(head, content, db)
-
-                    await websocket.send_json({
-                        "type":    "message",
-                        "role":    "head_of_council",
-                        # FIX #2: server must provide a stable UUID as message_id
-                        "message_id": response.get("message_id") or __import__("uuid").uuid4().hex,
-                        "content": response.get("content", "No response"),
-                        "metadata": {
-                            "agent_id":    user_info["head_agentium_id"],
-                            "model":       response.get("model"),
-                            "task_created": response.get("task_created"),
-                            "task_id":     response.get("task_id"),
-                            "tokens_used": response.get("tokens_used"),
-                        },
-                        "timestamp": datetime.utcnow().isoformat(),
-                    })
-
-                except Exception as exc:
-                    print(f"[WebSocket] ChatService error: {exc}")
-                    await websocket.send_json({
-                        "type":      "error",
-                        "content":   f"Error processing message: {exc}",
-                        "timestamp": datetime.utcnow().isoformat(),
-                    })
+            # ── Unknown message type ──────────────────────────────────────
+            await websocket.send_json({
+                "type":    "error",
+                "content": f"Unknown message type: {msg_type!r}",
+                "timestamp": datetime.utcnow().isoformat(),
+            })
 
     except WebSocketDisconnect:
         manager.disconnect(websocket)
@@ -504,6 +493,6 @@ async def websocket_chat_endpoint(
         print(f"[WebSocket] Unexpected error: {exc}")
         manager.disconnect(websocket)
         try:
-            await websocket.close(code=1011)
+            await websocket.close(code=1011, reason="Internal server error")
         except Exception:
             pass
