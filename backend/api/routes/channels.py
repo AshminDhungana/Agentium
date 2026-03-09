@@ -24,6 +24,7 @@ from typing import Optional, List, Any, Dict
 from fastapi import APIRouter, Depends, HTTPException, Request, status, Query, BackgroundTasks
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from backend.models.database import get_db
@@ -110,13 +111,21 @@ def list_channels(
             pass
     
     channels = query.all()
+
+    # Fix #7: single GROUP BY instead of one COUNT query per status (was N+1)
+    status_counts = (
+        db.query(ExternalChannel.status, func.count(ExternalChannel.id))
+        .group_by(ExternalChannel.status)
+        .all()
+    )
+    by_status = {s.value: 0 for s in ChannelStatus}
+    for status_val, count in status_counts:
+        by_status[status_val.value] = count
+
     return {
         "channels": [c.to_dict() for c in channels],
         "total": len(channels),
-        "by_status": {
-            s.value: db.query(ExternalChannel).filter(ExternalChannel.status == s).count()
-            for s in ChannelStatus
-        }
+        "by_status": by_status,
     }
 
 
@@ -242,14 +251,30 @@ def get_all_channels_metrics(
     """Get metrics for all channels (for dashboard widget)."""
     channels = db.query(ExternalChannel).all()
     
-    results = []
+    # Fix #8 (corrected): Ensure all new ChannelMetrics rows are flushed — and
+    # therefore have DB-assigned IDs — BEFORE metrics.to_dict() is called.
+    # Previous version called to_dict() inside the loop before the flush, which
+    # meant newly-created objects serialised with id=None.
+    #
+    # Pass 1: create any missing ChannelMetrics rows and collect them.
+    new_metrics_objs: list = []
     for channel in channels:
         metrics = db.query(ChannelMetrics).filter_by(channel_id=channel.id).first()
         if not metrics:
             metrics = ChannelMetrics(channel_id=channel.id)
             db.add(metrics)
-            db.commit()
-        
+            new_metrics_objs.append(metrics)
+
+    # Flush once so every new object gets its DB-generated ID, then commit
+    # atomically.  Existing rows are unaffected by the flush.
+    if new_metrics_objs:
+        db.flush()   # assigns IDs within the current transaction
+        db.commit()  # single commit for all new rows
+
+    # Pass 2: now safe to call to_dict() — all IDs are populated.
+    results = []
+    for channel in channels:
+        metrics = db.query(ChannelMetrics).filter_by(channel_id=channel.id).first()
         results.append({
             "channel_id": channel.id,
             "channel_name": channel.name,
@@ -258,9 +283,6 @@ def get_all_channels_metrics(
             "metrics": metrics.to_dict(),
             "health_status": _calculate_health_status(metrics)
         })
-    
-    # Commit once after all creations
-    db.commit()
     
     return {
         "channels": results,

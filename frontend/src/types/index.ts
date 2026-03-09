@@ -12,60 +12,130 @@ export interface BackendStatus {
     latency?: number;
 }
 
-// Channel Metrics Types (Phase 4 + Phase 7)
+// ─── Channel core types ───────────────────────────────────────────────────────
+// These were missing from the previous index.ts and were being redeclared
+// locally inside ChannelsPage.tsx, causing type duplication.
+
+export type ChannelTypeSlug =
+    | 'whatsapp'
+    | 'slack'
+    | 'telegram'
+    | 'email'
+    | 'discord'
+    | 'signal'
+    | 'google_chat'
+    | 'teams'
+    | 'zalo'
+    | 'matrix'
+    | 'imessage'
+    | 'custom';
+
+export type ChannelStatus = 'pending' | 'active' | 'error' | 'disconnected';
+
+export type WhatsAppProvider = 'cloud_api' | 'web_bridge';
+
+/**
+ * A configured external communication channel as returned by the backend.
+ * The `config` shape is intentionally permissive — different channel types
+ * populate different subsets of these optional fields.
+ */
+export interface Channel {
+    id: string;
+    name: string;
+    type: ChannelTypeSlug;
+    status: ChannelStatus;
+    config: {
+        phone_number?: string;
+        has_credentials: boolean;
+        webhook_url?: string;
+        homeserver_url?: string;
+        oa_id?: string;
+        backend?: string;
+        number?: string;
+        bb_url?: string;
+        // WhatsApp-specific
+        provider?: WhatsAppProvider;
+        bridge_url?: string;
+        allowed_senders?: string[];
+    };
+    routing: {
+        default_agent?: string;
+        auto_create_tasks: boolean;
+        require_approval: boolean;
+    };
+    stats: {
+        received: number;
+        sent: number;
+        last_message?: string;
+    };
+}
+
+/** Shape of the payload sent to POST /channels/ */
+export interface ChannelFormData {
+    name: string;
+    type: ChannelTypeSlug;
+    config: Record<string, string>;
+    default_agent_id?: string;
+    auto_create_tasks: boolean;
+    require_approval: boolean;
+}
+
+// ─── Channel Metrics Types (Phase 4 + Phase 7) ───────────────────────────────
+
 export type CircuitBreakerState = 'closed' | 'half_open' | 'open';
 export type ChannelHealthStatus = 'healthy' | 'warning' | 'critical';
 
 export interface ChannelMetrics {
-  channel_id: string;
-  total_requests: number;
-  successful_requests: number;
-  failed_requests: number;
-  success_rate: number;
-  circuit_breaker_state: CircuitBreakerState;
-  consecutive_failures: number;
-  rate_limit_hits: number;
-  avg_response_time_ms?: number;
-  last_failure_at?: string;
-  last_rate_limit_at?: string;
-  created_at: string;
-  updated_at: string;
+    channel_id: string;
+    total_requests: number;
+    successful_requests: number;
+    failed_requests: number;
+    success_rate: number;
+    circuit_breaker_state: CircuitBreakerState;
+    consecutive_failures: number;
+    rate_limit_hits: number;
+    avg_response_time_ms?: number;
+    last_failure_at?: string;
+    last_rate_limit_at?: string;
+    created_at: string;
+    updated_at: string;
 }
 
 export interface ChannelMetricsResponse {
-  channel_id: string;
-  channel_name: string;
-  channel_type: string;
-  status: string;
-  metrics: ChannelMetrics;
-  health_status: ChannelHealthStatus;
+    channel_id: string;
+    channel_name: string;
+    channel_type: string;
+    status: string;
+    metrics: ChannelMetrics;
+    health_status: ChannelHealthStatus;
 }
 
 export interface AllChannelsMetricsResponse {
-  channels: ChannelMetricsResponse[];
-  summary: {
-    total: number;
-    healthy: number;
-    warning: number;
-    critical: number;
-    circuit_open: number;
-  };
+    channels: ChannelMetricsResponse[];
+    summary: {
+        total: number;
+        healthy: number;
+        warning: number;
+        critical: number;
+        circuit_open: number;
+    };
 }
 
 export interface MessageLog {
-  id: string;
-  channel_id: string;
-  sender_id: string;
-  sender_name?: string;
-  content: string;
-  status: 'received' | 'processing' | 'responded' | 'failed';
-  error_count: number;
-  last_error?: string;
-  created_at: string;
-  responded_at?: string;
+    id: string;
+    channel_id: string;
+    sender_id: string;
+    sender_name?: string;
+    content: string;
+    status: 'received' | 'processing' | 'responded' | 'failed';
+    error_count: number;
+    last_error?: string;
+    created_at: string;
+    responded_at?: string;
 }
 
-// Provider Types
+// ─── Provider / Model types ───────────────────────────────────────────────────
+
 export type ProviderType =
     | 'openai'
     | 'anthropic'
@@ -75,11 +145,11 @@ export type ProviderType =
     | 'together'
     | 'cohere'
     | 'fireworks'
-    | 'moonshot'  // Kimi 2.5
+    | 'moonshot'       // Kimi 2.5
     | 'deepseek'
     | 'azure_openai'
-    | 'local'      // Ollama, LM Studio
-    | 'custom';    // Any OpenAI-compatible
+    | 'local'          // Ollama, LM Studio
+    | 'custom';        // Any OpenAI-compatible
 
 export interface ProviderInfo {
     id: ProviderType;
@@ -136,6 +206,8 @@ export interface UniversalProviderInput {
     is_default?: boolean;
 }
 
+// ─── Agent / Task types ───────────────────────────────────────────────────────
+
 export interface AgentStats {
     tasks_completed: number;
     tasks_failed: number;
@@ -159,20 +231,12 @@ export interface Agent {
     subordinates: string[];
     stats: AgentStats;
 
-    // Extended fields — populated by backend when available
-    /** Title of the task the agent is currently executing */
     current_task_title?: string;
-    /** Legacy field — may contain task ID or title */
     current_task?: string;
-    /** Pre-computed health score 0–100 from backend */
     health_score?: number;
-    /** Number of tasks currently assigned and running */
     active_task_count?: number;
-    /** ISO timestamp of last activity */
     last_active_at?: string;
-    /** Days without activity (used for idle detection) */
     idle_days?: number;
-    /** Free-text description of the agent's purpose */
     description?: string;
 
     constitution_version: string;
@@ -265,12 +329,13 @@ export interface MonitoringDashboard {
 }
 
 export type CheckpointPhase =
-  | 'plan_approved'
-  | 'execution_complete'
-  | 'critique_passed'
-  | 'manual';
+    | 'plan_approved'
+    | 'execution_complete'
+    | 'critique_passed'
+    | 'manual';
 
-// User Preferences Types
+// ─── User Preferences ─────────────────────────────────────────────────────────
+
 export interface UserPreference {
     agentium_id: string;
     key: string;
