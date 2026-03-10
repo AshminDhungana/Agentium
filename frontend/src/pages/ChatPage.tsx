@@ -3,9 +3,11 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { useAuthStore } from '@/store/authStore';
 import { useWebSocketStore } from '@/store/websocketStore';
 import { inboxApi, UnifiedConversation, UnifiedMessage } from '@/services/inboxApi';
+import { api } from '@/services/api';
 import {
     Send, Crown, Bot, AlertCircle, Loader2, Wifi, WifiOff, CheckCircle,
     RefreshCw, Paperclip, Image as ImageIcon, File, X, Mic, MicOff, Pause,
@@ -48,8 +50,25 @@ interface Message {
     role: 'sovereign' | 'head_of_council' | 'system';
     content: string;
     timestamp: Date;
-    metadata?: any;
+    metadata?: MessageMetadata;
     attachments?: Attachment[];
+}
+
+/** Typed metadata — replaces the previous `metadata?: any` */
+interface MessageMetadata {
+    agent_id?: string;
+    model?: string;
+    tokens_used?: number;
+    task_created?: boolean;
+    task_id?: string;
+    latency_ms?: number;
+    /** 'voice' when message originated from the voice bridge */
+    source?: string;
+    /** True when the message bubble should render in error styling */
+    error?: boolean;
+    prompt_type?: string;
+    requires_response?: boolean;
+    connection_id?: number;
 }
 
 type ActiveTab = 'ai' | 'inbox' | 'files';
@@ -62,6 +81,22 @@ interface BrowserFile {
     category: string;
     uploaded_at: string;
 }
+
+// ── Module-level constants ────────────────────────────────────────────────────
+
+/** Maximum dedup-set size — moved out of component to avoid re-creation on render (Issue 14) */
+const MAX_PROCESSED_IDS = 500;
+
+/**
+ * Static Tailwind class map for tab active text colours.
+ * Avoids dynamic `text-${color}-600` strings that Tailwind JIT cannot detect
+ * and will purge in production builds (Issue 10).
+ */
+const TAB_ACTIVE_STYLES: Record<ActiveTab, string> = {
+    ai:    'text-blue-600 dark:text-blue-400',
+    inbox: 'text-emerald-600 dark:text-emerald-400',
+    files: 'text-violet-600 dark:text-violet-400',
+};
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -99,7 +134,7 @@ export function ChatPage() {
     const [messages,       setMessages]      = useState<Message[]>([]);
     const [uploadedFiles,  setUploadedFiles] = useState<UploadedFile[]>([]);
     const [isRecording,    setIsRecording]   = useState(false);
-    const [isPaused,       setIsPaused]      = useState(false);
+    // isPaused was declared here but never consumed — removed (Issue 12)
     const [recordingTime,  setRecordingTime] = useState(0);
     const [showFileMenu,   setShowFileMenu]  = useState(false);
     const [imagePreview,   setImagePreview]  = useState<{ url: string; name: string } | null>(null);
@@ -108,7 +143,8 @@ export function ChatPage() {
     const [isLocalMode,    setIsLocalMode]   = useState(false);
     const [interimTranscript, setInterimTranscript] = useState('');
     const [showVoiceSettings, setShowVoiceSettings] = useState(false);
-    const [selectedVoice,  setSelectedVoice]  = useState('alloy');
+    // Issue 1: initialise to '' so that the API-provided default voice can be applied
+    const [selectedVoice,  setSelectedVoice]  = useState('');
     const [selectedLanguage, setSelectedLanguage] = useState('');
     const [availableVoices,  setAvailableVoices]  = useState<{ id: string; name: string; description: string }[]>([]);
     const [availableLanguages, setAvailableLanguages] = useState<{ code: string; name: string }[]>([]);
@@ -123,15 +159,15 @@ export function ChatPage() {
     const audioStreamRef      = useRef<MediaStream | null>(null);
 
     /**
-     * FIX #2 + #12: dedup set lives in a ref (not React state) — no re-renders,
-     * trimmed to MAX_IDS entries so it never grows unbounded.
+     * Dedup set lives in a ref (not React state) — no re-renders,
+     * trimmed to MAX_PROCESSED_IDS entries so it never grows unbounded.
+     * MAX_PROCESSED_IDS is defined at module scope (Issue 14).
      */
-    const MAX_IDS = 500;
     const processedMessageIds = useRef<Set<string>>(new Set());
     const trackId = useCallback((id: string) => {
-        if (processedMessageIds.current.size >= MAX_IDS) {
+        if (processedMessageIds.current.size >= MAX_PROCESSED_IDS) {
             const arr = Array.from(processedMessageIds.current);
-            processedMessageIds.current = new Set(arr.slice(Math.floor(MAX_IDS / 4)));
+            processedMessageIds.current = new Set(arr.slice(Math.floor(MAX_PROCESSED_IDS / 4)));
         }
         processedMessageIds.current.add(id);
     }, []);
@@ -179,13 +215,28 @@ export function ChatPage() {
     const user = useAuthStore((s) => s.user);
     const isAuthenticated = user?.isAuthenticated ?? false;
 
+    // Issue 9: useShallow prevents re-renders caused by internal store fields
+    // (_pingInterval, _pongTimeout, _messageQueue, etc.) that ChatPage doesn't use.
     const {
         isConnected, isConnecting, error,
         sendMessage: sendWsMessage,
         reconnect, connectionStats,
         unreadCount, markAsRead,
         messageHistory, lastMessage,
-    } = useWebSocketStore();
+    } = useWebSocketStore(
+        useShallow((s) => ({
+            isConnected:     s.isConnected,
+            isConnecting:    s.isConnecting,
+            error:           s.error,
+            sendMessage:     s.sendMessage,
+            reconnect:       s.reconnect,
+            connectionStats: s.connectionStats,
+            unreadCount:     s.unreadCount,
+            markAsRead:      s.markAsRead,
+            messageHistory:  s.messageHistory,
+            lastMessage:     s.lastMessage,
+        }))
+    );
 
     // ── Voice Bridge ──────────────────────────────────────────────────────────
     const handleVoiceInteraction = useCallback((event: VoiceInteractionEvent) => {
@@ -213,10 +264,14 @@ export function ChatPage() {
     // Mark messages as read when on AI tab
     useEffect(() => { markAsRead(); }, [markAsRead]);
 
-    // Load history once on mount
+    // Load history once on mount — AbortController cancels if component unmounts
+    // before the request resolves (Issue 6 + Issue 15)
     useEffect(() => {
-        if (isAuthenticated) loadChatHistory();
-    }, [isAuthenticated]);
+        if (!isAuthenticated) return;
+        const controller = new AbortController();
+        loadChatHistory(controller.signal);
+        return () => controller.abort();
+    }, [isAuthenticated, loadChatHistory]);
 
     // FIX #8: fetch voice options only once per connection, skip on reconnect
     useEffect(() => {
@@ -249,9 +304,11 @@ export function ChatPage() {
                     role:      (msg.role as Message['role']) || 'head_of_council',
                     content:   msg.content as string,
                     timestamp: new Date(),
-                    metadata:  msg.metadata,
+                    metadata:  msg.metadata as MessageMetadata | undefined,
                 };
-                isHistoryLoad.current = false;
+                // Note: isHistoryLoad.current is NOT reset here to avoid racing
+                // with loadChatHistory. It is consumed and reset in the scroll
+                // useEffect below (Issue 3).
                 setMessages((prev) => [...prev, newMessage]);
                 if (msg.metadata?.task_created) {
                     toast.success(`Task ${msg.metadata.task_id} created`);
@@ -265,11 +322,14 @@ export function ChatPage() {
         };
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // FIX #13: only scroll on new messages, not bulk history load
+    // Issue 3: Consume isHistoryLoad.current here — not in the WS subscriber —
+    // so there is no race between the subscriber and the bulk setMessages call.
     useEffect(() => {
-        if (!isHistoryLoad.current) {
-            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        if (isHistoryLoad.current) {
+            isHistoryLoad.current = false; // consume the flag before any scroll
+            return;                        // skip smooth-scroll on history load
         }
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
 
     // Auto-resize textarea
@@ -280,10 +340,13 @@ export function ChatPage() {
         }
     }, [input]);
 
-    // Inbox: load when tab switches
+    // Inbox: load when tab switches — AbortController cancels if tab changes again quickly
     useEffect(() => {
-        if (activeTab === 'inbox' && conversations.length === 0) loadConversations();
-    }, [activeTab]);
+        if (activeTab !== 'inbox' || conversations.length > 0) return;
+        const controller = new AbortController();
+        loadConversations(controller.signal);
+        return () => controller.abort();
+    }, [activeTab, loadConversations]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Inbox: reload on new external message
     useEffect(() => {
@@ -296,12 +359,15 @@ export function ChatPage() {
         if (selectedId) inboxMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [selectedId, conversations]);
 
-    // Files: load when tab switches
+    // Files: load when tab switches — AbortController cancels if tab changes again quickly
     useEffect(() => {
-        if (activeTab === 'files') loadBrowserFiles();
-    }, [activeTab]);
+        if (activeTab !== 'files') return;
+        const controller = new AbortController();
+        loadBrowserFiles(controller.signal);
+        return () => controller.abort();
+    }, [activeTab, loadBrowserFiles]);
 
-    // FIX #7: cleanup mic stream on unmount
+    // Cleanup mic stream and any in-flight audio on unmount (Issues 5 + 7)
     useEffect(() => {
         return () => {
             if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
@@ -312,6 +378,12 @@ export function ChatPage() {
             }
             if (recordingIntervalRef.current) {
                 clearInterval(recordingIntervalRef.current);
+            }
+            // Issue 5: stop audio and allow the browser to GC the blob URL
+            if (audioPlayerRef.current) {
+                audioPlayerRef.current.pause();
+                audioPlayerRef.current.src = '';
+                audioPlayerRef.current = null;
             }
         };
     }, []);
@@ -333,33 +405,36 @@ export function ChatPage() {
 
     const fetchVoiceOptions = async () => {
         try {
-            const token = localStorage.getItem('access_token');
-            const headers = { Authorization: `Bearer ${token}` };
+            // Issue 7: use the api service — it injects the auth header automatically
+            // and routes 401s through the global refresh/logout interceptor.
             const [voicesRes, langsRes] = await Promise.all([
-                fetch('/api/v1/voice/voices',    { headers }),
-                fetch('/api/v1/voice/languages', { headers }),
+                api.get<{ voices: { id: string; name: string; description: string }[]; default?: string }>(
+                    '/api/v1/voice/voices',
+                ),
+                api.get<{ languages: { code: string; name: string }[] }>(
+                    '/api/v1/voice/languages',
+                ),
             ]);
-            if (voicesRes.ok) {
-                const data = await voicesRes.json();
-                setAvailableVoices(data.voices || []);
-                if (data.default && !selectedVoice) setSelectedVoice(data.default);
-            }
-            if (langsRes.ok) {
-                const data = await langsRes.json();
-                setAvailableLanguages(data.languages || []);
-            }
+            setAvailableVoices(voicesRes.data.voices || []);
+            // Issue 1: selectedVoice starts as '' (falsy) so this guard now works correctly
+            if (voicesRes.data.default && !selectedVoice) setSelectedVoice(voicesRes.data.default);
+            setAvailableLanguages(langsRes.data.languages || []);
         } catch (e) {
             console.warn('[ChatPage] Could not fetch voice options:', e);
         }
     };
 
     /**
-     * FIX #3: Load history from API and seed the dedup set so incoming WS
-     * messages for already-shown history aren't re-appended.
+     * Load history from API and seed the dedup set so incoming WS messages
+     * for already-shown history aren't re-appended.
+     * Accepts an AbortSignal so the caller's useEffect can cancel mid-flight (Issue 6).
      */
-    const loadChatHistory = async () => {
+    const loadChatHistory = useCallback(async (signal?: AbortSignal) => {
         try {
             const history = await chatApi.getHistory(50);
+
+            // Aborted before we could process the response — discard silently
+            if (signal?.aborted) return;
 
             // Empty result (e.g. 500 fallback) — nothing to render, skip state update
             if (!history.messages.length) return;
@@ -369,7 +444,7 @@ export function ChatPage() {
                 role:        msg.role,
                 content:     msg.content,
                 timestamp:   new Date(msg.created_at),
-                metadata:    msg.metadata,
+                metadata:    msg.metadata as MessageMetadata | undefined,
                 attachments: msg.attachments,
             }));
             // Seed dedup set BEFORE setting state so the WS subscriber ignores these
@@ -378,13 +453,16 @@ export function ChatPage() {
             setMessages(formattedMessages);
             // Scroll to bottom without animation after history load
             requestAnimationFrame(() => {
-                messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+                if (!signal?.aborted) {
+                    messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+                }
             });
         } catch (error) {
+            if ((error as any)?.name === 'AbortError' || (error as any)?.name === 'CanceledError') return;
             console.error('[ChatPage] Failed to load chat history:', error);
             toast.error('Could not load chat history — your new messages will still work.');
         }
-    };
+    }, [trackId]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -417,8 +495,9 @@ export function ChatPage() {
         isHistoryLoad.current = false;
         setMessages((prev) => [...prev, userMessage]);
 
-        // FIX #1: send via WebSocket only — no SSE/chatStore
-        sendWsMessage(input.trim() || '(file attachment)');
+        // FIX Issue 2: forward attachment metadata over WebSocket — previously only
+        // text was sent and the backend never received the file URLs / names.
+        sendWsMessage(input.trim() || '(file attachment)', attachments.length > 0 ? attachments : undefined);
 
         setInput('');
         setUploadedFiles([]);
@@ -512,7 +591,7 @@ export function ChatPage() {
         }
         mediaRecorderRef.current = null;
         setIsRecording(false);
-        setIsPaused(false);
+        // isPaused state removed — was never consumed anywhere (Issue 12)
         setInterimTranscript('');
     };
 
@@ -525,7 +604,7 @@ export function ChatPage() {
         const toastId = toast.loading('Generating speech…');
         try {
             setIsSpeaking(messageId);
-            const audioBlob = await voiceApi.synthesize({ text: content, voice: selectedVoice as 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer' });
+            const audioBlob = await voiceApi.synthesize({ text: content, voice: (selectedVoice || 'alloy') as 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer' });
             toast.dismiss(toastId);
             if (audioBlob && audioBlob.size > 0) {
                 const audioUrl = URL.createObjectURL(audioBlob);
@@ -576,7 +655,13 @@ export function ChatPage() {
         }
     };
 
-    const removeFile = (id: string) => setUploadedFiles((prev) => prev.filter((f) => f.id !== id));
+    const removeFile = (id: string) =>
+        setUploadedFiles((prev) => {
+            // Issue 4: revoke object URL before dropping the file to prevent blob leaks
+            const target = prev.find((f) => f.id === id);
+            if (target?.preview) URL.revokeObjectURL(target.preview);
+            return prev.filter((f) => f.id !== id);
+        });
 
     const downloadFile = async (attachment: Attachment) => {
         try {
@@ -586,31 +671,36 @@ export function ChatPage() {
                 document.body.appendChild(a); a.click(); document.body.removeChild(a);
                 toast.success('Downloaded');
             } else if (attachment.url) {
-                const response = await fetch(attachment.url);
-                const blob     = await response.blob();
-                const url      = window.URL.createObjectURL(blob);
+                // Issue 8: use the authenticated api service so protected file URLs
+                // get the correct Authorization header and 401s are handled globally.
+                const response = await api.get(attachment.url, { responseType: 'blob' });
+                const url      = window.URL.createObjectURL(response.data);
                 const a        = document.createElement('a');
                 a.href = url; a.download = attachment.name;
                 document.body.appendChild(a); a.click(); document.body.removeChild(a);
                 window.URL.revokeObjectURL(url);
                 toast.success('Downloaded');
             }
-        } catch { toast.error('Download failed'); }
+        } catch (err: any) {
+            toast.error(err.response?.data?.detail || err.message || 'Download failed');
+        }
     };
 
     // ── Inbox ─────────────────────────────────────────────────────────────────
 
-    const loadConversations = async () => {
+    const loadConversations = useCallback(async (signal?: AbortSignal) => {
         setInboxLoading(true);
         try {
             const res = await inboxApi.getConversations();
+            if (signal?.aborted) return;
             setConversations(res.conversations);
         } catch (err: any) {
+            if (err?.name === 'AbortError' || err?.name === 'CanceledError') return;
             toast.error(err.message || 'Failed to load conversations');
         } finally {
-            setInboxLoading(false);
+            if (!signal?.aborted) setInboxLoading(false);
         }
-    };
+    }, []);
 
     const handleSendReply = async () => {
         if (!selectedId || !replyContent.trim()) return;
@@ -629,23 +719,24 @@ export function ChatPage() {
 
     // ── File Browser ──────────────────────────────────────────────────────────
 
-    const loadBrowserFiles = async () => {
+    const loadBrowserFiles = useCallback(async (signal?: AbortSignal) => {
         setBrowserLoading(true);
         try {
-            const token = localStorage.getItem('access_token');
-            const headers = { Authorization: `Bearer ${token}` };
+            // Issue 7: use the api service — auth header is injected automatically.
             const [listRes, statsRes] = await Promise.all([
-                fetch('/api/v1/files/?limit=100', { headers }),
-                fetch('/api/v1/files/stats',      { headers }),
+                api.get<{ files: BrowserFile[] }>('/api/v1/files/?limit=100'),
+                api.get<typeof browserStats>('/api/v1/files/stats'),
             ]);
-            if (listRes.ok)  { const d = await listRes.json();  setBrowserFiles(d.files || []); }
-            if (statsRes.ok) { const d = await statsRes.json(); setBrowserStats(d); }
-        } catch (e) {
+            if (signal?.aborted) return;
+            setBrowserFiles(listRes.data.files || []);
+            setBrowserStats(statsRes.data);
+        } catch (e: any) {
+            if (e?.name === 'AbortError' || e?.name === 'CanceledError') return;
             console.error('[ChatPage] loadBrowserFiles:', e);
         } finally {
-            setBrowserLoading(false);
+            if (!signal?.aborted) setBrowserLoading(false);
         }
-    };
+    }, []);
 
     const handleBrowserUpload = async (files: FileList | null) => {
         if (!files) return;
@@ -663,16 +754,12 @@ export function ChatPage() {
     const handleDeleteFile = async (storedName: string) => {
         setDeletingFile(storedName);
         try {
-            const token = localStorage.getItem('access_token');
-            const res = await fetch(`/api/v1/files/${storedName}`, {
-                method: 'DELETE',
-                headers: { Authorization: `Bearer ${token}` },
-            });
-            if (!res.ok) throw new Error('Delete failed');
+            // Issue 7: use fileApi so the auth header is handled consistently
+            await fileApi.deleteFile(storedName);
             toast.success('File deleted');
             loadBrowserFiles();
         } catch (e: any) {
-            toast.error(e.message || 'Delete failed');
+            toast.error(e.response?.data?.detail || e.message || 'Delete failed');
         } finally {
             setDeletingFile(null);
         }
@@ -841,14 +928,16 @@ export function ChatPage() {
                                 {/* Tab switcher */}
                                 <div className="flex items-center bg-gray-100 dark:bg-[#0f1117] rounded-xl p-1 border border-gray-200 dark:border-[#1e2535]">
                                     {([
-                                        { key: 'ai'    as const, icon: Crown,      label: 'AI Chat', color: 'blue'   },
-                                        { key: 'inbox' as const, icon: Inbox,      label: 'Inbox',   color: 'emerald'},
-                                        { key: 'files' as const, icon: FolderOpen, label: 'Files',   color: 'violet' },
-                                    ] as const).map(({ key, icon: Icon, label, color }) => (
+                                        { key: 'ai'    as const, icon: Crown,      label: 'AI Chat' },
+                                        { key: 'inbox' as const, icon: Inbox,      label: 'Inbox'   },
+                                        { key: 'files' as const, icon: FolderOpen, label: 'Files'   },
+                                    ] as const).map(({ key, icon: Icon, label }) => (
                                         <button key={key} onClick={() => setActiveTab(key)}
                                             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
                                                 activeTab === key
-                                                    ? `bg-white dark:bg-[#161b27] text-${color}-600 dark:text-${color}-400 shadow-sm`
+                                                    // Issue 10: static class map — dynamic text-${color}-* strings
+                                                    // are not detected by Tailwind JIT and get purged in production
+                                                    ? `bg-white dark:bg-[#161b27] ${TAB_ACTIVE_STYLES[key]} shadow-sm`
                                                     : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
                                             }`}>
                                             <Icon className="w-3.5 h-3.5" />

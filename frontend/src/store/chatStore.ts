@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
 import toast from 'react-hot-toast';
 import { api } from '@/services/api';
 
@@ -130,9 +129,7 @@ const sendMessageToCouncil = async (message: string): Promise<any> => {
     return response.data;
 };
 
-export const useChatStore = create<ChatState>()(
-    persist(
-        (set, get) => ({
+export const useChatStore = create<ChatState>()((set, get) => ({
             messages: [],
             isLoading: false,
             currentStreamingMessage: '',
@@ -308,10 +305,5 @@ export const useChatStore = create<ChatState>()(
             clearHistory: () => {
                 set({ messages: [], currentStreamingMessage: '' });
             }
-        }),
-        {
-            name: 'chat-storage',
-            partialize: (state) => ({ messages: state.messages })
-        }
-    )
+        })
 );

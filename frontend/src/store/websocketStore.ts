@@ -8,6 +8,19 @@ import toast from 'react-hot-toast';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
+/**
+ * Attachment metadata forwarded with a chat message over WebSocket.
+ * Mirrors the Attachment interface in ChatPage but lives here so the store
+ * can be typed without importing from a page component.
+ */
+export interface MessageAttachment {
+    name: string;
+    type: string;
+    size: number;
+    url?: string;
+    category?: string;
+}
+
 export interface WebSocketMessage {
     type: string;
     role?: string;
@@ -66,7 +79,7 @@ interface WebSocketState {
     _reconnectAttempts: number;
     _isManualDisconnect: boolean;
     _lastPingTime: string | null;
-    _messageQueue: Array<{ content: string; timestamp: number }>;
+    _messageQueue: Array<{ content: string; timestamp: number; attachments?: MessageAttachment[] }>;
     /** Capped dedup set — prevents duplicate toast stacking */
     _processedIds: Set<string>;
     /** Toast dedup: tracks IDs of active council-message toasts */
@@ -76,7 +89,7 @@ interface WebSocketState {
     connect: () => void;
     disconnect: (isManual?: boolean) => void;
     reconnect: () => void;
-    sendMessage: (content: string) => boolean;
+    sendMessage: (content: string, attachments?: MessageAttachment[]) => boolean;
     sendPing: () => boolean;
     markAsRead: () => void;
     addMessageToHistory: (message: WebSocketMessage) => void;
@@ -268,9 +281,10 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
                         if (queued.length > 0) {
                             queued.forEach(msg =>
                                 ws.send(JSON.stringify({
-                                    type:      'message',
-                                    content:   msg.content,
-                                    timestamp: new Date(msg.timestamp).toISOString(),
+                                    type:        'message',
+                                    content:     msg.content,
+                                    timestamp:   new Date(msg.timestamp).toISOString(),
+                                    attachments: msg.attachments,
                                 }))
                             );
                             set({ _messageQueue: [] });
@@ -387,14 +401,15 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
     },
 
     // ── Send message ───────────────────────────────────────────────────────
-    sendMessage: (content: string) => {
+    sendMessage: (content: string, attachments?: MessageAttachment[]) => {
         const s = get();
         if (s._ws?.readyState === WebSocket.OPEN) {
             try {
                 s._ws.send(JSON.stringify({
-                    type:      'message',
-                    content:   content.trim(),
-                    timestamp: new Date().toISOString(),
+                    type:        'message',
+                    content:     content.trim(),
+                    timestamp:   new Date().toISOString(),
+                    attachments: attachments && attachments.length > 0 ? attachments : undefined,
                 }));
                 return true;
             } catch (e) {
@@ -403,7 +418,7 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
             }
         }
         console.warn('[WebSocket] Not connected — queuing message');
-        set({ _messageQueue: [...get()._messageQueue, { content, timestamp: Date.now() }] });
+        set({ _messageQueue: [...get()._messageQueue, { content, timestamp: Date.now(), attachments }] });
         return false;
     },
 
