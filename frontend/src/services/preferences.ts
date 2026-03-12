@@ -97,7 +97,7 @@ export const preferencesService = {
     data_type?: string;
   }): Promise<UserPreference> => {
     // Backend returns { status: "created", preference: UserPreference }
-    const response = await api.post<{ status: string; preference: UserPreference }>('/api/v1/preferences/', data);
+    const response = await api.post<{ status: string; preference: UserPreference }>('/api/v1/preferences', data);
     return response.data.preference;
   },
 

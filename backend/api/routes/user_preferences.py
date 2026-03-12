@@ -13,7 +13,7 @@ from backend.core.auth import get_current_active_user, get_current_agent_tier, g
 from backend.services.user_preference_service import UserPreferenceService, PreferenceCategory
 
 
-router = APIRouter(prefix="/preferences", tags=["User Preferences"])
+router = APIRouter(prefix="/preferences", tags=["User Preferences"], redirect_slashes=False)
 
 
 # ═══════════════════════════════════════════════════════════
@@ -73,11 +73,8 @@ async def list_my_preferences(
         include_system=True
     )
 
-    return {
-        "user_id": current_user["user_id"],
-        "count": len(prefs),
-        "preferences": [p.to_dict() for p in prefs]
-    }
+    # Return a plain array — frontend unwrap logic handles both array and envelope shapes
+    return [p.to_dict() for p in prefs]
 
 
 @router.get("/{key}")
