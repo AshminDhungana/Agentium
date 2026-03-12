@@ -58,6 +58,7 @@ class PreferenceResponse(BaseModel):
 # ═══════════════════════════════════════════════════════════
 
 @router.get("/")
+@router.get("")  # also handles GET /api/v1/preferences (no trailing slash — prevents 307 redirect through Vite proxy)
 async def list_my_preferences(
     category: Optional[str] = None,
     scope: Optional[str] = None,
@@ -99,6 +100,7 @@ async def get_my_preference(
 
 
 @router.post("/")
+@router.post("")  # also handles POST /api/v1/preferences (no trailing slash — prevents 307 redirect)
 async def create_preference(
     request: PreferenceCreateRequest,
     db: Session = Depends(get_db),

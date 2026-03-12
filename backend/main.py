@@ -343,7 +343,8 @@ app = FastAPI(
     title="Agentium",
     description="AI Agent Governance System — Phase 6.7: MCP Server Integration | TextEditorTool added",
     version="3.0.0-phase6.7",
-    lifespan=lifespan
+    lifespan=lifespan,
+    redirect_slashes=False,  # prevent 307 redirects that bypass the Vite dev proxy (fixes /api/v1/preferences ERR_CONNECTION_REFUSED)
 )
 
 origins = os.getenv("ALLOWED_ORIGINS")
