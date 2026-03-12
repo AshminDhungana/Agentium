@@ -145,11 +145,22 @@ def register_peer(
 
 @router.get("/peers")
 def list_peers(
+    skip: int = 0,
+    limit: int = 100,
     current_user: User = Depends(get_current_user_from_token),
     db: Session = Depends(get_db),
 ):
-    """List all registered peer instances."""
-    peers = FederationService.list_peers(db)
+    """
+    List registered peer instances.
+
+    Query params:
+      - skip  (int, default 0):   offset for pagination.
+      - limit (int, default 100): max records to return.
+
+    These params are optional — omitting them returns all peers up to the
+    default limit, preserving backward compatibility with existing callers.
+    """
+    peers = FederationService.list_peers(db, skip=skip, limit=limit)
     return [
         {
             "id": p.id,

@@ -1,7 +1,7 @@
 // ─── Status → Colour Maps ─────────────────────────────────────────────────────
 // Single source of truth for every status badge / dot-indicator colour.
 // Eliminates the duplication that previously existed across Dashboard,
-// ChannelsPage, and other pages.
+// ChannelsPage, FederationPage, and other pages.
 
 import type { Agent } from '@/types';
 
@@ -123,6 +123,100 @@ export function getTaskStatusColors(status: string): StatusColors {
         TASK_STATUS_COLORS[status] ?? {
             dot:   'bg-gray-400',
             badge: 'bg-gray-100 text-gray-600 dark:bg-gray-500/15 dark:text-gray-400',
+            label: status,
+        }
+    );
+}
+
+// ── Federation peer status map ────────────────────────────────────────────────
+// Used by FederationPage's PeerTable component.
+
+export type PeerStatusType = 'active' | 'suspended' | 'pending';
+
+export const PEER_STATUS_COLORS: Record<PeerStatusType, StatusColors> = {
+    active: {
+        dot:   'bg-green-500',
+        badge: 'bg-green-100 text-green-700 border-green-200 dark:bg-green-500/10 dark:text-green-400 dark:border-green-500/20',
+        label: 'Active',
+    },
+    suspended: {
+        dot:   'bg-orange-400',
+        badge: 'bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-500/10 dark:text-orange-400 dark:border-orange-500/20',
+        label: 'Suspended',
+    },
+    pending: {
+        dot:   'bg-yellow-400',
+        badge: 'bg-yellow-100 text-yellow-700 border-yellow-200 dark:bg-yellow-500/10 dark:text-yellow-400 dark:border-yellow-500/20',
+        label: 'Pending',
+    },
+};
+
+/**
+ * Safe getter for peer status colours. Falls back to neutral grey for
+ * any status string not in the map (e.g. future backend values).
+ */
+export function getPeerStatusColors(status: string): StatusColors {
+    return (
+        PEER_STATUS_COLORS[status as PeerStatusType] ?? {
+            dot:   'bg-gray-400',
+            badge: 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-[#1e2535] dark:text-gray-400 dark:border-[#2a3347]',
+            label: status,
+        }
+    );
+}
+
+// ── Federated task status map ─────────────────────────────────────────────────
+// Used by FederationPage's Tasks tab.
+
+export type FedTaskStatusType =
+    | 'pending'
+    | 'delivered'
+    | 'accepted'
+    | 'rejected'
+    | 'completed'
+    | 'failed';
+
+export const FED_TASK_STATUS_COLORS: Record<FedTaskStatusType, StatusColors> = {
+    pending: {
+        dot:   'bg-yellow-400',
+        badge: 'bg-yellow-100 text-yellow-700 border-yellow-200 dark:bg-yellow-500/10 dark:text-yellow-400 dark:border-yellow-500/20',
+        label: 'Pending',
+    },
+    delivered: {
+        dot:   'bg-blue-400',
+        badge: 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20',
+        label: 'Delivered',
+    },
+    accepted: {
+        dot:   'bg-sky-400',
+        badge: 'bg-sky-100 text-sky-700 border-sky-200 dark:bg-sky-500/10 dark:text-sky-400 dark:border-sky-500/20',
+        label: 'Accepted',
+    },
+    rejected: {
+        dot:   'bg-red-400',
+        badge: 'bg-red-100 text-red-700 border-red-200 dark:bg-red-500/10 dark:text-red-400 dark:border-red-500/20',
+        label: 'Rejected',
+    },
+    completed: {
+        dot:   'bg-green-500',
+        badge: 'bg-green-100 text-green-700 border-green-200 dark:bg-green-500/10 dark:text-green-400 dark:border-green-500/20',
+        label: 'Completed',
+    },
+    failed: {
+        dot:   'bg-red-500',
+        badge: 'bg-red-100 text-red-700 border-red-200 dark:bg-red-500/10 dark:text-red-400 dark:border-red-500/20',
+        label: 'Failed',
+    },
+};
+
+/**
+ * Safe getter for federated task status colours.
+ */
+export function getFedTaskStatusColors(status: string): StatusColors {
+    return (
+        FED_TASK_STATUS_COLORS[status as FedTaskStatusType] ?? {
+            dot:   'bg-gray-400',
+            badge: 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-[#1e2535] dark:text-gray-400 dark:border-[#2a3347]',
             label: status,
         }
     );

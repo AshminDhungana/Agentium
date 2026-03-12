@@ -1,5 +1,5 @@
 """
-Federation Service (Phase 11.2)
+Federation Service 
 ===============================
 Handles peer instance registration, cross-instance messaging, and federated task delegation.
 
@@ -131,8 +131,26 @@ class FederationService:
         return peer
 
     @staticmethod
-    def list_peers(db: Session) -> List[FederatedInstance]:
-        return db.query(FederatedInstance).all()
+    def list_peers(db: Session, skip: int = 0, limit: int = 100) -> List[FederatedInstance]:
+        """
+        Return registered peer instances.
+
+        Args:
+            db:    SQLAlchemy session.
+            skip:  Number of records to skip (for pagination). Default 0.
+            limit: Maximum number of records to return. Default 100.
+
+        Callers that omit skip/limit get the same behaviour as before
+        (all peers up to the default limit), so this change is fully
+        backward-compatible.
+        """
+        return (
+            db.query(FederatedInstance)
+            .order_by(FederatedInstance.registered_at.desc())
+            .offset(skip)
+            .limit(limit)
+            .all()
+        )
 
     # ── Authentication (HMAC) ─────────────────────────────────────────────────
 
