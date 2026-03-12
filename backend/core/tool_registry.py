@@ -16,6 +16,7 @@ from backend.tools.embedding_tool      import embedding_tool
 from backend.tools.git_tool            import git_tool
 from backend.tools.http_api_tool       import http_api_tool
 from backend.tools.text_editor_tool    import text_editor_tool
+from backend.tools.web_search_tool     import web_search_tool
 from backend.tools.desktop_tool  import (
     mouse_kb_tool,
     file_tool      as desktop_file_tool,
@@ -47,6 +48,28 @@ class ToolRegistry:
                 "file_path":      {"type": "string",  "description": "Path to code file (alternative to code)", "optional": True},
                 "language":       {"type": "string",  "description": "Language: python, javascript, typescript, json, yaml"},
                 "analysis_types": {"type": "array",   "description": "Checks to run: syntax, lint, security, complexity, all", "optional": True},
+            },
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx"],
+        )
+
+        # ══════════════════════════════════════════════════════════════════════
+        # WEB SEARCH TOOL
+        # ══════════════════════════════════════════════════════════════════════
+        self.register_tool(
+            name="web_search",
+            description=(
+                "Search the web for current information. "
+                "Use when you need up-to-date news, documentation, facts, or any "
+                "information that may be beyond your training knowledge. "
+                "Returns ranked results with title, URL, and a text snippet for each. "
+                "Results are indexed (0, 1, 2 …) for easy citation. "
+                "Provider priority (auto): Tavily → Brave → SerpAPI → DuckDuckGo."
+            ),
+            function=web_search_tool.execute,
+            parameters={
+                "query":       {"type": "string",  "description": "Natural language search query"},
+                "max_results": {"type": "integer", "description": "Number of results to return, 1–10 (default 5)", "optional": True},
+                "provider":    {"type": "string",  "description": "Search provider: auto | tavily | brave | serpapi | duckduckgo (default: auto)", "optional": True},
             },
             authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx"],
         )
