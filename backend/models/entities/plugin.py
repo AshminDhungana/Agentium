@@ -57,6 +57,22 @@ class PluginInstallation(Base):
     is_active = Column(Boolean, default=True, nullable=False)
     installed_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
+class PluginRevenueLedger(Base):
+    """Ledger for recording plugin purchases, subscriptions, and revenue share."""
+    __tablename__ = "plugin_revenue_ledger"
+    
+    id = Column(String(36), primary_key=True, default=_new_uuid, index=True)
+    plugin_id = Column(String(36), ForeignKey("plugins.id", ondelete="CASCADE"), nullable=False, index=True)
+    
+    amount = Column(Float, nullable=False)
+    currency = Column(String(10), default="USD", nullable=False)
+    
+    # "purchase", "subscription", "refund", "payout"
+    transaction_type = Column(String(20), default="purchase", nullable=False)
+    notes = Column(String(500), nullable=True)
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
 class PluginReview(Base):
     """A user review for a plugin."""
     __tablename__ = "plugin_reviews"

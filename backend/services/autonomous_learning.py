@@ -297,10 +297,126 @@ class AutonomousLearningEngine:
             "last_run_at": self._stats.last_run_at,
         }
 
+    # ── Learning Decay (Phase 10.4) ──────────────────────────────────────
+
+    # Configurable thresholds (read from environment with defaults)
+    DECAY_THRESHOLD_DAYS = int(os.getenv("LEARNING_DECAY_DAYS", "30"))
+    DECAY_RATE = float(os.getenv("LEARNING_DECAY_RATE", "0.85"))
+    MIN_CONFIDENCE = float(os.getenv("LEARNING_MIN_CONFIDENCE", "0.1"))
+
+    def decay_outdated_learnings(self, db: Session) -> Dict[str, Any]:
+        """
+        Reduce the confidence of older learnings proportional to age.
+
+        Learnings older than ``DECAY_THRESHOLD_DAYS`` have their
+        confidence multiplied by ``DECAY_RATE``. Learnings whose
+        confidence drops below ``MIN_CONFIDENCE`` are pruned.
+
+        Uses VectorStore.decay_stale_entries() for the actual decay logic.
+        """
+        try:
+            from backend.core.vector_store import get_vector_store
+            vs = get_vector_store()
+            result = vs.decay_stale_entries(
+                max_age_days=self.DECAY_THRESHOLD_DAYS,
+                decay_factor=self.DECAY_RATE,
+                min_confidence=self.MIN_CONFIDENCE,
+                target_collections=["task_patterns", "best_practices"],
+            )
+            logger.info(
+                "Learning decay: decayed %d, pruned %d entries",
+                result.get("decayed", 0), result.get("pruned", 0),
+            )
+            return result
+        except Exception as exc:
+            logger.error("Learning decay failed: %s", exc)
+            return {"decayed": 0, "pruned": 0, "error": str(exc)}
+
+    # ── Cross-Agent Learning Sharing (Phase 10.4) ────────────────────────
+
+    def share_learnings_across_agents(self, db: Session) -> Dict[str, Any]:
+        """
+        Copy high-confidence best practices to a shared knowledge pool.
+
+        Extracts learnings with confidence ≥ 0.8 from the 'task_patterns'
+        collection and stores copies in a 'federated_knowledge' collection
+        in ChromaDB, making them available to all agents via RAG.
+
+        Gated behind ``FEDERATION_ENABLED`` config to avoid unintended
+        knowledge sharing in single-instance deployments.
+        """
+        from backend.core.config import settings
+
+        if not settings.FEDERATION_ENABLED:
+            return {
+                "shared": 0,
+                "reason": "Federation not enabled — cross-agent sharing disabled",
+            }
+
+        try:
+            from backend.core.vector_store import get_vector_store
+            vs = get_vector_store()
+
+            # Ensure federation knowledge collection exists
+            federated_coll_name = "federated_knowledge"
+            if federated_coll_name not in vs.COLLECTIONS:
+                vs.COLLECTIONS[federated_coll_name] = federated_coll_name
+
+            source_coll = vs.get_collection("task_patterns")
+            all_docs = source_coll.get(include=["documents", "metadatas"])
+
+            if not all_docs or not all_docs.get("ids"):
+                return {"shared": 0}
+
+            shared_count = 0
+            fed_coll = vs.get_collection(federated_coll_name)
+
+            for i, doc_id in enumerate(all_docs["ids"]):
+                meta = (all_docs.get("metadatas") or [])[i] if all_docs.get("metadatas") else {}
+                if not meta:
+                    continue
+
+                # Only share high-confidence best practices
+                doc_type = meta.get("type", "")
+                confidence = float(meta.get("confidence", 0))
+                if doc_type != "best_practice" or confidence < 0.8:
+                    continue
+
+                # Check if already shared (avoid duplicates)
+                shared_id = f"fed_{doc_id}"
+                doc_text = (all_docs.get("documents") or [])[i] if all_docs.get("documents") else ""
+                if not doc_text:
+                    continue
+
+                try:
+                    fed_coll.upsert(
+                        ids=[shared_id],
+                        documents=[doc_text],
+                        metadatas=[{
+                            **meta,
+                            "shared_from": "task_patterns",
+                            "shared_at": datetime.utcnow().isoformat(),
+                            "original_id": doc_id,
+                            "federated": "true",
+                        }],
+                    )
+                    shared_count += 1
+                except Exception as exc:
+                    logger.debug("Failed to share learning %s: %s", doc_id, exc)
+
+            logger.info("Cross-agent sharing: shared %d learnings", shared_count)
+            return {"shared": shared_count}
+
+        except Exception as exc:
+            logger.error("Cross-agent learning sharing failed: %s", exc)
+            return {"shared": 0, "error": str(exc)}
+
 
 # ---------------------------------------------------------------------------
 # Singleton
 # ---------------------------------------------------------------------------
+
+import os
 
 _learning_engine: Optional[AutonomousLearningEngine] = None
 

@@ -433,3 +433,133 @@ async def list_tts_voices():
         ],
         "default": "alloy"
     }
+
+
+# ── Voice Channel Stubs (Phase 10.3) ─────────────────────────────────────
+
+@router.post("/twilio/webhook")
+async def twilio_voice_webhook(
+    db: Session = Depends(get_db),
+):
+    """
+    Twilio voice webhook handler — Phase 10.3 stub.
+
+    Receives inbound Twilio voice call webhooks. In production, this
+    would handle call routing, IVR menus, and agent connection.
+    Currently validates the request shape and returns a TwiML response
+    stub for future integration.
+
+    Requires: TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN in environment.
+    """
+    twilio_sid = os.getenv("TWILIO_ACCOUNT_SID")
+    if not twilio_sid:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "message": "Twilio voice not configured",
+                "action_required": "Set TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN",
+                "configured": False,
+            }
+        )
+
+    # Return a TwiML-compatible response stub
+    return {
+        "status": "acknowledged",
+        "provider": "twilio",
+        "message": "Twilio voice webhook received — integration pending",
+        "twiml_response": '<?xml version="1.0" encoding="UTF-8"?>'
+                          '<Response><Say>Welcome to Agentium. '
+                          'Voice channel integration is being configured.</Say></Response>',
+    }
+
+
+@router.post("/twilio/status")
+async def twilio_status_callback():
+    """
+    Twilio call status callback — Phase 10.3 stub.
+
+    Receives status updates for ongoing Twilio calls (ringing, in-progress,
+    completed, failed). Logs the event for future analytics.
+    """
+    return {
+        "status": "received",
+        "provider": "twilio",
+        "message": "Status callback acknowledged",
+    }
+
+
+@router.get("/discord/status")
+async def discord_voice_status(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    Discord voice connection status — Phase 10.3 stub.
+
+    Returns the current state of the Discord voice integration.
+    In production, this would report active voice channels, connected
+    users, and bot status.
+
+    Requires: DISCORD_VOICE_ENABLED=true in environment.
+    """
+    discord_enabled = os.getenv("DISCORD_VOICE_ENABLED", "false").lower() == "true"
+
+    return {
+        "provider": "discord",
+        "enabled": discord_enabled,
+        "connected": False,  # Stub: always false until bot integration
+        "active_channels": [],
+        "status": "configured" if discord_enabled else "not_configured",
+        "message": (
+            "Discord voice bot ready for connection"
+            if discord_enabled
+            else "Set DISCORD_VOICE_ENABLED=true and configure Discord bot token"
+        ),
+    }
+
+
+@router.get("/channels")
+async def list_voice_channels(
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    List all available voice channels and their status.
+
+    Aggregates availability of all voice channel integrations
+    (OpenAI, Twilio, Discord, Browser local).
+    """
+    twilio_configured = bool(os.getenv("TWILIO_ACCOUNT_SID"))
+    discord_enabled = os.getenv("DISCORD_VOICE_ENABLED", "false").lower() == "true"
+
+    return {
+        "channels": [
+            {
+                "id": "openai",
+                "name": "OpenAI Voice",
+                "type": "api",
+                "status": "available",
+                "description": "Cloud STT (Whisper) + TTS via OpenAI API",
+            },
+            {
+                "id": "local",
+                "name": "Browser Local",
+                "type": "browser",
+                "status": "available",
+                "description": "Browser-native Web Speech API fallback",
+            },
+            {
+                "id": "twilio",
+                "name": "Twilio Phone",
+                "type": "phone",
+                "status": "configured" if twilio_configured else "not_configured",
+                "description": "Inbound/outbound phone calls via Twilio",
+            },
+            {
+                "id": "discord",
+                "name": "Discord Voice",
+                "type": "voip",
+                "status": "configured" if discord_enabled else "not_configured",
+                "description": "Discord voice channel bot integration",
+            },
+        ]
+    }

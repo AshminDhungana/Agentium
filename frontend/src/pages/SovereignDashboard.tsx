@@ -26,6 +26,8 @@ import {
     Users,
     Smartphone,
     Lock,
+    Webhook,
+    Code,
 } from 'lucide-react';
 import { hostAccessApi } from '@/services/hostAccessApi';
 import { MCPToolRegistry } from '@/components/mcp/MCPToolRegistry';
@@ -35,6 +37,8 @@ import ToolMarketplacePage from './ToolMarketplacePage';
 import FederationPage from './FederationPage';
 import MobilePage from './MobilePage';
 import RBACManagementPage from './RBACManagement';
+import WebhookManagementPage from './WebhookManagementPage';
+import DeveloperPortalPage from './DeveloperPortalPage';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -71,7 +75,9 @@ type TabId =
     | 'tools-marketplace'
     | 'federation'
     | 'rbac'
-    | 'mobile';
+    | 'mobile'
+    | 'webhooks'
+    | 'developer-portal';
 
 interface Tab {
     id: TabId;
@@ -130,6 +136,20 @@ const TABS: Tab[] = [
         label: 'Mobile',
         icon: Smartphone,
         description: 'Devices, push notifications, and offline sync settings',
+    },
+    {
+        id: 'webhooks',
+        label: 'Webhooks',
+        icon: Webhook,
+        description: 'Manage outbound event webhook subscriptions and delivery logs',
+        badge: 'NEW',
+    },
+    {
+        id: 'developer-portal',
+        label: 'Dev Portal',
+        icon: Code,
+        description: 'API documentation, code samples, and webhook event reference',
+        badge: 'NEW',
     },
 ];
 
@@ -355,6 +375,12 @@ export function SovereignDashboard() {
 
             {/* ── Mobile Tab ───────────────────────────────────────────────── */}
             {activeTab === 'mobile' && <MobilePage />}
+
+            {/* ── Webhooks Tab (Phase 12) ────────────────────────────────────── */}
+            {activeTab === 'webhooks' && <WebhookManagementPage />}
+
+            {/* ── Developer Portal Tab (Phase 12) ───────────────────────────── */}
+            {activeTab === 'developer-portal' && <DeveloperPortalPage />}
 
             {/* ── System Control Tab ───────────────────────────────────────── */}
             {activeTab === 'system' && (

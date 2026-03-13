@@ -139,6 +139,9 @@ from backend.models.entities.federation import FederatedInstance, FederatedTask,
 from backend.models.entities.plugin import Plugin, PluginInstallation, PluginReview
 from backend.models.entities.mobile import DeviceToken, NotificationPreference
 
+# Phase 12 — SDK & External Interface
+from backend.models.entities.webhook import WebhookSubscription, WebhookDeliveryLog
+
 # All models for Alembic/database creation
 __all__ = [
     # Base
@@ -250,4 +253,8 @@ __all__ = [
     'PluginReview',
     'DeviceToken',
     'NotificationPreference',
+
+    # Outbound Webhooks (Phase 12)
+    'WebhookSubscription',
+    'WebhookDeliveryLog',
 ]

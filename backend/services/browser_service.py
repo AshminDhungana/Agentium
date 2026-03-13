@@ -236,6 +236,30 @@ class BrowserService:
         self._initialized = False
         logger.info("Browser service shut down")
 
+    # ── Session Isolation (Phase 10.1 hardening) ──────────────────────────
+
+    async def _create_isolated_context(self):
+        """
+        Create a fresh BrowserContext with its own cookies, localStorage,
+        and cache.  The caller MUST close the context in a ``finally`` block.
+
+        This ensures per-session memory/cookie isolation — no cross-session
+        data leakage between different agents or requests.
+        """
+        if not self._browser:
+            raise RuntimeError("Browser not initialised")
+        context = await self._browser.new_context(
+            # Each context gets a clean storage state (no shared cookies)
+            accept_downloads=False,
+            java_script_enabled=True,
+            bypass_csp=False,
+            ignore_https_errors=False,
+            # Prevent fingerprinting between sessions
+            locale="en-US",
+            timezone_id="UTC",
+        )
+        return context
+
     # ── Rate Limiting ─────────────────────────────────────────────────────
 
     def _check_rate_limit(self, agent_id: str, max_per_min: int = 10) -> bool:
@@ -276,8 +300,9 @@ class BrowserService:
             )
 
         timeout = timeout_ms or settings.BROWSER_TIMEOUT_SECONDS * 1000
-        page = await self._browser.new_page()
+        context = await self._create_isolated_context()
         try:
+            page = await context.new_page()
             response = await page.goto(url, timeout=timeout, wait_until="domcontentloaded")
             title = await page.title()
             status = response.status if response else 0
@@ -288,7 +313,7 @@ class BrowserService:
                 success=False, error=str(exc),
             )
         finally:
-            await page.close()
+            await context.close()
 
     async def scrape(
         self,
@@ -312,8 +337,9 @@ class BrowserService:
             )
 
         timeout = settings.BROWSER_TIMEOUT_SECONDS * 1000
-        page = await self._browser.new_page()
+        context = await self._create_isolated_context()
         try:
+            page = await context.new_page()
             await page.goto(url, timeout=timeout, wait_until="domcontentloaded")
             if selector:
                 element = await page.query_selector(selector)
@@ -334,7 +360,7 @@ class BrowserService:
         except Exception as exc:
             return ScrapeResult(url=url, text="", html="", success=False, error=str(exc))
         finally:
-            await page.close()
+            await context.close()
 
     async def screenshot(
         self,
@@ -360,8 +386,9 @@ class BrowserService:
             )
 
         timeout = settings.BROWSER_TIMEOUT_SECONDS * 1000
-        page = await self._browser.new_page()
+        context = await self._create_isolated_context()
         try:
+            page = await context.new_page()
             await page.goto(url, timeout=timeout, wait_until="domcontentloaded")
             png_bytes = await page.screenshot(full_page=True, type="png")
             b64 = base64.b64encode(png_bytes).decode("utf-8")
@@ -389,7 +416,7 @@ class BrowserService:
                 url=url, image_base64="", success=False, error=str(exc),
             )
         finally:
-            await page.close()
+            await context.close()
 
     async def click(
         self,
@@ -416,8 +443,9 @@ class BrowserService:
             )
 
         timeout = settings.BROWSER_TIMEOUT_SECONDS * 1000
-        page = await self._browser.new_page()
+        context = await self._create_isolated_context()
         try:
+            page = await context.new_page()
             await page.goto(url, timeout=timeout, wait_until="domcontentloaded")
             await page.click(selector, timeout=5000)
             await page.wait_for_load_state("domcontentloaded", timeout=5000)
@@ -429,7 +457,7 @@ class BrowserService:
                 success=False, error=str(exc),
             )
         finally:
-            await page.close()
+            await context.close()
 
     async def search(
         self,
@@ -451,8 +479,9 @@ class BrowserService:
 
         search_url = f"https://html.duckduckgo.com/html/?q={query}"
         timeout = settings.BROWSER_TIMEOUT_SECONDS * 1000
-        page = await self._browser.new_page()
+        context = await self._create_isolated_context()
         try:
+            page = await context.new_page()
             await page.goto(search_url, timeout=timeout, wait_until="domcontentloaded")
             items: List[SearchResultItem] = []
 
@@ -472,7 +501,7 @@ class BrowserService:
         except Exception as exc:
             return SearchResult(query=query, results=[], success=False, error=str(exc))
         finally:
-            await page.close()
+            await context.close()
 
     def check_url(self, url: str) -> URLCheckResult:
         """Expose URL safety guard for external callers."""

@@ -292,3 +292,111 @@ def get_offline_task_queue(
         "synced_at": datetime.utcnow().isoformat(),
         "total_queued": len(tasks),
     }
+
+
+# ── Offline Delta Sync ───────────────────────────────────────────────────────
+
+class OfflineSyncRequest(BaseModel):
+    last_sync_at: Optional[str] = None  # ISO-8601 timestamp
+    cached_constitution_version: Optional[int] = None
+    cached_task_ids: Optional[List[str]] = None
+
+@router.post("/offline/sync")
+def offline_delta_sync(
+    request: OfflineSyncRequest,
+    current_user: User = Depends(get_current_user_from_token),
+    db: Session = Depends(get_db)
+):
+    """
+    Receives a client-side sync manifest and returns only data that has
+    changed since the client's last sync timestamp.
+    """
+    from backend.models.entities.constitution import Constitution
+    from backend.models.entities.task import Task
+
+    result: Dict[str, Any] = {"synced_at": datetime.utcnow().isoformat()}
+
+    # Parse last sync time
+    last_sync = None
+    if request.last_sync_at:
+        try:
+            last_sync = datetime.fromisoformat(request.last_sync_at)
+        except ValueError:
+            pass
+
+    # Constitution delta
+    constitution = db.query(Constitution).filter(
+        Constitution.is_active == True
+    ).order_by(Constitution.version.desc()).first()
+    
+    if constitution:
+        if request.cached_constitution_version is None or constitution.version != request.cached_constitution_version:
+            result["constitution"] = {
+                "version": constitution.version,
+                "preamble": constitution.preamble if hasattr(constitution, 'preamble') else "",
+                "articles": constitution.articles if hasattr(constitution, 'articles') else {},
+            }
+
+    # Task delta — only tasks changed since last sync
+    task_query = db.query(Task).filter(
+        Task.created_by == str(current_user.id)
+    )
+    if last_sync:
+        task_query = task_query.filter(Task.updated_at > last_sync)
+
+    changed_tasks = task_query.order_by(Task.updated_at.desc()).limit(100).all()
+    result["tasks"] = [
+        {
+            "id": t.id,
+            "description": t.description[:150] if t.description else "",
+            "status": t.status,
+            "priority": t.priority,
+            "updated_at": t.updated_at.isoformat() if hasattr(t, 'updated_at') and t.updated_at else None,
+        } for t in changed_tasks
+    ]
+    result["total_changed"] = len(changed_tasks)
+
+    return result
+
+
+# ── Voice Commands ───────────────────────────────────────────────────────────
+
+class VoiceCommandRequest(BaseModel):
+    transcribed_text: str
+    language: str = "en"
+
+@router.post("/voice-command")
+async def voice_command(
+    request: VoiceCommandRequest,
+    current_user: User = Depends(get_current_user_from_token),
+    db: Session = Depends(get_db)
+):
+    """
+    Accepts transcribed voice text from mobile clients, routes it to the
+    agent orchestrator, and returns the textual response.
+    """
+    if not request.transcribed_text.strip():
+        raise HTTPException(status_code=400, detail="Transcribed text cannot be empty.")
+
+    try:
+        from backend.services.agent_orchestrator import AgentOrchestrator
+        orchestrator = AgentOrchestrator(db)
+        response = await orchestrator.route_message(
+            message=request.transcribed_text,
+            user_id=str(current_user.id),
+            channel="mobile_voice",
+            metadata={"language": request.language}
+        )
+        return {
+            "status": "success",
+            "response": response.get("reply", "") if isinstance(response, dict) else str(response),
+            "source": "voice_command"
+        }
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Voice command error: {e}")
+        return {
+            "status": "error",
+            "response": "Sorry, I couldn't process your voice command at this time.",
+            "error": str(e)
+        }

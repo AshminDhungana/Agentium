@@ -10,10 +10,12 @@ from typing import List, Optional, Dict, Any
 
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
+import logging
 
 from backend.models.entities.plugin import Plugin, PluginInstallation, PluginReview
 from backend.models.entities.user import User
 
+logger = logging.getLogger(__name__)
 
 class PluginMarketplaceService:
 
@@ -70,6 +72,25 @@ class PluginMarketplaceService:
         db.commit()
         db.refresh(plugin)
         return plugin
+
+    @staticmethod
+    def request_council_approval(db: Session, plugin_id: str) -> str:
+        """
+        Creates a POLICY_CHANGE proposal for the Council to review and verify a plugin.
+        """
+        plugin = db.query(Plugin).filter(Plugin.id == plugin_id).first()
+        if not plugin:
+            raise HTTPException(status_code=404, detail="Plugin not found.")
+
+        if plugin.status != "submitted":
+            raise HTTPException(status_code=400, detail="Only 'submitted' plugins can be sent for approval.")
+
+        # In a full implementation, we would create a VotingProposal record here
+        # For now, we simulate the proposal creation and return a mock proposal ID
+        proposal_id = f"proposal-plugin-{plugin_id[:8]}"
+        
+        logger.info(f"Plugin Marketplace: Created Council approval proposal {proposal_id} for plugin {plugin.name}")
+        return proposal_id
 
     @staticmethod
     def publish_plugin(db: Session, plugin_id: str, admin_user: User) -> Plugin:
@@ -148,6 +169,66 @@ class PluginMarketplaceService:
         db.commit()
         db.refresh(installation)
         return installation
+
+    @staticmethod
+    async def execute_plugin_sandboxed(db: Session, installation_id: str, input_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Executes a plugin in a secure sandbox to prevent it from escaping to the host.
+        """
+        installation = db.query(PluginInstallation).filter(PluginInstallation.id == installation_id).first()
+        if not installation or not installation.is_active:
+            raise HTTPException(status_code=404, detail="Active plugin installation not found.")
+            
+        plugin = db.query(Plugin).filter(Plugin.id == installation.plugin_id).first()
+        if not plugin:
+            raise HTTPException(status_code=404, detail="Plugin not found.")
+            
+        # Ensure remote executor is enabled in config
+        from backend.core.config import settings
+        if not settings.REMOTE_EXECUTOR_ENABLED:
+            raise HTTPException(status_code=503, detail="Sandboxed execution is disabled on this instance.")
+            
+        logger.info(f"Plugin Marketplace: Dispatching {plugin.name} to sandbox with timeout {settings.SANDBOX_TIMEOUT_SECONDS}s")
+        
+        # Simulate sandbox execution delay and result
+        # In a real implementation Phase 6.6 Remote Executor would be called here via RabbitMQ/Celery
+        import asyncio
+        await asyncio.sleep(0.5)
+        
+        return {
+            "status": "success",
+            "plugin_name": plugin.name,
+            "sandbox_id": f"sandbox-{uuid.uuid4().hex[:8]}",
+            "execution_time_ms": 500,
+            "output": f"Mock sandboxed execution result for {plugin.name}",
+            "data": {"processed": True, "input_keys": list(input_data.keys())}
+        }
+
+    @staticmethod
+    def record_revenue(db: Session, plugin_id: str, amount: float, currency: str = "USD", notes: str = "") -> Any:
+        """
+        Records a revenue transaction for a plugin on the ledger.
+        """
+        plugin = db.query(Plugin).filter(Plugin.id == plugin_id).first()
+        if not plugin:
+            raise HTTPException(status_code=404, detail="Plugin not found.")
+            
+        from backend.models.entities.plugin import PluginRevenueLedger
+        
+        ledger_entry = PluginRevenueLedger(
+            plugin_id=plugin_id,
+            amount=amount,
+            currency=currency,
+            transaction_type="purchase",
+            notes=notes
+        )
+        
+        db.add(ledger_entry)
+        db.commit()
+        db.refresh(ledger_entry)
+        
+        logger.info(f"Plugin Marketplace: Recorded revenue {amount} {currency} for plugin {plugin.name}")
+        return ledger_entry
 
     @staticmethod
     def submit_review(

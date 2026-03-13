@@ -405,6 +405,104 @@ class VectorStore:
         return merged
 
     # ------------------------------------------------------------------
+    # Confidence Decay on Stale Knowledge (Phase 10.2)
+    # ------------------------------------------------------------------
+
+    def decay_stale_entries(
+        self,
+        max_age_days: int = 30,
+        decay_factor: float = 0.85,
+        min_confidence: float = 0.1,
+        target_collections: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Reduce confidence of stale knowledge entries.
+
+        Scans entries in the specified collections for metadata containing
+        ``extracted_at`` or ``confidence`` fields. Entries older than
+        ``max_age_days`` have their confidence multiplied by ``decay_factor``.
+        Entries whose confidence drops below ``min_confidence`` are pruned.
+
+        Returns a summary dict with counts of decayed and pruned entries.
+        """
+        import json as _json
+        from datetime import datetime, timedelta
+
+        cutoff = datetime.utcnow() - timedelta(days=max_age_days)
+        collections_to_scan = target_collections or [
+            "task_patterns", "best_practices",
+        ]
+
+        decayed = 0
+        pruned = 0
+
+        for coll_key in collections_to_scan:
+            try:
+                coll = self.get_collection(coll_key)
+                all_docs = coll.get(include=["metadatas"])
+                if not all_docs or not all_docs.get("ids"):
+                    continue
+
+                ids_to_delete: List[str] = []
+                ids_to_update: List[str] = []
+                metas_to_update: List[Dict[str, Any]] = []
+
+                for i, doc_id in enumerate(all_docs["ids"]):
+                    meta = (all_docs.get("metadatas") or [])[i] if all_docs.get("metadatas") else {}
+                    if not meta:
+                        continue
+
+                    # Check if entry has a timestamp
+                    extracted_at = (meta or {}).get("extracted_at", "")
+                    if not extracted_at:
+                        continue
+
+                    try:
+                        entry_time = datetime.fromisoformat(extracted_at.replace("Z", "+00:00").replace("+00:00", ""))
+                    except (ValueError, TypeError):
+                        continue
+
+                    if entry_time >= cutoff:
+                        continue  # Not stale yet
+
+                    # Decay the confidence
+                    current_confidence = float(meta.get("confidence", 1.0))
+                    new_confidence = current_confidence * decay_factor
+
+                    if new_confidence < min_confidence:
+                        ids_to_delete.append(doc_id)
+                        pruned += 1
+                    else:
+                        updated_meta = dict(meta)
+                        updated_meta["confidence"] = round(new_confidence, 4)
+                        updated_meta["decay_applied"] = "true"
+                        ids_to_update.append(doc_id)
+                        metas_to_update.append(updated_meta)
+                        decayed += 1
+
+                # Apply deletions
+                if ids_to_delete:
+                    coll.delete(ids=ids_to_delete)
+
+                # Apply updates
+                if ids_to_update:
+                    coll.update(ids=ids_to_update, metadatas=metas_to_update)
+
+            except Exception as exc:
+                logger.warning(
+                    "Confidence decay skipped collection '%s': %s",
+                    coll_key, exc,
+                )
+
+        if decayed > 0 or pruned > 0:
+            logger.info(
+                "Confidence decay: decayed %d entries, pruned %d entries",
+                decayed, pruned,
+            )
+
+        return {"decayed": decayed, "pruned": pruned}
+
+    # ------------------------------------------------------------------
     # Health
     # ------------------------------------------------------------------
 

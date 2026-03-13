@@ -144,3 +144,69 @@ def publish_plugin(
         raise HTTPException(status_code=403, detail="Only admins can publish plugins.")
     plugin = PluginMarketplaceService.publish_plugin(db, plugin_id, current_user)
     return {"id": plugin.id, "status": plugin.status}
+
+
+@router.post("/{plugin_id}/request-approval")
+def request_council_approval(
+    plugin_id: str,
+    current_user: User = Depends(get_current_user_from_token),
+    db: Session = Depends(get_db),
+):
+    """Developer: Request Council approval for a submitted plugin."""
+    proposal_id = PluginMarketplaceService.request_council_approval(db, plugin_id)
+    return {"status": "success", "proposal_id": proposal_id}
+
+
+class ExecutePluginRequest(BaseModel):
+    installation_id: str
+    input_data: Dict[str, Any]
+
+@router.post("/{plugin_id}/execute")
+async def execute_plugin(
+    plugin_id: str,
+    request: ExecutePluginRequest,
+    current_user: User = Depends(get_current_user_from_token),
+    db: Session = Depends(get_db),
+):
+    """Execute a plugin within a secure sandbox."""
+    # Ensure the user has the right to execute (e.g. they installed it)
+    if not current_user.is_sovereign:
+        raise HTTPException(status_code=403, detail="Only Sovereign can execute plugins manually.")
+        
+    result = await PluginMarketplaceService.execute_plugin_sandboxed(
+        db=db, 
+        installation_id=request.installation_id, 
+        input_data=request.input_data
+    )
+    return result
+
+
+class RevenueRecordRequest(BaseModel):
+    amount: float
+    currency: str = "USD"
+    notes: str = ""
+
+@router.post("/{plugin_id}/revenue")
+def record_plugin_revenue(
+    plugin_id: str,
+    request: RevenueRecordRequest,
+    current_user: User = Depends(get_current_user_from_token),
+    db: Session = Depends(get_db),
+):
+    """Record a revenue transaction for a plugin on the ledger."""
+    if not current_user.is_sovereign:
+        raise HTTPException(status_code=403, detail="Only Sovereign can record revenue for plugins.")
+        
+    ledger = PluginMarketplaceService.record_revenue(
+        db=db,
+        plugin_id=plugin_id,
+        amount=request.amount,
+        currency=request.currency,
+        notes=request.notes
+    )
+    return {
+        "status": "success", 
+        "ledger_id": ledger.id, 
+        "amount": ledger.amount, 
+        "currency": ledger.currency
+    }

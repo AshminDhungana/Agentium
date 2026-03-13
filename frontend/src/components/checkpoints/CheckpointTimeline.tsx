@@ -1,19 +1,4 @@
-/**
- * CheckpointTimeline Component — Phase 7.6
- * Visual timeline of execution checkpoints.
- * Supports restore (time-travel) and branch operations.
- *
- * Changes vs original skeleton:
- *  - Full Tailwind + dark-mode styling matching the app design system
- *  - toast() instead of alert()
- *  - Uses checkpointsService (not raw api calls)
- *  - Artifact / task-state preview in a scrollable code block
- *  - Branch name input inline, per-checkpoint (not global)
- *  - Loading and empty states styled properly
- *  - Refresh button with spinning indicator
- */
-
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import toast from 'react-hot-toast';
 import { Download, Upload } from 'lucide-react';
 import {
@@ -29,8 +14,10 @@ import {
     AlertCircle,
     Search,
     X,
+    ArrowRightLeft,
 } from 'lucide-react';
 import { checkpointsService, Checkpoint, CheckpointPhase } from '../../services/checkpoints';
+import { CheckpointDiffModal } from './CheckpointDiffModal';
 
 // ─── Phase metadata ──────────────────────────────────────────────────────────
 
@@ -397,6 +384,20 @@ export const CheckpointTimeline: React.FC<CheckpointTimelineProps> = ({
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    // Filter branches
+    const availableBranches = useMemo(() => {
+        const branches = new Set<string>();
+        for (const cp of checkpoints) {
+            if (cp.branch_name) branches.add(cp.branch_name);
+        }
+        return Array.from(branches).sort();
+    }, [checkpoints]);
+
+    const [isCompareModalOpen, setIsCompareModalOpen] = useState(false);
+    const [compareLeft, setCompareLeft] = useState<string>('');
+    const [compareRight, setCompareRight] = useState<string>('');
+    const [showDiff, setShowDiff] = useState(false);
+
     const load = useCallback(async (silent = false) => {
         if (silent) setIsRefreshing(true);
         else setIsLoading(true);
@@ -442,6 +443,16 @@ export const CheckpointTimeline: React.FC<CheckpointTimelineProps> = ({
             toast.error(err?.response?.data?.detail || 'Failed to create branch');
             throw err;
         }
+    };
+
+    const openCompareSelector = () => {
+        if (availableBranches.length < 2) {
+            toast.error('You need at least 2 branches to compare.');
+            return;
+        }
+        setCompareLeft(availableBranches[0]);
+        setCompareRight(availableBranches[1]);
+        setIsCompareModalOpen(true);
     };
 
     // ── Loading state ─────────────────────────────────────────────────────────
@@ -502,18 +513,31 @@ export const CheckpointTimeline: React.FC<CheckpointTimelineProps> = ({
                         {checkpoints.length} checkpoint{checkpoints.length !== 1 ? 's' : ''} recorded
                     </p>
                 </div>
-                <button
-                    onClick={() => load(true)}
-                    disabled={isRefreshing}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium
-                        border border-slate-200 dark:border-[#1e2535]
-                        bg-white dark:bg-[#161b27] text-slate-600 dark:text-slate-300
-                        hover:bg-slate-50 dark:hover:bg-[#1e2535]
-                        disabled:opacity-50 transition-colors duration-150"
-                >
-                    <RefreshCw className={`w-3 h-3 ${isRefreshing ? 'animate-spin' : ''}`} />
-                    Refresh
-                </button>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={openCompareSelector}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium
+                            bg-violet-50 dark:bg-violet-500/15 text-violet-700 dark:text-violet-300
+                            border border-violet-200 dark:border-violet-500/25
+                            hover:bg-violet-100 dark:hover:bg-violet-500/25
+                            transition-colors duration-150"
+                    >
+                        <ArrowRightLeft className="w-3 h-3" />
+                        Compare
+                    </button>
+                    <button
+                        onClick={() => load(true)}
+                        disabled={isRefreshing}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium
+                            border border-slate-200 dark:border-[#1e2535]
+                            bg-white dark:bg-[#161b27] text-slate-600 dark:text-slate-300
+                            hover:bg-slate-50 dark:hover:bg-[#1e2535]
+                            disabled:opacity-50 transition-colors duration-150"
+                    >
+                        <RefreshCw className={`w-3 h-3 ${isRefreshing ? 'animate-spin' : ''}`} />
+                        Refresh
+                    </button>
+                </div>
             </div>
 
             {/* Branch legend */}
@@ -541,6 +565,76 @@ export const CheckpointTimeline: React.FC<CheckpointTimelineProps> = ({
                     />
                 ))}
             </div>
+
+            {/* Compare Selector Modal */}
+            {isCompareModalOpen && !showDiff && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => setIsCompareModalOpen(false)}>
+                    <div className="bg-white dark:bg-[#161b27] border border-slate-200 dark:border-[#1e2535] rounded-xl shadow-2xl p-6 w-full max-w-sm" onClick={e => e.stopPropagation()}>
+                        <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Compare Branches</h3>
+                        
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Left Branch</label>
+                                <select 
+                                    className="w-full px-3 py-2 text-sm rounded bg-slate-50 border border-slate-200 dark:bg-[#0f1117] dark:border-[#1e2535] dark:text-white"
+                                    value={compareLeft}
+                                    onChange={(e) => setCompareLeft(e.target.value)}
+                                >
+                                    {availableBranches.map(b => (
+                                        <option key={b} value={b}>{b}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="flex justify-center text-slate-400">
+                                <ArrowRightLeft className="w-4 h-4" />
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Right Branch</label>
+                                <select 
+                                    className="w-full px-3 py-2 text-sm rounded bg-slate-50 border border-slate-200 dark:bg-[#0f1117] dark:border-[#1e2535] dark:text-white"
+                                    value={compareRight}
+                                    onChange={(e) => setCompareRight(e.target.value)}
+                                >
+                                    {availableBranches.map(b => (
+                                        <option key={b} value={b}>{b}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div className="mt-6 flex gap-2">
+                            <button 
+                                onClick={() => setIsCompareModalOpen(false)}
+                                className="flex-1 px-4 py-2 text-sm border border-slate-200 dark:border-[#1e2535] rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1e2535] transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button 
+                                onClick={() => setShowDiff(true)}
+                                disabled={compareLeft === compareRight}
+                                className="flex-1 px-4 py-2 text-sm bg-violet-600 text-white rounded-lg hover:bg-violet-700 disabled:opacity-50 transition-colors"
+                            >
+                                View Diff
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Diff Modal */}
+            {showDiff && (
+                <CheckpointDiffModal
+                    taskId={taskId}
+                    leftBranch={compareLeft}
+                    rightBranch={compareRight}
+                    onClose={() => {
+                        setShowDiff(false);
+                        setIsCompareModalOpen(false);
+                    }}
+                />
+            )}
         </div>
     );
 };

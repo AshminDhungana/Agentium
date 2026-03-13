@@ -107,9 +107,21 @@ class Settings(BaseSettings):
     BROWSER_MAX_CONCURRENT: int = Field(default=5, env="BROWSER_MAX_CONCURRENT")
     BROWSER_BLOCKED_DOMAINS: str = Field(default="", env="BROWSER_BLOCKED_DOMAINS")
     
+    # Phase 10.3: Voice Channels
+    TWILIO_ACCOUNT_SID: Optional[str] = Field(default=None, env="TWILIO_ACCOUNT_SID")
+    TWILIO_AUTH_TOKEN: Optional[str] = Field(default=None, env="TWILIO_AUTH_TOKEN")
+    DISCORD_VOICE_ENABLED: bool = Field(default=False, env="DISCORD_VOICE_ENABLED")
+    
+    # Phase 10.4: Autonomous Learning
+    LEARNING_DECAY_DAYS: int = Field(default=30, env="LEARNING_DECAY_DAYS")
+    LEARNING_DECAY_RATE: float = Field(default=0.85, env="LEARNING_DECAY_RATE")
+    LEARNING_MIN_CONFIDENCE: float = Field(default=0.1, env="LEARNING_MIN_CONFIDENCE")
+    
     # Phase 11.2: Federation
     FEDERATION_ENABLED: bool = Field(default=False, env="FEDERATION_ENABLED")
     FEDERATION_INSTANCE_NAME: str = Field(default="Agentium-Primary", env="FEDERATION_INSTANCE_NAME")
+    FEDERATION_INSTANCE_URL: str = Field(default="http://localhost:8000", env="FEDERATION_INSTANCE_URL")
+    FEDERATION_SHARED_SECRET: str = Field(default="change_me_in_production", env="FEDERATION_SHARED_SECRET")
     FEDERATION_HEARTBEAT_INTERVAL: int = Field(default=300, env="FEDERATION_HEARTBEAT_INTERVAL")  # seconds
     FEDERATION_STALE_TIMEOUT_MINUTES: int = Field(default=1440, env="FEDERATION_STALE_TIMEOUT_MINUTES")  # 24h
     
@@ -117,6 +129,8 @@ class Settings(BaseSettings):
     FCM_SERVER_KEY: Optional[str] = Field(default=None, env="FCM_SERVER_KEY")
     APNS_KEY_ID: Optional[str] = Field(default=None, env="APNS_KEY_ID")
     APNS_TEAM_ID: Optional[str] = Field(default=None, env="APNS_TEAM_ID")
+    APNS_KEY_PATH: Optional[str] = Field(default=None, env="APNS_KEY_PATH")
+    APNS_BUNDLE_ID: str = Field(default="com.agentium.app", env="APNS_BUNDLE_ID")
     PUSH_NOTIFICATION_ENABLED: bool = Field(default=False, env="PUSH_NOTIFICATION_ENABLED")
     
     @property

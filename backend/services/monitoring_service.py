@@ -737,9 +737,78 @@ class MonitoringService:
                 logger.error(f"Error in critic_queue_monitor loop: {e}")
             await asyncio.sleep(60)  # Every minute
 
+    # -------------------------------------------------------------------------
+    # Phase 11.1 Background Tasks — RBAC Delegation Expiry
+    # -------------------------------------------------------------------------
+
+    @staticmethod
+    async def delegation_expiry_monitor():
+        """
+        Background task: Every 5 minutes, checks for and auto-revokes
+        stale capability delegations.
+        """
+        while True:
+            try:
+                from backend.services.rbac_service import RBACService
+                with get_db_context() as db:
+                    count = RBACService.expire_stale_delegations(db)
+                    if count > 0:
+                        logger.info(f"Auto-revoked {count} expired capability delegations")
+            except Exception as e:
+                logger.error(f"Error in delegation_expiry_monitor loop: {e}")
+            await asyncio.sleep(300)  # Every 5 minutes
+
+    # -------------------------------------------------------------------------
+    # Phase 10.4 Background Tasks — Learning Decay & Cross-Agent Sharing
+    # -------------------------------------------------------------------------
+
+    @staticmethod
+    async def learning_decay():
+        """
+        Background task: Daily learning decay.
+        Reduces confidence of outdated knowledge patterns and prunes
+        entries below minimum threshold.
+        Phase 10.4 requirement.
+        """
+        while True:
+            try:
+                from backend.services.autonomous_learning import get_learning_engine
+                engine = get_learning_engine()
+                with get_db_context() as db:
+                    result = engine.decay_outdated_learnings(db)
+                    if result.get("decayed", 0) > 0 or result.get("pruned", 0) > 0:
+                        logger.info(
+                            f"Learning decay: decayed {result.get('decayed', 0)}, "
+                            f"pruned {result.get('pruned', 0)} entries"
+                        )
+            except Exception as e:
+                logger.error(f"Error in learning_decay loop: {e}")
+            await asyncio.sleep(86400)  # Daily
+
+    @staticmethod
+    async def cross_agent_sharing():
+        """
+        Background task: Every 6 hours, share high-confidence learnings
+        to the federated knowledge pool for cross-agent access.
+        Phase 10.4 requirement. Gated behind FEDERATION_ENABLED.
+        """
+        while True:
+            try:
+                from backend.services.autonomous_learning import get_learning_engine
+                engine = get_learning_engine()
+                with get_db_context() as db:
+                    result = engine.share_learnings_across_agents(db)
+                    if result.get("shared", 0) > 0:
+                        logger.info(
+                            f"Cross-agent sharing: shared {result['shared']} learnings"
+                        )
+            except Exception as e:
+                logger.error(f"Error in cross_agent_sharing loop: {e}")
+            await asyncio.sleep(21600)  # Every 6 hours
+
     @classmethod
     def start_background_monitors(cls):
-        """Starts all detached asynchronous monitoring loops (Phase 9)."""
+        """Starts all detached asynchronous monitoring loops (Phase 9 + 10)."""
         asyncio.create_task(cls.constitutional_patrol())
         asyncio.create_task(cls.stale_task_detector())
         asyncio.create_task(cls.resource_rebalancing())
@@ -747,3 +816,8 @@ class MonitoringService:
         asyncio.create_task(cls.knowledge_consolidation())
         asyncio.create_task(cls.orphaned_knowledge_check())
         asyncio.create_task(cls.critic_queue_monitor())
+        # Phase 10.4 background tasks
+        asyncio.create_task(cls.learning_decay())
+        asyncio.create_task(cls.cross_agent_sharing())
+        # Phase 11.1 background tasks
+        asyncio.create_task(cls.delegation_expiry_monitor())

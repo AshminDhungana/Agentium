@@ -1,0 +1,50 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agentium-sdk"
+version = "0.1.0"
+description = "Python SDK for the Agentium AI Agent Governance platform"
+readme = "README.md"
+license = {text = "AGPL-3.0"}
+requires-python = ">=3.10"
+authors = [
+    {name = "Ashmin Dhungana"}
+]
+keywords = ["agentium", "ai", "agents", "governance", "sdk"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "License :: OSI Approved :: GNU Affero General Public License v3",
+    "Framework :: AsyncIO",
+    "Typing :: Typed",
+]
+
+dependencies = [
+    "httpx>=0.25.0",
+    "pydantic>=2.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.21",
+    "respx>=0.21",
+]
+
+[project.urls]
+Homepage = "https://github.com/AshminDhungana/Agentium"
+Documentation = "https://github.com/AshminDhungana/Agentium/tree/main/sdk/python"
+Repository = "https://github.com/AshminDhungana/Agentium"
+
+[tool.setuptools.packages.find]
+include = ["agentium_sdk*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"

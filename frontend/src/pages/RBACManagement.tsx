@@ -242,7 +242,7 @@ export function RBACManagementPage() {
                             Access Control
                         </h1>
                         <span className="px-2.5 py-0.5 bg-purple-100 dark:bg-purple-500/10 text-purple-700 dark:text-purple-400 text-xs font-semibold rounded-full border border-purple-200 dark:border-purple-500/20">
-                            PHASE 11.1
+                            New
                         </span>
                     </div>
                     <p className="text-gray-500 dark:text-gray-400 text-sm">

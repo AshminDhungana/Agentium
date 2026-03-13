@@ -120,8 +120,8 @@ class Agent(BaseEntity):
         if prefix not in ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']:
             raise ValueError("Agentium ID must start with 0-9")
         
-        if len(agentium_id) != 5 or not agentium_id.isdigit():
-            raise ValueError("Agentium ID must be exactly 5 digits")
+        if len(agentium_id) < 5 or len(agentium_id) > 8 or not agentium_id.isdigit():
+            raise ValueError("Agentium ID must be between 5 and 8 digits")
         
         return agentium_id
 

@@ -214,7 +214,7 @@ export function FederationPage() {
                             Federation
                         </h1>
                         <span className="px-2.5 py-0.5 bg-indigo-100 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 text-xs font-semibold rounded-full border border-indigo-200 dark:border-indigo-500/20">
-                            PHASE 11.2
+                            New
                         </span>
                     </div>
                     <p className="text-gray-500 dark:text-gray-400 text-sm">

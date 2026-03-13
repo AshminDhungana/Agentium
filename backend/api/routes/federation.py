@@ -328,3 +328,90 @@ async def receive_heartbeat(
         "instance": getattr(settings, "FEDERATION_INSTANCE_NAME", "Agentium"),
         "timestamp": int(time.time()),
     }
+
+# ── Phase 11.2: Knowledge & Voting Routes ─────────────────────────────────
+
+@router.post("/knowledge/sync/{peer_id}")
+def sync_knowledge_from_peer(
+    peer_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_from_token)
+):
+    """Manually trigger a pull of domain knowledge (constitution) from a peer."""
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Only Sovereign can sync knowledge.")
+        
+    my_url = settings.FEDERATION_INSTANCE_URL
+    my_secret = getattr(settings, "FEDERATION_SHARED_SECRET", "")
+    key = FederationService._derive_signing_key(my_secret)
+    
+    success = FederationService.sync_constitution_from_peer(
+        db=db, 
+        target_peer_id=peer_id, 
+        my_base_url=my_url, 
+        my_signing_key=key
+    )
+    
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to sync knowledge from peer.")
+        
+    return {"status": "success", "message": "Knowledge synced to vector store."}
+
+
+class CreateVoteRequest(BaseModel):
+    proposal_id: str
+    peer_ids: List[str]
+    duration_hours: int = 48
+
+@router.post("/votes")
+def create_federated_vote(
+    request: CreateVoteRequest,
+    current_user: User = Depends(get_current_user_from_token),
+    db: Session = Depends(get_db)
+):
+    """Creates a federated vote spanning multiple instances."""
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Only Sovereign can create federated votes.")
+        
+    vote = FederationService.create_federated_vote(
+        db=db,
+        proposal_id=request.proposal_id,
+        peer_ids=request.peer_ids,
+        duration_hours=request.duration_hours
+    )
+    return {
+        "id": vote.id,
+        "proposal_id": vote.proposal_id,
+        "participating_instances": vote.participating_instances,
+        "closes_at": vote.closes_at.isoformat()
+    }
+
+
+class CastVoteRequest(BaseModel):
+    proposal_id: str
+    decision: str  # e.g., "PASS", "REJECT", "VETO"
+
+@router.post("/webhooks/votes/cast")
+async def webhook_cast_federated_vote(
+    request: Request,
+    db: Session = Depends(get_db),
+    peer=Depends(authenticate_peer),
+):
+    """
+    Webhook: A peer instance sends their decision on a federated proposal here.
+    """
+    body = await request.body()
+    try:
+        data = json.loads(body)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid JSON body.")
+
+    req = CastVoteRequest(**data)
+    
+    success = FederationService.cast_federated_vote(
+        db=db,
+        proposal_id=req.proposal_id,
+        peer_id=peer.id,
+        decision=req.decision
+    )
+    return {"status": "success"}

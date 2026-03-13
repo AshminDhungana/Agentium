@@ -10,6 +10,8 @@ with Firebase Admin SDK (FCM) or Apple Push Notification service (APNs).
 """
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
+import logging
+import json
 
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
@@ -17,6 +19,8 @@ from fastapi import HTTPException, status
 from backend.models.entities.mobile import DeviceToken, NotificationPreference
 from backend.models.entities.user import User
 from backend.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 class PushNotificationService:
@@ -119,25 +123,159 @@ class PushNotificationService:
         db.refresh(pref)
         return pref
 
-    # ── Push Dispatch ──────────────────────────────────────────────────────
+    @staticmethod
+    def _should_send(pref: NotificationPreference) -> bool:
+        """
+        Checks quiet hours. Returns False if the current time falls
+        within the user's configured quiet hours.
+        """
+        if not pref.quiet_hours_start or not pref.quiet_hours_end:
+            return True
+        try:
+            now = datetime.utcnow()
+            start_h, start_m = map(int, pref.quiet_hours_start.split(":"))
+            end_h, end_m = map(int, pref.quiet_hours_end.split(":"))
+            start_minutes = start_h * 60 + start_m
+            end_minutes = end_h * 60 + end_m
+            now_minutes = now.hour * 60 + now.minute
+
+            if start_minutes <= end_minutes:
+                return not (start_minutes <= now_minutes <= end_minutes)
+            else:  # wraps midnight
+                return not (now_minutes >= start_minutes or now_minutes <= end_minutes)
+        except Exception:
+            return True
+
+    @staticmethod
+    def _deliver_fcm(tokens: List[str], title: str, body: str, data: Optional[dict] = None) -> int:
+        """
+        Deliver push notification via Firebase Cloud Messaging.
+        Requires settings.FCM_SERVER_KEY to be configured.
+        Falls back to log-only when credentials are missing.
+        """
+        if not getattr(settings, 'FCM_SERVER_KEY', None):
+            logger.info(f"[FCM SIMULATED] → {len(tokens)} devices | {title}: {body}")
+            return len(tokens)
+
+        try:
+            import httpx
+            delivered = 0
+            for token in tokens:
+                payload = {
+                    "to": token,
+                    "notification": {"title": title, "body": body},
+                    "data": data or {}
+                }
+                resp = httpx.post(
+                    "https://fcm.googleapis.com/fcm/send",
+                    json=payload,
+                    headers={
+                        "Authorization": f"key={settings.FCM_SERVER_KEY}",
+                        "Content-Type": "application/json"
+                    },
+                    timeout=10
+                )
+                if resp.status_code == 200:
+                    delivered += 1
+                else:
+                    logger.warning(f"FCM delivery failed for token {token[:12]}...: {resp.status_code}")
+            return delivered
+        except Exception as e:
+            logger.error(f"FCM delivery error: {e}")
+            return 0
+
+    @staticmethod
+    def _deliver_apns(tokens: List[str], title: str, body: str, data: Optional[dict] = None) -> int:
+        """
+        Deliver push notification via Apple Push Notification service.
+        Requires settings.APNS_KEY_ID and settings.APNS_TEAM_ID.
+        Falls back to log-only when credentials are missing.
+        """
+        apns_key_id = getattr(settings, 'APNS_KEY_ID', None)
+        apns_team_id = getattr(settings, 'APNS_TEAM_ID', None)
+        apns_key_path = getattr(settings, 'APNS_KEY_PATH', None)
+
+        if not apns_key_id or not apns_team_id:
+            logger.info(f"[APNs SIMULATED] → {len(tokens)} devices | {title}: {body}")
+            return len(tokens)
+
+        try:
+            import httpx
+            import jwt
+            import time
+
+            # Read the APNs auth key
+            with open(apns_key_path, 'r') as f:
+                auth_key = f.read()
+
+            # Generate JWT for APNs
+            token_payload = {
+                "iss": apns_team_id,
+                "iat": int(time.time())
+            }
+            apns_token = jwt.encode(token_payload, auth_key, algorithm="ES256", headers={"kid": apns_key_id})
+
+            delivered = 0
+            for device_token in tokens:
+                apns_payload = {
+                    "aps": {
+                        "alert": {"title": title, "body": body},
+                        "sound": "default"
+                    }
+                }
+                if data:
+                    apns_payload.update(data)
+
+                resp = httpx.post(
+                    f"https://api.push.apple.com/3/device/{device_token}",
+                    json=apns_payload,
+                    headers={
+                        "authorization": f"bearer {apns_token}",
+                        "apns-topic": getattr(settings, 'APNS_BUNDLE_ID', 'com.agentium.app'),
+                    },
+                    timeout=10
+                )
+                if resp.status_code == 200:
+                    delivered += 1
+                else:
+                    logger.warning(f"APNs delivery failed for token {device_token[:12]}...: {resp.status_code}")
+            return delivered
+        except Exception as e:
+            logger.error(f"APNs delivery error: {e}")
+            return 0
 
     @staticmethod
     def send_push(db: Session, user_id: str, title: str, body: str, data: Optional[dict] = None) -> int:
         """
-        Send a generic push notification to a user.
-        Returns the number of devices targeted.
+        Send a push notification to all active devices for a user.
+        Routes to FCM (Android) or APNs (iOS) based on device platform.
+        Respects quiet hours.
         """
-        tokens = PushNotificationService.get_user_tokens(db, user_id)
-        if not tokens:
+        # Check quiet hours
+        pref = PushNotificationService.get_preferences(db, user_id)
+        if not PushNotificationService._should_send(pref):
+            logger.info(f"Push suppressed for user {user_id} (quiet hours)")
             return 0
 
-        # In production, integrate with Firebase Admin SDK (FCM) or APNs here.
-        # if settings.FCM_SERVER_KEY:
-        #    message = messaging.MulticastMessage(...)
-        #    response = messaging.send_multicast(message)
+        devices = db.query(DeviceToken).filter(
+            DeviceToken.user_id == user_id,
+            DeviceToken.is_active == True
+        ).all()
 
-        print(f"[PUSH NOTIFICATION] Sent to {len(tokens)} devices for user {user_id}. Title: {title}")
-        return len(tokens)
+        if not devices:
+            return 0
+
+        android_tokens = [d.token for d in devices if d.platform == 'android']
+        ios_tokens = [d.token for d in devices if d.platform == 'ios']
+
+        delivered = 0
+        if android_tokens:
+            delivered += PushNotificationService._deliver_fcm(android_tokens, title, body, data)
+        if ios_tokens:
+            delivered += PushNotificationService._deliver_apns(ios_tokens, title, body, data)
+
+        logger.info(f"Push sent to {delivered}/{len(devices)} devices for user {user_id}")
+        return delivered
 
     @staticmethod
     def send_vote_alert(db: Session, user_id: str, vote_data: Dict[str, Any]) -> int:

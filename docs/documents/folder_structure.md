@@ -20,6 +20,7 @@ Agentium/
 │   │       ├── 002_migration.py     # General migration
 │   │       ├── 003_reasoning_trace.py # Reasoning trace
 │   │       ├── 004_chat_indexes.py  # Chat indexes
+│   │       ├── 004_webhooks.py      # Webhooks
 │   │       ├── 005_phase11_ecosystem.py # Phase 11 ecosystem
 │   │       └── 006_notification_preferences.py # Notification prefs
 │   ├── api/                          # API layer
@@ -47,6 +48,7 @@ Agentium/
 │   │   │   ├── models.py            # Model management
 │   │   │   ├── mobile.py            # Mobile integration
 │   │   │   ├── monitoring_routes.py # Monitoring endpoints
+│   │   │   ├── outbound_webhooks.py # Outbound webhooks
 │   │   │   ├── plugins.py           # Plugin marketplace
 │   │   │   ├── provider_analytics.py # Provider analytics
 │   │   │   ├── rbac.py              # Role-based access control
@@ -73,6 +75,7 @@ Agentium/
 │   │   ├── auth.py                  # Authentication logic
 │   │   ├── config.py                # Configuration
 │   │   ├── constitutional_guard.py  # Constitutional governance
+│   │   ├── observer_middleware.py   # Observer middleware
 │   │   ├── security/                # Security module
 │   │   │   ├── __init__.py
 │   │   │   └── execution_guard.py   # Execution safety
@@ -114,7 +117,8 @@ Agentium/
 │   │   │   ├── user.py              # User entities
 │   │   │   ├── user_config.py       # User config
 │   │   │   ├── user_preference.py   # User preferences
-│   │   │   └── voting.py            # Voting records
+│   │   │   ├── voting.py            # Voting records
+│   │   │   └── webhook.py           # Webhook entities
 │   │   └── schemas/                 # Request/response schemas
 │   │       ├── messages.py
 │   │       ├── task.py
@@ -191,12 +195,18 @@ Agentium/
 │   │   ├── tool_marketplace.py      # Tool marketplace
 │   │   ├── tool_versioning.py       # Tool versioning
 │   │   ├── user_preference_service.py # User preferences
-│   │   └── ab_testing_service.py    # A/B testing service
+│   │   ├── ab_testing_service.py    # A/B testing service
+│   │   └── webhook_dispatch_service.py # Webhook dispatch
 │   ├── tools/                       # Built-in tools
 │   │   ├── browser_tool.py          # Browser automation
 │   │   ├── file_tool.py            # File operations
 │   │   └── shell_tool.py           # Shell commands
 │   ├── tests/                       # Backend tests
+│   │   ├── test_federation_e2e.py  # Federation E2E tests
+│   │   ├── test_outbound_webhooks.py # Outbound webhooks tests
+│   │   ├── test_plugin_marketplace.py # Plugin marketplace tests
+│   │   ├── test_push_notifications.py # Push notifications tests
+│   │   ├── test_rbac_delegation.py # RBAC delegation tests
 │   │   ├── services/
 │   │   │   └── test_capability_registry.py
 │   │   ├── test_remote_executor.py
@@ -250,6 +260,7 @@ Agentium/
 │   │   │   ├── tasks/               # Task UI
 │   │   │   │   ├── CreateTaskModal.tsx
 │   │   │   │   └── TaskCard.tsx
+│   │   │   ├── BrowserTaskPanel.tsx # Browser task panel
 │   │   │   ├── BudgetControl.tsx
 │   │   │   ├── ConnectionStatus.tsx
 │   │   │   ├── FlatMapAuthBackground.tsx
@@ -268,6 +279,7 @@ Agentium/
 │   │   │   ├── ChatPage.tsx
 │   │   │   ├── ConstitutionPage.tsx
 │   │   │   ├── Dashboard.tsx
+│   │   │   ├── DeveloperPortalPage.tsx # Developer portal
 │   │   │   ├── FederationPage.tsx   # Federation management
 │   │   │   ├── LoginPage.tsx
 │   │   │   ├── MessageLogPage.tsx
@@ -282,7 +294,8 @@ Agentium/
 │   │   │   ├── TasksPage.tsx
 │   │   │   ├── ToolMarketplacePage.tsx
 │   │   │   ├── Usermanagement.tsx
-│   │   │   └── VotingPage.tsx
+│   │   │   ├── VotingPage.tsx
+│   │   │   └── WebhookManagementPage.tsx # Webhook management
 │   │   ├── services/                # API service layers
 │   │   │   ├── abTesting.ts
 │   │   │   ├── admin.ts
@@ -308,7 +321,8 @@ Agentium/
 │   │   │   ├── tasks.ts
 │   │   │   ├── voiceApi.ts
 │   │   │   ├── voiceBridge.ts
-│   │   │   └── voting.ts
+│   │   │   ├── voting.ts
+│   │   │   └── webhookService.ts   # Webhook service
 │   │   ├── store/                   # State management
 │   │   │   ├── authStore.ts
 │   │   │   ├── backendStore.ts
@@ -333,8 +347,35 @@ Agentium/
 │   ├── tsconfig.node.json
 │   └── vite.config.ts
 │
+├── mobile/                          # Mobile applications
+│   ├── android/                    # Android app
+│   │   └── README.md
+│   └── ios/                        # iOS app
+│       └── README.md
+│
+├── sdk/                            # Agentium SDKs
+│   ├── python/                     # Python SDK
+│   │   ├── agentium_sdk/           # Python SDK package
+│   │   ├── pyproject.toml         # Python SDK config
+│   │   ├── README.md
+│   │   └── tests/                 # Python SDK tests
+│   └── typescript/                 # TypeScript SDK
+│       ├── src/                    # TypeScript SDK source
+│       │   ├── client.ts
+│       │   ├── errors.ts
+│       │   ├── index.ts
+│       │   └── types.ts
+│       ├── package.json            # TypeScript SDK config
+│       ├── tsconfig.json
+│       ├── jest.config.js
+│       ├── scripts/                # Build scripts
+│       ├── tests/                  # TypeScript SDK tests
+│       └── README.md
+│
 ├── docs/                            # Documentation
 │   ├── phase10_plan.md             # Phase 10 planning
+│   ├── architecture/               # Architecture documentation
+│   │   └── scalability_strategy.md # Scalability strategy
 │   ├── documents/
 │   │   ├── agentium_guide.md      # Agentium user guide
 │   │   ├── architectural_breakdown.md # Architecture details
@@ -384,6 +425,16 @@ Agentium/
 - **services/**: API communication layer
 - **store/**: State management (Zustand)
 - **hooks/**: Custom React hooks
+
+### Mobile
+
+- **android/**: Android application
+- **ios/**: iOS application
+
+### SDKs
+
+- **python/**: Python SDK for Agentium
+- **typescript/**: TypeScript/JavaScript SDK for Agentium
 
 ### Infrastructure
 

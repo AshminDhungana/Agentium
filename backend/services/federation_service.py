@@ -462,6 +462,132 @@ class FederationService:
         db.refresh(peer)
         return peer
 
+    # ── Phase 11.2: Knowledge Sync ────────────────────────────────────────────
+
+    @classmethod
+    def sync_constitution_from_peer(cls, db: Session, target_peer_id: str, my_base_url: str, my_signing_key: str) -> bool:
+        """
+        Pulls the active constitution from a federated peer and stores the 
+        articles as domain knowledge in the local vector DB for cross-reference.
+        """
+        peer = cls.get_peer(db, target_peer_id)
+        if peer.status != "active":
+            raise HTTPException(status_code=400, detail="Target peer is not active.")
+
+        try:
+            body = b""
+            ts = int(time.time())
+            sig = _sign_payload(my_signing_key, body, ts)
+
+            resp = httpx.get(
+                f"{peer.base_url}/api/v1/mobile/offline/constitution",
+                headers={
+                    "X-Agentium-Peer-Url": my_base_url,
+                    "X-Agentium-Timestamp": str(ts),
+                    "X-Agentium-Signature": f"sha256={sig}",
+                },
+                timeout=10,
+            )
+            
+            if resp.status_code != 200:
+                logger.warning(f"Federation: sync from '{peer.name}' returned {resp.status_code}")
+                return False
+                
+            data = resp.json()
+            if not data or "articles" not in data:
+                return False
+                
+            from backend.core.vector_store import VectorStore
+            vs = VectorStore()
+            col = vs.client.get_or_create_collection("domain_knowledge")
+            
+            articles = data["articles"]
+            if isinstance(articles, str):
+                import json
+                try:
+                    articles = json.loads(articles)
+                except:
+                    articles = {}
+            
+            # Upsert into vector store for domain knowledge
+            for key, val in articles.items():
+                content = val.get("content", "") if isinstance(val, dict) else str(val)
+                title = val.get("title", key) if isinstance(val, dict) else key
+                
+                doc_id = f"peer_{peer.id}_const_{key}"
+                col.upsert(
+                    ids=[doc_id],
+                    documents=[f"Federated Constitution from {peer.name} - {title}: {content}"],
+                    metadatas=[{"source": "federation", "peer_id": peer.id, "type": "constitution_article", "title": title}]
+                )
+                
+            logger.info(f"Federation: Synced {len(articles)} articles from '{peer.name}'")
+            return True
+            
+        except Exception as exc:
+            logger.warning(f"Federation: sync from '{peer.name}' failed: {exc}")
+            return False
+
+    # ── Phase 11.2: Federated Voting ──────────────────────────────────────────
+
+    @classmethod
+    def create_federated_vote(cls, db: Session, proposal_id: str, peer_ids: List[str], duration_hours: int = 48) -> FederatedVote:
+        """
+        Creates a new federated vote and records which peers correspond to it.
+        Dispatching the vote to peers is done asynchronously.
+        """
+        closes_at = datetime.utcnow() + timedelta(hours=duration_hours)
+        
+        # Verify peers exist
+        valid_peers = []
+        for pid in peer_ids:
+            peer = db.query(FederatedInstance).filter(FederatedInstance.id == pid, FederatedInstance.status == "active").first()
+            if peer:
+                valid_peers.append(peer.id)
+                
+        if not valid_peers:
+            raise HTTPException(status_code=400, detail="No active peers provided for federated vote.")
+            
+        vote = FederatedVote(
+            proposal_id=proposal_id,
+            participating_instances=valid_peers,
+            closes_at=closes_at
+        )
+        db.add(vote)
+        db.commit()
+        db.refresh(vote)
+        
+        # In a full implementation, we would dispatch a Celery task here to notify peers
+        
+        return vote
+
+    @classmethod
+    def cast_federated_vote(cls, db: Session, proposal_id: str, peer_id: str, decision: str) -> bool:
+        """
+        Records a peer's incoming vote on a federated proposal.
+        """
+        vote = db.query(FederatedVote).filter(FederatedVote.proposal_id == proposal_id).first()
+        
+        if not vote:
+            raise HTTPException(status_code=404, detail="Federated vote not found.")
+            
+        if vote.status != "open" or datetime.utcnow() > vote.closes_at:
+            vote.status = "closed"
+            db.commit()
+            raise HTTPException(status_code=400, detail="Federated vote is closed.")
+            
+        if peer_id not in vote.participating_instances:
+            raise HTTPException(status_code=403, detail="Peer is not a participant in this vote.")
+            
+        # Copy the JSON dict before modifying (SQLAlchemy JSON tracking)
+        current_votes = vote.votes.copy() if vote.votes else {}
+        current_votes[peer_id] = decision
+        vote.votes = current_votes
+        
+        db.commit()
+        logger.info(f"Federation: Peer {peer_id} voted {decision} on {proposal_id}")
+        return True
+
     # ── Federated task listing ────────────────────────────────────────────────
 
     @staticmethod

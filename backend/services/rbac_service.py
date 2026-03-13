@@ -166,3 +166,24 @@ class RBACService:
         db.refresh(new_sovereign)
         
         return delegation
+
+    @staticmethod
+    def expire_stale_delegations(db: Session) -> int:
+        """Scan and auto-revoke any delegations that have passed their expiry time."""
+        now = datetime.utcnow()
+        stale_delegations = db.query(Delegation).filter(
+            Delegation.revoked_at == None,
+            Delegation.expires_at != None,
+            Delegation.expires_at < now
+        ).all()
+        
+        count = 0
+        for delegation in stale_delegations:
+            delegation.revoke()
+            count += 1
+            
+        if count > 0:
+            db.commit()
+            
+        return count
+

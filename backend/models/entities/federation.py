@@ -23,6 +23,9 @@ class FederatedInstance(Base):
     base_url = Column(String(255), nullable=False, unique=True)
     shared_secret_hash = Column(String(255), nullable=False)
     
+    # Phase 11.2 - For HMAC JWT Exchange Authentication
+    signing_key = Column(String(255), nullable=True) # Derived key for HMAC
+    
     # "active", "suspended", "pending"
     status = Column(String(20), default="pending", nullable=False)
     # "full", "limited", "read_only"

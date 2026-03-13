@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@tanstack/react-query": "^5.90.21",
+    "@tanstack/react-virtual": "^3.13.22",
     "@types/three": "^0.182.0",
     "autoprefixer": "^10.4.16",
     "axios": "^1.6.5",

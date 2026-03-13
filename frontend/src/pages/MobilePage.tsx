@@ -274,7 +274,7 @@ export function MobilePage() {
                             Mobile App
                         </h1>
                         <span className="px-2.5 py-0.5 bg-emerald-100 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 text-xs font-semibold rounded-full border border-emerald-200 dark:border-emerald-500/20">
-                            PHASE 11.4
+                            New
                         </span>
                     </div>
                     <p className="text-gray-500 dark:text-gray-400 text-sm">

@@ -81,13 +81,16 @@ from backend.api.routes import skills as skills_routes
 from backend.api.routes import browser as browser_routes  # Phase 10.1: Browser Control
 from backend.api.routes import audio as audio_routes      # Phase 10.3: Voice Interface
 from backend.api.routes import dashboard as dashboard_routes  # Dashboard aggregate summary
+from backend.api.routes import outbound_webhooks as outbound_webhooks_routes  # Phase 12: Outbound Webhooks
 
-# Phase 9.4: Security Middleware
 from backend.core.security_middleware import (
     RateLimitMiddleware,
     SessionLimitMiddleware,
     InputSanitizationMiddleware,
 )
+
+# Phase 11.1: Observer Role Enforcement
+from backend.core.observer_middleware import ObserverReadOnlyMiddleware
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -358,10 +361,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Phase 9.4: Security Hardening Middleware
 app.add_middleware(RateLimitMiddleware)
 app.add_middleware(SessionLimitMiddleware)
 app.add_middleware(InputSanitizationMiddleware)
+
+# Phase 11.1: Observer Enforcement
+app.add_middleware(ObserverReadOnlyMiddleware)
 
 
 # ═══════════════════════════════════════════════════════════
@@ -403,6 +408,7 @@ app.include_router(federation_routes.router, prefix="/api/v1")
 app.include_router(plugins_routes.router, prefix="/api/v1")    
 app.include_router(mobile_routes.router, prefix="/api/v1")     
 app.include_router(dashboard_routes.router, prefix="/api/v1")  # Dashboard aggregate summary
+app.include_router(outbound_webhooks_routes.router, prefix="/api/v1")  # Phase 12: Outbound Webhooks
 
 
 # ══════════════════════════════════════════════════════════════════════════════

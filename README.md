@@ -8,7 +8,7 @@
 
 **Agentium** transforms AI task execution into a structured digital democracy. Unlike monolithic AI assistants, Agentium operates as a self-governing ecosystem where AI agents function like a parliamentary system — complete with a **Head of Council** (Executive), **Council Members** (Legislature), **Lead Agents** (Directors), **Task Agents** (Executors), and **Critic Agents** (Independent Judiciary) — all bound by a **Constitution** and managed through democratic voting.
 
-Built for those who believe AI should be **transparent, accountable, and sovereign**, Agentium runs entirely on your infrastructure with local-first architecture. Agentium can spawn up to **99,999 AI Agents** with proper control and management, and handle up to **9,999 concurrent tasks** provided by the user — all at once.
+Built for those who believe AI should be **transparent, accountable, and sovereign**, Agentium runs entirely on your infrastructure with local-first architecture. Agentium can scale up to **50M+ AI Agents** with proper control and management, and handle up to **5M+ concurrent tasks** provided by the user — all at once.
 
 ## ![[Agentium Demo]](./docs/assets/animation.svg)
 
@@ -45,15 +45,15 @@ One user. One conversation. All channels. Text, image, video, audio, and files a
 
 ### 🏗️ Hierarchical Agent IDs
 
-Rigorous identification system:
+Rigorous identification system (expanded to 8 digits for 50M+ scale):
 
-- **Head**: `0xxxx` (00001–09999) — The Sovereign's direct representative
-- **Council**: `1xxxx` (10001–19999) — Democratic deliberation layer
-- **Lead**: `2xxxx` (20001–29999) — Department coordination
-- **Task**: `3xxxx` (30001–69999) — Execution workers
-- **Code Critic**: `7xxxx` (70001–79999) — Code validation (syntax, security, logic)
-- **Output Critic**: `8xxxx` (80001–89999) — Output validation (user intent alignment)
-- **Plan Critic**: `9xxxx` (90001–99999) — Plan validation (DAG soundness)
+- **Head**: `0xxxxxxx` (00000001–09999999) — The Sovereign's direct representative
+- **Council**: `1xxxxxxx` (10000001–19999999) — Democratic deliberation layer
+- **Lead**: `2xxxxxxx` (20000001–29999999) — Department coordination
+- **Task**: `3xxxxxxx-6xxxxxxx` (30000001–69999999) — Execution workers
+- **Code Critic**: `7xxxxxxx` (70000001–79999999) — Code validation (syntax, security, logic)
+- **Output Critic**: `8xxxxxxx` (80000001–89999999) — Output validation (user intent alignment)
+- **Plan Critic**: `9xxxxxxx` (90000001–99999999) — Plan validation (DAG soundness)
 
 > Critics operate **outside** the democratic chain. They have veto authority with checks and balances implimented but no voting rights. Rejected tasks retry within the same team (max 5 retries) before escalating to Council.
 
