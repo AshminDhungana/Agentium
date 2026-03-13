@@ -515,6 +515,117 @@ class ReasoningTraceService:
     def get_active_trace(self, trace_id: str) -> Optional[ReasoningTrace]:
         return self._active_traces.get(trace_id)
 
+    def check_stalled_traces(
+        self,
+        db,
+        timeout_seconds: float = 120.0,
+    ) -> List[Dict[str, Any]]:
+        """
+        Scan all active in-memory traces and seal any that have been stuck
+        (no step progress) for longer than *timeout_seconds*.
+
+        For each stalled trace:
+          - Seals it as FAILED with reason "stalled".
+          - Emits a ``trace_stalled`` WebSocket event carrying ``task_id``
+            and the last known ethos snapshot from the agent's working memory.
+
+        Returns a list of dicts, one per stalled trace:
+          {"trace_id", "task_id", "agent_id", "last_activity_at", "age_seconds"}
+
+        Called by the ``check_stalled_reasoning`` Celery beat task every 60 s.
+        """
+        now = datetime.utcnow()
+        stalled: List[Dict[str, Any]] = []
+
+        # Iterate over a snapshot so we can mutate _active_traces inside the loop
+        for trace_id, trace in list(self._active_traces.items()):
+            # Skip already-terminal traces (they should have been removed, but be safe)
+            if trace.current_phase in (TracePhase.COMPLETED, TracePhase.FAILED):
+                self._active_traces.pop(trace_id, None)
+                continue
+
+            # Determine the timestamp of the most recent activity
+            last_step = trace.latest_step()
+            if last_step:
+                # Prefer the step's own started_at (always set) over completed_at
+                ts_str = last_step.started_at
+            else:
+                ts_str = trace.started_at
+
+            try:
+                last_activity = datetime.fromisoformat(ts_str.rstrip("Z"))
+            except (ValueError, AttributeError):
+                continue
+
+            age_seconds = (now - last_activity).total_seconds()
+            if age_seconds < timeout_seconds:
+                continue
+
+            # ── This trace is stalled ─────────────────────────────────────
+            logger.warning(
+                "[Watchdog] Trace %s for task=%s agent=%s stalled for %.0f s — sealing.",
+                trace_id, trace.task_id, trace.agent_id, age_seconds,
+            )
+
+            trace.seal(success=False, reason="stalled")
+            stalled.append({
+                "trace_id":        trace_id,
+                "task_id":         trace.task_id,
+                "agent_id":        trace.agent_id,
+                "last_activity_at": ts_str,
+                "age_seconds":     round(age_seconds, 1),
+            })
+
+            # Emit WebSocket event (best-effort, non-fatal)
+            try:
+                import asyncio
+                from backend.api.routes.websocket import manager
+
+                # Attempt to fetch the agent's ethos snapshot for the event payload
+                ethos_snapshot: Dict[str, Any] = {}
+                try:
+                    from backend.models.entities.agents import Agent
+                    agent_row = db.query(Agent).filter_by(
+                        agentium_id=trace.agent_id, is_active=True
+                    ).first()
+                    if agent_row and agent_row.ethos:
+                        ethos_snapshot = {
+                            "mission_statement": getattr(agent_row.ethos, "mission_statement", ""),
+                            "working_memory":    getattr(agent_row.ethos, "working_memory", {}),
+                        }
+                except Exception as ethos_exc:
+                    logger.debug("[Watchdog] Could not load ethos for %s: %s", trace.agent_id, ethos_exc)
+
+                event = {
+                    "event_type":  "trace_stalled",
+                    "timestamp":   now.isoformat(),
+                    "trace_id":    trace_id,
+                    "task_id":     trace.task_id,
+                    "agent_id":    trace.agent_id,
+                    "age_seconds": round(age_seconds, 1),
+                    "ethos":       ethos_snapshot,
+                }
+
+                # broadcast() is a coroutine; run it safely from a sync context
+                try:
+                    loop = asyncio.get_event_loop()
+                    if loop.is_running():
+                        asyncio.ensure_future(manager.broadcast(event))
+                    else:
+                        loop.run_until_complete(manager.broadcast(event))
+                except RuntimeError:
+                    # No event loop — skip broadcast gracefully
+                    pass
+            except Exception as ws_exc:
+                logger.debug("[Watchdog] WebSocket broadcast skipped: %s", ws_exc)
+
+            # Remove from active registry
+            self._active_traces.pop(trace_id, None)
+
+        if stalled:
+            logger.info("[Watchdog] Sealed %d stalled trace(s).", len(stalled))
+        return stalled
+
     def get_traces_for_task(self, task_id: str, db: Session) -> List[Dict[str, Any]]:
         """
         Retrieve all persisted traces for a task from the DB.

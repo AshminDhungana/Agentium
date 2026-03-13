@@ -87,6 +87,12 @@ celery_app.conf.beat_schedule = {
         'schedule': 600.0,
     },
 
+    # ── Reasoning recovery watchdog (Gap 2) ───────────────────────────────────
+    'reasoning-watchdog': {
+        'task': 'backend.services.tasks.task_executor.check_stalled_reasoning',
+        'schedule': 60.0,   # every 60 seconds
+    },
+
     # ── Federation (Phase 11.2) ───────────────────────────────────────────────
     'federation-heartbeat': {
         'task': 'backend.celery_app.federation_heartbeat',

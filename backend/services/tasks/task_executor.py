@@ -22,8 +22,9 @@ from backend.celery_app import celery_app
 from backend.models.entities.channels import ExternalMessage, ExternalChannel, ChannelStatus, ChannelType
 from backend.models.entities.task import Task, TaskStatus, TaskType, TaskPriority
 from backend.models.entities.task_events import TaskEvent, TaskEventType
-from backend.models.entities.agents import Agent, CouncilMember, HeadOfCouncil, AgentType
+from backend.models.entities.agents import Agent, CouncilMember, HeadOfCouncil, LeadAgent, AgentType
 from backend.models.entities.audit import AuditLog, AuditCategory, AuditLevel
+from backend.services.reincarnation_service import ReincarnationService
 
 logger = logging.getLogger(__name__)
 
@@ -465,13 +466,29 @@ def auto_scale_check():
                         }
                     )
                     
-                    # In production: actually spawn agents via reincarnation_service
+                    # Spawn recommended_agents new task agents under the Head
+                    recommended_agents = 3
+                    spawned = 0
+                    spawn_errors = []
+                    for i in range(recommended_agents):
+                        try:
+                            ReincarnationService.spawn_task_agent(
+                                parent=head,
+                                name=f"AutoScale-Agent-{datetime.utcnow().strftime('%H%M%S')}-{i}",
+                                db=db,
+                            )
+                            spawned += 1
+                        except Exception as spawn_exc:
+                            logger.error(f"auto_scale_check: spawn {i+1}/{recommended_agents} failed: {spawn_exc}")
+                            spawn_errors.append(str(spawn_exc))
                     
                     return {
                         "scaled": True,
                         "pending_count": pending_count,
                         "threshold": threshold,
-                        "new_agents_requested": 3,
+                        "new_agents_requested": recommended_agents,
+                        "new_agents_spawned": spawned,
+                        "spawn_errors": spawn_errors,
                         "timestamp": datetime.utcnow().isoformat()
                     }
             
@@ -483,6 +500,69 @@ def auto_scale_check():
             
         except Exception as e:
             logger.error(f"Error in auto_scale_check: {e}")
+            return {"error": str(e)}
+
+
+# ═══════════════════════════════════════════════════════════
+# Reasoning Recovery Watchdog (Gap 2)
+# ═══════════════════════════════════════════════════════════
+
+@celery_app.task
+def check_stalled_reasoning():
+    """
+    Watchdog: detect stalled reasoning traces and re-queue their tasks.
+    Runs every 60 s via beat schedule.
+    """
+    with get_task_db() as db:
+        try:
+            from backend.services.reasoning_trace_service import reasoning_trace_service
+            stalled = reasoning_trace_service.check_stalled_traces(db)
+
+            results = []
+            for entry in stalled:
+                task_id  = entry.get("task_id")
+                agent_id = entry.get("agent_id")
+                if not task_id or not agent_id:
+                    continue
+
+                task = db.query(Task).filter_by(agentium_id=task_id, is_active=True).first()
+                if not task:
+                    logger.warning(f"check_stalled_reasoning: task {task_id} not found, skipping re-queue")
+                    results.append({"task_id": task_id, "action": "skipped_not_found"})
+                    continue
+
+                # Cap re-queues: track in execution_context
+                exec_ctx = task.execution_context or {}
+                resume_count = exec_ctx.get("stalled_resume_count", 0)
+                if resume_count >= 3:
+                    logger.warning(
+                        f"check_stalled_reasoning: task {task_id} has stalled {resume_count} times — "
+                        "not re-queuing, escalating."
+                    )
+                    task.set_status(TaskStatus.ESCALATED, "WATCHDOG", "Max stall retries exceeded")
+                    results.append({"task_id": task_id, "action": "escalated"})
+                    continue
+
+                exec_ctx["stalled_resume_count"] = resume_count + 1
+                task.execution_context = exec_ctx
+                db.commit()
+
+                # Re-queue the task for execution
+                execute_task_async.delay(task_id, agent_id)
+                logger.info(
+                    f"check_stalled_reasoning: re-queued stalled task {task_id} "
+                    f"(resume attempt {resume_count + 1}/3)"
+                )
+                results.append({"task_id": task_id, "action": "re_queued", "attempt": resume_count + 1})
+
+            return {
+                "stalled_detected": len(stalled),
+                "actions": results,
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+
+        except Exception as e:
+            logger.error(f"check_stalled_reasoning: unexpected error: {e}")
             return {"error": str(e)}
 
 

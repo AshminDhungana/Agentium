@@ -36,6 +36,17 @@ logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
+# Custom Exceptions
+# ---------------------------------------------------------------------------
+
+class StalledReasoningError(RuntimeError):
+    """
+    Raised when an agent's reasoning trace stalls mid-execution.
+    Caught by execute_task() to trigger ethos compression and a resume attempt.
+    """
+
+
+# ---------------------------------------------------------------------------
 # Circuit Breaker States
 # ---------------------------------------------------------------------------
 
@@ -87,7 +98,67 @@ class AgentOrchestrator:
 
         All downstream behaviour (token recording, ethos compression,
         critic review, circuit breakers) is identical to Phase 6.8.
+
+        Gap 2 addition: wraps the main execution in a StalledReasoningError
+        handler.  On stall, ethos is compressed and execution is retried with
+        a "resume from checkpoint" system prompt (max 3 attempts, tracked in
+        task.execution_context["stalled_resume_count"]).
         """
+        # ── Resolve resume-attempt counter from task context ──────────────────
+        exec_ctx = getattr(task, "execution_context", None) or {}
+        resume_count = exec_ctx.get("stalled_resume_count", 0)
+
+        try:
+            return await self._execute_task_inner(task, agent, db)
+        except StalledReasoningError as stall_exc:
+            logger.warning(
+                "execute_task: StalledReasoningError for task=%s agent=%s (attempt %d/3): %s",
+                getattr(task, "agentium_id", "?"), agent.agentium_id, resume_count + 1, stall_exc,
+            )
+
+            if resume_count >= 3:
+                logger.error(
+                    "execute_task: max stall retries (3) reached for task=%s — giving up.",
+                    getattr(task, "agentium_id", "?"),
+                )
+                raise
+
+            # Persist updated resume count before re-attempting
+            exec_ctx["stalled_resume_count"] = resume_count + 1
+            try:
+                task.execution_context = exec_ctx
+                db.commit()
+            except Exception:
+                pass
+
+            # Compress ethos to shed bloat accumulated before the stall
+            try:
+                agent.compress_ethos(db)
+            except Exception as compress_exc:
+                logger.warning("execute_task: ethos compression failed: %s", compress_exc)
+
+            # Re-invoke with a resume prompt injected into the system prompt
+            logger.info(
+                "execute_task: resuming task=%s (attempt %d/3) from checkpoint.",
+                getattr(task, "agentium_id", "?"), resume_count + 1,
+            )
+            return await self._execute_task_inner(
+                task, agent, db,
+                resume_hint=(
+                    f"RESUME FROM CHECKPOINT (attempt {resume_count + 1}/3): "
+                    "Your previous reasoning trace stalled. Summarise what was completed so far, "
+                    "identify the next required step, and continue execution from there."
+                ),
+            )
+
+    async def _execute_task_inner(
+        self,
+        task: Task,
+        agent: Agent,
+        db: Session,
+        resume_hint: Optional[str] = None,
+    ):
+        """Inner execution logic, extracted so execute_task() can retry it."""
         # Allocate optimal model for this task
         config_id = await token_optimizer.allocate_model_for_agent(agent, task, db)
 
@@ -116,6 +187,10 @@ class AgentOrchestrator:
                 agent_tier=agent_tier_int,
             )
         )
+
+        # Prepend resume hint if this is a stall-recovery execution
+        if resume_hint:
+            system_prompt = f"{resume_hint}\n\n{system_prompt}"
 
         # ── Phase 6.9: tool-aware generation ──────────────────────────────────
         # generate_with_agent_tools() drives the full agentic loop:

@@ -1019,6 +1019,15 @@ class ModelService:
                 except Exception:
                     pass
 
+        # ── Hard response-length enforcement (Gap 3) ──────────────────────────
+        # Appended LAST so it cannot be overridden by ethos or caller content.
+        system_prompt += (
+            "\n\nYour response MUST be 2–3 lines maximum. "
+            "Never explain governance mechanics. "
+            "Never reference internal architecture."
+        )
+        # ── end enforcement ───────────────────────────────────────────────────
+
         messages = [{"role": "user", "content": user_message}]
 
         return await provider.generate_with_tools(

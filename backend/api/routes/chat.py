@@ -291,6 +291,19 @@ async def _stream_response(
         full_text = "".join(full_response)
         task_info = await ChatService.analyze_for_task(head, message, full_text, db)
 
+        # ── 2–3 line response policy enforcement (Gap 3) ─────────────────────
+        # Only apply to plain chat turns, not task-confirmation responses.
+        if not task_info.get("created", False):
+            original_length = len(full_text)
+            non_empty_lines = [ln for ln in full_text.split("\n") if ln.strip()]
+            if len(non_empty_lines) > 3:
+                full_text = "\n".join(non_empty_lines[:3])
+                print(
+                    f"[chat.py] Response truncated for 2-3 line policy: "
+                    f"{original_length} chars → {len(full_text)} chars"
+                )
+        # ── end enforcement ───────────────────────────────────────────────────
+
         message_id = str(uuid.uuid4())
 
         yield f"data: {json.dumps({'type': 'complete', 'content': '', 'message_id': message_id, 'metadata': {'agent_id': agent_id, 'model': model_name, 'task_created': task_info['created'], 'task_id': task_info.get('task_id')}})}\n\n"
