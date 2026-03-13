@@ -2135,17 +2135,23 @@ export const TasksPage: React.FC = () => {
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [filterStatus, setFilterStatus] = useState<string>('');
+    const [myTasksOnly, setMyTasksOnly]   = useState<boolean>(false);
+    const [hideSystem, setHideSystem]     = useState<boolean>(true); // system tasks hidden by default
     const [activeTab, setActiveTab]       = useState<Tab>('tasks');
     const [checkpointSubTab, setCheckpointSubTab] = useState<'timeline' | 'diff'>('timeline');
     const [showImportModal, setShowImportModal] = useState(false); 
-    useEffect(() => { loadTasks(); }, [filterStatus]);
+    useEffect(() => { loadTasks(); }, [filterStatus, myTasksOnly, hideSystem]);
 
     const loadTasks = async (silent = false) => {
         try {
             if (!silent) setIsLoading(true);
             else setIsRefreshing(true);
             const [data, active] = await Promise.all([
-                tasksService.getTasks({ status: filterStatus || undefined }),
+                tasksService.getTasks({
+                    status: filterStatus || undefined,
+                    my_tasks: myTasksOnly,
+                    hide_system: hideSystem,
+                }),
                 tasksService.getActiveTasks(),
             ]);
             setTasks(data);
@@ -2307,6 +2313,33 @@ export const TasksPage: React.FC = () => {
                                         </button>
                                     );
                                 })}
+                            </div>
+
+                            {/* ── View toggles ─────────────────────────── */}
+                            <div className="flex items-center gap-2">
+                                <div className="w-px h-4 bg-gray-200 dark:bg-[#2a3347] flex-shrink-0" />
+                                <button
+                                    onClick={() => setMyTasksOnly(v => !v)}
+                                    title={myTasksOnly ? 'Showing your tasks — click to show all' : 'Show only your tasks'}
+                                    className={`px-3 py-1 rounded-full text-xs font-medium border transition-all duration-150 ${
+                                        myTasksOnly
+                                            ? 'bg-blue-600 text-white border-blue-600 dark:bg-blue-500 dark:border-blue-500'
+                                            : 'bg-white dark:bg-[#161b27] text-gray-600 dark:text-gray-400 border-gray-200 dark:border-[#2a3347] hover:border-gray-300 dark:hover:border-[#3a4560]'
+                                    }`}
+                                >
+                                    My Tasks
+                                </button>
+                                <button
+                                    onClick={() => setHideSystem(v => !v)}
+                                    title={hideSystem ? 'System tasks hidden — click to show' : 'System tasks visible — click to hide'}
+                                    className={`px-3 py-1 rounded-full text-xs font-medium border transition-all duration-150 ${
+                                        hideSystem
+                                            ? 'bg-gray-500 text-white border-gray-500 dark:bg-gray-600 dark:border-gray-600'
+                                            : 'bg-white dark:bg-[#161b27] text-gray-600 dark:text-gray-400 border-gray-200 dark:border-[#2a3347] hover:border-gray-300 dark:hover:border-[#3a4560]'
+                                    }`}
+                                >
+                                    {hideSystem ? 'System hidden' : 'Show system'}
+                                </button>
                             </div>
                             {!isLoading && (
                                 <span className="ml-auto text-xs text-gray-400 dark:text-gray-500">

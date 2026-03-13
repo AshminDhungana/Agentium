@@ -147,7 +147,9 @@ async def create_task(
 async def list_tasks(
     status: Optional[str] = Query(None),
     agent_id: Optional[str] = Query(None),
-    parent_task_id: Optional[str] = Query(None),  # NEW: Filter by parent
+    parent_task_id: Optional[str] = Query(None),  # Filter by parent
+    my_tasks: bool = Query(False),                 # Scope to current user's tasks only
+    hide_system: bool = Query(True),               # Hide idle/system tasks (on by default)
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
     current_user: dict = Depends(get_current_active_user),
@@ -176,9 +178,18 @@ async def list_tasks(
             Task.assigned_task_agent_ids.contains([agent_id])
         )
     
-    # NEW: Filter by parent task
+    # Filter by parent task
     if parent_task_id:
         query = query.filter(Task.parent_task_id == parent_task_id)
+
+    # User isolation: restrict to tasks created by the current user
+    if my_tasks:
+        user_id = str(current_user.get("sub", ""))
+        query = query.filter(Task.created_by == user_id)
+
+    # System task filter: exclude idle/agent-generated tasks unless explicitly requested
+    if hide_system:
+        query = query.filter(Task.is_idle_task != True)  # noqa: E712
 
     tasks = query.order_by(Task.created_at.desc()).offset(skip).limit(limit).all()
     return [_serialize(t) for t in tasks]
@@ -188,9 +199,10 @@ async def get_active_tasks(
     current_user: dict = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """Get all active tasks."""
+    """Get all active tasks (excludes system/idle tasks)."""
     tasks = db.query(Task).filter(
-        Task.status.in_([TaskStatus.PENDING, TaskStatus.IN_PROGRESS, TaskStatus.DELIBERATING])
+        Task.status.in_([TaskStatus.PENDING, TaskStatus.IN_PROGRESS, TaskStatus.DELIBERATING]),
+        Task.is_idle_task != True,  # noqa: E712
     ).order_by(Task.created_at.desc()).all()
     return {"tasks": [_serialize(t) for t in tasks], "total": len(tasks)}
 

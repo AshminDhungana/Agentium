@@ -155,6 +155,7 @@ def get_mobile_tasks(
     limit: int = 20,
     offset: int = 0,
     status_filter: Optional[str] = None,
+    hide_system: bool = True,
     current_user: User = Depends(get_current_user_from_token),
     db: Session = Depends(get_db)
 ):
@@ -162,6 +163,14 @@ def get_mobile_tasks(
     from backend.models.entities.task import Task
 
     query = db.query(Task)
+
+    # User isolation: only return tasks created by this user
+    query = query.filter(Task.created_by == str(current_user.id))
+
+    # Exclude idle/system tasks by default
+    if hide_system:
+        query = query.filter(Task.is_idle_task != True)  # noqa: E712
+
     if status_filter:
         query = query.filter(Task.status == status_filter)
 

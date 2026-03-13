@@ -45,11 +45,20 @@ export interface AllowedTransitionsResponse {
 }
 
 export const tasksService = {
-    getTasks: async (filters?: { status?: string; agent_id?: string; parent_task_id?: string }): Promise<Task[]> => {
+    getTasks: async (filters?: {
+        status?: string;
+        agent_id?: string;
+        parent_task_id?: string;
+        my_tasks?: boolean;    // scope to current user's tasks only
+        hide_system?: boolean; // hide idle/system tasks (backend default: true)
+    }): Promise<Task[]> => {
         const params = new URLSearchParams();
         if (filters?.status) params.append('status', filters.status);
         if (filters?.agent_id) params.append('agent_id', filters.agent_id);
         if (filters?.parent_task_id) params.append('parent_task_id', filters.parent_task_id);
+        if (filters?.my_tasks) params.append('my_tasks', 'true');
+        // Only send hide_system when explicitly set — lets backend default handle the common case
+        if (filters?.hide_system !== undefined) params.append('hide_system', String(filters.hide_system));
 
         const query = params.toString() ? `?${params.toString()}` : '';
         const response = await api.get<Task[]>(`/api/v1/tasks/${query}`);
