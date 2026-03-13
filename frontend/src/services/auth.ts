@@ -28,6 +28,15 @@ export interface VerifySessionResponse {
 }
 
 export const authService = {
+    /**
+     * @deprecated Use `useAuthStore().login()` instead.
+     *
+     * This method duplicates the login logic that lives in `authStore.ts` and
+     * is no longer called by any page component. It is kept here only for
+     * backward compatibility with any external callers. New code should use
+     * the Zustand store exclusively so that authentication state stays in sync
+     * across the entire application.
+     */
     async login(credentials: LoginCredentials): Promise<LoginResponse> {
         const response = await api.post('/api/v1/auth/login', credentials);
 

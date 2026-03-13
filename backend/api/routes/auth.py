@@ -2,22 +2,74 @@
 Authentication API for frontend.
 Database-backed with user approval workflow.
 """
-import os 
+import os
+from collections import defaultdict
 from datetime import datetime
+from threading import Lock
+from time import time
+
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.orm import Session
 from typing import Optional
 
 from backend.models.database import get_db
-from backend.core.auth import create_access_token, create_refresh_token, verify_token, get_current_active_user
+from backend.core.auth import (
+    create_access_token,
+    create_refresh_token,
+    verify_token,
+    get_current_active_user,
+)
 from backend.models.entities.user import User
 from backend.models.entities.audit import AuditLog, AuditLevel, AuditCategory
 from backend.core.voice_auth import create_voice_token, verify_voice_token
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
-# Request/Response Models
+# ── Security scheme (for /verify header reading) ─────────────────────────────
+_security = HTTPBearer(auto_error=False)
+
+# ── B3: Simple in-memory login rate limiter ───────────────────────────────────
+# Tracks failed login attempts per username.  Not distributed (single-process
+# only), but effective for single-node deployments and requires zero external
+# dependencies.  For multi-worker deployments, replace with Redis-backed
+# slowapi or similar.
+_login_attempts: defaultdict[str, list[float]] = defaultdict(list)
+_attempts_lock = Lock()
+_MAX_LOGIN_ATTEMPTS   = 5
+_LOGIN_WINDOW_SECONDS = 300  # 5 minutes
+
+
+def _check_rate_limit(identifier: str) -> None:
+    """Raise HTTP 429 if the identifier has exceeded the allowed attempt count."""
+    now = time()
+    with _attempts_lock:
+        # Prune attempts outside the rolling window
+        _login_attempts[identifier] = [
+            t for t in _login_attempts[identifier]
+            if now - t < _LOGIN_WINDOW_SECONDS
+        ]
+        if len(_login_attempts[identifier]) >= _MAX_LOGIN_ATTEMPTS:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=(
+                    f"Too many failed login attempts. "
+                    f"Please wait {_LOGIN_WINDOW_SECONDS // 60} minutes before trying again."
+                ),
+                headers={"Retry-After": str(_LOGIN_WINDOW_SECONDS)},
+            )
+        _login_attempts[identifier].append(now)
+
+
+def _clear_rate_limit(identifier: str) -> None:
+    """Reset the attempt counter after a successful login."""
+    with _attempts_lock:
+        _login_attempts.pop(identifier, None)
+
+
+# ── Request / Response Models ─────────────────────────────────────────────────
+
 class SignupRequest(BaseModel):
     username: str = Field(..., min_length=3, max_length=50)
     email: EmailStr
@@ -26,7 +78,7 @@ class SignupRequest(BaseModel):
 class SignupResponse(BaseModel):
     success: bool
     message: str
-    user_id: Optional[str] = None 
+    user_id: Optional[str] = None
 
 class LoginRequest(BaseModel):
     username: str
@@ -44,41 +96,41 @@ class RefreshRequest(BaseModel):
 class VerifyResponse(BaseModel):
     valid: bool
     user: Optional[dict] = None
-    
+
 class ChangePasswordRequest(BaseModel):
     old_password: str
     new_password: str = Field(..., min_length=8)
 
+
+# ── Routes ────────────────────────────────────────────────────────────────────
+
 @router.post("/signup", response_model=SignupResponse)
 async def signup(
     request: SignupRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     User signup request.
     Creates a pending user account that requires admin approval.
     """
-    # Check if user already exists
     existing_user = db.query(User).filter(
-        (User.username == request.username) | 
+        (User.username == request.username) |
         (User.email == request.email)
     ).first()
-    
+
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Username or email already registered"
+            detail="Username or email already registered",
         )
-    
-    # Create new user (starts as pending/inactive)
+
     user = User.create_user(
         db=db,
         username=request.username,
         email=request.email,
-        password=request.password
+        password=request.password,
     )
-    
-    # Log the signup
+
     AuditLog.log(
         level=AuditLevel.INFO,
         category=AuditCategory.AUTHENTICATION,
@@ -89,14 +141,14 @@ async def signup(
         meta_data={
             "user_id": user.id,
             "email": request.email,
-            "auto_approved": False
-        }
+            "auto_approved": False,
+        },
     )
-    
+
     return SignupResponse(
         success=True,
         message="Account created successfully. Awaiting admin approval.",
-        user_id=user.id
+        user_id=user.id,
     )
 
 
@@ -113,41 +165,50 @@ def sovereign_request():
         pass
     return request
 
+
 @router.post("/login", response_model=LoginResponse)
 async def login(
     request: LoginRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     User login with username and password.
     Returns JWT token for authenticated sessions.
     """
+    # B3: enforce rate limit before any credential check so that enumeration
+    #     and brute-force attempts are blocked regardless of whether the
+    #     username exists.
+    _check_rate_limit(request.username)
+
     # First try database authentication
     user = User.authenticate(db, request.username, request.password)
     SOVEREIGN_REQUEST = sovereign_request()
+
     # Fallback to sovereign credentials for backward compatibility
     if not user:
         if request.username in SOVEREIGN_REQUEST:
             if SOVEREIGN_REQUEST[request.username] == request.password:
+                # Successful sovereign login — clear the rate-limit counter
+                _clear_rate_limit(request.username)
+
                 token_data = {
                     "sub": request.username,
                     "role": "sovereign",
                     "is_admin": True,
-                    "is_active": True
+                    "is_active": True,
                 }
-                access_token = create_access_token(token_data)
+                access_token  = create_access_token(token_data)
                 refresh_token = create_refresh_token(token_data)
-                
-                # Log successful login
+
                 AuditLog.log(
                     level=AuditLevel.INFO,
                     category=AuditCategory.AUTHENTICATION,
                     actor_type="user",
                     actor_id=request.username,
                     action="login_success",
-                    description="Sovereign user logged in successfully"
+                    description="Sovereign user logged in successfully",
                 )
-                
+
                 return LoginResponse(
                     access_token=access_token,
                     refresh_token=refresh_token,
@@ -155,10 +216,10 @@ async def login(
                     user={
                         "username": request.username,
                         "role": "sovereign",
-                        "is_admin": True
-                    }
+                        "is_admin": True,
+                    },
                 )
-        
+
         # Log failed login attempt
         AuditLog.log(
             level=AuditLevel.WARNING,
@@ -167,14 +228,14 @@ async def login(
             actor_id=request.username,
             action="login_failed",
             description="Failed login attempt",
-            success=False
+            success=False,
         )
-        
+
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid credentials or account not approved"
+            detail="Invalid credentials or account not approved",
         )
-    
+
     # Check if user is active and approved
     if not user.is_active or user.is_pending:
         AuditLog.log(
@@ -188,26 +249,27 @@ async def login(
             meta_data={
                 "user_id": user.id,
                 "is_active": user.is_active,
-                "is_pending": user.is_pending
-            }
+                "is_pending": user.is_pending,
+            },
         )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Account pending approval or deactivated"
+            detail="Account pending approval or deactivated",
         )
-    
-    # Create JWT token
+
+    # Successful DB login — clear rate-limit counter for this username
+    _clear_rate_limit(request.username)
+
     token_data = {
         "sub": user.username,
         "user_id": user.id,
         "role": "user",
         "is_admin": user.is_admin,
-        "is_active": user.is_active
+        "is_active": user.is_active,
     }
-    access_token = create_access_token(token_data)
+    access_token  = create_access_token(token_data)
     refresh_token = create_refresh_token(token_data)
-    
-    # Log successful login
+
     AuditLog.log(
         level=AuditLevel.INFO,
         category=AuditCategory.AUTHENTICATION,
@@ -215,157 +277,140 @@ async def login(
         actor_id=user.username,
         action="login_success",
         description="User logged in successfully",
-        meta_data={
-            "user_id": user.id,
-            "is_admin": user.is_admin
-        }
+        meta_data={"user_id": user.id, "is_admin": user.is_admin},
     )
-    
+
     return LoginResponse(
         access_token=access_token,
         refresh_token=refresh_token,
         token_type="bearer",
-        user=user.to_dict()
+        user=user.to_dict(),
     )
 
 
 @router.post("/refresh", response_model=LoginResponse)
 async def refresh_token_endpoint(
     request: RefreshRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
-    """
-    Refresh access token using a valid refresh token.
-    """
+    """Refresh access token using a valid refresh token."""
     payload = verify_token(request.refresh_token)
-    
+
     if not payload or payload.get("type") != "refresh":
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired refresh token",
             headers={"WWW-Authenticate": "Bearer"},
         )
-        
+
     username = payload.get("sub")
     if not username:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
-        
-    # Create new tokens
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token payload",
+        )
+
     token_data = {
         "sub": username,
         "user_id": payload.get("user_id"),
         "role": payload.get("role", "user"),
         "is_admin": payload.get("is_admin", False),
-        "is_active": payload.get("is_active", True)
+        "is_active": payload.get("is_active", True),
     }
-    
-    new_access_token = create_access_token(token_data)
+
+    new_access_token  = create_access_token(token_data)
     new_refresh_token = create_refresh_token(token_data)
-    
-    # Send mock user for sovereign, real for DB
+
     user_dict = {
         "username": username,
         "role": token_data["role"],
-        "is_admin": token_data["is_admin"]
+        "is_admin": token_data["is_admin"],
     }
-    
+
     if token_data["role"] != "sovereign" and token_data.get("user_id"):
-        user = db.query(User).filter(User.id == token_data["user_id"]).first()
-        if user:
-            user_dict = user.to_dict()
-            
+        db_user = db.query(User).filter(User.id == token_data["user_id"]).first()
+        if db_user:
+            user_dict = db_user.to_dict()
+
     return LoginResponse(
         access_token=new_access_token,
         refresh_token=new_refresh_token,
         token_type="bearer",
-        user=user_dict
+        user=user_dict,
     )
 
 
 @router.post("/verify", response_model=VerifyResponse)
 async def verify_token_endpoint(
-    token: Optional[str] = None  # Make it optional query param
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_security),
 ):
     """
-    Verify if a JWT token is valid.
-    Accepts token as query parameter or in request body.
+    Verify if the current bearer token is valid.
+
+    B2: The token is read exclusively from the Authorization header, NOT from
+    a query parameter.  Tokens in query strings are recorded in server access
+    logs, CDN logs, and browser history — a significant information-leak risk.
+
+    The frontend sends the token via the Authorization header automatically
+    (api.ts request interceptor), so no callers need to change.
+
+    The GET /verify variant that accepted a token query param has been removed
+    for the same reason.
     """
-    # If no token provided, return invalid
-    if not token:
+    if not credentials:
         return VerifyResponse(valid=False)
-    
-    payload = verify_token(token)
-    
+
+    payload = verify_token(credentials.credentials)
+
     if not payload:
         return VerifyResponse(valid=False)
-    
+
     return VerifyResponse(
         valid=True,
         user={
             "username": payload.get("sub"),
             "user_id": payload.get("user_id"),
             "is_admin": payload.get("is_admin", False),
-            "role": payload.get("role", "user")
-        }
+            "role": payload.get("role", "user"),
+        },
     )
 
-
-@router.get("/verify", response_model=VerifyResponse)
-async def verify_token_get(
-    token: str
-):
-    """
-    Verify token via GET request (for query param support).
-    """
-    payload = verify_token(token)
-    
-    if not payload:
-        return VerifyResponse(valid=False)
-    
-    return VerifyResponse(
-        valid=True,
-        user={
-            "username": payload.get("sub"),
-            "user_id": payload.get("user_id"),
-            "is_admin": payload.get("is_admin", False),
-            "role": payload.get("role", "user")
-        }
-    )
+# B2: GET /verify endpoint removed — it accepted the JWT as a query parameter
+#     (?token=<jwt>) which exposes the token in server logs, browser history,
+#     and Referer headers.  The POST /verify endpoint above is the sole
+#     verification route and reads from the Authorization header only.
 
 
 @router.post("/change-password")
 async def change_password(
     request: ChangePasswordRequest,
     current_user: dict = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
-    """
-    Change own password.
-    """
-    # Check if this is a sovereign user (not in database)
+    """Change own password."""
     if current_user.get("role") == "sovereign" or current_user.get("user_id") is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Emergency sovereign users cannot change password. Please use database admin account."
+            detail=(
+                "Emergency sovereign users cannot change password. "
+                "Please use database admin account."
+            ),
         )
-    
-    # Get user_id from current_user
+
     user_id = current_user.get("user_id")
     if not user_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User ID not found in token"
+            detail="User ID not found in token",
         )
-    
-    # Get user from database
+
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
+            detail="User not found",
         )
-    
-    # Verify old password
+
     if not User.verify_password(request.old_password, user.hashed_password):
         AuditLog.log(
             level=AuditLevel.WARNING,
@@ -374,31 +419,27 @@ async def change_password(
             actor_id=current_user.get("username", "unknown"),
             action="password_change_failed",
             description="Password change failed - incorrect old password",
-            success=False
+            success=False,
         )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Current password is incorrect"
+            detail="Current password is incorrect",
         )
-    
-    # Update password
+
     user.hashed_password = User.hash_password(request.new_password)
     user.updated_at = datetime.utcnow()
     db.commit()
-    
+
     AuditLog.log(
         level=AuditLevel.INFO,
         category=AuditCategory.AUTHENTICATION,
         actor_type="user",
         actor_id=current_user.get("username", "unknown"),
         action="password_changed",
-        description="Password changed successfully"
+        description="Password changed successfully",
     )
-    
-    return {
-        "status": "success",
-        "message": "Password updated successfully"
-    }
+
+    return {"status": "success", "message": "Password updated successfully"}
 
 
 class VoiceTokenResponse(BaseModel):
@@ -423,7 +464,6 @@ async def get_voice_token(
             user_id=current_user.get("user_id"),
         )
     except RuntimeError as exc:
-        # VOICE_JWT_SECRET not set — degrade gracefully
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=str(exc),

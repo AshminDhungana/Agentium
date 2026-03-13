@@ -3,7 +3,15 @@ import { persist } from 'zustand/middleware';
 import { api } from '@/services/api';
 import { jwtDecode } from 'jwt-decode';
 
-// Proper User interface matching backend
+// B6: extended role type to match the backend RBAC system
+type UserRole =
+    | 'primary_sovereign'
+    | 'deputy_sovereign'
+    | 'observer'
+    | 'sovereign'   // sovereign backdoor fallback role
+    | 'admin'       // legacy / convenience alias
+    | 'user';       // legacy / convenience alias
+
 interface User {
     id?: string;
     username: string;
@@ -11,11 +19,20 @@ interface User {
     is_active?: boolean;
     is_admin: boolean;
     is_pending?: boolean;
+    is_sovereign?: boolean;  // B6: field returned by backend to_dict()
     created_at?: string;
-    role?: 'admin' | 'user';
+    role?: UserRole;
     isAuthenticated: boolean;
     isSovereign?: boolean;
     agentium_id?: string;
+}
+
+// B5: result type for signup — avoids modifying the AuthState.isLoading /
+//     error fields (which belong to the login flow) while still routing the
+//     API call through a single service layer.
+interface SignupResult {
+    success: boolean;
+    message: string;
 }
 
 interface AuthState {
@@ -27,6 +44,9 @@ interface AuthState {
     isLoading: boolean;
     error: string | null;
     login: (username: string, password: string) => Promise<boolean>;
+    // B5: signup is now part of the store so all auth API calls go through
+    //     one layer — no more direct api.post() calls from page components.
+    signup: (username: string, email: string, password: string) => Promise<SignupResult>;
     logout: () => void;
     changePassword: (oldPassword: string, newPassword: string) => Promise<boolean>;
     checkAuth: () => Promise<boolean>;
@@ -46,11 +66,27 @@ const extractUserFromToken = (token: string): Partial<User> | null => {
     }
 };
 
+// B6: derive isSovereign from the role string returned by the backend.
+//     The backend `to_dict()` returns `role: "primary_sovereign"` for admins
+//     and `role: "sovereign"` for the backdoor fallback user.
+//     Checking is_sovereign (from to_dict) covers the DB path; role string
+//     covers both paths including the sovereign backdoor.
+function deriveIsSovereign(user: {
+    role?: string;
+    is_admin?: boolean;
+    is_sovereign?: boolean;
+}): boolean {
+    if (user.is_sovereign === true) return true;
+    if (user.role === 'primary_sovereign') return true;
+    if (user.role === 'sovereign') return true;
+    return false;
+}
+
 export const useAuthStore = create<AuthState>()(
     persist(
         (set, get) => ({
             user: null,
-            isInitialized: false, // always starts false on page load — never persisted
+            isInitialized: false,
             isLoading: false,
             error: null,
 
@@ -74,10 +110,13 @@ export const useAuthStore = create<AuthState>()(
                             is_active: user.is_active,
                             is_admin: user.is_admin,
                             is_pending: user.is_pending,
+                            is_sovereign: user.is_sovereign,
                             created_at: user.created_at,
                             isAuthenticated: true,
-                            role: user.is_admin ? 'admin' : 'user',
-                            isSovereign: user.is_admin,
+                            role: user.role ?? (user.is_admin ? 'admin' : 'user'),
+                            // B6: use deriveIsSovereign instead of blindly equating
+                            //     isSovereign to is_admin (not all admins are sovereign)
+                            isSovereign: deriveIsSovereign(user),
                         },
                         isLoading: false,
                         isInitialized: true,
@@ -92,6 +131,53 @@ export const useAuthStore = create<AuthState>()(
                         isInitialized: true,
                     });
                     return false;
+                }
+            },
+
+            // B5: centralised signup call — SignupPage no longer calls api.post directly.
+            //     Does NOT touch store-level isLoading/error (those belong to the login
+            //     flow); the page manages its own local loading state for signup.
+            signup: async (
+                username: string,
+                email: string,
+                password: string,
+            ): Promise<SignupResult> => {
+                try {
+                    const response = await api.post('/api/v1/auth/signup', {
+                        username,
+                        email,
+                        password,
+                    });
+
+                    if (response.data.success) {
+                        return {
+                            success: true,
+                            message:
+                                response.data.message ||
+                                'Account created successfully. Awaiting admin approval.',
+                        };
+                    }
+
+                    return {
+                        success: false,
+                        message: response.data.message || 'Signup failed',
+                    };
+                } catch (error: any) {
+                    // Normalise FastAPI validation errors and plain string details
+                    let message = 'Signup failed. Please try again.';
+                    const detail = error.response?.data?.detail;
+
+                    if (Array.isArray(detail)) {
+                        message = detail
+                            .map((err: any) => `${err.loc?.join(' ')} — ${err.msg}`)
+                            .join(', ');
+                    } else if (typeof detail === 'string') {
+                        message = detail;
+                    } else if (error.message) {
+                        message = error.message;
+                    }
+
+                    return { success: false, message };
                 }
             },
 
@@ -142,16 +228,17 @@ export const useAuthStore = create<AuthState>()(
                     return false;
                 }
 
-                // If persisted user exists, skip the loading spinner but still verify server-side
                 const hasPersistedUser = get().user?.isAuthenticated === true;
                 if (!hasPersistedUser) {
                     set({ isLoading: true });
                 }
 
                 try {
-                    const response = await api.post('/api/v1/auth/verify', null, {
-                        params: { token }
-                    });
+                    // B2: removed `params: { token }` — the token is already attached to
+                    //     every request as "Authorization: Bearer <token>" by api.ts's
+                    //     request interceptor. Passing it as a query param also exposed
+                    //     the JWT in server logs and browser history.
+                    const response = await api.post('/api/v1/auth/verify', null);
 
                     if (response.data.valid) {
                         const userData = response.data.user;
@@ -160,9 +247,11 @@ export const useAuthStore = create<AuthState>()(
                                 id: userData.user_id,
                                 username: userData.username,
                                 is_admin: userData.is_admin || false,
+                                is_sovereign: userData.is_sovereign,
                                 isAuthenticated: true,
-                                role: userData.role || (userData.is_admin ? 'admin' : 'user'),
-                                isSovereign: userData.is_admin || false,
+                                role: userData.role ?? (userData.is_admin ? 'admin' : 'user'),
+                                // B6: consistent isSovereign derivation
+                                isSovereign: deriveIsSovereign(userData),
                             },
                             isLoading: false,
                             isInitialized: true,
@@ -187,7 +276,7 @@ export const useAuthStore = create<AuthState>()(
                                     username: decoded.username,
                                     is_admin: decoded.is_admin || false,
                                     isAuthenticated: true,
-                                    isSovereign: decoded.is_admin || false,
+                                    isSovereign: deriveIsSovereign(decoded),
                                 } as User,
                                 isLoading: false,
                                 isInitialized: true,
@@ -216,9 +305,9 @@ export const useAuthStore = create<AuthState>()(
             partialize: (state) => ({ user: state.user }),
 
             // onRehydrateStorage fires immediately after localStorage is read,
-            // BEFORE any React component renders. This is the key fix:
-            // by calling checkAuth() here we eliminate the race condition where
-            // isInitialized was false but the router already made a redirect decision.
+            // BEFORE any React component renders. Calling checkAuth() here
+            // eliminates the race condition where isInitialized was false but the
+            // router had already made a redirect decision.
             onRehydrateStorage: () => (state) => {
                 if (state) {
                     state.checkAuth();
