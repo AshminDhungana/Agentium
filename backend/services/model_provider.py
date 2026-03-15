@@ -1085,6 +1085,8 @@ class ModelService:
         Falls back to sensible defaults if API call fails.
         """
         try:
+
+            # ── OPENAI ──────────────────────────────────────────────────────────
             if provider == ProviderType.OPENAI:
                 if not api_key:
                     return ModelService._get_default_models(provider)
@@ -1093,9 +1095,48 @@ class ModelService:
                 models = await client.models.list()
                 return sorted([
                     m.id for m in models.data
-                    if any(x in m.id.lower() for x in ['gpt-4', 'gpt-3.5', 'gpt-4o'])
+                    if any(x in m.id.lower() for x in ['gpt-4o', 'gpt-4', 'gpt-3.5', 'o1', 'o3'])
                 ])
 
+            # ── ANTHROPIC ────────────────────────────────────────────────────────
+            # Anthropic has no public ListModels REST endpoint — return curated list
+            elif provider == ProviderType.ANTHROPIC:
+                return [
+                    "claude-opus-4-5",
+                    "claude-sonnet-4-5",
+                    "claude-haiku-4-5",
+                    "claude-3-5-sonnet-20241022",
+                    "claude-3-5-haiku-20241022",
+                    "claude-3-opus-20240229",
+                    "claude-3-haiku-20240307",
+                ]
+
+            # ── GEMINI ────────────────────────────────────────────────────────────
+            # Uses Google Discovery REST API (v1beta/models) — NOT the old native SDK
+            # path that caused: "models/gemini-1.5-flash is not found for API version v1main"
+            elif provider == ProviderType.GEMINI:
+                if not api_key:
+                    return ModelService._get_default_models(provider)
+                import aiohttp
+                url = f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}&pageSize=100"
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                        if resp.status == 200:
+                            data = await resp.json()
+                            models = []
+                            for m in data.get("models", []):
+                                name = m.get("name", "")  # e.g. "models/gemini-2.0-flash"
+                                # Only include models that support text generation
+                                if "generateContent" in m.get("supportedGenerationMethods", []):
+                                    model_id = name.replace("models/", "")
+                                    models.append(model_id)
+                            return sorted(models) if models else ModelService._get_default_models(provider)
+                        else:
+                            err = await resp.text()
+                            print(f"Gemini list error {resp.status}: {err}")
+                            return ModelService._get_default_models(provider)
+
+            # ── GROQ ─────────────────────────────────────────────────────────────
             elif provider == ProviderType.GROQ:
                 if not api_key:
                     return ModelService._get_default_models(provider)
@@ -1104,6 +1145,7 @@ class ModelService:
                 models = await client.models.list()
                 return sorted([m.id for m in models.data])
 
+            # ── MISTRAL ───────────────────────────────────────────────────────────
             elif provider == ProviderType.MISTRAL:
                 if not api_key:
                     return ModelService._get_default_models(provider)
@@ -1112,6 +1154,7 @@ class ModelService:
                 models = await client.models.list()
                 return sorted([m.id for m in models.data])
 
+            # ── TOGETHER ──────────────────────────────────────────────────────────
             elif provider == ProviderType.TOGETHER:
                 if not api_key:
                     return ModelService._get_default_models(provider)
@@ -1120,6 +1163,56 @@ class ModelService:
                 models = await client.models.list()
                 return sorted([m.id for m in models.data])
 
+            # ── FIREWORKS ─────────────────────────────────────────────────────────
+            elif provider == ProviderType.FIREWORKS:
+                if not api_key:
+                    return ModelService._get_default_models(provider)
+                import openai
+                client = openai.AsyncOpenAI(api_key=api_key, base_url="https://api.fireworks.ai/inference/v1")
+                models = await client.models.list()
+                return sorted([m.id for m in models.data])
+
+            # ── PERPLEXITY ────────────────────────────────────────────────────────
+            # Perplexity has no public /models endpoint — return curated list
+            elif provider == ProviderType.PERPLEXITY:
+                return [
+                    "sonar-pro",
+                    "sonar",
+                    "sonar-reasoning-pro",
+                    "sonar-reasoning",
+                    "r1-1776",
+                ]
+
+            # ── COHERE ────────────────────────────────────────────────────────────
+            elif provider == ProviderType.COHERE:
+                if not api_key:
+                    return ModelService._get_default_models(provider)
+                import aiohttp
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(
+                        "https://api.cohere.com/v2/models?page_size=50",
+                        headers={"Authorization": f"Bearer {api_key}", "Accept": "application/json"},
+                        timeout=aiohttp.ClientTimeout(total=10)
+                    ) as resp:
+                        if resp.status == 200:
+                            data = await resp.json()
+                            models = [m["name"] for m in data.get("models", []) if "name" in m]
+                            return sorted(models) if models else ModelService._get_default_models(provider)
+                        return ModelService._get_default_models(provider)
+
+            # ── AI21 ──────────────────────────────────────────────────────────────
+            # AI21 has no standard /models endpoint — return curated list
+            elif provider == ProviderType.AI21:
+                return [
+                    "jamba-1.5-large",
+                    "jamba-1.5-mini",
+                    "jamba-instruct",
+                    "j2-ultra",
+                    "j2-mid",
+                    "j2-light",
+                ]
+
+            # ── DEEPSEEK ──────────────────────────────────────────────────────────
             elif provider == ProviderType.DEEPSEEK:
                 if not api_key:
                     return ModelService._get_default_models(provider)
@@ -1128,6 +1221,7 @@ class ModelService:
                 models = await client.models.list()
                 return sorted([m.id for m in models.data])
 
+            # ── MOONSHOT ──────────────────────────────────────────────────────────
             elif provider == ProviderType.MOONSHOT:
                 if not api_key:
                     return ModelService._get_default_models(provider)
@@ -1136,36 +1230,75 @@ class ModelService:
                 models = await client.models.list()
                 return sorted([m.id for m in models.data])
 
-            elif provider == ProviderType.ANTHROPIC:
+            # ── QIANWEN (Alibaba) ─────────────────────────────────────────────────
+            # No public /models endpoint — return curated list
+            elif provider == ProviderType.QIANWEN:
                 return [
-                    "claude-3-5-sonnet-20241022",
-                    "claude-3-5-haiku-20241022",
-                    "claude-3-opus-20240229",
-                    "claude-3-sonnet-20240229",
-                    "claude-3-haiku-20240307"
+                    "qwen-max",
+                    "qwen-plus",
+                    "qwen-turbo",
+                    "qwen-long",
+                    "qwen2.5-72b-instruct",
+                    "qwen2.5-32b-instruct",
+                    "qwen2.5-14b-instruct",
+                    "qwen2.5-7b-instruct",
                 ]
 
-            elif provider == ProviderType.GEMINI:
+            # ── ZHIPU (ChatGLM) ───────────────────────────────────────────────────
+            # No public /models endpoint — return curated list
+            elif provider == ProviderType.ZHIPU:
                 return [
-                    "gemini-1.5-pro-latest",
-                    "gemini-1.5-flash-latest",
-                    "gemini-1.0-pro"
+                    "glm-4-plus",
+                    "glm-4",
+                    "glm-4-air",
+                    "glm-4-flash",
+                    "glm-4-long",
+                    "chatglm_turbo",
                 ]
 
+            # ── AZURE OPENAI ──────────────────────────────────────────────────────
+            # Azure lists deployments, not base models — requires resource-specific URL
+            elif provider == ProviderType.AZURE_OPENAI:
+                if not api_key or not base_url:
+                    return ModelService._get_default_models(provider)
+                import openai
+                client = openai.AsyncOpenAI(
+                    api_key=api_key,
+                    base_url=base_url,
+                    default_headers={"api-key": api_key},
+                )
+                try:
+                    models = await client.models.list()
+                    return sorted([m.id for m in models.data])
+                except Exception:
+                    return ModelService._get_default_models(provider)
+
+            # ── LOCAL (Ollama / LM Studio) ────────────────────────────────────────
             elif provider == ProviderType.LOCAL:
                 import aiohttp
                 url = base_url or "http://localhost:11434"
                 if url.endswith('/v1'):
                     url = url[:-3]
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(f"{url}/api/tags", timeout=aiohttp.ClientTimeout(total=5)) as resp:
-                        if resp.status == 200:
-                            data = await resp.json()
-                            models = [m['name'] for m in data.get('models', [])]
-                            return sorted(models) if models else ModelService._get_default_models(provider)
-                        else:
-                            return ModelService._get_default_models(provider)
+                # Try Ollama native /api/tags first
+                try:
+                    async with aiohttp.ClientSession() as session:
+                        async with session.get(f"{url}/api/tags", timeout=aiohttp.ClientTimeout(total=5)) as resp:
+                            if resp.status == 200:
+                                data = await resp.json()
+                                models = [m['name'] for m in data.get('models', [])]
+                                return sorted(models) if models else ModelService._get_default_models(provider)
+                except Exception:
+                    pass
+                # Fallback: OpenAI-compat /models (LM Studio)
+                try:
+                    import openai
+                    client = openai.AsyncOpenAI(api_key="not-needed", base_url=f"{url}/v1")
+                    models = await client.models.list()
+                    return sorted([m.id for m in models.data])
+                except Exception:
+                    return ModelService._get_default_models(provider)
 
+            # ── CUSTOM / OPENAI_COMPATIBLE ────────────────────────────────────────
             elif provider in [ProviderType.CUSTOM, ProviderType.OPENAI_COMPATIBLE]:
                 if not base_url or not api_key:
                     return ["custom-model-1", "custom-model-2"]
@@ -1183,43 +1316,71 @@ class ModelService:
 
     @staticmethod
     def _get_default_models(provider: ProviderType) -> List[str]:
-        """Get sensible default models when API fetch fails."""
+        """Get current curated defaults when live API fetch fails."""
         defaults = {
             ProviderType.OPENAI: [
-                "gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-4-turbo-preview", "gpt-3.5-turbo"
+                "gpt-4o", "gpt-4o-mini", "o3-mini", "o1", "o1-mini",
+                "gpt-4-turbo", "gpt-3.5-turbo",
             ],
             ProviderType.ANTHROPIC: [
+                "claude-opus-4-5", "claude-sonnet-4-5", "claude-haiku-4-5",
                 "claude-3-5-sonnet-20241022", "claude-3-5-haiku-20241022",
-                "claude-3-opus-20240229", "claude-3-sonnet-20240229", "claude-3-haiku-20240307"
-            ],
-            ProviderType.GROQ: [
-                "llama-3.3-70b-versatile", "llama-3.1-70b-versatile",
-                "llama-3.1-8b-instant", "mixtral-8x7b-32768", "gemma2-9b-it"
-            ],
-            ProviderType.MISTRAL: [
-                "mistral-large-latest", "mistral-medium-latest",
-                "mistral-small-latest", "open-mistral-7b"
-            ],
-            ProviderType.TOGETHER: [
-                "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo",
-                "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
-                "mistralai/Mixtral-8x7B-Instruct-v0.1",
-                "Qwen/Qwen2.5-72B-Instruct-Turbo"
+                "claude-3-opus-20240229", "claude-3-haiku-20240307",
             ],
             ProviderType.GEMINI: [
-                "gemini-1.5-pro-latest", "gemini-1.5-flash-latest", "gemini-1.0-pro"
+                "gemini-2.0-flash", "gemini-2.0-flash-lite",
+                "gemini-2.5-pro-preview-03-25",
+                "gemini-1.5-pro", "gemini-1.5-flash", "gemini-1.5-flash-8b",
             ],
-            ProviderType.MOONSHOT: [
-                "moonshot-v1-128k", "moonshot-v1-32k", "moonshot-v1-8k"
+            ProviderType.GROQ: [
+                "llama-3.3-70b-versatile", "llama-3.1-8b-instant",
+                "mixtral-8x7b-32768", "gemma2-9b-it",
+                "deepseek-r1-distill-llama-70b",
             ],
-            ProviderType.DEEPSEEK: [
-                "deepseek-chat", "deepseek-coder"
+            ProviderType.MISTRAL: [
+                "mistral-large-latest", "mistral-small-latest",
+                "codestral-latest", "open-mistral-nemo",
             ],
-            ProviderType.LOCAL: [
-                "llama3.2", "llama3.1", "mistral", "qwen2.5", "phi3"
+            ProviderType.TOGETHER: [
+                "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+                "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
+                "Qwen/Qwen2.5-72B-Instruct-Turbo",
+                "deepseek-ai/DeepSeek-R1",
+                "mistralai/Mixtral-8x7B-Instruct-v0.1",
+            ],
+            ProviderType.FIREWORKS: [
+                "accounts/fireworks/models/llama-v3p3-70b-instruct",
+                "accounts/fireworks/models/llama-v3p1-8b-instruct",
+                "accounts/fireworks/models/mixtral-8x7b-instruct",
+                "accounts/fireworks/models/deepseek-r1",
+            ],
+            ProviderType.PERPLEXITY: [
+                "sonar-pro", "sonar", "sonar-reasoning-pro", "sonar-reasoning", "r1-1776",
             ],
             ProviderType.COHERE: [
-                "command-r-plus", "command-r", "command"
+                "command-r-plus", "command-r", "command-a-03-2025",
+            ],
+            ProviderType.AI21: [
+                "jamba-1.5-large", "jamba-1.5-mini", "jamba-instruct",
+            ],
+            ProviderType.MOONSHOT: [
+                "moonshot-v1-128k", "moonshot-v1-32k", "moonshot-v1-8k",
+            ],
+            ProviderType.DEEPSEEK: [
+                "deepseek-chat", "deepseek-reasoner",
+            ],
+            ProviderType.QIANWEN: [
+                "qwen-max", "qwen-plus", "qwen-turbo",
+                "qwen2.5-72b-instruct", "qwen2.5-32b-instruct",
+            ],
+            ProviderType.ZHIPU: [
+                "glm-4-plus", "glm-4", "glm-4-air", "glm-4-flash",
+            ],
+            ProviderType.AZURE_OPENAI: [
+                "gpt-4o", "gpt-4", "gpt-35-turbo",
+            ],
+            ProviderType.LOCAL: [
+                "llama3.2", "llama3.1", "mistral", "qwen2.5", "phi4", "deepseek-r1",
             ],
         }
         return defaults.get(provider, ["model-1", "model-2"])

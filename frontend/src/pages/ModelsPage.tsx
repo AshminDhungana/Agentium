@@ -247,7 +247,7 @@ export const ModelsPage: React.FC = () => {
             await modelsApi.deleteConfig(id);
             await loadConfigs();
         } catch {
-            alert('Failed to delete');
+            toast.error('Failed to delete configuration');
         } finally {
             setDeletingId(null);
         }
@@ -258,7 +258,7 @@ export const ModelsPage: React.FC = () => {
             await modelsApi.setDefault(id);
             await loadConfigs();
         } catch {
-            alert('Failed to set default');
+            toast.error('Failed to set default');
         }
     };
 
@@ -266,14 +266,14 @@ export const ModelsPage: React.FC = () => {
         setTestingId(id);
         try {
             const result = await modelsApi.testConfig(id);
-            alert(
-                result.success
-                    ? `✅ Connection successful!\nLatency: ${result.latency_ms}ms\nModel: ${result.model}`
-                    : `❌ Connection failed: ${result.error}`
-            );
+            if (result.success) {
+                toast.success(`✅ Connected · ${result.latency_ms}ms · ${result.model}`);
+            } else {
+                toast.error(`Connection failed: ${result.error}`);
+            }
             await loadConfigs();
         } catch {
-            alert('Test failed');
+            toast.error('Test failed — check your API key and network');
         } finally {
             setTestingId(null);
         }
@@ -283,12 +283,17 @@ export const ModelsPage: React.FC = () => {
         setFetchingModelsId(id);
         try {
             const result = await modelsApi.fetchModels(id);
-            alert(
-                `Found ${result.count} models:\n${result.models.slice(0, 10).join('\n')}${result.count > 10 ? '\n...and more' : ''}`
+            // Optimistically update the card immediately so the list reflects new models
+            setConfigs(prev =>
+                prev.map(c =>
+                    c.id === id ? { ...c, available_models: result.models } : c
+                )
             );
+            toast.success(`Fetched ${result.count} models from ${result.provider}`);
+            // Then sync from server to confirm persisted state
             await loadConfigs();
         } catch (err: any) {
-            alert('Failed to fetch models: ' + err.message);
+            toast.error('Failed to fetch models: ' + (err.response?.data?.detail || err.message));
         } finally {
             setFetchingModelsId(null);
         }

@@ -7,6 +7,7 @@ from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from pydantic import BaseModel, SecretStr, Field, field_validator
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import flag_modified
 
 from backend.models.database import get_db
 from backend.models.entities.user_config import UserModelConfig, ProviderType, ConnectionStatus, ModelUsageLog
@@ -134,7 +135,7 @@ async def list_providers():
             requires_base_url=False,
             default_base_url="https://api.openai.com/v1",
             description="GPT-4o, GPT-4 Turbo, and other OpenAI models",
-            popular_models=["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-3.5-turbo"]
+            popular_models=["gpt-4o", "gpt-4o-mini", "o3-mini", "gpt-4-turbo"]
         ),
         ProviderInfo(
             id=ProviderType.ANTHROPIC.value,
@@ -143,8 +144,8 @@ async def list_providers():
             requires_api_key=True,
             requires_base_url=False,
             default_base_url="https://api.anthropic.com/v1",
-            description="Claude 3.5 Sonnet, Claude 3 Opus/Haiku - excellent reasoning",
-            popular_models=["claude-3-5-sonnet-20240620", "claude-3-opus-20240229", "claude-3-haiku-20240307"]
+            description="Claude Opus, Sonnet, Haiku - excellent reasoning and coding",
+            popular_models=["claude-opus-4-5", "claude-sonnet-4-5", "claude-haiku-4-5"]
         ),
         ProviderInfo(
             id=ProviderType.GEMINI.value,
@@ -153,8 +154,8 @@ async def list_providers():
             requires_api_key=True,
             requires_base_url=False,
             default_base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
-            description="Google's multimodal models (Gemini 1.5 Pro, Flash)",
-            popular_models=["gemini-1.5-flash", "gemini-1.5-pro", "gemini-1.5-flash-8b"]
+            description="Google's multimodal models (Gemini 2.0 Flash, 1.5 Pro)",
+            popular_models=["gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash"]
         ),
         ProviderInfo(
             id=ProviderType.GROQ.value,
@@ -164,7 +165,7 @@ async def list_providers():
             requires_base_url=False,
             default_base_url="https://api.groq.com/openai/v1",
             description="Ultra-fast inference (100+ tokens/sec) with Llama 3.1",
-            popular_models=["llama-3.1-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768"]
+            popular_models=["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "deepseek-r1-distill-llama-70b"]
         ),
         ProviderInfo(
             id=ProviderType.MISTRAL.value,
@@ -184,7 +185,7 @@ async def list_providers():
             requires_base_url=False,
             default_base_url="https://api.together.xyz/v1",
             description="Access to 100+ open-source models (Llama 3.1, Qwen 2)",
-            popular_models=["meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo", "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo", "Qwen/Qwen2-72B-Instruct"]
+            popular_models=["meta-llama/Llama-3.3-70B-Instruct-Turbo", "Qwen/Qwen2.5-72B-Instruct-Turbo", "deepseek-ai/DeepSeek-R1"]
         ),
         ProviderInfo(
             id=ProviderType.COHERE.value,
@@ -214,7 +215,7 @@ async def list_providers():
             requires_base_url=False,
             default_base_url="https://api.deepseek.com/v1",
             description="DeepSeek Coder V2 and Chat models",
-            popular_models=["deepseek-chat", "deepseek-coder"]
+            popular_models=["deepseek-chat", "deepseek-reasoner"]
         ),
         ProviderInfo(
             id=ProviderType.AZURE_OPENAI.value,
@@ -476,6 +477,7 @@ async def fetch_models(
         )
         
         config.available_models = models
+        flag_modified(config, "available_models")  # required: SQLAlchemy won't detect JSON column reassignment without this
         db.commit()
         
         return {
