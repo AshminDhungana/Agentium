@@ -311,6 +311,42 @@ async def _stream_response(
         await ChatService.log_interaction(agent_id, message, full_text, config_id, db)
 
         sovereign_user = db.query(User).filter_by(is_admin=True, is_active=True).first()
+
+        # ── Persist both turns to ChatMessage so history survives navigation ──
+        if sovereign_user:
+            try:
+                from backend.models.entities.chat_message import ChatMessage as ChatMsg
+                user_str_id = str(sovereign_user.id)
+
+                db.add(ChatMsg(
+                    id=str(uuid.uuid4()),
+                    user_id=user_str_id,
+                    role="sovereign",
+                    content=message,
+                    metadata={"source": "chat"},
+                ))
+                db.add(ChatMsg(
+                    id=message_id,
+                    user_id=user_str_id,
+                    role="head_of_council",
+                    content=full_text,
+                    metadata={
+                        "agent_id": agent_id,
+                        "model": model_name,
+                        "task_created": task_info.get("created", False),
+                        "task_id": task_info.get("task_id"),
+                    },
+                ))
+                db.commit()
+            except Exception as _persist_err:
+                # Non-fatal — message already delivered to client
+                print(f"[chat.py] ChatMessage persist failed (non-fatal): {_persist_err}")
+                try:
+                    db.rollback()
+                except Exception:
+                    pass
+        # ─────────────────────────────────────────────────────────────────────
+
         if sovereign_user:
             broadcast_payload = {
                 "user_id": sovereign_user.id,

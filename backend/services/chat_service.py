@@ -8,7 +8,7 @@ from datetime import datetime
 from typing import Dict, Any, Optional
 from sqlalchemy.orm import Session
 
-from backend.models.entities import Agent, HeadOfCouncil, Task, TaskPriority, TaskType
+from backend.models.entities import Agent, HeadOfCouncil, Task, TaskPriority, TaskType, UserModelConfig
 from backend.models.entities.agents import AgentType
 from backend.models.entities.audit import AuditLog, AuditLevel, AuditCategory
 from backend.services.context_manager import context_manager
@@ -33,6 +33,35 @@ class ChatService:
         config = head.get_model_config(db)
         config_id = config.id if config else None
         model_name = config.default_model if config else "default"
+
+        # ── FALLBACK: Head has no model_config_id — use the global default ──────
+        # This happens on fresh deploys before the agent is assigned a config.
+        if not config_id:
+            try:
+                default_config = (
+                    db.query(UserModelConfig)
+                    .filter(UserModelConfig.is_default == True)
+                    .filter(UserModelConfig.status == "active")
+                    .first()
+                )
+                if default_config:
+                    config_id = str(default_config.id)
+                    model_name = default_config.default_model
+                    logger.info(
+                        f"Head {head.agentium_id} has no model_config_id — "
+                        f"falling back to default config '{default_config.config_name}' ({config_id})"
+                    )
+                    # Persist the link so we don't fall back on every request
+                    try:
+                        head.model_config_id = config_id
+                        db.commit()
+                        logger.info(f"✅ Persisted default model config to Head {head.agentium_id}")
+                    except Exception as persist_err:
+                        logger.warning(f"Could not persist model_config_id to Head: {persist_err}")
+                        db.rollback()
+            except Exception as fallback_err:
+                logger.warning(f"Default config fallback failed for Head {head.agentium_id}: {fallback_err}")
+        # ─────────────────────────────────────────────────────────────────────────
 
         # Register context tracking if not exists
         context_manager.register_agent(
@@ -176,6 +205,41 @@ Address the Sovereign respectfully. If they issue a command that requires execut
         # In a multi-tenant system we'd capture the exact user who invoked the chat.
         # For sovereign we just take the first active admin user.
         sovereign_user = db.query(User).filter_by(is_admin=True, is_active=True).first()
+
+        # ── Persist both turns to ChatMessage so history survives navigation ──
+        if sovereign_user:
+            try:
+                from backend.models.entities.chat_message import ChatMessage as ChatMsg
+                import uuid as _uuid
+                user_str_id = str(sovereign_user.id)
+                msg_id = str(_uuid.uuid4())
+
+                db.add(ChatMsg(
+                    id=str(_uuid.uuid4()),
+                    user_id=user_str_id,
+                    role="sovereign",
+                    content=message,
+                    metadata={"source": "websocket"},
+                ))
+                db.add(ChatMsg(
+                    id=msg_id,
+                    user_id=user_str_id,
+                    role="head_of_council",
+                    content=result["content"],
+                    metadata={
+                        "agent_id": head.agentium_id,
+                        "model": result.get("model", model_name),
+                    },
+                ))
+                db.commit()
+            except Exception as _persist_err:
+                logger.warning(f"ChatMessage persist failed (non-fatal): {_persist_err}")
+                try:
+                    db.rollback()
+                except Exception:
+                    pass
+        # ─────────────────────────────────────────────────────────────────────
+
         if sovereign_user:
             import asyncio
             asyncio.create_task(

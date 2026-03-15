@@ -186,6 +186,15 @@ async def lifespan(app: FastAPI):
         # Continue anyway — council can be initialized later
 
     # ─────────────────────────────────────────────────────────────
+    # 2b. Auto-assign default model config to Head if missing
+    #     Runs after API Manager (step 3) so configs already exist.
+    #     Moved here as a best-effort repair — does NOT block startup.
+    # ─────────────────────────────────────────────────────────────
+    # NOTE: This block runs AFTER step 3 below, but we declare it here
+    # so the call site is close to the Council init. The actual repair
+    # function is invoked at the end of step 3 (see _repair_head_model_config).
+
+    # ─────────────────────────────────────────────────────────────
     # 3. Initialize API Manager (Universal Provider Support)
     # ─────────────────────────────────────────────────────────────
     try:
@@ -197,6 +206,50 @@ async def lifespan(app: FastAPI):
             db.close()
     except Exception as e:
         logger.error(f"❌ API Manager initialization failed: {e}")
+
+    # ─────────────────────────────────────────────────────────────
+    # 3b. Auto-assign default model config to Head agent if missing
+    #     Runs after API Manager so model configs are guaranteed to exist.
+    # ─────────────────────────────────────────────────────────────
+    try:
+        db = next(get_db())
+        try:
+            from backend.models.entities import UserModelConfig
+            from backend.models.entities.agents import HeadOfCouncil
+
+            head = db.query(HeadOfCouncil).filter(
+                HeadOfCouncil.agentium_id == "00001"
+            ).first()
+
+            if head and not head.model_config_id:
+                default_cfg = (
+                    db.query(UserModelConfig)
+                    .filter(UserModelConfig.is_default == True)
+                    .filter(UserModelConfig.status == "active")
+                    .first()
+                )
+                if default_cfg:
+                    head.model_config_id = str(default_cfg.id)
+                    db.commit()
+                    logger.info(
+                        f"✅ Auto-assigned default model config to Head 00001: "
+                        f"'{default_cfg.config_name}' ({default_cfg.id})"
+                    )
+                else:
+                    logger.warning(
+                        "⚠️ No active default model config found — "
+                        "Head 00001 will fall back at chat time"
+                    )
+            elif head and head.model_config_id:
+                logger.info(
+                    f"✅ Head 00001 already has model config: {head.model_config_id}"
+                )
+        finally:
+            db.close()
+    except Exception as e:
+        logger.warning(
+            f"⚠️ Auto-assign model config to Head skipped (non-fatal): {e}"
+        )
 
     # ─────────────────────────────────────────────────────────────
     # 4. Initialize Model Allocator
