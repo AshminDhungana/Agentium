@@ -1,9 +1,8 @@
 /**
- * AgentTree — uses DragDropContext instead of prop-drilling 7 DnD props.
- * React.memo on all heavy sub-components to stop re-renders on drag events.
+ * AgentTree — virtualized, flattened tree with proper card sizing and connectors.
  */
 
-import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useCallback } from 'react';
 import { Agent } from '../../types';
 import { AgentCard } from './AgentCard';
 import { ChevronRight, ChevronDown, ShieldAlert } from 'lucide-react';
@@ -35,6 +34,18 @@ interface AgentTreeProps {
     level?:          number; // Backward compat flag (usually 0 now)
     includeCritics?: boolean;
 }
+
+// ─── Size constants (stable — not inside component to avoid re-creation) ─────
+
+/**
+ * Estimated row height used by the virtualizer for initial layout.
+ * AgentCard renders to ~220–240 px (header 56 + task-indicator 0–52 + stats 64 +
+ * actions 48 + paddings/borders) + 16 px gap = ~256 px worst case.
+ * measureElement corrects this automatically after first render.
+ */
+const ESTIMATE_CARD_HEIGHT   = 256;
+const ESTIMATE_CRITIC_HEADER = 68;
+const ESTIMATE_CRITIC_CARD   = 220; // Critics have no actions row
 
 // ─── Draggable / droppable card wrapper ───────────────────────────────────────
 
@@ -110,31 +121,28 @@ const DraggableCard: React.FC<{
 
 DraggableCard.displayName = 'DraggableCard';
 
-// ─── Critic helper function ───────────────────────────────────────────────────
+// ─── Critic helper ────────────────────────────────────────────────────────────
 
 function isCriticAgent(agent: Agent): boolean {
     return isCriticAgentId(agent.agentium_id ?? agent.id);
 }
 
-// ─── Flattening Logic ─────────────────────────────────────────────────────────
+// ─── Flattened node type ──────────────────────────────────────────────────────
 
 type FlattenedNode = {
-    agent: Agent;
-    level: number;
-    hasChildren: boolean;
-    isExpanded: boolean;
+    agent:           Agent;
+    level:           number;
+    hasChildren:     boolean;
+    isExpanded:      boolean;
     isCriticHeader?: boolean;
-    isCritic?: boolean;
+    isCritic?:       boolean;
 };
 
-// ─── Virtualized Tree Component ───────────────────────────────────────────────
+// ─── AgentTree (virtualized) ──────────────────────────────────────────────────
 
 export const AgentTree: React.FC<AgentTreeProps> = React.memo(({
     agent: rootAgent, agentsMap, onSpawn, onTerminate, onPromote,
 }) => {
-    // Keep track of expanded nodes. Default to all expanded for small trees, 
-    // or we could track this per-instance. We'll default to expanding everything initially
-    // by not having it in the Set mean "collapsed", but rather we will build a Set of collapsed nodes.
     const [collapsedNodes, setCollapsedNodes] = useState<Set<string>>(new Set());
     const [criticExpanded, setCriticExpanded] = useState(true);
 
@@ -147,126 +155,132 @@ export const AgentTree: React.FC<AgentTreeProps> = React.memo(({
         });
     }, []);
 
-    // Flatten tree structure visible based on expanded state
+    // ── Flatten tree into a linear list ──────────────────────────────────────
+
     const { flattenedNodes, critics } = useMemo(() => {
         const nodes: FlattenedNode[] = [];
         const allCritics: Agent[] = [];
 
-        // Pre-filter all agents if this is the root to separate critics
-        const allAgents = Array.from(agentsMap.values());
-        for (const a of allAgents) {
-            if (isCriticAgent(a)) {
-                allCritics.push(a);
-            }
+        for (const a of agentsMap.values()) {
+            if (isCriticAgent(a)) allCritics.push(a);
         }
 
         const flattenDeep = (agentId: string, depth: number) => {
             const ag = agentsMap.get(agentId);
-            if (!ag || isCriticAgent(ag)) return; // Critics handled separately
+            if (!ag || isCriticAgent(ag)) return;
 
             const subordinateIds = Array.isArray(ag.subordinates) ? ag.subordinates : [];
-            const mainChildren = subordinateIds.filter(subId => {
+            const mainChildren   = subordinateIds.filter(subId => {
                 const sub = agentsMap.get(subId);
                 return sub && !isCriticAgent(sub);
             });
             const hasChildren = mainChildren.length > 0;
             const isCollapsed = collapsedNodes.has(ag.agentium_id);
 
-            nodes.push({
-                agent: ag,
-                level: depth,
-                hasChildren,
-                isExpanded: !isCollapsed,
-            });
+            nodes.push({ agent: ag, level: depth, hasChildren, isExpanded: !isCollapsed });
 
             if (!isCollapsed && hasChildren) {
-                for (const subId of mainChildren) {
-                    flattenDeep(subId, depth + 1);
-                }
+                for (const subId of mainChildren) flattenDeep(subId, depth + 1);
             }
         };
 
-        if (rootAgent) {
-            flattenDeep(rootAgent.agentium_id, 0);
-        }
+        if (rootAgent) flattenDeep(rootAgent.agentium_id, 0);
 
         return { flattenedNodes: nodes, critics: allCritics };
     }, [rootAgent, agentsMap, collapsedNodes]);
 
-    // Construct the final linear array for the virtualizer
+    // ── Append critic section ─────────────────────────────────────────────────
+
     const virtualItems = useMemo(() => {
         const items: FlattenedNode[] = [...flattenedNodes];
-        
+
         if (critics.length > 0) {
-            // Add a special header item for critics
             items.push({
-                agent: { agentium_id: '__critic_header__', name: 'Critic Header', agent_type: 'task_agent', status: 'active', stats: {tasks_completed:0, tasks_failed:0}, subordinates: [], is_terminated: false, constitution_version: '' } as unknown as Agent,
-                level: 0,
-                hasChildren: true,
-                isExpanded: criticExpanded,
-                isCriticHeader: true,
+                agent: {
+                    agentium_id: '__critic_header__', name: 'Critic Header',
+                    agent_type: 'task_agent', status: 'active',
+                    stats: { tasks_completed: 0, tasks_failed: 0 },
+                    subordinates: [], is_terminated: false, constitution_version: '',
+                } as unknown as Agent,
+                level: 0, hasChildren: true, isExpanded: criticExpanded, isCriticHeader: true,
             });
 
             if (criticExpanded) {
-                // Determine how many critics per row, or just list them sequentially.
-                // We'll list them sequentially for simplicity in the virtual list.
                 for (const critic of critics) {
-                    items.push({
-                        agent: critic,
-                        level: 1, // Indent critics slightly
-                        hasChildren: false,
-                        isExpanded: false,
-                        isCritic: true,
-                    });
+                    items.push({ agent: critic, level: 1, hasChildren: false, isExpanded: false, isCritic: true });
                 }
             }
         }
         return items;
     }, [flattenedNodes, critics, criticExpanded]);
 
-    // Virtualizer setup
+    // ── Virtualizer ───────────────────────────────────────────────────────────
+
     const parentRef = useRef<HTMLDivElement>(null);
 
     const virtualizer = useVirtualizer({
-        count: virtualItems.length,
+        count:           virtualItems.length,
         getScrollElement: () => parentRef.current,
-        estimateSize: useCallback((index) => {
+
+        // Stable estimateSize — does NOT close over virtualItems to avoid
+        // forcing full remeasure on every agent update.
+        estimateSize: useCallback((index: number) => {
             const item = virtualItems[index];
-            if (item.isCriticHeader) return 60;
-            return 110; // Approximate height of AgentCard + margins
+            if (!item) return ESTIMATE_CARD_HEIGHT;
+            if (item.isCriticHeader) return ESTIMATE_CRITIC_HEADER;
+            if (item.isCritic)       return ESTIMATE_CRITIC_CARD;
+            return ESTIMATE_CARD_HEIGHT;
+        // eslint-disable-next-line react-hooks/exhaustive-deps
         }, [virtualItems]),
-        overscan: 5,
+
+        // measureElement — corrects estimates after actual render.
+        // Requires data-index on each row div + ref={virtualizer.measureElement}.
+        measureElement: (el) => el.getBoundingClientRect().height,
+
+        overscan:   10,  // was 5 — prevents blank flashes during fast scroll
+        paddingEnd: 16,  // bottom breathing room (replaces the no-op paddingBottom on abs divs)
     });
 
     if (!rootAgent) return null;
 
     return (
-        <div ref={parentRef} className="h-full w-full overflow-y-auto" style={{ minHeight: '500px' }}>
+        // Scroll container must have a concrete height — set by parent (AgentsPage).
+        // h-full works when the parent has overflow-hidden + fixed height.
+        <div
+            ref={parentRef}
+            className="w-full overflow-y-auto"
+            style={{ height: '100%', minHeight: '400px' }}
+        >
             <div
                 style={{
-                    height: `${virtualizer.getTotalSize()}px`,
-                    width: '100%',
+                    height:   `${virtualizer.getTotalSize()}px`,
+                    width:    '100%',
                     position: 'relative',
                 }}
             >
                 {virtualizer.getVirtualItems().map((virtualItem) => {
-                    const node = virtualItems[virtualItem.index];
-                    const leftOffset = node.level * 40; // 40px per indent level
+                    const node       = virtualItems[virtualItem.index];
+                    const leftOffset = node.level * 40; // 40 px per indent level
 
                     return (
                         <div
                             key={virtualItem.key}
+                            // data-index + ref enable measureElement to auto-correct heights
+                            data-index={virtualItem.index}
+                            ref={virtualizer.measureElement}
                             style={{
-                                position: 'absolute',
-                                top: 0,
-                                left: 0,
-                                width: '100%',
+                                position:  'absolute',
+                                top:       0,
+                                left:      0,
+                                width:     '100%',
                                 transform: `translateY(${virtualItem.start}px)`,
-                                paddingRight: '16px',
-                                paddingBottom: '16px'
+                                paddingRight:  '16px',
+                                paddingBottom: '16px', // measured by measureElement → correct spacing
                             }}
                         >
                             <div style={{ marginLeft: `${leftOffset}px`, width: `calc(100% - ${leftOffset}px)` }}>
+
+                                {/* ── Critic section header ─────────────────── */}
                                 {node.isCriticHeader ? (
                                     <div className="mt-4 mb-2">
                                         <button
@@ -277,42 +291,69 @@ export const AgentTree: React.FC<AgentTreeProps> = React.memo(({
                                                 <ShieldAlert className="w-4 h-4" />
                                                 <span className="text-sm font-semibold">Critic Agents</span>
                                                 <span className="text-xs font-mono opacity-70">({critics.length})</span>
-                                                {criticExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                                                {criticExpanded
+                                                    ? <ChevronDown  className="w-3.5 h-3.5" />
+                                                    : <ChevronRight className="w-3.5 h-3.5" />}
                                             </div>
                                             <div className="flex-1 h-px bg-rose-200 dark:bg-rose-500/20" />
                                         </button>
                                     </div>
+
+                                /* ── Critic card ─────────────────────────── */
                                 ) : node.isCritic ? (
-                                    <div className="relative rounded-xl border border-rose-200 dark:border-rose-500/20 bg-rose-50/40 dark:bg-rose-500/5 p-4 mb-2">
-                                        <div className="relative z-10 flex">
-                                            <div className="flex-shrink-0 flex-1">
-                                                <AgentCard agent={node.agent} onSpawn={onSpawn} onTerminate={onTerminate} />
-                                            </div>
-                                        </div>
+                                    <div className="relative rounded-xl border border-rose-200 dark:border-rose-500/20 bg-rose-50/40 dark:bg-rose-500/5 p-4">
+                                        <AgentCard
+                                            agent={node.agent}
+                                            onSpawn={onSpawn}
+                                            onTerminate={onTerminate}
+                                        />
                                     </div>
+
+                                /* ── Regular agent card ──────────────────── */
                                 ) : (
                                     <div className="flex items-start gap-2 relative group w-full">
-                                        {/* Connecting lines for deep levels */}
+
+                                        {/*
+                                         * Connecting lines — self-contained per row.
+                                         *
+                                         * In a virtualizer, items are independent absolutely-positioned divs.
+                                         * We CANNOT draw a line that spans from one item into the next —
+                                         * the previous approach used height:'120%' + top:'-24px' which broke
+                                         * layout by escaping the item's bounds into unrelated cards.
+                                         *
+                                         * New approach: a short vertical stub (top-half only) + horizontal
+                                         * elbow, both fully contained within this row's div. This gives a
+                                         * clear indent cue without cross-item bleeding.
+                                         */}
                                         {node.level > 0 && (
-                                            <>
+                                            <div
+                                                className="absolute pointer-events-none"
+                                                style={{ left: '-20px', top: 0, width: '20px', height: '28px' }}
+                                                aria-hidden="true"
+                                            >
+                                                {/* Vertical stub — top of item to elbow */}
                                                 <div
-                                                    className="absolute w-6 border-t-2 border-slate-300 dark:border-slate-600 rounded-bl-xl"
-                                                    style={{ left: '-24px', top: '24px' }}
+                                                    className="absolute border-l-2 border-slate-200 dark:border-slate-700"
+                                                    style={{ left: 0, top: 0, height: '28px' }}
                                                 />
+                                                {/* Horizontal elbow */}
                                                 <div
-                                                    className="absolute border-l-2 border-slate-300 dark:border-slate-600"
-                                                    style={{ left: '-24px', height: '120%', top: '-24px', zIndex: -1 }}
+                                                    className="absolute border-t-2 border-slate-200 dark:border-slate-700"
+                                                    style={{ left: 0, top: '27px', width: '20px' }}
                                                 />
-                                            </>
+                                            </div>
                                         )}
 
+                                        {/* Expand / collapse toggle */}
                                         {node.hasChildren ? (
                                             <button
                                                 onClick={() => toggleNode(node.agent.agentium_id)}
                                                 aria-label={node.isExpanded ? 'Collapse' : 'Expand'}
                                                 className="mt-3 p-1 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors duration-150 flex-shrink-0 z-10 bg-white dark:bg-[#161b27]"
                                             >
-                                                {node.isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                                                {node.isExpanded
+                                                    ? <ChevronDown  className="w-4 h-4" />
+                                                    : <ChevronRight className="w-4 h-4" />}
                                             </button>
                                         ) : (
                                             <div className="w-6 flex-shrink-0" />

@@ -36,8 +36,8 @@ function normalizeAgent(raw: unknown): Agent {
 
 // ─── Persistent preferences ───────────────────────────────────────────────────
 
-const PREF_VIEW_MODE   = 'agentsPage:viewMode';
-const PREF_SIDEBAR     = 'agentsPage:sidebarOpen';
+const PREF_VIEW_MODE = 'agentsPage:viewMode';
+const PREF_SIDEBAR   = 'agentsPage:sidebarOpen';
 
 function readPref<T>(key: string, fallback: T): T {
     try {
@@ -203,19 +203,17 @@ export const AgentsPage: React.FC = () => {
         pendingReassign, validating, validationError,
     } = state;
 
-    // ── Lifecycle sidebar refresh token (replaces dashboardKey hack) ──────────
+    // ── Lifecycle sidebar refresh token ───────────────────────────────────────
     const [dashboardKey, setDashboardKey] = React.useState(0);
 
     // ── WebSocket ─────────────────────────────────────────────────────────────
     const lastMessage = useWebSocketStore(s => s.lastMessage);
     const prevMsgRef  = useRef<typeof lastMessage>(null);
 
-    // Debounce flag: prevent duplicate fetches when a WS event fires
-    // both as a typed message AND as a system/content message
     const fetchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Data loading — AbortController prevents state updates on unmounted component
+    // Data loading
     // ─────────────────────────────────────────────────────────────────────────
 
     const loadAgents = useCallback(async (silent = false) => {
@@ -250,7 +248,7 @@ export const AgentsPage: React.FC = () => {
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Real-time updates via WebSocket — deduped, structured event support
+    // Real-time updates via WebSocket
     // ─────────────────────────────────────────────────────────────────────────
 
     const debouncedSilentFetch = useCallback(() => {
@@ -258,7 +256,7 @@ export const AgentsPage: React.FC = () => {
         fetchDebounceRef.current = setTimeout(() => {
             loadAgents(true);
             fetchDebounceRef.current = null;
-        }, 250); // 250ms window collapses duplicate events
+        }, 250);
     }, [loadAgents]);
 
     useEffect(() => {
@@ -268,7 +266,6 @@ export const AgentsPage: React.FC = () => {
         const { type, content, metadata } = lastMessage;
         const contentStr = typeof content === 'string' ? content : '';
 
-        // ── Handle structured lifecycle events from backend ───────────────
         if (type === 'agent_spawned' || type === 'agent_promoted') {
             debouncedSilentFetch();
             return;
@@ -284,7 +281,7 @@ export const AgentsPage: React.FC = () => {
         }
 
         if (type === 'agent_status_changed') {
-            const agentId  = (lastMessage.agent_id as string) ?? metadata?.agent_id as string;
+            const agentId   = (lastMessage.agent_id as string) ?? metadata?.agent_id as string;
             const newStatus = lastMessage.new_status as Agent['status'];
             if (agentId && newStatus) {
                 dispatch({ type: 'UPDATE_AGENT_STATUS', agentiumId: agentId, status: newStatus });
@@ -292,7 +289,6 @@ export const AgentsPage: React.FC = () => {
             return;
         }
 
-        // ── Handle legacy system/content events ──────────────────────────
         if (type === 'system' && isAgentWsEvent(type, contentStr)) {
             debouncedSilentFetch();
             return;
@@ -327,7 +323,7 @@ export const AgentsPage: React.FC = () => {
     }, []);
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Derived data — memoized so drag events don't re-derive the map
+    // Derived data
     // ─────────────────────────────────────────────────────────────────────────
 
     const agentsMap = useMemo(() => {
@@ -341,7 +337,6 @@ export const AgentsPage: React.FC = () => {
         [agents],
     );
 
-    // Tier counts for summary bar
     const tierCounts = useMemo(() => {
         const counts = { head: 0, council: 0, lead: 0, task: 0 };
         agents.forEach(a => {
@@ -365,7 +360,6 @@ export const AgentsPage: React.FC = () => {
     ) => {
         if (!spawnParent) return;
 
-        // Optimistic placeholder
         const placeholderId = `pending-${Date.now()}`;
         const placeholder   = normalizeAgent({
             id: placeholderId, agentium_id: placeholderId, name,
@@ -396,7 +390,6 @@ export const AgentsPage: React.FC = () => {
             toast.success('Agent spawned successfully');
             await loadAgents(true);
         } catch (err) {
-            // Roll back optimistic update
             dispatch({
                 type: 'SET_AGENTS',
                 agents: agents
@@ -412,7 +405,7 @@ export const AgentsPage: React.FC = () => {
     };
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Terminate (opens modal instead of window.confirm)
+    // Terminate
     // ─────────────────────────────────────────────────────────────────────────
 
     const handleTerminate = useCallback((agent: Agent) => {
@@ -422,7 +415,6 @@ export const AgentsPage: React.FC = () => {
     const handleTerminateConfirm = async (reason: string, authorizedById: string) => {
         if (!terminateTarget) return;
 
-        // Optimistic: show as "terminating"
         dispatch({ type: 'UPDATE_AGENT_STATUS', agentiumId: terminateTarget.agentium_id, status: 'terminating' });
 
         try {
@@ -432,7 +424,6 @@ export const AgentsPage: React.FC = () => {
             await loadAgents(true);
             setDashboardKey(k => k + 1);
         } catch (err: unknown) {
-            // Roll back optimistic update
             dispatch({ type: 'UPDATE_AGENT_STATUS', agentiumId: terminateTarget.agentium_id, status: 'active' });
             const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
             throw new Error(detail || 'Termination failed');
@@ -467,7 +458,7 @@ export const AgentsPage: React.FC = () => {
     };
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Drag-and-drop — handled by DragDropProvider; we just receive the commit
+    // Drag-and-drop reassign
     // ─────────────────────────────────────────────────────────────────────────
 
     const handleDropCommit = useCallback(async (draggingAgent: Agent, newParentId: string) => {
@@ -495,7 +486,6 @@ export const AgentsPage: React.FC = () => {
         const { agent, newParent } = pendingReassign;
         dispatch({ type: 'SET_PENDING_REASSIGN', payload: null });
 
-        // Optimistic tree update
         const oldParent = agents.find(a => a.subordinates.includes(agent.agentium_id));
         dispatch({
             type: 'SET_AGENTS',
@@ -545,7 +535,6 @@ export const AgentsPage: React.FC = () => {
                         Manage your AI workforce
                     </p>
 
-                    {/* Tier summary pills */}
                     {!isLoading && agents.length > 0 && (
                         <div className="flex items-center gap-2 mt-2 flex-wrap">
                             {([
@@ -610,10 +599,21 @@ export const AgentsPage: React.FC = () => {
             </div>
 
             {/* ── Main + sidebar layout ────────────────────────────── */}
+            {/*
+             * flex-1 + overflow-hidden here is critical.
+             * The tree uses a virtualizer that needs a concrete scroll container height.
+             * overflow-hidden on this row prevents the page itself from scrolling and
+             * ensures the inner virtualizer div gets h-full resolved to a real pixel value.
+             */}
             <div className={`flex flex-1 gap-4 overflow-hidden ${sidebarOpen ? 'flex-row' : ''}`}>
 
                 {/* ── Content area ──────────────────────────────────── */}
-                <div className="flex-1 overflow-auto rounded-xl border border-slate-200 dark:border-[#1e2535] p-6 bg-white dark:bg-[#161b27] shadow-sm dark:shadow-[0_2px_20px_rgba(0,0,0,0.3)] transition-colors duration-200">
+                {/*
+                 * overflow-hidden (not overflow-auto) — the virtualizer manages its own
+                 * scroll internally. Setting overflow-auto here competes with it and
+                 * breaks the scroll container height calculation.
+                 */}
+                <div className="flex-1 overflow-hidden rounded-xl border border-slate-200 dark:border-[#1e2535] bg-white dark:bg-[#161b27] shadow-sm dark:shadow-[0_2px_20px_rgba(0,0,0,0.3)] transition-colors duration-200">
 
                     {isLoading ? (
                         <div className="flex flex-col items-center justify-center h-40 gap-3 text-slate-400 dark:text-slate-500">
@@ -634,12 +634,29 @@ export const AgentsPage: React.FC = () => {
 
                     ) : viewMode === 'tree' ? (
                         headOfCouncil ? (
-                            <div className="relative rounded-xl border border-slate-200 dark:border-slate-700/50 bg-slate-50 dark:bg-slate-900 p-6 min-h-[500px] overflow-auto">
+                            /*
+                             * Tree wrapper:
+                             *
+                             * BEFORE: min-h-[500px] overflow-auto p-6
+                             *   - min-h grows with content → parent never clips → page scrolls
+                             *   - overflow-auto competes with the virtualizer's own scroll container
+                             *   - p-6 padding is inside the scroll area, causing the virtualizer
+                             *     to miscalculate available height
+                             *
+                             * AFTER: h-full overflow-hidden p-4
+                             *   - h-full resolves to the flex-1 parent's computed height (fixed)
+                             *   - overflow-hidden lets the virtualizer's own scroll container
+                             *     be the only scrollable element
+                             *   - Dot-grid bg is still there via the absolute overlay
+                             */
+                            <div className="relative h-full overflow-hidden bg-slate-50 dark:bg-slate-900">
+                                {/* Dot-grid background decoration */}
                                 <div
-                                    className="absolute inset-0 rounded-xl bg-[radial-gradient(circle,_#cbd5e1_1px,_transparent_1px)] dark:bg-[radial-gradient(circle,_#334155_1px,_transparent_1px)] bg-[length:20px_20px] opacity-60 pointer-events-none"
+                                    className="absolute inset-0 bg-[radial-gradient(circle,_#cbd5e1_1px,_transparent_1px)] dark:bg-[radial-gradient(circle,_#334155_1px,_transparent_1px)] bg-[length:20px_20px] opacity-60 pointer-events-none rounded-xl"
                                     aria-hidden="true"
                                 />
-                                <div className="relative z-10">
+                                {/* Tree content — p-4 applied here, inside the scroll area */}
+                                <div className="relative z-10 h-full p-4">
                                     <DragDropProvider onDropCommit={handleDropCommit}>
                                         <AgentTree
                                             agent={headOfCouncil}
@@ -652,19 +669,22 @@ export const AgentsPage: React.FC = () => {
                                 </div>
                             </div>
                         ) : (
-                            <div className="flex items-center gap-2 text-red-600 dark:text-red-400 text-sm">
+                            <div className="flex items-center gap-2 text-red-600 dark:text-red-400 text-sm p-6">
                                 <AlertCircle className="w-4 h-4 flex-shrink-0" />
                                 Head of Council not found in agent list.
                             </div>
                         )
 
                     ) : (
-                        <AgentListView
-                            agents={agents}
-                            onSpawn={a => dispatch({ type: 'SET_SPAWN_PARENT', agent: a })}
-                            onTerminate={handleTerminate}
-                            onPromote={a => dispatch({ type: 'SET_PROMOTE_TARGET', agent: a })}
-                        />
+                        // List view — its own scroll, so overflow-auto is correct here
+                        <div className="h-full overflow-auto p-6">
+                            <AgentListView
+                                agents={agents}
+                                onSpawn={a => dispatch({ type: 'SET_SPAWN_PARENT', agent: a })}
+                                onTerminate={handleTerminate}
+                                onPromote={a => dispatch({ type: 'SET_PROMOTE_TARGET', agent: a })}
+                            />
+                        </div>
                     )}
                 </div>
 
