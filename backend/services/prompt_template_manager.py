@@ -1,10 +1,13 @@
 """
 PromptTemplateManager - Model-specific prompt templates for different providers.
 Optimizes prompts based on provider strengths and model capabilities.
+
+Also manages structured task-specific templates such as SKILL_CREATION_TEMPLATE,
+which guides agents to generate well-structured, size-compliant skill JSON.
 """
 
 from typing import Dict, List, Optional, Any
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from backend.models.entities.user_config import ProviderType
 
@@ -26,10 +29,10 @@ class PromptTemplate:
     system_template: str
     user_prefix: str = ""
     user_suffix: str = ""
-    stop_sequences: List[str] = None
+    stop_sequences: List[str] = field(default_factory=list)
     requires_cot: bool = False  # Chain-of-thought
     max_tokens_multiplier: float = 1.0
-    
+
     def format(self, system_vars: Dict[str, Any], user_message: str) -> tuple:
         """Format the template with variables."""
         system = self.system_template.format(**system_vars)
@@ -42,9 +45,14 @@ class PromptTemplateManager:
     Manages provider and model-specific prompt templates.
     Each provider has different optimal prompting strategies.
     """
-    
+
+    # ═══════════════════════════════════════════════════════════════════════
     # Provider-specific base templates
+    # ═══════════════════════════════════════════════════════════════════════
+
     PROVIDER_TEMPLATES: Dict[ProviderType, Dict[TaskCategory, PromptTemplate]] = {
+
+        # ── OpenAI ──────────────────────────────────────────────────────────
         ProviderType.OPENAI: {
             TaskCategory.CODE: PromptTemplate(
                 name="openai_code",
@@ -57,7 +65,6 @@ Guidelines:
 - Use modern language features where appropriate
 
 Current task: {mission_statement}""",
-                user_prefix="",
                 user_suffix="\n\nPlease provide the complete, working code solution.",
                 requires_cot=False,
                 max_tokens_multiplier=1.5
@@ -89,6 +96,20 @@ Creative Guidelines:
 {mission_statement}""",
                 max_tokens_multiplier=1.3
             ),
+            TaskCategory.REASONING: PromptTemplate(
+                name="openai_reasoning",
+                system_template="""You are a logical reasoning assistant. {role_context}
+
+Reasoning approach:
+- Break the problem into atomic steps
+- State assumptions explicitly
+- Show your working before conclusions
+- Verify each step before proceeding
+
+{mission_statement}""",
+                requires_cot=True,
+                max_tokens_multiplier=1.4
+            ),
             TaskCategory.SYSTEM: PromptTemplate(
                 name="openai_system",
                 system_template="""{mission_statement}
@@ -98,7 +119,8 @@ Creative Guidelines:
                 max_tokens_multiplier=1.0
             ),
         },
-        
+
+        # ── Anthropic ───────────────────────────────────────────────────────
         ProviderType.ANTHROPIC: {
             TaskCategory.CODE: PromptTemplate(
                 name="anthropic_code",
@@ -147,6 +169,22 @@ Creative Approach:
                 user_suffix="\n</creative_task>",
                 max_tokens_multiplier=1.3
             ),
+            TaskCategory.REASONING: PromptTemplate(
+                name="anthropic_reasoning",
+                system_template="""You are Claude, a careful logical reasoner. {role_context}
+
+Reasoning principles:
+- Use <thinking> blocks to work through the problem step by step
+- State all assumptions clearly
+- Verify intermediate conclusions before continuing
+- Distinguish between certainty and inference
+
+{mission_statement}""",
+                user_prefix="<problem>\n",
+                user_suffix="\n</problem>",
+                requires_cot=True,
+                max_tokens_multiplier=1.5
+            ),
             TaskCategory.SYSTEM: PromptTemplate(
                 name="anthropic_system",
                 system_template="""{mission_statement}
@@ -156,7 +194,8 @@ Creative Approach:
                 max_tokens_multiplier=1.0
             ),
         },
-        
+
+        # ── Groq ────────────────────────────────────────────────────────────
         ProviderType.GROQ: {
             TaskCategory.CODE: PromptTemplate(
                 name="groq_code",
@@ -173,14 +212,188 @@ Requirements:
                 user_suffix="\nProvide code only, minimal comments.",
                 max_tokens_multiplier=1.2
             ),
+            TaskCategory.ANALYSIS: PromptTemplate(
+                name="groq_analysis",
+                system_template="""You are a concise analytical assistant. {role_context}
+Analyse quickly and return structured, bullet-pointed findings.
+{mission_statement}""",
+                max_tokens_multiplier=1.0
+            ),
+            TaskCategory.REASONING: PromptTemplate(
+                name="groq_reasoning",
+                system_template="""You are a fast reasoning assistant. {role_context}
+Think step by step but be concise. {mission_statement}""",
+                requires_cot=True,
+                max_tokens_multiplier=1.1
+            ),
             TaskCategory.CONVERSATION: PromptTemplate(
                 name="groq_chat",
                 system_template="""You are a quick, helpful assistant. {role_context}
 Be concise and fast. {mission_statement}""",
                 max_tokens_multiplier=0.8
             ),
+            TaskCategory.SYSTEM: PromptTemplate(
+                name="groq_system",
+                system_template="""{mission_statement}
+
+{role_context}
+{behavioral_rules}""",
+                max_tokens_multiplier=1.0
+            ),
         },
-        
+
+        # ── Gemini ──────────────────────────────────────────────────────────
+        ProviderType.GEMINI: {
+            TaskCategory.CODE: PromptTemplate(
+                name="gemini_code",
+                system_template="""You are a Gemini coding assistant. {role_context}
+
+Code standards:
+- Correct, idiomatic, well-documented solutions
+- Include type hints where applicable
+- Handle edge cases gracefully
+
+{mission_statement}""",
+                max_tokens_multiplier=1.4
+            ),
+            TaskCategory.ANALYSIS: PromptTemplate(
+                name="gemini_analysis",
+                system_template="""You are a Gemini analytical assistant. {role_context}
+
+Analyse systematically, present findings clearly with supporting evidence.
+{mission_statement}""",
+                requires_cot=True,
+                max_tokens_multiplier=1.3
+            ),
+            TaskCategory.REASONING: PromptTemplate(
+                name="gemini_reasoning",
+                system_template="""You are a Gemini reasoning assistant. {role_context}
+Apply multi-step reasoning. Show your chain of thought.
+{mission_statement}""",
+                requires_cot=True,
+                max_tokens_multiplier=1.4
+            ),
+            TaskCategory.SYSTEM: PromptTemplate(
+                name="gemini_system",
+                system_template="""{mission_statement}
+
+{role_context}
+{behavioral_rules}""",
+                max_tokens_multiplier=1.0
+            ),
+        },
+
+        # ── Mistral ─────────────────────────────────────────────────────────
+        ProviderType.MISTRAL: {
+            TaskCategory.CODE: PromptTemplate(
+                name="mistral_code",
+                system_template="""You are a Mistral coding assistant. {role_context}
+
+Focus on clean, efficient, well-structured code.
+{mission_statement}""",
+                max_tokens_multiplier=1.3
+            ),
+            TaskCategory.ANALYSIS: PromptTemplate(
+                name="mistral_analysis",
+                system_template="""You are a Mistral analytical assistant. {role_context}
+Provide structured analysis with clear sections.
+{mission_statement}""",
+                max_tokens_multiplier=1.2
+            ),
+            TaskCategory.SYSTEM: PromptTemplate(
+                name="mistral_system",
+                system_template="""{mission_statement}
+
+{role_context}
+{behavioral_rules}""",
+                max_tokens_multiplier=1.0
+            ),
+        },
+
+        # ── DeepSeek ────────────────────────────────────────────────────────
+        ProviderType.DEEPSEEK: {
+            TaskCategory.CODE: PromptTemplate(
+                name="deepseek_code",
+                system_template="""You are DeepSeek Coder, an expert programming assistant. {role_context}
+
+Priorities:
+- Correctness above all else
+- Optimal algorithmic complexity
+- Clean, maintainable code
+- Full test coverage when appropriate
+
+{mission_statement}""",
+                requires_cot=True,
+                max_tokens_multiplier=1.5
+            ),
+            TaskCategory.REASONING: PromptTemplate(
+                name="deepseek_reasoning",
+                system_template="""You are DeepSeek, a strong reasoning model. {role_context}
+Think through problems carefully with explicit step-by-step reasoning.
+{mission_statement}""",
+                requires_cot=True,
+                max_tokens_multiplier=1.5
+            ),
+            TaskCategory.SYSTEM: PromptTemplate(
+                name="deepseek_system",
+                system_template="""{mission_statement}
+
+{role_context}
+{behavioral_rules}""",
+                max_tokens_multiplier=1.0
+            ),
+        },
+
+        # ── Together ────────────────────────────────────────────────────────
+        ProviderType.TOGETHER: {
+            TaskCategory.CODE: PromptTemplate(
+                name="together_code",
+                system_template="""You are a helpful coding assistant running on Together AI. {role_context}
+Write correct, production-ready code. {mission_statement}""",
+                max_tokens_multiplier=1.2
+            ),
+            TaskCategory.CONVERSATION: PromptTemplate(
+                name="together_chat",
+                system_template="""You are a helpful assistant on Together AI. {role_context}
+{mission_statement}""",
+                max_tokens_multiplier=1.0
+            ),
+            TaskCategory.SYSTEM: PromptTemplate(
+                name="together_system",
+                system_template="""{mission_statement}
+
+{role_context}
+{behavioral_rules}""",
+                max_tokens_multiplier=1.0
+            ),
+        },
+
+        # ── Moonshot ────────────────────────────────────────────────────────
+        ProviderType.MOONSHOT: {
+            TaskCategory.CREATIVE: PromptTemplate(
+                name="moonshot_creative",
+                system_template="""You are Moonshot, a creative AI assistant. {role_context}
+Produce imaginative, original, high-quality creative content.
+{mission_statement}""",
+                max_tokens_multiplier=1.3
+            ),
+            TaskCategory.CONVERSATION: PromptTemplate(
+                name="moonshot_chat",
+                system_template="""You are Moonshot, a helpful conversational AI. {role_context}
+{mission_statement}""",
+                max_tokens_multiplier=1.0
+            ),
+            TaskCategory.SYSTEM: PromptTemplate(
+                name="moonshot_system",
+                system_template="""{mission_statement}
+
+{role_context}
+{behavioral_rules}""",
+                max_tokens_multiplier=1.0
+            ),
+        },
+
+        # ── Local ───────────────────────────────────────────────────────────
         ProviderType.LOCAL: {
             TaskCategory.CODE: PromptTemplate(
                 name="local_code",
@@ -195,46 +408,61 @@ Focus on:
 {mission_statement}""",
                 max_tokens_multiplier=1.0
             ),
+            TaskCategory.REASONING: PromptTemplate(
+                name="local_reasoning",
+                system_template="""You are a local reasoning assistant. {role_context}
+Think step by step. Keep responses focused and concise.
+{mission_statement}""",
+                requires_cot=True,
+                max_tokens_multiplier=1.0
+            ),
             TaskCategory.CONVERSATION: PromptTemplate(
                 name="local_chat",
                 system_template="""You are a helpful local AI assistant. {role_context}
 Provide helpful responses efficiently. {mission_statement}""",
                 max_tokens_multiplier=0.7
             ),
-        },
-        
-        # Default templates for other providers
-        ProviderType.GEMINI: {},
-        ProviderType.MISTRAL: {},
-        ProviderType.TOGETHER: {},
-        ProviderType.MOONSHOT: {},
-        ProviderType.DEEPSEEK: {},
-        ProviderType.CUSTOM: {},
-        ProviderType.OPENAI_COMPATIBLE: {},
-    }
-    
-    # Model-specific overrides (for fine-tuned or special models)
-    MODEL_OVERRIDES: Dict[str, Dict[TaskCategory, PromptTemplate]] = {
-        "claude-3-opus": {
-            TaskCategory.CODE: PromptTemplate(
-                name="opus_code",
-                system_template="""You are Claude 3 Opus, the most capable coding assistant. {role_context}
+            TaskCategory.SYSTEM: PromptTemplate(
+                name="local_system",
+                system_template="""{mission_statement}
 
-Coding Standards:
-- Architecturally sound solutions
-- Comprehensive error handling
-- Security-first approach
-- Extensive inline documentation
-- Test considerations
-
-{mission_statement}""",
-                requires_cot=True,
-                max_tokens_multiplier=2.0
+{role_context}
+{behavioral_rules}""",
+                max_tokens_multiplier=1.0
             ),
         },
+
+        # ── Custom / OpenAI-compatible ───────────────────────────────────────
+        ProviderType.CUSTOM: {
+            TaskCategory.SYSTEM: PromptTemplate(
+                name="custom_system",
+                system_template="""{mission_statement}
+
+{role_context}
+{behavioral_rules}""",
+                max_tokens_multiplier=1.0
+            ),
+        },
+        ProviderType.OPENAI_COMPATIBLE: {
+            TaskCategory.SYSTEM: PromptTemplate(
+                name="openai_compatible_system",
+                system_template="""{mission_statement}
+
+{role_context}
+{behavioral_rules}""",
+                max_tokens_multiplier=1.0
+            ),
+        },
+    }
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # Model-specific overrides (for fine-tuned or special models)
+    # ═══════════════════════════════════════════════════════════════════════
+
+    MODEL_OVERRIDES: Dict[str, Dict[TaskCategory, PromptTemplate]] = {
         "gpt-4-turbo": {
             TaskCategory.SYSTEM: PromptTemplate(
-                name="gpt4_system",
+                name="gpt4_turbo_system",
                 system_template="""{mission_statement}
 
 {role_context}
@@ -256,10 +484,92 @@ Write high-quality, efficient code following best practices.
             ),
         },
     }
-    
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # Skill Creation Template
+    # ═══════════════════════════════════════════════════════════════════════
+
+    SKILL_CREATION_TEMPLATE: str = """You are creating a reusable skill for the Agentium knowledge library.
+Output ONLY valid JSON — no markdown fences, no explanation, no preamble.
+
+STRICT SIZE LIMITS (content exceeding these will be clipped before embedding):
+  skill_name       : 3–100 chars, lowercase, underscores only (no spaces or hyphens)
+  display_name     : 5–200 chars, human-readable title
+  description      : 50–300 chars  ← primary search surface, keep dense and specific
+  steps            : 1–7 items, each step max 120 chars, ordered execution steps
+  prerequisites    : 0–5 items, each max 100 chars
+  code_template    : optional, max 300 chars — essential snippet only, not full solution
+  examples         : 0–3 items, each input/output field max 100 chars
+  common_pitfalls  : 0–5 items, each max 100 chars
+  validation_criteria : 1–5 items, each max 120 chars
+  tags             : 1–10 items, lowercase strings
+
+ENUM VALUES:
+  skill_type  : code_generation | analysis | integration | automation | research |
+                design | testing | deployment | debugging | optimization | documentation
+  domain      : frontend | backend | devops | data | ai | security |
+                mobile | desktop | general | database | api
+  complexity  : beginner | intermediate | advanced
+
+REQUIRED JSON STRUCTURE:
+{{
+  "skill_name": "snake_case_name",
+  "display_name": "Human Readable Title",
+  "skill_type": "<from enum>",
+  "domain": "<from enum>",
+  "tags": ["tag1", "tag2"],
+  "complexity": "<from enum>",
+  "description": "What this skill does and exactly when to use it. Max 300 chars.",
+  "prerequisites": ["item1", "item2"],
+  "steps": [
+    "Step 1: concise action description",
+    "Step 2: concise action description"
+  ],
+  "code_template": "optional short snippet",
+  "examples": [
+    {{"input": "scenario description", "output": "expected result"}}
+  ],
+  "common_pitfalls": ["mistake to avoid"],
+  "validation_criteria": ["how to verify this skill succeeded"]
+}}
+
+EXAMPLE OUTPUT:
+{{
+  "skill_name": "rest_api_error_handling",
+  "display_name": "REST API Error Handling Pattern",
+  "skill_type": "code_generation",
+  "domain": "backend",
+  "tags": ["api", "error-handling", "rest", "python"],
+  "complexity": "intermediate",
+  "description": "Implement consistent error handling for REST API endpoints using structured JSON responses and appropriate HTTP status codes.",
+  "prerequisites": ["FastAPI or Flask installed", "Basic Python exception knowledge"],
+  "steps": [
+    "Wrap endpoint logic in try/except block",
+    "Catch specific exceptions before generic ones",
+    "Return structured JSON with error code and message",
+    "Use appropriate HTTP status codes (400, 404, 422, 500)",
+    "Log the error with context before returning response"
+  ],
+  "code_template": "try:\\n    return {{\"data\": operation()}}\\nexcept ValueError as e:\\n    raise HTTPException(400, str(e))\\nexcept Exception as e:\\n    logger.error(e); raise HTTPException(500)",
+  "examples": [
+    {{"input": "endpoint raises ValueError", "output": "HTTP 400 with JSON error body"}}
+  ],
+  "common_pitfalls": ["Catching Exception too broadly", "Not logging before re-raising"],
+  "validation_criteria": ["All exceptions return JSON not HTML", "Status codes match error type"]
+}}
+
+TASK CONTEXT:
+{task_context}
+
+Generate the skill JSON now:"""
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # Core methods
+    # ═══════════════════════════════════════════════════════════════════════
+
     def __init__(self):
         self._cache: Dict[str, PromptTemplate] = {}
-    
+
     def get_template(
         self,
         provider: ProviderType,
@@ -269,7 +579,7 @@ Write high-quality, efficient code following best practices.
     ) -> PromptTemplate:
         """
         Get the best template for provider + model + task combination.
-        
+
         Hierarchy:
         1. Model-specific override
         2. Provider-specific for task
@@ -277,31 +587,30 @@ Write high-quality, efficient code following best practices.
         4. Generic default
         """
         cache_key = f"{provider.value}:{model_name}:{task_category.value}:{agent_tier}"
-        
+
         if cache_key in self._cache:
             return self._cache[cache_key]
-        
+
         # 1. Check model-specific override
-        model_key = model_name.lower().replace("-", "_")
         for key, templates in self.MODEL_OVERRIDES.items():
             if key in model_name.lower() and task_category in templates:
                 template = templates[task_category]
                 self._cache[cache_key] = template
                 return template
-        
+
         # 2. Check provider-specific for task
         provider_templates = self.PROVIDER_TEMPLATES.get(provider, {})
         if task_category in provider_templates:
             template = provider_templates[task_category]
             self._cache[cache_key] = template
             return template
-        
+
         # 3. Fallback to SYSTEM template for provider
         if TaskCategory.SYSTEM in provider_templates:
             template = provider_templates[TaskCategory.SYSTEM]
             self._cache[cache_key] = template
             return template
-        
+
         # 4. Generic default
         default = PromptTemplate(
             name="generic_default",
@@ -310,38 +619,54 @@ Write high-quality, efficient code following best practices.
         )
         self._cache[cache_key] = default
         return default
-    
+
+    def get_skill_creation_prompt(self, task_context: str) -> str:
+        """
+        Return the filled skill creation prompt for the given task context.
+
+        Usage in skill_rag.py / suggest_skill_creation():
+            prompt = prompt_template_manager.get_skill_creation_prompt(
+                task_context=task_description
+            )
+            response = await ModelService.generate_with_agent(agent, prompt)
+        """
+        return self.SKILL_CREATION_TEMPLATE.format(task_context=task_context)
+
     def classify_task(self, description: str, task_type: Optional[str] = None) -> TaskCategory:
         """Classify a task into a category for template selection."""
         desc_lower = description.lower()
-        
-        # Code detection
-        code_keywords = ['code', 'program', 'function', 'script', 'python', 'javascript', 
-                        'debug', 'error', 'implement', 'class', 'api', 'database', 'sql']
+
+        code_keywords = [
+            'code', 'program', 'function', 'script', 'python', 'javascript',
+            'debug', 'error', 'implement', 'class', 'api', 'database', 'sql',
+            'typescript', 'refactor', 'fix', 'bug',
+        ]
         if any(kw in desc_lower for kw in code_keywords) or task_type in ['code', 'coding']:
             return TaskCategory.CODE
-        
-        # Analysis detection
-        analysis_keywords = ['analyze', 'analysis', 'research', 'investigate', 'evaluate',
-                           'compare', 'assess', 'review', 'study', 'examine']
+
+        analysis_keywords = [
+            'analyze', 'analysis', 'research', 'investigate', 'evaluate',
+            'compare', 'assess', 'review', 'study', 'examine',
+        ]
         if any(kw in desc_lower for kw in analysis_keywords) or task_type in ['analysis', 'research']:
             return TaskCategory.ANALYSIS
-        
-        # Creative detection
-        creative_keywords = ['write', 'create', 'story', 'content', 'draft', 'design',
-                           'creative', 'blog', 'article', 'marketing', 'copy']
+
+        creative_keywords = [
+            'write', 'create', 'story', 'content', 'draft', 'design',
+            'creative', 'blog', 'article', 'marketing', 'copy',
+        ]
         if any(kw in desc_lower for kw in creative_keywords) or task_type in ['creative', 'writing']:
             return TaskCategory.CREATIVE
-        
-        # Reasoning detection
-        reasoning_keywords = ['reason', 'logic', 'solve', 'problem', 'math', 'calculate',
-                            'prove', 'deduce', 'infer']
+
+        reasoning_keywords = [
+            'reason', 'logic', 'solve', 'problem', 'math', 'calculate',
+            'prove', 'deduce', 'infer', 'plan', 'strategy',
+        ]
         if any(kw in desc_lower for kw in reasoning_keywords):
             return TaskCategory.REASONING
-        
-        # Default to conversation
+
         return TaskCategory.CONVERSATION
-    
+
     def build_system_prompt(
         self,
         provider: ProviderType,
@@ -352,42 +677,38 @@ Write high-quality, efficient code following best practices.
     ) -> tuple:
         """
         Build a complete system prompt using templates.
-        
+
         Returns: (system_prompt, max_tokens_multiplier, requires_cot)
         """
-        # Classify the task
         task_category = self.classify_task(task_description)
-        
-        # Get appropriate template
         template = self.get_template(provider, model_name, task_category, agent_tier)
-        
-        # Build template variables
+
         role_context = self._build_role_context(agent_tier, agent_ethos)
-        
+
         behavioral_rules = ""
         if agent_ethos and hasattr(agent_ethos, 'behavioral_rules'):
             import json
             try:
                 rules = json.loads(agent_ethos.behavioral_rules) if agent_ethos.behavioral_rules else []
                 behavioral_rules = "\n".join(f"- {r}" for r in rules[:10])
-            except:
+            except Exception:
                 pass
-        
+
         system_vars = {
             "mission_statement": getattr(agent_ethos, 'mission_statement', "You are an AI assistant."),
             "role_context": role_context,
             "behavioral_rules": behavioral_rules,
             "specialization": getattr(agent_ethos, 'specialization', 'general assistance'),
         }
-        
+
         system_prompt, _ = template.format(system_vars, "")
-        
+
         return (
             system_prompt,
             template.max_tokens_multiplier,
             template.requires_cot
         )
-    
+
     def _build_role_context(self, agent_tier: int, agent_ethos: Any) -> str:
         """Build role context based on agent tier."""
         tier_roles = {
@@ -397,57 +718,67 @@ Write high-quality, efficient code following best practices.
             3: "You are a Task Agent focused on efficient execution of assigned tasks.",
         }
         return tier_roles.get(agent_tier, "You are an AI assistant in the Agentium system.")
-    
+
     def get_provider_recommendations(self, task_description: str) -> List[tuple]:
         """
         Get provider recommendations for a task.
-        Returns list of (provider, confidence_score) tuples.
+        Returns list of (provider, confidence_score) tuples, sorted by score descending.
         """
         category = self.classify_task(task_description)
-        
-        recommendations = []
-        
-        # Code: Claude-3 Opus or GPT-4 best
+
+        # Code: Claude or GPT-4 best
         if category == TaskCategory.CODE:
-            recommendations = [
+            return [
                 (ProviderType.ANTHROPIC, 0.95),
                 (ProviderType.OPENAI, 0.90),
+                (ProviderType.DEEPSEEK, 0.82),
                 (ProviderType.GROQ, 0.75),
                 (ProviderType.LOCAL, 0.60),
             ]
+
         # Analysis: Claude best for deep reasoning
-        elif category == TaskCategory.ANALYSIS:
-            recommendations = [
+        if category == TaskCategory.ANALYSIS:
+            return [
                 (ProviderType.ANTHROPIC, 0.95),
                 (ProviderType.OPENAI, 0.88),
-                (ProviderType.DEEPSEEK, 0.80),
+                (ProviderType.DEEPSEEK, 0.82),
                 (ProviderType.GROQ, 0.70),
             ]
+
         # Creative: GPT-4 or Claude
-        elif category == TaskCategory.CREATIVE:
-            recommendations = [
+        if category == TaskCategory.CREATIVE:
+            return [
                 (ProviderType.OPENAI, 0.92),
                 (ProviderType.ANTHROPIC, 0.90),
                 (ProviderType.MOONSHOT, 0.75),
                 (ProviderType.GROQ, 0.65),
             ]
-        # Speed: Groq best
-        elif category == TaskCategory.CONVERSATION:
-            recommendations = [
+
+        # Reasoning: Claude or DeepSeek
+        if category == TaskCategory.REASONING:
+            return [
+                (ProviderType.ANTHROPIC, 0.95),
+                (ProviderType.DEEPSEEK, 0.90),
+                (ProviderType.OPENAI, 0.88),
+                (ProviderType.GROQ, 0.72),
+            ]
+
+        # Speed / Conversation: Groq best
+        if category == TaskCategory.CONVERSATION:
+            return [
                 (ProviderType.GROQ, 0.95),
                 (ProviderType.OPENAI, 0.85),
-                (ProviderType.GROQ, 0.80),
+                (ProviderType.ANTHROPIC, 0.80),
                 (ProviderType.LOCAL, 0.70),
             ]
-        else:
-            recommendations = [
-                (ProviderType.OPENAI, 0.90),
-                (ProviderType.ANTHROPIC, 0.88),
-                (ProviderType.GROQ, 0.80),
-                (ProviderType.LOCAL, 0.65),
-            ]
-        
-        return recommendations
+
+        # Default
+        return [
+            (ProviderType.OPENAI, 0.90),
+            (ProviderType.ANTHROPIC, 0.88),
+            (ProviderType.GROQ, 0.80),
+            (ProviderType.LOCAL, 0.65),
+        ]
 
 
 # Global instance

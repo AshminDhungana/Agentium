@@ -1,8 +1,17 @@
 """
 RAG (Retrieval-Augmented Generation) integration for skills.
 Combines skill retrieval with LLM generation.
+
+Context budget
+──────────────
+When multiple skills are injected into a prompt their combined size can
+easily overwhelm the LLM's useful context window. _build_rag_context()
+enforces a MAX_CONTEXT_CHARS budget that is distributed across retrieved
+skills proportionally by relevance score, with a per-skill floor of
+MIN_SKILL_CHARS so every result gets at least a meaningful snippet.
 """
 
+import json
 import logging
 from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
@@ -13,15 +22,27 @@ from backend.models.entities.agents import Agent
 
 logger = logging.getLogger(__name__)
 
+# ---------------------------------------------------------------------------
+# RAG context budget constants
+# ---------------------------------------------------------------------------
+# Total character budget shared across all injected skills
+MAX_CONTEXT_CHARS: int = 3_000
+# Floor so every retrieved skill gets at least a meaningful snippet
+MIN_SKILL_CHARS: int = 200
+
 
 class SkillRAG:
     """
     RAG pipeline: Retrieve skills → Augment prompt → Generate with context.
     """
-    
+
     def __init__(self):
         self.skill_manager = skill_manager
-    
+
+    # ═══════════════════════════════════════════════════════════
+    # Main execution entry point
+    # ═══════════════════════════════════════════════════════════
+
     async def execute_with_skills(
         self,
         task_description: str,
@@ -31,12 +52,13 @@ class SkillRAG:
     ) -> Dict[str, Any]:
         """
         Execute task using RAG with skills.
-        
+
         Flow:
         1. Search for relevant skills
-        2. Build augmented prompt with skill context
+        2. Build budget-aware augmented prompt
         3. Generate response using LLM
-        4. Return result with skill attribution
+        4. Record skill usage
+        5. Return result with attribution
         """
         # Step 1: Retrieve relevant skills
         skills = self.skill_manager.search_skills(
@@ -46,26 +68,25 @@ class SkillRAG:
             n_results=3,
             min_success_rate=0.7
         )
-        
-        # Step 2: Build RAG prompt
+
+        # Step 2: Build RAG prompt with context budget enforcement
         rag_context = self._build_rag_context(skills, task_description)
-        
+
         # Step 3: Generate with context
         result = await ModelService.generate_with_agent(
             agent=agent,
             user_message=rag_context["augmented_prompt"],
             config_id=model_config_id
         )
-        
-        # Step 4: Record skill usage
+
+        # Step 4: Record skill usage (optimistic — critics may revise later)
         for skill in skills:
-            # Record that these skills were used (async)
             self.skill_manager.record_skill_usage(
                 skill_id=skill["skill_id"],
-                success=True,  # Will be updated based on critic review
+                success=True,
                 db=db
             )
-        
+
         return {
             "content": result["content"],
             "model": result["model"],
@@ -74,67 +95,103 @@ class SkillRAG:
             "rag_context": rag_context["context_text"],
             "latency_ms": result["latency_ms"]
         }
-    
+
+    # ═══════════════════════════════════════════════════════════
+    # Context assembly (budget-aware)
+    # ═══════════════════════════════════════════════════════════
+
     def _build_rag_context(
         self,
         skills: List[Dict],
         task_description: str
     ) -> Dict[str, Any]:
-        """Build augmented prompt with skill context."""
-        
+        """
+        Build an augmented prompt from retrieved skills.
+
+        Budget allocation
+        ─────────────────
+        The total context budget (MAX_CONTEXT_CHARS) is split across skills
+        proportionally by relevance score.  Each skill is guaranteed at least
+        MIN_SKILL_CHARS so lower-ranked results are still useful.
+        Each skill's content_preview is trimmed to its allocated budget
+        *after* the fixed header (name / type / domain / success-rate) is
+        subtracted, so the header is never cut off.
+        """
         if not skills:
-            # No skills found - standard prompt
             return {
                 "augmented_prompt": task_description,
                 "skills_used": [],
                 "context_text": ""
             }
-        
-        # Build context from skills
-        context_parts = []
-        skills_used = []
-        
-        for i, skill in enumerate(skills, 1):
+
+        # ── Proportional budget allocation ────────────────────────────────
+        total_score = sum(max(s["relevance_score"], 0.0) for s in skills) or 1.0
+        budgets = []
+        for skill in skills:
+            share = max(skill["relevance_score"], 0.0) / total_score
+            allocated = max(MIN_SKILL_CHARS, int(MAX_CONTEXT_CHARS * share))
+            budgets.append(allocated)
+
+        # ── Assemble each skill block within its budget ───────────────────
+        context_parts: List[str] = []
+        skills_used: List[Dict] = []
+
+        for i, (skill, budget) in enumerate(zip(skills, budgets), 1):
             meta = skill["metadata"]
             content = skill["content_preview"]
-            
-            context_parts.append(f"""
-Relevant Skill {i}: {meta.get('display_name', 'Unknown')}
-Type: {meta.get('skill_type')} | Domain: {meta.get('domain')} | Success Rate: {meta.get('success_rate', 0):.0%}
-Description: {meta.get('description', 'N/A')}
-Approach:
-{content}
-""")
+
+            header = (
+                f"[Skill {i}] {meta.get('display_name', 'Unknown')}\n"
+                f"Type: {meta.get('skill_type')} | "
+                f"Domain: {meta.get('domain')} | "
+                f"Success: {meta.get('success_rate', 0):.0%} | "
+                f"Relevance: {skill['relevance_score']:.0%}\n"
+                f"---\n"
+            )
+
+            # Reserve chars for the header; trim only the content portion
+            content_budget = max(0, budget - len(header))
+            if len(content) > content_budget:
+                trimmed = content[:content_budget].rstrip()
+                # Add ellipsis so agents know content was cut
+                trimmed += " …"
+            else:
+                trimmed = content
+
+            context_parts.append(header + trimmed)
             skills_used.append({
                 "skill_id": skill["skill_id"],
                 "name": meta.get("display_name"),
                 "relevance_score": skill["relevance_score"]
             })
-        
-        # Build final augmented prompt
-        augmented_prompt = f"""You are an AI agent executing a task. Use the following relevant skills from your knowledge library to inform your approach.
 
-{chr(10).join(context_parts)}
+        context_text = "\n\n".join(context_parts)
 
----
-TASK TO EXECUTE:
-{task_description}
+        augmented_prompt = (
+            "You are an AI agent executing a task. "
+            "The following skills from your knowledge library are relevant — "
+            "use them to guide your approach.\n\n"
+            f"{context_text}\n\n"
+            "---\n"
+            f"TASK TO EXECUTE:\n{task_description}\n\n"
+            "Instructions:\n"
+            "1. Apply the approaches from the skills above to this specific task.\n"
+            "2. If multiple skills conflict, prefer the one with the higher success rate.\n"
+            "3. Adapt, do not copy — the skills are guides, not scripts.\n"
+            "4. Note which skill approaches informed your solution.\n\n"
+            "Begin execution:"
+        )
 
-Instructions:
-1. Follow the approaches from the relevant skills above
-2. Adapt them to the specific requirements of this task
-3. If multiple approaches conflict, choose the one with higher success rate
-4. Document which skill approaches you used in your thinking
-
-Begin execution:
-"""
-        
         return {
             "augmented_prompt": augmented_prompt,
             "skills_used": skills_used,
-            "context_text": chr(10).join(context_parts)
+            "context_text": context_text
         }
-    
+
+    # ═══════════════════════════════════════════════════════════
+    # Skill creation suggestion
+    # ═══════════════════════════════════════════════════════════
+
     async def suggest_skill_creation(
         self,
         task_description: str,
@@ -143,77 +200,88 @@ Begin execution:
         db: Session
     ) -> Optional[Dict[str, Any]]:
         """
-        Analyze if execution result should be converted to a skill.
-        Returns skill draft if worthy, None otherwise.
+        Analyse whether a successful execution result should become a reusable skill.
+
+        Uses the structured SKILL_CREATION_TEMPLATE from PromptTemplateManager
+        so the LLM output always matches SkillSchema field expectations.
+
+        Returns a skill draft dict if the execution is novel and reusable,
+        None otherwise.
         """
-        # Check novelty - is this significantly different from existing skills?
-        similar_skills = self.skill_manager.search_skills(
+        # Guard: only persist patterns from successful executions.
+        # execute_with_skills() returns {content, model, tokens_used, ...} with no
+        # "success" key, so checking for that key always evaluated to False and
+        # skill creation never triggered. We check for non-empty content instead,
+        # which is the real signal that the LLM produced a usable result.
+        if not execution_result.get("content", "").strip():
+            return None
+
+        # Guard: skip if an almost-identical skill already exists
+        similar = self.skill_manager.search_skills(
             query=task_description,
             agent_tier=agent.agent_type.value,
             db=db,
             n_results=1
         )
-        
-        if similar_skills and similar_skills[0]["relevance_score"] > 0.9:
-            # Too similar to existing skill
+        if similar and similar[0]["relevance_score"] > 0.9:
+            logger.debug(
+                "suggest_skill_creation: skipping — similar skill '%s' already exists (score=%.2f)",
+                similar[0].get("skill_id"),
+                similar[0]["relevance_score"],
+            )
             return None
-        
-        # Check quality - did execution succeed?
-        if not execution_result.get("success", False):
-            return None
-        
-        # Check reusability - is this a pattern that could be reused?
-        # Use LLM to analyze
-        analysis_prompt = f"""
-Analyze if the following task execution should be converted to a reusable skill.
 
-Task: {task_description}
-
-Execution Steps:
-{execution_result.get('steps_taken', 'N/A')}
-
-Code/Output:
-{execution_result.get('output', 'N/A')[:2000]}
-
-Evaluate:
-1. Is this a generalizable pattern or one-time task?
-2. Would this be useful for similar future tasks?
-3. Can the approach be documented as reusable steps?
-
-Respond with JSON:
-{{
-    "should_create_skill": true/false,
-    "reason": "explanation",
-    "suggested_skill_name": "name",
-    "suggested_domain": "frontend/backend/etc",
-    "key_steps": ["step1", "step2"]
-}}
-"""
-        
-        analysis = await ModelService.generate_with_agent(
-            agent=agent,
-            user_message=analysis_prompt
+        # Build task context for the template
+        task_context = (
+            f"Task description: {task_description}\n\n"
+            f"Execution steps taken:\n{execution_result.get('steps_taken', 'N/A')}\n\n"
+            f"Key output / result:\n{str(execution_result.get('output', 'N/A'))[:800]}"
         )
-        
-        # Parse response (simplified - would need robust JSON parsing)
+
+        # Use the structured skill creation template
+        from backend.services.prompt_template_manager import prompt_template_manager
+        creation_prompt = prompt_template_manager.get_skill_creation_prompt(
+            task_context=task_context
+        )
+
         try:
-            import json
-            result = json.loads(analysis["content"])
-            if result.get("should_create_skill"):
-                return {
-                    "draft_skill": {
-                        "skill_name": result.get("suggested_skill_name"),
-                        "domain": result.get("suggested_domain"),
-                        "steps": result.get("key_steps"),
-                        "description": task_description,
-                        "success_rate": 0.8  # Initial estimate
-                    },
-                    "reason": result.get("reason")
-                }
-        except:
-            pass
-        
-        return None
+            analysis = await ModelService.generate_with_agent(
+                agent=agent,
+                user_message=creation_prompt
+            )
+
+            raw = analysis.get("content", "").strip()
+
+            # Strip markdown fences if the model wrapped the JSON anyway
+            if raw.startswith("```"):
+                raw = raw.split("```")[1]
+                if raw.startswith("json"):
+                    raw = raw[4:]
+                raw = raw.strip()
+
+            skill_data = json.loads(raw)
+
+            # Minimal sanity check before returning
+            required = {"skill_name", "display_name", "skill_type", "domain",
+                        "description", "steps", "validation_criteria"}
+            if not required.issubset(skill_data.keys()):
+                logger.warning(
+                    "suggest_skill_creation: LLM output missing required fields. "
+                    "Got keys: %s", list(skill_data.keys())
+                )
+                return None
+
+            return {
+                "draft_skill": skill_data,
+                "reason": "Novel successful execution pattern extracted by SkillRAG"
+            }
+
+        except json.JSONDecodeError as e:
+            logger.warning("suggest_skill_creation: JSON parse failed — %s", e)
+            return None
+        except Exception as e:
+            logger.error("suggest_skill_creation: unexpected error — %s", e)
+            return None
 
 
 # Global instance
