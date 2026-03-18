@@ -564,6 +564,22 @@ TASK CONTEXT:
 Generate the skill JSON now:"""
 
     # ═══════════════════════════════════════════════════════════════════════
+    # Deep Think Hint — injected into every agent system prompt so agents
+    # know to reach for the deep_think tool on hard tasks.
+    # Kept as a class constant so it can be patched in tests or overridden
+    # per-deployment without touching build_system_prompt().
+    # ═══════════════════════════════════════════════════════════════════════
+
+    DEEP_THINK_HINT: str = (
+        "\n\nTool guidance: for complex planning, multi-step reasoning, "
+        "debugging, architecture decisions, trade-off analysis, or any task "
+        "where thinking carefully before answering improves quality — call "
+        "the `deep_think` tool BEFORE producing your final answer. "
+        "It returns a structured reasoning trace and a conclusion you can "
+        "build on. Use it proactively; do not wait to be asked."
+    )
+
+    # ═══════════════════════════════════════════════════════════════════════
     # Core methods
     # ═══════════════════════════════════════════════════════════════════════
 
@@ -702,6 +718,11 @@ Generate the skill JSON now:"""
         }
 
         system_prompt, _ = template.format(system_vars, "")
+
+        # Append deep_think guidance so every agent — regardless of provider
+        # or task category — knows the tool exists and when to use it.
+        # This is the single injection point; no per-provider template changes needed.
+        system_prompt += self.DEEP_THINK_HINT
 
         return (
             system_prompt,

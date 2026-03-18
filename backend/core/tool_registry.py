@@ -17,6 +17,7 @@ from backend.tools.git_tool            import git_tool
 from backend.tools.http_api_tool       import http_api_tool
 from backend.tools.text_editor_tool    import text_editor_tool
 from backend.tools.web_search_tool     import web_search_tool
+from backend.tools.deep_think_tool     import deep_think_tool
 from backend.tools.desktop_tool  import (
     mouse_kb_tool,
     file_tool      as desktop_file_tool,
@@ -1027,6 +1028,50 @@ class ToolRegistry:
             function=nodriver_tool.close,
             parameters={},
             authorized_tiers=["0xxxx", "1xxxx"],
+        )
+
+        # ══════════════════════════════════════════════════════════════════════
+        # DEEP THINK TOOL — universal extended reasoning, all providers
+        # ══════════════════════════════════════════════════════════════════════
+        # Routes to Anthropic native extended thinking when an active Anthropic
+        # config is present; falls back to a structured XML chain-of-thought
+        # prompt on any other provider (OpenAI, Groq, Gemini, local, etc.).
+        # The tool executor (tool_creation_service.execute_tool) automatically
+        # injects 'db' and 'agent_id' because deep_think_tool.execute declares
+        # them in its signature — all other tools are unaffected.
+        # ══════════════════════════════════════════════════════════════════════
+        self.register_tool(
+            name="deep_think",
+            description=(
+                "Perform deep structured reasoning before answering. "
+                "Use for complex planning, debugging, multi-step logic, "
+                "trade-off analysis, architecture decisions, or any task "
+                "where thinking carefully before answering improves quality. "
+                "Automatically uses Anthropic extended thinking if an active "
+                "Anthropic config is available; otherwise uses structured "
+                "chain-of-thought on any configured provider. "
+                "Returns: thinking_text (full reasoning scratchpad), "
+                "conclusion (final answer), confidence (0.0–1.0), "
+                "and provider_path so callers know which path ran."
+            ),
+            function=deep_think_tool.execute,
+            parameters={
+                "problem": {
+                    "type":        "string",
+                    "description": "The question, task, or problem to reason through deeply.",
+                },
+                "context": {
+                    "type":        "string",
+                    "description": "Optional background context or constraints.",
+                    "optional":    True,
+                },
+                "budget_tokens": {
+                    "type":        "integer",
+                    "description": "Thinking token budget 1024–32000 (Anthropic path only, default 8000).",
+                    "optional":    True,
+                },
+            },
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx"],
         )
 
         # ══════════════════════════════════════════════════════════════════════

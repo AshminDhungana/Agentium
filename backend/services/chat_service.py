@@ -137,9 +137,22 @@ Current System State:
 
 Address the Sovereign respectfully. If they issue a command that requires execution, indicate that you will create a task."""
 
+        # Switch to tool-aware generation so the Head agent can call deep_think
+        # and any other registered tool during conversational turns.
+        # generate_with_agent_tools() returns the same dict shape as
+        # provider.generate() {content, model, tokens_used, latency_ms, …}
+        # so all downstream code (reincarnation check, audit log, etc.) is
+        # completely unaffected.
         # FIX: Handle model generation failures with try/except
         try:
-            result = await provider.generate(full_prompt, message)
+            result = await ModelService.generate_with_agent_tools(
+                agent=head,
+                user_message=message,
+                db=db,
+                config_id=config_id,
+                system_prompt_override=full_prompt,
+                agent_tier=f"{head.agentium_id[0]}xxxx",
+            )
         except Exception as e:
             logger.error(f"Model generation failed for Head {head.agentium_id}: {str(e)}")
             return {

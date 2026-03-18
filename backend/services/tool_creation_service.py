@@ -307,7 +307,38 @@ class ToolCreationService:
                 ctx.set_error(f"Tool '{tool_name}' not found in registry")
                 return {"status": "error", "error": f"Tool '{tool_name}' not found"}
 
-            result = tool_fn(**kwargs)
+            # Inject db + agent_id for tools whose signatures declare them
+            # (e.g. deep_think_tool).  Uses inspect so every existing tool
+            # is completely unaffected — they don't declare these params.
+            import inspect as _inspect
+            _sig = _inspect.signature(tool_fn)
+            if "db" in _sig.parameters:
+                kwargs["db"] = self.db
+            if "agent_id" in _sig.parameters and "agent_id" not in kwargs:
+                kwargs["agent_id"] = called_by
+
+            # Async-aware dispatch — deep_think and any future async tools
+            # return coroutines that must be run; all existing sync tools hit
+            # the else-branch and behave exactly as before.
+            import asyncio as _asyncio
+            if _inspect.iscoroutinefunction(tool_fn):
+                try:
+                    _loop = _asyncio.get_running_loop()
+                except RuntimeError:
+                    _loop = None
+                if _loop and _loop.is_running():
+                    # Already inside an event loop (FastAPI request context):
+                    # run the coroutine in a fresh thread so we don't deadlock.
+                    import concurrent.futures as _cf
+                    with _cf.ThreadPoolExecutor(max_workers=1) as _pool:
+                        result = _pool.submit(
+                            _asyncio.run, tool_fn(**kwargs)
+                        ).result(timeout=120)
+                else:
+                    result = _asyncio.run(tool_fn(**kwargs))
+            else:
+                result = tool_fn(**kwargs)
+
             if isinstance(result, dict):
                 ctx.set_output_size(len(str(result)))
 

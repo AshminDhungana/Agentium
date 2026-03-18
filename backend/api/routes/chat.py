@@ -263,6 +263,24 @@ async def _stream_response(
         config_id = config.id if config else None
         model_name = config.default_model if config else "default"
 
+        # FALLBACK: mirror process_message — if Head has no model_config_id
+        # (fresh deploy / unassigned agent) fall back to the system default
+        # so streaming doesn't silently fail with no provider.
+        if not config_id:
+            try:
+                from backend.models.entities import UserModelConfig
+                _default = (
+                    db.query(UserModelConfig)
+                    .filter(UserModelConfig.is_default == True)
+                    .filter(UserModelConfig.status == "active")
+                    .first()
+                )
+                if _default:
+                    config_id  = str(_default.id)
+                    model_name = _default.default_model
+            except Exception as _fb_err:
+                print(f"[chat.py] Config fallback failed: {_fb_err}")
+
         provider = await ModelService.get_provider("sovereign", config_id)
         if not provider:
             error_msg = (
@@ -282,6 +300,11 @@ async def _stream_response(
             "You are speaking directly to the Sovereign. "
             "Address them respectfully and provide clear, actionable responses."
         )
+
+        # Append the same deep_think hint that build_system_prompt() injects
+        # for task agents — keeps streaming and non-streaming paths consistent.
+        from backend.services.prompt_template_manager import prompt_template_manager
+        full_prompt += prompt_template_manager.DEEP_THINK_HINT
 
         full_response: list[str] = []
         async for chunk in provider.stream_generate(full_prompt, message):
