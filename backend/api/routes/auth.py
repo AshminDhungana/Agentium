@@ -4,7 +4,7 @@ Database-backed with user approval workflow.
 """
 import os
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
 from threading import Lock
 from time import time
 
@@ -131,7 +131,8 @@ async def signup(
         password=request.password,
     )
 
-    AuditLog.log(
+    # C1: db.add() so this entry is actually persisted.
+    audit_entry = AuditLog.log(
         level=AuditLevel.INFO,
         category=AuditCategory.AUTHENTICATION,
         actor_type="user",
@@ -144,6 +145,8 @@ async def signup(
             "auto_approved": False,
         },
     )
+    db.add(audit_entry)
+    db.commit()
 
     return SignupResponse(
         success=True,
@@ -200,7 +203,8 @@ async def login(
                 access_token  = create_access_token(token_data)
                 refresh_token = create_refresh_token(token_data)
 
-                AuditLog.log(
+                # C1: persist the audit entry
+                audit_entry = AuditLog.log(
                     level=AuditLevel.INFO,
                     category=AuditCategory.AUTHENTICATION,
                     actor_type="user",
@@ -208,6 +212,8 @@ async def login(
                     action="login_success",
                     description="Sovereign user logged in successfully",
                 )
+                db.add(audit_entry)
+                db.commit()
 
                 return LoginResponse(
                     access_token=access_token,
@@ -220,8 +226,8 @@ async def login(
                     },
                 )
 
-        # Log failed login attempt
-        AuditLog.log(
+        # C1: persist failed login audit, then raise
+        audit_entry = AuditLog.log(
             level=AuditLevel.WARNING,
             category=AuditCategory.AUTHENTICATION,
             actor_type="user",
@@ -230,6 +236,8 @@ async def login(
             description="Failed login attempt",
             success=False,
         )
+        db.add(audit_entry)
+        db.commit()
 
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -238,7 +246,8 @@ async def login(
 
     # Check if user is active and approved
     if not user.is_active or user.is_pending:
-        AuditLog.log(
+        # C1: persist the inactive-login audit, then raise
+        audit_entry = AuditLog.log(
             level=AuditLevel.WARNING,
             category=AuditCategory.AUTHENTICATION,
             actor_type="user",
@@ -252,6 +261,9 @@ async def login(
                 "is_pending": user.is_pending,
             },
         )
+        db.add(audit_entry)
+        db.commit()
+
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Account pending approval or deactivated",
@@ -259,6 +271,9 @@ async def login(
 
     # Successful DB login — clear rate-limit counter for this username
     _clear_rate_limit(request.username)
+
+    # D3: Record the last login timestamp
+    user.last_login_at = datetime.now(timezone.utc)
 
     token_data = {
         "sub": user.username,
@@ -270,7 +285,8 @@ async def login(
     access_token  = create_access_token(token_data)
     refresh_token = create_refresh_token(token_data)
 
-    AuditLog.log(
+    # C1: persist the successful login audit in the same commit as last_login_at
+    audit_entry = AuditLog.log(
         level=AuditLevel.INFO,
         category=AuditCategory.AUTHENTICATION,
         actor_type="user",
@@ -279,6 +295,8 @@ async def login(
         description="User logged in successfully",
         meta_data={"user_id": user.id, "is_admin": user.is_admin},
     )
+    db.add(audit_entry)
+    db.commit()
 
     return LoginResponse(
         access_token=access_token,
@@ -412,7 +430,8 @@ async def change_password(
         )
 
     if not User.verify_password(request.old_password, user.hashed_password):
-        AuditLog.log(
+        # C1: persist failed audit, then raise
+        audit_entry = AuditLog.log(
             level=AuditLevel.WARNING,
             category=AuditCategory.AUTHENTICATION,
             actor_type="user",
@@ -421,16 +440,19 @@ async def change_password(
             description="Password change failed - incorrect old password",
             success=False,
         )
+        db.add(audit_entry)
+        db.commit()
+
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Current password is incorrect",
         )
 
     user.hashed_password = User.hash_password(request.new_password)
-    user.updated_at = datetime.utcnow()
-    db.commit()
+    user.updated_at = datetime.now(timezone.utc)
 
-    AuditLog.log(
+    # C1: persist success audit in the same commit as the password change
+    audit_entry = AuditLog.log(
         level=AuditLevel.INFO,
         category=AuditCategory.AUTHENTICATION,
         actor_type="user",
@@ -438,6 +460,8 @@ async def change_password(
         action="password_changed",
         description="Password changed successfully",
     )
+    db.add(audit_entry)
+    db.commit()
 
     return {"status": "success", "message": "Password updated successfully"}
 
@@ -450,6 +474,7 @@ class VoiceTokenResponse(BaseModel):
 @router.post("/voice-token", response_model=VoiceTokenResponse)
 async def get_voice_token(
     current_user: dict = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
 ):
     """
     Issue a short-lived voice-scoped JWT for the host-native voice bridge.
@@ -471,7 +496,8 @@ async def get_voice_token(
 
     duration = int(os.getenv("VOICE_TOKEN_DURATION_MINUTES", "30"))
 
-    AuditLog.log(
+    # C1: persist the audit entry
+    audit_entry = AuditLog.log(
         level=AuditLevel.INFO,
         category=AuditCategory.AUTHENTICATION,
         actor_type="user",
@@ -480,6 +506,8 @@ async def get_voice_token(
         description="Voice bridge token issued",
         meta_data={"expires_in_minutes": duration},
     )
+    db.add(audit_entry)
+    db.commit()
 
     return VoiceTokenResponse(voice_token=token, expires_in_minutes=duration)
 

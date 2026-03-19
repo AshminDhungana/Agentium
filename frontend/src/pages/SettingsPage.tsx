@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { useForm } from 'react-hook-form';
 import {
@@ -13,11 +13,11 @@ import {
     AlertTriangle,
     Info,
     Users,
-    Settings as SettingsIcon,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { api } from '@/services/api';
 import UserManagement from './Usermanagement';
+// C14: password strength logic extracted into a reusable hook
+import { usePasswordStrength } from '@/hooks/usePasswordStrength';
 
 interface PasswordFormData {
     currentPassword: string;
@@ -25,13 +25,30 @@ interface PasswordFormData {
     confirmPassword: string;
 }
 
+// C11: Human-readable labels for each RBAC role returned by the backend.
+const ROLE_PERMISSION_LABELS: Record<string, string> = {
+    primary_sovereign: 'Full Access',
+    deputy_sovereign:  'Elevated Access',
+    observer:          'Read Only',
+    sovereign:         'Full Access',   // backdoor sovereign fallback
+    admin:             'Full Access',   // legacy alias
+    user:              'Standard',      // legacy alias
+};
+
 export function SettingsPage() {
     const { user, changePassword } = useAuthStore();
     const [activeTab, setActiveTab] = useState<'account' | 'users'>('account');
+
+    // C8: individual show/hide states for all three password fields
     const [showCurrentPassword, setShowCurrentPassword] = useState(false);
     const [showNewPassword, setShowNewPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [passwordStrength, setPasswordStrength] = useState(0);
+
+    // C5: pendingCount is now driven by a callback from UserManagement instead
+    //     of a duplicate API call made here. Starts at 0; UserManagement sets
+    //     it after its own initial fetch completes.
     const [pendingCount, setPendingCount] = useState(0);
 
     const {
@@ -44,35 +61,31 @@ export function SettingsPage() {
 
     const newPassword = watch('newPassword');
 
-    useEffect(() => {
-        if (user?.is_admin) {
-            fetchPendingCount();
-        }
-    }, [user?.is_admin]);
+    // C14: Derived from the watched field — no extra state or effect needed.
+    const {
+        strength: passwordStrength,
+        color: strengthColor,
+        label: strengthLabel,
+        textColor: strengthTextColor,
+    } = usePasswordStrength(newPassword ?? '');
 
-    const fetchPendingCount = async () => {
-        try {
-            const response = await api.get('/api/v1/admin/users/pending');
-            setPendingCount(response.data.users?.length || 0);
-        } catch (error) {
-            console.error('Failed to fetch pending count:', error);
-        }
-    };
+    // C11: Derive permission label from the actual role instead of hardcoding.
+    const permissionLabel =
+        ROLE_PERMISSION_LABELS[user?.role ?? ''] ?? 'Standard';
 
-    const calculatePasswordStrength = (password: string) => {
-        if (!password) return 0;
-        let strength = 0;
-        if (password.length >= 8) strength += 25;
-        if (password.length >= 12) strength += 25;
-        if (/[a-z]/.test(password) && /[A-Z]/.test(password)) strength += 25;
-        if (/\d/.test(password)) strength += 12.5;
-        if (/[^a-zA-Z0-9]/.test(password)) strength += 12.5;
-        return Math.min(strength, 100);
-    };
-
-    useEffect(() => {
-        setPasswordStrength(newPassword ? calculatePasswordStrength(newPassword) : 0);
-    }, [newPassword]);
+    // D3: Show last_login_at when the backend provides it.
+    // NOTE: authStore's User interface does not currently include last_login_at.
+    // The value will populate automatically once authStore is updated to forward
+    // the field from the login response. Until then this falls back to 'N/A'.
+    const lastLoginDisplay = (() => {
+        const raw = (user as any)?.last_login_at as string | undefined;
+        if (!raw) return 'N/A';
+        return new Date(raw).toLocaleDateString('en-US', {
+            month: 'short',
+            day:   'numeric',
+            year:  'numeric',
+        });
+    })();
 
     const onSubmit = async (data: PasswordFormData) => {
         setIsSubmitting(true);
@@ -81,7 +94,6 @@ export function SettingsPage() {
             if (success) {
                 toast.success('Password changed successfully', { icon: '🔒', duration: 3000 });
                 reset();
-                setPasswordStrength(0);
             } else {
                 const currentError = useAuthStore.getState().error;
                 toast.error(currentError || 'Failed to change password');
@@ -97,24 +109,6 @@ export function SettingsPage() {
         } finally {
             setIsSubmitting(false);
         }
-    };
-
-    const getPasswordStrengthColor = () => {
-        if (passwordStrength < 40) return 'bg-red-500';
-        if (passwordStrength < 70) return 'bg-yellow-500';
-        return 'bg-green-500';
-    };
-
-    const getPasswordStrengthLabel = () => {
-        if (passwordStrength < 40) return 'Weak';
-        if (passwordStrength < 70) return 'Moderate';
-        return 'Strong';
-    };
-
-    const getPasswordStrengthTextColor = () => {
-        if (passwordStrength < 40) return 'text-red-600 dark:text-red-400';
-        if (passwordStrength < 70) return 'text-yellow-600 dark:text-yellow-400';
-        return 'text-green-600 dark:text-green-400';
     };
 
     /* ── Shared input class builder ── */
@@ -178,7 +172,10 @@ export function SettingsPage() {
                 </div>
 
                 {/* ── Account Settings Tab ─────────────────────────────────── */}
-                {activeTab === 'account' && (
+                {/* C6: Both tab panels are kept mounted; visibility is toggled  */}
+                {/*     with Tailwind's `hidden` class so UserManagement never   */}
+                {/*     re-mounts (and re-fetches) when switching tabs.           */}
+                <div className={activeTab === 'account' ? 'block' : 'hidden'}>
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
                         {/* Sidebar */}
@@ -210,10 +207,11 @@ export function SettingsPage() {
                                                 Active
                                             </span>
                                         </div>
+                                        {/* D3: Show real last-login timestamp when available */}
                                         <div className="flex items-center justify-between text-sm">
                                             <span className="text-gray-500 dark:text-gray-400">Last Login</span>
                                             <span className="text-gray-900 dark:text-gray-100 font-medium text-xs">
-                                                Today
+                                                {lastLoginDisplay}
                                             </span>
                                         </div>
                                     </div>
@@ -230,12 +228,15 @@ export function SettingsPage() {
                                     <div className="flex items-center justify-between py-2.5">
                                         <span className="text-xs text-gray-500 dark:text-gray-400">User ID</span>
                                         <span className="text-xs font-mono text-gray-900 dark:text-gray-100">
-                                            #{user?.id || '00001'}
+                                            #{user?.id || '—'}
                                         </span>
                                     </div>
+                                    {/* C11: Derived from actual role instead of hardcoded "Full Access" */}
                                     <div className="flex items-center justify-between py-2.5">
                                         <span className="text-xs text-gray-500 dark:text-gray-400">Permissions</span>
-                                        <span className="text-xs text-gray-900 dark:text-gray-100">Full Access</span>
+                                        <span className="text-xs text-gray-900 dark:text-gray-100">
+                                            {permissionLabel}
+                                        </span>
                                     </div>
                                     <div className="flex items-center justify-between py-2.5">
                                         <span className="text-xs text-gray-500 dark:text-gray-400">2FA Status</span>
@@ -288,6 +289,7 @@ export function SettingsPage() {
                                                     type="button"
                                                     onClick={() => setShowCurrentPassword(!showCurrentPassword)}
                                                     className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-150"
+                                                    aria-label={showCurrentPassword ? 'Hide password' : 'Show password'}
                                                 >
                                                     {showCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                                                 </button>
@@ -334,23 +336,24 @@ export function SettingsPage() {
                                                     type="button"
                                                     onClick={() => setShowNewPassword(!showNewPassword)}
                                                     className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-150"
+                                                    aria-label={showNewPassword ? 'Hide password' : 'Show password'}
                                                 >
                                                     {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                                                 </button>
                                             </div>
 
-                                            {/* Password Strength Indicator */}
+                                            {/* C14: Password Strength Indicator — driven by hook */}
                                             {newPassword && (
                                                 <div className="mt-2.5 space-y-1.5">
                                                     <div className="flex items-center justify-between text-xs">
                                                         <span className="text-gray-500 dark:text-gray-400">Password Strength</span>
-                                                        <span className={`font-semibold ${getPasswordStrengthTextColor()}`}>
-                                                            {getPasswordStrengthLabel()}
+                                                        <span className={`font-semibold ${strengthTextColor}`}>
+                                                            {strengthLabel}
                                                         </span>
                                                     </div>
                                                     <div className="h-1.5 bg-gray-200 dark:bg-[#1e2535] rounded-full overflow-hidden">
                                                         <div
-                                                            className={`h-full ${getPasswordStrengthColor()} transition-all duration-300 rounded-full`}
+                                                            className={`h-full ${strengthColor} transition-all duration-300 rounded-full`}
                                                             style={{ width: `${passwordStrength}%` }}
                                                         />
                                                     </div>
@@ -366,20 +369,31 @@ export function SettingsPage() {
                                         </div>
 
                                         {/* Confirm Password */}
+                                        {/* C8: now has its own show/hide toggle for consistency */}
                                         <div>
                                             <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                                                 Confirm New Password
                                             </label>
-                                            <input
-                                                type="password"
-                                                {...register('confirmPassword', {
-                                                    required: 'Please confirm your password',
-                                                    validate: (value) =>
-                                                        value === newPassword || 'Passwords do not match',
-                                                })}
-                                                className={inputClass(!!errors.confirmPassword)}
-                                                placeholder="Confirm new password"
-                                            />
+                                            <div className="relative">
+                                                <input
+                                                    type={showConfirmPassword ? 'text' : 'password'}
+                                                    {...register('confirmPassword', {
+                                                        required: 'Please confirm your password',
+                                                        validate: (value) =>
+                                                            value === newPassword || 'Passwords do not match',
+                                                    })}
+                                                    className={`${inputClass(!!errors.confirmPassword)} pr-11`}
+                                                    placeholder="Confirm new password"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-150"
+                                                    aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                                                >
+                                                    {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                                </button>
+                                            </div>
                                             {errors.confirmPassword && (
                                                 <p className="mt-1.5 text-xs text-red-600 dark:text-red-400 flex items-center gap-1.5">
                                                     <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
@@ -409,10 +423,7 @@ export function SettingsPage() {
                                             </button>
                                             <button
                                                 type="button"
-                                                onClick={() => {
-                                                    reset();
-                                                    setPasswordStrength(0);
-                                                }}
+                                                onClick={() => reset()}
                                                 className="px-6 py-2.5 border border-gray-300 dark:border-[#1e2535] hover:bg-gray-50 dark:hover:bg-[#0f1117] hover:border-gray-400 dark:hover:border-[#2a3347] text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg transition-all duration-150"
                                             >
                                                 Cancel
@@ -438,11 +449,22 @@ export function SettingsPage() {
                             </div>
                         </div>
                     </div>
-                )}
+                </div>
 
                 {/* ── User Management Tab ─────────────────────────────────── */}
-                {activeTab === 'users' && user?.is_admin && (
-                    <UserManagement />
+                {/* C6: Always mounted when user is admin so switching back to  */}
+                {/*     this tab does not trigger a full remount + refetch.      */}
+                {/* C7: embedded prop strips the standalone page wrapper so     */}
+                {/*     UserManagement fits inside the settings layout.          */}
+                {/* C5: onPendingCountChange callback keeps the tab badge count  */}
+                {/*     in sync without a duplicate /pending API call here.      */}
+                {user?.is_admin && (
+                    <div className={activeTab === 'users' ? 'block' : 'hidden'}>
+                        <UserManagement
+                            embedded
+                            onPendingCountChange={setPendingCount}
+                        />
+                    </div>
                 )}
             </div>
         </div>

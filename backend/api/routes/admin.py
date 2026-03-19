@@ -6,9 +6,10 @@ Budget endpoints:
   - GET  /admin/budget         → live usage from ModelUsageLog + limits from system_settings
   - POST /admin/budget         → persist new limits to system_settings, update in-memory manager
   - GET  /admin/budget/history → per-day and per-provider breakdown from real API logs
+
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from typing import Dict, Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -18,7 +19,8 @@ from sqlalchemy import func, text
 
 from backend.core.auth import get_current_active_user
 from backend.models.database import get_db
-from backend.models.entities.user import User
+from backend.models.entities.user import User, VALID_ROLES, ROLE_PRIMARY_SOVEREIGN
+from backend.models.entities.audit import AuditLog, AuditLevel, AuditCategory
 
 router = APIRouter()
 
@@ -49,6 +51,20 @@ def _can_modify_budget(current_user: dict) -> bool:
 class BudgetUpdateRequest(BaseModel):
     daily_token_limit: int = Field(..., ge=1000, description="Minimum 1,000 tokens/day")
     daily_cost_limit: float = Field(..., ge=0.0, description="Daily cost cap in USD")
+
+
+# C2: Pydantic body model so the password travels in the request body
+#     (encrypted by TLS) rather than in the query string (logged by servers).
+class AdminPasswordChangeRequest(BaseModel):
+    new_password: str = Field(..., min_length=8)
+
+
+# D6: Body model for role-change requests.
+class RoleChangeRequest(BaseModel):
+    new_role: str = Field(
+        ...,
+        description=f"Must be one of: {', '.join(sorted(VALID_ROLES))}",
+    )
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -140,6 +156,32 @@ def _persist_budget_limits(db: Session, daily_token_limit: int, daily_cost_limit
             {"key": key, "value": value},
         )
     db.commit()
+
+
+# C3: Fixed type annotation — user_id is a UUID string, not an integer.
+def _get_user_or_404(db: Session, user_id: str) -> User:
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
+
+
+# C13: Expanded to include role, is_sovereign, can_veto so the frontend can
+#      show accurate permission data without making a separate API call.
+def _user_dict(u: User) -> dict:
+    return {
+        "id":           u.id,
+        "username":     u.username,
+        "email":        u.email,
+        "is_active":    u.is_active,
+        "is_admin":     u.is_admin,
+        "is_pending":   u.is_pending,
+        "role":         u.effective_role,
+        "is_sovereign": u.is_sovereign,
+        "can_veto":     u.can_veto,
+        "created_at":   u.created_at.isoformat() if u.created_at else None,
+        "updated_at":   u.updated_at.isoformat() if u.updated_at else None,
+    }
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -359,9 +401,25 @@ async def approve_user(
     user = _get_user_or_404(db, user_id)
     if not user.is_pending:
         raise HTTPException(status_code=400, detail="User is not pending approval")
+
     user.is_pending = False
     user.is_active = True
+
+    # C1 + C12: persist audit entry for user approval
+    audit_entry = AuditLog.log(
+        level=AuditLevel.INFO,
+        category=AuditCategory.AUTHENTICATION,
+        actor_type="admin",
+        actor_id=admin.get("username", "unknown"),
+        action="user_approved",
+        target_type="user",
+        target_id=str(user.id),
+        description=f"Admin approved registration for user: {user.username}",
+        meta_data={"approved_user_id": user.id, "approved_username": user.username},
+    )
+    db.add(audit_entry)
     db.commit()
+
     return {"success": True, "message": f"User {user.username} approved successfully"}
 
 
@@ -375,9 +433,27 @@ async def reject_user(
     user = _get_user_or_404(db, user_id)
     if not user.is_pending:
         raise HTTPException(status_code=400, detail="Can only reject pending users")
+
     username = user.username
+    rejected_id = str(user.id)
+
     db.delete(user)
+
+    # C1 + C12: persist audit entry before committing the delete
+    audit_entry = AuditLog.log(
+        level=AuditLevel.WARNING,
+        category=AuditCategory.AUTHENTICATION,
+        actor_type="admin",
+        actor_id=admin.get("username", "unknown"),
+        action="user_rejected",
+        target_type="user",
+        target_id=rejected_id,
+        description=f"Admin rejected and removed pending user: {username}",
+        meta_data={"rejected_username": username},
+    )
+    db.add(audit_entry)
     db.commit()
+
     return {"success": True, "message": f"User {username} rejected and removed"}
 
 
@@ -390,46 +466,128 @@ async def delete_user(
     """Delete a user account. Cannot delete your own account."""
     if user_id == admin.get("user_id"):
         raise HTTPException(status_code=400, detail="Cannot delete your own account")
+
     user = _get_user_or_404(db, user_id)
     username = user.username
+    deleted_id = str(user.id)
+
     db.delete(user)
+
+    # C1 + C12: persist audit entry before committing the delete
+    audit_entry = AuditLog.log(
+        level=AuditLevel.WARNING,
+        category=AuditCategory.AUTHORIZATION,
+        actor_type="admin",
+        actor_id=admin.get("username", "unknown"),
+        action="user_deleted",
+        target_type="user",
+        target_id=deleted_id,
+        description=f"Admin permanently deleted user account: {username}",
+        meta_data={"deleted_username": username},
+    )
+    db.add(audit_entry)
     db.commit()
+
     return {"success": True, "message": f"User {username} deleted successfully"}
 
 
 @router.post("/admin/users/{user_id}/change-password")
 async def change_user_password(
     user_id: str,
-    new_password: str,
+    # C2: Use Pydantic body model instead of a bare query-string parameter.
+    #     Previously `new_password: str` was resolved from the query string,
+    #     exposing the password in server access logs and browser history.
+    request: AdminPasswordChangeRequest,
     admin: dict = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
     """Admin override: change any user's password."""
     user = _get_user_or_404(db, user_id)
-    user.hashed_password = User.hash_password(new_password)
+    user.hashed_password = User.hash_password(request.new_password)
+    user.updated_at = datetime.now(timezone.utc)
+
+    # C1 + C12: persist audit entry
+    audit_entry = AuditLog.log(
+        level=AuditLevel.WARNING,
+        category=AuditCategory.AUTHENTICATION,
+        actor_type="admin",
+        actor_id=admin.get("username", "unknown"),
+        action="admin_password_change",
+        target_type="user",
+        target_id=str(user.id),
+        description=f"Admin changed password for user: {user.username}",
+        meta_data={"target_username": user.username},
+    )
+    db.add(audit_entry)
     db.commit()
+
     return {"success": True, "message": f"Password changed for user {user.username}"}
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Private utilities
+# D6: POST /api/v1/admin/users/{user_id}/role
 # ──────────────────────────────────────────────────────────────────────────────
 
-def _get_user_or_404(db: Session, user_id: int) -> User:
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    return user
+@router.post("/admin/users/{user_id}/role")
+async def change_user_role(
+    user_id: str,
+    request: RoleChangeRequest,
+    admin: dict = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """
+    Change a user's RBAC role.
 
+    - Validates against VALID_ROLES (primary_sovereign, deputy_sovereign, observer).
+    - Syncs the is_admin flag: primary_sovereign → is_admin=True, others → False.
+    - Admins cannot change their own role.
+    - Audit-logged at WARNING level because role changes are high-privilege operations.
+    """
+    if request.new_role not in VALID_ROLES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid role '{request.new_role}'. Must be one of: {', '.join(sorted(VALID_ROLES))}",
+        )
 
-def _user_dict(u: User) -> dict:
+    if user_id == admin.get("user_id"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Administrators cannot change their own role.",
+        )
+
+    user = _get_user_or_404(db, user_id)
+    old_role = user.effective_role
+
+    user.role = request.new_role
+    # Keep is_admin in sync: only primary_sovereign carries admin privileges
+    user.is_admin = (request.new_role == ROLE_PRIMARY_SOVEREIGN)
+    user.updated_at = datetime.now(timezone.utc)
+
+    # C1: persist audit entry
+    audit_entry = AuditLog.log(
+        level=AuditLevel.WARNING,
+        category=AuditCategory.AUTHORIZATION,
+        actor_type="admin",
+        actor_id=admin.get("username", "unknown"),
+        action="user_role_changed",
+        target_type="user",
+        target_id=str(user.id),
+        description=(
+            f"Admin changed role for {user.username}: "
+            f"{old_role} → {request.new_role}"
+        ),
+        meta_data={
+            "target_username": user.username,
+            "old_role": old_role,
+            "new_role": request.new_role,
+        },
+    )
+    db.add(audit_entry)
+    db.commit()
+
     return {
-        "id": u.id,
-        "username": u.username,
-        "email": u.email,
-        "is_active": u.is_active,
-        "is_admin": u.is_admin,
-        "is_pending": u.is_pending,
-        "created_at": u.created_at.isoformat() if u.created_at else None,
-        "updated_at": u.updated_at.isoformat() if u.updated_at else None,
+        "success": True,
+        "message": f"Role updated for {user.username}",
+        "previous_role": old_role,
+        "new_role": request.new_role,
     }

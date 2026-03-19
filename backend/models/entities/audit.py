@@ -41,53 +41,56 @@ class AuditLog(BaseEntity):
     Central audit log for all Agentium activities.
     Immutable record of who did what, when, and with what result.
     """
-    
+
     __tablename__ = 'audit_logs'
-    
+
     # Classification
     level = Column(Enum(AuditLevel), default=AuditLevel.INFO, nullable=False, index=True)
     category = Column(Enum(AuditCategory), nullable=False, index=True)
-    
+
     # Actor identification
     actor_type = Column(String(20), nullable=False)  # agent, sovereign, system
-    actor_id = Column(String(10), nullable=False, index=True)  # agentium_id or user_id
-    
+    # C4: Widened from String(10) to String(100).
+    # Usernames are up to 50 chars; the old size caused silent truncation
+    # and DB errors once audit entries are correctly persisted.
+    actor_id = Column(String(100), nullable=False, index=True)
+
     # Action details
     action = Column(String(100), nullable=False)  # e.g., "task_assigned", "constitution_amended"
     description = Column(Text, nullable=True)  # Human-readable description
-    
+
     # Target (what was acted upon)
     target_type = Column(String(50), nullable=True)  # task, agent, constitution, etc.
     target_id = Column(String(36), nullable=True, index=True)  # UUID of target
-    
+
     # Context
     session_id = Column(String(100), nullable=True, index=True)  # WebSocket/HTTP session
     ip_address = Column(String(45), nullable=True)  # IPv4 or IPv6
-    
+
     # Detailed data
     before_state = Column(Text, nullable=True)  # State before action
     after_state = Column(Text, nullable=True)   # State after action
     metadata_json = Column(Text, nullable=True)      # ✅ FIXED: Changed from 'metadata' to 'metadata_json'
     screenshot_url = Column(String(500), nullable=True) # Used for Phase 10 Browser Control evidence
 
-    
+
     # Result
     success = Column(String(5), default='Y', nullable=False)  # Y/N or True/False
     result_message = Column(Text, nullable=True)
     error_code = Column(String(50), nullable=True)
     error_details = Column(Text, nullable=True)
-    
+
     # Chain of custody
     parent_audit_id = Column(String(36), ForeignKey('audit_logs.id'), nullable=True)
     correlation_id = Column(String(36), nullable=True, index=True)  # Groups related events
-    
+
     # Performance
     duration_ms = Column(Integer, nullable=True)  # Action duration in milliseconds
     memory_delta_mb = Column(Integer, nullable=True)  # Memory impact
-    
+
     # Relationships
     parent = relationship("AuditLog", remote_side="AuditLog.id", backref="children")
-    
+
     # Indexes for performance
     __table_args__ = (
         Index('idx_audit_timestamp', 'created_at'),
@@ -95,9 +98,9 @@ class AuditLog(BaseEntity):
         Index('idx_audit_level_category', 'level', 'category'),
         Index('idx_audit_correlation', 'correlation_id'),
     )
-    
+
     @classmethod
-    def log(cls, 
+    def log(cls,
             level: AuditLevel,
             category: AuditCategory,
             actor_type: str,
@@ -113,15 +116,23 @@ class AuditLog(BaseEntity):
             screenshot_url: str = None,
             **kwargs) -> 'AuditLog':
         """
-        Factory method to create audit log entry.
+        Factory method to create an audit log entry.
+
+        IMPORTANT: This method only creates the ORM object — it does NOT
+        persist it.  Callers MUST do:
+            entry = AuditLog.log(...)
+            db.add(entry)
+            db.commit()   # or rely on the route's session commit
         """
         import uuid as _uuid
+        # Truncate actor_id defensively so it never exceeds the column width.
+        safe_actor_id = str(actor_id)[:100] if actor_id else "unknown"
         entry = cls(
             agentium_id=f"A{_uuid.uuid4().hex[:19]}",  # exactly 20 chars, always unique
             level=level,
             category=category,
             actor_type=actor_type,
-            actor_id=actor_id,
+            actor_id=safe_actor_id,
             action=action,
             description=description,
             target_type=target_type,
@@ -134,7 +145,7 @@ class AuditLog(BaseEntity):
             **kwargs
         )
         return entry
-    
+
     @classmethod
     def system_log(cls, action: str, description: str, level: AuditLevel = AuditLevel.INFO):
         """Shortcut for system-level events."""
@@ -146,7 +157,7 @@ class AuditLog(BaseEntity):
             action=action,
             description=description
         )
-    
+
     @classmethod
     def security_log(cls, action: str, actor_id: str, description: str, success: bool = False):
         """Shortcut for security events."""
@@ -159,12 +170,12 @@ class AuditLog(BaseEntity):
             description=description,
             success=success
         )
-    
+
     def add_child_event(self, child_event: 'AuditLog'):
         """Link a related event as child."""
         child_event.parent_audit_id = self.id
         child_event.correlation_id = self.correlation_id or self.id
-    
+
     def to_dict(self) -> Dict[str, Any]:
         base = super().to_dict()
         base.update({
@@ -198,51 +209,51 @@ class ConstitutionViolation(BaseEntity):
     Special audit table for constitution violations.
     Tracks when agents attempt or succeed in violating the supreme law.
     """
-    
+
     __tablename__ = 'constitution_violations'
-    
+
     # Violator
     agentium_id = Column(String(10), ForeignKey('agents.agentium_id'), nullable=False)
-    
+
     # Violation details
     violation_type = Column(String(50), nullable=False)  # e.g., "unauthorized_action"
     violated_article = Column(String(50), nullable=True)  # Which constitution article
     description = Column(Text, nullable=False)
     severity = Column(Enum(AuditLevel), default=AuditLevel.WARNING, nullable=False)
-    
+
     # The action attempted
     attempted_action = Column(Text, nullable=False)
     context = Column(JSON, nullable=True)  # Full context of the situation
-    
+
     # Detection
     detected_by = Column(String(10), nullable=False)  # Agent or system that caught it
     detection_method = Column(String(50), nullable=True)  # e.g., "pre_execution_check"
-    
+
     # Resolution
     blocked = Column(Boolean, default=True)  # Whether the action was prevented
     auto_terminated = Column(Boolean, default=False)  # Agent was auto-terminated
     escalated_to = Column(String(10), nullable=True)  # Head of Council alerted
-    
+
     # Human review
     reviewed_by_sovereign = Column(Boolean, default=False)
     sovereign_decision = Column(String(20), nullable=True)  # override, confirm, pardon
     review_notes = Column(Text, nullable=True)
-    
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         if not kwargs.get('agentium_id'):
             self.agentium_id = f"X{kwargs.get('agentium_id', '00000')}{datetime.utcnow().strftime('%H%M%S')}"
-    
+
     def mark_reviewed(self, decision: str, notes: str = None):
         """Mark violation as reviewed by Sovereign."""
         self.reviewed_by_sovereign = True
         self.sovereign_decision = decision
         self.review_notes = notes
-    
+
     def escalate(self, head_agentium_id: str):
         """Alert Head of Council about violation."""
         self.escalated_to = head_agentium_id
-    
+
     def to_dict(self) -> Dict[str, Any]:
         base = super().to_dict()
         base.update({
@@ -265,63 +276,63 @@ class SessionLog(BaseEntity):
     Tracks user/agent sessions for activity analysis.
     Helps reconstruct what happened during a specific interaction.
     """
-    
+
     __tablename__ = 'session_logs'
-    
+
     session_id = Column(String(100), nullable=False, unique=True, index=True)
     session_type = Column(String(20), nullable=False)  # websocket, http, internal
-    
+
     # Participant
     actor_type = Column(String(20), nullable=False)
     actor_id = Column(String(10), nullable=False, index=True)
-    
+
     # Timing
     started_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     ended_at = Column(DateTime, nullable=True)
     last_activity_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    
+
     # Activity summary
     requests_count = Column(Integer, default=0)
     tasks_created = Column(Integer, default=0)
     votes_cast = Column(Integer, default=0)
     messages_exchanged = Column(Integer, default=0)
-    
+
     # Status
     termination_reason = Column(String(50), nullable=True)  # logout, timeout, error
-    
+
     # Related audit entries
-    audit_entries = relationship("AuditLog", foreign_keys=[AuditLog.session_id], 
+    audit_entries = relationship("AuditLog", foreign_keys=[AuditLog.session_id],
                                 primaryjoin="SessionLog.session_id == AuditLog.session_id",
                                 lazy="dynamic")
-    
+
     def record_activity(self):
         """Update last activity timestamp."""
         self.last_activity_at = datetime.utcnow()
-    
+
     def end_session(self, reason: str = "logout"):
         """Mark session as ended."""
         self.ended_at = datetime.utcnow()
         self.termination_reason = reason
-    
+
     def is_active(self, timeout_seconds: int = 3600) -> bool:
         """Check if session is still active."""
         if self.ended_at:
             return False
-        
+
         idle_time = (datetime.utcnow() - self.last_activity_at).total_seconds()
         return idle_time < timeout_seconds
-    
+
     def add_audit(self, audit_entry: AuditLog):
         """Link an audit entry to this session."""
         audit_entry.session_id = self.session_id
         self.requests_count += 1
-    
+
     def to_dict(self) -> Dict[str, Any]:
         base = super().to_dict()
         duration = None
         if self.ended_at and self.started_at:
             duration = (self.ended_at - self.started_at).total_seconds()
-        
+
         base.update({
             'session_id': self.session_id,
             'actor': self.actor_id,
@@ -345,33 +356,33 @@ class HealthCheck(BaseEntity):
     System health monitoring for observability.
     Tracks component status and performance metrics.
     """
-    
+
     __tablename__ = 'health_checks'
-    
+
     component = Column(String(50), nullable=False)  # e.g., "database", "head_council"
     status = Column(String(20), nullable=False)  # healthy, degraded, unhealthy
     latency_ms = Column(Integer, nullable=True)
     error_rate = Column(Float, nullable=True)  # 0.0 to 1.0
-    
+
     # Metrics
     memory_usage_mb = Column(Integer, nullable=True)
     cpu_usage_percent = Column(Float, nullable=True)
     active_connections = Column(Integer, nullable=True)
-    
+
     # Details
     check_output = Column(Text, nullable=True)  # JSON results
     last_error = Column(Text, nullable=True)
-    
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         if not kwargs.get('agentium_id'):
             component = kwargs.get('component', 'unknown')
             self.agentium_id = f"H{component[0].upper()}{datetime.utcnow().strftime('%H%M%S')}"
-    
+
     def is_healthy(self) -> bool:
         """Check if component is healthy."""
         return self.status == 'healthy'
-    
+
     def to_dict(self) -> Dict[str, Any]:
         base = super().to_dict()
         base.update({

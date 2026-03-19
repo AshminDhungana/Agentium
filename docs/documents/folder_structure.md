@@ -18,11 +18,10 @@ Agentium/
 │   │   └── versions/                # Migration scripts
 │   │       ├── 001_schema.py        # Initial schema
 │   │       ├── 002_migration.py     # General migration
-│   │       ├── 003_reasoning_trace.py # Reasoning trace
-│   │       ├── 004_chat_indexes.py  # Chat indexes
+│   │       ├── 003_migration.py     # Phase 11 ecosystem
 │   │       ├── 004_webhooks.py      # Webhooks
-│   │       ├── 005_phase11_ecosystem.py # Phase 11 ecosystem
-│   │       └── 006_notification_preferences.py # Notification prefs
+│   │       ├── 005_models.py        # Model provider
+│   │       └── 006_workflow.py      # Workflow system
 │   ├── api/                          # API layer
 │   │   ├── dependencies/
 │   │   │   └── auth.py              # Auth dependencies
@@ -40,13 +39,14 @@ Agentium/
 │   │   │   ├── chat.py              # Chat endpoints
 │   │   │   ├── checkpoints.py       # Checkpoint management
 │   │   │   ├── critics.py           # Critic agents
+│   │   │   ├── dashboard.py         # Dashboard data
 │   │   │   ├── federation.py        # Federation management
 │   │   │   ├── files.py             # File operations
 │   │   │   ├── inbox.py             # Unified inbox
 │   │   │   ├── lifecycle_routes.py  # Lifecycle management
 │   │   │   ├── mcp_tools.py         # MCP tools
-│   │   │   ├── models.py            # Model management
 │   │   │   ├── mobile.py            # Mobile integration
+│   │   │   ├── models.py            # Model management
 │   │   │   ├── monitoring_routes.py # Monitoring endpoints
 │   │   │   ├── outbound_webhooks.py # Outbound webhooks
 │   │   │   ├── plugins.py           # Plugin marketplace
@@ -61,7 +61,8 @@ Agentium/
 │   │   │   ├── voice.py             # Voice features
 │   │   │   ├── voting.py            # Voting/constitution
 │   │   │   ├── webhooks.py          # Webhook handlers
-│   │   │   └── websocket.py         # WebSocket endpoints
+│   │   │   ├── websocket.py         # WebSocket endpoints
+│   │   │   └── workflows.py         # Workflow automation
 │   │   ├── schemas/                 # Pydantic schemas
 │   │   │   ├── checkpoint.py
 │   │   │   ├── mcp_schemas.py
@@ -118,7 +119,8 @@ Agentium/
 │   │   │   ├── user_config.py       # User config
 │   │   │   ├── user_preference.py   # User preferences
 │   │   │   ├── voting.py            # Voting records
-│   │   │   └── webhook.py           # Webhook entities
+│   │   │   ├── webhook.py           # Webhook entities
+│   │   │   └── workflow.py          # Workflow definitions
 │   │   └── schemas/                 # Request/response schemas
 │   │       ├── messages.py
 │   │       ├── task.py
@@ -153,8 +155,11 @@ Agentium/
 │   │   ├── db_maintenance.py       # Database maintenance
 │   │   ├── fact_checker.py         # Fact checking
 │   │   ├── federation_service.py   # Federation management
+│   │   ├── file_processor.py       # PDF/image extraction
 │   │   ├── host_access.py          # Host access service
 │   │   ├── idle_governance.py      # Idle management
+│   │   ├── idle_tasks/              # Background idle tasks
+│   │   │   └── preference_optimizer.py # Preference optimization
 │   │   ├── initialization_service.py # System init
 │   │   ├── knowledge_governance.py # Knowledge policies
 │   │   ├── knowledge_service.py    # Knowledge base
@@ -196,11 +201,28 @@ Agentium/
 │   │   ├── tool_versioning.py       # Tool versioning
 │   │   ├── user_preference_service.py # User preferences
 │   │   ├── ab_testing_service.py    # A/B testing service
-│   │   └── webhook_dispatch_service.py # Webhook dispatch
+│   │   ├── webhook_dispatch_service.py # Webhook dispatch
+│   │   ├── workflow_executor.py     # Workflow execution
+│   │   ├── workflow_planner.py      # Workflow planning
+│   │   └── workflow_tools.py       # Workflow tools
 │   ├── tools/                       # Built-in tools
-│   │   ├── browser_tool.py          # Browser automation
+│   │   ├── browser_router.py        # Browser routing
+│   │   ├── browser_tool.py         # Browser automation
+│   │   ├── code_analyzer_tool.py   # Code analysis
+│   │   ├── data_transform_tool.py  # Data transformation
+│   │   ├── deep_think_tool.py       # Deep thinking
+│   │   ├── desktop_tool.py          # Desktop automation
+│   │   ├── embedding_tool.py        # Embeddings
 │   │   ├── file_tool.py            # File operations
-│   │   └── shell_tool.py           # Shell commands
+│   │   ├── generated/               # Generated tools
+│   │   ├── git_tool.py             # Git operations
+│   │   ├── host_os_tool.py         # Host OS operations
+│   │   ├── http_api_tool.py        # HTTP API calls
+│   │   ├── nodriver_tool.py        # Browser automation
+│   │   ├── shell_tool.py           # Shell commands
+│   │   ├── text_editor_tool.py     # Text editing
+│   │   ├── user_preference_tool.py # User preferences
+│   │   └── web_search_tool.py      # Web search
 │   ├── tests/                       # Backend tests
 │   │   ├── test_federation_e2e.py  # Federation E2E tests
 │   │   ├── test_outbound_webhooks.py # Outbound webhooks tests
@@ -247,6 +269,8 @@ Agentium/
 │   │   │   │   ├── ChannelHealthWidget.tsx
 │   │   │   │   ├── FinancialBurnDashboard.tsx
 │   │   │   │   └── ProviderAnalytics.tsx
+│   │   │   ├── federation/          # Federation UI
+│   │   │   │   └── ...
 │   │   │   ├── layout/              # Layout components
 │   │   │   │   └── MainLayout.tsx
 │   │   │   ├── models/              # Model config UI
@@ -260,6 +284,12 @@ Agentium/
 │   │   │   ├── tasks/               # Task UI
 │   │   │   │   ├── CreateTaskModal.tsx
 │   │   │   │   └── TaskCard.tsx
+│   │   │   ├── ui/                  # Shared UI components
+│   │   │   │   ├── DashboardSkeleton.tsx
+│   │   │   │   ├── ErrorState.tsx
+│   │   │   │   ├── StatCard.tsx
+│   │   │   │   ├── Toggle.tsx
+│   │   │   │   └── WidgetErrorFallback.tsx
 │   │   │   ├── BrowserTaskPanel.tsx # Browser task panel
 │   │   │   ├── BudgetControl.tsx
 │   │   │   ├── ConnectionStatus.tsx
@@ -301,7 +331,9 @@ Agentium/
 │   │   │   ├── admin.ts
 │   │   │   ├── agents.ts
 │   │   │   ├── api.ts
+│   │   │   ├── apiKeysService.ts
 │   │   │   ├── auth.ts
+│   │   │   ├── browserApi.ts
 │   │   │   ├── chatApi.ts
 │   │   │   ├── channelMessages.ts
 │   │   │   ├── channelMetrics.ts
@@ -312,17 +344,19 @@ Agentium/
 │   │   │   ├── hostAccessApi.ts
 │   │   │   ├── inboxApi.ts
 │   │   │   ├── localVoice.ts
+│   │   │   ├── mcpToolsApi.ts
 │   │   │   ├── models.ts
 │   │   │   ├── monitoring.ts
 │   │   │   ├── plugins.ts          # Plugin marketplace
 │   │   │   ├── preferences.ts
+│   │   │   ├── providerAnalyticsApi.ts
 │   │   │   ├── rbac.ts             # RBAC API
+│   │   │   ├── remoteExecutorApi.ts
 │   │   │   ├── skills.ts
 │   │   │   ├── tasks.ts
 │   │   │   ├── voiceApi.ts
 │   │   │   ├── voiceBridge.ts
-│   │   │   ├── voting.ts
-│   │   │   └── webhookService.ts   # Webhook service
+│   │   │   └── voting.ts
 │   │   ├── store/                   # State management
 │   │   │   ├── authStore.ts
 │   │   │   ├── backendStore.ts
@@ -373,25 +407,26 @@ Agentium/
 │       └── README.md
 │
 ├── docs/                            # Documentation
-│   ├── phase10_plan.md             # Phase 10 planning
 │   ├── architecture/               # Architecture documentation
 │   │   └── scalability_strategy.md # Scalability strategy
+│   ├── assets/                     # Documentation assets
+│   ├── constitution/
+│   │   └── core.md                # Constitution core
 │   ├── documents/
 │   │   ├── agentium_guide.md      # Agentium user guide
 │   │   ├── architectural_breakdown.md # Architecture details
 │   │   ├── folder_structure.md    # This file
 │   │   ├── selfhost.md            # Self-hosting guide
 │   │   └── todo.md                # TODO list
-│   ├── constitution/
-│   │   └── core.md                # Constitution core
-│   ├── verification_1_7_phase.md   # Verification phase doc
-│   └── workflow/
-│       ├── channel_verification.md
-│       ├── dev_workflow.md
-│       ├── multimodel_chat.md
-│       ├── system_workflow.md
-│       ├── task_execution.md
-│       └── unified_inbox.md
+│   ├── workflow/                   # Workflow documentation
+│   │   ├── channel_verification.md
+│   │   ├── dev_workflow.md
+│   │   ├── multimodel_chat.md
+│   │   ├── system_workflow.md
+│   │   ├── task_execution.md
+│   │   └── unified_inbox.md
+│   └── phase10_plan.md             # Phase 10 planning
+│
 ├── scripts/                         # Build and utility scripts
 ├── test/                            # Test files
 ├── voice-bridge/                    # Voice bridge functionality
