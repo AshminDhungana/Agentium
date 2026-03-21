@@ -143,6 +143,9 @@ from backend.models.entities.mobile import DeviceToken, NotificationPreference
 # Phase 12 — SDK & External Interface
 from backend.models.entities.webhook import WebhookSubscription, WebhookDeliveryLog
 
+# Phase 13.5 — Workflow Automation Pipeline
+from backend.models.entities.workflow import (Workflow, WorkflowExecution, WorkflowStep, WorkflowVersion, WorkflowExecutionStatus, WorkflowStepType)
+
 # All models for Alembic/database creation
 __all__ = [
     # Base
@@ -259,4 +262,12 @@ __all__ = [
     # Outbound Webhooks (Phase 12)
     'WebhookSubscription',
     'WebhookDeliveryLog',
+
+    # Workflow Automation Pipeline (Phase 13.5)
+    'Workflow',
+    'WorkflowExecution',
+    'WorkflowStep',
+    'WorkflowVersion',
+    'WorkflowExecutionStatus',
+    'WorkflowStepType',
 ]

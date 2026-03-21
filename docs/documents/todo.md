@@ -345,25 +345,25 @@ Build a self-governing AI ecosystem where agents operate under constitutional la
 
 #### Backend
 
-- [ ] **Learning Impact Tracker** — Redis hash `agentium:learning:impact`; 7-day rolling success rate delta; expose via `GET /improvements/impact`
+- [x] **Learning Impact Tracker** — Redis hash `agentium:learning:impact`; 7-day rolling success rate delta; expose via `GET /improvements/impact`
 
 #### Beat Schedule Additions
 
-- [ ] `knowledge-consolidation-weekly` — 604800 s
-- [ ] `anti-pattern-scan` — 3600 s
+- [x] `knowledge-consolidation-weekly` — 604800 s
+- [x] `anti-pattern-scan` — 3600 s
 
 #### API Routes (`backend/api/routes/improvements.py` — new file)
 
-- [ ] `GET /improvements/impact` — learning impact metrics (success rate delta, tools generated, amendments auto-proposed)
-- [ ] `GET /improvements/patterns` — detected anti-patterns with recurrence count
-- [ ] `POST /improvements/consolidate` — manual trigger of knowledge consolidation (admin only)
+- [x] `GET /improvements/impact` — learning impact metrics (success rate delta, tools generated, amendments auto-proposed)
+- [x] `GET /improvements/patterns` — detected anti-patterns with recurrence count
+- [x] `POST /improvements/consolidate` — manual trigger of knowledge consolidation (admin only)
 
 #### Frontend — `LearningImpactDashboard.tsx` (new component)
 
-- [ ] Success Rate Trend (Recharts `AreaChart`) — 30-day rolling rate with "learning event" vertical markers
-- [ ] Auto-Generated Tools list: name, trigger pattern, usage count, success rate
-- [ ] Anti-Pattern Warnings feed: pattern description, recurrence count, amendment status
-- [ ] Knowledge Base Stats: total learnings, federated contributions, consolidations run
+- [x] Success Rate Trend (Recharts `AreaChart`) — 30-day rolling rate with "learning event" vertical markers
+- [x] Auto-Generated Tools list: name, trigger pattern, usage count, success rate
+- [x] Anti-Pattern Warnings feed: pattern description, recurrence count, amendment status
+- [x] Knowledge Base Stats: total learnings, federated contributions, consolidations run
 
 ---
 
@@ -373,43 +373,43 @@ Build a self-governing AI ecosystem where agents operate under constitutional la
 
 #### Backend — New Models (`backend/models/entities/workflow.py`)
 
-- [ ] `Workflow` entity: `id`, `agentium_id`, `name`, `description`, `template_json` (JSONB), `version` (int), `is_active`, `created_by_agent_id`, `schedule_cron`, `created_at`, `updated_at`
-- [ ] `WorkflowExecution` entity: `id`, `workflow_id`, `status` (`pending | running | paused | completed | failed`), `current_step_index`, `context_data` (JSONB), `started_at`, `completed_at`, `triggered_by`
-- [ ] `WorkflowStep` entity: `id`, `workflow_id`, `step_index`, `step_type` (`task | condition | parallel | human_approval | delay`), `config` (JSONB), `on_success_step`, `on_failure_step`
+- [x] `Workflow` entity: `id`, `agentium_id`, `name`, `description`, `template_json` (JSONB), `version` (int), `is_active`, `created_by_agent_id`, `schedule_cron`, `created_at`, `updated_at`
+- [x] `WorkflowExecution` entity: `id`, `workflow_id`, `status` (`pending | running | paused | completed | failed`), `current_step_index`, `context_data` (JSONB), `started_at`, `completed_at`, `triggered_by`
+- [x] `WorkflowStep` entity: `id`, `workflow_id`, `step_index`, `step_type` (`task | condition | parallel | human_approval | delay`), `config` (JSONB), `on_success_step`, `on_failure_step`
 
 #### Alembic Migration — `008_workflow_engine.py`
 
-- [ ] Create `workflows`, `workflow_executions`, `workflow_steps` tables with indexes on `workflow_id`, `status`, `is_active`
-- [ ] Create `workflow_versions` audit table for version history snapshots
+- [x] Create `workflows`, `workflow_executions`, `workflow_steps` tables with indexes on `workflow_id`, `status`, `is_active`
+- [x] Create `workflow_versions` audit table for version history snapshots
 
 #### Backend — Workflow Engine (`backend/services/workflow_engine.py`)
 
-- [ ] **Step Executor** — iterate steps: Celery task dispatch for `task` steps, sandboxed `eval()` for `condition` steps, Celery `group()` for `parallel` steps, WebSocket pause for `human_approval` steps
-- [ ] **Conditional Branching** — config: `{ "field": "last_task_output.status", "operator": "eq", "value": "success", "on_true": 3, "on_false": 5 }`; only `context_data` in eval scope, no builtins
-- [ ] **Cron Scheduler** — on startup, register all `schedule_cron` workflows as dynamic Celery beat entries; de-register and re-register on update
-- [ ] **ETA Calculator** — use last 10 execution durations to estimate current run ETA
-- [ ] **Workflow Versioning** — on update, increment `version`, archive current `template_json` to `workflow_versions`
-- [ ] **Auto-Documentation** — on completion, LLM-generate a natural language summary of what was done; append to `Workflow.description` and store in `task_learnings`
+- [x] **Step Executor** — iterate steps: Celery task dispatch for `task` steps, sandboxed `eval()` for `condition` steps, Celery `group()` for `parallel` steps, WebSocket pause for `human_approval` steps
+- [x] **Conditional Branching** — config: `{ "field": "last_task_output.status", "operator": "eq", "value": "success", "on_true": 3, "on_false": 5 }`; only `context_data` in eval scope, no builtins
+- [x] **Cron Scheduler** — on startup, register all `schedule_cron` workflows as dynamic Celery beat entries; de-register and re-register on update
+- [x] **ETA Calculator** — use last 10 execution durations to estimate current run ETA
+- [x] **Workflow Versioning** — on update, increment `version`, archive current `template_json` to `workflow_versions`
+- [x] **Auto-Documentation** — on completion, LLM-generate a natural language summary of what was done; append to `Workflow.description` and store in `task_learnings`
 
 #### API Routes (`backend/api/routes/workflows.py` — new file)
 
-- [ ] `GET /workflows` — list with pagination
-- [ ] `POST /workflows` — create from template JSON
-- [ ] `GET /workflows/{id}` — detail with steps
-- [ ] `PUT /workflows/{id}` — update (auto-increments version)
-- [ ] `POST /workflows/{id}/execute` — trigger immediate execution
-- [ ] `GET /workflows/{id}/executions` — execution history
-- [ ] `GET /workflows/{id}/executions/{eid}` — live execution state
-- [ ] `POST /workflows/{id}/executions/{eid}/approve` — approve `human_approval` step
-- [ ] `GET /workflows/{id}/executions/{eid}/eta` — estimated completion time
-- [ ] `GET /workflows/{id}/versions` — version history
-- [ ] `POST /workflows/{id}/rollback` — rollback to prior version (admin)
+- [x] `GET /workflows` — list with pagination
+- [x] `POST /workflows` — create from template JSON
+- [x] `GET /workflows/{id}` — detail with steps
+- [x] `PUT /workflows/{id}` — update (auto-increments version)
+- [x] `POST /workflows/{id}/execute` — trigger immediate execution
+- [x] `GET /workflows/{id}/executions` — execution history
+- [x] `GET /workflows/{id}/executions/{eid}` — live execution state
+- [x] `POST /workflows/{id}/executions/{eid}/approve` — approve `human_approval` step
+- [x] `GET /workflows/{id}/executions/{eid}/eta` — estimated completion time
+- [x] `GET /workflows/{id}/versions` — version history
+- [x] `POST /workflows/{id}/rollback` — rollback to prior version (admin)
 
 #### Frontend
 
-- [ ] **`WorkflowsPage.tsx`** (new page at `/workflows`) — library list: name, version, last run status, next scheduled run, action buttons (Run Now / Edit / Duplicate / Archive)
-- [ ] **`WorkflowDesigner.tsx`** (new page at `/workflows/:id`) — drag-and-drop canvas; step type tiles; config drawer per node; conditional edges labeled "✓ True" / "✗ False"; version history sidebar with JSON diff viewer
-- [ ] **`WorkflowExecutionMonitor.tsx`** (new page at `/workflows/:id/executions/:eid`) — live step highlighting; human approval modal with approve/reject buttons; ETA countdown badge; bottleneck detection (steps exceeding median duration)
+- [x] **`WorkflowsPage.tsx`** (new page at `/workflows`) — library list: name, version, last run status, next scheduled run, action buttons (Run Now / Edit / Duplicate / Archive)
+- [x] **`WorkflowDesigner.tsx`** (new page at `/workflows/:id`) — drag-and-drop canvas; step type tiles; config drawer per node; conditional edges labeled "✓ True" / "✗ False"; version history sidebar with JSON diff viewer
+- [x] **`WorkflowExecutionMonitor.tsx`** (new page at `/workflows/:id/executions/:eid`) — live step highlighting; human approval modal with approve/reject buttons; ETA countdown badge; bottleneck detection (steps exceeding median duration)
 
 ---
 

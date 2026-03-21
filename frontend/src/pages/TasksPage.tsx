@@ -56,6 +56,8 @@ import toast from 'react-hot-toast';
 import { CheckpointTimeline } from '../components/checkpoints/CheckpointTimeline';
 import { BranchDiffView } from '../components/checkpoints/BranchDiffView';
 import { AutoDelegationPanel } from '../components/tasks/AutoDelegationPanel';
+import { WorkflowAutomationPanel } from '../components/workflows/WorkflowAutomationPanel';
+import { Network } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -2128,7 +2130,7 @@ const CriticsTab: React.FC = () => {
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
-type Tab = 'tasks' | 'critics' | 'checkpoints' | 'preferences' | 'delegation';
+type Tab = 'tasks' | 'critics' | 'checkpoints' | 'preferences' | 'delegation' | 'workflows';
 
 export const TasksPage: React.FC = () => {
     const [tasks, setTasks]               = useState<Task[]>([]);
@@ -2260,6 +2262,7 @@ export const TasksPage: React.FC = () => {
                         { id: 'checkpoints', label: 'Checkpoints', icon: Milestone   },
                         { id: 'delegation',  label: 'Delegation',  icon: Brain       },
                         { id: 'preferences', label: 'Preferences', icon: Settings    },
+                        { id: 'workflows',   label: 'Workflows',   icon: Network     },
                     ] as { id: Tab; label: string; icon: React.ElementType }[]).map(tab => {
                         const isActive = activeTab === tab.id;
                         return (
@@ -2484,6 +2487,13 @@ export const TasksPage: React.FC = () => {
                 {activeTab === 'preferences' && (
                     <div className="p-6">
                         <PreferencesTab />
+                    </div>
+                )}
+
+                {/* ── Workflows tab ─────────────────────────────────────── */}
+                {activeTab === 'workflows' && (
+                    <div className="p-6">
+                        <WorkflowAutomationPanel />
                     </div>
                 )}
             </div>

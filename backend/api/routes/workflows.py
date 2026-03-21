@@ -1,124 +1,88 @@
-"""
-Workflow execution API routes.
-
-  POST /api/v1/workflows/execute       — parse + execute a multi-step workflow
-  GET  /api/v1/workflows/{workflow_id} — live status + sub-task details
-  GET  /api/v1/workflows/              — paginated list of recent workflows
-"""
-from typing import Optional
-
-from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from typing import List, Dict, Any
 from sqlalchemy.orm import Session
+from datetime import datetime
 
-from backend.models.database import get_db
-from backend.models.entities.workflow import WorkflowExecution
-from backend.core.auth import get_current_active_user
+from backend.models.database import get_db_context
+from backend.models.entities.workflow import Workflow, WorkflowExecution
+from backend.services.workflow_engine import WorkflowEngine
 
-router = APIRouter(tags=["Workflows"])
+router = APIRouter(prefix="/workflows", tags=["Workflows"])
 
+# Dependency
+def get_db():
+    with get_db_context() as db:
+        yield db
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Request / Response schemas
-# ─────────────────────────────────────────────────────────────────────────────
-
-class WorkflowExecuteRequest(BaseModel):
-    message: str = Field(
-        ...,
-        min_length=3,
-        description=(
-            "Compound user instruction, e.g. "
-            "'Find HDFC price, email my broker, and remind me in 2 weeks.'"
-        ),
-    )
-    model_config_id: Optional[str] = Field(
-        None,
-        description="LLM config ID to use for intent decomposition (optional).",
-    )
-
-
-class WorkflowExecuteResponse(BaseModel):
-    workflow_id: str
-    status: str
-    subtask_count: int
-    detail: str
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Endpoints
-# ─────────────────────────────────────────────────────────────────────────────
-
-@router.post("/workflows/execute", response_model=WorkflowExecuteResponse)
-async def execute_workflow(
-    request: WorkflowExecuteRequest,
-    current_user: dict = Depends(get_current_active_user),
-    db: Session = Depends(get_db),
-):
-    """
-    Parse a compound instruction into atomic sub-tasks and execute them.
-
-    Immediate tasks run synchronously in dependency order; deferred tasks
-    (e.g. 2-week follow-up) are scheduled via Celery and return a
-    ``scheduled`` status.
-    """
-    from backend.services.workflow_planner import WorkflowPlanner
-    from backend.services.workflow_executor import WorkflowExecutor
-
-    planner = WorkflowPlanner(model_config_id=request.model_config_id)
-    plan = await planner.parse(request.message)
-
-    executor = WorkflowExecutor()
-    execution = await executor.execute(
-        plan,
-        created_by=current_user.get("agentium_id") or current_user.get("username"),
-    )
-
-    return WorkflowExecuteResponse(
-        workflow_id=execution.workflow_id,
-        status=execution.status,
-        subtask_count=len(plan.subtasks),
-        detail=(
-            f"Workflow executed with {len(plan.subtasks)} sub-task(s). "
-            f"Final status: {execution.status}."
-        ),
-    )
-
-
-@router.get("/workflows/", summary="List recent workflows")
-def list_workflows(
-    limit: int = Query(20, ge=1, le=100),
-    offset: int = Query(0, ge=0),
-    current_user: dict = Depends(get_current_active_user),
-    db: Session = Depends(get_db),
-):
-    """Return a paginated list of WorkflowExecution records (newest first)."""
-    total = db.query(WorkflowExecution).count()
-    rows = (
-        db.query(WorkflowExecution)
-        .order_by(WorkflowExecution.created_at.desc())
-        .offset(offset)
-        .limit(limit)
-        .all()
-    )
-    return {
-        "total": total,
-        "limit": limit,
-        "offset": offset,
-        "workflows": [wf.to_dict() for wf in rows],
-    }
-
-
-@router.get("/workflows/{workflow_id}", summary="Get workflow status")
-def get_workflow(
-    workflow_id: str,
-    current_user: dict = Depends(get_current_active_user),
-    db: Session = Depends(get_db),
-):
-    """Return the full WorkflowExecution record, including all sub-tasks."""
-    wf = db.query(WorkflowExecution).filter_by(workflow_id=workflow_id).first()
-    if not wf:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Workflow '{workflow_id}' not found.",
-        )
+@router.post("/", response_model=Dict[str, Any])
+def create_workflow(payload: Dict[str, Any], db: Session = Depends(get_db)):
+    """Create a new automation workflow."""
+    name = payload.get("name")
+    template = payload.get("template_json")
+    agent_id = payload.get("agent_id", "A0001")
+    cron = payload.get("schedule_cron")
+    
+    if not name or not template:
+        raise HTTPException(status_code=400, detail="name and template_json required")
+        
+    wf = WorkflowEngine.create_workflow(db, name, template, agent_id, cron)
+    db.commit()
     return wf.to_dict()
+
+@router.get("/", response_model=List[Dict[str, Any]])
+def list_workflows(db: Session = Depends(get_db)):
+    """List all workflows."""
+    workflows = db.query(Workflow).filter(Workflow.is_active == True).all()
+    return [wf.to_dict() for wf in workflows]
+
+@router.get("/{workflow_id}", response_model=Dict[str, Any])
+def get_workflow(workflow_id: str, db: Session = Depends(get_db)):
+    """Get workflow definition."""
+    wf = db.query(Workflow).filter(Workflow.id == workflow_id).first()
+    if not wf:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+    return wf.to_dict()
+
+@router.put("/{workflow_id}", response_model=Dict[str, Any])
+def update_workflow(workflow_id: str, payload: Dict[str, Any], db: Session = Depends(get_db)):
+    """Update workflow template."""
+    template = payload.get("template_json")
+    if not template:
+        raise HTTPException(status_code=400, detail="template_json required")
+    try:
+        wf = WorkflowEngine.update_workflow(db, workflow_id, template)
+        db.commit()
+        return wf.to_dict()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/{workflow_id}/execute", response_model=Dict[str, Any])
+def execute_workflow(workflow_id: str, payload: Dict[str, Any], db: Session = Depends(get_db)):
+    """Trigger a workflow execution."""
+    context = payload.get("context", {})
+    try:
+        execution = WorkflowEngine.trigger_execution(db, workflow_id, trigger="api", context=context)
+        return execution.to_dict()
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+@router.get("/executions/{execution_id}", response_model=Dict[str, Any])
+def get_execution_status(execution_id: str, db: Session = Depends(get_db)):
+    """Get status of an execution."""
+    execution = db.query(WorkflowExecution).filter(WorkflowExecution.id == execution_id).first()
+    if not execution:
+        raise HTTPException(status_code=404, detail="Execution not found")
+    return execution.to_dict()
+
+@router.get("/{workflow_id}/eta", response_model=Dict[str, Any])
+def get_workflow_eta(workflow_id: str, db: Session = Depends(get_db)):
+    """Calculate ETA based on historical data."""
+    return WorkflowEngine.calculate_eta(db, workflow_id)
+
+@router.get("/{workflow_id}/docs", response_model=Dict[str, str])
+def get_workflow_docs(workflow_id: str, db: Session = Depends(get_db)):
+    """Auto-generate documentation for a workflow."""
+    doc = WorkflowEngine.auto_document(db, workflow_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+    return {"documentation": doc}
