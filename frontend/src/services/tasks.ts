@@ -114,6 +114,23 @@ export const tasksService = {
         );
         return response.data;
     },
+
+    // Phase 13.1 — Auto-Delegation Engine
+
+    autoDelegate: async (taskId: string): Promise<any> => {
+        const response = await api.post(`/api/v1/tasks/${taskId}/auto-delegate`);
+        return response.data;
+    },
+
+    getDelegationLog: async (taskId: string): Promise<any> => {
+        const response = await api.get(`/api/v1/tasks/${taskId}/delegation-log`);
+        return response.data;
+    },
+
+    getDependencyGraph: async (taskId: string): Promise<any> => {
+        const response = await api.get(`/api/v1/tasks/${taskId}/dependency-graph`);
+        return response.data;
+    },
 };
 
 // ─── Critic service calls ─────────────────────────────────────────────────────

@@ -168,7 +168,12 @@ class Task(BaseEntity):
     # Which critic type has veto authority over this task's output.
     # Values: "code" | "output" | "plan"  (maps to CriticType enum)
     veto_authority = Column(String(20), nullable=True)
-    
+
+    # ── Phase 13.1: Automatic Task Delegation Engine ─────────────────────────
+    complexity_score = Column(Integer, nullable=True)           # 1-10 score
+    escalation_timeout_seconds = Column(Integer, default=300, nullable=False)
+    delegation_metadata = Column(JSON, nullable=True)           # decision trail
+
     # Relationships
     head_of_council = relationship("Agent", foreign_keys=[head_of_council_id], lazy="joined")
     lead_agent = relationship("Agent", foreign_keys=[lead_agent_id])
@@ -678,5 +683,37 @@ class TaskAuditLog(BaseEntity):
             'action': self.action,
             'details': self.action_details,
             'timestamp': self.created_at.isoformat()
+        })
+        return base
+
+
+# ═══════════════════════════════════════════════════════════
+# Phase 13.1 — Task Dependency DAG
+# ═══════════════════════════════════════════════════════════
+
+class TaskDependency(BaseEntity):
+    """
+    Tracks dependency ordering between sub-tasks for DAG-based parallel dispatch.
+    A child_task may only start when all dependencies with lower dependency_order
+    for the same parent have completed.
+    """
+    __tablename__ = 'task_dependencies'
+
+    parent_task_id = Column(String(36), ForeignKey('tasks.id', ondelete='CASCADE'), nullable=False, index=True)
+    child_task_id = Column(String(36), ForeignKey('tasks.id', ondelete='CASCADE'), nullable=False, index=True)
+    dependency_order = Column(Integer, default=0, nullable=False)
+    status = Column(String(20), default="pending", nullable=False)
+
+    # Relationships
+    parent_task = relationship("Task", foreign_keys=[parent_task_id])
+    child_task = relationship("Task", foreign_keys=[child_task_id])
+
+    def to_dict(self) -> Dict[str, Any]:
+        base = super().to_dict()
+        base.update({
+            'parent_task_id': self.parent_task_id,
+            'child_task_id': self.child_task_id,
+            'dependency_order': self.dependency_order,
+            'status': self.status,
         })
         return base

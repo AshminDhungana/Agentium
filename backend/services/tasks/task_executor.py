@@ -842,3 +842,133 @@ def broadcast_to_channels(channel_ids: list, message: str, agent_id: str):
             "failed": sum(1 for r in results if not r.get('success')),
             "details": results
         }
+
+
+# ═══════════════════════════════════════════════════════════
+# Phase 13.1 — Auto-Delegation Engine Tasks
+# ═══════════════════════════════════════════════════════════
+
+@celery_app.task(name='backend.services.tasks.task_executor.check_escalation_timeouts')
+def check_escalation_timeouts():
+    """
+    Auto-escalation timer: finds IN_PROGRESS tasks whose
+    escalation_timeout_seconds has elapsed and escalates them.
+    """
+    with get_task_db() as db:
+        try:
+            now = datetime.utcnow()
+            # Get all in-progress, non-idle tasks
+            tasks = db.query(Task).filter(
+                Task.status == TaskStatus.IN_PROGRESS,
+                Task.is_idle_task == False,
+                Task.is_active == True,
+                Task.started_at.isnot(None),
+            ).all()
+
+            escalated = 0
+            for task in tasks:
+                timeout = getattr(task, 'escalation_timeout_seconds', 300) or 300
+                elapsed = (now - task.started_at).total_seconds()
+
+                if elapsed > timeout:
+                    try:
+                        task.status = TaskStatus.ESCALATED
+                        task.status_history = (task.status_history or []) + [{
+                            'from': TaskStatus.IN_PROGRESS.value,
+                            'to': TaskStatus.ESCALATED.value,
+                            'by': 'ESCALATION_TIMER',
+                            'at': now.isoformat(),
+                            'note': f'Timeout after {elapsed:.0f}s (limit: {timeout}s)',
+                        }]
+                        escalated += 1
+                        logger.info(
+                            f"⏰ Auto-escalated task {task.agentium_id} "
+                            f"after {elapsed:.0f}s (limit: {timeout}s)"
+                        )
+                    except Exception as e:
+                        logger.warning(f"Failed to escalate task {task.agentium_id}: {e}")
+
+            if escalated:
+                db.commit()
+                logger.info(f"⏰ Auto-escalation: {escalated} tasks escalated")
+
+            return {"escalated": escalated, "checked": len(tasks)}
+
+        except Exception as e:
+            logger.error(f"check_escalation_timeouts failed: {e}")
+            return {"error": str(e)}
+
+
+@celery_app.task(name='backend.services.tasks.task_executor.process_dependency_graph')
+def process_dependency_graph():
+    """
+    Dependency graph processor: for each parent task with TaskDependency rows,
+    checks which child tasks are ready (all dependencies of lower order are
+    complete) and dispatches them.
+    """
+    with get_task_db() as db:
+        try:
+            from backend.models.entities.task import TaskDependency
+
+            # Get all pending dependency records
+            pending_deps = db.query(TaskDependency).filter(
+                TaskDependency.status == "pending",
+            ).all()
+
+            if not pending_deps:
+                return {"dispatched": 0}
+
+            # Group by parent task
+            by_parent = {}
+            for dep in pending_deps:
+                by_parent.setdefault(dep.parent_task_id, []).append(dep)
+
+            dispatched = 0
+            for parent_id, deps in by_parent.items():
+                # Sort by dependency_order
+                deps.sort(key=lambda d: d.dependency_order)
+
+                for dep in deps:
+                    # Check: all deps with lower order for this parent must be complete
+                    lower_complete = db.query(TaskDependency).filter(
+                        TaskDependency.parent_task_id == parent_id,
+                        TaskDependency.dependency_order < dep.dependency_order,
+                        TaskDependency.status != "completed",
+                    ).count()
+
+                    if lower_complete > 0:
+                        continue  # Dependencies not yet met
+
+                    # Check if child task is still pending
+                    child = db.query(Task).filter_by(
+                        id=dep.child_task_id, is_active=True
+                    ).first()
+
+                    if not child or child.status != TaskStatus.PENDING:
+                        # Already started or completed
+                        if child and child.status in (TaskStatus.COMPLETED, TaskStatus.CANCELLED):
+                            dep.status = "completed"
+                        continue
+
+                    # Dispatch the child task
+                    try:
+                        child.status = TaskStatus.IN_PROGRESS
+                        child.started_at = datetime.utcnow()
+                        dep.status = "dispatched"
+                        dispatched += 1
+
+                        logger.info(
+                            f"📊 DAG: dispatched child task {child.agentium_id} "
+                            f"(order={dep.dependency_order}) for parent {parent_id}"
+                        )
+                    except Exception as e:
+                        logger.warning(f"Failed to dispatch child task: {e}")
+
+            if dispatched:
+                db.commit()
+
+            return {"dispatched": dispatched, "parents_checked": len(by_parent)}
+
+        except Exception as e:
+            logger.error(f"process_dependency_graph failed: {e}")
+            return {"error": str(e)}

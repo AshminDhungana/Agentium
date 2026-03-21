@@ -38,7 +38,8 @@ from backend.models.entities.task import (
     TaskAuditLog,
     TaskStatus,
     TaskPriority,
-    TaskType
+    TaskType,
+    TaskDependency,
 )
 
 from backend.models.entities.task_events import (
@@ -194,6 +195,7 @@ __all__ = [
     'TaskStatus',
     'TaskPriority',
     'TaskType',
+    'TaskDependency',
     'TaskEvent',
     'TaskEventType',
     

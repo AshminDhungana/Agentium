@@ -169,6 +169,17 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, onClick }) => {
                         ${isActive ? 'animate-pulse' : ''}
                     `} />
                     {task.priority}
+                    {/* Phase 13.1: Complexity score badge */}
+                    {task.delegation?.complexity_score != null && task.delegation.complexity_score > 0 && (
+                        <span className={`
+                            ml-1 px-1.5 py-0.5 rounded text-[10px] font-bold leading-none
+                            ${task.delegation.complexity_score >= 8 ? 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300' :
+                              task.delegation.complexity_score >= 5 ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300' :
+                              'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300'}
+                        `}>
+                            C{task.delegation.complexity_score}
+                        </span>
+                    )}
                 </div>
                 
                 {/* Enhanced status badge with icon */}

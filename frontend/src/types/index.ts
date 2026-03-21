@@ -261,6 +261,12 @@ export interface ErrorInfo {
     last_error?: string | null;
 }
 
+export interface DelegationInfo {
+    complexity_score?: number | null;
+    escalation_timeout_seconds: number;
+    delegation_metadata?: Record<string, any> | null;
+}
+
 export interface Task {
     id: string;
     agentium_id?: string;
@@ -277,6 +283,7 @@ export interface Task {
     };
     governance: GovernanceInfo;
     error_info?: ErrorInfo | null;
+    delegation?: DelegationInfo | null;
     created_at: string | null;
     updated_at?: string | null;
     event_count?: number;

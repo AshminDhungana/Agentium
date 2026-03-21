@@ -103,6 +103,16 @@ celery_app.conf.beat_schedule = {
         'task': 'backend.celery_app.federation_cleanup_stale',
         'schedule': 3600.0,  # every hour
     },
+
+    # ── Phase 13.1: Auto-Delegation Engine ────────────────────────────────
+    'auto-escalation-timer': {
+        'task': 'backend.services.tasks.task_executor.check_escalation_timeouts',
+        'schedule': 60.0,   # every 60 seconds
+    },
+    'dependency-graph-processor': {
+        'task': 'backend.services.tasks.task_executor.process_dependency_graph',
+        'schedule': 30.0,   # every 30 seconds
+    },
 }
 
 

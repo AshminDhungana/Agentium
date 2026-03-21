@@ -50,10 +50,12 @@ import {
     Database,
     GitCompareArrows,
     Upload,
+    Brain,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { CheckpointTimeline } from '../components/checkpoints/CheckpointTimeline';
 import { BranchDiffView } from '../components/checkpoints/BranchDiffView';
+import { AutoDelegationPanel } from '../components/tasks/AutoDelegationPanel';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -2126,7 +2128,7 @@ const CriticsTab: React.FC = () => {
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
-type Tab = 'tasks' | 'critics' | 'checkpoints' | 'preferences';
+type Tab = 'tasks' | 'critics' | 'checkpoints' | 'preferences' | 'delegation';
 
 export const TasksPage: React.FC = () => {
     const [tasks, setTasks]               = useState<Task[]>([]);
@@ -2256,6 +2258,7 @@ export const TasksPage: React.FC = () => {
                         { id: 'tasks',       label: 'Tasks',       icon: ListTodo    },
                         { id: 'critics',     label: 'Critics',     icon: ShieldCheck },
                         { id: 'checkpoints', label: 'Checkpoints', icon: Milestone   },
+                        { id: 'delegation',  label: 'Delegation',  icon: Brain       },
                         { id: 'preferences', label: 'Preferences', icon: Settings    },
                     ] as { id: Tab; label: string; icon: React.ElementType }[]).map(tab => {
                         const isActive = activeTab === tab.id;
@@ -2449,6 +2452,31 @@ export const TasksPage: React.FC = () => {
                         </div>
                         {checkpointSubTab === 'timeline' && <CheckpointTimeline />}
                         {checkpointSubTab === 'diff'     && <BranchDiffView />}
+                    </div>
+                )}
+
+                {/* ── Delegation tab (Phase 13.1) ───────────────────────── */}
+                {activeTab === 'delegation' && (
+                    <div className="p-6 space-y-4">
+                        <div className="flex items-center gap-2 mb-4">
+                            <Brain className="w-5 h-5 text-violet-500 dark:text-violet-400" />
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Auto-Delegation Engine</h3>
+                        </div>
+                        {tasks.length === 0 ? (
+                            <p className="text-sm text-gray-500 dark:text-gray-400 italic">No tasks to display.</p>
+                        ) : (
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                {tasks.map(t => (
+                                    <AutoDelegationPanel
+                                        key={t.id}
+                                        task={t}
+                                        onTaskUpdated={(updated) => {
+                                            setTasks(prev => prev.map(p => p.id === updated.id ? updated : p));
+                                        }}
+                                    />
+                                ))}
+                            </div>
+                        )}
                     </div>
                 )}
 

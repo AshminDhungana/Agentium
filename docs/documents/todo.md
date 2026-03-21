@@ -234,35 +234,35 @@ Build a self-governing AI ecosystem where agents operate under constitutional la
 
 #### Backend
 
-- [ ] **Complexity Analyzer** (`backend/services/auto_delegation_service.py`) — score tasks 1–10 on creation; map: 1–3 → `3xxxx` TaskAgent, 4–6 → `2xxxx` LeadAgent, 7–10 → Council deliberation
-- [ ] **Sub-task Breakdown** — for score ≥ 7, decompose via LLM mini-call; persist sub-tasks with `parent_task_id` FK and dependency order in new `task_dependencies` junction table
-- [ ] **Capability-Aware Assignment** — rank candidate agents by `(1 - error_rate) × (1 / current_load)` using `CapabilityRegistry`
-- [ ] **Auto-Escalation Timer** — Celery beat every 60 s: tasks stuck in `in_progress` beyond `escalation_timeout` (default 300 s) → re-assign to next tier or trigger Council micro-vote
-- [ ] **Dependency Graph Parallelizer** — build DAG from `task_dependencies`; dispatch independent branches as parallel Celery `group()` tasks
-- [ ] **Priority Queue Rebalancer** — on `CRITICAL` / `SOVEREIGN` task arrival, re-sort the Celery queue without losing in-flight tasks
-- [ ] **Smart Retry Router** — on failure, re-dispatch to a different agent of the same tier; never retry on an agent with `CB_OPEN`
-- [ ] **Cost-Aware Delegation** — if `idle_budget < 20%`, force simple tasks to local Ollama regardless of tier preference
+- [x] **Complexity Analyzer** (`backend/services/auto_delegation_service.py`) — score tasks 1–10 on creation; map: 1–3 → `3xxxx` TaskAgent, 4–6 → `2xxxx` LeadAgent, 7–10 → Council deliberation
+- [x] **Sub-task Breakdown** — for score ≥ 7, decompose via LLM mini-call; persist sub-tasks with `parent_task_id` FK and dependency order in new `task_dependencies` junction table
+- [x] **Capability-Aware Assignment** — rank candidate agents by `(1 - error_rate) × (1 / current_load)` using `CapabilityRegistry`
+- [x] **Auto-Escalation Timer** — Celery beat every 60 s: tasks stuck in `in_progress` beyond `escalation_timeout` (default 300 s) → re-assign to next tier or trigger Council micro-vote
+- [x] **Dependency Graph Parallelizer** — build DAG from `task_dependencies`; dispatch independent branches as parallel Celery `group()` tasks
+- [x] **Priority Queue Rebalancer** — on `CRITICAL` / `SOVEREIGN` task arrival, re-sort the Celery queue without losing in-flight tasks
+- [x] **Smart Retry Router** — on failure, re-dispatch to a different agent of the same tier; never retry on an agent with `CB_OPEN`
+- [x] **Cost-Aware Delegation** — if `idle_budget < 20%`, force simple tasks to local Ollama regardless of tier preference
 
-#### Alembic Migration — `007_task_delegation.py`
+#### Alembic Migration — `009_task_delegation.py`
 
-- [ ] `task_dependencies` table: `task_id` (FK), `depends_on_task_id` (FK), `dependency_type` (`sequential | parallel`), `created_at`
-- [ ] `complexity_score` (Integer, nullable) on `tasks`
-- [ ] `escalation_timeout_seconds` (Integer, default 300) on `tasks`
-- [ ] `delegation_metadata` (JSONB) on `tasks`
+- [x] `task_dependencies` table: `task_id` (FK), `depends_on_task_id` (FK), `dependency_type` (`sequential | parallel`), `created_at`
+- [x] `complexity_score` (Integer, nullable) on `tasks`
+- [x] `escalation_timeout_seconds` (Integer, default 300) on `tasks`
+- [x] `delegation_metadata` (JSONB) on `tasks`
 
 #### API Routes
 
-- [ ] `POST /tasks/auto-delegate` — force re-delegation with optional `force_tier`
-- [ ] `GET /tasks/{id}/delegation-log` — return delegation decision trail from `delegation_metadata`
-- [ ] `GET /tasks/{id}/dependency-graph` — return DAG as `{ nodes, edges }` for frontend rendering
+- [x] `POST /tasks/auto-delegate` — force re-delegation with optional `force_tier`
+- [x] `GET /tasks/{id}/delegation-log` — return delegation decision trail from `delegation_metadata`
+- [x] `GET /tasks/{id}/dependency-graph` — return DAG as `{ nodes, edges }` for frontend rendering
 
 #### Frontend
 
-- [ ] `AutoDelegationPanel.tsx` — complexity score badge, tier assignment rationale, candidate agents ranked by score
-- [ ] Manual override dropdown — calls `POST /tasks/auto-delegate`
-- [ ] DAG viewer using React-Flow; nodes colored by status, edges labeled sequential vs parallel
-- [ ] Escalation countdown timer on in-progress tasks (amber → red as timeout approaches)
-- [ ] Extend `TaskCard.tsx` — add complexity score pill and "delegated by AI" vs "manually assigned" label
+- [x] `AutoDelegationPanel.tsx` — complexity score badge, tier assignment rationale, candidate agents ranked by score
+- [x] Manual override dropdown — calls `POST /tasks/auto-delegate`
+- [x] DAG viewer using React-Flow; nodes colored by status, edges labeled sequential vs parallel
+- [x] Escalation countdown timer on in-progress tasks (amber → red as timeout approaches)
+- [x] Extend `TaskCard.tsx` — add complexity score pill and "delegated by AI" vs "manually assigned" label
 
 ---
 

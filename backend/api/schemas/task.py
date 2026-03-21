@@ -58,6 +58,12 @@ class TaskCreate(BaseModel):
         description="Critic type with veto authority: code | output | plan"
     )
 
+    # Phase 13.1 — Auto-Delegation
+    auto_delegate: bool = Field(
+        default=True,
+        description="Trigger auto-delegation engine on task creation"
+    )
+
     @pydantic_validator("priority")
     def validate_priority(cls, v):
         allowed = [p.value for p in TaskPriority]
@@ -127,6 +133,8 @@ class TaskUpdate(BaseModel):
     # Phase 6.3
     acceptance_criteria: Optional[List[AcceptanceCriterionSchema]] = None
     veto_authority: Optional[str] = None
+    # Phase 13.1
+    escalation_timeout_seconds: Optional[int] = None
 
     @pydantic_validator("veto_authority")
     def validate_veto_authority(cls, v):
@@ -135,3 +143,4 @@ class TaskUpdate(BaseModel):
         if v not in {"code", "output", "plan"}:
             raise ValueError("veto_authority must be one of: code, output, plan")
         return v
+

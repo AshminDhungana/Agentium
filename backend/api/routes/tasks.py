@@ -60,6 +60,12 @@ def _serialize(task: Task) -> dict:
             "max_retries": task.max_retries,
             "last_error": task.last_error
         } if task.error_count > 0 else None,
+        # Phase 13.1: Delegation info
+        "delegation": {
+            "complexity_score": getattr(task, 'complexity_score', None),
+            "escalation_timeout_seconds": getattr(task, 'escalation_timeout_seconds', 300),
+            "delegation_metadata": getattr(task, 'delegation_metadata', None),
+        },
         "created_at": task.created_at.isoformat() if task.created_at else None,
         "updated_at": task.updated_at.isoformat() if hasattr(task, 'updated_at') and task.updated_at else None,
         "event_count": task.events.count() if hasattr(task, 'events') else 0
@@ -484,4 +490,91 @@ async def get_allowed_transitions(
         "current_status": task.status.value,
         "allowed_transitions": [s.value for s in allowed],
         "is_terminal": TaskStateMachine.is_terminal_state(task.status)
+    }
+
+
+# ═══════════════════════════════════════════════════════════
+# Phase 13.1 — Auto-Delegation Endpoints
+# ═══════════════════════════════════════════════════════════
+
+@router.post("/{task_id}/auto-delegate")
+async def auto_delegate_task(
+    task_id: str,
+    current_user: dict = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Force (re-)delegation of a task through the auto-delegation engine."""
+    task = db.query(Task).filter(Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    try:
+        from backend.services.auto_delegation_service import DelegationEngine
+        import asyncio
+        result = await DelegationEngine.delegate(task, db, force=True)
+        db.commit()
+        return {
+            "status": "success",
+            "delegation": result,
+            "task": _serialize(task),
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/{task_id}/delegation-log")
+async def get_delegation_log(
+    task_id: str,
+    current_user: dict = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Retrieve the delegation decision trail for a task."""
+    task = db.query(Task).filter(Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    return {
+        "task_id": task_id,
+        "agentium_id": task.agentium_id,
+        "complexity_score": getattr(task, 'complexity_score', None),
+        "delegation_metadata": getattr(task, 'delegation_metadata', None),
+    }
+
+
+@router.get("/{task_id}/dependency-graph")
+async def get_dependency_graph(
+    task_id: str,
+    current_user: dict = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Return the dependency graph (DAG) for a parent task."""
+    from backend.models.entities.task import TaskDependency
+
+    task = db.query(Task).filter(Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    deps = db.query(TaskDependency).filter(
+        TaskDependency.parent_task_id == task_id,
+    ).order_by(TaskDependency.dependency_order).all()
+
+    nodes = []
+    for dep in deps:
+        child = db.query(Task).filter_by(id=dep.child_task_id).first()
+        nodes.append({
+            "dependency_id": dep.id,
+            "child_task_id": dep.child_task_id,
+            "child_agentium_id": child.agentium_id if child else None,
+            "child_title": child.title if child else None,
+            "child_status": child.status.value if child else None,
+            "dependency_order": dep.dependency_order,
+            "status": dep.status,
+        })
+
+    return {
+        "task_id": task_id,
+        "agentium_id": task.agentium_id,
+        "total_dependencies": len(nodes),
+        "dependencies": nodes,
     }
