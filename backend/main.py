@@ -142,7 +142,7 @@ async def lifespan(app: FastAPI):
     Application lifespan with:
     - Database initialization
     - Constitution seed (API-key independent)
-    - Persistent Council (IDLE GOVERNANCE)
+    - Persistent Council status check (genesis runs on-demand, not at startup)
     - API Manager & Model Allocation
     - Enhanced Token Optimizer
     - Idle Governance Engine
@@ -191,38 +191,43 @@ async def lifespan(app: FastAPI):
         logger.error(f"❌ Constitution seed failed (non-fatal): {e}")
 
     # ─────────────────────────────────────────────────────────────
-    # 2. Initialize Persistent Council (IDLE GOVERNANCE)
-    #    Guarded: genesis requires at least one healthy API key.
-    #    If none exists yet, skip silently — the user will be
-    #    redirected to /models on first login (useGenesisCheck).
+    # 2. Persistent Council — status check only (read-only)
+    #
+    #    Genesis (Head 00001 + Council + full Constitution) is NOT
+    #    run at startup. It runs on-demand via:
+    #      POST /api/v1/genesis/initialize
+    #
+    #    This endpoint is called automatically by the frontend
+    #    (useGenesisCheck hook) the first time a user logs in after
+    #    an API key has been saved. You can also trigger it manually
+    #    from the Models page.
+    #
+    #    Why not at startup?
+    #    - Genesis creates agents that need an LLM key to function.
+    #      Initialising them before a key exists creates a broken
+    #      half-state where agents exist but can never make a call.
+    #    - The old approach called persistent_council.initialize_
+    #      persistent_council() here, which tried to INSERT a
+    #      constitution with version="v1.0.0" — but step 1b had
+    #      already seeded that exact row → UniqueViolation crash
+    #      on every restart.
     # ─────────────────────────────────────────────────────────────
     try:
         db = next(get_db())
         try:
-            # api_key_manager is already imported at the top of this module.
-            availability = api_key_manager.get_provider_availability(db)
-            has_key = any(availability.values())
-
-            if not has_key:
-                logger.warning(
-                    "⚠️  No API key configured — skipping Genesis Protocol at startup. "
-                    "Add a provider key via the Models page and restart, or trigger "
-                    "genesis manually via POST /api/v1/genesis/initialize."
-                )
+            from backend.models.entities.agents import HeadOfCouncil
+            head = db.query(HeadOfCouncil).filter_by(
+                agentium_id="00001", is_active=True
+            ).first()
+            if head:
+                logger.info("✅ Persistent Council already initialized (Head 00001 present)")
             else:
-                council_status = persistent_council.initialize_persistent_council(db)
-
-                persistent_agents = persistent_council.get_persistent_agents(db)
-                agent_list = list(persistent_agents.values())
-
-                logger.info(f"✅ Persistent Council initialized: {council_status}")
-                logger.info(f"   - Head: {len([a for a in agent_list if a.agentium_id.startswith('0')])}")
-                logger.info(f"   - Council: {len([a for a in agent_list if a.agentium_id.startswith('1')])}")
+                logger.info("⏳ Persistent Council not yet initialized")
+                logger.info("   Add an API key on the Models page — genesis triggers automatically")
         finally:
             db.close()
     except Exception as e:
-        logger.error(f"❌ Persistent Council initialization failed: {e}")
-        # Continue anyway — council can be initialized later
+        logger.warning(f"⚠️ Persistent Council status check failed (non-fatal): {e}")
 
     # ─────────────────────────────────────────────────────────────
     # 2b. Auto-assign default model config to Head if missing
@@ -487,22 +492,22 @@ app.include_router(capability_routes.router)
 app.include_router(lifecycle_routes.router)
 app.include_router(monitoring_router.router,        prefix="/api/v1")
 app.include_router(api_keys_routes.router,          prefix="/api/v1")
-app.include_router(critics_routes.router,           prefix="/api/v1")   
-app.include_router(checkpoints_routes.router,       prefix="/api/v1")  
-app.include_router(remote_executor_routes.router,   prefix="/api/v1")   
-app.include_router(voting_routes.router,            prefix="/api/v1")   
-app.include_router(mcp_tools_router)                                     
-app.include_router(tools_routes.router,             prefix="/api/v1")   
+app.include_router(critics_routes.router,           prefix="/api/v1")
+app.include_router(checkpoints_routes.router,       prefix="/api/v1")
+app.include_router(remote_executor_routes.router,   prefix="/api/v1")
+app.include_router(voting_routes.router,            prefix="/api/v1")
+app.include_router(mcp_tools_router)
+app.include_router(tools_routes.router,             prefix="/api/v1")
 app.include_router(user_preferences_routes.router, prefix="/api/v1")
 app.include_router(ab_testing_router, prefix="/api/v1")
 app.include_router(provider_analytics_routes.router, prefix="/api/v1")
 app.include_router(skills_routes.router, prefix="/api/v1")
-app.include_router(browser_routes.router, prefix="/api/v1") 
-app.include_router(audio_routes.router, prefix="/api/v1")    
-app.include_router(rbac_routes.router, prefix="/api/v1")     
-app.include_router(federation_routes.router, prefix="/api/v1") 
-app.include_router(plugins_routes.router, prefix="/api/v1")    
-app.include_router(mobile_routes.router, prefix="/api/v1")     
+app.include_router(browser_routes.router, prefix="/api/v1")
+app.include_router(audio_routes.router, prefix="/api/v1")
+app.include_router(rbac_routes.router, prefix="/api/v1")
+app.include_router(federation_routes.router, prefix="/api/v1")
+app.include_router(plugins_routes.router, prefix="/api/v1")
+app.include_router(mobile_routes.router, prefix="/api/v1")
 app.include_router(dashboard_routes.router, prefix="/api/v1")  # Dashboard aggregate summary
 app.include_router(outbound_webhooks_routes.router, prefix="/api/v1")  # Phase 12: Outbound Webhooks
 app.include_router(workflows_routes.router,          prefix="/api/v1")  # Workflow Engine (006_workflow)

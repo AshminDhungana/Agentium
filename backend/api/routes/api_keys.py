@@ -105,11 +105,142 @@ class FailoverTestResponse(BaseModel):
     latency_ms: float
 
 
+class CreateKeyRequest(BaseModel):
+    """Request body for adding a new API key."""
+    provider: str = Field(..., description="Provider name, e.g. 'openai', 'anthropic'")
+    api_key: str = Field(..., min_length=10, description="Raw API key (encrypted at rest)")
+    config_name: str = Field(..., min_length=1, description="Human-readable label")
+    model_name: str = Field(..., min_length=1, description="Default model for this key")
+    monthly_budget_usd: float = Field(default=0.0, ge=0, description="Monthly budget (0 = unlimited)")
+    priority: int = Field(default=1, ge=1, description="Failover priority — lower = higher priority")
+    is_default: bool = Field(default=False, description="Set as default config for agents")
+
+
+class CreateKeyResponse(BaseModel):
+    success: bool
+    key_id: str
+    provider: str
+    config_name: str
+    genesis_triggered: bool
+    message: str
+
+
 # =============================================================================
 # Routes
 # =============================================================================
 
-@router.get("/health", response_model=HealthReportResponse)
+@router.post("/", response_model=CreateKeyResponse, status_code=201)
+async def create_api_key(
+    request: CreateKeyRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Save a new API key and auto-trigger the Genesis Protocol if the system
+    has not been initialized yet.
+
+    Flow:
+      1. Encrypt and persist the key as a UserModelConfig row.
+      2. If Head 00001 does not exist (genesis not run), fire
+         POST /genesis/initialize in a background task so the HTTP
+         response is returned immediately and the frontend can poll
+         GET /genesis/status for progress.
+      3. Return whether genesis was triggered so the frontend can show
+         the appropriate status message without an extra round-trip.
+    """
+    from backend.core.security import encrypt_api_key
+    from backend.models.entities.user_config import ProviderType
+
+    # ── Resolve provider enum ────────────────────────────────────────────────
+    try:
+        provider_enum = ProviderType(request.provider.lower())
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown provider '{request.provider}'. "
+                   f"Valid values: {[p.value for p in ProviderType]}",
+        )
+
+    # ── Encrypt key ──────────────────────────────────────────────────────────
+    try:
+        encrypted = encrypt_api_key(request.api_key)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Key encryption failed: {exc}")
+
+    masked = f"...{request.api_key[-4:]}"
+
+    # ── If is_default, demote any existing default for same provider ─────────
+    if request.is_default:
+        db.query(UserModelConfig).filter_by(
+            provider=provider_enum, is_default=True
+        ).update({"is_default": False})
+        db.flush()
+
+    # ── Persist ──────────────────────────────────────────────────────────────
+    key = UserModelConfig(
+        provider=provider_enum,
+        config_name=request.config_name,
+        model_name=request.model_name,
+        api_key=encrypted,
+        api_key_masked=masked,
+        monthly_budget_usd=request.monthly_budget_usd,
+        priority=request.priority,
+        is_default=request.is_default,
+        is_active=True,
+        status="active",
+    )
+    db.add(key)
+    db.commit()
+    db.refresh(key)
+
+    # ── Auto-trigger Genesis if not yet initialized ──────────────────────────
+    # Check whether Head 00001 already exists.  If not, fire genesis in the
+    # background so the user doesn't have to navigate to /models and manually
+    # trigger it — adding a key IS the trigger.
+    from backend.models.entities.agents import HeadOfCouncil
+    from backend.services.initialization_service import InitializationService
+
+    genesis_triggered = False
+    head_exists = db.query(HeadOfCouncil).filter_by(
+        agentium_id="00001", is_active=True
+    ).first()
+
+    if not head_exists:
+        genesis_triggered = True
+
+        async def _run_genesis() -> None:
+            # Always open a fresh session — never reuse the request session
+            # inside a background task (it gets closed when the request ends).
+            from backend.models.database import get_db as _get_db
+            with next(_get_db()) as new_db:
+                svc = InitializationService(new_db)
+                try:
+                    await svc.run_genesis_protocol()
+                except Exception as exc:
+                    import logging
+                    logging.getLogger(__name__).error(
+                        "Auto-genesis after key creation failed: %s", exc, exc_info=True
+                    )
+
+        background_tasks.add_task(_run_genesis)
+
+    return CreateKeyResponse(
+        success=True,
+        key_id=str(key.id),
+        provider=provider_enum.value,
+        config_name=request.config_name,
+        genesis_triggered=genesis_triggered,
+        message=(
+            "API key saved and Genesis Protocol started. "
+            "Poll GET /api/v1/genesis/status for progress."
+            if genesis_triggered
+            else "API key saved successfully."
+        ),
+    )
+
+
+
 async def get_health_report(
     provider: Optional[str] = Query(None, description="Filter by specific provider"),
     db: Session = Depends(get_db),

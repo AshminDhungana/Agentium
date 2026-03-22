@@ -30,9 +30,20 @@ api.interceptors.response.use(
         const message = error.response?.data?.detail || error.message || 'An unexpected error occurred';
 
         if (status === 401) {
-            // Avoid redirect loop on the login page itself
-            if (!window.location.pathname.includes('/login')) {
+            // FIX: Do NOT call logout() when the 401 comes from the token
+            // verification endpoint itself (/auth/verify).  checkAuth() already
+            // handles that path (it clears the token and sets user to null in its
+            // own catch block).  Calling logout() here as well creates two
+            // concurrent state writes with stale closure values, which can leave
+            // isInitialized in an inconsistent state and prevent the login page
+            // from rendering correctly after a logout/re-login cycle.
+            const isVerifyCall = error.config?.url?.includes('/auth/verify');
+
+            if (!isVerifyCall && !window.location.pathname.includes('/login')) {
                 localStorage.removeItem('access_token');
+                // Note: deleting from defaults is redundant (the request
+                // interceptor reads directly from localStorage) but kept for
+                // safety in case any code sets a default header directly.
                 delete api.defaults.headers.common['Authorization'];
                 import('@/store/authStore').then(({ useAuthStore }) => {
                     useAuthStore.getState().logout();
@@ -41,12 +52,12 @@ api.interceptors.response.use(
         } else if (status === 403) {
             toast.error(`Permission Denied: ${message}`);
         } else if (status === 404) {
-            // Suppress 404 toasts for GET requests — handled by the component
+            // Suppress 404 toasts for GET requests — handled by the component.
             if (error.config?.method !== 'get') {
                 toast.error(`Not Found: ${message}`);
             }
         } else if (status >= 500) {
-            // Suppress server-error toasts for endpoints that handle 5xx themselves
+            // Suppress server-error toasts for endpoints that handle 5xx themselves.
             const silentPaths = ['/api/v1/chat/history'];
             const isSilent = silentPaths.some((p) => error.config?.url?.includes(p));
             if (!isSilent) {
@@ -67,11 +78,11 @@ api.interceptors.response.use(
                     }, retryAfter * 1000);
                 });
             } else {
-                // Exceeded retry budget — surface error to caller
+                // Exceeded retry budget — surface error to caller.
                 toast.error('Rate limit exceeded. Please try again later.');
             }
         } else if (status !== undefined && status !== 401) {
-            // 400, 422, etc. — show the detail message
+            // 400, 422, etc. — show the detail message.
             toast.error(message);
         }
 

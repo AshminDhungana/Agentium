@@ -8,6 +8,7 @@ Handles:
 """
 
 import asyncio
+import logging
 from fastapi import APIRouter, Depends, BackgroundTasks
 from sqlalchemy.orm import Session
 
@@ -17,6 +18,8 @@ from backend.services.initialization_service import InitializationService
 from backend.services.api_key_manager import api_key_manager
 
 router = APIRouter(prefix="/api/v1/genesis", tags=["genesis"])
+
+logger = logging.getLogger(__name__)
 
 
 @router.post("/initialize")
@@ -49,14 +52,32 @@ async def initialize_genesis(
             "message": "No active API key configured. Add a provider key first.",
         }
 
-    # Run genesis in the background so the HTTP response is immediate.
-    # The client polls GET /status to track progress.
-    async def _run():
-        try:
-            await service.run_genesis_protocol(country_name=country_name)
-        except Exception as exc:
-            import logging
-            logging.getLogger(__name__).error("Genesis Protocol failed: %s", exc)
+    # FIX (Bug 1): The background task must open its OWN database session.
+    #
+    # The original code passed the request's `db` session into the background
+    # task. FastAPI keeps that session open for the entire lifetime of the task,
+    # which means a single genesis run (up to 60 s country-name timeout + LLM
+    # calls) holds one DB connection the whole time. With a typical pool of
+    # 5-20 connections this starves every other request — including auth and
+    # page-data fetches — causing all pages to hang at loading.
+    #
+    # The fix: capture only the plain values we need (country_name string) and
+    # let the task create a fresh session from the pool, which it owns and
+    # closes when it finishes. The request's `db` session is released normally
+    # at the end of this handler function.
+    _country_name = country_name  # capture primitive, not the session
+
+    async def _run() -> None:
+        # Import inside the task to avoid any module-level circular-import
+        # issues; this path is only executed once per genesis run so the
+        # overhead is negligible.
+        from backend.models.database import get_db as _get_db  # noqa: PLC0415
+        with next(_get_db()) as new_db:
+            svc = InitializationService(new_db)
+            try:
+                await svc.run_genesis_protocol(country_name=_country_name)
+            except Exception as exc:
+                logger.error("Genesis Protocol failed: %s", exc, exc_info=True)
 
     background_tasks.add_task(_run)
 

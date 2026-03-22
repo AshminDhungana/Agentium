@@ -463,7 +463,20 @@ class InitializationService:
         head: HeadOfCouncil, 
         council: List[CouncilMember]
     ) -> Constitution:
-        """Load constitution template."""
+        """
+        Load and activate the genesis constitution.
+
+        Deactivates the fallback constitution seeded at startup, then either
+        UPDATES the existing v1.0.0 row (if the fallback already occupies that
+        version slot) or INSERTs a new one.
+
+        Using an upsert rather than a bare INSERT prevents the
+        UniqueViolation on the `constitutions_version_key` constraint that
+        occurred when the fallback constitution (seeded in main.py step 1b
+        with version="v1.0.0") was still in the database at the time genesis
+        ran.  Both the fallback and the genesis constitution share the same
+        version string by design — genesis simply upgrades the row in place.
+        """
         # Deactivate the fallback constitution (or any prior active version)
         # so the newly ratified genesis constitution becomes the sole active one.
         self.db.query(Constitution).filter_by(is_active=True).update({"is_active": False})
@@ -471,7 +484,40 @@ class InitializationService:
 
         template = self._get_constitution_template()
         preamble = template["preamble"].replace("{{COUNTRY_NAME}}", country_name)
-        
+
+        sovereign_prefs = json.dumps({
+            "country_name": country_name,
+            "founded_at": datetime.utcnow().isoformat(),
+            "council_size": len(council),
+            "genesis_protocol": "v1.0",
+            # Degraded mode is lifted once the full genesis constitution is in force.
+            "degraded_mode": False,
+        })
+        changelog = json.dumps([{
+            "change": "Genesis creation — upgraded from fallback constitution",
+            "reason": f"Establishment of {country_name}",
+            "timestamp": datetime.utcnow().isoformat(),
+        }])
+
+        # FIX: Check if version="v1.0.0" already exists (from the fallback row
+        # seeded at startup).  If it does, UPDATE it instead of INSERTing a new
+        # row to avoid the unique constraint violation on `version`.
+        existing = self.db.query(Constitution).filter_by(version="v1.0.0").first()
+        if existing:
+            existing.agentium_id             = "C00001"
+            existing.version_number          = 1
+            existing.preamble                = preamble
+            existing.articles                = json.dumps(template["articles"])
+            existing.prohibited_actions      = json.dumps(template["prohibited_actions"])
+            existing.sovereign_preferences   = sovereign_prefs
+            existing.changelog               = changelog
+            existing.created_by_agentium_id  = head.agentium_id
+            existing.effective_date          = datetime.utcnow()
+            existing.is_active               = True
+            self.db.flush()
+            return existing
+
+        # Fresh install with no prior v1.0.0 row — insert normally.
         constitution = Constitution(
             agentium_id="C00001",
             version="v1.0.0",
@@ -479,25 +525,16 @@ class InitializationService:
             preamble=preamble,
             articles=json.dumps(template["articles"]),
             prohibited_actions=json.dumps(template["prohibited_actions"]),
-            sovereign_preferences=json.dumps({
-                "country_name": country_name,
-                "founded_at": datetime.utcnow().isoformat(),
-                "council_size": len(council),
-                "genesis_protocol": "v1.0"
-            }),
-            changelog=json.dumps([{
-                "change": "Genesis creation",
-                "reason": f"Establishment of {country_name}",
-                "timestamp": datetime.utcnow().isoformat()
-            }]),
+            sovereign_preferences=sovereign_prefs,
+            changelog=changelog,
             created_by_agentium_id=head.agentium_id,
             effective_date=datetime.utcnow(),
-            is_active=True
+            is_active=True,
         )
-        
+
         self.db.add(constitution)
         self.db.flush()
-        
+
         return constitution
     
     async def _index_to_vector_db(

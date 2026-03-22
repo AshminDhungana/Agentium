@@ -1,6 +1,28 @@
 /**
  * websocketStore.ts
  *
+ * Bug fixes applied:
+ *
+ * BUG 1 — Pong timeout called connect() directly, bypassing backoff.
+ *   The old code did: get().disconnect(false); get().connect();
+ *   This created an immediate reconnect on every pong timeout with no delay,
+ *   producing the rapid 499 loop visible in nginx logs.
+ *   Fix: pong timeout now increments _reconnectAttempts and schedules connect()
+ *   with the same exponential backoff as the onclose path.
+ *
+ * BUG 2 — _reconnectAttempts was reset to 0 on every `system` message.
+ *   This caused the backoff counter to restart from scratch on every reconnect
+ *   cycle (2s → 2s → 2s…) instead of growing (2s → 4s → 8s…).
+ *   Fix: _reconnectAttempts is now only reset after the FIRST successful
+ *   ping→pong round-trip (_handlePong), confirming a genuinely stable
+ *   connection, not just a successful auth handshake.
+ *
+ * BUG 3 — connect() had no minimum-time guard between calls.
+ *   When _ws is briefly null (between a close and its reconnect timer), two
+ *   simultaneous callers (e.g. reconnect timer + GlobalWebSocketProvider
+ *   effect) could both slip through the readyState guards and open two sockets.
+ *   Fix: _lastConnectTime tracks the timestamp of each connect() call; any
+ *   call within 1 s of the previous one is ignored.
  */
 
 import { create } from 'zustand';
@@ -84,6 +106,20 @@ interface WebSocketState {
     _processedIds: Set<string>;
     /** Toast dedup: tracks IDs of active council-message toasts */
     _activeToastId: string | null;
+    /**
+     * BUG 3 FIX: timestamp (ms) of the last connect() invocation.
+     * Any call within 1 s of the previous one is dropped, preventing two
+     * simultaneous callers from opening duplicate sockets when _ws is
+     * momentarily null between close and reconnect.
+     */
+    _lastConnectTime: number;
+    /**
+     * BUG 2 FIX: true after the first successful ping→pong round-trip,
+     * which is when we consider the connection genuinely stable and safe to
+     * reset _reconnectAttempts. Using the system handshake alone was too
+     * early — it reset the backoff counter on every reconnect cycle.
+     */
+    _connectionStable: boolean;
 
     // Public actions
     connect: () => void;
@@ -107,6 +143,7 @@ interface WebSocketState {
     _startHeartbeat: () => void;
     _handlePong: (timestamp: string) => void;
     _trackProcessedId: (id: string) => void;
+    _scheduleReconnect: () => void;
 }
 
 // ── Config ────────────────────────────────────────────────────────────────────
@@ -121,6 +158,11 @@ const WS_CONFIG = {
     MAX_HISTORY_SIZE:         100,
     /** Cap the dedup set so it doesn't grow forever */
     MAX_PROCESSED_IDS:        500,
+    /**
+     * BUG 3 FIX: minimum ms between connect() calls.
+     * Prevents duplicate sockets when multiple callers race on a briefly-null _ws.
+     */
+    MIN_CONNECT_INTERVAL_MS:  1_000,
 } as const;
 
 // ── Store ─────────────────────────────────────────────────────────────────────
@@ -150,6 +192,8 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
     _messageQueue:       [],
     _processedIds:       new Set<string>(),
     _activeToastId:      null,
+    _lastConnectTime:    0,       // BUG 3 FIX
+    _connectionStable:   false,   // BUG 2 FIX
 
     // ── Internal setters ───────────────────────────────────────────────────
     _setConnected:   (connected)  => set({ isConnected: connected }),
@@ -194,15 +238,57 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
         if (s._pongTimeout)  { clearTimeout(s._pongTimeout);   set({ _pongTimeout: null }); }
     },
 
+    // ── BUG 1 FIX: shared reconnect scheduling ─────────────────────────────
+    // Both onclose and the pong timeout now call _scheduleReconnect() instead
+    // of directly calling connect(). This ensures exponential backoff is
+    // always applied, regardless of which code path triggers the reconnect.
+    _scheduleReconnect: () => {
+        const attempts = get()._reconnectAttempts;
+        if (attempts >= WS_CONFIG.MAX_RECONNECT_ATTEMPTS) {
+            get()._setError('Max retries reached. Click Reconnect to try again.');
+            return;
+        }
+        const newAttempts = attempts + 1;
+        set({ _reconnectAttempts: newAttempts });
+        get()._updateStats({ reconnectAttempts: newAttempts });
+        const delay = Math.min(
+            WS_CONFIG.BASE_RECONNECT_DELAY_MS * Math.pow(2, newAttempts),
+            WS_CONFIG.MAX_RECONNECT_DELAY_MS,
+        );
+        get()._setError(`Reconnecting in ${delay / 1000}s… (${newAttempts}/${WS_CONFIG.MAX_RECONNECT_ATTEMPTS})`);
+        const t = setTimeout(() => get().connect(), delay);
+        set({ _reconnectTimeout: t });
+    },
+
     _startHeartbeat: () => {
         get()._stopHeartbeat();
         const interval = setInterval(() => {
             get().sendPing();
+            // BUG 1 FIX: pong timeout now uses _scheduleReconnect() instead of
+            // calling connect() directly. The old direct call bypassed backoff
+            // entirely, producing an immediate reconnect on every pong failure
+            // and causing the rapid 499 loop visible in nginx logs.
             const pongTimeout = setTimeout(() => {
-                console.warn('[WebSocket] Pong timeout — reconnecting');
+                console.warn('[WebSocket] Pong timeout — scheduling reconnect with backoff');
                 get()._setError('Connection lost (pong timeout)');
-                get().disconnect(false);
-                get().connect();
+                get()._stopHeartbeat();
+                // Cleanly close the socket without triggering the onclose
+                // reconnect path (disconnect() nulls the handlers). The
+                // reconnect is instead handled by _scheduleReconnect() below.
+                const ws = get()._ws;
+                if (ws) {
+                    ws.onopen    = null;
+                    ws.onclose   = null;
+                    ws.onerror   = null;
+                    ws.onmessage = null;
+                    if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+                        ws.close(1000, 'Pong timeout');
+                    }
+                }
+                set({ _ws: null, _connectionStable: false });
+                get()._setConnected(false);
+                get()._setConnecting(false);
+                get()._scheduleReconnect();
             }, WS_CONFIG.PONG_TIMEOUT_MS);
             set({ _pongTimeout: pongTimeout });
         }, WS_CONFIG.PING_INTERVAL_MS);
@@ -215,6 +301,15 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
         if (s._lastPingTime) {
             const latencyMs = Date.now() - new Date(s._lastPingTime).getTime();
             get()._updateStats({ latencyMs });
+        }
+        // BUG 2 FIX: reset _reconnectAttempts here (first successful pong)
+        // instead of in the system message handler. The system message fires
+        // immediately after auth — too early to call the connection stable.
+        // A completed ping→pong round-trip proves the connection is healthy.
+        if (!s._connectionStable) {
+            set({ _connectionStable: true, _reconnectAttempts: 0 });
+            get()._updateStats({ reconnectAttempts: 0 });
+            console.log('[WebSocket] Connection stable — backoff counter reset');
         }
     },
 
@@ -230,9 +325,20 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
         if (s._ws?.readyState === WebSocket.CONNECTING) return;
         if (s._ws?.readyState === WebSocket.OPEN)       return;
 
+        // BUG 3 FIX: reject calls that arrive within MIN_CONNECT_INTERVAL_MS
+        // of the previous call. When _ws is momentarily null (between close and
+        // reconnect timer), two callers (e.g. reconnect timer + effect re-run)
+        // can both pass the readyState guards above and open duplicate sockets.
+        const now = Date.now();
+        if (now - s._lastConnectTime < WS_CONFIG.MIN_CONNECT_INTERVAL_MS) {
+            console.debug('[WebSocket] connect() called too soon — debounced');
+            return;
+        }
+        set({ _lastConnectTime: now });
+
         get()._setConnecting(true);
         get()._setError(null);
-        set({ _isManualDisconnect: false });
+        set({ _isManualDisconnect: false, _connectionStable: false });
 
         // NO token in URL — connect cleanly, send auth as first message
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -272,8 +378,11 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
                     if (data.type === 'system') {
                         get()._setConnected(true);
                         get()._setConnecting(false);
-                        set({ _reconnectAttempts: 0 });
-                        get()._updateStats({ reconnectAttempts: 0 });
+                        // BUG 2 FIX: do NOT reset _reconnectAttempts here.
+                        // We only reset it after the first successful pong
+                        // round-trip (in _handlePong), which confirms the
+                        // connection is genuinely stable. Resetting here caused
+                        // the backoff to restart from 2 s on every reconnect.
                         get()._startHeartbeat();
 
                         // Flush queued messages
@@ -328,7 +437,7 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
                 get()._clearAllTimers();
                 get()._setConnected(false);
                 get()._setConnecting(false);
-                set({ _ws: null });
+                set({ _ws: null, _connectionStable: false });
 
                 let errorMsg: string | null = null;
                 switch (event.code) {
@@ -341,21 +450,11 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
 
                 const isManual = get()._isManualDisconnect;
                 if (!isManual && event.code !== 4001) {
-                    const attempts = get()._reconnectAttempts;
-                    if (attempts < WS_CONFIG.MAX_RECONNECT_ATTEMPTS) {
-                        const newAttempts = attempts + 1;
-                        set({ _reconnectAttempts: newAttempts });
-                        get()._updateStats({ reconnectAttempts: newAttempts });
-                        const delay = Math.min(
-                            WS_CONFIG.BASE_RECONNECT_DELAY_MS * Math.pow(2, newAttempts),
-                            WS_CONFIG.MAX_RECONNECT_DELAY_MS,
-                        );
-                        get()._setError(`Reconnecting in ${delay / 1000}s… (${newAttempts}/${WS_CONFIG.MAX_RECONNECT_ATTEMPTS})`);
-                        const t = setTimeout(() => get().connect(), delay);
-                        set({ _reconnectTimeout: t });
-                    } else {
-                        get()._setError('Max retries reached. Click Reconnect to try again.');
-                    }
+                    // BUG 1 FIX: use the shared _scheduleReconnect() which
+                    // applies exponential backoff. Previously this path had
+                    // its own inline backoff while the pong timeout bypassed
+                    // it entirely — now both code paths behave consistently.
+                    get()._scheduleReconnect();
                 }
             };
 
@@ -369,7 +468,7 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
     // ── Disconnect ─────────────────────────────────────────────────────────
     disconnect: (isManual = false) => {
         const s = get();
-        set({ _isManualDisconnect: isManual });
+        set({ _isManualDisconnect: isManual, _connectionStable: false });
         get()._clearAllTimers();
 
         if (s._ws) {
