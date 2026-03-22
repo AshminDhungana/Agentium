@@ -18,70 +18,320 @@ import {
     Inbox,
     FlaskConical,
 } from 'lucide-react';
-import { useState, useRef, useCallback, Suspense } from 'react';
-// ── Voice Bridge addition ─────────────────────────────────────────────────────
+import { useState, useRef, useCallback, useEffect, Suspense } from 'react';
 import { VoiceIndicator } from '@/components/VoiceIndicator';
-import { useGenesisCheck } from '@/hooks/useGenesisCheck';
 
-// ── KeepAliveOutlet ───────────────────────────────────────────────────────────
-// Replaces AnimatePresence + motion.div. Instead of unmounting the previous
-// page and mounting the next one (which caused the full-screen flicker from two
-// absolutely-positioned divs overlapping during a crossfade), we keep every
-// visited page mounted and simply toggle visibility via opacity + pointer-events.
+// ─── Timing constants ─────────────────────────────────────────────────────────
 //
-// Why this eliminates the flicker:
-//   • Only one div is ever opaque at a time — no overlapping paint.
-//   • Pages are never unmounted, so returning to a tab is instantaneous with
-//     zero re-fetch or loading-skeleton flash.
-//   • CSS opacity transition handles the fade; no JS animation frame budget used.
+//  Animation timeline for a first-visit page load:
+//
+//    0ms    Shield icon pops in        (spring scale, 400ms)
+//    280ms  Progress ring starts draw  (stroke animation, 680ms)
+//    360ms  Page label fades in        (280ms)
+//    960ms  Ring completes             (280 + 680)
+//   1000ms  Reveal triggered           (40ms buffer after ring finishes)
+//   1000ms    ├─ Overlay fades out     (300ms)
+//   1000ms    └─ Page reveals          (320ms, simultaneous)
+//   1300ms  Complete
+//
+const OVERLAY_HOLD_MS = 1000;
+const OVERLAY_FADE_MS = 300;
+const PAGE_REVEAL_MS  = 320;
+
+// SVG ring: r=28 → circumference = 2π×28 ≈ 175.93 → use 176
+const RING_R = 28;
+const RING_C = Math.round(2 * Math.PI * RING_R); // 176
+
+// ─── Per-page labels ──────────────────────────────────────────────────────────
+const PAGE_LABELS: Record<string, string> = {
+    '/':             'Dashboard',
+    '/chat':         'Command Interface',
+    '/agents':       'Agents',
+    '/tasks':        'Tasks',
+    '/monitoring':   'Monitoring',
+    '/voting':       'Voting',
+    '/constitution': 'Constitution',
+    '/models':       'Models',
+    '/channels':     'Channels',
+    '/message-log':  'Message Log',
+    '/ab-testing':   'A/B Testing',
+    '/settings':     'Settings',
+    '/sovereign':    'Sovereign Control',
+};
+
+// ─── Global stylesheet (injected once) ───────────────────────────────────────
+// Uses `html.dark` selector to match Tailwind's dark-mode strategy.
+// CSS variables avoid duplicating color values.
+if (typeof document !== 'undefined') {
+    const ID = 'agentium-page-transitions';
+    if (!document.getElementById(ID)) {
+        const s = document.createElement('style');
+        s.id = ID;
+        s.textContent = `
+            :root {
+                --ka-bg:         #f9fafb;
+                --ka-shield:     #2563eb;
+                --ka-ring:       #3b82f6;
+                --ka-track:      #e5e7eb;
+                --ka-label:      #9ca3af;
+            }
+            html.dark {
+                --ka-bg:         #0f1117;
+                --ka-shield:     #60a5fa;
+                --ka-ring:       #3b82f6;
+                --ka-track:      #1e2535;
+                --ka-label:      #4b5563;
+            }
+            @keyframes kaShieldIn {
+                from { opacity:0; transform:scale(0.72); }
+                65%  {            transform:scale(1.06); }
+                to   { opacity:1; transform:scale(1);    }
+            }
+            @keyframes kaRingDraw {
+                from { stroke-dashoffset:${RING_C}; }
+                to   { stroke-dashoffset:0;         }
+            }
+            @keyframes kaLabelIn {
+                from { opacity:0; transform:translateY(4px); }
+                to   { opacity:1; transform:translateY(0);   }
+            }
+            @keyframes kaOverlayOut {
+                to { opacity:0; }
+            }
+            @keyframes kaPageReveal {
+                from { opacity:0; transform:translateY(7px); }
+                to   { opacity:1; transform:translateY(0);   }
+            }
+        `;
+        document.head.appendChild(s);
+    }
+}
+
+// ─── PageLoadOverlay ──────────────────────────────────────────────────────────
+interface PageLoadOverlayProps {
+    pathname:    string;
+    isFadingOut: boolean;
+    onFadeDone:  () => void;
+}
+
+function PageLoadOverlay({ pathname, isFadingOut, onFadeDone }: PageLoadOverlayProps) {
+    const label = PAGE_LABELS[pathname] ?? 'Loading';
+
+    return (
+        <div
+            onAnimationEnd={(e) => {
+                // Guard: onAnimationEnd fires for every child animation too.
+                // Only call onFadeDone when the overlay's own fade completes.
+                if (isFadingOut && e.animationName === 'kaOverlayOut') {
+                    onFadeDone();
+                }
+            }}
+            style={{
+                position:        'absolute',
+                inset:           0,
+                zIndex:          10,
+                display:         'flex',
+                flexDirection:   'column',
+                alignItems:      'center',
+                justifyContent:  'center',
+                gap:             '14px',
+                backgroundColor: 'var(--ka-bg)',
+                animation: isFadingOut
+                    ? `kaOverlayOut ${OVERLAY_FADE_MS}ms ease forwards`
+                    : 'none',
+            }}
+        >
+            {/* Shield icon + orbital progress ring */}
+            <div style={{ position:'relative', width:'64px', height:'64px' }}>
+
+                {/* Rotate -90° so the ring draws from the top (12-o'clock) */}
+                <svg
+                    width="64" height="64" viewBox="0 0 64 64"
+                    style={{ position:'absolute', inset:0, transform:'rotate(-90deg)' }}
+                    aria-hidden="true"
+                >
+                    {/* Faint track */}
+                    <circle
+                        cx="32" cy="32" r={RING_R}
+                        fill="none"
+                        stroke="var(--ka-track)"
+                        strokeWidth="1.5"
+                    />
+                    {/* Animated fill ring */}
+                    <circle
+                        cx="32" cy="32" r={RING_R}
+                        fill="none"
+                        stroke="var(--ka-ring)"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeDasharray={RING_C}
+                        style={{
+                            // `both` fill-mode: starts fully hidden before the 280ms delay
+                            animation: `kaRingDraw 680ms cubic-bezier(0.4,0,0.2,1) 280ms both`,
+                        }}
+                    />
+                </svg>
+
+                {/* Shield centered over the ring */}
+                <div style={{
+                    position:'absolute', inset:0,
+                    display:'flex', alignItems:'center', justifyContent:'center',
+                }}>
+                    <Shield
+                        aria-hidden="true"
+                        style={{
+                            width: '26px', height: '26px',
+                            color: 'var(--ka-shield)',
+                            // Spring overshoot (1.4 amplitude) for a confident snap-in feel
+                            animation: 'kaShieldIn 400ms cubic-bezier(0.34,1.4,0.64,1) both',
+                        }}
+                    />
+                </div>
+            </div>
+
+            {/* Page label — fades in after icon is settled */}
+            <span style={{
+                fontSize:      '12px',
+                color:         'var(--ka-label)',
+                fontWeight:    400,
+                letterSpacing: '0.04em',
+                animation:     'kaLabelIn 280ms ease 360ms both',
+            }}>
+                {label}
+            </span>
+        </div>
+    );
+}
+
+// ─── KeepAliveOutlet ──────────────────────────────────────────────────────────
+// Keeps every visited page in the DOM; only active page is visible (opacity:1).
+//
+// State machine per navigation:
+//
+//   FIRST VISIT
+//     ├─ showOverlay → true  (overlay renders above content)
+//     ├─ page renders hidden under overlay (opacity:0, transition:none)
+//     ├─ after OVERLAY_HOLD_MS:
+//     │    ├─ fadingOut → true   (triggers kaOverlayOut on overlay div)
+//     │    └─ revealPath → path  (triggers kaPageReveal on page div)
+//     └─ after overlay animation: showOverlay → false, overlay unmounts
+//
+//   REVISIT
+//     ├─ Any active overlay state is cleared
+//     └─ CSS transition opacity 0→1 (180ms) — smooth, no overlay
+//
+//   GO INACTIVE
+//     └─ CSS transition opacity 1→0 (180ms)
+//
 function KeepAliveOutlet() {
-    const location = useLocation();
+    const location      = useLocation();
     const currentOutlet = useOutlet();
 
-    // Cache React elements keyed by pathname. Once a page is first rendered its
-    // element stays in the map for the lifetime of the layout, keeping the
-    // component tree alive even when the route is not active.
-    const cache = useRef<Map<string, React.ReactNode>>(new Map());
+    const cache      = useRef<Map<string, React.ReactNode>>(new Map());
+    const visited    = useRef<Set<string>>(new Set());
+    const holdTimer  = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const isMounted  = useRef(true);
+
+    const [showOverlay, setShowOverlay] = useState(false);
+    const [fadingOut,   setFadingOut]   = useState(false);
+    const [revealPath,  setRevealPath]  = useState<string | null>(null);
+
+    useEffect(() => {
+        isMounted.current = true;
+        return () => { isMounted.current = false; };
+    }, []);
+
+    // Always update the cache with the current outlet
     if (currentOutlet) {
         cache.current.set(location.pathname, currentOutlet);
     }
 
+    useEffect(() => {
+        const path    = location.pathname;
+        const isFirst = !visited.current.has(path);
+
+        // Cancel any pending reveal from a previous navigation
+        if (holdTimer.current) {
+            clearTimeout(holdTimer.current);
+            holdTimer.current = null;
+        }
+
+        if (!isFirst) {
+            // Revisit — clear any leftover overlay state and use CSS transition
+            setShowOverlay(false);
+            setFadingOut(false);
+            setRevealPath(null);
+            return;
+        }
+
+        // First visit — mark, show overlay, schedule reveal
+        visited.current.add(path);
+        setShowOverlay(true);
+        setFadingOut(false);
+        setRevealPath(null);
+
+        holdTimer.current = setTimeout(() => {
+            if (!isMounted.current) return;
+            setFadingOut(true);
+            setRevealPath(path);
+        }, OVERLAY_HOLD_MS);
+    }, [location.pathname]);
+
+    // Cleanup on unmount
+    useEffect(() => () => { if (holdTimer.current) clearTimeout(holdTimer.current); }, []);
+
+    const handleOverlayDone = useCallback(() => {
+        setShowOverlay(false);
+        setFadingOut(false);
+    }, []);
+
     return (
         <>
             {Array.from(cache.current.entries()).map(([path, outlet]) => {
-                const isActive = path === location.pathname;
+                const isActive    = path === location.pathname;
+                const isRevealing = revealPath === path;
+                // During hold phase: keep page invisible under the overlay
+                const isHeld      = isActive && showOverlay && !isRevealing;
+
                 return (
                     <div
                         key={path}
                         style={{
-                            position: 'absolute',
-                            inset: 0,
-                            overflowY: 'auto',
-                            // Inactive pages are invisible and non-interactive but
-                            // remain mounted — no re-mount cost on revisit.
-                            opacity: isActive ? 1 : 0,
+                            position:      'absolute',
+                            inset:         0,
+                            overflowY:     'auto',
+                            opacity:       isActive ? (isHeld ? 0 : 1) : 0,
                             pointerEvents: isActive ? 'auto' : 'none',
-                            transition: 'opacity 0.15s ease',
+                            // Suppress CSS transition while keyframe animations are running
+                            transition:    (isRevealing || isHeld) ? 'none' : 'opacity 0.18s ease',
+                            animation:     isRevealing
+                                ? `kaPageReveal ${PAGE_REVEAL_MS}ms cubic-bezier(0.25,0.1,0.25,1) forwards`
+                                : 'none',
                         }}
                     >
                         {outlet}
                     </div>
                 );
             })}
+
+            {showOverlay && (
+                <PageLoadOverlay
+                    pathname={location.pathname}
+                    isFadingOut={fadingOut}
+                    onFadeDone={handleOverlayDone}
+                />
+            )}
         </>
     );
 }
 
-// ── PageSkeleton ──────────────────────────────────────────────────────────────
-// Shown only on the very first visit to a lazy page while its JS chunk loads.
-// Subsequent visits hit KeepAliveOutlet's cache and never render this at all.
-// Deliberately low-contrast so it doesn't flash aggressively in dark mode.
+// ─── PageSkeleton ─────────────────────────────────────────────────────────────
+// Only shown while React.lazy() fetches the JS chunk for the first time.
+// After that, KeepAliveOutlet serves from cache — this never renders again.
 function PageSkeleton() {
     return (
         <div className="absolute inset-0 flex flex-col gap-4 p-6 overflow-hidden">
-            {/* Simulated page header */}
             <div className="h-8 w-48 rounded-lg bg-gray-200 dark:bg-white/5 animate-pulse" />
-            {/* Simulated content rows */}
             <div className="flex flex-col gap-3 mt-2">
                 {[100, 85, 92, 78].map((w, i) => (
                     <div
@@ -91,7 +341,6 @@ function PageSkeleton() {
                     />
                 ))}
             </div>
-            {/* Simulated card grid */}
             <div className="grid grid-cols-3 gap-4 mt-4">
                 {[0, 1, 2].map(i => (
                     <div
@@ -104,18 +353,17 @@ function PageSkeleton() {
         </div>
     );
 }
+
+// ─── MainLayout ───────────────────────────────────────────────────────────────
 export function MainLayout() {
-    useGenesisCheck(); // One-time post-login redirect if no API key is configured
     const { user, logout } = useAuthStore();
-    const navigate = useNavigate();
+    const navigate    = useNavigate();
     const unreadCount = useWebSocketStore(state => state.unreadCount);
-    const [isDark, setIsDark] = useState(() => {
-        if (typeof window !== 'undefined') {
-            return document.documentElement.classList.contains('dark');
-        }
-        return false;
-    });
-    // Updated: Check both isSovereign and is_admin
+    const [isDark, setIsDark] = useState(() =>
+        typeof window !== 'undefined'
+            ? document.documentElement.classList.contains('dark')
+            : false
+    );
     const isAdmin = user?.isSovereign || user?.is_admin || false;
 
     const handleLogout = () => {
@@ -125,78 +373,64 @@ export function MainLayout() {
     };
 
     const toggleTheme = () => {
-        const newDark = !isDark;
-        setIsDark(newDark);
-        if (newDark) {
-            document.documentElement.classList.add('dark');
-            localStorage.setItem('theme', 'dark');
-        } else {
-            document.documentElement.classList.remove('dark');
-            localStorage.setItem('theme', 'light');
-        }
+        const next = !isDark;
+        setIsDark(next);
+        document.documentElement.classList.toggle('dark', next);
+        localStorage.setItem('theme', next ? 'dark' : 'light');
     };
 
-    // ── Hover prefetch ────────────────────────────────────────────────────────
-    // Triggers the dynamic import for a page's JS chunk on nav-link hover so
-    // that by the time the user clicks, the chunk is already in the browser
-    // cache. Wrapped in useCallback so the function reference is stable.
     const prefetch = useCallback((path: string) => {
         switch (path) {
-            case '/chat':         import('@/pages/ChatPage');         break;
-            case '/agents':       import('@/pages/AgentsPage');       break;
-            case '/tasks':        import('@/pages/TasksPage');        break;
-            case '/monitoring':   import('@/pages/MonitoringPage');   break;
-            case '/voting':       import('@/pages/VotingPage');       break;
-            case '/constitution': import('@/pages/ConstitutionPage'); break;
-            case '/models':       import('@/pages/ModelsPage');       break;
-            case '/channels':     import('@/pages/ChannelsPage');     break;
-            case '/message-log':  import('@/pages/MessageLogPage');   break;
-            case '/ab-testing':   import('@/pages/ABTestingPage');    break;
-            case '/settings':     import('@/pages/SettingsPage');     break;
+            case '/chat':         import('@/pages/ChatPage');           break;
+            case '/agents':       import('@/pages/AgentsPage');         break;
+            case '/tasks':        import('@/pages/TasksPage');          break;
+            case '/monitoring':   import('@/pages/MonitoringPage');     break;
+            case '/voting':       import('@/pages/VotingPage');         break;
+            case '/constitution': import('@/pages/ConstitutionPage');   break;
+            case '/models':       import('@/pages/ModelsPage');         break;
+            case '/channels':     import('@/pages/ChannelsPage');       break;
+            case '/message-log':  import('@/pages/MessageLogPage');     break;
+            case '/ab-testing':   import('@/pages/ABTestingPage');      break;
+            case '/settings':     import('@/pages/SettingsPage');       break;
             case '/sovereign':    import('@/pages/SovereignDashboard'); break;
-            default:              import('@/pages/Dashboard');        break;
+            default:              import('@/pages/Dashboard');          break;
         }
     }, []);
 
     type NavItem = {
-        path: string;
-        label: string;
-        icon: React.ComponentType<{ className?: string }>;
-        badge?: number;
-        variant?: 'default' | 'danger';
+        path:       string;
+        label:      string;
+        icon:       React.ComponentType<{ className?: string }>;
+        badge?:     number;
+        variant?:   'default' | 'danger';
         adminOnly?: boolean;
     };
 
     const navItems: NavItem[] = [
-        { path: '/', label: 'Dashboard', icon: LayoutDashboard },
-        {
-            path: '/chat',
-            label: 'Command Interface',
-            icon: Crown,
-            badge: unreadCount > 0 ? unreadCount : undefined,
-        },
-        { path: '/agents', label: 'Agents', icon: Users },
-        { path: '/tasks', label: 'Tasks', icon: ClipboardList },
-        { path: '/monitoring', label: 'Monitoring', icon: Activity },
-        { path: '/voting', label: 'Voting', icon: Gavel },
-        { path: '/constitution', label: 'Constitution', icon: BookOpen },
-        { path: '/models', label: 'Models', icon: Cpu },
-        { path: '/channels', label: 'Channels', icon: Radio },
-        { path: '/message-log', label: 'Message Log', icon: Inbox },
-        { path: '/ab-testing', label: 'A/B Testing', icon: FlaskConical, adminOnly: true },
-        { path: '/settings', label: 'Settings', icon: Settings },
+        { path: '/',             label: 'Dashboard',         icon: LayoutDashboard },
+        { path: '/chat',         label: 'Command Interface', icon: Crown,
+          badge: unreadCount > 0 ? unreadCount : undefined },
+        { path: '/agents',       label: 'Agents',            icon: Users },
+        { path: '/tasks',        label: 'Tasks',             icon: ClipboardList },
+        { path: '/monitoring',   label: 'Monitoring',        icon: Activity },
+        { path: '/voting',       label: 'Voting',            icon: Gavel },
+        { path: '/constitution', label: 'Constitution',      icon: BookOpen },
+        { path: '/models',       label: 'Models',            icon: Cpu },
+        { path: '/channels',     label: 'Channels',          icon: Radio },
+        { path: '/message-log',  label: 'Message Log',       icon: Inbox },
+        { path: '/ab-testing',   label: 'A/B Testing',       icon: FlaskConical, adminOnly: true },
+        { path: '/settings',     label: 'Settings',          icon: Settings },
         ...(isAdmin
             ? [{ path: '/sovereign', label: 'Sovereign Control', icon: Shield, variant: 'danger' as const }]
             : []),
     ];
 
-    // Filter nav items based on admin status
     const visibleNavItems = navItems.filter(item => !item.adminOnly || isAdmin);
 
     return (
         <div className="h-screen bg-gray-50 dark:bg-[#0f1117] flex">
+            {/* ── Sidebar ───────────────────────────────────────────────── */}
             <aside className="w-64 bg-white dark:bg-[#161b27] border-r border-gray-200 dark:border-[#1e2535] flex flex-col">
-                {/* Header */}
                 <div className="px-4 py-3 border-b border-gray-200 dark:border-[#1e2535] flex-shrink-0">
                     <div className="flex items-center gap-2">
                         <button
@@ -215,7 +449,6 @@ export function MainLayout() {
                     </div>
                 </div>
 
-                {/* Navigation */}
                 <nav className="flex-1 px-3 py-2 space-y-0.5 overflow-y-hidden">
                     {visibleNavItems.map((item) => (
                         <div key={item.path}>
@@ -250,7 +483,6 @@ export function MainLayout() {
                     ))}
                 </nav>
 
-                {/* User section */}
                 <div className="px-4 py-3 border-t border-gray-200 dark:border-[#1e2535]">
                     <div className="flex items-center gap-3 mb-2">
                         <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-sm font-bold">
@@ -264,10 +496,8 @@ export function MainLayout() {
                                 {user?.role || 'Member'}
                             </p>
                         </div>
-                        {/* ── Voice Bridge status indicator (icon only) ── */}
                         <VoiceIndicator iconOnly />
                     </div>
-
                     <button
                         onClick={handleLogout}
                         className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors"
@@ -278,12 +508,8 @@ export function MainLayout() {
                 </div>
             </aside>
 
-            {/* Main content — position:relative is required so the absolutely-
-                positioned KeepAliveOutlet fills this container correctly.
-                Suspense is intentionally placed HERE (not in App.tsx) so that
-                when a lazy page chunk suspends on first visit, only this content
-                pane shows the skeleton — the sidebar and nav stay mounted and
-                visible, eliminating the full-layout flicker.                   */}
+            {/* ── Main content ──────────────────────────────────────────── */}
+            {/* position:relative anchors all absolutely-positioned children */}
             <main className="flex-1 min-h-0 overflow-hidden relative">
                 <Suspense fallback={<PageSkeleton />}>
                     <KeepAliveOutlet />
