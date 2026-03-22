@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Coins, DollarSign, Shield, AlertTriangle } from 'lucide-react';
 import { api } from '@/services/api';
 import { useAuthStore } from '@/store/authStore';
+import toast from 'react-hot-toast';
 
 interface BudgetStatus {
     current_limits: {
@@ -29,6 +30,7 @@ export default function BudgetControl() {
     const [costInput, setCostInput] = useState('');
     const [loading, setLoading] = useState(false);
     const [success, setSuccess] = useState(false);
+    const [updateError, setUpdateError] = useState<string | null>(null);
     const { user } = useAuthStore();
 
     const fetchBudget = async () => {
@@ -49,17 +51,20 @@ export default function BudgetControl() {
     const handleUpdateBudget = async () => {
         setLoading(true);
         setSuccess(false);
+        setUpdateError(null);
         try {
             await api.post('/api/v1/admin/budget', {
                 daily_token_limit: parseInt(tokenInput),
                 daily_cost_limit: parseFloat(costInput),
             });
             setSuccess(true);
+            toast.success('Budget updated successfully!');
             await fetchBudget();
             setTimeout(() => setSuccess(false), 3000);
         } catch (error: any) {
-            console.error('Failed to update budget:', error);
-            alert(error.response?.data?.detail || 'Failed to update budget');
+            const msg = error.response?.data?.detail || 'Failed to update budget';
+            setUpdateError(msg);
+            toast.error(msg);
         } finally {
             setLoading(false);
         }
@@ -236,6 +241,14 @@ export default function BudgetControl() {
                                 <p className="text-xs text-gray-400 dark:text-gray-500">Maximum: $ as much as you want/day</p>
                             </div>
                         </div>
+
+                        {/* Inline error banner (replaces alert()) */}
+                        {updateError && (
+                            <div className="flex items-start gap-2 px-4 py-3 rounded-xl bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20">
+                                <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
+                                <p className="text-sm text-red-700 dark:text-red-300">{updateError}</p>
+                            </div>
+                        )}
 
                         <button
                             onClick={handleUpdateBudget}

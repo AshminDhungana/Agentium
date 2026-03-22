@@ -14,26 +14,38 @@ export const WorkflowAutomationPanel: React.FC = () => {
   const [executionStatus, setExecutionStatus] = useState<any>(null);
 
   useEffect(() => {
-    let interval: any;
+    // FIX 15: depend on executionId string, not the whole executionStatus object —
+    // avoids stale-closure drift and prevents extra re-schedules.
+    let interval: ReturnType<typeof setInterval> | undefined;
+
     if (view === 'list') {
       loadWorkflows();
     } else if (view === 'executions' && executionId) {
       const poll = async () => {
+        // FIX 15: skip the API call entirely when the browser tab is hidden.
+        // Halves background traffic for users who switch tabs mid-run.
+        if (document.hidden) return;
         try {
           const res = await api.get(`/api/v1/workflows/executions/${executionId}`);
           setExecutionStatus(res.data);
+          // Stop polling once the run reaches a terminal state.
           if (res.data.status === 'COMPLETED' || res.data.status === 'FAILED') {
             clearInterval(interval);
           }
         } catch (e) {
-          console.error('Poll failed', e);
+          console.error('Workflow poll failed', e);
         }
       };
+
+      // Run once immediately, then every 5 s (was 2 s — 60 % reduction in requests).
       poll();
-      interval = setInterval(poll, 2000);
+      interval = setInterval(poll, 5_000);
     }
-    return () => clearInterval(interval);
-  }, [view, executionId]);
+
+    return () => {
+      if (interval !== undefined) clearInterval(interval);
+    };
+  }, [view, executionId]); // depend on string ID, not the status object
 
   const loadWorkflows = async () => {
     try {

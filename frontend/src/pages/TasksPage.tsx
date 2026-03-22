@@ -1,8 +1,17 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { Task, UserPreference } from '../types';
-import { tasksService, CreateTaskRequest, UpdateTaskRequest } from '../services/tasks';
+// FIX 7: Import shared types instead of declaring them locally
+import {
+    Task,
+    UserPreference,
+    Subtask,
+    CritiqueReview,
+    CriticAgentStats,
+    CriticStatsResponse,
+} from '../types';
+// FIX 5: Import criticsService so components use the service layer, not raw api.get()
+import { tasksService, criticsService, CreateTaskRequest, UpdateTaskRequest } from '../services/tasks';
+// FIX 5: api import removed — all data fetching now goes through service methods
 import { preferencesService, PREFERENCE_CATEGORIES, DATA_TYPE_LABELS, formatPreferenceValue, parsePreferenceValue } from '../services/preferences';
-import { api } from '../services/api';
 import { TaskCard } from '../components/tasks/TaskCard';
 import { CreateTaskModal } from '../components/tasks/CreateTaskModal';
 import { CheckpointImportModal } from '../components/checkpoints/CheckpointImportModal';
@@ -51,82 +60,15 @@ import {
     GitCompareArrows,
     Upload,
     Brain,
+    Network,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { CheckpointTimeline } from '../components/checkpoints/CheckpointTimeline';
 import { BranchDiffView } from '../components/checkpoints/BranchDiffView';
 import { AutoDelegationPanel } from '../components/tasks/AutoDelegationPanel';
 import { WorkflowAutomationPanel } from '../components/workflows/WorkflowAutomationPanel';
-import { Network } from 'lucide-react';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-interface CriticAgentStats {
-    agentium_id: string;
-    critic_specialty: 'code' | 'output' | 'plan';
-    reviews_completed: number;
-    vetoes_issued: number;
-    escalations_issued: number;
-    passes_issued: number;
-    approval_rate: number;
-    veto_rate: number;
-    avg_review_time_ms: number;
-    status: string;
-    preferred_review_model: string | null;
-}
-
-interface CriticStatsResponse {
-    total_critics: number;
-    total_reviews: number;
-    total_vetoes: number;
-    total_escalations: number;
-    overall_approval_rate: number;
-    by_type: Record<string, {
-        count: number;
-        reviews: number;
-        vetoes: number;
-        escalations: number;
-        approval_rate: number;
-    }>;
-    critics: CriticAgentStats[];
-}
-
-interface CritiqueReview {
-    id: string;
-    task_id: string;
-    subtask_id?: string;
-    critic_type: string;
-    critic_agentium_id: string;
-    verdict: 'pass' | 'reject' | 'escalate';
-    rejection_reason: string | null;
-    suggestions: string | null;
-    retry_count: number;
-    max_retries: number;
-    review_duration_ms: number;
-    model_used: string | null;
-    reviewed_at: string;
-    can_retry?: boolean;
-}
-
-interface Subtask {
-    id: string;
-    agentium_id?: string;
-    title: string;
-    status: string;
-    assigned_agents?: {
-        head?: string;
-        lead?: string;
-        task_agents?: string[];
-    };
-    error_info?: {
-        error_count: number;
-        retry_count: number;
-        max_retries: number;
-        last_error?: string;
-    } | null;
-    progress?: number;
-    created_at?: string;
-}
+// ─── Local-only type (UI state, not suitable for shared types/index.ts) ────────
 
 interface SubtaskWithReviews extends Subtask {
     reviews: CritiqueReview[];
@@ -134,6 +76,50 @@ interface SubtaskWithReviews extends Subtask {
     reviewsLoading: boolean;
 }
 
+// ─── FIX 14: Tab-level error boundary ─────────────────────────────────────────
+// Prevents a runtime error in one tab from blanking the entire page.
+
+class TabErrorBoundary extends React.Component<
+    { children: React.ReactNode; tabName: string },
+    { hasError: boolean; errorMessage: string }
+> {
+    state = { hasError: false, errorMessage: '' };
+
+    static getDerivedStateFromError(error: Error) {
+        return { hasError: true, errorMessage: error.message };
+    }
+
+    componentDidCatch(error: Error, info: React.ErrorInfo) {
+        console.error(`[TabErrorBoundary:${this.props.tabName}]`, error, info);
+    }
+
+    render() {
+        if (this.state.hasError) {
+            return (
+                <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
+                    <div className="w-12 h-12 rounded-xl bg-red-100 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 flex items-center justify-center">
+                        <AlertCircle className="w-6 h-6 text-red-500 dark:text-red-400" />
+                    </div>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">
+                        Something went wrong in the {this.props.tabName} tab
+                    </p>
+                    {this.state.errorMessage && (
+                        <p className="text-xs text-gray-500 dark:text-gray-400 max-w-sm font-mono">
+                            {this.state.errorMessage}
+                        </p>
+                    )}
+                    <button
+                        onClick={() => this.setState({ hasError: false, errorMessage: '' })}
+                        className="mt-1 px-4 py-2 text-xs font-medium rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors"
+                    >
+                        Retry
+                    </button>
+                </div>
+            );
+        }
+        return this.props.children;
+    }
+}
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -230,18 +216,72 @@ const SUBTASK_STATUS_CONFIG: Record<string, {
     badge: string;
     label: string;
 }> = {
-    pending:      { border: 'border-l-gray-300 dark:border-l-gray-600',     dot: 'bg-gray-400',                      badge: 'bg-gray-100 text-gray-600 dark:bg-gray-500/20 dark:text-gray-400',       label: 'Pending' },
-    in_progress:  { border: 'border-l-blue-400 dark:border-l-blue-500',     dot: 'bg-blue-400 animate-pulse',        badge: 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400',       label: 'In Progress' },
-    deliberating: { border: 'border-l-purple-400 dark:border-l-purple-500', dot: 'bg-purple-400',                    badge: 'bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-400', label: 'Deliberating' },
-    retrying:     { border: 'border-l-amber-400 dark:border-l-amber-500',   dot: 'bg-amber-400',                     badge: 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400',     label: 'Retrying' },
-    completed:    { border: 'border-l-green-400 dark:border-l-green-500',   dot: 'bg-green-400',                     badge: 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400',     label: 'Completed' },
-    failed:       { border: 'border-l-red-400 dark:border-l-red-500',       dot: 'bg-red-400',                       badge: 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400',             label: 'Failed' },
-    escalated:    { border: 'border-l-orange-400 dark:border-l-orange-500', dot: 'bg-orange-400',                    badge: 'bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-400', label: 'Escalated' },
-    stopped:      { border: 'border-l-gray-400 dark:border-l-gray-500',     dot: 'bg-gray-500',                      badge: 'bg-gray-100 text-gray-600 dark:bg-gray-500/20 dark:text-gray-400',         label: 'Stopped' },
+    pending:      { border: 'border-l-gray-300 dark:border-l-gray-600',     dot: 'bg-gray-400',               badge: 'bg-gray-100 text-gray-600 dark:bg-gray-500/20 dark:text-gray-400',       label: 'Pending' },
+    in_progress:  { border: 'border-l-blue-400 dark:border-l-blue-500',     dot: 'bg-blue-400 animate-pulse', badge: 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400',       label: 'In Progress' },
+    deliberating: { border: 'border-l-purple-400 dark:border-l-purple-500', dot: 'bg-purple-400',             badge: 'bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-400', label: 'Deliberating' },
+    retrying:     { border: 'border-l-amber-400 dark:border-l-amber-500',   dot: 'bg-amber-400',              badge: 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400',     label: 'Retrying' },
+    completed:    { border: 'border-l-green-400 dark:border-l-green-500',   dot: 'bg-green-400',              badge: 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400',     label: 'Completed' },
+    failed:       { border: 'border-l-red-400 dark:border-l-red-500',       dot: 'bg-red-400',                badge: 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400',             label: 'Failed' },
+    escalated:    { border: 'border-l-orange-400 dark:border-l-orange-500', dot: 'bg-orange-400',             badge: 'bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-400', label: 'Escalated' },
+    stopped:      { border: 'border-l-gray-400 dark:border-l-gray-500',     dot: 'bg-gray-500',               badge: 'bg-gray-100 text-gray-600 dark:bg-gray-500/20 dark:text-gray-400',         label: 'Stopped' },
+};
+
+// ─── FIX 1: Module-scope statics (no longer recreated on every render) ─────────
+
+/** Priority options used in the inline edit dropdown of MainTaskCard. */
+const PRIORITY_OPTIONS_LIST = ['low', 'normal', 'high', 'critical', 'sovereign'] as const;
+
+/** Status → badge class map for MainTaskCard (was recreated inside component body). */
+const TASK_STATUS_COLOR: Record<string, string> = {
+    pending:      'bg-yellow-100 text-yellow-700 dark:bg-yellow-500/15 dark:text-yellow-400',
+    in_progress:  'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400',
+    deliberating: 'bg-purple-100 text-purple-700 dark:bg-purple-500/15 dark:text-purple-400',
+    retrying:     'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400',
+    completed:    'bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-400',
+    failed:       'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400',
+    escalated:    'bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-400',
+};
+
+/** Priority → text class map for MainTaskCard (was recreated inside component body). */
+const TASK_PRIORITY_COLOR: Record<string, string> = {
+    sovereign: 'text-indigo-600 dark:text-indigo-400',
+    critical:  'text-red-600 dark:text-red-400',
+    high:      'text-orange-600 dark:text-orange-400',
+    urgent:    'text-orange-600 dark:text-orange-400',
+    normal:    'text-gray-500 dark:text-gray-400',
+    low:       'text-gray-400 dark:text-gray-500',
+};
+
+/** VerdictBadge config map (was recreated inside VerdictBadge on every render). */
+const VERDICT_CONFIG: Record<string, { icon: React.ElementType; cls: string; label: string }> = {
+    pass:     { icon: ShieldCheck, cls: 'bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-400',   label: 'Pass' },
+    reject:   { icon: ShieldX,     cls: 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400',           label: 'Reject' },
+    escalate: { icon: ShieldAlert, cls: 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400',   label: 'Escalate' },
+};
+
+/** Verdict → dot color map for CriticSummaryDots (was recreated inside the component). */
+const VERDICT_DOT_COLOR: Record<string, string> = {
+    pass:     'bg-green-400 dark:bg-green-500',
+    reject:   'bg-red-400 dark:bg-red-500',
+    escalate: 'bg-amber-400 dark:bg-amber-500',
+};
+
+/**
+ * FIX 4: Full, static Tailwind class strings for data-type badges.
+ * Replaces the `bg-${color}-100 text-${color}-700` interpolation pattern
+ * which Tailwind's build-time purge cannot detect and therefore strips in
+ * production. Keys match the `color` values in DATA_TYPE_LABELS.
+ */
+const DATA_TYPE_BADGE_CLASSES: Record<string, string> = {
+    blue:   'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400',
+    green:  'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400',
+    cyan:   'bg-cyan-100 text-cyan-700 dark:bg-cyan-500/20 dark:text-cyan-400',
+    purple: 'bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-400',
+    orange: 'bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-400',
+    pink:   'bg-pink-100 text-pink-700 dark:bg-pink-500/20 dark:text-pink-400',
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
 
 const fmtMs = (ms: number) =>
     ms < 1000 ? `${Math.round(ms)}ms` : `${(ms / 1000).toFixed(1)}s`;
@@ -260,13 +300,9 @@ const getSubtaskStatusCfg = (status: string) =>
 
 // ─── Shared Sub-components ────────────────────────────────────────────────────
 
+// FIX 1: VerdictBadge now reads from module-scope VERDICT_CONFIG
 const VerdictBadge: React.FC<{ verdict: string; size?: 'sm' | 'xs' }> = ({ verdict, size = 'sm' }) => {
-    const map: Record<string, { icon: React.ElementType; cls: string; label: string }> = {
-        pass:     { icon: ShieldCheck, cls: 'bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-400', label: 'Pass' },
-        reject:   { icon: ShieldX,     cls: 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400',         label: 'Reject' },
-        escalate: { icon: ShieldAlert, cls: 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400', label: 'Escalate' },
-    };
-    const cfg = map[verdict] ?? map.pass;
+    const cfg = VERDICT_CONFIG[verdict] ?? VERDICT_CONFIG.pass;
     const Icon = cfg.icon;
     return (
         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-semibold ${size === 'xs' ? 'text-[10px]' : 'text-xs'} ${cfg.cls}`}>
@@ -298,22 +334,16 @@ const DeltaChip: React.FC<{ value: number }> = ({ value }) => {
 
 // ─── Critic Summary Dots ──────────────────────────────────────────────────────
 
+// FIX 1: CriticSummaryDots now reads from module-scope VERDICT_DOT_COLOR
 const CriticSummaryDots: React.FC<{ reviews: CritiqueReview[] }> = ({ reviews }) => {
     if (reviews.length === 0) {
         return <span className="text-xs text-gray-300 dark:text-gray-600 italic">No reviews</span>;
     }
 
-    // Group by critic_type, get latest verdict per type
     const latest: Record<string, string> = {};
     [...reviews]
         .sort((a, b) => new Date(a.reviewed_at).getTime() - new Date(b.reviewed_at).getTime())
         .forEach(r => { latest[r.critic_type] = r.verdict; });
-
-    const dotColor: Record<string, string> = {
-        pass:     'bg-green-400 dark:bg-green-500',
-        reject:   'bg-red-400 dark:bg-red-500',
-        escalate: 'bg-amber-400 dark:bg-amber-500',
-    };
 
     return (
         <div className="flex items-center gap-1.5">
@@ -321,8 +351,7 @@ const CriticSummaryDots: React.FC<{ reviews: CritiqueReview[] }> = ({ reviews })
                 const meta = CRITIC_META[type];
                 return (
                     <div key={type} className="relative group flex items-center">
-                        <span className={`w-2 h-2 rounded-full inline-block ${dotColor[verdict] ?? 'bg-gray-300'}`} />
-                        {/* Tooltip */}
+                        <span className={`w-2 h-2 rounded-full inline-block ${VERDICT_DOT_COLOR[verdict] ?? 'bg-gray-300'}`} />
                         <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:flex flex-col items-center z-20 pointer-events-none">
                             <div className="bg-gray-900 dark:bg-gray-700 text-white text-[10px] rounded px-2 py-1 whitespace-nowrap shadow-lg">
                                 {meta?.label ?? type}: {verdict}
@@ -362,7 +391,6 @@ const CriticReviewPanel: React.FC<{
         );
     }
 
-    // Group by critic_type, sort latest first within each group
     const grouped: Record<string, CritiqueReview[]> = {};
     reviews.forEach(r => {
         if (!grouped[r.critic_type]) grouped[r.critic_type] = [];
@@ -435,7 +463,6 @@ const CriticReviewPanel: React.FC<{
                                     </span>
                                 </div>
 
-                                {/* Rejection reason */}
                                 {latest.rejection_reason && (
                                     <div className="mt-2 flex items-start gap-2">
                                         <AlertCircle className="w-3.5 h-3.5 text-red-400 dark:text-red-500 flex-shrink-0 mt-0.5" />
@@ -445,7 +472,6 @@ const CriticReviewPanel: React.FC<{
                                     </div>
                                 )}
 
-                                {/* Suggestions accordion */}
                                 {hasSuggestions && (
                                     <div className="mt-2">
                                         <button
@@ -471,7 +497,6 @@ const CriticReviewPanel: React.FC<{
                                     </div>
                                 )}
 
-                                {/* Previous reviews count */}
                                 {typeReviews.length > 1 && (
                                     <p className="mt-1.5 text-[10px] text-gray-400 dark:text-gray-500 font-mono">
                                         + {typeReviews.length - 1} earlier review{typeReviews.length - 1 !== 1 ? 's' : ''}
@@ -515,56 +540,38 @@ const SubtaskRow: React.FC<{
                 transition-colors duration-200
             `}
         >
-            {/* Row header */}
             <button
                 onClick={handleToggle}
                 className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-[#1e2535]/50 transition-colors duration-150 text-left group"
             >
-                {/* Index */}
                 <span className="text-[10px] font-mono text-gray-300 dark:text-gray-600 w-5 flex-shrink-0 text-right select-none">
                     {String(index + 1).padStart(2, '0')}
                 </span>
-
-                {/* Status dot */}
                 <span className={`w-2 h-2 rounded-full flex-shrink-0 ${cfg.dot}`} />
-
-                {/* Title */}
                 <span className="flex-1 text-sm font-medium text-gray-800 dark:text-gray-200 truncate min-w-0">
                     {subtask.title}
                 </span>
-
-                {/* Agentium ID */}
                 {subtask.agentium_id && (
                     <span className="hidden sm:block text-[10px] font-mono text-gray-300 dark:text-gray-600 flex-shrink-0">
                         {subtask.agentium_id}
                     </span>
                 )}
-
-                {/* Critic summary dots */}
                 <div className="flex-shrink-0">
                     <CriticSummaryDots reviews={subtask.reviews} />
                 </div>
-
-                {/* Status badge */}
                 <span className={`hidden md:inline-flex flex-shrink-0 items-center px-2 py-0.5 rounded text-[10px] font-semibold ${cfg.badge}`}>
                     {cfg.label}
                 </span>
-
-                {/* Problem indicator */}
                 {hasProblem && (
                     <AlertCircle className="w-3.5 h-3.5 text-red-400 dark:text-red-500 flex-shrink-0" />
                 )}
-
-                {/* Expand chevron */}
                 <ChevronDown
                     className={`w-4 h-4 text-gray-400 flex-shrink-0 transition-transform duration-200 group-hover:text-gray-600 dark:group-hover:text-gray-300 ${isExpanded ? 'rotate-180' : ''}`}
                 />
             </button>
 
-            {/* Expanded critic panel */}
             {isExpanded && (
                 <div className="border-t border-gray-100 dark:border-[#1e2535] bg-gray-50/50 dark:bg-[#0f1117]/50">
-                    {/* Subtask meta strip */}
                     <div className="px-5 pt-3 pb-2 flex items-center gap-4 flex-wrap border-b border-gray-100 dark:border-[#1e2535]">
                         <span className="text-xs text-gray-400 dark:text-gray-500 font-medium uppercase tracking-wide">
                             Critic Reviews
@@ -591,11 +598,7 @@ const SubtaskRow: React.FC<{
                             </span>
                         )}
                     </div>
-
-                    <CriticReviewPanel
-                        reviews={subtask.reviews}
-                        loading={subtask.reviewsLoading}
-                    />
+                    <CriticReviewPanel reviews={subtask.reviews} loading={subtask.reviewsLoading} />
                 </div>
             )}
         </div>
@@ -604,42 +607,32 @@ const SubtaskRow: React.FC<{
 
 // ─── Task Subtask Accordion ───────────────────────────────────────────────────
 
+// FIX 5: Uses tasksService.getTaskSubtasks() and criticsService.getTaskReviews()
+//        instead of calling api.get() directly.
 const TaskSubtaskAccordion: React.FC<{ task: Task }> = ({ task }) => {
     const [subtasks, setSubtasks] = useState<SubtaskWithReviews[]>([]);
     const [loading, setLoading]   = useState(true);
     const [expanded, setExpanded] = useState<Set<string>>(new Set());
+    // FIX 6: useRef<Map> keeps refs stable across renders — createRef is only
+    // called once per unique subtask id, not on every render cycle.
     const subtaskRefs = useRef<Map<string, React.RefObject<HTMLDivElement>>>(new Map());
 
-    useEffect(() => {
-        api.get(`/api/v1/tasks/${task.id}/subtasks`)
-            .then(r => {
-                const raw: Subtask[] = (r.data as any).subtasks ?? [];
-                const withReviews: SubtaskWithReviews[] = raw.map(s => ({
-                    ...s,
-                    reviews: [],
-                    reviewsLoaded: false,
-                    reviewsLoading: false,
-                }));
-                setSubtasks(withReviews);
+    const getOrCreateRef = (id: string): React.RefObject<HTMLDivElement> => {
+        if (!subtaskRefs.current.has(id)) {
+            subtaskRefs.current.set(id, React.createRef<HTMLDivElement>());
+        }
+        return subtaskRefs.current.get(id)!;
+    };
 
-                // Auto-expand and auto-load reviews for problematic subtasks
-                const autoExpand = new Set<string>(
-                    raw.filter(s => isProblematic(s.status)).map(s => s.id)
-                );
-                setExpanded(autoExpand);
-                autoExpand.forEach(id => loadReviewsForSubtask(id));
-            })
-            .catch(() => toast.error('Failed to load subtasks'))
-            .finally(() => setLoading(false));
-    }, [task.id]);
-
+    // FIX 5: hoisted so it can be referenced in useEffect without closure issues
     const loadReviewsForSubtask = useCallback(async (subtaskId: string) => {
         setSubtasks(prev => prev.map(s =>
             s.id === subtaskId ? { ...s, reviewsLoading: true } : s
         ));
         try {
-            const r = await api.get(`/api/v1/critics/reviews/${subtaskId}`);
-            const reviews: CritiqueReview[] = (r.data as any).reviews ?? [];
+            // FIX 5: use service layer instead of api.get()
+            const data = await criticsService.getTaskReviews(subtaskId);
+            const reviews: CritiqueReview[] = data.reviews ?? [];
             setSubtasks(prev => prev.map(s =>
                 s.id === subtaskId ? { ...s, reviews, reviewsLoaded: true, reviewsLoading: false } : s
             ));
@@ -650,6 +643,29 @@ const TaskSubtaskAccordion: React.FC<{ task: Task }> = ({ task }) => {
         }
     }, []);
 
+    useEffect(() => {
+        // FIX 5: use service layer instead of api.get()
+        tasksService.getTaskSubtasks(task.id)
+            .then(data => {
+                const raw: Subtask[] = data.subtasks ?? [];
+                const withReviews: SubtaskWithReviews[] = raw.map(s => ({
+                    ...s,
+                    reviews: [],
+                    reviewsLoaded: false,
+                    reviewsLoading: false,
+                }));
+                setSubtasks(withReviews);
+
+                const autoExpand = new Set<string>(
+                    raw.filter(s => isProblematic(s.status)).map(s => s.id)
+                );
+                setExpanded(autoExpand);
+                autoExpand.forEach(id => loadReviewsForSubtask(id));
+            })
+            .catch(() => toast.error('Failed to load subtasks'))
+            .finally(() => setLoading(false));
+    }, [task.id, loadReviewsForSubtask]);
+
     const toggleSubtask = (id: string) => {
         setExpanded(prev => {
             const next = new Set(prev);
@@ -657,13 +673,6 @@ const TaskSubtaskAccordion: React.FC<{ task: Task }> = ({ task }) => {
             else next.add(id);
             return next;
         });
-    };
-
-    const getOrCreateRef = (id: string): React.RefObject<HTMLDivElement> => {
-        if (!subtaskRefs.current.has(id)) {
-            subtaskRefs.current.set(id, React.createRef<HTMLDivElement>());
-        }
-        return subtaskRefs.current.get(id)!;
     };
 
     const jumpToFirstIssue = () => {
@@ -696,7 +705,6 @@ const TaskSubtaskAccordion: React.FC<{ task: Task }> = ({ task }) => {
 
     return (
         <div>
-            {/* Subtask list header */}
             <div className="px-5 py-2.5 bg-gray-50 dark:bg-[#0f1117] border-b border-gray-100 dark:border-[#1e2535] flex items-center justify-between">
                 <div className="flex items-center gap-3">
                     <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
@@ -735,7 +743,6 @@ const TaskSubtaskAccordion: React.FC<{ task: Task }> = ({ task }) => {
                 </div>
             </div>
 
-            {/* Subtask rows */}
             <div className="divide-y divide-gray-100 dark:divide-[#1e2535]">
                 {subtasks.map((subtask, i) => (
                     <SubtaskRow
@@ -750,7 +757,6 @@ const TaskSubtaskAccordion: React.FC<{ task: Task }> = ({ task }) => {
                 ))}
             </div>
 
-            {/* Jump-to-issues floating bar */}
             {problemCount > 0 && (
                 <div className="sticky bottom-4 mx-4 mt-2 mb-1 z-10">
                     <button
@@ -776,27 +782,28 @@ const TaskSubtaskAccordion: React.FC<{ task: Task }> = ({ task }) => {
 
 // ─── Main Task Card ───────────────────────────────────────────────────────────
 
-const MainTaskCard: React.FC<{ task: Task; onUpdated?: (updated: Task) => void }> = ({ task, onUpdated }) => {
+// FIX 2: React.memo prevents re-renders when sibling tasks update
+const MainTaskCard: React.FC<{ task: Task; onUpdated?: (updated: Task) => void }> = React.memo(({ task, onUpdated }) => {
     const [subtasksOpen, setSubtasksOpen]         = useState(false);
     const [governanceOpen, setGovernanceOpen]     = useState(false);
     const [isEditing, setIsEditing]               = useState(false);
     const [isSaving, setIsSaving]                 = useState(false);
     const [editTitle, setEditTitle]               = useState(task.title);
     const [editDescription, setEditDescription]   = useState(task.description ?? '');
-    const [editPriority, setEditPriority]         = useState((task as any).priority ?? 'normal');
+    // FIX 8: task.priority is typed in the Task interface — no as any needed
+    const [editPriority, setEditPriority]         = useState(task.priority ?? 'normal');
     const [editStatus, setEditStatus]             = useState(task.status);
     const [allowedTransitions, setAllowedTransitions] = useState<string[] | null>(null);
     const [transitionsLoading, setTransitionsLoading] = useState(false);
 
-    const PRIORITY_OPTIONS = ['low', 'normal', 'high', 'critical', 'sovereign'];
+    // FIX 1: PRIORITY_OPTIONS_LIST is now at module scope — no recreation per render
 
     const openEdit = async () => {
         setEditTitle(task.title);
         setEditDescription(task.description ?? '');
-        setEditPriority((task as any).priority ?? 'normal');
+        setEditPriority(task.priority ?? 'normal');
         setEditStatus(task.status);
         setIsEditing(true);
-        // Fetch allowed transitions so the status dropdown only shows valid options
         setTransitionsLoading(true);
         try {
             const res = await tasksService.getAllowedTransitions(task.id);
@@ -819,7 +826,7 @@ const MainTaskCard: React.FC<{ task: Task; onUpdated?: (updated: Task) => void }
             const payload: UpdateTaskRequest = {};
             if (editTitle !== task.title)                       payload.title = editTitle;
             if (editDescription !== (task.description ?? ''))  payload.description = editDescription;
-            if (editPriority !== (task as any).priority)       payload.priority = editPriority;
+            if (editPriority !== (task.priority ?? 'normal'))  payload.priority = editPriority;
             if (editStatus !== task.status)                    payload.status = editStatus;
 
             if (Object.keys(payload).length === 0) { cancelEdit(); return; }
@@ -835,27 +842,13 @@ const MainTaskCard: React.FC<{ task: Task; onUpdated?: (updated: Task) => void }
         }
     };
 
-    const statusColor: Record<string, string> = {
-        pending:      'bg-yellow-100 text-yellow-700 dark:bg-yellow-500/15 dark:text-yellow-400',
-        in_progress:  'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400',
-        deliberating: 'bg-purple-100 text-purple-700 dark:bg-purple-500/15 dark:text-purple-400',
-        retrying:     'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400',
-        completed:    'bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-400',
-        failed:       'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400',
-        escalated:    'bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-400',
-    };
-
-    const priorityColor: Record<string, string> = {
-        critical: 'text-red-600 dark:text-red-400',
-        high:     'text-orange-600 dark:text-orange-400',
-        normal:   'text-gray-500 dark:text-gray-400',
-        low:      'text-gray-400 dark:text-gray-500',
-    };
-
-    const gov       = (task as any).governance;
-    const agents    = (task as any).assigned_agents;
-    const errorInfo = (task as any).error_info;
-    const progress  = (task as any).progress ?? 0;
+    // FIX 1+8: These maps are now at module scope (TASK_STATUS_COLOR,
+    // TASK_PRIORITY_COLOR) — removed from component body.
+    // FIX 8: All (task as any) casts removed — fields exist on Task type.
+    const gov       = task.governance;
+    const agents    = task.assigned_agents;
+    const errorInfo = task.error_info;
+    const progress  = task.progress ?? 0;
 
     return (
         <div className="bg-white dark:bg-[#161b27] rounded-xl border border-gray-200 dark:border-[#1e2535] shadow-sm dark:shadow-[0_2px_16px_rgba(0,0,0,0.25)] overflow-hidden transition-colors duration-200">
@@ -863,17 +856,16 @@ const MainTaskCard: React.FC<{ task: Task; onUpdated?: (updated: Task) => void }
             {/* ── Main task header ──────────────────────────────────────── */}
             <div className="px-6 pt-5 pb-4 border-b border-gray-100 dark:border-[#1e2535]">
                 <div className="flex items-start gap-4">
-                    {/* Icon */}
                     <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-500/10 flex items-center justify-center flex-shrink-0 mt-0.5">
                         <ListTodo className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                     </div>
 
-                    {/* Title + meta */}
                     <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap mb-1">
-                            {(task as any).agentium_id && (
+                            {/* FIX 8: task.agentium_id is optional string — no as any */}
+                            {task.agentium_id && (
                                 <span className="text-xs font-mono text-gray-400 dark:text-gray-500">
-                                    {(task as any).agentium_id}
+                                    {task.agentium_id}
                                 </span>
                             )}
                             {isEditing ? (
@@ -888,7 +880,7 @@ const MainTaskCard: React.FC<{ task: Task; onUpdated?: (updated: Task) => void }
                                     ))}
                                 </select>
                             ) : (
-                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${statusColor[task.status] ?? statusColor.pending}`}>
+                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${TASK_STATUS_COLOR[task.status] ?? TASK_STATUS_COLOR.pending}`}>
                                     {task.status.replace('_', ' ')}
                                 </span>
                             )}
@@ -898,13 +890,15 @@ const MainTaskCard: React.FC<{ task: Task; onUpdated?: (updated: Task) => void }
                                     onChange={e => setEditPriority(e.target.value)}
                                     className="text-xs font-semibold uppercase rounded px-2 py-0.5 border border-gray-300 dark:border-gray-600 bg-white dark:bg-[#1e2535] text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-400"
                                 >
-                                    {PRIORITY_OPTIONS.map(p => (
+                                    {/* FIX 1: use module-scope constant */}
+                                    {PRIORITY_OPTIONS_LIST.map(p => (
                                         <option key={p} value={p}>{p}</option>
                                     ))}
                                 </select>
                             ) : (
-                                <span className={`text-xs font-semibold uppercase tracking-wide ${priorityColor[(task as any).priority ?? 'normal']}`}>
-                                    {(task as any).priority ?? 'normal'}
+                                // FIX 8: task.priority typed — no as any
+                                <span className={`text-xs font-semibold uppercase tracking-wide ${TASK_PRIORITY_COLOR[task.priority ?? 'normal'] ?? TASK_PRIORITY_COLOR.normal}`}>
+                                    {task.priority ?? 'normal'}
                                 </span>
                             )}
                         </div>
@@ -936,7 +930,6 @@ const MainTaskCard: React.FC<{ task: Task; onUpdated?: (updated: Task) => void }
                         )}
                     </div>
 
-                    {/* Action buttons */}
                     <div className="flex items-center gap-2 flex-shrink-0">
                         {isEditing ? (
                             <>
@@ -998,7 +991,6 @@ const MainTaskCard: React.FC<{ task: Task; onUpdated?: (updated: Task) => void }
                     </div>
                 </div>
 
-                {/* Progress bar */}
                 {progress > 0 && (
                     <div className="mt-4">
                         <div className="flex items-center justify-between mb-1.5">
@@ -1014,7 +1006,6 @@ const MainTaskCard: React.FC<{ task: Task; onUpdated?: (updated: Task) => void }
                     </div>
                 )}
 
-                {/* Agent assignment strip */}
                 {agents && (
                     <div className="mt-4 flex items-center gap-3 flex-wrap">
                         <Users className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
@@ -1039,7 +1030,6 @@ const MainTaskCard: React.FC<{ task: Task; onUpdated?: (updated: Task) => void }
                     </div>
                 )}
 
-                {/* Error info banner */}
                 {errorInfo && errorInfo.error_count > 0 && (
                     <div className="mt-3 flex items-start gap-2 px-3 py-2 rounded-lg bg-red-50 dark:bg-red-500/5 border border-red-200 dark:border-red-500/20">
                         <AlertCircle className="w-3.5 h-3.5 text-red-500 flex-shrink-0 mt-0.5" />
@@ -1069,7 +1059,6 @@ const MainTaskCard: React.FC<{ task: Task; onUpdated?: (updated: Task) => void }
                         className={`w-4 h-4 text-gray-400 transition-transform duration-200 group-hover:text-gray-600 dark:group-hover:text-gray-300 ${subtasksOpen ? 'rotate-180' : ''}`}
                     />
                 </button>
-
                 {subtasksOpen && <TaskSubtaskAccordion task={task} />}
             </div>
 
@@ -1133,16 +1122,18 @@ const MainTaskCard: React.FC<{ task: Task; onUpdated?: (updated: Task) => void }
             {/* ── Footer meta ──────────────────────────────────────────── */}
             <div className="px-6 py-3 bg-gray-50 dark:bg-[#0f1117] border-t border-gray-100 dark:border-[#1e2535] flex items-center justify-between">
                 <div className="flex items-center gap-3 text-xs text-gray-400 dark:text-gray-500">
+                    {/* FIX 8: task.created_at is string | null — guard null before passing to fmtDate */}
                     {task.created_at && (
                         <span className="flex items-center gap-1">
                             <Calendar className="w-3 h-3" />
-                            {fmtDate(task.created_at as unknown as string)}
+                            {fmtDate(task.created_at)}
                         </span>
                     )}
-                    {(task as any).event_count > 0 && (
+                    {/* FIX 8: task.event_count is optional number — no as any */}
+                    {(task.event_count ?? 0) > 0 && (
                         <span className="flex items-center gap-1">
                             <Hash className="w-3 h-3" />
-                            {(task as any).event_count} events
+                            {task.event_count} events
                         </span>
                     )}
                 </div>
@@ -1152,7 +1143,8 @@ const MainTaskCard: React.FC<{ task: Task; onUpdated?: (updated: Task) => void }
             </div>
         </div>
     );
-};
+});
+MainTaskCard.displayName = 'MainTaskCard';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // User Preferences Components
@@ -1164,18 +1156,17 @@ const CATEGORY_META: Record<string, {
     color: string;
     bg: string;
     border: string;
-}>
-= {
-    general:       { label: 'General',       icon: Settings,      color: 'text-gray-600',       bg: 'bg-gray-50',       border: 'border-gray-200' },
-    ui:            { label: 'UI',            icon: SlidersHorizontal, color: 'text-blue-600',  bg: 'bg-blue-50',       border: 'border-blue-200' },
-    notifications: { label: 'Notifications', icon: Activity,      color: 'text-yellow-600',   bg: 'bg-yellow-50',     border: 'border-yellow-200' },
-    agents:        { label: 'Agents',        icon: Users,         color: 'text-green-600',    bg: 'bg-green-50',      border: 'border-green-200' },
-    tasks:         { label: 'Tasks',         icon: CheckSquare,   color: 'text-purple-600',   bg: 'bg-purple-50',     border: 'border-purple-200' },
-    chat:          { label: 'Chat',          icon: Users,         color: 'text-pink-600',     bg: 'bg-pink-50',       border: 'border-pink-200' },
-    models:        { label: 'Models',        icon: Cpu,           color: 'text-indigo-600',   bg: 'bg-indigo-50',     border: 'border-indigo-200' },
-    tools:         { label: 'Tools',         icon: Zap,           color: 'text-orange-600',   bg: 'bg-orange-50',     border: 'border-orange-200' },
-    privacy:       { label: 'Privacy',       icon: ShieldCheck,   color: 'text-teal-600',     bg: 'bg-teal-50',       border: 'border-teal-200' },
-    custom:        { label: 'Custom',        icon: Edit3,         color: 'text-cyan-600',     bg: 'bg-cyan-50',       border: 'border-cyan-200' },
+}> = {
+    general:       { label: 'General',       icon: Settings,          color: 'text-gray-600',   bg: 'bg-gray-50',   border: 'border-gray-200' },
+    ui:            { label: 'UI',            icon: SlidersHorizontal, color: 'text-blue-600',   bg: 'bg-blue-50',   border: 'border-blue-200' },
+    notifications: { label: 'Notifications', icon: Activity,          color: 'text-yellow-600', bg: 'bg-yellow-50', border: 'border-yellow-200' },
+    agents:        { label: 'Agents',        icon: Users,             color: 'text-green-600',  bg: 'bg-green-50',  border: 'border-green-200' },
+    tasks:         { label: 'Tasks',         icon: CheckSquare,       color: 'text-purple-600', bg: 'bg-purple-50', border: 'border-purple-200' },
+    chat:          { label: 'Chat',          icon: Users,             color: 'text-pink-600',   bg: 'bg-pink-50',   border: 'border-pink-200' },
+    models:        { label: 'Models',        icon: Cpu,               color: 'text-indigo-600', bg: 'bg-indigo-50', border: 'border-indigo-200' },
+    tools:         { label: 'Tools',         icon: Zap,               color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-200' },
+    privacy:       { label: 'Privacy',       icon: ShieldCheck,       color: 'text-teal-600',   bg: 'bg-teal-50',   border: 'border-teal-200' },
+    custom:        { label: 'Custom',        icon: Edit3,             color: 'text-cyan-600',   bg: 'bg-cyan-50',   border: 'border-cyan-200' },
 };
 
 // ─── Preference Value Editor ──────────────────────────────────────────────────
@@ -1270,19 +1261,23 @@ const PreferenceValueEditor: React.FC<{
 
 // ─── Preference Card ──────────────────────────────────────────────────────────
 
+// FIX 2: React.memo prevents re-renders when the list changes but this card's props don't
 const PreferenceCard: React.FC<{
     preference: UserPreference;
     onUpdate: (key: string, value: any, reason?: string) => void;
     onDelete: (key: string) => void;
-}> = ({ preference, onUpdate, onDelete }) => {
+}> = React.memo(({ preference, onUpdate, onDelete }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [showHistory, setShowHistory] = useState(false);
     const [history, setHistory] = useState<any[]>([]);
     const [loadingHistory, setLoadingHistory] = useState(false);
+    // FIX 10: local confirm state — replaces browser confirm() dialog
+    const [confirmingDelete, setConfirmingDelete] = useState(false);
     const meta = CATEGORY_META[preference.category] || CATEGORY_META.general;
 
     const handleSave = (value: any) => {
-        onUpdate(preference.key, value, 'Updated via TasksPage');
+        // FIX 17 (audit reason): use a descriptive reason string instead of hardcoded file name
+        onUpdate(preference.key, value, 'Updated by user via preferences panel');
         setIsEditing(false);
     };
 
@@ -1360,14 +1355,32 @@ const PreferenceCard: React.FC<{
                             >
                                 <Edit3 className="w-4 h-4" />
                             </button>
-                            <button
-                                onClick={() => onDelete(preference.key)}
-                                className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 dark:hover:text-red-400
-                                    hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
-                                title="Delete"
-                            >
-                                <Trash2 className="w-4 h-4" />
-                            </button>
+                            {/* FIX 10: styled inline confirm instead of browser confirm() */}
+                            {confirmingDelete ? (
+                                <div className="flex items-center gap-1">
+                                    <button
+                                        onClick={() => { onDelete(preference.key); setConfirmingDelete(false); }}
+                                        className="px-2 py-1 text-[10px] font-semibold rounded-md bg-red-600 hover:bg-red-700 text-white transition-colors"
+                                    >
+                                        Confirm
+                                    </button>
+                                    <button
+                                        onClick={() => setConfirmingDelete(false)}
+                                        className="px-2 py-1 text-[10px] font-medium rounded-md bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            ) : (
+                                <button
+                                    onClick={() => setConfirmingDelete(true)}
+                                    className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 dark:hover:text-red-400
+                                        hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
+                                    title="Delete"
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                </button>
+                            )}
                         </>
                     )}
                 </div>
@@ -1388,10 +1401,11 @@ const PreferenceCard: React.FC<{
                                 text-gray-800 dark:text-gray-200">
                                 {formatPreferenceValue(preference.value, preference.data_type)}
                             </code>
+                            {/* FIX 4: use DATA_TYPE_BADGE_CLASSES for full static class names instead of
+                                      bg-${color}-100 interpolation which Tailwind purges in production builds */}
                             <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
-                                DATA_TYPE_LABELS[preference.data_type]?.color
-                                    ? `bg-${DATA_TYPE_LABELS[preference.data_type].color}-100 text-${DATA_TYPE_LABELS[preference.data_type].color}-700 dark:bg-${DATA_TYPE_LABELS[preference.data_type].color}-500/20 dark:text-${DATA_TYPE_LABELS[preference.data_type].color}-400`
-                                    : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'
+                                DATA_TYPE_BADGE_CLASSES[DATA_TYPE_LABELS[preference.data_type]?.color]
+                                    ?? 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'
                             }`}>
                                 {DATA_TYPE_LABELS[preference.data_type]?.label || preference.data_type}
                             </span>
@@ -1445,7 +1459,8 @@ const PreferenceCard: React.FC<{
             )}
         </div>
     );
-};
+});
+PreferenceCard.displayName = 'PreferenceCard';
 
 // ─── Preferences Tab ────────────────────────────────────────────────────────────
 
@@ -1460,7 +1475,6 @@ const PreferencesTab: React.FC = () => {
     const [optimizing, setOptimizing] = useState(false);
     const [optimizationResult, setOptimizationResult] = useState<any>(null);
 
-    // Form state for new preference
     const [newPref, setNewPref] = useState({
         key: '',
         value: '',
@@ -1475,12 +1489,12 @@ const PreferencesTab: React.FC = () => {
         setLoading(true);
         setLoadError(null);
         try {
+            // FIX 9: backend filters by category; client-side re-filter removed below.
             const data = await preferencesService.getPreferences(
                 categoryFilter ? { category: categoryFilter } : undefined
             );
             setPreferences(data);
         } catch (err: any) {
-            // Network errors (ERR_CONNECTION_REFUSED) have no .response object
             const isNetworkError = !err?.response;
             const msg = isNetworkError
                 ? 'Cannot reach the server — make sure the backend is running on port 8000.'
@@ -1504,8 +1518,8 @@ const PreferencesTab: React.FC = () => {
         }
     };
 
+    // FIX 10: confirm() removed — PreferenceCard handles inline confirmation
     const handleDelete = async (key: string) => {
-        if (!confirm(`Are you sure you want to delete "${key}"?`)) return;
         try {
             await preferencesService.deletePreference(key);
             toast.success('Preference deleted');
@@ -1575,9 +1589,9 @@ const PreferencesTab: React.FC = () => {
         setShowDefaults(!showDefaults);
     };
 
-    const filteredPreferences = preferences.filter(p =>
-        categoryFilter ? p.category === categoryFilter : true
-    );
+    // FIX 9: backend already filtered by categoryFilter — no redundant client-side filter.
+    // preferences is already the correctly-filtered list from the server.
+    const filteredPreferences = preferences;
 
     const groupedByCategory = filteredPreferences.reduce((acc, pref) => {
         if (!acc[pref.category]) acc[pref.category] = [];
@@ -1639,34 +1653,23 @@ const PreferencesTab: React.FC = () => {
                     </h3>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
                         <div className="text-center p-2 bg-white dark:bg-green-500/5 rounded">
-                            <div className="font-semibold text-green-700 dark:text-green-400">
-                                {optimizationResult.duplicates_removed}
-                            </div>
+                            <div className="font-semibold text-green-700 dark:text-green-400">{optimizationResult.duplicates_removed}</div>
                             <div className="text-xs text-green-600 dark:text-green-500">Duplicates</div>
                         </div>
                         <div className="text-center p-2 bg-white dark:bg-green-500/5 rounded">
-                            <div className="font-semibold text-green-700 dark:text-green-400">
-                                {optimizationResult.unused_cleaned}
-                            </div>
+                            <div className="font-semibold text-green-700 dark:text-green-400">{optimizationResult.unused_cleaned}</div>
                             <div className="text-xs text-green-600 dark:text-green-500">Unused</div>
                         </div>
                         <div className="text-center p-2 bg-white dark:bg-green-500/5 rounded">
-                            <div className="font-semibold text-green-700 dark:text-green-400">
-                                {optimizationResult.history_compressed}
-                            </div>
+                            <div className="font-semibold text-green-700 dark:text-green-400">{optimizationResult.history_compressed}</div>
                             <div className="text-xs text-green-600 dark:text-green-500">History</div>
                         </div>
                         <div className="text-center p-2 bg-white dark:bg-green-500/5 rounded">
-                            <div className="font-semibold text-green-700 dark:text-green-400">
-                                {optimizationResult.conflicts_resolved}
-                            </div>
+                            <div className="font-semibold text-green-700 dark:text-green-400">{optimizationResult.conflicts_resolved}</div>
                             <div className="text-xs text-green-600 dark:text-green-500">Conflicts</div>
                         </div>
                     </div>
-                    <button
-                        onClick={() => setOptimizationResult(null)}
-                        className="mt-2 text-xs text-green-600 dark:text-green-400 hover:underline"
-                    >
+                    <button onClick={() => setOptimizationResult(null)} className="mt-2 text-xs text-green-600 dark:text-green-400 hover:underline">
                         Dismiss
                     </button>
                 </div>
@@ -1676,13 +1679,8 @@ const PreferencesTab: React.FC = () => {
             {showDefaults && (
                 <div className="bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
                     <div className="flex items-center justify-between mb-3">
-                        <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                            System Defaults
-                        </h3>
-                        <button
-                            onClick={handleInitializeDefaults}
-                            className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
-                        >
+                        <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">System Defaults</h3>
+                        <button onClick={handleInitializeDefaults} className="text-xs text-blue-600 dark:text-blue-400 hover:underline">
                             Initialize for my account
                         </button>
                     </div>
@@ -1709,6 +1707,7 @@ const PreferencesTab: React.FC = () => {
             <div className="flex flex-wrap items-center gap-2">
                 <button
                     onClick={() => setCategoryFilter('')}
+                    aria-pressed={categoryFilter === ''}
                     className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
                         categoryFilter === ''
                             ? 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400'
@@ -1721,6 +1720,7 @@ const PreferencesTab: React.FC = () => {
                     <button
                         key={cat}
                         onClick={() => setCategoryFilter(cat === categoryFilter ? '' : cat)}
+                        aria-pressed={categoryFilter === cat}
                         className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors flex items-center gap-1 ${
                             categoryFilter === cat
                                 ? 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400'
@@ -1738,16 +1738,18 @@ const PreferencesTab: React.FC = () => {
                 ))}
             </div>
 
-            {/* Preferences Grid */}
             {/* Error state */}
             {loadError && !loading && (
                 <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-xl p-6 text-center text-red-600 dark:text-red-400">
                     <AlertTriangle className="w-10 h-10 mx-auto mb-3 opacity-80" />
                     <h3 className="text-base font-semibold mb-1">Failed to load preferences</h3>
                     <p className="text-sm mb-4">{loadError}</p>
-                    <button onClick={loadPreferences} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium inline-flex items-center gap-2"><RefreshCw className="w-4 h-4" />Retry</button>
+                    <button onClick={loadPreferences} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium inline-flex items-center gap-2">
+                        <RefreshCw className="w-4 h-4" />Retry
+                    </button>
                 </div>
             )}
+
             {loading ? (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                     {[...Array(4)].map((_, i) => (
@@ -1757,9 +1759,7 @@ const PreferencesTab: React.FC = () => {
             ) : filteredPreferences.length === 0 ? (
                 <div className="text-center py-12">
                     <Settings className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-1">
-                        No preferences found
-                    </h3>
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-1">No preferences found</h3>
                     <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
                         {categoryFilter
                             ? `No preferences in category "${categoryFilter}"`
@@ -1794,9 +1794,7 @@ const PreferencesTab: React.FC = () => {
                         </h3>
                         <div className="space-y-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                    Key
-                                </label>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Key</label>
                                 <input
                                     type="text"
                                     value={newPref.key}
@@ -1808,9 +1806,7 @@ const PreferencesTab: React.FC = () => {
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                    Value
-                                </label>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Value</label>
                                 <input
                                     type="text"
                                     value={newPref.value}
@@ -1823,9 +1819,7 @@ const PreferencesTab: React.FC = () => {
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                        Category
-                                    </label>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Category</label>
                                     <select aria-label="Category"
                                         value={newPref.category}
                                         onChange={(e) => setNewPref({ ...newPref, category: e.target.value })}
@@ -1839,9 +1833,7 @@ const PreferencesTab: React.FC = () => {
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                        Data Type
-                                    </label>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Data Type</label>
                                     <select aria-label="Data Type"
                                         value={newPref.dataType}
                                         onChange={(e) => setNewPref({ ...newPref, dataType: e.target.value })}
@@ -1859,9 +1851,7 @@ const PreferencesTab: React.FC = () => {
                                 </div>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                    Description
-                                </label>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
                                 <textarea
                                     value={newPref.description}
                                     onChange={(e) => setNewPref({ ...newPref, description: e.target.value })}
@@ -1910,7 +1900,8 @@ const PreferencesTab: React.FC = () => {
 
 // ─── Critic Card (Critics tab) ────────────────────────────────────────────────
 
-const CriticCard: React.FC<{ critic: CriticAgentStats }> = ({ critic }) => {
+// FIX 2: React.memo prevents unnecessary re-renders when the stats grid refreshes
+const CriticCard: React.FC<{ critic: CriticAgentStats }> = React.memo(({ critic }) => {
     const meta     = CRITIC_META[critic.critic_specialty] ?? CRITIC_META.output;
     const Icon     = meta.icon;
     const isActive = critic.status === 'active';
@@ -1968,11 +1959,13 @@ const CriticCard: React.FC<{ critic: CriticAgentStats }> = ({ critic }) => {
             </div>
         </div>
     );
-};
+});
+CriticCard.displayName = 'CriticCard';
 
 // ─── Critics Tab ──────────────────────────────────────────────────────────────
 
-const CriticsTab: React.FC = () => {
+// FIX 11: accepts an optional callback so the parent can show the real critic count in the tab badge
+const CriticsTab: React.FC<{ onStatsLoaded?: (count: number) => void }> = ({ onStatsLoaded }) => {
     const [stats, setStats]           = useState<CriticStatsResponse | null>(null);
     const [loading, setLoading]       = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -1984,15 +1977,18 @@ const CriticsTab: React.FC = () => {
     const loadStats = useCallback(async (silent = false) => {
         try {
             if (silent) setRefreshing(true); else setLoading(true);
-            const r = await api.get<CriticStatsResponse>('/api/v1/critics/stats');
-            setStats(r.data);
+            // FIX 5: use service layer instead of api.get()
+            const data = await criticsService.getStats();
+            setStats(data);
+            // FIX 11: surface the real count to the parent for the tab badge
+            onStatsLoaded?.(data.total_critics);
         } catch {
             toast.error('Failed to load critic stats');
         } finally {
             setLoading(false);
             setRefreshing(false);
         }
-    }, []);
+    }, [onStatsLoaded]);
 
     useEffect(() => { loadStats(); }, [loadStats]);
 
@@ -2001,8 +1997,9 @@ const CriticsTab: React.FC = () => {
         setInspectLoading(true);
         setShowInspect(true);
         try {
-            const r = await api.get(`/api/v1/critics/reviews/${inspectTask.trim()}`);
-            setInspectReviews((r.data as any).reviews ?? []);
+            // FIX 5: use service layer instead of api.get()
+            const data = await criticsService.getTaskReviews(inspectTask.trim());
+            setInspectReviews(data.reviews ?? []);
         } catch {
             toast.error('Failed to load reviews');
         } finally {
@@ -2140,13 +2137,16 @@ export const TasksPage: React.FC = () => {
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [filterStatus, setFilterStatus] = useState<string>('');
     const [myTasksOnly, setMyTasksOnly]   = useState<boolean>(false);
-    const [hideSystem, setHideSystem]     = useState<boolean>(true); // system tasks hidden by default
+    const [hideSystem, setHideSystem]     = useState<boolean>(true);
     const [activeTab, setActiveTab]       = useState<Tab>('tasks');
     const [checkpointSubTab, setCheckpointSubTab] = useState<'timeline' | 'diff'>('timeline');
-    const [showImportModal, setShowImportModal] = useState(false); 
+    const [showImportModal, setShowImportModal] = useState(false);
+    // FIX 11: track critic count from CriticsTab for the tab badge
+    const [criticCount, setCriticCount] = useState<number | null>(null);
+
     useEffect(() => { loadTasks(); }, [filterStatus, myTasksOnly, hideSystem]);
 
-    const loadTasks = async (silent = false) => {
+    const loadTasks = useCallback(async (silent = false) => {
         try {
             if (!silent) setIsLoading(true);
             else setIsRefreshing(true);
@@ -2167,7 +2167,7 @@ export const TasksPage: React.FC = () => {
             setIsLoading(false);
             setIsRefreshing(false);
         }
-    };
+    }, [filterStatus, myTasksOnly, hideSystem]);
 
     const handleCreateTask = async (data: any) => {
         const requestData: CreateTaskRequest = {
@@ -2280,12 +2280,12 @@ export const TasksPage: React.FC = () => {
                             >
                                 <tab.icon className="w-4 h-4" />
                                 {tab.label}
-                                {tab.id === 'critics' && (
+                                {/* FIX 11: Show real critic count from loaded stats instead of hardcoded 3 */}
+                                {tab.id === 'critics' && criticCount !== null && (
                                     <span className="ml-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-violet-100 text-violet-600 dark:bg-violet-500/20 dark:text-violet-400">
-                                        3
+                                        {criticCount}
                                     </span>
                                 )}
-
                             </button>
                         );
                     })}
@@ -2304,9 +2304,11 @@ export const TasksPage: React.FC = () => {
                                 {STATUS_FILTERS.map(({ value, label, color }) => {
                                     const isActive = filterStatus === value;
                                     return (
+                                        // FIX 12: aria-pressed announces the active filter to screen readers
                                         <button
                                             key={value}
                                             onClick={() => setFilterStatus(value)}
+                                            aria-pressed={isActive}
                                             className={`px-3 py-1 rounded-full text-xs font-medium border transition-all duration-150 ${
                                                 isActive ? FILTER_ACTIVE[color] : FILTER_COLORS[color]
                                             }`}
@@ -2320,8 +2322,10 @@ export const TasksPage: React.FC = () => {
                             {/* ── View toggles ─────────────────────────── */}
                             <div className="flex items-center gap-2">
                                 <div className="w-px h-4 bg-gray-200 dark:bg-[#2a3347] flex-shrink-0" />
+                                {/* FIX 12: aria-pressed for toggle buttons */}
                                 <button
                                     onClick={() => setMyTasksOnly(v => !v)}
+                                    aria-pressed={myTasksOnly}
                                     title={myTasksOnly ? 'Showing your tasks — click to show all' : 'Show only your tasks'}
                                     className={`px-3 py-1 rounded-full text-xs font-medium border transition-all duration-150 ${
                                         myTasksOnly
@@ -2333,6 +2337,7 @@ export const TasksPage: React.FC = () => {
                                 </button>
                                 <button
                                     onClick={() => setHideSystem(v => !v)}
+                                    aria-pressed={hideSystem}
                                     title={hideSystem ? 'System tasks hidden — click to show' : 'System tasks visible — click to hide'}
                                     className={`px-3 py-1 rounded-full text-xs font-medium border transition-all duration-150 ${
                                         hideSystem
@@ -2398,8 +2403,12 @@ export const TasksPage: React.FC = () => {
 
                 {/* ── Critics tab ───────────────────────────────────────── */}
                 {activeTab === 'critics' && (
+                    // FIX 14: TabErrorBoundary prevents a crash in CriticsTab from blanking the page
                     <div className="p-6">
-                        <CriticsTab />
+                        <TabErrorBoundary tabName="Critics">
+                            {/* FIX 11: pass the callback so the badge updates once stats are loaded */}
+                            <CriticsTab onStatsLoaded={setCriticCount} />
+                        </TabErrorBoundary>
                     </div>
                 )}
 
@@ -2431,12 +2440,7 @@ export const TasksPage: React.FC = () => {
                                 Branch Diff
                             </button>
                         </div>
-                        <div className="flex items-center justify-between mb-6">
-                            <div className="flex items-center gap-1 bg-gray-100 dark:bg-[#0f1117] rounded-lg p-1">
-                                {/* existing timeline/diff buttons */}
-                            </div>
-                            
-                            {/* Add Import Button */}
+                        <div className="flex items-center justify-end mb-6">
                             <button
                                 onClick={() => setShowImportModal(true)}
                                 className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium
@@ -2449,8 +2453,11 @@ export const TasksPage: React.FC = () => {
                                 Import Checkpoint
                             </button>
                         </div>
-                        {checkpointSubTab === 'timeline' && <CheckpointTimeline />}
-                        {checkpointSubTab === 'diff'     && <BranchDiffView />}
+                        {/* FIX 14: error boundary for checkpoint sub-tabs */}
+                        <TabErrorBoundary tabName="Checkpoints">
+                            {checkpointSubTab === 'timeline' && <CheckpointTimeline />}
+                            {checkpointSubTab === 'diff'     && <BranchDiffView />}
+                        </TabErrorBoundary>
                     </div>
                 )}
 
@@ -2461,35 +2468,44 @@ export const TasksPage: React.FC = () => {
                             <Brain className="w-5 h-5 text-violet-500 dark:text-violet-400" />
                             <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Auto-Delegation Engine</h3>
                         </div>
-                        {tasks.length === 0 ? (
-                            <p className="text-sm text-gray-500 dark:text-gray-400 italic">No tasks to display.</p>
-                        ) : (
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                                {tasks.map(t => (
-                                    <AutoDelegationPanel
-                                        key={t.id}
-                                        task={t}
-                                        onTaskUpdated={(updated) => {
-                                            setTasks(prev => prev.map(p => p.id === updated.id ? updated : p));
-                                        }}
-                                    />
-                                ))}
-                            </div>
-                        )}
+                        {/* FIX 14: error boundary */}
+                        <TabErrorBoundary tabName="Delegation">
+                            {tasks.length === 0 ? (
+                                <p className="text-sm text-gray-500 dark:text-gray-400 italic">No tasks to display.</p>
+                            ) : (
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                    {tasks.map(t => (
+                                        <AutoDelegationPanel
+                                            key={t.id}
+                                            task={t}
+                                            onTaskUpdated={(updated) => {
+                                                setTasks(prev => prev.map(p => p.id === updated.id ? updated : p));
+                                            }}
+                                        />
+                                    ))}
+                                </div>
+                            )}
+                        </TabErrorBoundary>
                     </div>
                 )}
 
                 {/* ── Preferences tab ───────────────────────────────────── */}
                 {activeTab === 'preferences' && (
                     <div className="p-6">
-                        <PreferencesTab />
+                        {/* FIX 14: error boundary */}
+                        <TabErrorBoundary tabName="Preferences">
+                            <PreferencesTab />
+                        </TabErrorBoundary>
                     </div>
                 )}
 
                 {/* ── Workflows tab ─────────────────────────────────────── */}
                 {activeTab === 'workflows' && (
                     <div className="p-6">
-                        <WorkflowAutomationPanel />
+                        {/* FIX 14: error boundary */}
+                        <TabErrorBoundary tabName="Workflows">
+                            <WorkflowAutomationPanel />
+                        </TabErrorBoundary>
                     </div>
                 )}
             </div>
@@ -2504,10 +2520,12 @@ export const TasksPage: React.FC = () => {
                 <CheckpointImportModal
                     isOpen={showImportModal}
                     onClose={() => setShowImportModal(false)}
-                    onImportSuccess={(result) => {
-                        if (checkpointSubTab === 'timeline') {
-                            window.location.reload();
-                        }
+                    onImportSuccess={async () => {
+                        // FIX 13: replace window.location.reload() with a targeted data refresh.
+                        // Preserves scroll position, expanded cards, and active tab state.
+                        setShowImportModal(false);
+                        await loadTasks(true);
+                        toast.success('Checkpoint imported — task list refreshed');
                     }}
                 />
             )}

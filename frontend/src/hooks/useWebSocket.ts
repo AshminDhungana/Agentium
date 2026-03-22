@@ -15,7 +15,6 @@ export interface WebSocketMessage {
         task_id?: string;
         tokens_used?: number;
         connection_id?: number;
-        // Genesis prompt flag - just a hint for UI styling
         requires_response?: boolean;
         prompt_type?: string;
     };
@@ -67,9 +66,11 @@ export function useWebSocketChat(onMessage: (msg: WebSocketMessage) => void): Us
     const reconnectAttemptsRef = useRef(0);
     const isManualDisconnect = useRef(false);
     const lastPingTimeRef = useRef<number | null>(null);
+    // Stable ref so onMessage identity changes don't trigger reconnects
+    const onMessageRef = useRef(onMessage);
+    useEffect(() => { onMessageRef.current = onMessage; }, [onMessage]);
 
-    const user = useAuthStore(state => state.user);
-    const isAuthenticated = user?.isAuthenticated ?? false;
+    const isAuthenticated = useAuthStore(state => state.user?.isAuthenticated ?? false);
     const logout = useAuthStore(state => state.logout);
 
     const clearAllTimers = useCallback(() => {
@@ -154,6 +155,9 @@ export function useWebSocketChat(onMessage: (msg: WebSocketMessage) => void): Us
         }
     }, [clearAllTimers]);
 
+    // connect is defined with useCallback but doesn't list isConnected/isConnecting
+    // as dependencies — we use the ws.current ref directly to avoid stale closures
+    // that previously caused the useEffect connection logic to re-run on every state change.
     const connect = useCallback(() => {
         if (!isAuthenticated) {
             setError('Not authenticated');
@@ -161,12 +165,10 @@ export function useWebSocketChat(onMessage: (msg: WebSocketMessage) => void): Us
         }
 
         if (ws.current?.readyState === WebSocket.CONNECTING) {
-            console.log('[WebSocket] Already connecting...');
             return;
         }
 
         if (ws.current?.readyState === WebSocket.OPEN) {
-            console.log('[WebSocket] Already connected');
             return;
         }
 
@@ -183,8 +185,6 @@ export function useWebSocketChat(onMessage: (msg: WebSocketMessage) => void): Us
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const wsUrl = `${protocol}//${window.location.host}/ws/chat?token=${encodeURIComponent(token)}`;
 
-        console.log(`[WebSocket] Connecting to ${wsUrl}... (attempt ${reconnectAttemptsRef.current + 1})`);
-
         try {
             ws.current = new WebSocket(wsUrl);
 
@@ -197,7 +197,6 @@ export function useWebSocketChat(onMessage: (msg: WebSocketMessage) => void): Us
             }, WS_CONFIG.CONNECTION_TIMEOUT_MS);
 
             ws.current.onopen = () => {
-                console.log('[WebSocket]  Connected');
                 clearAllTimers();
                 setIsConnected(true);
                 setIsConnecting(false);
@@ -215,23 +214,19 @@ export function useWebSocketChat(onMessage: (msg: WebSocketMessage) => void): Us
                         return;
                     }
 
-                    // Backend may send auth_required if the token is valid but the
-                    // server-side session context was lost (e.g. after a worker restart).
-                    // Re-send the auth frame and do NOT propagate this to the UI.
                     if ((data as any).type === 'auth_required') {
                         console.warn('[WebSocket] Received auth_required — resending auth token');
                         const token = localStorage.getItem('access_token');
                         if (token && ws.current?.readyState === WebSocket.OPEN) {
                             ws.current.send(JSON.stringify({ type: 'auth', token }));
                         } else {
-                            // Token is gone; force logout
                             setError('Session expired — please log in again');
                             logout();
                         }
                         return;
                     }
 
-                    onMessage(data);
+                    onMessageRef.current(data);
                 } catch (e) {
                     console.error('[WebSocket] Parse error:', e);
                 }
@@ -244,7 +239,6 @@ export function useWebSocketChat(onMessage: (msg: WebSocketMessage) => void): Us
             };
 
             ws.current.onclose = (event) => {
-                console.log(`[WebSocket] Closed: ${event.code} - ${event.reason}`);
                 stopHeartbeat();
                 setIsConnected(false);
                 setIsConnecting(false);
@@ -297,10 +291,11 @@ export function useWebSocketChat(onMessage: (msg: WebSocketMessage) => void): Us
             setError('Failed to create WebSocket connection');
             setIsConnecting(false);
         }
-    }, [isAuthenticated, onMessage, clearAllTimers, startHeartbeat, handlePong, logout, stopHeartbeat]);
+    // Note: connect intentionally omits isConnected/isConnecting to avoid
+    // the reconnect loop bug. State is read from ws.current ref instead.
+    }, [isAuthenticated, clearAllTimers, startHeartbeat, handlePong, logout, stopHeartbeat]);
 
     const reconnect = useCallback(() => {
-        console.log('[WebSocket] Manual reconnect triggered');
         reconnectAttemptsRef.current = 0;
         setConnectionStats(prev => ({ ...prev, reconnectAttempts: 0 }));
         disconnect(true);
@@ -340,25 +335,26 @@ export function useWebSocketChat(onMessage: (msg: WebSocketMessage) => void): Us
         return false;
     }, []);
 
+    // Initial connection — only re-runs when auth state changes, not on every
+    // connect/disconnect state update (the previous bug).
     useEffect(() => {
-        if (isAuthenticated && !isConnected && !isConnecting && !ws.current) {
+        if (isAuthenticated) {
             connect();
         }
 
         return () => {
             disconnect(true);
         };
-    }, [isAuthenticated, connect, disconnect, isConnected, isConnecting]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isAuthenticated]);
 
     useEffect(() => {
         const handleStorage = (e: StorageEvent) => {
             if (e.key === 'access_token') {
                 if (e.newValue) {
-                    console.log('[WebSocket] Token changed in another tab');
                     disconnect(true);
                     setTimeout(connect, 100);
                 } else {
-                    console.log('[WebSocket] Logged out in another tab');
                     disconnect(true);
                     setError('Logged out in another tab');
                 }
@@ -368,12 +364,6 @@ export function useWebSocketChat(onMessage: (msg: WebSocketMessage) => void): Us
         window.addEventListener('storage', handleStorage);
         return () => window.removeEventListener('storage', handleStorage);
     }, [connect, disconnect]);
-
-    useEffect(() => {
-        return () => {
-            disconnect(true);
-        };
-    }, [disconnect]);
 
     return {
         isConnected,

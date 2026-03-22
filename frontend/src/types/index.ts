@@ -13,8 +13,6 @@ export interface BackendStatus {
 }
 
 // ─── Channel core types ───────────────────────────────────────────────────────
-// These were missing from the previous index.ts and were being redeclared
-// locally inside ChannelsPage.tsx, causing type duplication.
 
 export type ChannelTypeSlug =
     | 'whatsapp'
@@ -34,11 +32,6 @@ export type ChannelStatus = 'pending' | 'active' | 'error' | 'disconnected';
 
 export type WhatsAppProvider = 'cloud_api' | 'web_bridge';
 
-/**
- * A configured external communication channel as returned by the backend.
- * The `config` shape is intentionally permissive — different channel types
- * populate different subsets of these optional fields.
- */
 export interface Channel {
     id: string;
     name: string;
@@ -53,7 +46,6 @@ export interface Channel {
         backend?: string;
         number?: string;
         bb_url?: string;
-        // WhatsApp-specific
         provider?: WhatsAppProvider;
         bridge_url?: string;
         allowed_senders?: string[];
@@ -70,7 +62,6 @@ export interface Channel {
     };
 }
 
-/** Shape of the payload sent to POST /channels/ */
 export interface ChannelFormData {
     name: string;
     type: ChannelTypeSlug;
@@ -80,7 +71,7 @@ export interface ChannelFormData {
     require_approval: boolean;
 }
 
-// ─── Channel Metrics Types (Phase 4 + Phase 7) ───────────────────────────────
+// ─── Channel Metrics Types ────────────────────────────────────────────────────
 
 export type CircuitBreakerState = 'closed' | 'half_open' | 'open';
 export type ChannelHealthStatus = 'healthy' | 'warning' | 'critical';
@@ -145,11 +136,11 @@ export type ProviderType =
     | 'together'
     | 'cohere'
     | 'fireworks'
-    | 'moonshot'       // Kimi 2.5
+    | 'moonshot'
     | 'deepseek'
     | 'azure_openai'
-    | 'local'          // Ollama, LM Studio
-    | 'custom';        // Any OpenAI-compatible
+    | 'local'
+    | 'custom';
 
 export interface ProviderInfo {
     id: ProviderType;
@@ -211,7 +202,6 @@ export interface UniversalProviderInput {
 export interface AgentStats {
     tasks_completed: number;
     tasks_failed: number;
-    /** Optional — percentage 0–100 */
     success_rate?: number;
 }
 
@@ -230,7 +220,6 @@ export interface Agent {
     parent?: string;
     subordinates: string[];
     stats: AgentStats;
-
     current_task_title?: string;
     current_task?: string;
     health_score?: number;
@@ -238,7 +227,6 @@ export interface Agent {
     last_active_at?: string;
     idle_days?: number;
     description?: string;
-
     constitution_version: string;
     is_terminated: boolean;
 }
@@ -273,6 +261,7 @@ export interface Task {
     title: string;
     description: string;
     status: string;
+    /** Task priority: 'low' | 'normal' | 'high' | 'urgent' | 'critical' | 'sovereign' */
     priority: string;
     task_type: string;
     progress: number;
@@ -289,36 +278,95 @@ export interface Task {
     event_count?: number;
 }
 
+// ─── Subtask & Critic types ───────────────────────────────────────────────────
+// Shared between TasksPage, monitoring views, and any future consumers.
+
+export interface Subtask {
+    id: string;
+    agentium_id?: string;
+    title: string;
+    status: string;
+    assigned_agents?: {
+        head?: string;
+        lead?: string;
+        task_agents?: string[];
+    };
+    error_info?: {
+        error_count: number;
+        retry_count: number;
+        max_retries: number;
+        last_error?: string;
+    } | null;
+    progress?: number;
+    created_at?: string;
+}
+
+export interface CritiqueReview {
+    id: string;
+    task_id: string;
+    subtask_id?: string;
+    critic_type: string;
+    critic_agentium_id: string;
+    verdict: 'pass' | 'reject' | 'escalate';
+    rejection_reason: string | null;
+    suggestions: string | null;
+    retry_count: number;
+    max_retries: number;
+    review_duration_ms: number;
+    model_used: string | null;
+    reviewed_at: string;
+    can_retry?: boolean;
+}
+
+export interface CriticAgentStats {
+    agentium_id: string;
+    critic_specialty: 'code' | 'output' | 'plan';
+    reviews_completed: number;
+    vetoes_issued: number;
+    escalations_issued: number;
+    passes_issued: number;
+    approval_rate: number;
+    veto_rate: number;
+    avg_review_time_ms: number;
+    status: string;
+    preferred_review_model: string | null;
+}
+
+export interface CriticStatsResponse {
+    total_critics: number;
+    total_reviews: number;
+    total_vetoes: number;
+    total_escalations: number;
+    overall_approval_rate: number;
+    by_type: Record<string, {
+        count: number;
+        reviews: number;
+        vetoes: number;
+        escalations: number;
+        approval_rate: number;
+    }>;
+    critics: CriticAgentStats[];
+}
+
 // ─── Constitution types ────────────────────────────────────────────────────────
 
-/**
- * A single article entry as normalized by the backend.
- * The backend's get_articles_dict() always returns this shape.
- * The optional `amended_at` field is provided per-article when available.
- */
 export interface ConstitutionArticle {
     title: string;
     content: string;
     amended_at?: string;
 }
 
-/** A single entry in the constitution's changelog. */
 export interface ConstitutionChangelogEntry {
     change: string;
     timestamp: string;
     previous_version?: string;
 }
 
-/**
- * The full constitution document as returned by GET /api/v1/constitution.
- * Matches the shape produced by Constitution.to_dict() in the backend model.
- */
 export interface Constitution {
     id: string;
     version: string;
     version_number: number;
     preamble: string;
-    /** Always normalized to { title, content } objects by the backend. */
     articles: Record<string, ConstitutionArticle>;
     prohibited_actions: string[];
     sovereign_preferences: Record<string, unknown>;
@@ -407,9 +455,6 @@ export interface SystemDefaults {
 }
 
 // ─── Dashboard aggregate types ────────────────────────────────────────────────
-// Re-exported from the dedicated file so any component can import from
-// the single canonical path  `@/types`  without needing to know about
-// the sub-file.
 export type {
     DashboardStats,
     AgentSummary,

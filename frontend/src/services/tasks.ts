@@ -1,13 +1,13 @@
 import { api } from './api';
-import { Task } from '../types';
+import { Task, Subtask, CritiqueReview, CriticStatsResponse } from '../types';
 
 // Phase 6.3 — Acceptance Criteria
 export interface AcceptanceCriterion {
-    metric: string;                          // snake_case identifier
+    metric: string;
     threshold: boolean | number | string | number[];
-    validator: 'code' | 'output' | 'plan';  // which critic validates this
-    is_mandatory: boolean;                   // mandatory = failure blocks task
-    description?: string;                    // human-readable, shown in dashboard
+    validator: 'code' | 'output' | 'plan';
+    is_mandatory: boolean;
+    description?: string;
 }
 
 export interface CreateTaskRequest {
@@ -18,7 +18,6 @@ export interface CreateTaskRequest {
     constitutional_basis?: string;
     hierarchical_id?: string;
     parent_task_id?: string;
-    // Phase 6.3
     acceptance_criteria?: AcceptanceCriterion[];
     veto_authority?: 'code' | 'output' | 'plan';
 }
@@ -49,15 +48,14 @@ export const tasksService = {
         status?: string;
         agent_id?: string;
         parent_task_id?: string;
-        my_tasks?: boolean;    // scope to current user's tasks only
-        hide_system?: boolean; // hide idle/system tasks (backend default: true)
+        my_tasks?: boolean;
+        hide_system?: boolean;
     }): Promise<Task[]> => {
         const params = new URLSearchParams();
         if (filters?.status) params.append('status', filters.status);
         if (filters?.agent_id) params.append('agent_id', filters.agent_id);
         if (filters?.parent_task_id) params.append('parent_task_id', filters.parent_task_id);
         if (filters?.my_tasks) params.append('my_tasks', 'true');
-        // Only send hide_system when explicitly set — lets backend default handle the common case
         if (filters?.hide_system !== undefined) params.append('hide_system', String(filters.hide_system));
 
         const query = params.toString() ? `?${params.toString()}` : '';
@@ -93,8 +91,9 @@ export const tasksService = {
         return response.data;
     },
 
-    getTaskSubtasks: async (taskId: string): Promise<any> => {
-        const response = await api.get(`/api/v1/tasks/${taskId}/subtasks`);
+    /** Returns subtasks for a task. Now typed with the shared Subtask interface. */
+    getTaskSubtasks: async (taskId: string): Promise<{ subtasks: Subtask[] }> => {
+        const response = await api.get<{ subtasks: Subtask[] }>(`/api/v1/tasks/${taskId}/subtasks`);
         return response.data;
     },
 
@@ -136,13 +135,20 @@ export const tasksService = {
 // ─── Critic service calls ─────────────────────────────────────────────────────
 
 export const criticsService = {
-    getStats: async () => {
-        const response = await api.get('/api/v1/critics/stats');
+    /** Fetch aggregate stats for all critic agents. */
+    getStats: async (): Promise<CriticStatsResponse> => {
+        const response = await api.get<CriticStatsResponse>('/api/v1/critics/stats');
         return response.data;
     },
 
-    getTaskReviews: async (taskId: string) => {
-        const response = await api.get(`/api/v1/critics/reviews/${taskId}`);
+    /**
+     * Fetch critic reviews for a task or subtask.
+     * The same endpoint is used for both task-level and subtask-level lookups.
+     */
+    getTaskReviews: async (taskId: string): Promise<{ reviews: CritiqueReview[] }> => {
+        const response = await api.get<{ reviews: CritiqueReview[] }>(
+            `/api/v1/critics/reviews/${taskId}`
+        );
         return response.data;
     },
 

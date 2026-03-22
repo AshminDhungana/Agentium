@@ -21,8 +21,10 @@ import {
 } from 'lucide-react';
 import { api } from '@/services/api';
 import { useAuthStore } from '@/store/authStore';
+import toast from 'react-hot-toast';
 
-// Types matching backend API
+// ── Types ─────────────────────────────────────────────────────────────────────
+
 interface KeyHealth {
     id: string;
     provider: string;
@@ -63,6 +65,8 @@ interface ProviderAvailability {
     available: boolean;
     healthy_keys_count: number;
 }
+
+// ── Constants ─────────────────────────────────────────────────────────────────
 
 const PROVIDER_COLORS: Record<string, string> = {
     openai: 'from-emerald-500 to-teal-600',
@@ -139,6 +143,8 @@ const STATUS_CONFIG = {
     },
 };
 
+// ── Component ─────────────────────────────────────────────────────────────────
+
 export default function APIKeyHealth() {
     const { user } = useAuthStore();
     const [report, setReport] = useState<HealthReport | null>(null);
@@ -149,6 +155,9 @@ export default function APIKeyHealth() {
     const [recoveringKeys, setRecoveringKeys] = useState<Set<string>>(new Set());
     const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
     const [autoRefresh, setAutoRefresh] = useState(true);
+    // Tracks which key is pending force-recovery confirmation
+    const [forceRecoveryPendingId, setForceRecoveryPendingId] = useState<string | null>(null);
+    const [forceCooldownMsg, setForceCooldownMsg] = useState<string>('');
 
     const isAdmin = user?.is_admin || user?.role === 'admin';
 
@@ -174,44 +183,45 @@ export default function APIKeyHealth() {
         fetchHealthData();
     }, [fetchHealthData]);
 
-    // Auto-refresh every 30 seconds
     useEffect(() => {
         if (!autoRefresh) return;
-        
         const interval = setInterval(() => {
             fetchHealthData();
         }, 30000);
-
         return () => clearInterval(interval);
     }, [autoRefresh, fetchHealthData]);
 
     const toggleProvider = (provider: string) => {
         setExpandedProviders(prev => {
             const next = new Set(prev);
-            if (next.has(provider)) {
-                next.delete(provider);
-            } else {
-                next.add(provider);
-            }
+            if (next.has(provider)) next.delete(provider);
+            else next.add(provider);
             return next;
         });
     };
 
-    const handleRecoverKey = async (keyId: string) => {
+    /**
+     * Attempt normal recovery first.
+     * If the backend returns a cooldown-related error, show inline confirmation
+     * UI instead of calling window.confirm().
+     */
+    const handleRecoverKey = async (keyId: string, force = false) => {
         setRecoveringKeys(prev => new Set(prev).add(keyId));
+        // Clear any pending force confirmation for this key when starting a recovery
+        if (!force) setForceRecoveryPendingId(null);
+
         try {
-            await api.post(`/api/v1/api-keys/${keyId}/recover`, { force: false });
+            await api.post(`/api/v1/api-keys/${keyId}/recover`, { force });
+            toast.success('Key recovery successful');
             await fetchHealthData();
         } catch (err: any) {
             const msg = err.response?.data?.detail || 'Recovery failed';
-            if (msg.includes('cooldown')) {
-                // Force recovery if user confirms
-                if (confirm(`${msg}\n\nForce recovery anyway?`)) {
-                    await api.post(`/api/v1/api-keys/${keyId}/recover`, { force: true });
-                    await fetchHealthData();
-                }
+            if (!force && msg.toLowerCase().includes('cooldown')) {
+                // Surface inline force-recovery confirmation
+                setForceCooldownMsg(msg);
+                setForceRecoveryPendingId(keyId);
             } else {
-                alert(msg);
+                toast.error(msg);
             }
         } finally {
             setRecoveringKeys(prev => {
@@ -220,6 +230,11 @@ export default function APIKeyHealth() {
                 return next;
             });
         }
+    };
+
+    const handleCancelForceRecovery = () => {
+        setForceRecoveryPendingId(null);
+        setForceCooldownMsg('');
     };
 
     const formatCooldown = (isoDate: string | null): string => {
@@ -282,7 +297,7 @@ export default function APIKeyHealth() {
                     <div>
                         <p className="text-sm font-medium text-red-900 dark:text-red-300">Failed to Load API Key Health</p>
                         <p className="text-sm text-red-700 dark:text-red-400/80 mt-0.5">{error}</p>
-                        <button 
+                        <button
                             onClick={fetchHealthData}
                             className="mt-3 text-xs font-medium text-red-700 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 flex items-center gap-1.5"
                         >
@@ -302,7 +317,7 @@ export default function APIKeyHealth() {
 
     return (
         <div className="w-full bg-white dark:bg-[#161b27] border border-gray-200 dark:border-[#1e2535] rounded-xl shadow-sm dark:shadow-[0_2px_16px_rgba(0,0,0,0.25)] transition-colors duration-200">
-            
+
             {/* ── Header ──────────────────────────────────────────────── */}
             <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 dark:border-[#1e2535]">
                 <div className="flex items-center gap-3">
@@ -318,14 +333,13 @@ export default function APIKeyHealth() {
                         </p>
                     </div>
                 </div>
-                
+
                 <div className="flex items-center gap-3">
-                    {/* Auto-refresh toggle */}
                     <button
                         onClick={() => setAutoRefresh(!autoRefresh)}
                         className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                            autoRefresh 
-                                ? 'bg-green-100 dark:bg-green-500/10 text-green-700 dark:text-green-400' 
+                            autoRefresh
+                                ? 'bg-green-100 dark:bg-green-500/10 text-green-700 dark:text-green-400'
                                 : 'bg-gray-100 dark:bg-[#1e2535] text-gray-600 dark:text-gray-400'
                         }`}
                         title={autoRefresh ? 'Auto-refresh enabled (30s)' : 'Auto-refresh disabled'}
@@ -333,8 +347,7 @@ export default function APIKeyHealth() {
                         <Activity className="w-3.5 h-3.5" />
                         {autoRefresh ? 'Live' : 'Paused'}
                     </button>
-                    
-                    {/* Refresh button */}
+
                     <button
                         onClick={fetchHealthData}
                         className="p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#1e2535] transition-colors"
@@ -342,8 +355,7 @@ export default function APIKeyHealth() {
                     >
                         <RefreshCw className="w-4 h-4" />
                     </button>
-                    
-                    {/* Overall status badge */}
+
                     <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg ${overall.bg} ${overall.border} border`}>
                         <OverallIcon className={`w-4 h-4 ${overall.color}`} />
                         <span className={`text-xs font-semibold ${overall.color}`}>{overall.label}</span>
@@ -380,7 +392,7 @@ export default function APIKeyHealth() {
                             {report.summary.total_keys}
                         </div>
                     </div>
-                    
+
                     <div className="bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-500/20 rounded-xl p-4">
                         <div className="flex items-center gap-2 text-sm font-medium text-green-900 dark:text-green-400 mb-1">
                             <CheckCircle className="w-4 h-4" />
@@ -390,7 +402,7 @@ export default function APIKeyHealth() {
                             {report.summary.healthy_keys}
                         </div>
                     </div>
-                    
+
                     <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-xl p-4">
                         <div className="flex items-center gap-2 text-sm font-medium text-amber-900 dark:text-amber-400 mb-1">
                             <Clock className="w-4 h-4" />
@@ -400,7 +412,7 @@ export default function APIKeyHealth() {
                             {report.summary.keys_in_cooldown}
                         </div>
                     </div>
-                    
+
                     <div className="bg-purple-50 dark:bg-purple-500/10 border border-purple-200 dark:border-purple-500/20 rounded-xl p-4">
                         <div className="flex items-center gap-2 text-sm font-medium text-purple-900 dark:text-purple-400 mb-1">
                             <DollarSign className="w-4 h-4" />
@@ -421,7 +433,7 @@ export default function APIKeyHealth() {
 
                     {Object.entries(report.providers).length === 0 ? (
                         <div className="text-center py-8 text-sm text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-[#0f1117] rounded-xl border border-dashed border-gray-200 dark:border-[#1e2535]">
-                            No API keys configured. 
+                            No API keys configured.{' '}
                             <a href="/models" className="text-blue-600 dark:text-blue-400 hover:underline ml-1">
                                 Add your first key
                             </a>
@@ -431,13 +443,12 @@ export default function APIKeyHealth() {
                             const isExpanded = expandedProviders.has(provider);
                             const colorClass = PROVIDER_COLORS[provider] || 'from-gray-500 to-slate-600';
                             const isAvailable = availability.find(a => a.provider === provider)?.available ?? false;
-                            
+
                             return (
-                                <div 
+                                <div
                                     key={provider}
                                     className="bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-[#1e2535] rounded-xl overflow-hidden"
                                 >
-                                    {/* Provider Header */}
                                     <button
                                         onClick={() => toggleProvider(provider)}
                                         className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-100 dark:hover:bg-[#1e2535] transition-colors"
@@ -451,37 +462,33 @@ export default function APIKeyHealth() {
                                                     {PROVIDER_NAMES[provider] || provider}
                                                 </p>
                                                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                                                    {data.total_keys} key{data.total_keys !== 1 ? 's' : ''} • 
-                                                    {' '}{data.healthy} healthy
+                                                    {data.total_keys} key{data.total_keys !== 1 ? 's' : ''} •{' '}
+                                                    {data.healthy} healthy
                                                     {data.cooldown > 0 && ` • ${data.cooldown} in cooldown`}
                                                     {data.exhausted > 0 && ` • ${data.exhausted} budget exhausted`}
                                                 </p>
                                             </div>
                                         </div>
-                                        
+
                                         <div className="flex items-center gap-3">
-                                            {/* Availability indicator */}
                                             <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
-                                                isAvailable 
-                                                    ? 'bg-green-100 dark:bg-green-500/10 text-green-700 dark:text-green-400' 
+                                                isAvailable
+                                                    ? 'bg-green-100 dark:bg-green-500/10 text-green-700 dark:text-green-400'
                                                     : 'bg-red-100 dark:bg-red-500/10 text-red-700 dark:text-red-400'
                                             }`}>
-                                                {isAvailable ? (
-                                                    <><Wifi className="w-3 h-3" /> Available</>
-                                                ) : (
-                                                    <><WifiOff className="w-3 h-3" /> Unavailable</>
-                                                )}
+                                                {isAvailable
+                                                    ? <><Wifi className="w-3 h-3" /> Available</>
+                                                    : <><WifiOff className="w-3 h-3" /> Unavailable</>
+                                                }
                                             </div>
-                                            
-                                            {isExpanded ? (
-                                                <ChevronUp className="w-4 h-4 text-gray-400 dark:text-gray-500" />
-                                            ) : (
-                                                <ChevronDown className="w-4 h-4 text-gray-400 dark:text-gray-500" />
-                                            )}
+
+                                            {isExpanded
+                                                ? <ChevronUp className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+                                                : <ChevronDown className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+                                            }
                                         </div>
                                     </button>
 
-                                    {/* Expanded Key Details */}
                                     {isExpanded && (
                                         <div className="border-t border-gray-200 dark:border-[#1e2535]">
                                             <div className="p-4 space-y-3">
@@ -489,108 +496,136 @@ export default function APIKeyHealth() {
                                                     const statusConfig = STATUS_CONFIG[key.status];
                                                     const StatusIcon = statusConfig.icon;
                                                     const isRecovering = recoveringKeys.has(key.id);
-                                                    
+                                                    const isPendingForce = forceRecoveryPendingId === key.id;
+
                                                     return (
-                                                        <div 
+                                                        <div
                                                             key={key.id}
-                                                            className={`flex items-center justify-between p-3 rounded-lg border ${
-                                                                key.status === 'healthy' 
-                                                                    ? 'bg-white dark:bg-[#161b27] border-gray-200 dark:border-[#1e2535]' 
+                                                            className={`flex flex-col p-3 rounded-lg border ${
+                                                                key.status === 'healthy'
+                                                                    ? 'bg-white dark:bg-[#161b27] border-gray-200 dark:border-[#1e2535]'
                                                                     : `${statusConfig.bg} ${statusConfig.border} border`
                                                             }`}
                                                         >
-                                                            <div className="flex items-center gap-3">
-                                                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                                                                    key.priority <= 2 
-                                                                        ? 'bg-blue-100 dark:bg-blue-500/10' 
-                                                                        : 'bg-gray-100 dark:bg-[#1e2535]'
-                                                                }`}>
-                                                                    <span className={`text-xs font-bold ${
-                                                                        key.priority <= 2 
-                                                                            ? 'text-blue-600 dark:text-blue-400' 
-                                                                            : 'text-gray-500 dark:text-gray-400'
+                                                            <div className="flex items-center justify-between">
+                                                                <div className="flex items-center gap-3">
+                                                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                                                                        key.priority <= 2
+                                                                            ? 'bg-blue-100 dark:bg-blue-500/10'
+                                                                            : 'bg-gray-100 dark:bg-[#1e2535]'
                                                                     }`}>
-                                                                        P{key.priority}
-                                                                    </span>
-                                                                </div>
-                                                                
-                                                                <div>
-                                                                    <div className="flex items-center gap-2">
-                                                                        <StatusIcon className={`w-4 h-4 ${statusConfig.color}`} />
-                                                                        <span className={`text-sm font-medium ${statusConfig.color}`}>
-                                                                            {statusConfig.label}
+                                                                        <span className={`text-xs font-bold ${
+                                                                            key.priority <= 2
+                                                                                ? 'text-blue-600 dark:text-blue-400'
+                                                                                : 'text-gray-500 dark:text-gray-400'
+                                                                        }`}>
+                                                                            P{key.priority}
                                                                         </span>
-                                                                        {key.failure_count > 0 && (
-                                                                            <span className="text-xs text-gray-500 dark:text-gray-400">
-                                                                                ({key.failure_count} failures)
+                                                                    </div>
+
+                                                                    <div>
+                                                                        <div className="flex items-center gap-2">
+                                                                            <StatusIcon className={`w-4 h-4 ${statusConfig.color}`} />
+                                                                            <span className={`text-sm font-medium ${statusConfig.color}`}>
+                                                                                {statusConfig.label}
                                                                             </span>
+                                                                            {key.failure_count > 0 && (
+                                                                                <span className="text-xs text-gray-500 dark:text-gray-400">
+                                                                                    ({key.failure_count} failures)
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+
+                                                                        {key.cooldown_until && (
+                                                                            <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">
+                                                                                <Clock className="w-3 h-3 inline mr-1" />
+                                                                                {formatCooldown(key.cooldown_until)}
+                                                                            </p>
+                                                                        )}
+
+                                                                        {key.monthly_budget_usd > 0 && (
+                                                                            <div className="mt-2">
+                                                                                <div className="flex items-center justify-between text-xs mb-1">
+                                                                                    <span className="text-gray-500 dark:text-gray-400">
+                                                                                        Budget: ${key.current_spend_usd.toFixed(2)} / ${key.monthly_budget_usd.toFixed(2)}
+                                                                                    </span>
+                                                                                    <span className={`font-medium ${
+                                                                                        key.budget_remaining_pct < 10
+                                                                                            ? 'text-red-600 dark:text-red-400'
+                                                                                            : key.budget_remaining_pct < 25
+                                                                                                ? 'text-amber-600 dark:text-amber-400'
+                                                                                                : 'text-green-600 dark:text-green-400'
+                                                                                    }`}>
+                                                                                        {key.budget_remaining_pct.toFixed(0)}%
+                                                                                    </span>
+                                                                                </div>
+                                                                                <div className="w-full bg-gray-200 dark:bg-[#1e2535] rounded-full h-1.5">
+                                                                                    <div
+                                                                                        className={`h-1.5 rounded-full transition-all ${
+                                                                                            key.budget_remaining_pct < 10
+                                                                                                ? 'bg-red-500'
+                                                                                                : key.budget_remaining_pct < 25
+                                                                                                    ? 'bg-amber-500'
+                                                                                                    : 'bg-green-500'
+                                                                                        }`}
+                                                                                        style={{ width: `${Math.min(100, 100 - key.budget_remaining_pct)}%` }}
+                                                                                    />
+                                                                                </div>
+                                                                            </div>
                                                                         )}
                                                                     </div>
-                                                                    
-                                                                    {key.cooldown_until && (
-                                                                        <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">
-                                                                            <Clock className="w-3 h-3 inline mr-1" />
-                                                                            {formatCooldown(key.cooldown_until)}
-                                                                        </p>
+                                                                </div>
+
+                                                                {/* Actions */}
+                                                                <div className="flex items-center gap-2">
+                                                                    {key.status !== 'healthy' && key.status !== 'disabled' && isAdmin && !isPendingForce && (
+                                                                        <button
+                                                                            onClick={() => handleRecoverKey(key.id)}
+                                                                            disabled={isRecovering}
+                                                                            className="flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-[#161b27] border border-gray-200 dark:border-[#1e2535] hover:border-green-300 dark:hover:border-green-500/30 text-gray-700 dark:text-gray-300 text-xs font-medium rounded-lg transition-colors disabled:opacity-50"
+                                                                        >
+                                                                            {isRecovering
+                                                                                ? <><Loader2 className="w-3 h-3 animate-spin" /> Recovering...</>
+                                                                                : <><RotateCcw className="w-3 h-3" /> Recover</>
+                                                                            }
+                                                                        </button>
                                                                     )}
-                                                                    
-                                                                    {/* Budget bar */}
-                                                                    {key.monthly_budget_usd > 0 && (
-                                                                        <div className="mt-2">
-                                                                            <div className="flex items-center justify-between text-xs mb-1">
-                                                                                <span className="text-gray-500 dark:text-gray-400">
-                                                                                    Budget: ${key.current_spend_usd.toFixed(2)} / ${key.monthly_budget_usd.toFixed(2)}
-                                                                                </span>
-                                                                                <span className={`font-medium ${
-                                                                                    key.budget_remaining_pct < 10 
-                                                                                        ? 'text-red-600 dark:text-red-400' 
-                                                                                        : key.budget_remaining_pct < 25 
-                                                                                            ? 'text-amber-600 dark:text-amber-400' 
-                                                                                            : 'text-green-600 dark:text-green-400'
-                                                                                }`}>
-                                                                                    {key.budget_remaining_pct.toFixed(0)}%
-                                                                                </span>
-                                                                            </div>
-                                                                            <div className="w-full bg-gray-200 dark:bg-[#1e2535] rounded-full h-1.5">
-                                                                                <div 
-                                                                                    className={`h-1.5 rounded-full transition-all ${
-                                                                                        key.budget_remaining_pct < 10 
-                                                                                            ? 'bg-red-500' 
-                                                                                            : key.budget_remaining_pct < 25 
-                                                                                                ? 'bg-amber-500' 
-                                                                                                : 'bg-green-500'
-                                                                                    }`}
-                                                                                    style={{ width: `${Math.min(100, 100 - key.budget_remaining_pct)}%` }}
-                                                                                />
-                                                                            </div>
-                                                                        </div>
+
+                                                                    {key.status === 'healthy' && (
+                                                                        <span className="text-xs text-green-600 dark:text-green-400 font-medium flex items-center gap-1">
+                                                                            <TrendingUp className="w-3 h-3" />
+                                                                            Active
+                                                                        </span>
                                                                     )}
                                                                 </div>
                                                             </div>
-                                                            
-                                                            {/* Actions */}
-                                                            <div className="flex items-center gap-2">
-                                                                {key.status !== 'healthy' && key.status !== 'disabled' && isAdmin && (
-                                                                    <button
-                                                                        onClick={() => handleRecoverKey(key.id)}
-                                                                        disabled={isRecovering}
-                                                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-[#161b27] border border-gray-200 dark:border-[#1e2535] hover:border-green-300 dark:hover:border-green-500/30 text-gray-700 dark:text-gray-300 text-xs font-medium rounded-lg transition-colors disabled:opacity-50"
-                                                                    >
-                                                                        {isRecovering ? (
-                                                                            <><Loader2 className="w-3 h-3 animate-spin" /> Recovering...</>
-                                                                        ) : (
-                                                                            <><RotateCcw className="w-3 h-3" /> Recover</>
-                                                                        )}
-                                                                    </button>
-                                                                )}
-                                                                
-                                                                {key.status === 'healthy' && (
-                                                                    <span className="text-xs text-green-600 dark:text-green-400 font-medium flex items-center gap-1">
-                                                                        <TrendingUp className="w-3 h-3" />
-                                                                        Active
-                                                                    </span>
-                                                                )}
-                                                            </div>
+
+                                                            {/* Inline force-recovery confirmation (replaces window.confirm) */}
+                                                            {isPendingForce && (
+                                                                <div className="mt-3 p-3 rounded-lg bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20">
+                                                                    <p className="text-xs text-amber-700 dark:text-amber-300 mb-2">
+                                                                        {forceCooldownMsg} — force recovery anyway?
+                                                                    </p>
+                                                                    <div className="flex gap-2">
+                                                                        <button
+                                                                            onClick={() => handleRecoverKey(key.id, true)}
+                                                                            disabled={isRecovering}
+                                                                            className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-medium rounded-lg transition-colors disabled:opacity-50"
+                                                                        >
+                                                                            {isRecovering
+                                                                                ? <><Loader2 className="w-3 h-3 animate-spin" /> Forcing...</>
+                                                                                : <><RotateCcw className="w-3 h-3" /> Force Recovery</>
+                                                                            }
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={handleCancelForceRecovery}
+                                                                            className="px-3 py-1.5 border border-gray-200 dark:border-[#1e2535] text-gray-600 dark:text-gray-400 text-xs font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-[#1e2535] transition-colors"
+                                                                        >
+                                                                            Cancel
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     );
                                                 })}
@@ -603,7 +638,7 @@ export default function APIKeyHealth() {
                     )}
                 </div>
 
-                {/* ── Footer Info ───────────────────────────────────────────── */}
+                {/* ── Footer ───────────────────────────────────────────────── */}
                 <div className="flex items-center justify-between pt-4 border-t border-gray-100 dark:border-[#1e2535] text-xs text-gray-500 dark:text-gray-400">
                     <div className="flex items-center gap-4">
                         <span>Last updated: {lastUpdated.toLocaleTimeString()}</span>

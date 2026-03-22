@@ -3,6 +3,9 @@ import toast from 'react-hot-toast';
 
 const API_URL = import.meta.env.VITE_API_BASE_URL || '';
 
+/** Maximum number of times a 429 response will be automatically retried. */
+const MAX_RATE_LIMIT_RETRIES = 3;
+
 export const api = axios.create({
     baseURL: API_URL,
     headers: {
@@ -31,8 +34,6 @@ api.interceptors.response.use(
             if (!window.location.pathname.includes('/login')) {
                 localStorage.removeItem('access_token');
                 delete api.defaults.headers.common['Authorization'];
-                // Use React Router navigation instead of hard redirect
-                // to preserve the SPA state and avoid full page reload
                 import('@/store/authStore').then(({ useAuthStore }) => {
                     useAuthStore.getState().logout();
                 });
@@ -40,7 +41,7 @@ api.interceptors.response.use(
         } else if (status === 403) {
             toast.error(`Permission Denied: ${message}`);
         } else if (status === 404) {
-            // Suppress 404 toasts for GET requests — they're handled by the component
+            // Suppress 404 toasts for GET requests — handled by the component
             if (error.config?.method !== 'get') {
                 toast.error(`Not Found: ${message}`);
             }
@@ -52,13 +53,23 @@ api.interceptors.response.use(
                 toast.error(`Server Error: ${message}`);
             }
         } else if (status === 429) {
-            // Rate limited — retry after the suggested delay (default 5 s)
-            const retryAfter = parseInt(error.response?.headers?.['retry-after'] || '5', 10);
-            return new Promise((resolve, reject) => {
-                setTimeout(() => {
-                    api.request(error.config).then(resolve).catch(reject);
-                }, retryAfter * 1000);
-            });
+            // Rate limited — retry after the suggested delay (default 5 s).
+            // Guard: track retry count on the config object to prevent infinite loops.
+            const config = error.config as typeof error.config & { _rateLimitRetries?: number };
+            const retries = config._rateLimitRetries ?? 0;
+
+            if (retries < MAX_RATE_LIMIT_RETRIES) {
+                const retryAfter = parseInt(error.response?.headers?.['retry-after'] || '5', 10);
+                config._rateLimitRetries = retries + 1;
+                return new Promise((resolve, reject) => {
+                    setTimeout(() => {
+                        api.request(config).then(resolve).catch(reject);
+                    }, retryAfter * 1000);
+                });
+            } else {
+                // Exceeded retry budget — surface error to caller
+                toast.error('Rate limit exceeded. Please try again later.');
+            }
         } else if (status !== undefined && status !== 401) {
             // 400, 422, etc. — show the detail message
             toast.error(message);
@@ -68,7 +79,7 @@ api.interceptors.response.use(
     },
 );
 
-// ── Channel type helpers (used by ChannelsPage + any other consumer) ──────────
+// ── Channel type helpers ──────────────────────────────────────────────────────
 
 export type ChannelTypeSlug =
     | 'whatsapp'
@@ -113,7 +124,7 @@ export interface Channel {
     };
 }
 
-// ── WebSocket event types (mirrors backend websocket.py emit_* methods) ───────
+// ── WebSocket event types ─────────────────────────────────────────────────────
 
 export type WebSocketEventType =
     | 'agent_spawned'
