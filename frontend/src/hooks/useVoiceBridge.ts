@@ -12,9 +12,16 @@ import { useEffect, useRef, useState } from 'react';
 import { voiceBridgeService, BridgeStatus, VoiceInteractionEvent } from '@/services/voiceBridge';
 import { useAuthStore } from '@/store/authStore';
 
+const STATUS_MESSAGES: Record<BridgeStatus, string> = {
+  offline:    'Voice bridge not running',
+  connecting: 'Connecting to voice bridge...',
+  connected:  'Voice bridge active',
+  error:      'Voice bridge unavailable',
+};
+
 export function useVoiceBridge(
   onInteraction?: (event: VoiceInteractionEvent) => void,
-): { status: BridgeStatus } {
+): { status: BridgeStatus; statusMessage: string } {
   const [status, setStatus] = useState<BridgeStatus>(voiceBridgeService.status);
   const user = useAuthStore((state) => state.user);
   const isAuthenticated = user?.isAuthenticated ?? false;
@@ -50,5 +57,5 @@ export function useVoiceBridge(
     };
   }, [isAuthenticated]);
 
-  return { status };
+  return { status, statusMessage: STATUS_MESSAGES[status] };
 }

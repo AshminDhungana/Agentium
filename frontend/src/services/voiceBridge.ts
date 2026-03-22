@@ -50,6 +50,24 @@ class VoiceBridgeService {
     try {
       token = await this._fetchVoiceToken();
     } catch (err) {
+      const errMsg = String(err);
+
+      if (errMsg.includes('HTTP 404')) {
+        // Endpoint not registered — VOICE_JWT_SECRET not configured server-side.
+        // This is a deployment config issue, not a user-actionable error.
+        console.warn('[voiceBridge] Voice token endpoint not found — VOICE_JWT_SECRET may not be configured');
+        this._setStatus('offline');
+        return;
+      }
+
+      if (err instanceof TypeError) {
+        // fetch() network failure — backend unreachable or CORS issue.
+        console.warn('[voiceBridge] Network error fetching voice token:', err);
+        this._setStatus('offline');
+        return;
+      }
+
+      // Any other error (401, 503, parse failure) — surface to the user.
       console.warn('[voiceBridge] Could not fetch voice token:', err);
       toast.error('Voice bridge: failed to get token — running in text mode');
       this._setStatus('error');
