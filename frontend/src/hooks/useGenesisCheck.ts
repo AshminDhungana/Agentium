@@ -13,7 +13,23 @@
  *   - SESSION_KEY is set ONLY when status === "ready" (not on no_api_key),
  *     so the check keeps re-running on every navigation until genesis is
  *     actually complete.
- *   - Cleared by authStore.logout() so the next login always re-checks.
+ *   - REDIRECT_KEY is set when we first redirect to /models for the
+ *     no_api_key case, preventing repeated redirects on the same session.
+ *     It is cleared when status transitions away from no_api_key (key added).
+ *   - Both keys are cleared by authStore.logout() so the next login
+ *     always re-checks from a clean state.
+ *
+ * ── Root Cause Fix ──────────────────────────────────────────────────────────
+ * Previously a React ref (redirectedRef) was used to prevent duplicate
+ * redirects to /models. A ref resets to false every time the component
+ * unmounts and remounts (page refresh, route-level remount, etc.), so the
+ * redirect fired on every page refresh while no API key was configured.
+ *
+ * The fix replaces redirectedRef with a sessionStorage key (REDIRECT_KEY).
+ * sessionStorage survives page refreshes within the same tab but is cleared
+ * on logout, giving us the correct "redirect exactly once per login session"
+ * semantics without any component lifecycle dependency.
+ * ────────────────────────────────────────────────────────────────────────────
  *
  * Genesis polling:
  *   After triggering POST /initialize the hook polls GET /status every 3 s
@@ -26,9 +42,32 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/store/authStore';
 
-const SESSION_KEY       = 'genesis_check_done';
+// ── Session keys ──────────────────────────────────────────────────────────────
+
+/**
+ * Set once genesis reaches "ready".
+ * Guards the entire hook from running once the system is fully initialized.
+ */
+export const GENESIS_SESSION_KEY = 'genesis_check_done';
+
+/**
+ * Set the FIRST time we redirect to /models due to a missing API key.
+ * Prevents repeated redirects on the same login session (including after
+ * page refreshes), while still being cleared the moment a key is added.
+ *
+ * Lifecycle:
+ *   • Set   → when status === "no_api_key" and we navigate to /models
+ *   • Clear → when status transitions to "pending" or "ready" (key exists)
+ *   • Clear → on logout (via authStore.logout)
+ */
+export const GENESIS_REDIRECT_KEY = 'genesis_redirected_to_models';
+
+// ── Constants ─────────────────────────────────────────────────────────────────
+
 const POLL_INTERVAL_MS  = 3_000;
 const MAX_POLL_ATTEMPTS = 20; // 60 s total ceiling
+
+// ── Hook ──────────────────────────────────────────────────────────────────────
 
 export function useGenesisCheck() {
     const navigate        = useNavigate();
@@ -39,16 +78,10 @@ export function useGenesisCheck() {
     const userId          = useAuthStore((s) => s.user?.id);
     const pollTimerRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    // Prevent the "add a key" toast + redirect from firing on every navigation
-    // burst while the user is already heading to /models.
-    const redirectedRef = useRef(false);
-
     // FIX (Bug 2): Prevent POST /initialize being fired more than once while
     // genesis is already running. Without this guard every navigation while
     // status === "pending" sends another POST, spawning a new background task
-    // on the backend and multiplying the DB connection starvation described in
-    // the genesis.py fix. The ref persists across re-renders and re-runs of
-    // the effect so it survives rapid navigation between pages.
+    // on the backend and multiplying DB connection starvation.
     const initInProgressRef = useRef(false);
 
     // Clean up any in-flight polling timer when the component unmounts.
@@ -56,47 +89,30 @@ export function useGenesisCheck() {
         if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
     }, []);
 
-    // Re-run on every navigation (location.pathname) so that after the user
-    // adds an API key on /models and navigates away, the pending → initialize
-    // path fires immediately without requiring a logout/re-login.
     useEffect(() => {
         if (!isAuthenticated) return;
-        if (sessionStorage.getItem(SESSION_KEY)) return;
+        if (sessionStorage.getItem(GENESIS_SESSION_KEY)) return;
 
         const token = localStorage.getItem('access_token');
         if (!token) return;
 
         const authHeaders = { Authorization: `Bearer ${token}` };
 
-        // FIX (Bug 3): Use a per-run cancellation flag instead of relying
-        // solely on pollTimerRef.
-        //
-        // The original code tracked only the most-recently-created timer in
-        // pollTimerRef. When the effect re-fired (due to navigation) a new
-        // polling chain started, but the previous chain's in-flight timers
-        // continued running independently — pollTimerRef could only cancel
-        // the last scheduled one, not every timer from every prior chain.
-        // Over a few navigations this accumulated many concurrent chains all
-        // hammering GET /genesis/status simultaneously.
-        //
-        // The fix: each effect run owns a `cancelled` boolean. The cleanup
-        // function sets it to true, which every async callback in THIS run
-        // checks before scheduling the next tick. Old chains are therefore
-        // silenced as soon as the effect re-runs, regardless of how many
-        // timers are still in the JS queue.
+        // FIX (Bug 3): Per-run cancellation flag — each navigation that
+        // triggers a new effect run cancels the previous run's async chain.
         let cancelled = false;
 
         // ── Poll until status === "ready" ─────────────────────────────────────
         let attempts = 0;
         function pollUntilReady() {
-            if (cancelled) return; // this run was superseded — stop silently
+            if (cancelled) return;
             if (attempts >= MAX_POLL_ATTEMPTS) {
                 toast.error('Genesis is taking longer than expected. Please refresh.');
                 return;
             }
             attempts += 1;
             pollTimerRef.current = setTimeout(async () => {
-                if (cancelled) return; // double-check after the async gap
+                if (cancelled) return;
                 try {
                     const r = await fetch('/api/v1/genesis/status', { headers: authHeaders });
                     if (cancelled) return;
@@ -107,7 +123,10 @@ export function useGenesisCheck() {
                     const data = await r.json();
                     if (data.status === 'ready') {
                         initInProgressRef.current = false;
-                        sessionStorage.setItem(SESSION_KEY, 'true');
+                        sessionStorage.setItem(GENESIS_SESSION_KEY, 'true');
+                        // Clear the redirect flag — genesis is done, no more
+                        // redirecting needed even if user logs in again.
+                        sessionStorage.removeItem(GENESIS_REDIRECT_KEY);
                         toast.success('System initialized and ready.', { icon: '🏛️', duration: 5_000 });
                     } else {
                         pollUntilReady(); // still pending — keep polling
@@ -127,39 +146,41 @@ export function useGenesisCheck() {
             .then(async (data) => {
                 if (cancelled) return;
 
-                // ── Case 1: No API key — redirect to /models ──────────────────
+                // ── Case 1: No API key — redirect to /models (once per session) ──
                 if (data.status === 'no_api_key') {
-                    // FIX: do NOT set SESSION_KEY here.
-                    // The old code set SESSION_KEY immediately, meaning after the
-                    // user added a key on /models and navigated back, the guard
-                    // blocked the check from ever running again — genesis never
-                    // triggered and every page that needs agents/tasks failed.
-                    // Now SESSION_KEY is only set when status === "ready", so the
-                    // effect keeps re-checking on each navigation until genesis
-                    // actually completes.
+                    // FIX (Bug 1): Use sessionStorage instead of a React ref so
+                    // this flag survives page refreshes within the same login
+                    // session. A ref reset to false on every component remount,
+                    // causing repeated redirects on page refresh.
+                    const alreadyRedirected = sessionStorage.getItem(GENESIS_REDIRECT_KEY);
 
-                    // Only redirect + toast once per navigation burst.
-                    if (!redirectedRef.current && location.pathname !== '/models') {
-                        redirectedRef.current = true;
+                    if (!alreadyRedirected && location.pathname !== '/models') {
+                        // Mark as redirected BEFORE navigating so that the
+                        // navigation-triggered effect re-run sees the flag.
+                        sessionStorage.setItem(GENESIS_REDIRECT_KEY, 'true');
                         toast('Add an AI provider key to begin Genesis.', {
                             icon: '🔑',
                             duration: 6_000,
                         });
                         navigate('/models', { replace: true });
                     }
+                    // Note: SESSION_KEY is intentionally NOT set here.
+                    // The check must keep re-running until genesis actually
+                    // completes (status reaches "ready").
                     return;
                 }
 
-                // Reset the redirect guard once a key exists so future
-                // no_api_key transitions (e.g. key deleted) redirect again.
-                redirectedRef.current = false;
+                // Status is not no_api_key → a key has been added (or was
+                // already present).  Clear the one-time redirect flag so that
+                // if the key is later deleted and the user logs out/in, the
+                // redirect will fire again on the new session.
+                sessionStorage.removeItem(GENESIS_REDIRECT_KEY);
 
                 // ── Case 2: Key exists but genesis not run → trigger it ────────
                 if (data.status === 'pending') {
                     // FIX (Bug 2): skip the POST if we already fired it.
                     // Without this guard, every navigation while genesis is still
-                    // running sends another POST /initialize, spawning an extra
-                    // background task and extra DB connections on the backend.
+                    // running sends another POST /initialize.
                     if (initInProgressRef.current) {
                         // Genesis already triggered — just poll for completion.
                         pollUntilReady();
@@ -178,7 +199,7 @@ export function useGenesisCheck() {
                             if (initData.status === 'already_initialized') {
                                 // Race condition: another tab finished first.
                                 initInProgressRef.current = false;
-                                sessionStorage.setItem(SESSION_KEY, 'true');
+                                sessionStorage.setItem(GENESIS_SESSION_KEY, 'true');
                             } else {
                                 // "started" — poll until ready.
                                 toast('Initializing Agentium governance system…', {
@@ -204,13 +225,14 @@ export function useGenesisCheck() {
                 // ── Case 3: Already ready ──────────────────────────────────────
                 if (data.status === 'ready') {
                     initInProgressRef.current = false;
-                    sessionStorage.setItem(SESSION_KEY, 'true');
+                    sessionStorage.setItem(GENESIS_SESSION_KEY, 'true');
+                    sessionStorage.removeItem(GENESIS_REDIRECT_KEY);
                 }
             })
             .catch((err) => {
                 // Network or auth failure — leave key unset so we retry.
                 console.warn('[GenesisCheck] Status check failed, will retry:', err);
-                sessionStorage.removeItem(SESSION_KEY);
+                sessionStorage.removeItem(GENESIS_SESSION_KEY);
             });
 
         // Cleanup: mark this run as cancelled so its polling chain goes silent
@@ -220,7 +242,7 @@ export function useGenesisCheck() {
             if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
         };
 
-    // location.pathname is the critical addition: causes the check to re-run
+    // location.pathname is the critical dep: causes the check to re-run
     // on every navigation, so "add key on /models → navigate to dashboard"
     // immediately triggers genesis without needing a logout/re-login cycle.
     // userId guards against a different user logging in within the same tab.
