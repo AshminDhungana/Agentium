@@ -468,7 +468,6 @@ app.add_middleware(ObserverReadOnlyMiddleware)
 
 from backend.api.routes import scaling as scaling_routes                       # Phase 13.3: Scaling Engine
 from backend.api.routes import improvements as improvements_routes             # Phase 13.4: Continuous Self-Improvement
-from backend.api.routes import genesis as genesis_routes                       # Genesis Protocol endpoints
 
 # ═══════════════════════════════════════════════════════════
 # REGISTER ROUTERS
@@ -513,7 +512,6 @@ app.include_router(outbound_webhooks_routes.router, prefix="/api/v1")  # Phase 1
 app.include_router(workflows_routes.router,          prefix="/api/v1")  # Workflow Engine (006_workflow)
 app.include_router(scaling_routes.router,            prefix="/api/v1")  # Phase 13.3: Scaling Engine
 app.include_router(improvements_routes.router,       prefix="/api/v1")  # Phase 13.4: Continuous Self-Improvement
-app.include_router(genesis_routes.router)                                # Genesis Protocol endpoints (prefix defined in genesis.py)
 
 
 

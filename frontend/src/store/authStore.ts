@@ -2,7 +2,6 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { api } from '@/services/api';
 import { jwtDecode } from 'jwt-decode';
-import { GENESIS_SESSION_KEY, GENESIS_REDIRECT_KEY } from '@/constants/genesis';
 
 // B6: extended role type to match the backend RBAC system
 type UserRole =
@@ -103,13 +102,6 @@ export const useAuthStore = create<AuthState>()(
                     const { access_token, user } = response.data;
                     localStorage.setItem('access_token', access_token);
 
-                    // Clear genesis session state on every fresh login.
-                    // If a user logs out without adding an API key and logs back
-                    // in, these stale keys would otherwise suppress the redirect
-                    // and the genesis check for the entire new session.
-                    sessionStorage.removeItem(GENESIS_SESSION_KEY);
-                    sessionStorage.removeItem(GENESIS_REDIRECT_KEY);
-
                     set({
                         user: {
                             id: user.id,
@@ -191,20 +183,6 @@ export const useAuthStore = create<AuthState>()(
 
             logout: () => {
                 localStorage.removeItem('access_token');
-
-                // Clear both genesis session keys so the next login re-checks
-                // from a completely clean state.
-                //
-                // GENESIS_SESSION_KEY ('genesis_check_done'):
-                //   Guards the hook from re-running after genesis is complete.
-                //
-                // GENESIS_REDIRECT_KEY ('genesis_redirected_to_models'):
-                //   Prevents repeated one-time redirects to /models within a
-                //   session. Must be cleared on logout so the NEXT login session
-                //   will redirect again if no API key has been added.
-                sessionStorage.removeItem(GENESIS_SESSION_KEY);
-                sessionStorage.removeItem(GENESIS_REDIRECT_KEY);
-
                 set({ user: null, error: null, isInitialized: true });
             },
 
