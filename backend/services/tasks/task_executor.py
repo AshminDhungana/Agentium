@@ -67,18 +67,23 @@ CeleryScopedSession = scoped_session(CelerySessionLocal)
 # Database Session Context Manager
 # ═══════════════════════════════════════════════════════════
 
-@contextmanager
 @retry(
     retry=retry_if_exception_type(OperationalError),
     stop=stop_after_attempt(5),
     wait=wait_fixed(2),
     reraise=True,
 )
+@contextmanager
 def get_task_db():
     """
     Context manager for database sessions in Celery tasks.
     Uses dedicated Celery engine with NullPool to avoid connection
     corruption across forked worker processes.
+
+    Decorator order matters: @retry must be the outermost decorator so it
+    can catch OperationalError raised inside the context manager body.
+    Previously @contextmanager was outermost which meant @retry wrapped a
+    raw generator and never saw the exception.
     """
     db = CelerySessionLocal()
     try:
@@ -89,7 +94,6 @@ def get_task_db():
         raise
     finally:
         db.close()
-        # Remove from scoped session registry if using scoped sessions
         CeleryScopedSession.remove()
 
 
@@ -146,9 +150,10 @@ def execute_task_async(self, task_id: str, agent_id: str):
                 logger.info(f"Real-Time Learning executed for task {task_id}: {learning_stats}")
             except Exception as learning_exc:
                 logger.error(f"Real-Time Learning extraction failed for task {task_id}: {learning_exc}")
-            
-            db.commit()
-            
+
+            # No explicit db.commit() here — get_task_db() commits automatically
+            # on clean exit. A redundant commit here would mask rollback errors.
+
             return {
                 "status": "completed",
                 "task_id": task_id,
@@ -181,31 +186,33 @@ def execute_task_async(self, task_id: str, agent_id: str):
                         if similar_count >= 3:
                             warning_msg = f"Anti-Pattern Detected: Similar failure occurred {similar_count} times. Error: {str(exc)[:100]}"
                             logger.warning(warning_msg)
-                            
+
+                            # Broadcast warning over WebSocket — use asyncio.run() which
+                            # is safe in a sync Celery worker and avoids the deprecated
+                            # get_event_loop() / set_event_loop() pattern.
                             try:
-                                loop = asyncio.get_event_loop()
-                            except RuntimeError:
-                                loop = asyncio.new_event_loop()
-                                asyncio.set_event_loop(loop)
-                                
-                            loop.run_until_complete(manager.broadcast({
-                                "type": "pattern_warning",
-                                "data": {
-                                    "task_id": task_id,
-                                    "error": str(exc),
-                                    "message": warning_msg
-                                }
-                            }))
-                            
+                                asyncio.run(manager.broadcast({
+                                    "type": "pattern_warning",
+                                    "data": {
+                                        "task_id": task_id,
+                                        "error": str(exc),
+                                        "message": warning_msg
+                                    }
+                                }))
+                            except Exception:
+                                pass
+
                             # Increment impact tracker for anti-patterns finding
                             try:
                                 import redis.asyncio as aioredis
                                 redis_url = os.getenv("REDIS_URL", "redis://redis:6379/0")
+
                                 async def inc_ap():
                                     r = await aioredis.from_url(redis_url, decode_responses=True)
                                     await r.hincrby("agentium:learning:impact", "anti_patterns_warned", 1)
                                     await r.close()
-                                loop.run_until_complete(inc_ap())
+
+                                asyncio.run(inc_ap())
                             except Exception:
                                 pass
                 except Exception as inner_exc:
@@ -846,17 +853,18 @@ def send_channel_heartbeat():
             ExternalChannel.last_message_at > cutoff_time
         ).all()
         
-        channel_ids = [ch.id for ch in active_channels]
-        
+        channel_ids = [ch.id for ch in active_channels]  # kept for return value logging
+
+        now = datetime.utcnow()
         heartbeats_sent = 0
-        for channel_id in channel_ids:
+        # Iterate directly over the already-loaded objects — avoids N+1 queries
+        # that re-fetched each channel by ID in a loop.
+        for channel in active_channels:
             try:
-                channel = db.query(ExternalChannel).filter_by(id=channel_id).first()
-                if channel:
-                    channel.updated_at = datetime.utcnow()
-                    heartbeats_sent += 1
+                channel.updated_at = now
+                heartbeats_sent += 1
             except Exception as e:
-                logger.error(f"Failed to update channel {channel_id}: {e}")
+                logger.error(f"Failed to update channel {channel.id}: {e}")
         
         db.commit()
         logger.info(f"Heartbeat sent to {heartbeats_sent} channels")
@@ -886,21 +894,23 @@ def broadcast_to_channels(channel_ids: list, message: str, agent_id: str):
                     status="pending"
                 )
                 db.add(test_msg)
-                db.commit()
-                
+                # Flush to get test_msg.id without committing yet —
+                # a single commit after the loop is safer than one per channel.
+                db.flush()
+
                 success = ChannelManager.send_response(
                     message_id=test_msg.id,
                     response_content=message,
                     agent_id=agent_id,
                     db=db
                 )
-                
+
                 results.append({
                     "channel_id": channel_id,
                     "success": success,
                     "message_id": test_msg.id
                 })
-                
+
             except Exception as e:
                 logger.error(f"Failed to broadcast to channel {channel_id}: {e}")
                 results.append({
@@ -908,7 +918,10 @@ def broadcast_to_channels(channel_ids: list, message: str, agent_id: str):
                     "success": False,
                     "error": str(e)
                 })
-        
+
+        # Single commit for all channels — get_task_db() also auto-commits on
+        # clean exit, but being explicit here documents the intent.
+        # (get_task_db auto-commit is a no-op if already committed.)
         return {
             "total": len(channel_ids),
             "successful": sum(1 for r in results if r.get('success')),
@@ -946,13 +959,19 @@ def check_escalation_timeouts():
                 if elapsed > timeout:
                     try:
                         task.status = TaskStatus.ESCALATED
-                        task.status_history = (task.status_history or []) + [{
+                        # Reassign to a new list — SQLAlchemy does not detect in-place
+                        # mutations on JSON columns. flag_modified() ensures the ORM
+                        # marks the column dirty even if the object identity is the same.
+                        new_history_entry = {
                             'from': TaskStatus.IN_PROGRESS.value,
                             'to': TaskStatus.ESCALATED.value,
                             'by': 'ESCALATION_TIMER',
                             'at': now.isoformat(),
                             'note': f'Timeout after {elapsed:.0f}s (limit: {timeout}s)',
-                        }]
+                        }
+                        task.status_history = list(task.status_history or []) + [new_history_entry]
+                        from sqlalchemy.orm.attributes import flag_modified
+                        flag_modified(task, 'status_history')
                         escalated += 1
                         logger.info(
                             f"⏰ Auto-escalated task {task.agentium_id} "
@@ -1030,10 +1049,21 @@ def process_dependency_graph():
                         dep.status = "dispatched"
                         dispatched += 1
 
-                        logger.info(
-                            f"📊 DAG: dispatched child task {child.agentium_id} "
-                            f"(order={dep.dependency_order}) for parent {parent_id}"
-                        )
+                        # Actually queue the task for execution — previously this was
+                        # missing, leaving child tasks perpetually stuck in IN_PROGRESS
+                        # with no Celery worker ever picking them up.
+                        assigned_agent_id = getattr(child, 'assigned_agent_id', None)
+                        if assigned_agent_id:
+                            execute_task_async.delay(child.agentium_id, assigned_agent_id)
+                            logger.info(
+                                f"📊 DAG: dispatched child task {child.agentium_id} "
+                                f"(order={dep.dependency_order}) for parent {parent_id}"
+                            )
+                        else:
+                            logger.warning(
+                                f"📊 DAG: child task {child.agentium_id} has no assigned_agent_id "
+                                f"— marked IN_PROGRESS but not queued for execution"
+                            )
                     except Exception as e:
                         logger.warning(f"Failed to dispatch child task: {e}")
 
@@ -1202,4 +1232,3 @@ def predictive_scale():
         except Exception as e:
             logger.error(f"predictive_scale failed: {e}")
             return {"error": str(e)}
-

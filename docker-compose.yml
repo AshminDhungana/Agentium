@@ -235,16 +235,16 @@ services:
       chromadb:
         condition: service_healthy
       whatsapp-bridge:
-        condition: service_healthy
+        condition: service_started   # service_healthy would block boot if bridge fails QR scan or is slow
       minio:
         condition: service_healthy
     networks:
       - agentium-network
     healthcheck:
-      test: ["CMD", "python", "-c", "import http.client; conn = http.client.HTTPConnection('localhost', 8000); conn.request('GET', '/api/health'); exit(0 if conn.getresponse().status == 200 else 1)"]
-      interval: 30s
+      test: ["CMD", "python", "-c", "import http.client, sys; c=http.client.HTTPConnection('localhost',8000,timeout=5); c.request('GET','/api/health'); r=c.getresponse(); sys.exit(0 if r.status==200 else 1)"]
+      interval: 15s
       timeout: 10s
-      start_period: 60s
+      start_period: 90s
       retries: 5
 
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -353,6 +353,21 @@ services:
       - DISPLAY=:99
       - XVFB_RESOLUTION=1920x1080x24
       - TOKENIZERS_PARALLELISM=false
+      # ── Storage (MinIO primary / local fallback) ──────────────────────────
+      # These were missing from celery-beat, causing "AWS credentials not set"
+      # warnings on every startup and silent failures in any beat task that
+      # touches file storage (e.g. sovereign_data_retention).
+      - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER:-minioadmin}
+      - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD:-minioadmin}
+      - S3_ENDPOINT=http://minio:9000
+      - S3_BUCKET_NAME=${S3_BUCKET_NAME:-agentium-media}
+      - S3_FORCE_PATH_STYLE=true
+      - STORAGE_LOCAL_PATH=/app/data/uploads
+      - APP_BASE_URL=${APP_BASE_URL:-http://localhost:8000}
+      # ── Workflow Engine ───────────────────────────────────────────────────
+      - STOCK_API_KEY=${STOCK_API_KEY:-}
+      - STOCK_API_PROVIDER=${STOCK_API_PROVIDER:-yfinance}
+      - DEFAULT_BROKER_EMAIL=${DEFAULT_BROKER_EMAIL:-}
     depends_on:
       backend:
         condition: service_healthy

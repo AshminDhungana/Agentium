@@ -282,9 +282,15 @@ class SelfHealingService:
         paused_count = 0
         for task in non_critical_tasks:
             task.status = TaskStatus.PENDING
-            task.execution_context = (task.execution_context or {})
-            task.execution_context["paused_by_degradation"] = True
-            task.execution_context["paused_at"] = datetime.utcnow().isoformat()
+            # Build a new dict rather than mutating in place — SQLAlchemy does
+            # not detect in-place mutations on JSON columns.  Reassignment
+            # combined with flag_modified() guarantees the column is marked dirty.
+            ctx = dict(task.execution_context or {})
+            ctx["paused_by_degradation"] = True
+            ctx["paused_at"] = datetime.utcnow().isoformat()
+            task.execution_context = ctx
+            from sqlalchemy.orm.attributes import flag_modified
+            flag_modified(task, "execution_context")
             paused_count += 1
 
         # Log the mode change
@@ -672,34 +678,55 @@ class SelfHealingService:
     @staticmethod
     def check_degradation_triggers(db: Session) -> Dict[str, Any]:
         """
-        Check if all API providers have circuit breakers open.
-        If so, enter degraded mode.
-        Called during crash detection cycle.
+        Check if enough circuit breakers have opened recently to warrant
+        entering degraded mode.  Called during crash detection cycle.
+
+        Architecture note: AgentOrchestrator stores circuit breaker state
+        in-memory inside the FastAPI process.  Celery workers are separate
+        OS processes and cannot share that memory.  We therefore derive
+        degradation state from the audit log — the only data store that is
+        visible to every process in the system.
+
+        Degradation threshold: if the number of distinct agents that have
+        fired a circuit_breaker_escalation event in the last 10 minutes
+        is >= the total number of active agents, all providers are
+        effectively down and we should enter degraded mode.
         """
         try:
-            from backend.services.agent_orchestrator import orchestrator
+            window = datetime.utcnow() - timedelta(minutes=10)
 
-            if not orchestrator:
-                return {"checked": False, "reason": "orchestrator not available"}
+            # Collect distinct agent IDs that escalated a circuit breaker recently
+            recent_escalations = db.query(AuditLog).filter(
+                AuditLog.action == "circuit_breaker_escalation",
+                AuditLog.created_at >= window,
+            ).all()
 
-            metrics = orchestrator.get_metrics()
-            open_breakers = metrics.get("circuit_breakers", {})
+            open_breaker_agents = {
+                row.target_id for row in recent_escalations if row.target_id
+            }
+            open_breakers_count = len(open_breaker_agents)
 
-            # Count total active agents vs agents with open breakers
+            # Count total active agents
             total_active = db.query(func.count(Agent.id)).filter(
                 Agent.is_active == True,
                 Agent.status.in_([AgentStatus.ACTIVE, AgentStatus.WORKING]),
             ).scalar() or 0
 
-            if total_active > 0 and len(open_breakers) >= total_active:
-                # All agents have open circuit breakers
+            if total_active > 0 and open_breakers_count >= total_active:
+                # Every active agent has an open circuit breaker — enter degraded mode
                 SelfHealingService.enter_degraded_mode(db)
-                return {"degraded": True, "open_breakers": len(open_breakers)}
+                return {
+                    "degraded": True,
+                    "open_breakers": open_breakers_count,
+                    "total_active": total_active,
+                    "window_minutes": 10,
+                }
 
             return {
                 "degraded": False,
-                "open_breakers": len(open_breakers),
+                "open_breakers": open_breakers_count,
                 "total_active": total_active,
+                "window_minutes": 10,
             }
 
         except Exception as e:
@@ -715,10 +742,15 @@ class SelfHealingService:
         """
         Best-effort WebSocket broadcast.
         Uses same lazy import pattern as AlertManager.
+
+        Imports from backend.api.routes.websocket (where `manager` is defined)
+        rather than backend.main to avoid a circular import: main.py imports
+        SelfHealingService (via task_executor), so importing main here would
+        create a dependency cycle that breaks Celery worker startup.
         """
         try:
             import asyncio
-            from backend.main import manager as websocket_manager
+            from backend.api.routes.websocket import manager as websocket_manager
 
             payload = {"type": event_type, **data}
 

@@ -240,7 +240,7 @@ async def create_api_key(
     )
 
 
-
+@router.get("/health", response_model=HealthReportResponse)
 async def get_health_report(
     provider: Optional[str] = Query(None, description="Filter by specific provider"),
     db: Session = Depends(get_db),
@@ -248,7 +248,7 @@ async def get_health_report(
 ):
     """
     Get comprehensive health report for all API keys.
-    
+
     Returns overall system status and per-provider breakdown.
     """
     report = api_key_manager.get_key_health_report(provider, db)
@@ -270,6 +270,84 @@ async def get_provider_health(
         raise HTTPException(status_code=404, detail=f"No keys found for provider: {provider}")
     
     return report["providers"][provider]
+
+
+@router.get("/availability", response_model=List[ProviderAvailabilityResponse])
+async def get_provider_availability(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Quick check of which providers have healthy keys available.
+    
+    Returns list of all providers with availability status.
+    """
+    availability = api_key_manager.get_provider_availability(db)
+    
+    # Get counts for each provider
+    result = []
+    for provider, available in availability.items():
+        count = db.query(UserModelConfig).filter_by(
+            provider=provider,
+            is_active=True
+        ).filter(
+            UserModelConfig.priority < 999
+        ).count()
+        
+        result.append({
+            "provider": provider,
+            "available": available,
+            "healthy_keys_count": count if available else 0
+        })
+    
+    return result
+
+
+@router.post("/test-failover", response_model=FailoverTestResponse)
+async def test_failover(
+    provider: str,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Test the failover mechanism for a provider.
+    
+    This attempts to get an active key without making actual API calls.
+    Useful for verifying failover configuration.
+    """
+    import time
+    
+    start = time.time()
+    
+    # Get all keys for provider
+    keys = db.query(UserModelConfig).filter_by(
+        provider=provider,
+        is_active=True
+    ).order_by(UserModelConfig.priority.asc()).all()
+    
+    attempted = 0
+    failed = []
+    successful_id = None
+    
+    for key in keys:
+        attempted += 1
+        is_healthy = api_key_manager._is_key_healthy(key)
+        
+        if is_healthy:
+            successful_id = str(key.id)
+            break
+        else:
+            failed.append(str(key.id))
+    
+    latency = (time.time() - start) * 1000
+    
+    return {
+        "tested_provider": provider,
+        "attempted_keys": attempted,
+        "successful_key_id": successful_id,
+        "failed_keys": failed,
+        "latency_ms": round(latency, 2)
+    }
 
 
 @router.get("/{key_id}/status", response_model=KeyHealthResponse)
@@ -421,84 +499,6 @@ async def rotate_api_key(
     }
 
 
-@router.get("/availability", response_model=List[ProviderAvailabilityResponse])
-async def get_provider_availability(
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
-):
-    """
-    Quick check of which providers have healthy keys available.
-    
-    Returns list of all providers with availability status.
-    """
-    availability = api_key_manager.get_provider_availability(db)
-    
-    # Get counts for each provider
-    result = []
-    for provider, available in availability.items():
-        count = db.query(UserModelConfig).filter_by(
-            provider=provider,
-            is_active=True
-        ).filter(
-            UserModelConfig.priority < 999
-        ).count()
-        
-        result.append({
-            "provider": provider,
-            "available": available,
-            "healthy_keys_count": count if available else 0
-        })
-    
-    return result
-
-
-@router.post("/test-failover", response_model=FailoverTestResponse)
-async def test_failover(
-    provider: str,
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
-):
-    """
-    Test the failover mechanism for a provider.
-    
-    This attempts to get an active key without making actual API calls.
-    Useful for verifying failover configuration.
-    """
-    import time
-    
-    start = time.time()
-    
-    # Get all keys for provider
-    keys = db.query(UserModelConfig).filter_by(
-        provider=provider,
-        is_active=True
-    ).order_by(UserModelConfig.priority.asc()).all()
-    
-    attempted = 0
-    failed = []
-    successful_id = None
-    
-    for key in keys:
-        attempted += 1
-        is_healthy = api_key_manager._is_key_healthy(key)
-        
-        if is_healthy:
-            successful_id = str(key.id)
-            break
-        else:
-            failed.append(str(key.id))
-    
-    latency = (time.time() - start) * 1000
-    
-    return {
-        "tested_provider": provider,
-        "attempted_keys": attempted,
-        "successful_key_id": successful_id,
-        "failed_keys": failed,
-        "latency_ms": round(latency, 2)
-    }
-
-
 @router.delete("/{key_id}")
 async def delete_key(
     key_id: str,
@@ -569,7 +569,7 @@ async def get_spend_history(
     if not key:
         raise HTTPException(status_code=404, detail="Key not found")
     
-    since = datetime.utcnow() - __import__('datetime').timedelta(days=days)
+    since = datetime.utcnow() - timedelta(days=days)
     
     # Aggregate daily spend
     daily_spend = db.query(
