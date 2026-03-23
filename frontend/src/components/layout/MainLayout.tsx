@@ -20,7 +20,6 @@ import {
 } from 'lucide-react';
 import { useState, useRef, useCallback, useEffect, Suspense } from 'react';
 import { VoiceIndicator } from '@/components/VoiceIndicator';
-import { useGenesisCheck } from '@/hooks/useGenesisCheck';
 
 // ─── Timing constants ─────────────────────────────────────────────────────────
 //
@@ -357,10 +356,6 @@ function PageSkeleton() {
 
 // ─── MainLayout ───────────────────────────────────────────────────────────────
 export function MainLayout() {
-    // ── Genesis gate: redirects to /models on first login with no API key,
-    //    and triggers the Genesis Protocol once a key is present.
-    useGenesisCheck();
-
     const { user, logout } = useAuthStore();
     const navigate    = useNavigate();
     const unreadCount = useWebSocketStore(state => state.unreadCount);

@@ -103,6 +103,13 @@ export const useAuthStore = create<AuthState>()(
                     const { access_token, user } = response.data;
                     localStorage.setItem('access_token', access_token);
 
+                    // Clear genesis session state on every fresh login.
+                    // If a user logs out without adding an API key and logs back
+                    // in, these stale keys would otherwise suppress the redirect
+                    // and the genesis check for the entire new session.
+                    sessionStorage.removeItem(GENESIS_SESSION_KEY);
+                    sessionStorage.removeItem(GENESIS_REDIRECT_KEY);
+
                     set({
                         user: {
                             id: user.id,

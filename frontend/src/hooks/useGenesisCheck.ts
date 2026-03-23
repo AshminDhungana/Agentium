@@ -125,14 +125,17 @@ export function useGenesisCheck() {
                 return r.json();
             })
             .then(async (data) => {
-                if (cancelled) return;
-
                 // ── Case 1: No API key — redirect to /models (once per session) ──
+                //
+                // IMPORTANT: this case is checked BEFORE `if (cancelled) return`.
+                // `location.pathname` is in the effect deps, so any navigation
+                // (including the redirect to /models) triggers cleanup and sets
+                // `cancelled = true`. Checking cancelled first would suppress the
+                // redirect whenever it raced against a navigation event.
+                // The pending/ready cases below remain guarded by `cancelled`
+                // because they write global state that should not fire from a
+                // superseded effect run.
                 if (data.status === 'no_api_key') {
-                    // FIX (Bug 1): Use sessionStorage instead of a React ref so
-                    // this flag survives page refreshes within the same login
-                    // session. A ref reset to false on every component remount,
-                    // causing repeated redirects on page refresh.
                     const alreadyRedirected = sessionStorage.getItem(GENESIS_REDIRECT_KEY);
 
                     if (!alreadyRedirected && location.pathname !== '/models') {
@@ -150,6 +153,8 @@ export function useGenesisCheck() {
                     // completes (status reaches "ready").
                     return;
                 }
+
+                if (cancelled) return;
 
                 // Status is not no_api_key → a key has been added (or was
                 // already present).  Clear the one-time redirect flag so that

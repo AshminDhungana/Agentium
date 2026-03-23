@@ -1,6 +1,6 @@
 // src/App.tsx
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useOutlet } from 'react-router-dom';
-import { useEffect, useState, lazy } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useOutlet, useNavigate } from 'react-router-dom';
+import { useEffect, useState, useRef, lazy } from 'react';
 import { Toaster } from 'react-hot-toast';
 import { useAuthStore } from '@/store/authStore';
 import { useBackendStore } from '@/store/backendStore';
@@ -12,6 +12,159 @@ import { SignupPage } from '@/pages/SignupPage';
 import { SovereignRoute } from '@/components/SovereignRoute';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Shield, Loader2 } from 'lucide-react';
+import { modelsApi } from '@/services/models';
+
+// ── Session key ───────────────────────────────────────────────────────────────
+// Marks that the model-redirect check has already fired for this login session.
+// sessionStorage resets when the tab is closed, and is explicitly cleared on
+// every new login / logout (username change detected inside the hook).
+const MODEL_REDIRECT_KEY = 'model_redirect_checked';
+
+// ── useModelRedirect ──────────────────────────────────────────────────────────
+// Runs once per login session. Uses the existing modelsApi to check whether
+// any model configs exist. If none → redirects to /models exactly one time.
+// Once the user adds a model the redirect stops for the rest of the session.
+// On the next login the check runs fresh.
+//
+// Enforced by:
+//   1. sessionStorage key — survives page refresh within the same tab session.
+//   2. Username ref — if user identity changes (different login) the key is
+//      cleared and the check re-runs, without touching authStore.
+function useModelRedirect() {
+    const navigate        = useNavigate();
+    const location        = useLocation();
+    const isAuthenticated = useAuthStore(s => s.user?.isAuthenticated);
+    const username        = useAuthStore(s => s.user?.username ?? null);
+    const prevUsernameRef = useRef<string | null>(null);
+
+    useEffect(() => {
+        // User logged out — clear the key so next login re-checks.
+        if (!isAuthenticated || !username) {
+            sessionStorage.removeItem(MODEL_REDIRECT_KEY);
+            prevUsernameRef.current = null;
+            return;
+        }
+
+        // Different user logged in — clear stale key so check re-runs.
+        if (prevUsernameRef.current !== username) {
+            sessionStorage.removeItem(MODEL_REDIRECT_KEY);
+            prevUsernameRef.current = username;
+        }
+
+        // Already checked this login session — do nothing.
+        if (sessionStorage.getItem(MODEL_REDIRECT_KEY)) return;
+
+        // Already on /models — mark as checked, no redirect needed.
+        if (location.pathname === '/models') {
+            sessionStorage.setItem(MODEL_REDIRECT_KEY, 'true');
+            return;
+        }
+
+        let active = true;
+
+        modelsApi.getConfigs()
+            .then(configs => {
+                if (!active) return;
+                // Mark checked regardless of outcome so this never re-fires
+                // within the same login session.
+                sessionStorage.setItem(MODEL_REDIRECT_KEY, 'true');
+                if (configs.length === 0) {
+                    navigate('/models', { replace: true });
+                }
+            })
+            .catch(() => {
+                // API failed — mark checked so we don't keep retrying and
+                // blocking the user.
+                if (active) sessionStorage.setItem(MODEL_REDIRECT_KEY, 'true');
+            });
+
+        return () => { active = false; };
+    // Intentionally only re-runs on auth/identity change, not on navigation.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isAuthenticated, username]);
+}
+
+// ── AppWithRedirect ───────────────────────────────────────────────────────────
+// Wrapper that runs the model redirect check inside the Router context
+// (useNavigate requires being inside <Router>).
+function AppWithRedirect() {
+    useModelRedirect();
+    const { user, isInitialized } = useAuthStore();
+    const { startPolling, stopPolling } = useBackendStore();
+
+    useEffect(() => {
+        startPolling();
+        return () => stopPolling();
+    }, [startPolling, stopPolling]);
+
+    if (!isInitialized) {
+        return <AppLoader />;
+    }
+
+    const isAuthenticated = user?.isAuthenticated === true;
+
+    return (
+        <>
+            <Toaster
+                position="top-right"
+                toastOptions={{
+                    duration: 4000,
+                    className: 'dark:bg-gray-800 dark:text-white',
+                    style: { background: '#1f2937', color: '#fff' },
+                }}
+            />
+
+            <GlobalWebSocketProvider>
+                <Routes>
+                    {/* Auth Routes */}
+                    <Route element={<AuthLayout />}>
+                        <Route
+                            path="/login"
+                            element={isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />}
+                        />
+                        <Route
+                            path="/signup"
+                            element={isAuthenticated ? <Navigate to="/" replace /> : <SignupPage />}
+                        />
+                    </Route>
+
+                    {/* Protected Routes */}
+                    <Route
+                        path="/"
+                        element={
+                            isAuthenticated
+                                ? <MainLayout />
+                                : <Navigate to="/login" replace />
+                        }
+                    >
+                        <Route index element={<Dashboard />} />
+                        <Route path="chat" element={<ChatPage />} />
+                        <Route path="agents" element={<AgentsPage />} />
+                        <Route path="tasks" element={<TasksPage />} />
+                        <Route path="monitoring" element={<MonitoringPage />} />
+                        <Route path="voting" element={<VotingPage />} />
+                        <Route path="constitution" element={<ConstitutionPage />} />
+                        <Route path="models" element={<ModelsPage />} />
+                        <Route path="channels" element={<ChannelsPage />} />
+                        <Route path="message-log" element={<MessageLogPage />} />
+                        <Route path="ab-testing" element={<ABTestingPage />} />
+                        <Route
+                            path="sovereign"
+                            element={
+                                <SovereignRoute>
+                                    <SovereignDashboard />
+                                </SovereignRoute>
+                            }
+                        />
+                        <Route path="settings" element={<SettingsPage />} />
+                    </Route>
+
+                    <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+            </GlobalWebSocketProvider>
+        </>
+    );
+}
 
 // ── Lazy-loaded page components ───────────────────────────────────────────────
 // Each page chunk is fetched on first visit and cached by the browser thereafter.
@@ -132,81 +285,9 @@ function AuthLayout() {
 }
 
 export default function App() {
-  const { user, isInitialized } = useAuthStore();
-  const { startPolling, stopPolling } = useBackendStore();
-
-  useEffect(() => {
-    startPolling();
-    return () => stopPolling();
-  }, [startPolling, stopPolling]);
-
-  if (!isInitialized) {
-    return <AppLoader />;
-  }
-
-  const isAuthenticated = user?.isAuthenticated === true;
-
-  return (
-    <Router>
-      <Toaster
-        position="top-right"
-        toastOptions={{
-          duration: 4000,
-          className: 'dark:bg-gray-800 dark:text-white',
-          style: { background: '#1f2937', color: '#fff' },
-        }}
-      />
-
-      <GlobalWebSocketProvider>
-        <Routes>
-          {/* Auth Routes */}
-          <Route element={<AuthLayout />}>
-            <Route
-              path="/login"
-              element={isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />}
-            />
-            <Route
-              path="/signup"
-              element={isAuthenticated ? <Navigate to="/" replace /> : <SignupPage />}
-            />
-          </Route>
-
-          {/* Protected Routes — Suspense uses an invisible fallback so lazy
-              chunks never flash a spinner; the page transition handles the reveal. */}
-          <Route
-            path="/"
-            element={
-              isAuthenticated
-                ? <MainLayout />
-                : <Navigate to="/login" replace />
-            }
-          >
-            <Route index element={<Dashboard />} />
-            <Route path="chat" element={<ChatPage />} />
-            <Route path="agents" element={<AgentsPage />} />
-            <Route path="tasks" element={<TasksPage />} />
-            <Route path="monitoring" element={<MonitoringPage />} />
-            <Route path="voting" element={<VotingPage />} />
-            <Route path="constitution" element={<ConstitutionPage />} />
-            <Route path="models" element={<ModelsPage />} />
-            <Route path="channels" element={<ChannelsPage />} />
-            <Route path="message-log" element={<MessageLogPage />} />
-            {/* ── A/B Testing ── */}
-            <Route path="ab-testing" element={<ABTestingPage />} />
-            <Route
-              path="sovereign"
-              element={
-                <SovereignRoute>
-                  <SovereignDashboard />
-                </SovereignRoute>
-              }
-            />
-            <Route path="settings" element={<SettingsPage />} />
-          </Route>
-
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </GlobalWebSocketProvider>
-    </Router>
-  );
+    return (
+        <Router>
+            <AppWithRedirect />
+        </Router>
+    );
 }
