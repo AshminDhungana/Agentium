@@ -944,12 +944,12 @@ export function ConstitutionPage() {
                                 data.prohibited_actions.map((action: string, idx: number) => (
                                     <div
                                         key={idx}
-                                        className="flex items-start gap-3 px-4 py-3 rounded-xl bg-red-50 dark:bg-red-500/8 border border-red-100 dark:border-red-500/15 transition-colors duration-200"
+                                        className="flex items-start gap-3 px-4 py-3 rounded-xl bg-red-50 dark:bg-[#1e1215] border border-red-100 dark:border-red-500/20 transition-colors duration-200"
                                     >
-                                        <div className="flex-shrink-0 mt-0.5 w-5 h-5 rounded-full bg-red-100 dark:bg-red-500/20 border border-red-200 dark:border-red-500/25 flex items-center justify-center">
+                                        <div className="flex-shrink-0 mt-0.5 w-5 h-5 rounded-full bg-red-100 dark:bg-red-500/20 border border-red-200 dark:border-red-500/30 flex items-center justify-center">
                                             <X className="h-3 w-3 text-red-500 dark:text-red-400" />
                                         </div>
-                                        <span className="text-sm text-gray-800 dark:text-gray-200 leading-relaxed">{action}</span>
+                                        <span className="text-sm text-gray-800 dark:text-gray-300 leading-relaxed">{action}</span>
                                     </div>
                                 ))
                             ) : (
