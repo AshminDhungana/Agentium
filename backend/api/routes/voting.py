@@ -1,6 +1,7 @@
 """
 Voting API routes for Agentium.
 Handles constitutional amendment voting and task deliberations.
+
 """
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
@@ -391,7 +392,13 @@ async def cast_deliberation_vote(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_active_user),
 ):
-    """Cast a vote in a task deliberation."""
+    """
+    Cast a vote in a task deliberation.
+
+    FIX: Now accepts both ACTIVE and QUORUM_REACHED statuses. The model's
+    cast_vote() method supports voting in both states, but the old route
+    only accepted ACTIVE, causing 400 errors when quorum was already reached.
+    """
     user_id = str(current_user.get("sub", ""))
 
     try:
@@ -403,10 +410,19 @@ async def cast_deliberation_vote(
     if not deliberation:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Deliberation not found")
 
-    if deliberation.status != DeliberationStatus.ACTIVE:
+    # FIX: Accept votes in both ACTIVE and QUORUM_REACHED states.
+    # The TaskDeliberation.cast_vote() model method handles both statuses correctly.
+    if deliberation.status not in (
+        DeliberationStatus.ACTIVE,
+        DeliberationStatus.QUORUM_REACHED,
+    ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Deliberation is not currently ACTIVE (current: {deliberation.status.value})"
+            detail=(
+                f"Deliberation is not currently accepting votes "
+                f"(current status: {deliberation.status.value}). "
+                f"Voting is only open when status is 'active' or 'quorum'."
+            ),
         )
 
     if user_id not in (deliberation.participating_members or []):

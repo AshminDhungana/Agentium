@@ -38,6 +38,8 @@ export interface DiscussionEntry {
 
 export interface AmendmentDetails extends AmendmentVoting {
     debate_document?: string;
+    diff_markdown?: string;
+    rationale?: string;
     discussion_thread: DiscussionEntry[];
 }
 
@@ -245,10 +247,12 @@ export function calculateVotePercentage(votes: number, total: number): number {
 
 /**
  * Check if voting is still active.
+ * FIX: Added 'quorum' status — a deliberation in QUORUM_REACHED state still
+ * accepts votes but was previously treated as inactive, hiding vote buttons.
  */
 export function isVotingActive(amendment: AmendmentVoting | TaskDeliberation): boolean {
     const status = (amendment as any).status;
-    if (status === 'voting' || status === 'active') {
+    if (status === 'voting' || status === 'active' || status === 'quorum') {
         if (amendment.ended_at) {
             return new Date(amendment.ended_at) > new Date();
         }
@@ -269,6 +273,7 @@ export function getStatusColor(status: string): string {
         case 'active':
             return '#3b82f6'; // blue
         case 'voting':
+        case 'quorum':
             return '#f59e0b'; // amber
         case 'passed':
         case 'executed':
@@ -280,4 +285,19 @@ export function getStatusColor(status: string): string {
         default:
             return '#6b7280';
     }
+}
+
+/**
+ * Format countdown string from an ISO end date.
+ */
+export function formatCountdown(endedAt: string | undefined): string {
+    if (!endedAt) return '—';
+    const diff = new Date(endedAt).getTime() - Date.now();
+    if (diff <= 0) return 'Ended';
+    const h = Math.floor(diff / 3_600_000);
+    const m = Math.floor((diff % 3_600_000) / 60_000);
+    const s = Math.floor((diff % 60_000) / 1_000);
+    if (h > 0) return `${h}h ${m}m remaining`;
+    if (m > 0) return `${m}m ${s}s remaining`;
+    return `${s}s remaining`;
 }
