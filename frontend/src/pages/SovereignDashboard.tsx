@@ -16,6 +16,7 @@ import {
     Code,
     TrendingUp,
     Sparkles,
+    Zap,
 } from 'lucide-react';
 import { SystemTab } from '@/components/sovereign/SystemTab';
 import { MCPToolRegistry } from '@/components/mcp/MCPToolRegistry';
@@ -29,6 +30,7 @@ import WebhookManagementPage from './WebhookManagementPage';
 import DeveloperPortalPage from './DeveloperPortalPage';
 import { ScalingDashboard } from './ScalingDashboard';
 import { LearningImpactDashboard } from './LearningImpactDashboard';
+import { EventTriggerManager } from '@/components/sovereign/EventTriggerManager';
 
 // ── Tab definitions ───────────────────────────────────────────────────────────
 
@@ -44,7 +46,8 @@ type TabId =
     | 'webhooks'
     | 'developer-portal'
     | 'scaling'
-    | 'improve';
+    | 'improve'
+    | 'events';
 
 interface Tab {
     id: TabId;
@@ -124,6 +127,13 @@ const TABS: Tab[] = [
         label: 'Mobile',
         icon: Smartphone,
         description: 'Devices, push notifications, and offline sync settings',
+    },
+    // ── Automate ──────────────────────────────────────────────────────────────
+    {
+        id: 'events',
+        label: 'Events',
+        icon: Zap,
+        description: 'Intelligent event processing — webhooks, thresholds, API polling, and dead-letter management',
     },
     // ── Optimize ──────────────────────────────────────────────────────────────
     {
@@ -250,6 +260,7 @@ export function SovereignDashboard() {
                 {activeTab === 'developer-portal' && <DeveloperPortalPage />}
                 {activeTab === 'scaling'          && <ScalingDashboard />}
                 {activeTab === 'improve'          && <LearningImpactDashboard />}
+                {activeTab === 'events'           && <EventTriggerManager />}
             </div>
         </div>
     );

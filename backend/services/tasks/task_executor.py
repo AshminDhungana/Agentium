@@ -1232,3 +1232,50 @@ def predictive_scale():
         except Exception as e:
             logger.error(f"predictive_scale failed: {e}")
             return {"error": str(e)}
+
+# ═══════════════════════════════════════════════════════════
+# Phase 13.6 — Intelligent Event Processing Tasks
+# ═══════════════════════════════════════════════════════════
+
+@celery_app.task(name='backend.services.tasks.task_executor.threshold_event_check')
+def threshold_event_check():
+    """
+    Evaluate all active threshold triggers against live Redis metrics.
+    Fires actions when configured conditions are met.
+    Runs every 60 seconds via Celery beat.
+    """
+    with get_task_db() as db:
+        try:
+            from backend.services.event_processor import EventProcessorService
+            result = EventProcessorService.check_thresholds(db)
+            if result.get("fired", 0) > 0:
+                logger.info(
+                    f"⚡ Threshold check: {result['fired']} trigger(s) fired "
+                    f"out of {result['checked']} checked"
+                )
+            return result
+        except Exception as e:
+            logger.error(f"threshold_event_check failed: {e}")
+            return {"error": str(e)}
+
+
+@celery_app.task(name='backend.services.tasks.task_executor.external_api_poll')
+def external_api_poll():
+    """
+    Poll all active api_poll triggers for data changes.
+    Fires actions when the response hash changes from the previous poll.
+    Runs every 60 seconds via Celery beat.
+    """
+    with get_task_db() as db:
+        try:
+            from backend.services.event_processor import EventProcessorService
+            result = EventProcessorService.poll_external_apis(db)
+            if result.get("fired", 0) > 0:
+                logger.info(
+                    f"🔄 API poll: {result['fired']} change(s) detected "
+                    f"out of {result['polled']} polled"
+                )
+            return result
+        except Exception as e:
+            logger.error(f"external_api_poll failed: {e}")
+            return {"error": str(e)}

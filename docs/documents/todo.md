@@ -413,49 +413,49 @@ Build a self-governing AI ecosystem where agents operate under constitutional la
 
 ---
 
-### 13.6 Intelligent Event Processing
+### 13.6 Intelligent Event Processing ✅
 
 **Purpose:** Automatically react to external webhooks, threshold breaches, and scheduled polls — translating signals into tasks and workflows without manual dispatch.
 
 #### Backend — New Models (`backend/models/entities/event_trigger.py`)
 
-- [ ] `EventTrigger` entity: `id`, `name`, `trigger_type` (`webhook | schedule | threshold | api_poll`), `config` (JSONB), `target_workflow_id` (FK nullable), `target_agent_id` (FK nullable), `is_active`, `last_fired_at`, `fire_count`
-- [ ] `EventLog` entity: `id`, `trigger_id`, `event_payload` (JSONB), `status` (`processed | dead_letter | duplicate`), `correlation_id` (UUID), `created_at`
+- [x] `EventTrigger` entity: `id`, `name`, `trigger_type` (`webhook | schedule | threshold | api_poll`), `config` (JSONB), `target_workflow_id` (FK nullable), `target_agent_id` (FK nullable), `is_active`, `last_fired_at`, `fire_count`
+- [x] `EventLog` entity: `id`, `trigger_id`, `event_payload` (JSONB), `status` (`processed | dead_letter | duplicate`), `correlation_id` (UUID), `created_at`
 
-#### Alembic Migration — `009_event_triggers.py`
+#### Alembic Migration — `004_event_triggers.py`
 
-- [ ] Create `event_triggers` and `event_logs` tables
+- [x] Create `event_triggers` and `event_logs` tables
 
 #### Backend — Event Processor (`backend/services/event_processor.py`)
 
-- [ ] **Webhook Receiver** (`POST /events/webhook/{trigger_id}`) — HMAC-SHA256 validation; 24 h Redis deduplication by `correlation_id`; enqueue `process_event` Celery task
-- [ ] **Threshold Monitor** — Celery beat every 60 s: evaluate `config.metric` expressions against live Redis metrics from 13.3; respect `config.cooldown_seconds`
-- [ ] **External API Poller** — Celery beat every `config.poll_interval_seconds`: `GET config.url`; compare response hash to last known hash in Redis; fire on change
-- [ ] **Event Correlation Engine** — group `EventLog` entries with same `correlation_id` prefix within 60 s window; submit as single consolidated task
-- [ ] **Dead Letter Queue** — events failing processing 3 times → `dead_letter` status; expose for manual review
-- [ ] **Circuit Breaker for Events** — if a trigger fires > `config.max_fires_per_minute` (default 10) per minute, pause trigger for `config.pause_duration_seconds`
+- [x] **Webhook Receiver** (`POST /events/webhook/{trigger_id}`) — HMAC-SHA256 validation; 24 h Redis deduplication by `correlation_id`; enqueue `process_event` Celery task
+- [x] **Threshold Monitor** — Celery beat every 60 s: evaluate `config.metric` expressions against live Redis metrics from 13.3; respect `config.cooldown_seconds`
+- [x] **External API Poller** — Celery beat every `config.poll_interval_seconds`: `GET config.url`; compare response hash to last known hash in Redis; fire on change
+- [x] **Event Correlation Engine** — group `EventLog` entries with same `correlation_id` prefix within 60 s window; submit as single consolidated task
+- [x] **Dead Letter Queue** — events failing processing 3 times → `dead_letter` status; expose for manual review
+- [x] **Circuit Breaker for Events** — if a trigger fires > `config.max_fires_per_minute` (default 10) per minute, pause trigger for `config.pause_duration_seconds`
 
 #### Beat Schedule Additions
 
-- [ ] `threshold-event-check` — 60 s
-- [ ] `external-api-poll` — 60 s
+- [x] `threshold-event-check` — 60 s
+- [x] `external-api-poll` — 60 s
 
 #### API Routes (`backend/api/routes/events.py` — new file)
 
-- [ ] `GET /events/triggers` — list all triggers
-- [ ] `POST /events/triggers` — create trigger
-- [ ] `PUT /events/triggers/{id}` — update trigger
-- [ ] `DELETE /events/triggers/{id}` — deactivate
-- [ ] `POST /events/webhook/{trigger_id}` — public receiver (HMAC only, no Bearer)
-- [ ] `GET /events/logs` — paginated log filtered by `status`, `trigger_id`
-- [ ] `GET /events/dead-letters` — dead letter queue viewer
-- [ ] `POST /events/dead-letters/{id}/retry` — manual retry
+- [x] `GET /events/triggers` — list all triggers
+- [x] `POST /events/triggers` — create trigger
+- [x] `PUT /events/triggers/{id}` — update trigger
+- [x] `DELETE /events/triggers/{id}` — deactivate
+- [x] `POST /events/webhook/{trigger_id}` — public receiver (HMAC only, no Bearer)
+- [x] `GET /events/logs` — paginated log filtered by `status`, `trigger_id`
+- [x] `GET /events/dead-letters` — dead letter queue viewer
+- [x] `POST /events/dead-letters/{id}/retry` — manual retry
 
-#### Frontend — `EventTriggerManager.tsx` (new page at `/events`)
+#### Frontend — `EventTriggerManager.tsx` (tab in SovereignDashboard)
 
-- [ ] Trigger list: name, type badge, last fired, fire count, active toggle
-- [ ] Trigger creation form: type selector drives dynamic config fields (webhook → generated URL + HMAC secret; threshold → metric/operator/value dropdowns; api_poll → URL/headers/interval fields)
-- [ ] Event Log tab: scrollable log with status badges; click to expand full payload JSON
+- [x] Trigger list: name, type badge, last fired, fire count, active toggle
+- [x] Trigger creation form: type selector drives dynamic config fields (webhook → generated URL + HMAC secret; threshold → metric/operator/value dropdowns; api_poll → URL/headers/interval fields)
+- [x] Event Log tab: scrollable log with status badges; click to expand full payload JSON
 
 ---
 

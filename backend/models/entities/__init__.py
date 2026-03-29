@@ -146,6 +146,9 @@ from backend.models.entities.webhook import WebhookSubscription, WebhookDelivery
 # Phase 13.5 — Workflow Automation Pipeline
 from backend.models.entities.workflow import (Workflow, WorkflowExecution, WorkflowStep, WorkflowVersion, WorkflowExecutionStatus, WorkflowStepType)
 
+# Phase 13.6 — Intelligent Event Processing
+from backend.models.entities.event_trigger import EventTrigger, EventLog, TriggerType, EventLogStatus
+
 # All models for Alembic/database creation
 __all__ = [
     # Base
@@ -270,4 +273,10 @@ __all__ = [
     'WorkflowVersion',
     'WorkflowExecutionStatus',
     'WorkflowStepType',
+
+    # Intelligent Event Processing (Phase 13.6)
+    'EventTrigger',
+    'EventLog',
+    'TriggerType',
+    'EventLogStatus',
 ]

@@ -151,6 +151,16 @@ celery_app.conf.beat_schedule = {
         'task': 'backend.services.tasks.task_executor.performance_optimization',
         'schedule': 604800.0,  # weekly
     },
+
+    # ── Phase 13.6: Intelligent Event Processing ──────────────────────
+    'threshold-event-check': {
+        'task': 'backend.services.tasks.task_executor.threshold_event_check',
+        'schedule': 60.0,   # every 60 seconds
+    },
+    'external-api-poll': {
+        'task': 'backend.services.tasks.task_executor.external_api_poll',
+        'schedule': 60.0,   # every 60 seconds
+    },
 }
 
 
