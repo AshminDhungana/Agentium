@@ -1,10 +1,11 @@
 import React from 'react';
 import { Task } from '../../types';
-import { Clock, User, Zap, CheckCircle2, AlertCircle, Loader2, MessageSquare, RefreshCw } from 'lucide-react';
+import { Clock, User, Zap, CheckCircle2, AlertCircle, Loader2, MessageSquare, RefreshCw, Monitor } from 'lucide-react';
 
 interface TaskCardProps {
     task: Task;
     onClick?: (task: Task) => void;
+    onViewLive?: (task: Task) => void;
 }
 
 // Enhanced status configuration with icons and proper dark mode tokens
@@ -108,7 +109,7 @@ const PRIORITY_CONFIG: Record<string, {
     },
 };
 
-export const TaskCard: React.FC<TaskCardProps> = ({ task, onClick }) => {
+export const TaskCard: React.FC<TaskCardProps> = ({ task, onClick, onViewLive }) => {
     const assignedAgents = task.assigned_agents?.task_agents ?? [];
     const progress = task.progress ?? 0;
 
@@ -261,6 +262,18 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, onClick }) => {
                     <Clock className="w-3 h-3" />
                     {formattedDate}
                 </div>
+
+                {/* View Live Button for Browser Tasks */}
+                {task.task_type === 'browser' && (task.status === 'in_progress' || task.status === 'executing') && onViewLive && (
+                    <button
+                        onClick={(e) => { e.stopPropagation(); onViewLive(task); }}
+                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-400 border border-violet-200 dark:border-violet-500/20 hover:bg-violet-200 dark:hover:bg-violet-500/25 transition-colors duration-150 mx-auto"
+                        title="Watch agent interact with browser live"
+                    >
+                        <Monitor className="w-3 h-3" />
+                        View Live
+                    </button>
+                )}
 
                 {/* Enhanced agent assignment display */}
                 {assignedAgents.length > 0 ? (

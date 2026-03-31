@@ -562,9 +562,9 @@ Build a self-governing AI ecosystem where agents operate under constitutional la
 
 ### 14.1 Live Screenshot Stream for Browser Tasks
 
-- [ ] **Backend** — extend `browser.py`: emit screenshot frames as base64 via WebSocket event `browser_frame` at configurable FPS (default 2); add `GET /browser/sessions/{id}/stream` endpoint for polling fallback
-- [ ] **Frontend** — `BrowserTaskViewer.tsx`: subscribe to `browser_frame` WebSocket events; render frames in an `<img>` tag with smooth replacement; show URL bar, page title, and action log alongside screenshot
-- [ ] Add to `TaskCard.tsx`: "View Live" button when `task_type = 'browser'` and status is `in_progress`; opens `BrowserTaskViewer` in a modal or slide-over panel
+- [x] **Backend** — extend `browser.py`: emit screenshot frames as base64 via WebSocket event `browser_frame` at configurable FPS (default 2); add `GET /browser/sessions/{id}/stream` endpoint for polling fallback
+- [x] **Frontend** — `BrowserTaskViewer.tsx`: subscribe to `browser_frame` WebSocket events; render frames in an `<img>` tag with smooth replacement; show URL bar, page title, and action log alongside screenshot
+- [x] Add to `TaskCard.tsx`: "View Live" button when `task_type = 'browser'` and status is `in_progress`; opens `BrowserTaskViewer` in a modal or slide-over panel
 
 ### 14.2 WebSocket Reconnection Logic
 

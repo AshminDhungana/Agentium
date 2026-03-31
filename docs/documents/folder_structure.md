@@ -37,9 +37,9 @@ Agentium/
 │   │   │   ├── checkpoints.py       # Checkpoint management
 │   │   │   ├── critics.py           # Critic agents
 │   │   │   ├── dashboard.py         # Dashboard data
+│   │   │   ├── events.py            # Event processing
 │   │   │   ├── federation.py        # Federation management
 │   │   │   ├── files.py             # File operations
-│   │   │   ├── genesis.py           # Genesis/initialization
 │   │   │   ├── inbox.py             # Unified inbox
 │   │   │   ├── improvements.py      # Self-improvement engine
 │   │   │   ├── lifecycle_routes.py  # Lifecycle management
@@ -161,6 +161,7 @@ Agentium/
 │   │   ├── db_maintenance.py       # Database maintenance
 │   │   ├── fact_checker.py         # Fact checking
 │   │   ├── federation_service.py   # Federation management
+│   │   ├── event_processor.py      # Event processing
 │   │   ├── file_processor.py       # PDF/image extraction
 │   │   ├── host_access.py          # Host access service
 │   │   ├── idle_governance.py      # Idle management
@@ -224,7 +225,6 @@ Agentium/
 │   │   ├── desktop_tool.py          # Desktop automation
 │   │   ├── embedding_tool.py        # Embeddings
 │   │   ├── file_tool.py            # File operations
-│   │   ├── generated/               # Generated tools
 │   │   ├── git_tool.py             # Git operations
 │   │   ├── host_os_tool.py         # Host OS operations
 │   │   ├── http_api_tool.py        # HTTP API calls
@@ -264,6 +264,7 @@ Agentium/
 │   │   │   │   ├── AgentListView.tsx
 │   │   │   │   ├── AgentTree.tsx
 │   │   │   │   ├── BulkLiquidateModal.tsx
+│   │   │   │   ├── CriticStatsPanel.tsx
 │   │   │   │   ├── LifecycleDashboard.tsx
 │   │   │   │   ├── PromoteAgentModal.tsx
 │   │   │   │   ├── SpawnAgentModal.tsx

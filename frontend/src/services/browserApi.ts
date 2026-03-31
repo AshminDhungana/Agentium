@@ -71,6 +71,29 @@ export interface ScreenshotResponse {
   captured_at: string;
 }
 
+export interface BrowserSessionInfo {
+  task_id: string;
+  url: string;
+  title: string;
+  status: 'active' | 'paused' | 'completed' | 'error';
+  started_at: string;
+  fps: number;
+}
+
+export interface BrowserSessionsResponse {
+  sessions: BrowserSessionInfo[];
+}
+
+export interface BrowserFrameResponse {
+  task_id: string;
+  frame: string;
+  url: string;
+  title: string;
+  status: string;
+  action_log: Array<{action: string, timestamp: string}>;
+  timestamp: string;
+}
+
 // ─── Service ──────────────────────────────────────────────────────────────────
 
 export const browserApi = {
@@ -101,5 +124,22 @@ export const browserApi = {
   screenshot: async (request: ScreenshotRequest): Promise<ScreenshotResponse> => {
     const response = await api.post<ScreenshotResponse>(`${BASE}/screenshot`, request);
     return response.data;
+  },
+
+  /** Get all active browser sessions */
+  getSessions: async (): Promise<BrowserSessionsResponse> => {
+    const response = await api.get<BrowserSessionsResponse>(`${BASE}/sessions`);
+    return response.data;
+  },
+
+  /** Get latest frame for a session (polling fallback) */
+  getSessionStream: async (taskId: string): Promise<BrowserFrameResponse> => {
+    const response = await api.get<BrowserFrameResponse>(`${BASE}/sessions/${taskId}/stream`);
+    return response.data;
+  },
+
+  /** Configure stream settings */
+  configureSession: async (taskId: string, config: { fps?: number; paused?: boolean }): Promise<void> => {
+    await api.post(`${BASE}/sessions/${taskId}/configure`, config);
   },
 };

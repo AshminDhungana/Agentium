@@ -224,6 +224,28 @@ class ConnectionManager:
             "timestamp":  datetime.utcnow().isoformat(),
         })
 
+    async def emit_browser_frame(
+        self,
+        task_id: str,
+        frame: str,
+        url: str,
+        title: str,
+        action_log: List[dict],
+        frame_number: int,
+    ) -> None:
+        """Broadcast a live browser frame."""
+        await self.broadcast({
+            "type": "browser_frame",
+            "task_id": task_id,
+            "frame": frame,
+            "url": url,
+            "title": title,
+            "action_log": action_log,
+            "frame_number": frame_number,
+            "timestamp": datetime.utcnow().isoformat(),
+        })
+
+
     async def emit_task_escalated(
         self,
         task_id:      str,

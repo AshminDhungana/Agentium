@@ -176,6 +176,21 @@ class SearchResult:
     success: bool = True
     error: str = ""
 
+@dataclass
+class BrowserSession:
+    session_id: str
+    url: str
+    title: str
+    status: str
+    agent_id: str
+    fps: float
+    started_at: datetime
+    latest_frame: str
+    action_log: List[Dict] = field(default_factory=list)
+    _context: Any = field(default=None, repr=False)
+    _page: Any = field(default=None, repr=False)
+    _capture_task: Any = field(default=None, repr=False)
+
 
 # ---------------------------------------------------------------------------
 # Browser Service
@@ -199,6 +214,7 @@ class BrowserService:
         self._safety_guard = URLSafetyGuard()
         self._request_counts: Dict[str, List[float]] = {}  # agent_id → timestamps
         self._initialized = False
+        self._sessions: Dict[str, BrowserSession] = {}  # task_id → BrowserSession
 
     # ── Lifecycle ──────────────────────────────────────────────────────────
 
@@ -229,12 +245,150 @@ class BrowserService:
 
     async def shutdown(self):
         """Shut down browser and Playwright."""
+        # Stop all active streams
+        for task_id in list(self._sessions.keys()):
+            await self.stop_stream(task_id)
+            
         if self._browser:
             await self._browser.close()
         if self._playwright:
             await self._playwright.stop()
         self._initialized = False
         logger.info("Browser service shut down")
+
+    # ── Live Streaming (Phase 14.1) ───────────────────────────────────────
+
+    async def start_stream(
+        self,
+        task_id: str,
+        url: str,
+        agent_id: str = "system",
+        fps: float = 2.0,
+    ) -> None:
+        """Start a browser session and broadcast frames via WebSocket."""
+        if not self._initialized or not self._browser:
+            logger.warning("Browser service not initialized, cannot start stream")
+            return
+            
+        check = self._safety_guard.check_url(url)
+        if not check.safe:
+            logger.warning(f"Blocked unsafe stream URL: {url} ({check.reason})")
+            return
+
+        if task_id in self._sessions:
+            logger.info(f"Stream already running for task {task_id}")
+            return
+            
+        context = await self._create_isolated_context()
+        page = await context.new_page()
+        
+        session = BrowserSession(
+            session_id=task_id,
+            url=url,
+            title="",
+            status="active",
+            agent_id=agent_id,
+            fps=fps,
+            started_at=datetime.utcnow(),
+            latest_frame="",
+            action_log=[],
+            _context=context,
+            _page=page,
+            _capture_task=None
+        )
+        self._sessions[task_id] = session
+        
+        self.record_action(task_id, f"Started browser session at {url}")
+        
+        try:
+            await page.goto(url, wait_until="networkidle", timeout=30000)
+            session.title = await page.title()
+            session.url = page.url
+        except Exception as e:
+            logger.warning(f"Navigation error in stream {task_id}: {e}")
+            self.record_action(task_id, f"Navigation error: {e}")
+            
+        # Start capture loop
+        session._capture_task = asyncio.create_task(self._capture_loop(task_id))
+        
+    async def _capture_loop(self, task_id: str):
+        """Loop that captures screenshots and emits WebSocket events."""
+        from backend.api.routes.websocket import manager as websocket_manager
+        
+        session = self._sessions.get(task_id)
+        if not session:
+            return
+            
+        frame_number = 0
+        while task_id in self._sessions and session.status != "completed":
+            try:
+                if session.status == "paused":
+                    await asyncio.sleep(1.0)
+                    continue
+                    
+                start_time = time.time()
+                
+                # Capture frame as JPEG
+                jpeg_bytes = await session._page.screenshot(type="jpeg", quality=60)
+                frame_b64 = base64.b64encode(jpeg_bytes).decode('utf-8')
+                
+                session.latest_frame = frame_b64
+                session.title = await session._page.title()
+                session.url = session._page.url
+                frame_number += 1
+                
+                # Emit WebSocket event
+                await websocket_manager.emit_browser_frame(
+                    task_id=task_id,
+                    frame=frame_b64,
+                    url=session.url,
+                    title=session.title,
+                    action_log=session.action_log[-50:],  # keep it bounded
+                    frame_number=frame_number
+                )
+                
+                elapsed = time.time() - start_time
+                sleep_time = max(0, (1.0 / session.fps) - elapsed)
+                await asyncio.sleep(sleep_time)
+                
+            except Exception as e:
+                logger.error(f"Error in capture loop for task {task_id}: {e}")
+                await asyncio.sleep(2.0)  # back off on error
+                
+    async def stop_stream(self, task_id: str) -> None:
+        """Stop a stream and cleanup its browser context."""
+        session = self._sessions.pop(task_id, None)
+        if not session:
+            return
+            
+        session.status = "completed"
+        if session._capture_task:
+            session._capture_task.cancel()
+            
+        try:
+            if session._context:
+                await session._context.close()
+        except Exception as e:
+            logger.warning(f"Error closing browser context for task {task_id}: {e}")
+            
+        logger.info(f"Stopped browser stream for task {task_id}")
+
+    def get_session(self, task_id: str) -> Optional[BrowserSession]:
+        """Get the current session state."""
+        return self._sessions.get(task_id)
+
+    def get_all_sessions(self) -> List[BrowserSession]:
+        """Get all active sessions."""
+        return list(self._sessions.values())
+
+    def record_action(self, task_id: str, action: str) -> None:
+        """Record an action in the session's action log."""
+        session = self._sessions.get(task_id)
+        if session:
+            session.action_log.append({
+                "action": action,
+                "timestamp": datetime.utcnow().isoformat()
+            })
 
     # ── Session Isolation (Phase 10.1 hardening) ──────────────────────────
 

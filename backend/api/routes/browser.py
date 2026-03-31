@@ -6,6 +6,7 @@ headless browser operations (navigate, scrape, screenshot, search).
 """
 
 import logging
+from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -49,6 +50,11 @@ class SearchRequest(BaseModel):
 
 class URLCheckRequest(BaseModel):
     url: str = Field(..., description="URL to validate")
+
+
+class ConfigureSessionRequest(BaseModel):
+    fps: Optional[float] = None
+    paused: Optional[bool] = None
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
@@ -142,3 +148,67 @@ async def check_url(
         "safe": result.safe,
         "reason": result.reason,
     }
+
+
+@router.get("/sessions")
+async def get_sessions(
+    current_user: User = Depends(get_current_active_user),
+):
+    """List all active browser sessions."""
+    svc = get_browser_service()
+    sessions = svc.get_all_sessions()
+    return {
+        "sessions": [
+            {
+                "task_id": s.session_id,
+                "url": s.url,
+                "title": s.title,
+                "status": s.status,
+                "started_at": s.started_at.isoformat() if s.started_at else None,
+                "fps": s.fps
+            }
+            for s in sessions
+        ]
+    }
+
+
+@router.get("/sessions/{task_id}/stream")
+async def get_session_stream(
+    task_id: str,
+    current_user: User = Depends(get_current_active_user),
+):
+    """Get the latest frame for a browser session (polling fallback)."""
+    svc = get_browser_service()
+    session = svc.get_session(task_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Browser session not found")
+        
+    return {
+        "task_id": session.session_id,
+        "frame": session.latest_frame,
+        "url": session.url,
+        "title": session.title,
+        "status": session.status,
+        "action_log": session.action_log[-50:],
+        "timestamp": datetime.utcnow().isoformat()
+    }
+
+
+@router.post("/sessions/{task_id}/configure")
+async def configure_session(
+    task_id: str,
+    req: ConfigureSessionRequest,
+    current_user: User = Depends(get_current_active_user),
+):
+    """Configure stream settings."""
+    svc = get_browser_service()
+    session = svc.get_session(task_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Browser session not found")
+        
+    if req.fps is not None:
+        session.fps = req.fps
+    if req.paused is not None:
+        session.status = "paused" if req.paused else "active"
+        
+    return {"status": "success"}

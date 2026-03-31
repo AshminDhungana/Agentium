@@ -61,12 +61,15 @@ import {
     Upload,
     Brain,
     Network,
+    Monitor,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { CheckpointTimeline } from '../components/checkpoints/CheckpointTimeline';
 import { BranchDiffView } from '../components/checkpoints/BranchDiffView';
 import { AutoDelegationPanel } from '../components/tasks/AutoDelegationPanel';
 import { WorkflowAutomationPanel } from '../components/workflows/WorkflowAutomationPanel';
+import { BrowserSessionsList } from '../components/tasks/BrowserSessionsList';
+import { BrowserTaskViewer } from '../components/tasks/BrowserTaskViewer';
 
 // ─── Local-only type (UI state, not suitable for shared types/index.ts) ────────
 
@@ -783,7 +786,7 @@ const TaskSubtaskAccordion: React.FC<{ task: Task }> = ({ task }) => {
 // ─── Main Task Card ───────────────────────────────────────────────────────────
 
 // FIX 2: React.memo prevents re-renders when sibling tasks update
-const MainTaskCard: React.FC<{ task: Task; onUpdated?: (updated: Task) => void }> = React.memo(({ task, onUpdated }) => {
+const MainTaskCard: React.FC<{ task: Task; onUpdated?: (updated: Task) => void; onViewLive?: (task: Task) => void }> = React.memo(({ task, onUpdated, onViewLive }) => {
     const [subtasksOpen, setSubtasksOpen]         = useState(false);
     const [governanceOpen, setGovernanceOpen]     = useState(false);
     const [isEditing, setIsEditing]               = useState(false);
@@ -984,6 +987,16 @@ const MainTaskCard: React.FC<{ task: Task; onUpdated?: (updated: Task) => void }
                                     >
                                         <ShieldAlert className="w-3.5 h-3.5" />
                                         Escalate
+                                    </button>
+                                )}
+                                {task.task_type === 'browser' && (task.status === 'in_progress' || task.status === 'executing') && onViewLive && (
+                                    <button
+                                        onClick={() => onViewLive(task)}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-400 border border-violet-200 dark:border-violet-500/20 hover:bg-violet-200 dark:hover:bg-violet-500/25 transition-colors duration-150"
+                                        title="Watch agent interact with browser live"
+                                    >
+                                        <Monitor className="w-3.5 h-3.5" />
+                                        View Live
                                     </button>
                                 )}
                             </>
@@ -2128,7 +2141,7 @@ const CriticsTab: React.FC<{ onStatsLoaded?: (count: number) => void }> = ({ onS
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
-type Tab = 'tasks' | 'critics' | 'checkpoints' | 'preferences' | 'delegation' | 'workflows';
+type Tab = 'tasks' | 'critics' | 'checkpoints' | 'preferences' | 'delegation' | 'workflows' | 'browser';
 
 export const TasksPage: React.FC = () => {
     const [tasks, setTasks]               = useState<Task[]>([]);
@@ -2144,6 +2157,10 @@ export const TasksPage: React.FC = () => {
     const [showImportModal, setShowImportModal] = useState(false);
     // FIX 11: track critic count from CriticsTab for the tab badge
     const [criticCount, setCriticCount] = useState<number | null>(null);
+    
+    // Phase 14.1
+    const [selectedBrowserTask, setSelectedBrowserTask] = useState<string | null>(null);
+    const [showLiveViewerTask, setShowLiveViewerTask] = useState<string | null>(null);
 
     useEffect(() => { loadTasks(); }, [filterStatus, myTasksOnly, hideSystem]);
 
@@ -2264,6 +2281,7 @@ export const TasksPage: React.FC = () => {
                         { id: 'delegation',  label: 'Delegation',  icon: Brain       },
                         { id: 'preferences', label: 'Preferences', icon: Settings    },
                         { id: 'workflows',   label: 'Workflows',   icon: Network     },
+                        { id: 'browser',     label: 'Browser',     icon: Monitor     },
                     ] as { id: Tab; label: string; icon: React.ElementType }[]).map(tab => {
                         const isActive = activeTab === tab.id;
                         return (
@@ -2394,6 +2412,7 @@ export const TasksPage: React.FC = () => {
                                             onUpdated={updated =>
                                                 setTasks(prev => prev.map(t => t.id === updated.id ? updated : t))
                                             }
+                                            onViewLive={(t) => setShowLiveViewerTask(t.id)}
                                         />
                                     ))}
                                 </div>
@@ -2509,6 +2528,27 @@ export const TasksPage: React.FC = () => {
                         </TabErrorBoundary>
                     </div>
                 )}
+
+                {/* ── Browser tab ───────────────────────────────────────── */}
+                {activeTab === 'browser' && (
+                    <div className="p-6">
+                        <TabErrorBoundary tabName="Browser">
+                            {selectedBrowserTask ? (
+                                <div className="space-y-4">
+                                    <button 
+                                        onClick={() => setSelectedBrowserTask(null)}
+                                        className="text-sm text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                                    >
+                                        &larr; Back to Sessions
+                                    </button>
+                                    <BrowserTaskViewer taskId={selectedBrowserTask} mode="tab" />
+                                </div>
+                            ) : (
+                                <BrowserSessionsList tasks={tasks} onSelectTask={setSelectedBrowserTask} />
+                            )}
+                        </TabErrorBoundary>
+                    </div>
+                )}
             </div>
 
             {showCreateModal && (
@@ -2528,6 +2568,14 @@ export const TasksPage: React.FC = () => {
                         await loadTasks(true);
                         toast.success('Checkpoint imported — task list refreshed');
                     }}
+                />
+            )}
+
+            {showLiveViewerTask && (
+                <BrowserTaskViewer
+                    taskId={showLiveViewerTask}
+                    mode="modal"
+                    onClose={() => setShowLiveViewerTask(null)}
                 />
             )}
         </div>
