@@ -332,14 +332,14 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
                 if (data.events.length > 0) {
                     console.log(`[WebSocket] Replaying ${data.events.length} missed events`);
                 }
-                const wsLikeOnMessage = get()._ws?.onmessage;
-                if (!wsLikeOnMessage) return;
+                const ws = get()._ws;
+                if (!ws || !ws.onmessage) return;
                 
                 data.events.forEach((ev: any) => {
                     const syntheticEvent = new MessageEvent('message', {
                         data: JSON.stringify(ev)
                     });
-                    wsLikeOnMessage(syntheticEvent as any);
+                    ws.onmessage!.call(ws, syntheticEvent as any);
                 });
             }
         } catch (err) {
