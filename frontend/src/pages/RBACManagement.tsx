@@ -19,10 +19,12 @@ import {
     AlertTriangle,
     CheckCircle,
     XCircle,
+    ScrollText,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/store/authStore';
 import { rbacService, Delegation, RBACUser } from '@/services/rbac';
+import { AuditTrailTab } from '@/components/rbac/AuditTrailTab';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -161,7 +163,7 @@ function RBACManagementInner() {
     const [users, setUsers] = useState<RBACUser[]>([]);
     const [delegations, setDelegations] = useState<Delegation[]>([]);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'users' | 'delegations' | 'capabilities'>('users');
+    const [activeTab, setActiveTab] = useState<'users' | 'delegations' | 'capabilities' | 'audit'>('users');
     const [searchQuery, setSearchQuery] = useState('');
 
     // Delegate modal state
@@ -338,9 +340,10 @@ function RBACManagementInner() {
                 <div className="flex gap-2 mb-6">
                     {(
                         [
-                            { id: 'users', label: 'Users & Roles', icon: Users },
-                            { id: 'delegations', label: 'Delegations', icon: HandMetal },
-                            { id: 'capabilities', label: 'Capabilities', icon: Key },
+                            { id: 'users',        label: 'Users & Roles',  icon: Users      },
+                            { id: 'delegations',  label: 'Delegations',    icon: HandMetal  },
+                            { id: 'capabilities', label: 'Capabilities',   icon: Key        },
+                            { id: 'audit',        label: 'Audit Trail',    icon: ScrollText },
                         ] as const
                     ).map(({ id, label, icon: Icon }) => (
                         <button
@@ -676,6 +679,9 @@ function RBACManagementInner() {
                         </div>
                     </div>
                 )}
+
+                {/* ── Audit Trail Tab ───────────────────────────────────────── */}
+                {activeTab === 'audit' && <AuditTrailTab />}
             </div>
 
             {/* ── Delegate Modal ────────────────────────────────────────────── */}

@@ -15,6 +15,7 @@ from backend.models.entities.user import (
     ROLE_OBSERVER,
 )
 from backend.models.entities.delegation import Delegation
+from backend.models.entities.audit import AuditLog, AuditLevel, AuditCategory
 
 
 # ── Capabilities ───────────────────────────────────────────────────────────────
@@ -102,6 +103,23 @@ class RBACService:
         db.add(delegation)
         db.commit()
         db.refresh(delegation)
+
+        # Audit log for privilege escalation
+        audit_entry = AuditLog.log(
+            level=AuditLevel.WARNING,
+            category=AuditCategory.AUTHORIZATION,
+            actor_type="user",
+            actor_id=grantor.id,
+            action="privilege_escalation",
+            target_type="user",
+            target_id=grantee.id,
+            description=f"Delegated capabilities: {', '.join(capabilities)}",
+            success=True,
+            meta_data={"capabilities": capabilities, "delegation_id": delegation.id, "reason": reason, "expires_at": expires_at.isoformat() if expires_at else None}
+        )
+        db.add(audit_entry)
+        db.commit()
+
         return delegation
 
     @staticmethod
@@ -122,6 +140,21 @@ class RBACService:
             )
 
         delegation.revoke()
+        
+        # Audit log for capability revocation
+        audit_entry = AuditLog.log(
+            level=AuditLevel.INFO,
+            category=AuditCategory.AUTHORIZATION,
+            actor_type="user",
+            actor_id=actor.id,
+            action="privilege_revocation",
+            target_type="user",
+            target_id=delegation.grantee_id,
+            description=f"Revoked delegation {delegation.id}",
+            success=True,
+            meta_data={"delegation_id": delegation.id}
+        )
+        db.add(audit_entry)
         db.commit()
         db.refresh(delegation)
         return delegation
@@ -164,6 +197,20 @@ class RBACService:
         current_sovereign.is_admin = False
         new_sovereign.is_admin = True
 
+        # Audit log for emergency transfer
+        audit_entry = AuditLog.log(
+            level=AuditLevel.EMERGENCY,
+            category=AuditCategory.AUTHORIZATION,
+            actor_type="user",
+            actor_id=current_sovereign.id,
+            action="privilege_escalation",
+            target_type="user",
+            target_id=new_sovereign.id,
+            description="Transferred Primary Sovereign role via emergency override.",
+            success=True,
+            meta_data={"reason": reason, "delegation_id": delegation.id}
+        )
+        db.add(audit_entry)
         db.commit()
         db.refresh(delegation)
         db.refresh(current_sovereign)

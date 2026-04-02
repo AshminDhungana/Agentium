@@ -588,9 +588,9 @@ Build a self-governing AI ecosystem where agents operate under constitutional la
 
 ### 15.1 Audit Trail for Privilege Escalations
 
-- [ ] **Backend** — on every `PATCH /users/{id}/role` or capability grant call, write an `AuditLog` entry with `category = SECURITY`, `level = WARNING`, capturing `actor_id`, `target_user_id`, `old_role`, `new_role`, `expires_at`, `ip_address`
-- [ ] Add `GET /audit/privilege-escalations` route: paginated, filterable by `actor_id`, `target_id`, date range
-- [ ] **Frontend** — add "Privilege Escalation Log" tab to `RBACManagement.tsx`; table with actor, target, role change delta, timestamp, expiry; export to CSV button
+- [x] **Backend** — on every `PATCH /users/{id}/role` or capability grant call, write an `AuditLog` entry with `category = SECURITY`, `level = WARNING`, capturing `actor_id`, `target_user_id`, `old_role`, `new_role`, `expires_at`, `ip_address`
+- [x] Add `GET /audit/privilege-escalations` route: paginated, filterable by `actor_id`, `target_id`, date range
+- [x] **Frontend** — add "Privilege Escalation Log" tab to `RBACManagement.tsx`; table with actor, target, role change delta, timestamp, expiry; export to CSV button
 
 ### 15.2 Real-Time MCP Tool Stats & Sub-Second Revocation
 
@@ -704,9 +704,9 @@ Build a self-governing AI ecosystem where agents operate under constitutional la
 1. **13.2** Agent crash detection and reincarnation service (`reincarnation_service.py`)
 2. **13.1** Task complexity analyzer and sub-task breakdown (`auto_delegation_service.py`)
 3. **13.3** Fix `auto_scale_check` stub — wire real `AgentLifecycleService.spawn_agent()` call
-~~4. **14.2** WebSocket reconnection with exponential backoff and server-side event buffer~~
-5. **14.3** Global frontend error boundaries wrapping all route-level pages
-6. **15.3** Channel health monitoring, message logs, and per-channel settings UI
+   ~~4. **14.2** WebSocket reconnection with exponential backoff and server-side event buffer~~
+4. **14.3** Global frontend error boundaries wrapping all route-level pages
+5. **15.3** Channel health monitoring, message logs, and per-channel settings UI
 
 ### 🟡 Medium Priority
 

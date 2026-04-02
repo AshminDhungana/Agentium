@@ -62,7 +62,8 @@ Agentium/
 │   │   │   ├── voting.py            # Voting/constitution
 │   │   │   ├── webhooks.py          # Webhook handlers
 │   │   │   ├── websocket.py         # WebSocket endpoints
-│   │   │   └── workflows.py         # Workflow automation
+│   │   │   ├── workflows.py         # Workflow automation
+│   │   │   └── browser.py          # Browser automation
 │   │   ├── schemas/                 # Pydantic schemas
 │   │   │   ├── checkpoint.py
 │   │   │   ├── mcp_schemas.py
@@ -120,7 +121,8 @@ Agentium/
 │   │   │   ├── user_preference.py   # User preferences
 │   │   │   ├── voting.py            # Voting records
 │   │   │   ├── webhook.py           # Webhook entities
-│   │   │   └── workflow.py          # Workflow definitions
+│   │   │   ├── workflow.py          # Workflow definitions
+│   │   │   └── event_trigger.py     # Event triggers
 │   │   └── schemas/                 # Request/response schemas
 │   │       ├── messages.py
 │   │       ├── task.py
@@ -143,6 +145,7 @@ Agentium/
 │   │   ├── audit/                   # Audit processing
 │   │   │   ├── __init__.py
 │   │   │   └── audit_processor.py   # Audit processor
+│   │   ├── audit_service.py        # Audit service
 │   │   ├── auth.py                  # Auth service
 │   │   ├── auto_delegation_service.py # Automatic task delegation
 │   │   ├── autonomous_learning.py  # Autonomous learning
@@ -316,10 +319,20 @@ Agentium/
 │   │   │   │   ├── HealthScore.tsx
 │   │   │   │   └── ViolationCard.tsx
 │   │   │   ├── sovereign/           # Sovereign governance UI
-│   │   │   │   └── SystemTab.tsx
+│   │   │   │   ├── SystemTab.tsx
+│   │   │   │   └── EventTriggerManager.tsx
+│   │   │   ├── voting/              # Voting UI
+│   │   │   │   ├── ConstitutionTab.tsx
+│   │   │   │   ├── DetailPanel.tsx
+│   │   │   │   ├── GovernanceTab.tsx
+│   │   │   │   ├── ProposeAmendmentModal.tsx
+│   │   │   │   ├── QuorumBar.tsx
+│   │   │   │   └── VotingCard.tsx
 │   │   │   ├── SovereignRoute.tsx
 │   │   │   ├── tasks/               # Task UI
 │   │   │   │   ├── AutoDelegationPanel.tsx
+│   │   │   │   ├── BrowserSessionsList.tsx
+│   │   │   │   ├── BrowserTaskViewer.tsx
 │   │   │   │   ├── CreateTaskModal.tsx
 │   │   │   │   └── TaskCard.tsx
 │   │   │   ├── UnifiedInbox.tsx
