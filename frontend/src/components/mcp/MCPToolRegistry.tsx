@@ -1,7 +1,7 @@
 // src/components/mcp/MCPToolRegistry.tsx
-// Embedded inside SovereignDashboard as a tab panel.
 
-import { useEffect, useState, useCallback } from 'react';
+
+import { useEffect, useState, useCallback, useRef } from 'react';
 import {
     Plus,
     RefreshCw,
@@ -20,11 +20,16 @@ import {
     ChevronUp,
     Loader2,
     Hash,
+    BarChart2,
+    TrendingUp,
+    AlertOctagon,
 } from 'lucide-react';
 import { api } from '@/services/api';
+import { mcpToolsApi, MCPToolStats } from '@/services/mcpToolsApi';
 import { useAuthStore } from '@/store/authStore';
+import { useWebSocketStore } from '@/store/websocketStore';
 
-// ── Shared input style (C6: moved to top — was at line 558 in original) ───────
+// ── Shared input style ────────────────────────────────────────────────────────
 
 const inputCls =
     'w-full px-3 py-2 text-sm bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-[#2a3347] rounded-lg text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40 transition-colors';
@@ -110,13 +115,12 @@ const HEALTH_META: Record<string, { cls: string; dot: string }> = {
     unknown:  { cls: 'text-gray-500 dark:text-gray-400',     dot: 'bg-gray-400' },
 };
 
-// C5: typed lookup object replaces the fragile `.split(' ').slice(...)` pattern
-// that broke whenever Tailwind class order changed.
 const CARD_COLORS: Record<string, { bg: string; text: string }> = {
     blue:   { bg: 'bg-blue-100 dark:bg-blue-500/10',     text: 'text-blue-600 dark:text-blue-400' },
     green:  { bg: 'bg-green-100 dark:bg-green-500/10',   text: 'text-green-600 dark:text-green-400' },
     yellow: { bg: 'bg-yellow-100 dark:bg-yellow-500/10', text: 'text-yellow-600 dark:text-yellow-400' },
     red:    { bg: 'bg-red-100 dark:bg-red-500/10',       text: 'text-red-600 dark:text-red-400' },
+    purple: { bg: 'bg-purple-100 dark:bg-purple-500/10', text: 'text-purple-600 dark:text-purple-400' },
 };
 
 function fmtDate(iso: string | null): string {
@@ -124,7 +128,28 @@ function fmtDate(iso: string | null): string {
     return new Date(iso).toLocaleString();
 }
 
-// ── Propose Modal ─────────────────────────────────────────────────────────────
+/** Format latency as "12.3 ms" or "—" */
+function fmtLatency(ms: number): string {
+    if (ms <= 0) return '—';
+    return `${ms.toFixed(1)} ms`;
+}
+
+/** Format error rate as percentage string with colour class */
+function errorRateColor(rate: number): string {
+    if (rate >= 0.3)  return 'text-red-600 dark:text-red-400';
+    if (rate >= 0.1)  return 'text-yellow-600 dark:text-yellow-400';
+    return 'text-green-600 dark:text-green-400';
+}
+
+/** Format latency with colour class based on severity */
+function latencyColor(ms: number): string {
+    if (ms >= 2000) return 'text-red-600 dark:text-red-400';
+    if (ms >= 500)  return 'text-yellow-600 dark:text-yellow-400';
+    return 'text-gray-700 dark:text-gray-300';
+}
+
+
+// ── Propose Modal (unchanged) ─────────────────────────────────────────────────
 
 interface ProposeModalProps {
     onClose: () => void;
@@ -141,7 +166,7 @@ function ProposeModal({ onClose, onProposed }: ProposeModalProps) {
         capabilities: '',
     });
     const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const [error, setError]     = useState<string | null>(null);
 
     const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
 
@@ -168,7 +193,6 @@ function ProposeModal({ onClose, onProposed }: ProposeModalProps) {
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
             <div className="bg-white dark:bg-[#161b27] rounded-2xl border border-gray-200 dark:border-[#1e2535] shadow-2xl w-full max-w-lg">
-                {/* Header */}
                 <div className="p-6 border-b border-gray-100 dark:border-[#1e2535] flex items-center gap-3">
                     <div className="w-9 h-9 rounded-lg bg-blue-100 dark:bg-blue-500/10 flex items-center justify-center">
                         <Plus className="w-5 h-5 text-blue-600 dark:text-blue-400" />
@@ -179,7 +203,6 @@ function ProposeModal({ onClose, onProposed }: ProposeModalProps) {
                     </div>
                 </div>
 
-                {/* Body */}
                 <div className="p-6 space-y-4">
                     {error && (
                         <div className="flex items-start gap-2 p-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-lg text-sm text-red-700 dark:text-red-400">
@@ -189,74 +212,33 @@ function ProposeModal({ onClose, onProposed }: ProposeModalProps) {
                     )}
 
                     <Field label="Name" required>
-                        <input
-                            className={inputCls}
-                            placeholder="e.g. Weather API"
-                            value={form.name}
-                            onChange={e => set('name', e.target.value)}
-                        />
+                        <input className={inputCls} placeholder="e.g. Weather API" value={form.name} onChange={e => set('name', e.target.value)} />
                     </Field>
-
                     <Field label="Description" required>
-                        <textarea
-                            className={`${inputCls} resize-none`}
-                            rows={2}
-                            placeholder="What does this MCP server do?"
-                            value={form.description}
-                            onChange={e => set('description', e.target.value)}
-                        />
+                        <textarea className={`${inputCls} resize-none`} rows={2} placeholder="What does this MCP server do?" value={form.description} onChange={e => set('description', e.target.value)} />
                     </Field>
-
                     <Field label="Server URL / Command" required>
-                        <input
-                            className={inputCls}
-                            placeholder="https://mcp.example.com or /usr/bin/mcp-server"
-                            value={form.server_url}
-                            onChange={e => set('server_url', e.target.value)}
-                        />
+                        <input className={inputCls} placeholder="https://mcp.example.com or /usr/bin/mcp-server" value={form.server_url} onChange={e => set('server_url', e.target.value)} />
                     </Field>
-
                     <Field label="Constitutional Tier" required>
-                        <select
-                            aria-label="Constitutional Tier"
-                            className={inputCls}
-                            value={form.tier}
-                            onChange={e => set('tier', e.target.value)}
-                        >
+                        <select aria-label="Constitutional Tier" className={inputCls} value={form.tier} onChange={e => set('tier', e.target.value)}>
                             <option value="pre_approved">Pre-Approved — safe read-only APIs</option>
                             <option value="restricted">Restricted — destructive / side-effectful</option>
                             <option value="forbidden">Forbidden — constitutionally banned</option>
                         </select>
                     </Field>
-
                     <div className="grid grid-cols-2 gap-3">
                         <Field label="Constitution Article">
-                            <input
-                                className={inputCls}
-                                placeholder="e.g. Article 7.2"
-                                value={form.constitutional_article}
-                                onChange={e => set('constitutional_article', e.target.value)}
-                            />
+                            <input className={inputCls} placeholder="e.g. Article 7.2" value={form.constitutional_article} onChange={e => set('constitutional_article', e.target.value)} />
                         </Field>
                         <Field label="Capabilities (comma-separated)">
-                            <input
-                                className={inputCls}
-                                placeholder="search, fetch, write"
-                                value={form.capabilities}
-                                onChange={e => set('capabilities', e.target.value)}
-                            />
+                            <input className={inputCls} placeholder="search, fetch, write" value={form.capabilities} onChange={e => set('capabilities', e.target.value)} />
                         </Field>
                     </div>
                 </div>
 
-                {/* Footer */}
                 <div className="p-6 border-t border-gray-100 dark:border-[#1e2535] flex justify-end gap-3">
-                    <button
-                        onClick={onClose}
-                        className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 rounded-lg transition-colors"
-                    >
-                        Cancel
-                    </button>
+                    <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 rounded-lg transition-colors">Cancel</button>
                     <button
                         onClick={handleSubmit}
                         disabled={loading || !form.name || !form.description || !form.server_url}
@@ -271,7 +253,8 @@ function ProposeModal({ onClose, onProposed }: ProposeModalProps) {
     );
 }
 
-// ── Audit Log Drawer ──────────────────────────────────────────────────────────
+
+// ── Audit Log Drawer (unchanged) ──────────────────────────────────────────────
 
 function AuditDrawer({ tool, onClose }: { tool: MCPTool; onClose: () => void }) {
     const [entries, setEntries] = useState<AuditEntry[]>([]);
@@ -297,12 +280,7 @@ function AuditDrawer({ tool, onClose }: { tool: MCPTool; onClose: () => void }) 
                             <p className="text-xs text-gray-400 dark:text-gray-500">Last 100 invocations</p>
                         </div>
                     </div>
-                    <button
-                        onClick={onClose}
-                        className="p-2 hover:bg-gray-100 dark:hover:bg-white/5 rounded-lg transition-colors"
-                        title="Close"
-                        aria-label="Close audit log"
-                    >
+                    <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-white/5 rounded-lg transition-colors" aria-label="Close audit log">
                         <XCircle className="w-4 h-4 text-gray-400" />
                     </button>
                 </div>
@@ -315,7 +293,6 @@ function AuditDrawer({ tool, onClose }: { tool: MCPTool; onClose: () => void }) 
                     {!loading && entries.length === 0 && (
                         <div className="text-center py-12 text-sm text-gray-400">No invocations recorded yet.</div>
                     )}
-                    {/* C7: use stable compound key instead of array index */}
                     {!loading && entries.map((e) => (
                         <div key={`${e.agent_id}-${e.timestamp}`} className="p-4 hover:bg-gray-50 dark:hover:bg-[#0f1117] transition-colors">
                             <div className="flex items-center gap-3 mb-1">
@@ -339,16 +316,68 @@ function AuditDrawer({ tool, onClose }: { tool: MCPTool; onClose: () => void }) 
     );
 }
 
-// ── Tool Row / Card ───────────────────────────────────────────────────────────
 
-// C4: currentUser passed in so approve/revoke log the real actor, not '00001'
+// ── Phase 15.2: Stats Mini-Card ───────────────────────────────────────────────
+
+function StatsRow({ stats }: { stats: MCPToolStats | null }) {
+    if (!stats || stats.invocation_count === 0) {
+        return (
+            <div className="flex items-center gap-1.5 text-xs text-gray-400 dark:text-gray-500 italic">
+                <BarChart2 className="w-3.5 h-3.5" />
+                No invocations recorded yet
+            </div>
+        );
+    }
+
+    return (
+        <div className="grid grid-cols-3 gap-3">
+            {/* Invocations */}
+            <div className="bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-lg px-3 py-2">
+                <div className="flex items-center gap-1.5 text-xs text-blue-500 dark:text-blue-400 mb-0.5">
+                    <TrendingUp className="w-3 h-3" />
+                    Invocations
+                </div>
+                <p className="text-base font-bold text-blue-700 dark:text-blue-300 tabular-nums">
+                    {stats.invocation_count.toLocaleString()}
+                </p>
+            </div>
+
+            {/* Avg Latency */}
+            <div className="bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-[#2a3347] rounded-lg px-3 py-2">
+                <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 mb-0.5">
+                    <Activity className="w-3 h-3" />
+                    Avg Latency
+                </div>
+                <p className={`text-base font-bold tabular-nums ${latencyColor(stats.avg_latency_ms)}`}>
+                    {fmtLatency(stats.avg_latency_ms)}
+                </p>
+            </div>
+
+            {/* Error Rate */}
+            <div className="bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-[#2a3347] rounded-lg px-3 py-2">
+                <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 mb-0.5">
+                    <AlertOctagon className="w-3 h-3" />
+                    Error Rate
+                </div>
+                <p className={`text-base font-bold tabular-nums ${errorRateColor(stats.error_rate)}`}>
+                    {(stats.error_rate * 100).toFixed(1)}%
+                </p>
+            </div>
+        </div>
+    );
+}
+
+
+// ── Tool Card ─────────────────────────────────────────────────────────────────
+
 interface ToolCardProps {
     tool: MCPTool;
+    stats: MCPToolStats | null;   // Phase 15.2: live stats for this tool
     onRefresh: () => void;
     currentUser: { username?: string } | null;
 }
 
-function ToolCard({ tool, onRefresh, currentUser }: ToolCardProps) {
+function ToolCard({ tool, stats, onRefresh, currentUser }: ToolCardProps) {
     const [expanded,        setExpanded]        = useState(false);
     const [showAudit,       setShowAudit]       = useState(false);
     const [healthLoading,   setHealthLoading]   = useState(false);
@@ -357,12 +386,11 @@ function ToolCard({ tool, onRefresh, currentUser }: ToolCardProps) {
     const [revokeReason,    setRevokeReason]    = useState('');
     const [showRevokeInput, setShowRevokeInput] = useState(false);
 
-    const tier       = TIER_META[tool.tier]         || TIER_META.restricted;
-    const statusMeta = STATUS_META[tool.status]     || STATUS_META.pending;
-    const health     = HEALTH_META[tool.health_status] || HEALTH_META.unknown;
+    const tier       = TIER_META[tool.tier]              || TIER_META.restricted;
+    const statusMeta = STATUS_META[tool.status]          || STATUS_META.pending;
+    const health     = HEALTH_META[tool.health_status]   || HEALTH_META.unknown;
     const TierIcon   = tier.icon;
 
-    // C4: use the logged-in sovereign's username, not a hardcoded agent ID
     const actorName = currentUser?.username ?? 'sovereign';
 
     const pingHealth = async () => {
@@ -378,10 +406,7 @@ function ToolCard({ tool, onRefresh, currentUser }: ToolCardProps) {
     const approve = async () => {
         setApproving(true);
         try {
-            await api.post(`/api/v1/mcp-tools/${tool.id}/approve`, {
-                approved_by: actorName,
-                vote_id: null,
-            });
+            await api.post(`/api/v1/mcp-tools/${tool.id}/approve`, { approved_by: actorName, vote_id: null });
             onRefresh();
         } finally {
             setApproving(false);
@@ -392,10 +417,7 @@ function ToolCard({ tool, onRefresh, currentUser }: ToolCardProps) {
         if (!revokeReason.trim()) return;
         setRevoking(true);
         try {
-            await api.post(`/api/v1/mcp-tools/${tool.id}/revoke`, {
-                revoked_by: actorName,
-                reason: revokeReason,
-            });
+            await api.post(`/api/v1/mcp-tools/${tool.id}/revoke`, { revoked_by: actorName, reason: revokeReason });
             setShowRevokeInput(false);
             setRevokeReason('');
             onRefresh();
@@ -404,34 +426,42 @@ function ToolCard({ tool, onRefresh, currentUser }: ToolCardProps) {
         }
     };
 
+    // Phase 15.2: highlight cards with high error rate
+    const hasHighErrorRate = stats !== null && stats.invocation_count > 0 && stats.error_rate >= 0.3;
+
     return (
         <>
             {showAudit && <AuditDrawer tool={tool} onClose={() => setShowAudit(false)} />}
 
-            <div className="bg-white dark:bg-[#161b27] rounded-xl border border-gray-200 dark:border-[#1e2535] hover:border-gray-300 dark:hover:border-[#2a3347] transition-all duration-150 overflow-hidden">
+            <div className={`bg-white dark:bg-[#161b27] rounded-xl border transition-all duration-150 overflow-hidden ${
+                hasHighErrorRate
+                    ? 'border-red-300 dark:border-red-500/40'
+                    : 'border-gray-200 dark:border-[#1e2535] hover:border-gray-300 dark:hover:border-[#2a3347]'
+            }`}>
                 {/* ── Summary row ── */}
                 <div className="p-5">
                     <div className="flex items-start gap-4">
-                        {/* Tier icon */}
                         <div className={`w-10 h-10 rounded-lg ${tier.bg} flex items-center justify-center shrink-0 mt-0.5`}>
                             <TierIcon className={`w-5 h-5 ${tier.text}`} />
                         </div>
 
-                        {/* Main info */}
                         <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap mb-1">
                                 <span className="text-sm font-semibold text-gray-900 dark:text-white truncate">{tool.name}</span>
-
-                                {/* Tier badge */}
                                 <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full border ${tier.bg} ${tier.text} ${tier.border}`}>
                                     <span className={`w-1.5 h-1.5 rounded-full ${tier.dot}`} />
                                     {tier.label}
                                 </span>
-
-                                {/* Status badge */}
                                 <span className={`inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full border ${statusMeta.cls}`}>
                                     {tool.status}
                                 </span>
+                                {/* Phase 15.2: high error rate warning badge */}
+                                {hasHighErrorRate && (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-red-100 dark:bg-red-500/10 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-500/20">
+                                        <AlertOctagon className="w-3 h-3" />
+                                        High Error Rate
+                                    </span>
+                                )}
                             </div>
 
                             <p className="text-xs text-gray-500 dark:text-gray-400 truncate mb-2">{tool.description}</p>
@@ -444,8 +474,15 @@ function ToolCard({ tool, onRefresh, currentUser }: ToolCardProps) {
                                 </span>
                                 <span className="flex items-center gap-1">
                                     <Zap className="w-3 h-3" />
-                                    {tool.usage_count} uses
+                                    {tool.usage_count} DB uses
                                 </span>
+                                {/* Phase 15.2: inline invocation count from Redis */}
+                                {stats && stats.invocation_count > 0 && (
+                                    <span className="flex items-center gap-1 text-blue-500 dark:text-blue-400">
+                                        <TrendingUp className="w-3 h-3" />
+                                        {stats.invocation_count.toLocaleString()} live invocations
+                                    </span>
+                                )}
                                 {tool.constitutional_article && (
                                     <span className="text-blue-500 dark:text-blue-400">{tool.constitutional_article}</span>
                                 )}
@@ -487,12 +524,27 @@ function ToolCard({ tool, onRefresh, currentUser }: ToolCardProps) {
                 {/* ── Expanded detail ── */}
                 {expanded && (
                     <div className="px-5 pb-5 border-t border-gray-100 dark:border-[#1e2535] pt-4 space-y-4">
-                        {/* Stats grid */}
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                            <Stat label="Total Uses"           value={tool.usage_count.toString()} />
-                            <Stat label="Failures"            value={tool.failure_count.toString()}             warn={tool.failure_count > 0} />
-                            <Stat label="Consecutive Failures" value={tool.consecutive_failures.toString()}     warn={tool.consecutive_failures > 0} />
-                            <Stat label="Last Used"           value={tool.last_used_at ? new Date(tool.last_used_at).toLocaleDateString() : '—'} />
+
+                        {/* Phase 15.2: Live stats section */}
+                        <div>
+                            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                                <BarChart2 className="w-3.5 h-3.5" />
+                                Live Stats (Redis)
+                            </p>
+                            <StatsRow stats={stats} />
+                        </div>
+
+                        {/* DB stats grid (unchanged) */}
+                        <div>
+                            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
+                                Database Counters
+                            </p>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                <Stat label="DB Uses"              value={tool.usage_count.toString()} />
+                                <Stat label="Failures"             value={tool.failure_count.toString()}            warn={tool.failure_count > 0} />
+                                <Stat label="Consec. Failures"     value={tool.consecutive_failures.toString()}     warn={tool.consecutive_failures > 0} />
+                                <Stat label="Last Used"            value={tool.last_used_at ? new Date(tool.last_used_at).toLocaleDateString() : '—'} />
+                            </div>
                         </div>
 
                         {/* Capabilities */}
@@ -513,10 +565,16 @@ function ToolCard({ tool, onRefresh, currentUser }: ToolCardProps) {
                         <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
                             <MetaRow label="Proposed by"       value={tool.proposed_by || '—'} />
                             <MetaRow label="Proposed at"       value={fmtDate(tool.proposed_at)} />
-                            {tool.approved_by        && <MetaRow label="Approved by"       value={tool.approved_by} />}
-                            {tool.approved_at        && <MetaRow label="Approved at"       value={fmtDate(tool.approved_at)} />}
-                            {tool.revoked_by         && <MetaRow label="Revoked by"        value={tool.revoked_by} />}
-                            {tool.revocation_reason  && <MetaRow label="Revocation reason" value={tool.revocation_reason} />}
+                            {tool.approved_by       && <MetaRow label="Approved by"       value={tool.approved_by} />}
+                            {tool.approved_at       && <MetaRow label="Approved at"       value={fmtDate(tool.approved_at)} />}
+                            {tool.revoked_by        && <MetaRow label="Revoked by"        value={tool.revoked_by} />}
+                            {tool.revocation_reason && <MetaRow label="Revocation reason" value={tool.revocation_reason} />}
+                            {stats?.last_used_ts    && (
+                                <MetaRow
+                                    label="Last invoked (Redis)"
+                                    value={new Date(stats.last_used_ts * 1000).toLocaleString()}
+                                />
+                            )}
                         </div>
 
                         {/* Action buttons */}
@@ -578,6 +636,7 @@ function ToolCard({ tool, onRefresh, currentUser }: ToolCardProps) {
     );
 }
 
+
 // ── Small helpers ─────────────────────────────────────────────────────────────
 
 function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
@@ -611,24 +670,43 @@ function MetaRow({ label, value }: { label: string; value: string }) {
     );
 }
 
-// ── Filters bar ───────────────────────────────────────────────────────────────
+function SummaryCard({ label, value, color }: { label: string; value: number; color: string }) {
+    const { bg, text } = CARD_COLORS[color] ?? CARD_COLORS.blue;
+    return (
+        <div className={`rounded-xl border border-gray-200 dark:border-[#1e2535] p-4 ${bg}`}>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{label}</p>
+            <p className={`text-2xl font-bold ${text}`}>{value}</p>
+        </div>
+    );
+}
+
+
+// ── Filters bar ────────────────────────────────────────────────────────────────
 
 type FilterStatus = 'all' | 'pending' | 'approved' | 'revoked' | 'disabled';
 type FilterTier   = 'all' | 'pre_approved' | 'restricted' | 'forbidden';
 
-// ── Main component ────────────────────────────────────────────────────────────
+
+// ── Main component ─────────────────────────────────────────────────────────────
 
 export function MCPToolRegistry() {
-    // C4: read the current sovereign user so ToolCard can log correct actor
-    const { user } = useAuthStore();
+    const { user }          = useAuthStore();
+    const lastMessage       = useWebSocketStore(s => s.lastMessage);
 
-    const [tools,        setTools]        = useState<MCPTool[]>([]);
-    const [loading,      setLoading]      = useState(true);
-    const [showPropose,  setShowPropose]  = useState(false);
-    const [statusFilter, setStatusFilter] = useState<FilterStatus>('all');
-    const [tierFilter,   setTierFilter]   = useState<FilterTier>('all');
-    const [search,       setSearch]       = useState('');
+    const [tools,         setTools]         = useState<MCPTool[]>([]);
+    const [loading,       setLoading]       = useState(true);
+    const [showPropose,   setShowPropose]   = useState(false);
+    const [statusFilter,  setStatusFilter]  = useState<FilterStatus>('all');
+    const [tierFilter,    setTierFilter]    = useState<FilterTier>('all');
+    const [search,        setSearch]        = useState('');
 
+    // Phase 15.2: per-tool stats keyed by tool_id
+    const [statsMap,       setStatsMap]       = useState<Map<string, MCPToolStats>>(new Map());
+    const [statsLoading,   setStatsLoading]   = useState(false);
+    const [statsLastUpdate, setStatsLastUpdate] = useState<Date | null>(null);
+    const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+    // ── Fetch tools ────────────────────────────────────────────────────────────
     const fetchTools = useCallback(async () => {
         setLoading(true);
         try {
@@ -647,6 +725,53 @@ export function MCPToolRegistry() {
 
     useEffect(() => { fetchTools(); }, [fetchTools]);
 
+    // ── Phase 15.2: Fetch live stats ───────────────────────────────────────────
+    const fetchStats = useCallback(async () => {
+        setStatsLoading(true);
+        try {
+            const statsArr = await mcpToolsApi.getStats();
+            const map = new Map<string, MCPToolStats>();
+            for (const s of statsArr) {
+                map.set(s.tool_id, s);
+            }
+            setStatsMap(map);
+            setStatsLastUpdate(new Date());
+        } catch {
+            // Non-fatal — stats are best-effort
+        } finally {
+            setStatsLoading(false);
+        }
+    }, []);
+
+    // Initial stats load and 60-second polling fallback
+    useEffect(() => {
+        fetchStats();
+        pollTimerRef.current = setInterval(fetchStats, 60_000);
+        return () => {
+            if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+        };
+    }, [fetchStats]);
+
+    // ── Phase 15.2: WebSocket listener for mcp_stats_update ───────────────────
+    useEffect(() => {
+        if (!lastMessage) return;
+        const msg = lastMessage as any;
+        if (msg.type !== 'mcp_stats_update') return;
+
+        const statsArr: MCPToolStats[] = msg.stats || [];
+        if (statsArr.length === 0) return;
+
+        setStatsMap(prev => {
+            const next = new Map(prev);
+            for (const s of statsArr) {
+                next.set(s.tool_id, s);
+            }
+            return next;
+        });
+        setStatsLastUpdate(new Date());
+    }, [lastMessage]);
+
+    // ── Filter ─────────────────────────────────────────────────────────────────
     const filtered = tools.filter(t =>
         !search ||
         t.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -654,7 +779,6 @@ export function MCPToolRegistry() {
         t.server_url.toLowerCase().includes(search.toLowerCase())
     );
 
-    // Summary counts
     const counts = {
         total:    tools.length,
         approved: tools.filter(t => t.status === 'approved').length,
@@ -682,17 +806,26 @@ export function MCPToolRegistry() {
                     <SummaryCard label="Revoked / Off" value={counts.revoked}  color="red"    />
                 </div>
 
+                {/* Phase 15.2: Stats health row */}
+                <div className="flex items-center gap-3 text-xs text-gray-400 dark:text-gray-500">
+                    <div className="flex items-center gap-1.5">
+                        <div className={`w-2 h-2 rounded-full ${statsMap.size > 0 ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`} />
+                        <span>
+                            Live stats: {statsMap.size} tool{statsMap.size !== 1 ? 's' : ''} tracked
+                            {statsLoading && ' (refreshing…)'}
+                            {statsLastUpdate && !statsLoading && ` · updated ${statsLastUpdate.toLocaleTimeString()}`}
+                        </span>
+                    </div>
+                </div>
+
                 {/* ── Toolbar ── */}
                 <div className="bg-white dark:bg-[#161b27] rounded-xl border border-gray-200 dark:border-[#1e2535] p-4 flex flex-wrap items-center gap-3">
-                    {/* Search */}
                     <input
                         className={`${inputCls} max-w-xs`}
                         placeholder="Search tools…"
                         value={search}
                         onChange={e => setSearch(e.target.value)}
                     />
-
-                    {/* Status filter */}
                     <select
                         aria-label="Status filter"
                         className={`${inputCls} w-auto`}
@@ -705,8 +838,6 @@ export function MCPToolRegistry() {
                         <option value="revoked">Revoked</option>
                         <option value="disabled">Disabled</option>
                     </select>
-
-                    {/* Tier filter */}
                     <select
                         aria-label="Tier filter"
                         className={`${inputCls} w-auto`}
@@ -721,7 +852,7 @@ export function MCPToolRegistry() {
 
                     <div className="ml-auto flex items-center gap-2">
                         <button
-                            onClick={fetchTools}
+                            onClick={() => { fetchTools(); fetchStats(); }}
                             className="p-2 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition-colors"
                             title="Refresh"
                         >
@@ -755,26 +886,18 @@ export function MCPToolRegistry() {
                     </div>
                 ) : (
                     <div className="space-y-3">
-                        {/* C4: currentUser passed to ToolCard */}
                         {filtered.map(tool => (
-                            <ToolCard key={tool.id} tool={tool} onRefresh={fetchTools} currentUser={user} />
+                            <ToolCard
+                                key={tool.id}
+                                tool={tool}
+                                stats={statsMap.get(tool.id) ?? null}
+                                onRefresh={fetchTools}
+                                currentUser={user}
+                            />
                         ))}
                     </div>
                 )}
             </div>
         </>
-    );
-}
-
-// ── Summary card ──────────────────────────────────────────────────────────────
-
-// C5: replaced fragile .split(' ').slice(...) with CARD_COLORS lookup object
-function SummaryCard({ label, value, color }: { label: string; value: number; color: string }) {
-    const { bg, text } = CARD_COLORS[color] ?? CARD_COLORS.blue;
-    return (
-        <div className={`rounded-xl border border-gray-200 dark:border-[#1e2535] p-4 ${bg}`}>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{label}</p>
-            <p className={`text-2xl font-bold ${text}`}>{value}</p>
-        </div>
     );
 }

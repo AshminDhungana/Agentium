@@ -594,10 +594,10 @@ Build a self-governing AI ecosystem where agents operate under constitutional la
 
 ### 15.2 Real-Time MCP Tool Stats & Sub-Second Revocation
 
-- [ ] **Backend** — track per-tool invocation count, average latency, last-used timestamp, error rate in a Redis hash (`agentium:mcp:stats:{tool_id}`) updated on every invocation in `audit_tool_invocation()`
-- [ ] `GET /mcp-tools/stats` — return live stats for all tools from Redis (not DB); response time < 50 ms
-- [ ] Revocation path: on `revoke_mcp_tool(tool_id)`, write to Redis SET `agentium:mcp:revoked` with no TTL; check this set before every invocation in `get_approved_tools()` — eliminates DB roundtrip, achieving < 1 s revocation
-- [ ] **Frontend** — extend `ToolRegistry.tsx`: add stats columns (invocations / avg latency / error rate) to the tool table; live-update via WebSocket event `mcp_stats_update` (emit every 30 s from Celery beat)
+- [x] **Backend** — track per-tool invocation count, average latency, last-used timestamp, error rate in a Redis hash (`agentium:mcp:stats:{tool_id}`) updated on every invocation in `audit_tool_invocation()`
+- [x] `GET /mcp-tools/stats` — return live stats for all tools from Redis (not DB); response time < 50 ms
+- [x] Revocation path: on `revoke_mcp_tool(tool_id)`, write to Redis SET `agentium:mcp:revoked` with no TTL; check this set before every invocation in `get_approved_tools()` — eliminates DB roundtrip, achieving < 1 s revocation
+- [x] **Frontend** — extend `ToolRegistry.tsx`: add stats columns (invocations / avg latency / error rate) to the tool table; live-update via WebSocket event `mcp_stats_update` (emit every 30 s from Celery beat)
 
 ### 15.3 Channel Health Monitoring, Logs & Settings
 

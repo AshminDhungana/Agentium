@@ -2,11 +2,6 @@
  * mcpToolsApi.ts
  *
  * Centralised service for MCP (Model Context Protocol) tool operations.
- *
- * The MCPToolRegistry component previously called the API inline.
- * This file consolidates all MCP tool calls and adds the missing
- *   GET /api/v1/mcp-tools/{tool_id}
- * endpoint that was not yet reachable from the frontend.
  */
 
 import { api } from './api';
@@ -61,6 +56,38 @@ export interface ProposeMCPToolRequest {
   schema?: Record<string, unknown>;
 }
 
+// ─── Phase 15.2: Stats types ──────────────────────────────────────────────────
+
+/** Real-time per-tool invocation stats read from Redis. */
+export interface MCPToolStats {
+  /** DB UUID of the tool */
+  tool_id: string;
+  /** Human-readable tool name — only present on per-tool endpoint */
+  tool_name?: string;
+  /** Total number of invocations recorded */
+  invocation_count: number;
+  /** Total number of failed invocations */
+  error_count: number;
+  /** Rolling average latency in milliseconds */
+  avg_latency_ms: number;
+  /** Error rate: 0.0 – 1.0 (divide by 100 for percentage) */
+  error_rate: number;
+  /** Unix timestamp of last invocation (null if never invoked) */
+  last_used_ts: number | null;
+}
+
+export interface MCPStatsHealthResponse {
+  status: 'healthy' | 'unavailable';
+  redis_version?: string;
+  tools_with_stats?: number;
+  error?: string;
+}
+
+export interface MCPRevokedResponse {
+  revoked_tool_ids: string[];
+  count: number;
+}
+
 // ─── Service ──────────────────────────────────────────────────────────────────
 
 export const mcpToolsApi = {
@@ -72,8 +99,6 @@ export const mcpToolsApi = {
 
   /**
    * Fetch a single MCP tool by its ID.
-   * Previously missing from the frontend — added to support detail modals
-   * and audit drill-downs in MCPToolRegistry.
    */
   getTool: async (toolId: string): Promise<MCPTool> => {
     const response = await api.get<MCPTool>(`${BASE}/${toolId}`);
@@ -113,6 +138,47 @@ export const mcpToolsApi = {
   /** Check connectivity and latency for a specific tool's server. */
   getToolHealth: async (toolId: string): Promise<MCPToolHealth> => {
     const response = await api.get<MCPToolHealth>(`${BASE}/${toolId}/health`);
+    return response.data;
+  },
+
+  // ─── Phase 15.2: Real-time stats ──────────────────────────────────────────
+
+  /**
+   * Fetch real-time invocation stats for ALL tools from Redis.
+   * Response time target: <50 ms (pure Redis read, no DB query).
+   *
+   * Used by MCPToolRegistry to populate the stats columns on initial load
+   * and after WebSocket reconnect.
+   */
+  getStats: async (): Promise<MCPToolStats[]> => {
+    const response = await api.get<MCPToolStats[]>(`${BASE}/stats`);
+    return response.data;
+  },
+
+  /**
+   * Fetch real-time invocation stats for a SINGLE tool.
+   * Returns zero values if the tool has never been invoked.
+   */
+  getToolStats: async (toolId: string): Promise<MCPToolStats> => {
+    const response = await api.get<MCPToolStats>(`${BASE}/${toolId}/stats`);
+    return response.data;
+  },
+
+  /**
+   * Check health of the Redis stats layer.
+   * Use this to verify connectivity before relying on stats data.
+   */
+  getStatsHealth: async (): Promise<MCPStatsHealthResponse> => {
+    const response = await api.get<MCPStatsHealthResponse>(`${BASE}/stats/health`);
+    return response.data;
+  },
+
+  /**
+   * Return all tool IDs currently in the Redis revocation SET.
+   * Admin / Sovereign only.
+   */
+  getRevoked: async (): Promise<MCPRevokedResponse> => {
+    const response = await api.get<MCPRevokedResponse>(`${BASE}/revoked`);
     return response.data;
   },
 };

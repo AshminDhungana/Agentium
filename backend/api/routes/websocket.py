@@ -1,25 +1,5 @@
 """
 WebSocket endpoint for real-time chat with authentication.
-
-Broadcast events emitted:
-  agent_spawned            — new agent created
-  agent_liquidated         — agent terminated / decommissioned
-  agent_promoted           — task agent promoted to lead
-  agent_status_changed     — agent status updated (active/working/deliberating/…)
-  task_escalated           — task promoted to council
-  vote_initiated           — deliberation vote started
-  constitutional_violation — rule breach detected
-  message_routed           — external channel message dispatched to agent
-  knowledge_submitted      — agent submitted knowledge to the KB
-  knowledge_approved       — council approved a knowledge submission
-  amendment_proposed       — constitutional amendment proposed
-
-Changes vs original:
-  - FIX: Chat message handler now reads 'attachments' from the incoming JSON.
-  - FIX: File content (extracted_text) is injected into the AI prompt via
-         build_file_context_for_ai() before ChatService.process_message().
-  - FIX: Empty-message guard now checks enriched_message, not bare content,
-         so a message with only an attachment (no text) is still processed.
 """
 
 import json
@@ -84,12 +64,6 @@ def _decode_token(token: str) -> Optional[Dict[str, Any]]:
 def _build_enriched_message(content: str, attachments: List[dict]) -> str:
     """
     Combine the user's text message with extracted file content.
-
-    Uses build_file_context_for_ai() from file_processor to assemble a
-    token-budgeted context block that is appended after the text.
-
-    Returns the enriched message string, or the original content if
-    there are no attachments or all attachments have no extracted text.
     """
     if not attachments:
         return content
@@ -98,7 +72,6 @@ def _build_enriched_message(content: str, attachments: List[dict]) -> str:
         from backend.services.file_processor import build_file_context_for_ai
         file_context = build_file_context_for_ai(attachments, max_total_chars=30_000)
     except Exception as exc:
-        # Non-fatal: log and fall back to text-only message
         print(f"[WebSocket] file_processor import/call failed: {exc}")
         file_context = ""
 
@@ -118,9 +91,7 @@ class ConnectionManager:
     """Manage authenticated WebSocket connections with heartbeat support."""
 
     def __init__(self):
-        # websocket → user_info
         self.active_connections: Dict[WebSocket, Dict[str, Any]] = {}
-        # username → websocket  (for direct targeting)
         self.user_connections: Dict[str, WebSocket] = {}
         self.redis_client: Optional[redis.Redis] = None
 
@@ -138,7 +109,6 @@ class ConnectionManager:
     ) -> Optional[Dict[str, Any]]:
         """
         Validate JWT and resolve the Head of Council identity.
-        Uses a *short-lived* session that is closed immediately after.
         Returns user_info dict on success, None on failure.
         """
         payload = _decode_token(token)
@@ -148,7 +118,6 @@ class ConnectionManager:
 
         username = payload["sub"]
 
-        # Resolve head_agent_id with a fresh, short-lived session
         try:
             with get_fresh_db() as db:
                 head = db.query(HeadOfCouncil).filter_by(agentium_id="00001").first()
@@ -200,8 +169,8 @@ class ConnectionManager:
     async def broadcast(self, message: dict, exclude: Optional[WebSocket] = None) -> None:
         """Broadcast JSON message to all authenticated connections."""
         try:
-            r = await self._get_redis()
-            msg_str = json.dumps(message)
+            r        = await self._get_redis()
+            msg_str  = json.dumps(message)
             pipeline = r.pipeline()
             pipeline.lpush("agentium:ws:buffer", msg_str)
             pipeline.ltrim("agentium:ws:buffer", 0, 99)
@@ -229,10 +198,10 @@ class ConnectionManager:
 
     async def emit_agent_spawned(
         self,
-        agent_id:   str,
+        agent_id: str,
         agent_name: str,
         agent_type: str,
-        parent_id:  Optional[str] = None,
+        parent_id: Optional[str] = None,
     ) -> None:
         await self.broadcast({
             "type":       "agent_spawned",
@@ -254,23 +223,22 @@ class ConnectionManager:
     ) -> None:
         """Broadcast a live browser frame."""
         await self.broadcast({
-            "type": "browser_frame",
-            "task_id": task_id,
-            "frame": frame,
-            "url": url,
-            "title": title,
-            "action_log": action_log,
+            "type":         "browser_frame",
+            "task_id":      task_id,
+            "frame":        frame,
+            "url":          url,
+            "title":        title,
+            "action_log":   action_log,
             "frame_number": frame_number,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp":    datetime.utcnow().isoformat(),
         })
-
 
     async def emit_task_escalated(
         self,
-        task_id:      str,
-        task_title:   str,
+        task_id: str,
+        task_title: str,
         escalated_by: str,
-        reason:       str,
+        reason: str,
     ) -> None:
         await self.broadcast({
             "type":         "task_escalated",
@@ -283,9 +251,9 @@ class ConnectionManager:
 
     async def emit_vote_initiated(
         self,
-        vote_id:         str,
-        subject:         str,
-        initiated_by:    str,
+        vote_id: str,
+        subject: str,
+        initiated_by: str,
         quorum_required: int,
     ) -> None:
         await self.broadcast({
@@ -299,27 +267,27 @@ class ConnectionManager:
 
     async def emit_constitutional_violation(
         self,
-        violator_id:  str,
-        article:      str,
-        severity:     str,
-        description:  str,
+        violator_id: str,
+        article: str,
+        severity: str,
+        description: str,
         requires_vote: bool = False,
     ) -> None:
         await self.broadcast({
-            "type":         "constitutional_violation",
-            "violator_id":  violator_id,
-            "article":      article,
-            "severity":     severity,
-            "description":  description,
+            "type":          "constitutional_violation",
+            "violator_id":   violator_id,
+            "article":       article,
+            "severity":      severity,
+            "description":   description,
             "requires_vote": requires_vote,
-            "timestamp":    datetime.utcnow().isoformat(),
+            "timestamp":     datetime.utcnow().isoformat(),
         })
 
     async def emit_message_routed(
         self,
-        channel:      str,
-        sender:       str,
-        task_id:      str,
+        channel: str,
+        sender: str,
+        task_id: str,
         requires_approval: bool = False,
     ) -> None:
         await self.broadcast({
@@ -333,8 +301,8 @@ class ConnectionManager:
 
     async def emit_knowledge_submitted(
         self,
-        agent_id:    str,
-        topic:       str,
+        agent_id: str,
+        topic: str,
         requires_vote: bool = True,
     ) -> None:
         await self.broadcast({
@@ -347,7 +315,7 @@ class ConnectionManager:
 
     async def emit_knowledge_approved(
         self,
-        topic:       str,
+        topic: str,
         approved_by: str,
     ) -> None:
         await self.broadcast({
@@ -360,7 +328,7 @@ class ConnectionManager:
     async def emit_amendment_proposed(
         self,
         proposer_id: str,
-        article:     str,
+        article: str,
         description: str,
         requires_vote: bool = True,
     ) -> None:
@@ -375,10 +343,10 @@ class ConnectionManager:
 
     async def emit_agent_liquidated(
         self,
-        agent_id:         str,
-        agent_name:       str,
-        liquidated_by:    str,
-        reason:           str,
+        agent_id: str,
+        agent_name: str,
+        liquidated_by: str,
+        reason: str,
         tasks_reassigned: int = 0,
     ) -> None:
         await self.broadcast({
@@ -395,9 +363,9 @@ class ConnectionManager:
         self,
         old_agentium_id: str,
         new_agentium_id: str,
-        agent_name:      str,
-        promoted_by:     str,
-        reason:          str,
+        agent_name: str,
+        promoted_by: str,
+        reason: str,
     ) -> None:
         """Broadcast when a Task Agent is promoted to Lead Agent."""
         await self.broadcast({
@@ -412,12 +380,12 @@ class ConnectionManager:
 
     async def emit_agent_status_changed(
         self,
-        agent_id:   str,
+        agent_id: str,
         agent_name: str,
         old_status: str,
         new_status: str,
     ) -> None:
-        """Broadcast when an agent's status changes (active/working/deliberating/…)."""
+        """Broadcast when an agent's status changes."""
         await self.broadcast({
             "type":       "agent_status_changed",
             "agent_id":   agent_id,
@@ -427,20 +395,43 @@ class ConnectionManager:
             "timestamp":  datetime.utcnow().isoformat(),
         })
 
+    # ── Phase 15.2: MCP stats broadcast ──────────────────────────────────────
+
+    async def emit_mcp_stats_update(
+        self,
+        stats: List[Dict[str, Any]],
+    ) -> None:
+        """
+        Phase 15.2: Broadcast real-time MCP tool stats to all connected clients.
+
+        Called by the Celery beat task `broadcast_mcp_stats` every 30 seconds.
+        Frontend MCPToolRegistry subscribes to 'mcp_stats_update' and updates
+        the Invocations / Avg Latency / Error Rate columns in real-time.
+
+        Args:
+            stats: List of per-tool stat dicts from mcp_stats_service.get_all_stats()
+                   Each dict: { tool_id, invocation_count, avg_latency_ms,
+                                error_rate, error_count, last_used_ts }
+        """
+        await self.broadcast({
+            "type":      "mcp_stats_update",
+            "stats":     stats,
+            "count":     len(stats),
+            "timestamp": datetime.utcnow().isoformat(),
+        })
+
 
 # ── global singleton ──────────────────────────────────────────────────────────
 manager = ConnectionManager()
 
 
 # ═══════════════════════════════════════════════════════════
-# WebSocket endpoint
+# WebSocket endpoint (unchanged)
 # ═══════════════════════════════════════════════════════════
 
 @router.websocket("/chat")
 async def websocket_chat_endpoint(
     websocket: WebSocket,
-    # DEPRECATED: query-param token kept for backward-compat only.
-    # Prefer sending {"type":"auth","token":"<JWT>"} as the first message.
     token: Optional[str] = Query(None, description="[DEPRECATED] JWT — send via auth message instead"),
 ):
     """
@@ -452,36 +443,16 @@ async def websocket_chat_endpoint(
       3. Server validates and replies with welcome message
       4. All subsequent messages are processed
 
-    Legacy flow (still supported):
-      1. Client connects with ?token=JWT query param
-      2. Server validates immediately
-
-    Heartbeat: Client sends {"type": "ping"} every 30 s.
-
-    Chat message format:
-      {
-        "type": "message",
-        "content": "...",
-        "attachments": [          ← optional; populated by frontend after upload
-          {
-            "name": "report.pdf",
-            "type": "application/pdf",
-            "size": 123456,
-            "url": "/api/v1/files/download/.../...",
-            "extracted_text": "..."  ← server-extracted text content
-          }
-        ]
-      }
+    Phase 15.2: also receives 'mcp_stats_update' broadcasts pushed by Celery.
     """
     await websocket.accept()
 
     user_info: Optional[Dict[str, Any]] = None
 
-    # ── Legacy: token in query param ─────────────────────────────────────────
     if token:
         user_info = await manager.authenticate(websocket, token)
         if not user_info:
-            return  # authenticate() already closed the socket
+            return
 
         await websocket.send_json({
             "type":      "system",
@@ -494,7 +465,6 @@ async def websocket_chat_endpoint(
             "timestamp": datetime.utcnow().isoformat(),
         })
 
-    # ── Main message loop ─────────────────────────────────────────────────────
     try:
         while True:
             raw = await websocket.receive_text()
@@ -507,12 +477,12 @@ async def websocket_chat_endpoint(
 
             msg_type = data.get("type", "")
 
-            # ── Auth message (new preferred flow) ─────────────────────────
+            # ── Auth message ──────────────────────────────────────────────────
             if msg_type == "auth":
                 if user_info is not None:
                     await websocket.send_json({
-                        "type":    "system",
-                        "content": "Already authenticated.",
+                        "type":      "system",
+                        "content":   "Already authenticated.",
                         "timestamp": datetime.utcnow().isoformat(),
                     })
                     continue
@@ -520,7 +490,7 @@ async def websocket_chat_endpoint(
                 auth_token = data.get("token", "")
                 user_info  = await manager.authenticate(websocket, auth_token)
                 if not user_info:
-                    return  # socket closed inside authenticate()
+                    return
 
                 await websocket.send_json({
                     "type":      "system",
@@ -533,16 +503,16 @@ async def websocket_chat_endpoint(
                 })
                 continue
 
-            # ── Require authentication for all subsequent messages ─────────
+            # ── Require authentication ────────────────────────────────────────
             if user_info is None:
                 await websocket.send_json({
-                    "type":    "auth_required",
-                    "content": "Please send an auth message first.",
+                    "type":      "auth_required",
+                    "content":   "Please send an auth message first.",
                     "timestamp": datetime.utcnow().isoformat(),
                 })
                 continue
 
-            # ── Ping / heartbeat ──────────────────────────────────────────
+            # ── Ping / heartbeat ──────────────────────────────────────────────
             if msg_type == "ping":
                 await websocket.send_json({
                     "type":      "pong",
@@ -550,20 +520,13 @@ async def websocket_chat_endpoint(
                 })
                 continue
 
-            # ── Chat message ──────────────────────────────────────────────
+            # ── Chat message ──────────────────────────────────────────────────
             if msg_type == "message":
                 content     = data.get("content", "").strip()
-                # FIX: Read attachments from the incoming message.
-                # The frontend sends extracted_text inside each attachment dict
-                # after the file has been uploaded via POST /api/v1/files/upload.
                 attachments: List[dict] = data.get("attachments") or []
 
-                # Build enriched message: user text + file context
-                # This is the single line that was missing and caused total failure.
                 enriched_message = _build_enriched_message(content, attachments)
 
-                # Guard: skip if there is truly nothing to process
-                # (previously only checked `content`, blocking file-only messages)
                 if not enriched_message:
                     continue
 
@@ -577,7 +540,6 @@ async def websocket_chat_endpoint(
                         })
                         continue
 
-                    # Pass the enriched message (text + file content) to the AI
                     response = await ChatService.process_message(head, enriched_message, db)
 
                 await websocket.send_json({
@@ -589,10 +551,10 @@ async def websocket_chat_endpoint(
                 })
                 continue
 
-            # ── Unknown message type ──────────────────────────────────────
+            # ── Unknown message type ──────────────────────────────────────────
             await websocket.send_json({
-                "type":    "error",
-                "content": f"Unknown message type: {msg_type!r}",
+                "type":      "error",
+                "content":   f"Unknown message type: {msg_type!r}",
                 "timestamp": datetime.utcnow().isoformat(),
             })
 
@@ -608,22 +570,20 @@ async def websocket_chat_endpoint(
 
 
 @router.get("/replay")
-async def replay_events(since: str, current_user = Depends(get_current_user)):
+async def replay_events(since: str, current_user=Depends(get_current_user)):
     """Fetch buffered broadcast events for reconnection replay."""
     try:
-        r = await manager._get_redis()
+        r          = await manager._get_redis()
         events_str = await r.lrange("agentium:ws:buffer", 0, 99)
-        events = []
+        events     = []
         for e_str in events_str:
             try:
                 e_obj = json.loads(e_str)
-                # Replay must have timestamp newer than since
                 if e_obj.get("timestamp", "") > since:
                     events.append(e_obj)
             except Exception:
                 pass
-        
-        # Return in chronological order
+
         events.sort(key=lambda x: x.get("timestamp", ""))
         return {"events": events}
     except Exception as exc:

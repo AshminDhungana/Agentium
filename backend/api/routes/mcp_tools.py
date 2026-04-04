@@ -1,8 +1,7 @@
 """
-MCP Tools API Routes — Phase 6.7
-Updated: bridge sync called after approve / revoke so agents see changes instantly.
+MCP Tools API Routes 
 """
-from typing import Optional
+from typing import Optional, List, Any, Dict
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
@@ -37,6 +36,8 @@ def _bridge():
     except ImportError:
         return None
 
+
+# ── Existing routes (unchanged) ────────────────────────────────────────────────
 
 @router.get("", response_model=MCPToolListResponse)
 async def list_mcp_tools(
@@ -79,6 +80,61 @@ async def propose_mcp_server(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
 
 
+# ── Phase 15.2: Stats routes (placed BEFORE /{tool_id} to avoid routing conflicts) ──
+
+@router.get("/stats", tags=["MCP Tools", "Phase 15.2"])
+async def get_all_mcp_stats(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_active_user),
+) -> List[Dict[str, Any]]:
+    """
+    Return real-time invocation stats for all MCP tools from Redis.
+    Response time target: <50 ms (pure Redis read, no DB query).
+
+    Each item contains:
+      tool_id, invocation_count, error_count, avg_latency_ms, error_rate, last_used_ts
+    """
+    try:
+        from backend.services import mcp_stats_service
+        stats = mcp_stats_service.get_all_stats()
+        return stats
+    except Exception as exc:
+        # Non-fatal — return empty list rather than 500
+        return []
+
+
+@router.get("/stats/health", tags=["MCP Tools", "Phase 15.2"])
+async def get_stats_health(
+    current_user: dict = Depends(get_current_active_user),
+) -> Dict[str, Any]:
+    """Check connectivity and health of the Redis stats layer."""
+    try:
+        from backend.services import mcp_stats_service
+        return mcp_stats_service.redis_health()
+    except Exception as exc:
+        return {"status": "unavailable", "error": str(exc)}
+
+
+@router.get("/revoked", tags=["MCP Tools", "Phase 15.2"])
+async def get_revoked_tools(
+    current_user: dict = Depends(get_current_active_user),
+) -> Dict[str, Any]:
+    """
+    Return the list of tool IDs currently in the Redis revocation SET.
+    Admin / Sovereign only.
+    """
+    if not current_user.get("is_admin") and current_user.get("role") != "sovereign":
+        raise HTTPException(status_code=403, detail="Admin or Sovereign privileges required.")
+    try:
+        from backend.services import mcp_stats_service
+        revoked = mcp_stats_service.get_revoked_ids()
+        return {"revoked_tool_ids": revoked, "count": len(revoked)}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+# ── Existing /{tool_id} routes (unchanged) ─────────────────────────────────────
+
 @router.get("/{tool_id}", response_model=MCPToolResponse)
 async def get_mcp_tool(
     tool_id: str,
@@ -92,6 +148,41 @@ async def get_mcp_tool(
     return MCPToolResponse(**tool.to_dict())
 
 
+@router.get("/{tool_id}/stats", tags=["MCP Tools", "Phase 15.2"])
+async def get_tool_stats(
+    tool_id: str,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_active_user),
+) -> Dict[str, Any]:
+    """
+    Return real-time invocation stats for a single MCP tool.
+    Reads from Redis — no DB query.
+    """
+    # Verify tool exists first
+    from backend.models.entities.mcp_tool import MCPTool
+    tool = db.query(MCPTool).filter(MCPTool.id == tool_id).first()
+    if not tool:
+        raise HTTPException(status_code=404, detail=f"MCP tool '{tool_id}' not found.")
+
+    try:
+        from backend.services import mcp_stats_service
+        stats = mcp_stats_service.get_tool_stats(tool_id)
+        if stats is None:
+            # Tool exists but has never been invoked
+            return {
+                "tool_id":          tool_id,
+                "tool_name":        tool.name,
+                "invocation_count": 0,
+                "error_count":      0,
+                "avg_latency_ms":   0.0,
+                "error_rate":       0.0,
+                "last_used_ts":     None,
+            }
+        return {**stats, "tool_name": tool.name}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
 @router.post("/{tool_id}/approve", response_model=MCPToolResponse)
 async def approve_mcp_tool(
     tool_id: str,
@@ -102,6 +193,7 @@ async def approve_mcp_tool(
     """
     Approve a pending MCP tool.
     Immediately registers it into the live ToolRegistry so agents can use it.
+    Phase 15.2: also removes tool from the Redis revocation SET if present.
     """
     if not current_user.get("is_admin") and current_user.get("role") != "sovereign":
         raise HTTPException(status_code=403, detail="Admin or Sovereign privileges required.")
@@ -112,7 +204,6 @@ async def approve_mcp_tool(
     except (ValueError, PermissionError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
-    # Sync into live registry immediately — agents can now call this tool
     bridge = _bridge()
     if bridge:
         bridge.sync_one(tool)
@@ -129,7 +220,8 @@ async def revoke_mcp_tool(
 ):
     """
     Emergency revocation — removes tool from live ToolRegistry in < 1s.
-    Agents attempting to use a revoked tool will receive 404 immediately.
+    Phase 15.2: also writes to Redis revocation SET for immediate enforcement.
+    Agents attempting to use a revoked tool receive 404/block immediately.
     """
     if not current_user.get("is_admin") and current_user.get("role") != "sovereign":
         raise HTTPException(status_code=403, detail="Admin or Sovereign privileges required.")
@@ -140,7 +232,6 @@ async def revoke_mcp_tool(
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
 
-    # Deregister from live registry immediately
     bridge = _bridge()
     if bridge:
         bridge.deregister(tool)

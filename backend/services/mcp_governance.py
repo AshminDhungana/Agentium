@@ -1,14 +1,6 @@
 """
-MCP Governance Service — Phase 6.7
-Brings MCP tools into Agentium's democratic approval model.
-
-Philosophy: "Rowboat connects MCP tools directly. Agentium connects them through the Constitution."
-
-Every tool invocation is:
-  1. Checked against the Constitutional tier (forbidden → always block)
-  2. Checked for required approval tokens (restricted → Head approval required)
-  3. Executed via MCPClient
-  4. Appended to the tool's persistent audit_log
+MCP Governance Service
+================================================
 """
 import logging
 from datetime import datetime
@@ -20,9 +12,8 @@ from backend.services.mcp_client import MCPClient, MCPConnectionError
 
 logger = logging.getLogger(__name__)
 
-# ── Constants ─────────────────────────────────────────────────────────────────
+# ── Constants ──────────────────────────────────────────────────────────────────
 
-# After this many consecutive failures the tool is auto-disabled
 AUTO_DISABLE_THRESHOLD = 5
 
 TIER_PRE_APPROVED = "pre_approved"
@@ -36,16 +27,16 @@ STATUS_REVOKED  = "revoked"
 STATUS_DISABLED = "disabled"
 
 
-# ── Verdict enum (mirrors constitutional_guard pattern) ───────────────────────
+# ── Verdict enum ───────────────────────────────────────────────────────────────
 
 class MCPVerdict:
-    ALLOW          = "allow"
-    BLOCK          = "block"
-    VOTE_REQUIRED  = "vote_required"
-    HEAD_REQUIRED  = "head_required"
+    ALLOW         = "allow"
+    BLOCK         = "block"
+    VOTE_REQUIRED = "vote_required"
+    HEAD_REQUIRED = "head_required"
 
 
-# ── Service ───────────────────────────────────────────────────────────────────
+# ── Service ────────────────────────────────────────────────────────────────────
 
 class MCPGovernanceService:
     """
@@ -54,6 +45,7 @@ class MCPGovernanceService:
     - Constitutional tier enforcement
     - Execution with full audit logging
     - Health monitoring and auto-disable
+    - Phase 15.2: Redis-based real-time stats + sub-second revocation
     """
 
     def __init__(self, db: Session):
@@ -77,7 +69,6 @@ class MCPGovernanceService:
         """
         Council member proposes a new MCP server for review.
         Creates the MCPTool record in 'pending' state.
-        A Council vote must follow before the tool becomes usable.
         """
         if tier not in (TIER_PRE_APPROVED, TIER_RESTRICTED, TIER_FORBIDDEN):
             raise ValueError(f"Invalid tier '{tier}'. Must be pre_approved, restricted, or forbidden.")
@@ -120,7 +111,7 @@ class MCPGovernanceService:
         """
         Record Council approval after a successful vote.
         Moves the tool from 'pending' → 'approved'.
-        Forbidden-tier tools can never be approved.
+        Phase 15.2: removes tool from Redis revocation SET on re-approval.
         """
         tool = self._get_tool_or_404(tool_id)
 
@@ -137,6 +128,14 @@ class MCPGovernanceService:
         tool.approved_at = datetime.utcnow()
         self.db.commit()
         self.db.refresh(tool)
+
+        # Phase 15.2: clear any stale revocation in Redis
+        try:
+            from backend.services import mcp_stats_service
+            mcp_stats_service.remove_from_revoked(str(tool.id))
+        except Exception as exc:
+            logger.debug("[MCPGovernance] Could not clear revocation SET on approve: %s", exc)
+
         logger.info("[MCPGovernance] Tool approved: %s by %s (vote=%s)", tool.name, approved_by, vote_id)
         return tool
 
@@ -149,8 +148,9 @@ class MCPGovernanceService:
     ) -> MCPTool:
         """
         Emergency revocation — no vote required.
-        Tool becomes immediately unavailable (checked at execution time).
-        Cache invalidation is guaranteed: status checked on every call.
+        Phase 15.2: writes to Redis SET immediately for sub-second propagation.
+        The Redis check happens before every invocation, so agents see the
+        revocation within milliseconds of this call returning.
         """
         tool = self._get_tool_or_404(tool_id)
         tool.status = STATUS_REVOKED
@@ -159,6 +159,18 @@ class MCPGovernanceService:
         tool.revocation_reason = reason
         self.db.commit()
         self.db.refresh(tool)
+
+        # Phase 15.2: write to Redis revocation SET immediately
+        try:
+            from backend.services import mcp_stats_service
+            mcp_stats_service.add_to_revoked(str(tool.id))
+        except Exception as exc:
+            logger.error(
+                "[MCPGovernance] CRITICAL: Redis revocation SET write failed for %s: %s — "
+                "DB status is set but Redis check will not fire until service restarts.",
+                tool.name, exc,
+            )
+
         logger.warning("[MCPGovernance] Tool REVOKED: %s by %s — %s", tool.name, revoked_by, reason)
         return tool
 
@@ -175,8 +187,8 @@ class MCPGovernanceService:
         """
         Returns an MCPVerdict constant.
 
-        Tier 3 / forbidden  → always BLOCK regardless of who asks
-        Tier 2 / restricted → ALLOW only with Head approval token; else HEAD_REQUIRED
+        Tier 3 / forbidden  → always BLOCK
+        Tier 2 / restricted → ALLOW only with Head approval token
         Tier 1 / pre_approved → ALLOW for any approved agent
         """
         if tool_tier == TIER_FORBIDDEN:
@@ -185,12 +197,10 @@ class MCPGovernanceService:
         if tool_tier == TIER_RESTRICTED:
             if has_head_approval_token:
                 return MCPVerdict.ALLOW
-            # Council members (1xxxx) and above can request approval
             if agent_tier.startswith("0") or agent_tier.startswith("1"):
                 return MCPVerdict.HEAD_REQUIRED
             return MCPVerdict.BLOCK
 
-        # pre_approved — open to any approved agent tier
         return MCPVerdict.ALLOW
 
     # ══════════════════════════════════════════════════════════════════════════
@@ -209,18 +219,30 @@ class MCPGovernanceService:
         async_callback_url: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
-        Execute an MCP tool through the full governance pipeline:
-        1. Load and validate tool state (approved, not revoked/disabled)
-        2. Constitutional Guard tier check
-        3. Execute via MCPClient (async if callback provided)
-        4. Append to audit_log
-        5. Update health counters
+        Execute an MCP tool through the full governance pipeline.
+        Phase 15.2: records invocation stats in Redis after execution.
         """
         import asyncio
         import httpx
+        import time as _time
+
         tool = self._get_tool_or_404(tool_id)
 
-        # ── State guard ────────────────────────────────────────────────────────
+        # ── Phase 15.2: Redis revocation check (fast path, no DB) ────────────
+        try:
+            from backend.services import mcp_stats_service as _stats
+            if _stats.is_revoked(str(tool.id)):
+                logger.warning(
+                    "[MCPGovernance] Tool %s blocked by Redis revocation SET", tool.name
+                )
+                return self._blocked_response(
+                    tool.name,
+                    "Tool has been revoked (Redis fast-path). Access denied immediately.",
+                )
+        except Exception as exc:
+            logger.debug("[MCPGovernance] Redis revocation check error (continuing): %s", exc)
+
+        # ── State guard (DB-authoritative fallback) ───────────────────────────
         if tool.status != STATUS_APPROVED:
             return self._blocked_response(tool.name, f"Tool status is '{tool.status}' — not approved for use.")
 
@@ -242,53 +264,63 @@ class MCPGovernanceService:
         # ── Execute ────────────────────────────────────────────────────────────
         target_tool = tool_name or (tool.capabilities[0] if tool.capabilities else tool.name)
 
-        # If async callback is provided, we spawn a background task and return SUSPENDED
         if async_callback_url:
-            # We need a new session for the background task since the current one might close
-            # But for simplicity in this implementation, we just pass the necessary data
-            _tool_id = tool.id
+            _tool_id    = tool.id
             _server_url = tool.server_url
-            _name = tool.name
-            
+            _name       = tool.name
+
             async def _background_mcp_execution():
                 result_payload = {}
+                t_start = _time.monotonic()
+                success = False
                 try:
                     async with MCPClient(_server_url) as client:
                         call_res = await client.call_tool(target_tool, params)
                         result_payload = call_res
+                        success = True
                 except Exception as e:
                     result_payload = {"success": False, "error": str(e), "tool": target_tool}
-                    
-                # Fire the webhook callback
+
+                latency_ms = (_time.monotonic() - t_start) * 1000
+                # Record stats asynchronously
+                try:
+                    from backend.services import mcp_stats_service as _stats
+                    _stats.record_invocation(str(_tool_id), latency_ms, success)
+                except Exception:
+                    pass
+
                 try:
                     async with httpx.AsyncClient() as http:
                         await http.post(async_callback_url, json={
                             "agent_id": agent_id,
-                            "tool_id": _tool_id,
+                            "tool_id": str(_tool_id),
                             "target_tool": target_tool,
-                            "result": result_payload
+                            "result": result_payload,
                         })
                 except Exception as e:
                     logger.error(f"Failed to fire MCP async callback to {async_callback_url}: {e}")
-            
+
             asyncio.create_task(_background_mcp_execution())
-            
+
             return {
                 "success": True,
                 "tool": target_tool,
                 "status": "SUSPENDED",
                 "message": f"Execution started asynchronously. Webhook will be sent to {async_callback_url}.",
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.utcnow().isoformat(),
             }
 
-        # Original synchronous execution path
+        # ── Synchronous execution path ─────────────────────────────────────────
+        t_start    = _time.monotonic()
+        invocation_success = False
+
         try:
             async with MCPClient(tool.server_url) as client:
                 result = await client.call_tool(target_tool, params)
 
-            # Update health counters on success
             tool.consecutive_failures = 0
             tool.health_status = "healthy"
+            invocation_success = result.get("success", True)
 
         except MCPConnectionError as exc:
             result = {
@@ -308,10 +340,18 @@ class MCPGovernanceService:
             }
             self._record_failure(tool)
 
+        latency_ms = (_time.monotonic() - t_start) * 1000
+
+        # ── Phase 15.2: Record invocation stats in Redis ──────────────────────
+        try:
+            from backend.services import mcp_stats_service as _stats
+            _stats.record_invocation(str(tool.id), latency_ms, invocation_success)
+        except Exception as exc:
+            logger.debug("[MCPGovernance] Stats record failed (non-fatal): %s", exc)
+
         # ── Audit ──────────────────────────────────────────────────────────────
         self._audit(tool, agent_id, params, success=result.get("success", False), error=result.get("error"))
 
-        # Update usage stats
         tool.usage_count = (tool.usage_count or 0) + 1
         tool.last_used_at = datetime.utcnow()
         self.db.commit()
@@ -364,6 +404,7 @@ class MCPGovernanceService:
         """
         Return all approved tools, optionally filtered to those accessible
         by the given agent tier (forbidden tools are never returned).
+        Phase 15.2: additionally excludes tools present in the Redis revocation SET.
         """
         query = self.db.query(MCPTool).filter(
             MCPTool.status == STATUS_APPROVED,
@@ -372,8 +413,24 @@ class MCPGovernanceService:
         )
         tools = query.order_by(MCPTool.name).all()
 
+        # Phase 15.2: fast Redis revocation filter (no extra DB query)
+        revoked_ids: set = set()
+        try:
+            from backend.services import mcp_stats_service as _stats
+            revoked_ids = set(_stats.get_revoked_ids())
+        except Exception as exc:
+            logger.debug("[MCPGovernance] Redis revocation filter unavailable (skip): %s", exc)
+
+        if revoked_ids:
+            before_count = len(tools)
+            tools = [t for t in tools if str(t.id) not in revoked_ids]
+            if len(tools) < before_count:
+                logger.info(
+                    "[MCPGovernance] Filtered %d revoked tool(s) from approved list via Redis SET",
+                    before_count - len(tools),
+                )
+
         if agent_tier and (agent_tier.startswith("2") or agent_tier.startswith("3")):
-            # Lead and Task agents cannot access restricted tools
             tools = [t for t in tools if t.tier == TIER_PRE_APPROVED]
 
         return tools
@@ -395,8 +452,29 @@ class MCPGovernanceService:
     def get_tool_audit_log(self, tool_id: str, limit: int = 100) -> List[dict]:
         """Return the last N audit entries for a tool."""
         tool = self._get_tool_or_404(tool_id)
-        log = tool.audit_log or []
+        log  = tool.audit_log or []
         return log[-limit:]
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # PHASE 15.2 — LIVE STATS (proxy to mcp_stats_service)
+    # ══════════════════════════════════════════════════════════════════════════
+
+    @staticmethod
+    def get_live_stats(tool_ids: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+        """
+        Return real-time invocation stats from Redis.
+        If ``tool_ids`` is provided, return stats only for those tools (enrichment use-case).
+        Otherwise return stats for all tools that have ever been invoked.
+        """
+        try:
+            from backend.services import mcp_stats_service as _stats
+            if tool_ids is not None:
+                stats_map = _stats.get_stats_for_tools(tool_ids)
+                return list(stats_map.values())
+            return _stats.get_all_stats()
+        except Exception as exc:
+            logger.warning("[MCPGovernance] get_live_stats error: %s", exc)
+            return []
 
     # ══════════════════════════════════════════════════════════════════════════
     # PRIVATE HELPERS
@@ -418,32 +496,31 @@ class MCPGovernanceService:
         error: Optional[str] = None,
     ) -> None:
         """Append one entry to the tool's persistent audit_log JSON column."""
-        entry = {
-            "agent_id": agent_id,
-            "timestamp": datetime.utcnow().isoformat(),
+        entry: Dict[str, Any] = {
+            "agent_id":   agent_id,
+            "timestamp":  datetime.utcnow().isoformat(),
             "input_hash": MCPClient.hash_params(params),
-            "success": success,
+            "success":    success,
         }
         if error:
             entry["error"] = error
 
         current_log = list(tool.audit_log or [])
         current_log.append(entry)
-        # Prevent unbounded growth — keep last 1000 entries in DB column
         tool.audit_log = current_log[-1000:]
 
     def _record_failure(self, tool: MCPTool) -> None:
-        tool.failure_count = (tool.failure_count or 0) + 1
+        tool.failure_count        = (tool.failure_count or 0) + 1
         tool.consecutive_failures = (tool.consecutive_failures or 0) + 1
-        tool.health_status = "degraded" if tool.consecutive_failures < AUTO_DISABLE_THRESHOLD else "down"
+        tool.health_status        = "degraded" if tool.consecutive_failures < AUTO_DISABLE_THRESHOLD else "down"
         self.auto_disable_on_failures(str(tool.id))
 
     @staticmethod
     def _blocked_response(tool_name: str, reason: str) -> Dict[str, Any]:
         return {
-            "success": False,
-            "tool": tool_name,
-            "error": reason,
-            "verdict": MCPVerdict.BLOCK,
+            "success":   False,
+            "tool":      tool_name,
+            "error":     reason,
+            "verdict":   MCPVerdict.BLOCK,
             "timestamp": datetime.utcnow().isoformat(),
         }

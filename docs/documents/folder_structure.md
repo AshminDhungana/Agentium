@@ -177,6 +177,7 @@ Agentium/
 │   │   ├── knowledge_service.py    # Knowledge base
 │   │   ├── mcp_client.py           # MCP client
 │   │   ├── mcp_governance.py       # MCP governance
+│   │   ├── mcp_stats_service.py    # MCP statistics
 │   │   ├── mcp_tool_bridge.py      # MCP tool bridge
 │   │   ├── message_bus.py          # Message bus
 │   │   ├── model_allocation.py     # Model allocation
@@ -308,6 +309,8 @@ Agentium/
 │   │   │   │   ├── APIKeyHealth.tsx
 │   │   │   │   ├── HealthScore.tsx
 │   │   │   │   └── ViolationCard.tsx
+│   │   │   ├── rbac/               # RBAC UI
+│   │   │   │   └── AuditTrailTab.tsx
 │   │   │   ├── sovereign/           # Sovereign governance UI
 │   │   │   │   ├── SystemTab.tsx
 │   │   │   │   └── EventTriggerManager.tsx
@@ -378,6 +381,7 @@ Agentium/
 │   │   │   ├── api.ts
 │   │   │   ├── apiKeysService.ts
 │   │   │   ├── auth.ts
+│   │   │   ├── audit.ts
 │   │   │   ├── browserApi.ts
 │   │   │   ├── chatApi.ts
 │   │   │   ├── channelMessages.ts
@@ -389,9 +393,9 @@ Agentium/
 │   │   │   ├── hostAccessApi.ts
 │   │   │   ├── inboxApi.ts
 │   │   │   ├── localVoice.ts
-│   │   │   ├── mcpToolsApi.ts
 │   │   │   ├── models.ts
 │   │   │   ├── monitoring.ts
+│   │   │   ├── mcpToolsApi.ts
 │   │   │   ├── plugins.ts
 │   │   │   ├── preferences.ts
 │   │   │   ├── providerAnalyticsApi.ts
