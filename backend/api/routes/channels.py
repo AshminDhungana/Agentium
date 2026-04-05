@@ -11,14 +11,16 @@ Endpoints:
   POST   /channels/{id}/test             — test connection
   GET    /channels/{id}/qr               — poll WhatsApp QR code
   GET    /channels/{id}/messages         — list inbound messages
+  GET    /channels/{id}/logs             — paginated log with status/sender/date filters [15.3]
+  PATCH  /channels/{id}/settings         — update per-channel settings [15.3]
   POST   /channels/{id}/send             — send test message
-  GET    /channels/{id}/health           — get health metrics
+  GET    /channels/{id}/health           — get health metrics (now includes error_count_24h) [15.3]
   POST   /channels/{id}/reset            — reset circuit breaker
 """
 
 import secrets
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, List, Any, Dict
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status, Query, BackgroundTasks
@@ -71,6 +73,24 @@ class SendTestMessageRequest(BaseModel):
     recipient: str = Field(..., description="Recipient ID (phone, chat_id, email, etc.)")
     content: str = Field(..., min_length=1, max_length=4000)
     use_rich_media: bool = False
+
+
+# ─── Phase 15.3: per-channel settings schema ─────────────────────────────────
+
+class ChannelSettingsRequest(BaseModel):
+    """
+    Update per-channel operational settings without touching credentials.
+    All fields are optional — only provided fields are applied.
+    """
+    rate_limit_per_minute: Optional[int] = Field(None, ge=1, le=10_000)
+    rate_limit_per_hour: Optional[int] = Field(None, ge=1, le=200_000)
+    auto_create_tasks: Optional[bool] = None
+    require_approval: Optional[bool] = None
+    default_agent_id: Optional[str] = None
+    content_filters: Optional[List[str]] = Field(
+        None,
+        description="List of blocked keyword substrings; messages matching any are dropped"
+    )
 
 
 # ═══════════════════════════════════════════════════════════
@@ -833,13 +853,35 @@ def get_channel_health(
     current_user: dict = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """Get comprehensive health metrics for a channel."""
+    """
+    Get comprehensive health metrics for a channel.
+
+    Phase 15.3 additions:
+    - statistics.error_count_24h  — errors in the last 24 hours
+    - rate_limits.utilization_pct — current usage as % of hourly platform limit
+    """
     channel = _get_channel_or_404(channel_id, db)
     
     health = ChannelManager.get_channel_health(channel_id)
     
     message_stats = db.query(ExternalMessage).filter_by(channel_id=channel_id)
-    
+
+    # ── Phase 15.3: 24-hour error window ──────────────────────────────────────
+    cutoff_24h = datetime.utcnow() - timedelta(hours=24)
+    error_count_24h = (
+        message_stats
+        .filter(ExternalMessage.created_at >= cutoff_24h)
+        .filter(ExternalMessage.error_count > 0)
+        .count()
+    )
+
+    # ── Rate limit utilization ────────────────────────────────────────────────
+    rate_status = rate_limiter.get_status(channel_id)
+    platform_limits = PLATFORM_RATE_LIMITS.get(channel.channel_type, RateLimitConfig())
+    hourly_limit = platform_limits.requests_per_hour or 1
+    hourly_used = rate_status.get("requests_this_hour", 0) if isinstance(rate_status, dict) else 0
+    utilization_pct = round(min(hourly_used / hourly_limit * 100, 100), 1)
+
     return {
         "channel_id": channel_id,
         "channel_name": channel.name,
@@ -850,17 +892,125 @@ def get_channel_health(
             "total_messages_received": channel.messages_received,
             "total_messages_sent": channel.messages_sent,
             "error_count": message_stats.filter(ExternalMessage.error_count > 0).count(),
+            "error_count_24h": error_count_24h,
             "last_message_at": channel.last_message_at.isoformat() if channel.last_message_at else None,
-            "last_tested_at": channel.last_tested_at.isoformat() if hasattr(channel, 'last_tested_at') and channel.last_tested_at else None
+            "last_tested_at": channel.last_tested_at.isoformat() if hasattr(channel, 'last_tested_at') and channel.last_tested_at else None,
         },
         "rate_limits": {
-            "current_usage": rate_limiter.get_status(channel_id),
+            "current_usage": rate_status,
+            "utilization_pct": utilization_pct,
             "platform_limits": {
-                "requests_per_minute": PLATFORM_RATE_LIMITS.get(channel.channel_type, RateLimitConfig()).requests_per_minute,
-                "requests_per_hour": PLATFORM_RATE_LIMITS.get(channel.channel_type, RateLimitConfig()).requests_per_hour
-            }
-        }
+                "requests_per_minute": platform_limits.requests_per_minute,
+                "requests_per_hour": platform_limits.requests_per_hour,
+            },
+        },
     }
+
+
+# ─── Phase 15.3: per-channel logs endpoint ────────────────────────────────────
+
+@router.get("/channels/{channel_id}/logs")
+def get_channel_logs(
+    channel_id: str,
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    status: Optional[str] = Query(None, description="Filter by message status: received, processing, responded, failed"),
+    sender_id: Optional[str] = Query(None, description="Partial match on sender_id or sender_name"),
+    date_from: Optional[str] = Query(None, description="ISO datetime lower bound, e.g. 2024-01-01T00:00:00"),
+    date_to: Optional[str] = Query(None, description="ISO datetime upper bound"),
+    current_user: dict = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Paginated ExternalMessage history for a single channel.
+
+    Phase 15.3: Supports filtering by status, sender_id (partial), and date range.
+    """
+    _get_channel_or_404(channel_id, db)
+
+    query = db.query(ExternalMessage).filter_by(channel_id=channel_id)
+
+    if status:
+        query = query.filter(ExternalMessage.status == status)
+
+    if sender_id:
+        from sqlalchemy import or_
+        term = f"%{sender_id}%"
+        query = query.filter(
+            or_(
+                ExternalMessage.sender_id.ilike(term),
+                ExternalMessage.sender_name.ilike(term),
+            )
+        )
+
+    if date_from:
+        try:
+            query = query.filter(ExternalMessage.created_at >= datetime.fromisoformat(date_from))
+        except ValueError:
+            pass
+
+    if date_to:
+        try:
+            query = query.filter(ExternalMessage.created_at <= datetime.fromisoformat(date_to))
+        except ValueError:
+            pass
+
+    total = query.count()
+    messages = (
+        query.order_by(ExternalMessage.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+
+    return {
+        "messages": [m.to_dict() for m in messages],
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+    }
+
+
+# ─── Phase 15.3: per-channel settings PATCH ───────────────────────────────────
+
+@router.patch("/channels/{channel_id}/settings")
+def update_channel_settings(
+    channel_id: str,
+    request: ChannelSettingsRequest,
+    current_user: dict = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Update per-channel operational settings.
+
+    Phase 15.3: rate limits, auto-create-tasks flag, default agent assignment,
+    and content filter keyword list. Credentials and webhook paths are
+    intentionally excluded — use PUT /channels/{id} for those.
+    """
+    channel = _get_channel_or_404(channel_id, db)
+
+    # Routing fields live on the model directly
+    if request.auto_create_tasks is not None:
+        channel.auto_create_tasks = request.auto_create_tasks
+    if request.require_approval is not None:
+        channel.require_approval = request.require_approval
+    if request.default_agent_id is not None:
+        channel.default_agent_id = request.default_agent_id
+
+    # Rate limits and content filters are stored inside config so they survive
+    # without a schema migration; existing credential keys are preserved.
+    config = dict(channel.config or {})
+    if request.rate_limit_per_minute is not None:
+        config["rate_limit_per_minute"] = request.rate_limit_per_minute
+    if request.rate_limit_per_hour is not None:
+        config["rate_limit_per_hour"] = request.rate_limit_per_hour
+    if request.content_filters is not None:
+        config["content_filters"] = request.content_filters
+    channel.config = config
+
+    db.commit()
+    db.refresh(channel)
+    return channel.to_dict()
 
 
 @router.post("/channels/{channel_id}/reset")

@@ -175,6 +175,12 @@ celery_app.conf.beat_schedule = {
         'task': 'backend.celery_app.broadcast_mcp_stats',
         'schedule': 30.0,   # every 30 seconds
     },
+
+    # ── Phase 15.3: Channel Health Broadcast ──────────────────────────────────
+    'channel-health-broadcast': {
+        'task': 'backend.celery_app.broadcast_channel_health',
+        'schedule': 300.0,  # every 5 minutes — aligns with health-check-every-5-minutes
+    },
 }
 
 
@@ -236,6 +242,116 @@ def broadcast_mcp_stats():
     except Exception as exc:
         # Non-fatal: frontend can always fall back to polling GET /mcp-tools/stats
         logger.debug("[MCPStats] WebSocket broadcast skipped (non-fatal): %s", exc)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Phase 15.3 — Channel Health Broadcast Task
+# ──────────────────────────────────────────────────────────────────────────────
+
+@celery_app.task(name="backend.celery_app.broadcast_channel_health", ignore_result=True)
+def broadcast_channel_health():
+    """
+    Phase 15.3: Fetch health summary for all active channels and push a
+    'channel_health_update' WebSocket event to all connected clients.
+
+    Runs every 5 minutes via Celery Beat (co-scheduled with
+    check_channel_health so the broadcast reflects freshly-updated metrics).
+
+    WebSocket payload:
+        {
+            "type":     "channel_health_update",
+            "channels": [
+                {
+                    "channel_id":       "<uuid>",
+                    "channel_name":     "<str>",
+                    "channel_type":     "<str>",
+                    "status":           "<str>",
+                    "health":           { ... },
+                    "rate_limit_status": { ... }
+                },
+                ...
+            ],
+            "count":     <int>,
+            "timestamp": "<ISO>"
+        }
+
+    Frontend subscribes to 'channel_health_update' in ChannelsPage and
+    invalidates the 'all-channel-metrics' React Query cache so the health
+    cards refresh without a full page reload.
+    """
+    import asyncio
+    from datetime import datetime
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from sqlalchemy.pool import NullPool
+
+    DATABASE_URL = os.getenv(
+        "DATABASE_URL",
+        "postgresql://postgres:postgres@postgres:5432/agentium"
+    )
+    engine = create_engine(DATABASE_URL, poolclass=NullPool, pool_pre_ping=True)
+    Session = sessionmaker(bind=engine)
+    db = Session()
+
+    try:
+        from backend.models.entities.channels import ExternalChannel, ChannelStatus
+        from backend.services.channel_manager import ChannelManager, rate_limiter
+
+        active_channels = db.query(ExternalChannel).filter(
+            ExternalChannel.status == ChannelStatus.ACTIVE
+        ).all()
+
+        health_updates = []
+        for channel in active_channels:
+            try:
+                health = ChannelManager.get_channel_health(channel.id)
+                rate_status = rate_limiter.get_status(channel.id)
+                health_updates.append({
+                    "channel_id":        channel.id,
+                    "channel_name":      channel.name,
+                    "channel_type":      channel.channel_type.value,
+                    "status":            channel.status.value,
+                    "health":            health,
+                    "rate_limit_status": rate_status,
+                })
+            except Exception as exc:
+                logger.warning(
+                    "[ChannelHealth] Failed to fetch health for channel %s: %s",
+                    channel.id, exc
+                )
+
+        if not health_updates:
+            logger.debug("[ChannelHealth] No active channels — skipping broadcast")
+            return
+
+        message = {
+            "type":      "channel_health_update",
+            "channels":  health_updates,
+            "count":     len(health_updates),
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+
+        try:
+            from backend.api.routes.websocket import manager
+
+            loop = asyncio.new_event_loop()
+            try:
+                loop.run_until_complete(manager.broadcast(message))
+                logger.debug(
+                    "[ChannelHealth] Broadcast health for %d active channels",
+                    len(health_updates)
+                )
+            finally:
+                loop.close()
+
+        except Exception as exc:
+            # Non-fatal: frontend falls back to its 30 s refetchInterval
+            logger.debug("[ChannelHealth] WebSocket broadcast skipped (non-fatal): %s", exc)
+
+    except Exception as exc:
+        logger.error("[ChannelHealth] broadcast_channel_health task failed: %s", exc)
+    finally:
+        db.close()
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -460,6 +576,7 @@ def on_worker_ready(**kwargs):
     print("🥬 Celery worker ready for Agentium tasks")
     print("   Task Execution Architecture: Governance Alignment active")
     print("   Phase 15.2: MCP stats broadcast registered (every 30s)")
+    print("   Phase 15.3: Channel health broadcast registered (every 5m)")
     print("   Federation tasks registered: deliver_federated_task, federation_heartbeat, "
           "federation_cleanup_stale, send_federation_result")
 

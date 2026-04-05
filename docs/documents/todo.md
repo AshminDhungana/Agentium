@@ -601,11 +601,11 @@ Build a self-governing AI ecosystem where agents operate under constitutional la
 
 ### 15.3 Channel Health Monitoring, Logs & Settings
 
-- [ ] **Backend** — `GET /channels/{id}/health` — return: connection status, last message timestamp, error count (last 24 h), circuit breaker state, rate limit utilization
-- [ ] `GET /channels/{id}/logs` — paginated `ExternalMessage` history with filters for `status`, `sender_id`, date range
-- [ ] `PATCH /channels/{id}/settings` — update per-channel rate limit, auto-create-tasks flag, default agent assignment, content filters
-- [ ] Celery beat every 5 min: emit `channel_health_update` WebSocket event for all active channels
-- [ ] **Frontend** — build full channel management UI in `ChannelsPage.tsx`:
+- [x] **Backend** — `GET /channels/{id}/health` — return: connection status, last message timestamp, error count (last 24 h), circuit breaker state, rate limit utilization
+- [x] `GET /channels/{id}/logs` — paginated `ExternalMessage` history with filters for `status`, `sender_id`, date range
+- [x] `PATCH /channels/{id}/settings` — update per-channel rate limit, auto-create-tasks flag, default agent assignment, content filters
+- [x] Celery beat every 5 min: emit `channel_health_update` WebSocket event for all active channels
+- [x] **Frontend** — build full channel management UI in `ChannelsPage.tsx`:
   - Health tab: status badge, last message time, error count, circuit breaker indicator per channel
   - Logs tab: scrollable message history with status filtering and sender search
   - Settings tab: rate limit slider, auto-task toggle, default agent dropdown, content filter keyword list

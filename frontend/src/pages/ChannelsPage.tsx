@@ -1,7 +1,8 @@
 // src/pages/ChannelsPage.tsx
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useState, useReducer, useCallback } from 'react';
+import { useState, useReducer, useCallback, useEffect } from 'react';
+import { ChannelDetailPanel } from '@/components/channels/ChannelDetailPanel';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { api } from '@/services/api';
 import { channelMetricsApi } from '@/services/channelMetrics';
@@ -42,6 +43,7 @@ import {
     MessageSquare,
     Send,
     QrCode,
+    SlidersHorizontal,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
@@ -357,6 +359,34 @@ export function ChannelsPage() {
     // Per-channel loading flag for the test button (#5)
     const [testingChannelId,   setTestingChannelId]   = useState<string | null>(null);
 
+    // ── Phase 15.3: channel detail panel ──────────────────────────────────────
+    const [selectedChannel, setSelectedChannel] = useState<Channel | null>(null);
+
+    // Subscribe to Celery-beat channel_health_update events (Phase 15.3).
+    // When the broadcast fires every 5 min we silently invalidate the metrics
+    // cache so the health cards refresh without any user action.
+    //
+    // Integration note: replace the addEventListener stub below with your
+    // project's WebSocket store subscriber (e.g. useWebSocketStore.subscribe)
+    // once it exposes a typed event bus. The invalidation call is the only
+    // thing that matters — the transport mechanism is swappable.
+    useEffect(() => {
+        const handler = (event: MessageEvent) => {
+            try {
+                const msg = JSON.parse(event.data);
+                if (msg.type === 'channel_health_update') {
+                    queryClient.invalidateQueries({ queryKey: ['all-channel-metrics'] });
+                }
+            } catch {
+                // non-JSON frames — ignore
+            }
+        };
+        // Attach to the global WebSocket if one exists on window (project-specific)
+        const ws = (window as any).__agentiumWS as WebSocket | undefined;
+        ws?.addEventListener('message', handler);
+        return () => ws?.removeEventListener('message', handler);
+    }, [queryClient]);
+
     // ── QR polling hook (#2) ───────────────────────────────────────────────────
     const { startPolling, stopPolling } = useQRPolling({
         onAuthenticated: useCallback(() => {
@@ -654,6 +684,14 @@ export function ChannelsPage() {
 
                                         {/* Action buttons */}
                                         <div className="flex gap-1">
+                                            {/* Phase 15.3: open detail panel */}
+                                            <button
+                                                onClick={() => setSelectedChannel(channel)}
+                                                title="Health, logs & settings"
+                                                className="p-2 text-gray-400 dark:text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 rounded-lg transition-all duration-150"
+                                            >
+                                                <SlidersHorizontal className="w-4 h-4" />
+                                            </button>
                                             <button
                                                 onClick={() => handleViewLog(channel.id)}
                                                 title="View message log"
@@ -1196,6 +1234,14 @@ export function ChannelsPage() {
                 <TestMessageModal
                     channel={testChannel}
                     onClose={() => setTestChannel(null)}
+                />
+            )}
+
+            {/* ── Phase 15.3: Channel Detail Panel ─────────────────────────── */}
+            {selectedChannel && (
+                <ChannelDetailPanel
+                    channel={selectedChannel}
+                    onClose={() => setSelectedChannel(null)}
                 />
             )}
         </div>

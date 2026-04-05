@@ -49,6 +49,10 @@ export interface Channel {
         provider?: WhatsAppProvider;
         bridge_url?: string;
         allowed_senders?: string[];
+        // Phase 15.3 — per-channel settings persisted in config
+        rate_limit_per_minute?: number;
+        rate_limit_per_hour?: number;
+        content_filters?: string[];
     };
     routing: {
         default_agent?: string;
@@ -123,6 +127,65 @@ export interface MessageLog {
     last_error?: string;
     created_at: string;
     responded_at?: string;
+}
+
+// ─── Phase 15.3 types ────────────────────────────────────────────────────────
+
+/**
+ * Filters accepted by GET /channels/{id}/logs and channelMetricsApi.getChannelLogs.
+ */
+export interface ChannelLogFilters {
+    status?: 'received' | 'processing' | 'responded' | 'failed';
+    /** Partial match on sender_id or sender_name */
+    sender_id?: string;
+    /** ISO datetime lower bound */
+    date_from?: string;
+    /** ISO datetime upper bound */
+    date_to?: string;
+    limit?: number;
+    offset?: number;
+}
+
+/**
+ * Body for PATCH /channels/{id}/settings.
+ * All fields optional — only provided values are applied.
+ */
+export interface ChannelSettings {
+    rate_limit_per_minute?: number;
+    rate_limit_per_hour?: number;
+    auto_create_tasks?: boolean;
+    require_approval?: boolean;
+    default_agent_id?: string;
+    content_filters?: string[];
+}
+
+/**
+ * Response shape of GET /channels/{id}/health (Phase 15.3 extended).
+ */
+export interface ChannelHealthDetail {
+    channel_id: string;
+    channel_name: string;
+    channel_type: string;
+    status: string;
+    health: Record<string, unknown>;
+    statistics: {
+        total_messages_received: number;
+        total_messages_sent: number;
+        error_count: number;
+        /** Errors in the last 24 hours — Phase 15.3 addition */
+        error_count_24h: number;
+        last_message_at: string | null;
+        last_tested_at: string | null;
+    };
+    rate_limits: {
+        current_usage: Record<string, unknown>;
+        /** Current hourly usage as % of platform limit — Phase 15.3 addition */
+        utilization_pct: number;
+        platform_limits: {
+            requests_per_minute: number;
+            requests_per_hour: number;
+        };
+    };
 }
 
 // ─── Provider / Model types ───────────────────────────────────────────────────
