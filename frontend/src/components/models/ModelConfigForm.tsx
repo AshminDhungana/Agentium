@@ -1,14 +1,5 @@
 /**
  * frontend/src/components/models/ModelConfigForm.tsx
- *
- * Two-step wizard for creating / editing a model configuration.
- *
- * Changes from original:
- *  ✓ Removed local normaliseId, ProviderIcon, getProviderGradient — now imported
- *    from @/constants/providerMeta (single source of truth shared with ModelCard)
- *  ✓ Removed console.log debug line from provider grid map
- *  ✓ Replaced catch (err: any) with typed getErrorMessage
- *  ✓ handleTestConnection payload typed explicitly (removed `any`)
  */
 
 import React, { useState, useEffect } from 'react';
@@ -28,8 +19,61 @@ import {
 } from 'lucide-react';
 import { modelsApi } from '@/services/models';
 import { getProviderFormGradient, ProviderFormIcon } from '@/constants/providerMeta';
-import { getErrorMessage } from '@/utils/errors';
 import type { ModelConfig, ProviderInfo, ProviderType } from '@/types';
+
+// ─── Error helper ─────────────────────────────────────────────────────────────
+//
+// getErrorMessage from @/utils/errors doesn't handle Pydantic 422 responses,
+// which look like: { detail: [{type, loc, msg, input, ctx}, ...] }
+// If that object (or the array) reaches JSX it triggers React error #31 and
+// the page goes dark. This helper always returns a plain string.
+
+function extractErrorMessage(err: unknown): string {
+    if (err && typeof err === 'object') {
+        const e = err as Record<string, unknown>;
+
+        // Axios error — dig into response body
+        const data = (e?.response as Record<string, unknown> | undefined)?.data as
+            | Record<string, unknown>
+            | undefined;
+
+        if (data) {
+            const detail = data.detail;
+
+            // Pydantic validation error — array of {type, loc, msg, input, ctx}
+            if (Array.isArray(detail) && detail.length > 0) {
+                return detail
+                    .map((d: unknown) => {
+                        if (d && typeof d === 'object') {
+                            const item = d as Record<string, unknown>;
+                            // e.g. "body → api_key: Field required"
+                            const loc = Array.isArray(item.loc)
+                                ? (item.loc as unknown[]).slice(1).join(' → ')
+                                : '';
+                            const msg = typeof item.msg === 'string' ? item.msg : JSON.stringify(item);
+                            return loc ? `${loc}: ${msg}` : msg;
+                        }
+                        return String(d);
+                    })
+                    .join('; ');
+            }
+
+            // Plain string detail
+            if (typeof detail === 'string') return detail;
+
+            // Other body-level message keys
+            const bodyMsg = data.message ?? data.error ?? data.msg;
+            if (bodyMsg) return String(bodyMsg);
+        }
+
+        // Standard Error .message
+        const msg = (err as Error).message;
+        if (msg) return msg;
+    }
+
+    if (typeof err === 'string') return err;
+    return 'An unexpected error occurred';
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -91,7 +135,8 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
                     setError('Invalid providers data received');
                 }
             } catch (err: unknown) {
-                setError(getErrorMessage(err) || 'Failed to load providers');
+                // FIX: use extractErrorMessage so a Pydantic error object is never stored in state
+                setError(extractErrorMessage(err) || 'Failed to load providers');
             } finally {
                 setIsLoadingProviders(false);
             }
@@ -199,7 +244,8 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
                 message: `✓ Found ${result.count} available models from ${result.provider}`,
             });
         } catch (err: unknown) {
-            const msg = getErrorMessage(err);
+            // FIX: extractErrorMessage always returns a string — never an object
+            const msg = extractErrorMessage(err);
             setError(`Failed to fetch models: ${msg}`);
             setTestResult({ success: false, message: 'Failed to fetch models', error: msg });
         } finally {
@@ -211,10 +257,17 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
         setTesting(true);
         setTestResult(null);
         setError(null);
+
+        // FIX: track the temp config ID outside try so finally can always clean it up.
+        // Previously deleteConfig was INSIDE the try block — if testConfig() threw
+        // (e.g. bad API key rejected by the provider), deleteConfig was never called
+        // and a ghost record was left in the database.
+        let tempConfigId: string | null = null;
+
         try {
             const payload: Parameters<typeof modelsApi.createConfig>[0] = {
                 provider: formData.provider,
-                config_name: 'Test Config',
+                config_name: '__test_connection__',
                 default_model: formData.default_model,
                 api_key: formData.api_key || undefined,
                 max_tokens: formData.max_tokens,
@@ -228,22 +281,36 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
             };
 
             const tempConfig = await modelsApi.createConfig(payload);
+            tempConfigId = tempConfig.id;
+
             const result = await modelsApi.testConfig(tempConfig.id);
             setTestResult({
                 success: result.success,
                 message: result.success
                     ? `✓ Connection successful! (${result.latency_ms}ms)`
                     : '✗ Connection failed',
-                error: result.error,
+                // FIX: coerce result.error to string — the API may return an object
+                error: result.error ? String(result.error) : undefined,
             });
-            await modelsApi.deleteConfig(tempConfig.id);
         } catch (err: unknown) {
             setTestResult({
                 success: false,
                 message: 'Connection failed',
-                error: getErrorMessage(err),
+                // FIX: extractErrorMessage — if the 422 detail is an object array,
+                // this converts it to a readable string instead of storing the object.
+                // Storing an object then rendering {testResult.error} was the root
+                // cause of React error #31 and the page going dark.
+                error: extractErrorMessage(err),
             });
         } finally {
+            // FIX: always delete the temp config, even when testConfig() threw
+            if (tempConfigId) {
+                try {
+                    await modelsApi.deleteConfig(tempConfigId);
+                } catch {
+                    // Best-effort cleanup — don't surface this to the user
+                }
+            }
             setTesting(false);
         }
     };
@@ -280,7 +347,8 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
 
             onSave(result);
         } catch (err: unknown) {
-            setError(getErrorMessage(err) || 'Failed to save configuration');
+            // FIX: extractErrorMessage — handles Pydantic 422 validation errors
+            setError(extractErrorMessage(err) || 'Failed to save configuration');
         } finally {
             setIsLoading(false);
         }
@@ -484,7 +552,12 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
                                         {testResult.message}
                                     </p>
                                     {testResult.error && (
-                                        <p className="text-xs text-red-700 dark:text-red-400/80 mt-0.5">{testResult.error}</p>
+                                        // FIX: String() coercion — final safety net so that if an object
+                                        // somehow slips through, React renders "[object Object]" instead
+                                        // of throwing error #31 and blanking the page.
+                                        <p className="text-xs text-red-700 dark:text-red-400/80 mt-0.5">
+                                            {String(testResult.error)}
+                                        </p>
                                     )}
                                 </div>
                             </div>

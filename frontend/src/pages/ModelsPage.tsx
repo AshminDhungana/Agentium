@@ -2,24 +2,9 @@
  * frontend/src/pages/ModelsPage.tsx
  *
  * AI Model Configurations page.
- *
- * This component is a pure orchestration layer:
- *  - All data + mutation logic lives in useModelConfigs
- *  - Each card is rendered by ModelCard (memoised)
- *  - Loading placeholders are ModelCardSkeleton
- *  - Summary tiles reuse the shared StatCard from the UI library
- *
- * Changes from the original:
- *  ✓ Removed inline SummaryCard / StatusBadge / PROVIDER_META (now in shared files)
- *  ✓ Replaced 3 separate loading-id states with Map-based activeActions (in hook)
- *  ✓ Replaced window.confirm with inline delete confirmation (in ModelCard)
- *  ✓ Full-page spinner only on first load; skeleton cards on subsequent refreshes
- *  ✓ All catch (err: any) replaced with typed getErrorMessage utility
- *  ✓ formatTokenCount used for summary stat (from utils/time)
- *  ✓ aria-labels added throughout
  */
 
-import React, { useState } from 'react';
+import React, { useState, Component } from 'react';
 import {
     Plus,
     AlertCircle,
@@ -28,6 +13,7 @@ import {
     BarChart3,
     Activity,
     Settings,
+    RefreshCw,
 } from 'lucide-react';
 
 import { ModelConfigForm } from '@/components/models/ModelConfigForm';
@@ -35,6 +21,63 @@ import { ModelCard } from '@/components/models/ModelCard';
 import { ModelCardSkeleton } from '@/components/models/ModelCardSkeleton';
 import { useModelConfigs } from '@/hooks/useModelConfigs';
 import { formatTokenCount } from '@/utils/time';
+
+// ─── Error Boundary ───────────────────────────────────────────────────────────
+//
+// Catches render-time errors (such as React error #31 — objects rendered as
+// JSX children) so the page never goes completely dark. Instead the user sees
+// a friendly error card with a Reload button.
+
+interface EBState { hasError: boolean; message: string }
+
+class ModelConfigErrorBoundary extends Component<
+    { children: React.ReactNode },
+    EBState
+> {
+    state: EBState = { hasError: false, message: '' };
+
+    static getDerivedStateFromError(err: unknown): EBState {
+        const message =
+            err instanceof Error ? err.message : String(err ?? 'Unknown render error');
+        return { hasError: true, message };
+    }
+
+    handleReload = () => {
+        this.setState({ hasError: false, message: '' });
+    };
+
+    render() {
+        if (!this.state.hasError) return this.props.children;
+
+        return (
+            <div className="min-h-screen bg-gray-50 dark:bg-[#0f1117] p-6 flex items-center justify-center">
+                <div className="max-w-md w-full bg-white dark:bg-[#161b27] rounded-xl border border-red-200 dark:border-red-500/20 shadow-sm p-8 text-center">
+                    <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-red-100 dark:bg-red-500/10 mb-5">
+                        <AlertCircle className="w-7 h-7 text-red-600 dark:text-red-400" />
+                    </div>
+                    <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+                        Something went wrong
+                    </h2>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
+                        An unexpected error occurred while rendering this page.
+                    </p>
+                    {this.state.message && (
+                        <p className="text-xs font-mono text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-500/10 rounded-lg px-3 py-2 mb-6 break-all text-left">
+                            {this.state.message}
+                        </p>
+                    )}
+                    <button
+                        onClick={this.handleReload}
+                        className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors duration-150"
+                    >
+                        <RefreshCw className="w-4 h-4" />
+                        Try Again
+                    </button>
+                </div>
+            </div>
+        );
+    }
+}
 
 // ─── Summary stat card (local — uses the existing shared StatCard shape) ──────
 // We keep a local version here because the ModelsPage SummaryCard accepts
@@ -71,9 +114,9 @@ const SummaryCard: React.FC<{
     );
 };
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
+// ─── Inner page (wrapped by ErrorBoundary below) ──────────────────────────────
 
-export const ModelsPage: React.FC = () => {
+const ModelsPageInner: React.FC = () => {
     const [showForm, setShowForm] = useState(false);
     const [editingConfig, setEditingConfig] = useState<import('@/types').ModelConfig | null>(null);
 
@@ -204,7 +247,8 @@ export const ModelsPage: React.FC = () => {
                             <p className="font-medium text-red-900 dark:text-red-300 text-sm">
                                 Failed to load configurations
                             </p>
-                            <p className="text-sm text-red-700 dark:text-red-400/80 mt-0.5">{error}</p>
+                            {/* FIX: String() coercion — ensures we never render a raw error object */}
+                            <p className="text-sm text-red-700 dark:text-red-400/80 mt-0.5">{String(error)}</p>
                         </div>
                         <button
                             onClick={loadConfigs}
@@ -276,5 +320,18 @@ export const ModelsPage: React.FC = () => {
         </div>
     );
 };
+
+// ─── Page (exported) ──────────────────────────────────────────────────────────
+//
+// Wrapping ModelsPageInner in ModelConfigErrorBoundary means any render crash
+// (React error #31, null-deref in a card, etc.) shows a friendly error card
+// instead of a blank/dark page. The "Try Again" button resets the boundary
+// so the user doesn't need to reload the whole app.
+
+export const ModelsPage: React.FC = () => (
+    <ModelConfigErrorBoundary>
+        <ModelsPageInner />
+    </ModelConfigErrorBoundary>
+);
 
 export default ModelsPage;
