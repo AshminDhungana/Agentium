@@ -103,8 +103,8 @@ fake-useragent==2.0.3
 # SpeechRecognition and pyttsx3 removed — they require a physical microphone
 # and ALSA/PulseAudio hardware unavailable in a container environment.
 # Voice is handled entirely via OpenAI Whisper (STT) and TTS APIs in voice.py.
-speechbrain>=1.0.0
-torchaudio
+speechbrain==1.1.0
+torchaudio==2.11.0
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 🔐 SECURITY

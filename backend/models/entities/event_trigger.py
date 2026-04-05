@@ -58,7 +58,7 @@ class EventTrigger(BaseEntity):
 
     name = Column(String(200), nullable=False)
     trigger_type = Column(
-        Enum(TriggerType, name="triggertype", create_constraint=True),
+        Enum(TriggerType, name="triggertype", values_callable=lambda obj: [e.value for e in obj], create_constraint=True),
         nullable=False,
     )
     config = Column(JSON, nullable=False, default=dict)
@@ -139,7 +139,7 @@ class EventLog(BaseEntity):
     )
     event_payload = Column(JSON, nullable=False, default=dict)
     status = Column(
-        Enum(EventLogStatus, name="eventlogstatus", create_constraint=True),
+        Enum(EventLogStatus, name="eventlogstatus", values_callable=lambda obj: [e.value for e in obj], create_constraint=True),
         nullable=False, default=EventLogStatus.PROCESSED,
     )
     correlation_id = Column(String(36), nullable=True, index=True)

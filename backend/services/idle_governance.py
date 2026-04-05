@@ -345,7 +345,10 @@ class EnhancedIdleGovernanceEngine:
         head = db.query(HeadOfCouncil).filter_by(agentium_id="00001").first()
         
         if not head:
-            logger.warning("⚠️ Auto-liquidation skipped: Head of Council not found")
+            # We don't want to spam warnings if Genesis hasn't run yet.
+            if not getattr(self, '_head_missing_logged', False):
+                logger.info("ℹ️ Auto-liquidation skipped: Head of Council not found (Genesis likely hasn't run yet)")
+                self._head_missing_logged = True
             return {"liquidated": [], "skipped": [], "reason": "no_head"}
         
         for agent in idle_agents:

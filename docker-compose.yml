@@ -9,6 +9,8 @@ services:
       POSTGRES_DB: agentium
       POSTGRES_USER: agentium
       POSTGRES_PASSWORD: agentium
+      POSTGRES_INITDB_ARGS: "--locale=C"
+      POSTGRES_HOST_AUTH_METHOD: scram-sha-256
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
@@ -73,8 +75,9 @@ services:
     container_name: agentium-minio
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_CI_CD: 1
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-4a98cf79ada70d471771d7c1b5f0f014c}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-e94607c6d227c6496100fba01a0}
     ports:
       - "9000:9000"   # S3 API
       - "9001:9001"   # Web console
@@ -199,10 +202,11 @@ services:
       - XVFB_RESOLUTION=1920x1080x24
       - TOKENIZERS_PARALLELISM=false
       - HF_HUB_OFFLINE=1
+      - HF_HOME=/app/.cache/huggingface
       # ── Storage (MinIO primary / local fallback) ──────────────────────────
       # MinIO credentials — must match MINIO_ROOT_USER / MINIO_ROOT_PASSWORD above.
-      - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER:-minioadmin}
-      - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD:-minioadmin}
+      - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER:-4a98cf79ada70d471771d7c1b5f0f014c}
+      - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD:-e94607c6d227c6496100fba01a0}
       - S3_ENDPOINT=http://minio:9000
       - S3_BUCKET_NAME=${S3_BUCKET_NAME:-agentium-media}
       - S3_FORCE_PATH_STYLE=true
@@ -279,9 +283,10 @@ services:
       - XVFB_RESOLUTION=1920x1080x24
       - TOKENIZERS_PARALLELISM=false
       - HF_HUB_OFFLINE=1
+      - HF_HOME=/app/.cache/huggingface
       # ── Storage (MinIO primary / local fallback) ──────────────────────────
-      - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER:-minioadmin}
-      - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD:-minioadmin}
+      - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER:-4a98cf79ada70d471771d7c1b5f0f014c}
+      - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD:-e94607c6d227c6496100fba01a0}
       - S3_ENDPOINT=http://minio:9000
       - S3_BUCKET_NAME=${S3_BUCKET_NAME:-agentium-media}
       - S3_FORCE_PATH_STYLE=true
@@ -353,12 +358,13 @@ services:
       - DISPLAY=:99
       - XVFB_RESOLUTION=1920x1080x24
       - TOKENIZERS_PARALLELISM=false
+      - HF_HOME=/app/.cache/huggingface
       # ── Storage (MinIO primary / local fallback) ──────────────────────────
       # These were missing from celery-beat, causing "AWS credentials not set"
       # warnings on every startup and silent failures in any beat task that
       # touches file storage (e.g. sovereign_data_retention).
-      - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER:-minioadmin}
-      - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD:-minioadmin}
+      - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER:-4a98cf79ada70d471771d7c1b5f0f014c}
+      - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD:-e94607c6d227c6496100fba01a0}
       - S3_ENDPOINT=http://minio:9000
       - S3_BUCKET_NAME=${S3_BUCKET_NAME:-agentium-media}
       - S3_FORCE_PATH_STYLE=true
