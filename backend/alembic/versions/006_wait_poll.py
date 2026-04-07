@@ -1,7 +1,7 @@
 """006_wait_poll — create wait_conditions table
 
 Revision ID: 006_wait_poll
-Revises: 003
+Revises: 005_speaker_profiles
 Create Date: 2025-01-01 00:00:00.000000
 
 Non-breaking: adds a new table; no existing columns are modified.
@@ -13,13 +13,15 @@ from sqlalchemy.dialects import postgresql
 
 # ── Revision identifiers ──────────────────────────────────────────────────────
 
-revision  = "006_wait_poll"
-down_revision = "005_speaker_profiles"          
+revision      = "006_wait_poll"
+down_revision = "005_speaker_profiles"
 branch_labels = None
 depends_on    = None
 
 
 # ── Enums (created idempotently) ──────────────────────────────────────────────
+# create_type=False tells SQLAlchemy NOT to emit CREATE TYPE automatically.
+# The DO $$ blocks in upgrade() handle creation safely on any PG version.
 
 wait_strategy_enum = postgresql.ENUM(
     "http_poll", "redis_key", "timeout", "webhook", "manual",
@@ -35,18 +37,43 @@ wait_condition_status_enum = postgresql.ENUM(
 
 
 def upgrade() -> None:
-    # ── Create enum types (safe to re-run) ───────────────────────────────
-    op.execute("CREATE TYPE IF NOT EXISTS waitstrategy AS ENUM "
-               "('http_poll','redis_key','timeout','webhook','manual')")
-    op.execute("CREATE TYPE IF NOT EXISTS waitconditionstatus AS ENUM "
-               "('pending','active','resolved','expired','cancelled')")
+    # ── Create enum types ─────────────────────────────────────────────────
+    # CREATE TYPE IF NOT EXISTS only works on PG 14+; use a DO block
+    # checking pg_type instead — works on PG 9.6+ including Alpine PG 15.
+    op.execute("""
+        DO $$ BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'waitstrategy') THEN
+                CREATE TYPE waitstrategy AS ENUM
+                    ('http_poll','redis_key','timeout','webhook','manual');
+            END IF;
+        END $$;
+    """)
+    op.execute("""
+        DO $$ BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'waitconditionstatus') THEN
+                CREATE TYPE waitconditionstatus AS ENUM
+                    ('pending','active','resolved','expired','cancelled');
+            END IF;
+        END $$;
+    """)
 
-    # ── Add WAITING to existing taskstatus enum ───────────────────────────
-    # ALTER TYPE … ADD VALUE is idempotent in PG 14+ with IF NOT EXISTS.
-    op.execute("ALTER TYPE taskstatus ADD VALUE IF NOT EXISTS 'waiting'")
+    # ── Add WAITING to taskstatus enum ────────────────────────────────────
+    op.execute("""
+        DO $$ BEGIN
+            IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'taskstatus') THEN
+                ALTER TYPE taskstatus ADD VALUE IF NOT EXISTS 'waiting';
+            END IF;
+        END $$;
+    """)
 
     # ── Add WAIT_ENTERED to checkpointphase enum ──────────────────────────
-    op.execute("ALTER TYPE checkpointphase ADD VALUE IF NOT EXISTS 'wait_entered'")
+    op.execute("""
+        DO $$ BEGIN
+            IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'checkpointphase') THEN
+                ALTER TYPE checkpointphase ADD VALUE IF NOT EXISTS 'wait_entered';
+            END IF;
+        END $$;
+    """)
 
     # ── Create wait_conditions table ──────────────────────────────────────
     op.create_table(
@@ -62,31 +89,33 @@ def upgrade() -> None:
         # Domain columns
         sa.Column("task_id", sa.String(36),
                   sa.ForeignKey("tasks.id", ondelete="CASCADE"),
-                  nullable=False, index=True),
+                  nullable=False),
 
-        sa.Column("strategy", sa.Enum(
-            "http_poll", "redis_key", "timeout", "webhook", "manual",
-            name="waitstrategy",
-        ), nullable=False),
+        # ← Use the module-level ENUM objects (create_type=False) so SQLAlchemy
+        #   does NOT fire a second CREATE TYPE after the DO $$ blocks above.
+        sa.Column("strategy", wait_strategy_enum, nullable=False),
 
-        sa.Column("status", sa.Enum(
-            "pending", "active", "resolved", "expired", "cancelled",
-            name="waitconditionstatus",
-        ), nullable=False, server_default="pending"),
+        sa.Column("status", wait_condition_status_enum,
+                  nullable=False, server_default="pending"),
 
-        sa.Column("config",               postgresql.JSON(), nullable=False,
-                  server_default="'{}'::json"),
-        sa.Column("max_attempts",         sa.Integer(), nullable=False, server_default="60"),
-        sa.Column("attempt_count",        sa.Integer(), nullable=False, server_default="0"),
-        sa.Column("poll_interval_seconds",sa.Integer(), nullable=False, server_default="30"),
-        sa.Column("expires_at",           sa.DateTime(), nullable=True),
-        sa.Column("resolved_at",          sa.DateTime(), nullable=True),
-        sa.Column("resolution_data",      postgresql.JSON(), nullable=True),
-        sa.Column("failure_reason",       sa.Text(), nullable=True),
-        sa.Column("created_by_agent_id",  sa.String(36), nullable=True),
+        # sa.text() is required for any server_default that contains a SQL
+        # expression (cast, function call, etc.). Without it SQLAlchemy wraps
+        # the value in extra quotes, producing invalid SQL like '''{}''::json'.
+        sa.Column("config",                postgresql.JSON(), nullable=False,
+                  server_default=sa.text("'{}'::json")),
+        sa.Column("max_attempts",          sa.Integer(), nullable=False, server_default="60"),
+        sa.Column("attempt_count",         sa.Integer(), nullable=False, server_default="0"),
+        sa.Column("poll_interval_seconds", sa.Integer(), nullable=False, server_default="30"),
+        sa.Column("expires_at",            sa.DateTime(), nullable=True),
+        sa.Column("resolved_at",           sa.DateTime(), nullable=True),
+        sa.Column("resolution_data",       postgresql.JSON(), nullable=True),
+        sa.Column("failure_reason",        sa.Text(), nullable=True),
+        sa.Column("created_by_agent_id",   sa.String(36), nullable=True),
     )
 
     # ── Indexes ───────────────────────────────────────────────────────────
+    # Defined explicitly here — removed index=True from task_id column above
+    # to avoid Alembic emitting a duplicate index.
     op.create_index("ix_wait_conditions_task_id", "wait_conditions", ["task_id"])
     op.create_index("ix_wait_conditions_status",  "wait_conditions", ["status"])
 
