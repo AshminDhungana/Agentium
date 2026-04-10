@@ -11,6 +11,18 @@ services:
       POSTGRES_PASSWORD: agentium
       POSTGRES_INITDB_ARGS: "--locale=C"
       POSTGRES_HOST_AUTH_METHOD: scram-sha-256
+    # Phase 16.1: enable pg_stat_statements for slow-query analysis.
+    # -c shared_preload_libraries — loads the extension module at server start.
+    # -c pg_stat_statements.track=all — capture top-level AND nested statements.
+    # -c log_min_duration_statement=500 — log any query taking >= 500 ms to
+    #   stderr (visible in `docker compose logs postgres`).
+    command: >
+      postgres
+        -c shared_preload_libraries=pg_stat_statements
+        -c pg_stat_statements.track=all
+        -c pg_stat_statements.max=10000
+        -c log_min_duration_statement=500
+        -c log_line_prefix='%t [%p]: [%l-1] db=%d,user=%u '
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:

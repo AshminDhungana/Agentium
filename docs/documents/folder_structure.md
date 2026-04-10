@@ -488,10 +488,11 @@ Agentium/
 ├── scripts/                          # Build and utility scripts
 ├── test/                             # Test files
 ├── voice-bridge/                     # Voice bridge functionality
+├── .env                              # Environment variables (do not commit)
 ├── .gitignore
 ├── .github/
 │   └── workflows/
-│       └── docker-image.yml
+│       └── docker-image.yml          # CI/CD Docker image workflow
 ├── CONTRIBUTING.md                   # Contributing guidelines
 ├── LICENSE
 ├── Makefile                          # Build automation
