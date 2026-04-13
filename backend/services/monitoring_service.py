@@ -833,6 +833,7 @@ class MonitoringService:
 
         from backend.models.entities.agents import AgentStatus
         from backend.models.entities.task import Task, TaskStatus
+        from sqlalchemy import func as sqla_func
 
         now = datetime.utcnow()
         day_ago = now - timedelta(hours=24)
@@ -848,7 +849,7 @@ class MonitoringService:
             Agent.is_active == True,
         ).count()
 
-        avg_health_row = db.query(func.avg(AgentHealthReport.overall_health_score)).filter(
+        avg_health_row = db.query(sqla_func.avg(AgentHealthReport.overall_health_score)).filter(
             AgentHealthReport.created_at >= day_ago,
         ).scalar()
         avg_agent_health = round(float(avg_health_row), 1) if avg_health_row else 100.0
@@ -856,7 +857,6 @@ class MonitoringService:
         agent_health_pct = round((agents_active / max(total_agents, 1)) * 100, 1)
 
         # ── Task Health ───────────────────────────────────────────────────
-        from sqlalchemy import func as sqla_func
 
         tasks_24h = db.query(Task).filter(
             Task.created_at >= day_ago, Task.is_active == True,
@@ -894,6 +894,7 @@ class MonitoringService:
                 (wf_completed / max(wf_total, 1)) * 100, 1,
             )
         except Exception:
+            db.rollback()
             workflow_health_pct = 100.0
 
         # ── Event Health ──────────────────────────────────────────────────
@@ -910,6 +911,7 @@ class MonitoringService:
                 ((events_total - events_dead) / max(events_total, 1)) * 100, 1,
             )
         except Exception:
+            db.rollback()
             event_health_pct = 100.0
 
         # ── Budget Health ─────────────────────────────────────────────────
@@ -920,6 +922,7 @@ class MonitoringService:
             budget_limit = float(os.getenv("DAILY_TOKEN_BUDGET_USD", "10.00"))
             budget_pct = round(max(0, 100 - (cost_used / max(budget_limit, 0.01)) * 100), 1)
         except Exception:
+            db.rollback()
             cost_used = 0.0
             budget_limit = 10.0
             budget_pct = 100.0
@@ -929,6 +932,7 @@ class MonitoringService:
             from backend.services.predictive_scaling import predictive_scaling_service
             predictions = predictive_scaling_service.get_predictions()
         except Exception:
+            db.rollback()
             predictions = {"next_1h": 0, "next_6h": 0, "next_24h": 0, "current_capacity": 0, "recommendation": "neutral"}
 
         # ── Scaling Events (24h) ──────────────────────────────────────────
