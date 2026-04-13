@@ -182,6 +182,12 @@ celery_app.conf.beat_schedule = {
         'schedule': 30.0,   # every 30 seconds — matches default poll_interval_seconds
     },
 
+    # ── Phase 16.1: Database Connection Pool Tuning & Slow Query Logging ──────
+    'log-slow-query-summary-daily': {
+        'task': 'backend.services.tasks.task_executor.log_slow_query_summary_daily',
+        'schedule': 86400.0,
+    },
+
     # ── Phase 15.3: Channel Health Broadcast ──────────────────────────────────
     'channel-health-broadcast': {
         'task': 'backend.celery_app.broadcast_channel_health',

@@ -627,11 +627,11 @@ Build a self-governing AI ecosystem where agents operate under constitutional la
 
 ### 16.1 Database Connection Pool Tuning & Slow Query Logging
 
-- [ ] **Connection Pool Tuning** — configure `pool_size`, `max_overflow`, `pool_timeout`, `pool_recycle` in `backend/core/database.py` based on expected concurrency (start: `pool_size=20, max_overflow=10, pool_recycle=1800`)
-- [ ] Add `pool_pre_ping=True` to main app engine (already done for Celery engine — replicate)
-- [ ] **Slow Query Logging** — enable PostgreSQL `log_min_duration_statement = 500` via `docker-compose.yml` command args; parse logs in a Celery task and write summaries to `AuditLog` with category `SYSTEM`
-- [ ] Add `GET /admin/slow-queries` endpoint: return top 20 slowest queries from last 24 h, aggregated from PG `pg_stat_statements` view
-- [ ] **Frontend** — add "Slow Queries" tab to `MonitoringPage.tsx`: table of query hash, call count, avg duration, last seen; link to explain plan documentation
+- [x] **Connection Pool Tuning** — configure `pool_size`, `max_overflow`, `pool_timeout`, `pool_recycle` in `backend/core/database.py` based on expected concurrency (start: `pool_size=20, max_overflow=10, pool_recycle=1800`)
+- [x] Add `pool_pre_ping=True` to main app engine (already done for Celery engine — replicate)
+- [x] **Slow Query Logging** — enable PostgreSQL `log_min_duration_statement = 500` via `docker-compose.yml` command args; parse logs in a Celery task and write summaries to `AuditLog` with category `SYSTEM`
+- [x] Add `GET /admin/slow-queries` endpoint: return top 20 slowest queries from last 24 h, aggregated from PG `pg_stat_statements` view
+- [x] **Frontend** — add "Slow Queries" tab to `MonitoringPage.tsx`: table of query hash, call count, avg duration, last seen; link to explain plan documentation
 
 ### 16.2 Learning Decay for Outdated Knowledge Patterns
 

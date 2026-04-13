@@ -312,5 +312,14 @@ export const monitoringService = {
   rollbackAction: async (auditId: string): Promise<{ success: boolean; message: string; audit_id: string }> => {
     const response = await api.post(`/api/v1/monitoring/admin/rollback-audit/${auditId}`);
     return response.data;
+  },
+
+  // ─── Phase 16.1: Slow Query Logging ────────────────────────────────────────
+
+  getSlowQueries: async (limit = 20): Promise<{ success: boolean; count: number; slow_queries: any[] }> => {
+    const response = await api.get('/api/v1/admin/slow-queries', {
+      params: { limit }
+    });
+    return response.data;
   }
 };

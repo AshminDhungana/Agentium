@@ -29,7 +29,7 @@ import {
 const KNOWN_MONITOR_IDS  = ['00001', '00002', '00003'];
 const REFRESH_INTERVAL_MS = 30_000;
 
-type Tab = 'dashboard' | 'violations' | 'recovery' | 'operations' | 'sla' | 'incidents' | 'chaos';
+type Tab = 'dashboard' | 'violations' | 'recovery' | 'operations' | 'sla' | 'incidents' | 'chaos' | 'slow_queries';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -752,6 +752,95 @@ function ChaosTab() {
     );
 }
 
+// ─── Slow Queries Tab ─────────────────────────────────────────────────────────
+
+function SlowQueriesTab() {
+    const [queries, setQueries] = useState<any[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
+    const loadData = useCallback(async () => {
+        setIsLoading(true);
+        setError(null);
+        try {
+            const res = await monitoringService.getSlowQueries(20);
+            setQueries(res.slow_queries || []);
+        } catch (e: any) {
+            setError(e?.response?.data?.detail || 'Failed to load slow queries');
+        } finally {
+            setIsLoading(false);
+        }
+    }, []);
+
+    useEffect(() => { loadData(); }, [loadData]);
+
+    if (isLoading) return <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-blue-500" /></div>;
+
+    return (
+        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-500">
+            <div className="border-b border-gray-200 dark:border-gray-800 px-6 py-4 flex items-center justify-between">
+                <h2 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                    <Clock className="w-5 h-5 text-purple-500" />
+                    Slow Queries
+                </h2>
+                <div className="flex gap-2 text-gray-500">
+                    <a href="https://www.postgresql.org/docs/current/using-explain.html" target="_blank" rel="noreferrer" className="text-xs font-semibold px-3 py-1.5 dark:text-gray-300 hover:text-gray-900 border border-gray-200 rounded-lg shrink-0">EXPLAIN Docs</a>
+                    <button onClick={loadData} className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400">
+                        Refresh
+                    </button>
+                </div>
+            </div>
+            
+            <div className="p-6">
+                {error && <ErrorState message={error} onRetry={loadData} />}
+                
+                {!error && queries.length === 0 ? (
+                    <div className="text-center py-12">
+                        <CheckCircle className="w-12 h-12 text-green-400 mx-auto mb-3" />
+                        <p className="text-gray-900 dark:text-white font-medium">No Slow Queries</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">All database queries are running efficiently.</p>
+                    </div>
+                ) : (
+                    !error && (
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="border-b border-gray-200 dark:border-gray-800 text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/50">
+                                        <th className="p-3 font-semibold rounded-tl-lg">Query Preview</th>
+                                        <th className="p-3 font-semibold">Avg Duration (ms)</th>
+                                        <th className="p-3 font-semibold">Calls</th>
+                                        <th className="p-3 font-semibold">Rows/Call</th>
+                                        <th className="p-3 font-semibold rounded-tr-lg">Last Seen</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {queries.map((q, idx) => (
+                                        <tr key={idx} className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                                            <td className="p-3 font-mono text-xs max-w-sm overflow-hidden text-ellipsis whitespace-nowrap text-gray-800 dark:text-gray-200" title={q.query_preview}>
+                                                {q.query_preview}
+                                            </td>
+                                            <td className="p-3 text-sm text-gray-600 dark:text-gray-300">
+                                                <span className={`font-semibold ${q.avg_duration_ms > 1000 ? 'text-red-500' : 'text-yellow-600 dark:text-yellow-500'}`}>
+                                                    {Number(q.avg_duration_ms).toFixed(2)}
+                                                </span>
+                                            </td>
+                                            <td className="p-3 text-sm text-gray-600 dark:text-gray-300">{q.call_count}</td>
+                                            <td className="p-3 text-sm text-gray-600 dark:text-gray-300">{Number(q.rows_per_call).toFixed(1)}</td>
+                                            <td className="p-3 text-xs text-gray-500 dark:text-gray-400">
+                                                {q.last_seen ? new Date(q.last_seen).toLocaleString() : '—'}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )
+                )}
+            </div>
+        </div>
+    );
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export const MonitoringPage: React.FC = () => {
@@ -946,8 +1035,8 @@ export const MonitoringPage: React.FC = () => {
                 )}
 
                 {/* ── Tabs ────────────────────────────────────────────────── */}
-                <div className="flex gap-1 mb-6 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-1 w-fit shadow-sm">
-                    {(['operations', 'dashboard', 'violations', 'recovery', 'sla', 'incidents', 'chaos'] as Tab[]).map(tab => (
+                <div className="flex gap-1 mb-6 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-1 w-fit shadow-sm max-w-full overflow-x-auto">
+                    {(['operations', 'dashboard', 'violations', 'recovery', 'sla', 'incidents', 'chaos', 'slow_queries'] as Tab[]).map(tab => (
                         <button
                             key={tab}
                             onClick={() => setActiveTab(tab)}
@@ -1204,6 +1293,11 @@ export const MonitoringPage: React.FC = () => {
                 {/* ══ Chaos Tab ══════════════════════════════════════════════ */}
                 {activeTab === 'chaos' && (
                     <ChaosTab />
+                )}
+
+                {/* ══ Slow Queries Tab ══════════════════════════════════════════════ */}
+                {activeTab === 'slow_queries' && (
+                    <SlowQueriesTab />
                 )}
 
             </div>

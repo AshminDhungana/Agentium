@@ -1363,3 +1363,46 @@ def poll_wait_conditions():
         except Exception as exc:
             logger.error(f"poll_wait_conditions failed: {exc}", exc_info=True)
             return {"error": str(exc)}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Phase 16.1 — Database Connection Pool Tuning & Slow Query Logging
+# ══════════════════════════════════════════════════════════════════════════════
+
+@celery_app.task(name='backend.services.tasks.task_executor.log_slow_query_summary_daily')
+def log_slow_query_summary_daily():
+    """Daily evaluation to parse slow queries and log to AuditLog."""
+    with get_task_db() as db:
+        try:
+            from backend.services.slow_query_service import get_slow_queries, get_summary
+            import dataclasses
+            
+            queries = get_slow_queries(db, limit=10, min_avg_ms=500.0) 
+            summary = get_summary(db)
+            
+            if queries:
+                AuditLog.log(
+                    db=db,
+                    level=AuditLevel.WARNING,
+                    category=AuditCategory.SYSTEM,
+                    actor_type="system",
+                    actor_id="DB_MONITOR",
+                    action="slow_query_summary",
+                    description=f"Slow query daily report: found {len(queries)} queries with avg > 500ms",
+                    after_state={
+                        "summary": summary,
+                        "top_slow_queries": [dataclasses.asdict(q) for q in queries]
+                    }
+                )
+                logger.info(f"Logged slow query summary with {len(queries)} offending queries")
+            else:
+                logger.info("No slow queries > 500ms found for daily summary.")
+                
+            return {
+                "status": "completed",
+                "queries_found": len(queries),
+                "summary": summary
+            }
+
+        except Exception as e:
+            logger.error(f"Error in log_slow_query_summary_daily: {e}")
+            return {"error": str(e)}

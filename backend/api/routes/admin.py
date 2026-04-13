@@ -628,3 +628,33 @@ async def change_user_role(
         "previous_role": old_role,
         "new_role": request.new_role,
     }
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# GET /api/v1/admin/slow-queries
+# ──────────────────────────────────────────────────────────────────────────────
+
+@router.get("/admin/slow-queries")
+async def get_slow_queries(
+    limit: int = 20,
+    admin: dict = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """
+    Return top N slowest queries aggregated from pg_stat_statements.
+    """
+    from backend.services.slow_query_service import get_slow_queries as fetch_slow_queries
+    import dataclasses
+
+    try:
+        queries = fetch_slow_queries(db, limit=limit, min_avg_ms=0.0)
+        return {
+            "success": True,
+            "count": len(queries),
+            "slow_queries": [dataclasses.asdict(q) for q in queries] 
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch slow queries: {str(e)}"
+        )
