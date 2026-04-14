@@ -245,6 +245,9 @@ class AutonomousLearningEngine:
                         "source_task_ids": ",".join(bp.source_task_ids),
                         "confidence": bp.confidence,
                         "extracted_at": bp.extracted_at,
+                        # Phase 16.2: initialise decay fields
+                        "decay_score": 1.0,
+                        "last_validated_at": datetime.utcnow().isoformat(),
                     },
                 )
                 stored_count += 1
@@ -263,6 +266,9 @@ class AutonomousLearningEngine:
                         "source_task_ids": ",".join(ap.source_task_ids),
                         "confidence": ap.confidence,
                         "extracted_at": ap.extracted_at,
+                        # Phase 16.2: initialise decay fields
+                        "decay_score": 1.0,
+                        "last_validated_at": datetime.utcnow().isoformat(),
                     },
                 )
                 stored_count += 1
@@ -304,31 +310,57 @@ class AutonomousLearningEngine:
     DECAY_THRESHOLD_DAYS = int(os.getenv("LEARNING_DECAY_DAYS", "30"))
     DECAY_RATE = float(os.getenv("LEARNING_DECAY_RATE", "0.85"))
     MIN_CONFIDENCE = float(os.getenv("LEARNING_MIN_CONFIDENCE", "0.1"))
+    # Phase 16.2: exponential decay base (per-day rate)
+    DECAY_BASE = float(os.getenv("LEARNING_DECAY_BASE", "0.95"))
 
     def decay_outdated_learnings(self, db: Session) -> Dict[str, Any]:
         """
-        Reduce the confidence of older learnings proportional to age.
+        Reduce the confidence of older learnings using exponential
+        time-based decay (Phase 16.2).
 
-        Learnings older than ``DECAY_THRESHOLD_DAYS`` have their
-        confidence multiplied by ``DECAY_RATE``. Learnings whose
-        confidence drops below ``MIN_CONFIDENCE`` are pruned.
+        Learnings older than ``DECAY_THRESHOLD_DAYS`` since their
+        ``last_validated_at`` have their ``decay_score`` multiplied by
+        ``DECAY_BASE ** days_since_validation``.  Entries whose
+        ``decay_score`` drops below ``MIN_CONFIDENCE`` are pruned.
 
-        Uses VectorStore.decay_stale_entries() for the actual decay logic.
+        Also runs the legacy flat-decay on the ``confidence`` field
+        for backward compatibility with Phase 10.4 consumers.
         """
         try:
             from backend.core.vector_store import get_vector_store
             vs = get_vector_store()
-            result = vs.decay_stale_entries(
+
+            # Phase 16.2: exponential decay on decay_score field
+            result = vs.apply_learning_decay(
+                grace_days=self.DECAY_THRESHOLD_DAYS,
+                decay_base=self.DECAY_BASE,
+                min_decay_score=self.MIN_CONFIDENCE,
+                target_collections=["task_patterns", "best_practices"],
+            )
+
+            # Phase 10.4 (legacy): flat decay on confidence field
+            legacy = vs.decay_stale_entries(
                 max_age_days=self.DECAY_THRESHOLD_DAYS,
                 decay_factor=self.DECAY_RATE,
                 min_confidence=self.MIN_CONFIDENCE,
                 target_collections=["task_patterns", "best_practices"],
             )
+
+            merged = {
+                "decayed": result.get("decayed", 0),
+                "pruned": result.get("pruned", 0),
+                "backfilled": result.get("backfilled", 0),
+                "legacy_decayed": legacy.get("decayed", 0),
+                "legacy_pruned": legacy.get("pruned", 0),
+            }
+
             logger.info(
-                "Learning decay: decayed %d, pruned %d entries",
-                result.get("decayed", 0), result.get("pruned", 0),
+                "Learning decay: decayed %d, pruned %d, backfilled %d entries "
+                "(legacy: decayed %d, pruned %d)",
+                merged["decayed"], merged["pruned"], merged["backfilled"],
+                merged["legacy_decayed"], merged["legacy_pruned"],
             )
-            return result
+            return merged
         except Exception as exc:
             logger.error("Learning decay failed: %s", exc)
             return {"decayed": 0, "pruned": 0, "error": str(exc)}

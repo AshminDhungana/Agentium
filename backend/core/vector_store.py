@@ -392,8 +392,18 @@ class VectorStore:
                     }
                 )
 
-        # Sort ascending by distance so best results are kept after truncation
-        entries.sort(key=lambda e: e["distance"])
+        # Phase 16.2: Apply decay_score weighting — stale knowledge gets
+        # a higher effective distance so it ranks below fresh knowledge.
+        for entry in entries:
+            decay_score = float(
+                (entry.get("metadata") or {}).get("decay_score", 1.0)
+            )
+            # Clamp to [0.1, 1.0] to prevent division by near-zero
+            decay_score = max(0.1, min(1.0, decay_score))
+            entry["effective_distance"] = entry["distance"] / decay_score
+
+        # Sort ascending by effective distance so best results survive truncation
+        entries.sort(key=lambda e: e["effective_distance"])
         entries = entries[:n_results]
 
         merged: QueryResult = {
@@ -501,6 +511,220 @@ class VectorStore:
             )
 
         return {"decayed": decayed, "pruned": pruned}
+
+    # ------------------------------------------------------------------
+    # Phase 16.2: Exponential Learning Decay & Validation Boost
+    # ------------------------------------------------------------------
+
+    def apply_learning_decay(
+        self,
+        grace_days: int = 30,
+        decay_base: float = 0.95,
+        min_decay_score: float = 0.1,
+        target_collections: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Apply exponential time-based decay to knowledge entries.
+
+        For each document older than ``grace_days`` since its
+        ``last_validated_at`` timestamp, compute:
+
+            decay_score = max(min_decay_score,
+                              current_decay × decay_base ^ days_since_validation)
+
+        Documents whose ``decay_score`` falls below ``min_decay_score``
+        are pruned entirely.  Documents without ``last_validated_at`` are
+        backfilled with ``extracted_at`` or ``created_at`` on first run.
+
+        Returns a summary dict with counts of decayed, pruned, and
+        backfilled entries.
+        """
+        from datetime import datetime, timedelta
+
+        now = datetime.utcnow()
+        cutoff = now - timedelta(days=grace_days)
+        collections_to_scan = target_collections or [
+            "task_patterns", "best_practices",
+        ]
+
+        decayed = 0
+        pruned = 0
+        backfilled = 0
+
+        for coll_key in collections_to_scan:
+            try:
+                coll = self.get_collection(coll_key)
+                all_docs = coll.get(include=["metadatas"])
+                if not all_docs or not all_docs.get("ids"):
+                    continue
+
+                ids_to_delete: List[str] = []
+                ids_to_update: List[str] = []
+                metas_to_update: List[Dict[str, Any]] = []
+
+                for i, doc_id in enumerate(all_docs["ids"]):
+                    meta = (
+                        (all_docs.get("metadatas") or [])[i]
+                        if all_docs.get("metadatas")
+                        else {}
+                    )
+                    if not meta:
+                        continue
+
+                    # ── Resolve last_validated_at (backfill if missing) ────
+                    validated_at_str = meta.get("last_validated_at", "")
+                    needs_backfill = False
+
+                    if not validated_at_str:
+                        # Backfill from extracted_at or created_at
+                        validated_at_str = (
+                            meta.get("extracted_at")
+                            or meta.get("created_at")
+                            or ""
+                        )
+                        if validated_at_str:
+                            needs_backfill = True
+                        else:
+                            continue  # No timestamp at all — skip
+
+                    try:
+                        validated_at = datetime.fromisoformat(
+                            validated_at_str.replace("Z", "+00:00")
+                                           .replace("+00:00", "")
+                        )
+                    except (ValueError, TypeError):
+                        continue
+
+                    # ── Backfill defaults on first encounter ──────────────
+                    current_decay = float(meta.get("decay_score", 1.0))
+                    if needs_backfill:
+                        updated_meta = dict(meta)
+                        updated_meta["last_validated_at"] = validated_at_str
+                        if "decay_score" not in meta:
+                            updated_meta["decay_score"] = 1.0
+                            current_decay = 1.0
+                        ids_to_update.append(doc_id)
+                        metas_to_update.append(updated_meta)
+                        backfilled += 1
+                        # Still check if this entry also needs decay below
+                        # (it might be very old)
+
+                    if validated_at >= cutoff:
+                        continue  # Within grace period — no decay
+
+                    # ── Exponential decay ─────────────────────────────────
+                    days_since = (now - validated_at).days
+                    new_decay = current_decay * (decay_base ** days_since)
+                    new_decay = round(new_decay, 6)
+
+                    if new_decay < min_decay_score:
+                        ids_to_delete.append(doc_id)
+                        # Remove from update list if already queued for backfill
+                        if doc_id in ids_to_update:
+                            idx = ids_to_update.index(doc_id)
+                            ids_to_update.pop(idx)
+                            metas_to_update.pop(idx)
+                        pruned += 1
+                    else:
+                        # Check if already in update list (from backfill)
+                        if doc_id in ids_to_update:
+                            idx = ids_to_update.index(doc_id)
+                            metas_to_update[idx]["decay_score"] = new_decay
+                            metas_to_update[idx]["decay_applied_at"] = (
+                                now.isoformat()
+                            )
+                        else:
+                            updated_meta = dict(meta)
+                            updated_meta["decay_score"] = new_decay
+                            updated_meta["decay_applied_at"] = (
+                                now.isoformat()
+                            )
+                            ids_to_update.append(doc_id)
+                            metas_to_update.append(updated_meta)
+                        decayed += 1
+
+                # Apply deletions
+                if ids_to_delete:
+                    coll.delete(ids=ids_to_delete)
+
+                # Apply updates
+                if ids_to_update:
+                    coll.update(
+                        ids=ids_to_update, metadatas=metas_to_update
+                    )
+
+            except Exception as exc:
+                logger.warning(
+                    "Learning decay skipped collection '%s': %s",
+                    coll_key, exc,
+                )
+
+        if decayed > 0 or pruned > 0 or backfilled > 0:
+            logger.info(
+                "Phase 16.2 learning decay: decayed %d, pruned %d, "
+                "backfilled %d entries",
+                decayed, pruned, backfilled,
+            )
+
+        return {
+            "decayed": decayed,
+            "pruned": pruned,
+            "backfilled": backfilled,
+        }
+
+    def boost_validated_learning(
+        self,
+        doc_id: str,
+        collection_key: str = "task_patterns",
+        boost_increment: float = 0.1,
+    ) -> Dict[str, Any]:
+        """
+        Validation boost: reset ``last_validated_at`` and increase
+        ``decay_score`` for a knowledge entry that was successfully
+        retrieved and used in a completed task.
+
+        Called by KnowledgeService.boost_retrieved_learnings() after
+        a task completes successfully.
+        """
+        from datetime import datetime
+
+        try:
+            coll = self.get_collection(collection_key)
+            existing = coll.get(ids=[doc_id], include=["metadatas"])
+
+            if not existing or not existing.get("ids") or not existing["ids"]:
+                return {"boosted": False, "reason": "doc_not_found"}
+
+            meta = (
+                existing["metadatas"][0]
+                if existing.get("metadatas")
+                else {}
+            )
+            updated_meta = dict(meta)
+            current_decay = float(updated_meta.get("decay_score", 1.0))
+            updated_meta["decay_score"] = round(
+                min(1.0, current_decay + boost_increment), 4
+            )
+            updated_meta["last_validated_at"] = (
+                datetime.utcnow().isoformat()
+            )
+            updated_meta["validation_count"] = (
+                int(updated_meta.get("validation_count", 0)) + 1
+            )
+
+            coll.update(ids=[doc_id], metadatas=[updated_meta])
+
+            return {
+                "boosted": True,
+                "doc_id": doc_id,
+                "new_decay_score": updated_meta["decay_score"],
+            }
+
+        except Exception as exc:
+            logger.debug(
+                "boost_validated_learning failed for %s: %s", doc_id, exc
+            )
+            return {"boosted": False, "error": str(exc)}
 
     # ------------------------------------------------------------------
     # Health

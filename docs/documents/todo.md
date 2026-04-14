@@ -635,10 +635,10 @@ Build a self-governing AI ecosystem where agents operate under constitutional la
 
 ### 16.2 Learning Decay for Outdated Knowledge Patterns
 
-- [ ] **Backend** — extend `rag_service.py`: add `decay_score` (float, default 1.0) to ChromaDB metadata on every `task_learnings` document
-- [ ] Weekly Celery beat task `decay-learnings`: for each document, compute age in days since `last_validated_at`; apply `decay_score = max(0.1, decay_score × 0.95 ^ days_since_validation)` for documents older than 30 days
-- [ ] Modify `query_similar()` to multiply cosine similarity by `decay_score` before ranking, so stale knowledge naturally sinks below fresh knowledge
-- [ ] When a task completes successfully and a learning was retrieved, reset `last_validated_at = utcnow()` and `decay_score = min(1.0, decay_score + 0.1)` — validation boosts confidence
+- [x] **Backend** — extend `rag_service.py`: add `decay_score` (float, default 1.0) to ChromaDB metadata on every `task_learnings` document
+- [x] Weekly Celery beat task `decay-learnings`: for each document, compute age in days since `last_validated_at`; apply `decay_score = max(0.1, decay_score × 0.95 ^ days_since_validation)` for documents older than 30 days
+- [x] Modify `query_similar()` to multiply cosine similarity by `decay_score` before ranking, so stale knowledge naturally sinks below fresh knowledge
+- [x] When a task completes successfully and a learning was retrieved, reset `last_validated_at = utcnow()` and `decay_score = min(1.0, decay_score + 0.1)` — validation boosts confidence
 
 ### 16.3 Cross-Document Citation Graph for RAG
 

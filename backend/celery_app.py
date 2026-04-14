@@ -188,6 +188,12 @@ celery_app.conf.beat_schedule = {
         'schedule': 86400.0,
     },
 
+    # ── Phase 16.2: Learning Decay for Outdated Knowledge Patterns ────────────
+    'decay-learnings': {
+        'task': 'backend.services.tasks.task_executor.decay_learnings',
+        'schedule': 604800.0,  # Weekly
+    },
+
     # ── Phase 15.3: Channel Health Broadcast ──────────────────────────────────
     'channel-health-broadcast': {
         'task': 'backend.celery_app.broadcast_channel_health',

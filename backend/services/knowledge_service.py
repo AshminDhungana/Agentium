@@ -335,6 +335,12 @@ class KnowledgeService:
                     "revised_at": datetime.utcnow().isoformat(),
                     "revision_count": revision_count,
                     "previous_distance": existing["distances"][0][0],
+                    # Phase 16.2: carry forward decay_score but reset
+                    # last_validated_at on revision (content refreshed)
+                    "decay_score": float(
+                        existing_meta.get("decay_score", 1.0)
+                    ),
+                    "last_validated_at": datetime.utcnow().isoformat(),
                 }
 
                 collection.delete(ids=[existing_id])
@@ -362,6 +368,9 @@ class KnowledgeService:
             **(metadata or {}),
             "created_at": datetime.utcnow().isoformat(),
             "revision_count": 0,
+            # Phase 16.2: initialise decay fields for new knowledge
+            "decay_score": (metadata or {}).get("decay_score", 1.0),
+            "last_validated_at": datetime.utcnow().isoformat(),
         }
         collection.add(
             documents=[content],
@@ -409,6 +418,9 @@ class KnowledgeService:
                     task.title.split()[0] if task.title else "general"
                 ),
                 "success_rate": 1.0,
+                # Phase 16.2: initialise decay fields
+                "decay_score": 1.0,
+                "last_validated_at": datetime.utcnow().isoformat(),
             },
         )
 
@@ -460,6 +472,51 @@ class KnowledgeService:
             return ["source_url", "author", "context"]
         required = ["source_url", "author", "context"]
         return [f for f in required if not metadata.get(f)]
+
+    # ------------------------------------------------------------------
+    # Phase 16.2: Validation Boost for Retrieved Learnings
+    # ------------------------------------------------------------------
+
+    def boost_retrieved_learnings(
+        self,
+        doc_ids: List[str],
+        collection_key: str = "task_patterns",
+    ) -> Dict[str, Any]:
+        """
+        After a task completes successfully, boost decay_score and
+        reset last_validated_at for every knowledge document that was
+        retrieved during RAG context building.
+
+        This keeps actively-useful knowledge fresh and prevents it
+        from being pruned by the weekly decay task.
+        """
+        if not doc_ids:
+            return {"boosted": 0, "doc_ids": []}
+
+        boosted = 0
+        boosted_ids: List[str] = []
+
+        for doc_id in doc_ids:
+            try:
+                result = self.vector_store.boost_validated_learning(
+                    doc_id=doc_id,
+                    collection_key=collection_key,
+                )
+                if result.get("boosted"):
+                    boosted += 1
+                    boosted_ids.append(doc_id)
+            except Exception:
+                logger.debug(
+                    "boost_retrieved_learnings: skip %s", doc_id
+                )
+
+        if boosted > 0:
+            logger.info(
+                "Phase 16.2: validation-boosted %d knowledge entries",
+                boosted,
+            )
+
+        return {"boosted": boosted, "doc_ids": boosted_ids}
 
 
     # ------------------------------------------------------------------

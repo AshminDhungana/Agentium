@@ -151,6 +151,25 @@ def execute_task_async(self, task_id: str, agent_id: str):
             except Exception as learning_exc:
                 logger.error(f"Real-Time Learning extraction failed for task {task_id}: {learning_exc}")
 
+            # Phase 16.2: Validation Boost — reset decay clock for
+            # knowledge entries that were retrieved and used successfully.
+            try:
+                retrieved_ids = (
+                    (task.execution_context or {}).get("retrieved_learning_ids")
+                    or result.get("retrieved_learning_ids")
+                    or []
+                )
+                if retrieved_ids:
+                    from backend.services.knowledge_service import get_knowledge_service
+                    ks = get_knowledge_service()
+                    boost_result = ks.boost_retrieved_learnings(retrieved_ids)
+                    logger.info(
+                        f"Phase 16.2: Validation boost for task {task_id}: "
+                        f"boosted {boost_result.get('boosted', 0)} entries"
+                    )
+            except Exception as boost_exc:
+                logger.debug(f"Validation boost skipped for task {task_id}: {boost_exc}")
+
             # No explicit db.commit() here — get_task_db() commits automatically
             # on clean exit. A redundant commit here would mask rollback errors.
 
@@ -1405,4 +1424,54 @@ def log_slow_query_summary_daily():
 
         except Exception as e:
             logger.error(f"Error in log_slow_query_summary_daily: {e}")
+            return {"error": str(e)}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Phase 16.2 — Learning Decay for Outdated Knowledge Patterns
+# ══════════════════════════════════════════════════════════════════════════════
+
+@celery_app.task(name='backend.services.tasks.task_executor.decay_learnings')
+def decay_learnings():
+    """
+    Weekly exponential decay on knowledge entries in ChromaDB.
+
+    Phase 16.2: Applies ``decay_score = max(0.1, score × 0.95 ^ days)``
+    to all documents in ``task_patterns`` and ``best_practices`` whose
+    ``last_validated_at`` is older than 30 days.  Prunes entries whose
+    ``decay_score`` drops below 0.1.  Also runs the legacy Phase 10.4
+    flat confidence decay for backward compatibility.
+
+    Runs weekly (604800 s) via Celery Beat.
+    """
+    with get_task_db() as db:
+        try:
+            from backend.services.autonomous_learning import get_learning_engine
+            result = get_learning_engine().decay_outdated_learnings(db)
+
+            # Audit trail for observability
+            total_affected = (
+                result.get("decayed", 0) + result.get("pruned", 0)
+            )
+            if total_affected > 0:
+                AuditLog.log(
+                    db=db,
+                    level=AuditLevel.INFO,
+                    category=AuditCategory.SYSTEM,
+                    actor_type="system",
+                    actor_id="DECAY_ENGINE",
+                    action="learning_decay_weekly",
+                    description=(
+                        f"Weekly learning decay: decayed {result.get('decayed', 0)}, "
+                        f"pruned {result.get('pruned', 0)}, "
+                        f"backfilled {result.get('backfilled', 0)} entries"
+                    ),
+                    after_state=result,
+                )
+
+            logger.info(f"📉 Learning decay completed: {result}")
+            return result
+
+        except Exception as e:
+            logger.error(f"decay_learnings failed: {e}")
             return {"error": str(e)}
