@@ -100,6 +100,7 @@ class KnowledgeService:
         agent: Agent,
         task_description: Optional[str] = None,
         include_constitution: bool = True,
+        task_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Build RAG context for an agent based on its tier.
@@ -271,6 +272,46 @@ class KnowledgeService:
                 )
         except ValueError:
             pass
+
+        # ── Phase 16.3: Record citation edges for all retrieved segments ──
+        # Use record_retrieval_citations() for a single batch flush rather than
+        # calling record_citation() N times.  Group by collection_key so the
+        # collection field is accurate for every edge.
+        try:
+            from backend.services.citation_graph_service import get_citation_graph_service
+            cg = get_citation_graph_service()
+
+            # Build per-collection buckets: {collection_key: [(doc_id, score), ...]}
+            from collections import defaultdict
+            buckets: dict = defaultdict(list)
+            for seg in context.get("knowledge_segments", []):
+                src = seg.get("source") or seg.get("metadata") or {}
+                doc_id = (
+                    src.get("article_id")
+                    or src.get("doc_id")
+                    or src.get("agentium_id")
+                    or src.get("id")
+                    or ""
+                )
+                if doc_id:
+                    coll = seg.get("type", "")
+                    buckets[coll].append((str(doc_id), float(seg.get("relevance", 0.0))))
+
+            for coll_key, pairs in buckets.items():
+                doc_ids = [p[0] for p in pairs]
+                scores  = [p[1] for p in pairs]
+                cg.record_retrieval_citations(
+                    db=db,
+                    query_context_id=agent.agentium_id,
+                    retrieved_doc_ids=doc_ids,
+                    task_id=task_id,
+                    collection_key=coll_key,
+                    relevance_scores=scores,
+                )
+        except Exception as cite_exc:
+            logger.debug(
+                "Phase 16.3: citation recording skipped: %s", cite_exc
+            )
 
         return context
 

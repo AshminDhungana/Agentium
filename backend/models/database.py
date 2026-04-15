@@ -334,6 +334,9 @@ def init_db():
     # SkillSubmission and the skills / skill_submissions tables are not created.
     from backend.models.entities.skill import SkillDB, SkillSubmission  # noqa: F401
 
+    # ── Phase 16.3: Citation Graph ───────────────────────────────────────────
+    from backend.models.entities.citation_edge import CitationEdge  # noqa: F401
+
     # Create all tables that don't exist yet
     Base.metadata.create_all(bind=engine)
 

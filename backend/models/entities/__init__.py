@@ -159,6 +159,9 @@ from backend.models.entities.event_trigger import EventTrigger, EventLog, Trigge
 # Phase 15.4 — Speaker Identification
 from backend.models.entities.speaker_profile import SpeakerProfile
 
+# Phase 16.3 — Cross-Document Citation Graph
+from backend.models.entities.citation_edge import CitationEdge
+
 # All models for Alembic/database creation
 __all__ = [
     # Base
@@ -297,4 +300,7 @@ __all__ = [
 
     # Phase 15.4 — Speaker Identification
     'SpeakerProfile',
+
+    # Phase 16.3 — Cross-Document Citation Graph
+    'CitationEdge',
 ]

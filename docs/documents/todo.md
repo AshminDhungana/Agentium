@@ -642,10 +642,10 @@ Build a self-governing AI ecosystem where agents operate under constitutional la
 
 ### 16.3 Cross-Document Citation Graph for RAG
 
-- [ ] **Backend** — on every RAG retrieval, record `{ source_doc_id, cited_by_doc_id, task_id, timestamp }` to a PostgreSQL `citation_edges` table (Migration 010)
-- [ ] `GET /knowledge/citation-graph?root={doc_id}&depth={n}` — return graph as `{ nodes, edges }` BFS-traversed up to depth `n` (default 2)
-- [ ] Use citation frequency to boost `query_similar()` ranking: documents cited more often receive a `citation_boost` multiplier (cap at 1.3×)
-- [ ] **Frontend** — add "Citation Graph" tab to knowledge management page (or constitution page): force-directed D3 graph; click node to expand one more hop; node size = citation frequency
+- [x] **Backend** — on every RAG retrieval, record `{ source_doc_id, cited_by_doc_id, task_id, timestamp }` to a PostgreSQL `citation_edges` table (Migration 010)
+- [x] `GET /knowledge/citation-graph?root={doc_id}&depth={n}` — return graph as `{ nodes, edges }` BFS-traversed up to depth `n` (default 2)
+- [x] Use citation frequency to boost `query_similar()` ranking: documents cited more often receive a `citation_boost` multiplier (cap at 1.3×)
+- [x] **Frontend** — add "Citation Graph" tab to knowledge management page (or constitution page): force-directed D3 graph; click node to expand one more hop; node size = citation frequency
 
 ### 16.4 Git Versioning Backups for Config Files
 

@@ -394,13 +394,20 @@ class VectorStore:
 
         # Phase 16.2: Apply decay_score weighting — stale knowledge gets
         # a higher effective distance so it ranks below fresh knowledge.
+        # Phase 16.3: Apply citation_boost — more-cited documents get lower
+        # effective distance so they rank higher.
         for entry in entries:
-            decay_score = float(
-                (entry.get("metadata") or {}).get("decay_score", 1.0)
-            )
+            meta = entry.get("metadata") or {}
+            decay_score = float(meta.get("decay_score", 1.0))
             # Clamp to [0.1, 1.0] to prevent division by near-zero
             decay_score = max(0.1, min(1.0, decay_score))
-            entry["effective_distance"] = entry["distance"] / decay_score
+
+            citation_boost = float(meta.get("citation_boost", 1.0))
+            citation_boost = max(1.0, min(1.3, citation_boost))
+
+            entry["effective_distance"] = entry["distance"] / (
+                decay_score * citation_boost
+            )
 
         # Sort ascending by effective distance so best results survive truncation
         entries.sort(key=lambda e: e["effective_distance"])

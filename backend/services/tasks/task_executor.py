@@ -1475,3 +1475,145 @@ def decay_learnings():
         except Exception as e:
             logger.error(f"decay_learnings failed: {e}")
             return {"error": str(e)}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Phase 16.3 — Cross-Document Citation Graph: Periodic Tasks
+# ══════════════════════════════════════════════════════════════════════════════
+
+@celery_app.task(name='backend.services.tasks.task_executor.update_citation_boosts')
+def update_citation_boosts():
+    """
+    Recompute citation_boost metadata for ChromaDB documents.
+
+    Phase 16.3: For each document in task_patterns, best_practices, and
+    council_memory collections, compute a boost multiplier based on how
+    often it has been cited in the citation_edges table.
+
+    Formula: min(1.3, 1.0 + 0.05 * citation_count)
+
+    Runs every 6 hours via Celery Beat.
+    """
+    with get_task_db() as db:
+        try:
+            from backend.services.citation_graph_service import get_citation_graph_service
+            from backend.core.vector_store import get_vector_store
+
+            cg = get_citation_graph_service()
+            vs = get_vector_store()
+
+            collections_to_boost = [
+                "constitution",
+                "ethos",
+                "task_patterns",
+                "best_practices",
+                "council_memory",
+            ]
+
+            total_updated = 0
+
+            for coll_key in collections_to_boost:
+                try:
+                    collection = vs.get_collection(coll_key)
+                    existing = collection.get()
+                    if not existing or not existing.get("ids"):
+                        continue
+
+                    doc_ids = existing["ids"]
+                    boosts = cg.compute_citation_boost(db, doc_ids)
+
+                    if not boosts:
+                        continue
+
+                    # Update metadata in batches
+                    ids_to_update = []
+                    metas_to_update = []
+
+                    for i, doc_id in enumerate(doc_ids):
+                        if doc_id in boosts:
+                            meta = (
+                                existing["metadatas"][i]
+                                if existing.get("metadatas") and i < len(existing["metadatas"])
+                                else {}
+                            ) or {}
+                            meta["citation_boost"] = round(boosts[doc_id], 4)
+                            ids_to_update.append(doc_id)
+                            metas_to_update.append(meta)
+
+                    if ids_to_update:
+                        collection.update(
+                            ids=ids_to_update,
+                            metadatas=metas_to_update,
+                        )
+                        total_updated += len(ids_to_update)
+
+                except Exception as coll_exc:
+                    logger.debug(
+                        "Phase 16.3: boost update skipped for %s: %s",
+                        coll_key, coll_exc,
+                    )
+
+            if total_updated > 0:
+                AuditLog.log(
+                    db=db,
+                    level=AuditLevel.INFO,
+                    category=AuditCategory.SYSTEM,
+                    actor_type="system",
+                    actor_id="CITATION_GRAPH",
+                    action="citation_boost_update",
+                    description=(
+                        f"Phase 16.3: Updated citation_boost for "
+                        f"{total_updated} ChromaDB documents"
+                    ),
+                    after_state={"updated": total_updated},
+                )
+
+            logger.info(
+                "📊 Citation boost update completed: %d documents updated",
+                total_updated,
+            )
+            return {"updated": total_updated}
+
+        except Exception as e:
+            logger.error(f"update_citation_boosts failed: {e}")
+            return {"error": str(e)}
+
+
+@celery_app.task(name='backend.services.tasks.task_executor.cleanup_citation_edges')
+def cleanup_citation_edges():
+    """
+    Delete citation edges older than 90 days.
+
+    Phase 16.3: Retention cleanup to prevent unbounded table growth.
+    Runs weekly via Celery Beat.
+    """
+    with get_task_db() as db:
+        try:
+            from backend.services.citation_graph_service import get_citation_graph_service
+            cg = get_citation_graph_service()
+            deleted = cg.cleanup_old_edges(db, retention_days=90)
+
+            if deleted > 0:
+                AuditLog.log(
+                    db=db,
+                    level=AuditLevel.INFO,
+                    category=AuditCategory.SYSTEM,
+                    actor_type="system",
+                    actor_id="CITATION_GRAPH",
+                    action="citation_edge_cleanup",
+                    description=(
+                        f"Phase 16.3: Cleaned up {deleted} citation edges "
+                        f"older than 90 days"
+                    ),
+                    after_state={"deleted": deleted},
+                )
+
+            logger.info(
+                "🧹 Citation edge cleanup completed: %d edges removed",
+                deleted,
+            )
+            return {"deleted": deleted}
+
+        except Exception as e:
+            logger.error(f"cleanup_citation_edges failed: {e}")
+            return {"error": str(e)}

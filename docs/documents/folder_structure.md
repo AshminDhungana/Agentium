@@ -21,7 +21,8 @@ Agentium/
 │   │       ├── 003_consolidated.py  # Consolidated migration (Phases 3-11)
 │   │       ├── 004_event_triggers.py # Event triggers migration
 │   │       ├── 005_speaker_profiles.py # Speaker profiles migration
-│   │       └── 006_wait_poll.py     # Wait/poll condition migration
+│   │       ├── 006_wait_poll.py     # Wait/poll condition migration
+│   │       └── 007_citation_edges.py # Citation edges migration
 │   ├── api/                          # API layer
 │   │   ├── dependencies/
 │   │   │   └── auth.py              # Auth dependencies
@@ -46,6 +47,7 @@ Agentium/
 │   │   │   ├── files.py             # File operations
 │   │   │   ├── inbox.py             # Unified inbox
 │   │   │   ├── improvements.py      # Self-improvement engine
+│   │   │   ├── knowledge.py         # Knowledge base
 │   │   │   ├── lifecycle_routes.py  # Lifecycle management
 │   │   │   ├── mcp_tools.py         # MCP tools
 │   │   │   ├── mobile.py            # Mobile integration
@@ -68,6 +70,7 @@ Agentium/
 │   │   │   ├── webhooks.py          # Webhook handlers
 │   │   │   ├── websocket.py         # WebSocket endpoints
 │   │   │   ├── workflows.py         # Workflow automation
+│   │   │   ├── knowledge.py          # Knowledge base & citation graph
 │   │   │   └── browser.py          # Browser automation
 │   │   ├── schemas/                 # Pydantic schemas
 │   │   │   ├── checkpoint.py
@@ -128,6 +131,7 @@ Agentium/
 │   │   │   ├── user_preference.py   # User preferences
 │   │   │   ├── voting.py            # Voting records
 │   │   │   ├── wait_condition.py    # Wait conditions
+│   │   │   ├── citation_edge.py    # Citation edges (RAG)
 │   │   │   ├── webhook.py           # Webhook entities
 │   │   │   ├── workflow.py          # Workflow definitions
 │   │   │   └── event_trigger.py     # Event triggers
@@ -181,6 +185,7 @@ Agentium/
 │   │   ├── initialization_service.py # System init
 │   │   ├── knowledge_governance.py # Knowledge policies
 │   │   ├── knowledge_service.py    # Knowledge base
+│   │   ├── citation_graph_service.py # Citation graph (RAG)
 │   │   ├── mcp_client.py           # MCP client
 │   │   ├── mcp_governance.py       # MCP governance
 │   │   ├── mcp_stats_service.py    # MCP statistics
@@ -192,6 +197,7 @@ Agentium/
 │   │   │   ├── __init__.py
 │   │   │   └── health_checks.py
 │   │   ├── monitoring_service.py    # System monitoring
+│   │   ├── slow_query_service.py    # Slow query logging
 │   │   ├── persistent_council.py    # Persistent council
 │   │   ├── plugin_marketplace_service.py # Plugin marketplace
 │   │   ├── predictive_scaling.py   # Predictive auto-scaling

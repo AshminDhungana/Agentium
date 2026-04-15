@@ -4,9 +4,10 @@ import { skillsApi, Skill, SkillSearchResult } from '../services/skills';
 import { 
   Search, BookOpen, Tag, BarChart3, CheckCircle, Plus, Trash2, 
   Edit3, X, Save, AlertTriangle, Code2, Layers, Cpu, Loader2,
-  ChevronDown, ChevronUp, MoreVertical, RefreshCw
+  ChevronDown, ChevronUp, MoreVertical, RefreshCw, Network
 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
+import { CitationGraph } from '@/components/knowledge/CitationGraph';
 
 // Extended skill interface for creation
 interface SkillFormData {
@@ -66,7 +67,7 @@ export const SkillsPage: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [expandedSkill, setExpandedSkill] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'browse' | 'my-submissions'>('browse');
+  const [activeTab, setActiveTab] = useState<'browse' | 'my-submissions' | 'citation-graph'>('browse');
   const [mySubmissions, setMySubmissions] = useState<Skill[]>([]);
 
   const userRole = user?.role as string | undefined;
@@ -316,6 +317,19 @@ export const SkillsPage: React.FC = () => {
         >
           My Submissions
         </button>
+        <button
+          onClick={() => setActiveTab('citation-graph')}
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-150 ${
+            activeTab === 'citation-graph'
+              ? 'bg-white dark:bg-[#161b27] text-gray-900 dark:text-white shadow-sm'
+              : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+          }`}
+        >
+          <span className="flex items-center gap-1.5">
+            <Network className="w-3.5 h-3.5" />
+            Citation Graph
+          </span>
+        </button>
       </div>
 
       {activeTab === 'browse' ? (
@@ -404,6 +418,9 @@ export const SkillsPage: React.FC = () => {
             )}
           </div>
         </>
+      ) : activeTab === 'citation-graph' ? (
+        /* Citation Graph Tab — Phase 16.3 */
+        <CitationGraph />
       ) : (
         /* My Submissions Tab */
         <div className="space-y-4">

@@ -194,6 +194,16 @@ celery_app.conf.beat_schedule = {
         'schedule': 604800.0,  # Weekly
     },
 
+    # ── Phase 16.3: Cross-Document Citation Graph ─────────────────────────────
+    'update-citation-boosts': {
+        'task': 'backend.services.tasks.task_executor.update_citation_boosts',
+        'schedule': 21600.0,  # Every 6 hours
+    },
+    'cleanup-citation-edges-weekly': {
+        'task': 'backend.services.tasks.task_executor.cleanup_citation_edges',
+        'schedule': 604800.0,  # Weekly
+    },
+
     # ── Phase 15.3: Channel Health Broadcast ──────────────────────────────────
     'channel-health-broadcast': {
         'task': 'backend.celery_app.broadcast_channel_health',
