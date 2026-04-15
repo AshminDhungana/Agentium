@@ -287,6 +287,8 @@ Agentium/
 │   │   │   │   ├── CheckpointDiffModal.tsx
 │   │   │   │   ├── CheckpointImportModal.tsx
 │   │   │   │   └── CheckpointTimeline.tsx
+│   │   │   ├── knowledge/           # Knowledge graph UI
+│   │   │   │   └── CitationGraph.tsx
 │   │   │   ├── common/              # Shared components
 │   │   │   │   ├── ErrorBoundary.tsx
 │   │   │   │   └── ProtectedRoute.tsx
@@ -405,6 +407,7 @@ Agentium/
 │   │   │   ├── fileApi.ts
 │   │   │   ├── hostAccessApi.ts
 │   │   │   ├── inboxApi.ts
+│   │   │   ├── knowledge.ts
 │   │   │   ├── localVoice.ts
 │   │   │   ├── models.ts
 │   │   │   ├── monitoring.ts
