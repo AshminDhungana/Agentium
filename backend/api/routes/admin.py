@@ -658,3 +658,90 @@ async def get_slow_queries(
             status_code=500,
             detail=f"Failed to fetch slow queries: {str(e)}"
         )
+
+# ──────────────────────────────────────────────────────────────────────────────
+# GET /admin/config-history/{entity_type}/{entity_id}
+# ──────────────────────────────────────────────────────────────────────────────
+
+@router.get("/admin/config-history/{entity_type}/{entity_id}")
+async def get_config_history(
+    entity_type: str,
+    entity_id: str,
+    admin: dict = Depends(require_admin),
+):
+    from backend.services.config_versioning import ConfigVersioningService
+    history = ConfigVersioningService.get_config_history(entity_type, entity_id)
+    return {"history": history}
+
+# ──────────────────────────────────────────────────────────────────────────────
+# POST /admin/config-restore/{entity_type}/{entity_id}
+# ──────────────────────────────────────────────────────────────────────────────
+
+@router.post("/admin/config-restore/{entity_type}/{entity_id}")
+async def restore_config_snapshot(
+    entity_type: str,
+    entity_id: str,
+    commit: str,
+    admin: dict = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    from backend.services.config_versioning import ConfigVersioningService
+    try:
+        snapshot = ConfigVersioningService.restore_snapshot(entity_type, entity_id, commit)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+        
+    if entity_type == "channel":
+        from backend.models.entities.channels import ExternalChannel
+        channel = db.query(ExternalChannel).filter(ExternalChannel.id == entity_id).first()
+        if not channel:
+            raise HTTPException(status_code=404, detail="Channel not found")
+        
+        # update fields from snapshot
+        for key in ["name", "config", "default_agent_id", "auto_create_tasks", "require_approval", "status"]:
+            if key in snapshot:
+                setattr(channel, key, snapshot[key])
+        
+    elif entity_type == "model_config":
+        from backend.models.entities.user_config import UserModelConfig
+        config = db.query(UserModelConfig).filter(UserModelConfig.id == entity_id).first()
+        if not config:
+            raise HTTPException(status_code=404, detail="Model config not found")
+        
+        for key in ["provider_name", "config_name", "api_base_url", "local_server_url", "default_model", "available_models", "is_default", "max_tokens", "temperature", "top_p", "timeout_seconds", "status"]:
+            if key in snapshot:
+                setattr(config, key, snapshot[key])
+                
+        # for api_key_encrypted and api_key_masked
+        if "api_key_encrypted" in snapshot:
+            config.api_key_encrypted = snapshot["api_key_encrypted"]
+        if "api_key_masked" in snapshot:
+            config.api_key_masked = snapshot["api_key_masked"]
+
+    elif entity_type == "plugin":
+        from backend.models.entities.plugin import PluginInstallation
+        inst = db.query(PluginInstallation).filter(PluginInstallation.id == entity_id).first()
+        if not inst:
+            raise HTTPException(status_code=404, detail="Plugin installation not found")
+        if "config" in snapshot:
+            inst.config = snapshot["config"]
+        
+    elif entity_type == "constitution_article":
+        from backend.models.entities.constitution import ConstitutionArticle
+        article = db.query(ConstitutionArticle).filter(ConstitutionArticle.id == entity_id).first()
+        if not article:
+            raise HTTPException(status_code=404, detail="Constitution Article not found")
+            
+        for key in ["text", "commentary", "tier"]:
+            if key in snapshot:
+                setattr(article, key, snapshot[key])
+    else:
+        raise HTTPException(status_code=400, detail=f"Unsupported entity type for restore: {entity_type}")
+        
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Database update failed: {str(e)}")
+        
+    return {"success": True, "message": f"{entity_type} {entity_id} restored to {commit}"}

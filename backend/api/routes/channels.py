@@ -212,6 +212,14 @@ def create_channel(
     result['webhook_url'] = webhook_url_display
     result['setup_instructions'] = _get_setup_instructions(ctype, webhook_url_display)
     
+    try:
+        from backend.services.config_versioning import ConfigVersioningService
+        user_id_str = current_user.get('id', 'system') if isinstance(current_user, dict) else getattr(current_user, "id", "system")
+        ConfigVersioningService.commit_snapshot("channel", channel.id, str(user_id_str), channel.to_dict())
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Config versioning failed: {e}")
+    
     return result
 
 
@@ -1010,6 +1018,15 @@ def update_channel_settings(
 
     db.commit()
     db.refresh(channel)
+    
+    try:
+        from backend.services.config_versioning import ConfigVersioningService
+        user_id_str = current_user.get('id', 'system') if isinstance(current_user, dict) else getattr(current_user, "id", "system")
+        ConfigVersioningService.commit_snapshot("channel", channel.id, str(user_id_str), channel.to_dict())
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Config versioning failed: {e}")
+        
     return channel.to_dict()
 
 

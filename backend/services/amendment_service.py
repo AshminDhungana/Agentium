@@ -466,6 +466,22 @@ class AmendmentService:
 
         self.db.add(new_constitution)
         self.db.flush()
+        
+        try:
+            from backend.services.config_versioning import ConfigVersioningService
+            content_dict = {
+                "name": new_constitution.name,
+                "version": new_constitution.version,
+                "version_number": new_constitution.version_number,
+                "content": new_constitution.content,
+                "articles": new_constitution.articles,
+                "prohibited_actions": new_constitution.prohibited_actions,
+                "sovereign_preferences": new_constitution.sovereign_preferences
+            }
+            ConfigVersioningService.commit_snapshot("constitution_article", new_constitution.id, "System", content_dict)
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).error(f"Config versioning failed: {exc}")
 
         # Update amendment status
         amendment.status = AmendmentStatus.RATIFIED

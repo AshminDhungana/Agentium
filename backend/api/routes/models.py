@@ -338,7 +338,14 @@ async def create_config(
     db.commit()
     db.refresh(db_config)
 
-    return _serialize_config(db_config)
+    serialized = _serialize_config(db_config)
+    try:
+        from backend.services.config_versioning import ConfigVersioningService
+        ConfigVersioningService.commit_snapshot("model_config", serialized["id"], user_id, serialized)
+    except Exception as e:
+        logger.error(f"Config versioning failed: {e}")
+
+    return serialized
 
 
 @router.post("/configs/universal", response_model=ModelConfigResponse)
@@ -378,7 +385,14 @@ async def create_universal_config(
     db.commit()
     db.refresh(db_config)
 
-    return _serialize_config(db_config)
+    serialized = _serialize_config(db_config)
+    try:
+        from backend.services.config_versioning import ConfigVersioningService
+        ConfigVersioningService.commit_snapshot("model_config", serialized["id"], user_id, serialized)
+    except Exception as e:
+        logger.error(f"Config versioning failed: {e}")
+
+    return serialized
 
 
 @router.get("/configs", response_model=List[ModelConfigResponse])
@@ -441,7 +455,14 @@ async def update_config(
     db.commit()
     db.refresh(config)
 
-    return _serialize_config(config)
+    serialized = _serialize_config(config)
+    try:
+        from backend.services.config_versioning import ConfigVersioningService
+        ConfigVersioningService.commit_snapshot("model_config", serialized["id"], user_id, serialized)
+    except Exception as e:
+        logger.error(f"Config versioning failed: {e}")
+
+    return serialized
 
 
 @router.delete("/configs/{config_id}")

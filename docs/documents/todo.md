@@ -649,11 +649,11 @@ Build a self-governing AI ecosystem where agents operate under constitutional la
 
 ### 16.4 Git Versioning Backups for Config Files
 
-- [ ] **Backend** — new service `backend/services/config_versioning.py`: on any write to constitution articles, model configs, plugin configs, or channel settings, commit a snapshot to a bare Git repo at `/data/config-repo`
-- [ ] Use `gitpython` library; commit message format: `[auto] {entity_type}/{entity_id} updated by {actor_id} at {timestamp}`
-- [ ] `GET /admin/config-history/{entity_type}/{entity_id}` — return list of Git commits for that entity
-- [ ] `POST /admin/config-restore/{entity_type}/{entity_id}?commit={sha}` — restore entity to a specific commit's snapshot (admin only)
-- [ ] Mount `/data/config-repo` as a named Docker volume in `docker-compose.yml` for persistence across container restarts
+- [x] **Backend** — new service `backend/services/config_versioning.py`: on any write to constitution articles, model configs, plugin configs, or channel settings, commit a snapshot to a bare Git repo at `/data/config-repo`
+- [x] Use `gitpython` library; commit message format: `[auto] {entity_type}/{entity_id} updated by {actor_id} at {timestamp}`
+- [x] `GET /admin/config-history/{entity_type}/{entity_id}` — return list of Git commits for that entity
+- [x] `POST /admin/config-restore/{entity_type}/{entity_id}?commit={sha}` — restore entity to a specific commit's snapshot (admin only)
+- [x] Mount `/data/config-repo` as a named Docker volume in `docker-compose.yml` for persistence across container restarts
 
 ---
 

@@ -152,6 +152,19 @@ class PluginMarketplaceService:
         db.add(installation)
         db.commit()
         db.refresh(installation)
+        
+        try:
+            from backend.services.config_versioning import ConfigVersioningService
+            ConfigVersioningService.commit_snapshot(
+                "plugin",
+                installation.id,
+                str(user.id),
+                {"config": installation.config, "plugin_id": installation.plugin_id, "is_active": installation.is_active}
+            )
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"Config versioning failed: {e}")
+            
         return installation
         
     @staticmethod

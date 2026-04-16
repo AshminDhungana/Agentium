@@ -241,6 +241,7 @@ services:
       - /dev:/dev:rw
       # Persistent local file storage (fallback when MinIO is unavailable)
       - uploads_data:/app/data/uploads
+      - config_repo:/data/config-repo
     restart: unless-stopped
     command: uvicorn backend.main:app --host 0.0.0.0 --port 8000
     depends_on:
@@ -319,6 +320,7 @@ services:
       - /dev:/dev:rw
       # Same persistent uploads volume as the backend
       - uploads_data:/app/data/uploads
+      - config_repo:/data/config-repo
     depends_on:
       backend:
         condition: service_healthy
@@ -354,6 +356,7 @@ services:
       - /:/host:rw
       - ${USERPROFILE:-~}:/host_home:rw
       - /sys:/sys:rw
+      - config_repo:/data/config-repo
     environment:
       - DATABASE_URL=postgresql://agentium:agentium@postgres:5432/agentium
       - CHROMA_HOST=chromadb
@@ -434,6 +437,9 @@ volumes:
   # Local filesystem fallback — used when MinIO is unavailable.
   # Shared between backend and celery-worker so both can read/write uploads.
   uploads_data:
+    driver: local
+  # Config repo volume for git versioning backups
+  config_repo:
     driver: local
 
 networks:
