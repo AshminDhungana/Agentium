@@ -712,11 +712,21 @@ async def restore_config_snapshot(
             if key in snapshot:
                 setattr(config, key, snapshot[key])
                 
-        # for api_key_encrypted and api_key_masked
-        if "api_key_encrypted" in snapshot:
-            config.api_key_encrypted = snapshot["api_key_encrypted"]
-        if "api_key_masked" in snapshot:
-            config.api_key_masked = snapshot["api_key_masked"]
+        # Issue 5 fix: never restore encrypted API key fields from a Git
+        # snapshot. The snapshot may contain a rotated or revoked key, and
+        # silently writing it back to the DB would put an invalid credential
+        # into live service with no warning.  The masked value is cosmetic
+        # only so it's also skipped — let it stay consistent with whatever
+        # key is currently configured.
+        _skipped_key_fields = [k for k in ("api_key_encrypted", "api_key_masked") if k in snapshot]
+        if _skipped_key_fields:
+            import logging as _log
+            _log.getLogger(__name__).warning(
+                "config-restore: skipped restoring sensitive field(s) %s for "
+                "model_config %s — re-enter the API key manually if needed.",
+                _skipped_key_fields,
+                entity_id,
+            )
 
     elif entity_type == "plugin":
         from backend.models.entities.plugin import PluginInstallation
@@ -744,4 +754,14 @@ async def restore_config_snapshot(
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Database update failed: {str(e)}")
         
-    return {"success": True, "message": f"{entity_type} {entity_id} restored to {commit}"}
+    return {
+        "success": True,
+        "message": f"{entity_type} {entity_id} restored to {commit}",
+        "warnings": (
+            ["API key fields were not restored — re-enter the key manually if needed."]
+            if entity_type == "model_config" and any(
+                k in snapshot for k in ("api_key_encrypted", "api_key_masked")
+            )
+            else []
+        ),
+    }

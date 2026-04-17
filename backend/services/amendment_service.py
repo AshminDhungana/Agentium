@@ -377,12 +377,23 @@ class AmendmentService:
     # 5. Conclude Voting
     # ------------------------------------------------------------------
 
-    async def conclude_voting(self, amendment_id: str) -> Dict[str, Any]:
+    async def conclude_voting(
+        self,
+        amendment_id: str,
+        actor_id: str = "system",
+    ) -> Dict[str, Any]:
         """
         Conclude voting and execute the result.
 
         If PASSED: ratify the amendment (PostgreSQL + Vector DB + broadcast).
         If FAILED: rollback (log + notify).
+
+        Args:
+            amendment_id: The amendment to conclude.
+            actor_id: ID of the user/agent triggering conclusion (used in
+                      the Git commit message for auditability). Pass the
+                      ``current_user`` id from the HTTP route handler; it
+                      defaults to "system" when called from a scheduled task.
 
         Returns:
             dict with conclusion result.
@@ -395,7 +406,7 @@ class AmendmentService:
         voting_result = amendment.conclude()
 
         if voting_result["result"] == "passed":
-            ratification = await self._ratify_amendment(amendment)
+            ratification = await self._ratify_amendment(amendment, actor_id=actor_id)
             result = {**voting_result, **ratification, "status": "ratified"}
         else:
             await self._rollback_amendment(amendment)
@@ -419,7 +430,9 @@ class AmendmentService:
     # ------------------------------------------------------------------
 
     async def _ratify_amendment(
-        self, amendment: AmendmentVoting
+        self,
+        amendment: AmendmentVoting,
+        actor_id: str = "system",
     ) -> Dict[str, Any]:
         """
         Execute a passed amendment:
@@ -478,7 +491,7 @@ class AmendmentService:
                 "prohibited_actions": new_constitution.prohibited_actions,
                 "sovereign_preferences": new_constitution.sovereign_preferences
             }
-            ConfigVersioningService.commit_snapshot("constitution_article", new_constitution.id, "System", content_dict)
+            ConfigVersioningService.commit_snapshot("constitution_article", new_constitution.id, actor_id, content_dict)
         except Exception as exc:
             import logging
             logging.getLogger(__name__).error(f"Config versioning failed: {exc}")
