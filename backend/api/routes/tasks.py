@@ -2,7 +2,7 @@
 Tasks API routes for Agentium.
 Updated for Task Execution Architecture: Governance Alignment
 """
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.orm import Session, noload
 from typing import List, Optional
 
@@ -13,6 +13,7 @@ from backend.api.schemas.task import TaskCreate, TaskResponse, TaskUpdate
 from backend.core.auth import get_current_active_user
 from backend.services.task_state_machine import TaskStateMachine, IllegalStateTransition
 from backend.services.acceptance_criteria import AcceptanceCriteriaService  # Phase 6.3
+from backend.core.rate_limit import limiter
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
@@ -73,7 +74,9 @@ def _serialize(task: Task) -> dict:
 
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
+@limiter.limit("30/minute", error_message="Too many task creation requests. Please slow down.")
 async def create_task(
+    request: Request,
     task_data: TaskCreate,
     current_user: dict = Depends(get_current_active_user),
     db: Session = Depends(get_db)

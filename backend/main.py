@@ -10,7 +10,7 @@ import logging
 import uvicorn
 from backend.api import host_access
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, HTTPException
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from backend.celery_app import celery_app
@@ -42,6 +42,11 @@ from backend.models.entities.agents import AgentStatus
 # Phase 6.7 — MCP Bridge
 from backend.services.mcp_tool_bridge import init_bridge
 from backend.core.tool_registry import tool_registry
+
+# Phase 17.1 — Rate limiting
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 
 # API Routes
 from backend.api.routes import chat as chat_routes
@@ -89,9 +94,14 @@ from backend.api.routes import wait_poll as wait_poll_routes                   #
 from backend.api.routes import knowledge as knowledge_routes                   # Phase 16.3
 
 from backend.core.security_middleware import (
+    # Phase 9.4
     RateLimitMiddleware,
     SessionLimitMiddleware,
     InputSanitizationMiddleware,
+    # Phase 17.1
+    IPBlocklistMiddleware,
+    PayloadSizeLimitMiddleware,
+    ErrorCounterMiddleware,
 )
 
 from backend.core.observer_middleware import ObserverReadOnlyMiddleware
@@ -100,6 +110,8 @@ from backend.core.observer_middleware import ObserverReadOnlyMiddleware
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 celery = celery_app
+
+from backend.core.rate_limit import limiter
 
 
 class ConstitutionUpdateRequest(BaseModel):
@@ -172,11 +184,6 @@ async def lifespan(app: FastAPI):
 
     # ─────────────────────────────────────────────────────────────
     # 1b. Seed fallback Constitution (API-key independent)
-    #     The constitution is pure DB data — no LLM call required.
-    #     This ensures GET /api/v1/constitution always returns 200,
-    #     even on a fresh install before Genesis has run.
-    #     create_default_constitution() is idempotent: it returns
-    #     the existing row if one is already present.
     # ─────────────────────────────────────────────────────────────
     try:
         db = next(get_db())
@@ -194,25 +201,6 @@ async def lifespan(app: FastAPI):
 
     # ─────────────────────────────────────────────────────────────
     # 2. Persistent Council — status check only (read-only)
-    #
-    #    Genesis (Head 00001 + Council + full Constitution) is NOT
-    #    run at startup. It runs on-demand via:
-    #      POST /api/v1/genesis/initialize
-    #
-    #    This endpoint is called automatically by the frontend
-    #    (useGenesisCheck hook) the first time a user logs in after
-    #    an API key has been saved. You can also trigger it manually
-    #    from the Models page.
-    #
-    #    Why not at startup?
-    #    - Genesis creates agents that need an LLM key to function.
-    #      Initialising them before a key exists creates a broken
-    #      half-state where agents exist but can never make a call.
-    #    - The old approach called persistent_council.initialize_
-    #      persistent_council() here, which tried to INSERT a
-    #      constitution with version="v1.0.0" — but step 1b had
-    #      already seeded that exact row → UniqueViolation crash
-    #      on every restart.
     # ─────────────────────────────────────────────────────────────
     try:
         db = next(get_db())
@@ -232,15 +220,6 @@ async def lifespan(app: FastAPI):
         logger.warning(f"⚠️ Persistent Council status check failed (non-fatal): {e}")
 
     # ─────────────────────────────────────────────────────────────
-    # 2b. Auto-assign default model config to Head if missing
-    #     Runs after API Manager (step 3) so configs already exist.
-    #     Moved here as a best-effort repair — does NOT block startup.
-    # ─────────────────────────────────────────────────────────────
-    # NOTE: This block runs AFTER step 3 below, but we declare it here
-    # so the call site is close to the Council init. The actual repair
-    # function is invoked at the end of step 3 (see _repair_head_model_config).
-
-    # ─────────────────────────────────────────────────────────────
     # 3. Initialize API Manager (Universal Provider Support)
     # ─────────────────────────────────────────────────────────────
     try:
@@ -255,7 +234,6 @@ async def lifespan(app: FastAPI):
 
     # ─────────────────────────────────────────────────────────────
     # 3b. Auto-assign default model config to Head agent if missing
-    #     Runs after API Manager so model configs are guaranteed to exist.
     # ─────────────────────────────────────────────────────────────
     try:
         db = next(get_db())
@@ -368,9 +346,6 @@ async def lifespan(app: FastAPI):
 
     # ─────────────────────────────────────────────────────────────
     # 8. Initialize MCP Tool Bridge 
-    #    Syncs all approved MCP tools from the database into the
-    #    in-memory ToolRegistry so agents can discover and invoke
-    #    them through the standard /tools/ endpoints.
     # ─────────────────────────────────────────────────────────────
     try:
         db = next(get_db())
@@ -407,6 +382,7 @@ async def lifespan(app: FastAPI):
         logger.error("❌ Knowledge base bootstrap failed: %s", e)
 
     logger.info("🎉 Agentium startup complete!")
+    logger.info("   Phase 17.1: DDoS hardening active — slowapi + blocklist + payload limits")
 
     yield  # ── Application runs here ──────────────────────────────
 
@@ -443,11 +419,15 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Agentium",
-    description="AI Agent Governance System — Phase 6.7: MCP Server Integration | TextEditorTool added",
-    version="3.0.0-phase6.7",
+    description="AI Agent Governance System — Phase 17.1: Application-Layer DDoS Hardening",
+    version="3.0.0-phase17.1",
     lifespan=lifespan,
-    redirect_slashes=False,  # prevent 307 redirects that bypass the Vite dev proxy (fixes /api/v1/preferences ERR_CONNECTION_REFUSED)
+    redirect_slashes=False,
 )
+
+# ── Phase 17.1: attach slowapi limiter to app state ──────────────────────────
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 origins = os.getenv("ALLOWED_ORIGINS")
 
@@ -460,6 +440,43 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ── Phase 17.1 — DDoS hardening middleware stack ─────────────────────────────
+# Starlette applies add_middleware() in REVERSE insertion order.
+# Execution order on every request:
+#   1. IPBlocklistMiddleware    — single EXISTS, 403 before body read
+#   2. PayloadSizeLimitMiddleware — Content-Length header check, 413
+#   3. ErrorCounterMiddleware   — post-response weighted 4xx counter
+#
+# The three Phase 9.4 middlewares run after these (they were registered first).
+#
+# IMPORTANT: IPBlocklistMiddleware and PayloadSizeLimitMiddleware need a Redis
+# client injected at startup. Import get_redis_client from your Redis module
+# and pass it here. Example:
+#
+#   from backend.core.redis import get_redis_client
+#   _redis = get_redis_client()
+#   app.add_middleware(ErrorCounterMiddleware, redis=_redis)
+#   app.add_middleware(PayloadSizeLimitMiddleware)
+#   app.add_middleware(IPBlocklistMiddleware, redis=_redis)
+#
+# If your project uses a different Redis import path, adjust accordingly.
+# The middleware classes are Redis-client-agnostic (sync or async redis-py).
+try:
+    from backend.core.redis import get_redis_client as _get_redis
+    _redis_client = _get_redis()
+    app.add_middleware(ErrorCounterMiddleware, redis=_redis_client)
+    app.add_middleware(PayloadSizeLimitMiddleware)
+    app.add_middleware(IPBlocklistMiddleware, redis=_redis_client)
+    logger.info("✅ Phase 17.1 DDoS middleware stack registered")
+except Exception as _mw_exc:
+    logger.warning(
+        "⚠️ Phase 17.1 middleware could not load Redis client (%s). "
+        "IPBlocklist and ErrorCounter disabled — PayloadSizeLimit still active.",
+        _mw_exc,
+    )
+    app.add_middleware(PayloadSizeLimitMiddleware)
+
+# Phase 9.4 middleware (unchanged)
 app.add_middleware(RateLimitMiddleware)
 app.add_middleware(SessionLimitMiddleware)
 app.add_middleware(InputSanitizationMiddleware)
@@ -521,7 +538,6 @@ app.include_router(wait_poll_routes.router,          prefix="/api/v1")  # Phase 
 app.include_router(knowledge_routes.router,          prefix="/api/v1")  # Phase 16.3
 
 
-
 # ══════════════════════════════════════════════════════════════════════════════
 # INLINE ENDPOINTS
 # ══════════════════════════════════════════════════════════════════════════════
@@ -538,6 +554,9 @@ async def health_check_api():
         "timestamp": datetime.utcnow().isoformat()
     }
 
+
+# The slowapi per-endpoint limits are applied directly in the respective routes
+# (e.g., auth_routes.py and tasks_routes.py) using the @limiter.limit decorator.
 
 
 # ── Agent Management ──────────────────────────────────────────────────────────
@@ -624,7 +643,7 @@ async def get_agent(
 @app.get("/api/v1/constitution")
 async def get_constitution(
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),  # auth guard added — constitution is governance-sensitive
+    current_user: dict = Depends(get_current_user),
 ):
     """Get the current active constitution."""
     constitution = db.query(Constitution).filter_by(
@@ -694,9 +713,6 @@ async def update_constitution(
     new_agentium_id    = f"C{new_version_number:04d}"
     actor              = current_user.get("username", "sovereign")
 
-    # ── Build changelog ───────────────────────────────────────────────────────
-    # Prepend a new entry to the existing changelog so the history panel has
-    # data to display. Older versions had a NULL changelog; we handle that safely.
     existing_changelog: list = []
     try:
         existing_changelog = _json.loads(current.changelog or "[]")
@@ -710,9 +726,7 @@ async def update_constitution(
         "timestamp": datetime.utcnow().isoformat(),
         "previous_version": current.version,
     }
-    # Most recent entry first
     new_changelog = _json.dumps([new_changelog_entry] + existing_changelog)
-    # ─────────────────────────────────────────────────────────────────────────
 
     new_version = Constitution(
         agentium_id=new_agentium_id,

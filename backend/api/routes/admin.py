@@ -16,10 +16,13 @@ User management endpoints:
   - POST /admin/users/{id}/change-password → admin password override (body, not query param)
   - POST /admin/users/{id}/role            → change RBAC role
 
+Phase 17.1 DDoS endpoints:
+  - GET    /admin/blocked-ips      → list currently blocked IPs with remaining TTL
+  - DELETE /admin/blocked-ips/{ip} → manually unblock an IP (kill-switch)
 """
 
 from datetime import datetime, timezone, timedelta
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
@@ -62,13 +65,10 @@ class BudgetUpdateRequest(BaseModel):
     daily_cost_limit: float = Field(..., ge=0.0, description="Daily cost cap in USD")
 
 
-# C2: Pydantic body model so the password travels in the request body
-#     (encrypted by TLS) rather than in the query string (logged by servers).
 class AdminPasswordChangeRequest(BaseModel):
     new_password: str = Field(..., min_length=8)
 
 
-# D6: Body model for role-change requests.
 class RoleChangeRequest(BaseModel):
     new_role: str = Field(
         ...,
@@ -76,16 +76,17 @@ class RoleChangeRequest(BaseModel):
     )
 
 
+class BlockedIPResponse(BaseModel):
+    """Response schema for a single blocked IP entry."""
+    ip: str
+    ttl_seconds: int   # remaining seconds; -1 = no expiry; -2 = key gone
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Internal helpers
 # ──────────────────────────────────────────────────────────────────────────────
 
 def _get_budget_limits(db: Session) -> Dict[str, Any]:
-    """
-    Load persisted budget limits from system_settings.
-    Falls back to in-memory IdleBudgetManager values if the table
-    is not yet available (first boot before migration runs).
-    """
     try:
         rows = db.execute(
             text(
@@ -102,14 +103,12 @@ def _get_budget_limits(db: Session) -> Dict[str, Any]:
             elif key == "daily_cost_limit":
                 result["daily_cost_limit"] = float(value)
 
-        # Fill any missing keys from in-memory manager
         from backend.services.token_optimizer import idle_budget
         result.setdefault("daily_token_limit", idle_budget.daily_token_limit)
         result.setdefault("daily_cost_limit", idle_budget.daily_cost_limit)
         return result
 
     except Exception:
-        # system_settings table might not exist yet on very first boot
         from backend.services.token_optimizer import idle_budget
         return {
             "daily_token_limit": idle_budget.daily_token_limit,
@@ -118,16 +117,10 @@ def _get_budget_limits(db: Session) -> Dict[str, Any]:
 
 
 def _get_todays_usage(db: Session) -> Dict[str, Any]:
-    """
-    Aggregate today's token/cost totals from ModelUsageLog.
-    Ground-truth source: reflects what was actually charged across all providers.
-    """
     try:
         from backend.models.entities.user_config import ModelUsageLog
 
-        today_start = datetime.utcnow().replace(
-            hour=0, minute=0, second=0, microsecond=0
-        )
+        today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
 
         row = db.query(
             func.coalesce(func.sum(ModelUsageLog.total_tokens), 0).label("tokens"),
@@ -146,10 +139,6 @@ def _get_todays_usage(db: Session) -> Dict[str, Any]:
 
 
 def _persist_budget_limits(db: Session, daily_token_limit: int, daily_cost_limit: float):
-    """
-    Upsert new budget limits into system_settings.
-    These become the permanent default — they survive restarts.
-    """
     for key, value in [
         ("daily_token_limit", str(daily_token_limit)),
         ("daily_cost_limit", str(daily_cost_limit)),
@@ -167,7 +156,6 @@ def _persist_budget_limits(db: Session, daily_token_limit: int, daily_cost_limit
     db.commit()
 
 
-# C3: Fixed type annotation — user_id is a UUID string, not an integer.
 def _get_user_or_404(db: Session, user_id: str) -> User:
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
@@ -175,8 +163,6 @@ def _get_user_or_404(db: Session, user_id: str) -> User:
     return user
 
 
-# C13: Expanded to include role, is_sovereign, can_veto so the frontend can
-#      show accurate permission data without making a separate API call.
 def _user_dict(u: User) -> dict:
     return {
         "id":           u.id,
@@ -202,17 +188,6 @@ async def get_budget_status(
     current_user: dict = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
-    """
-    Return live budget status.
-
-    Response shape matches what BudgetControl.tsx expects:
-      current_limits.daily_token_limit
-      current_limits.daily_cost_limit
-      usage.tokens_used_today / tokens_remaining
-      usage.cost_used_today_usd / cost_remaining_usd / cost_percentage_used / cost_percentage_tokens
-      can_modify
-      optimizer_status.idle_mode_active / time_since_last_activity_seconds
-    """
     from backend.services.token_optimizer import token_optimizer
 
     limits = _get_budget_limits(db)
@@ -244,7 +219,7 @@ async def get_budget_status(
             "cost_remaining_usd": round(max(0.0, daily_cost_limit - cost_used), 6),
             "cost_percentage_used": min(cost_pct, 100),
             "cost_percentage_tokens": min(token_pct, 100),
-            "data_source": "api_usage_logs",   # Signals to frontend this is real data
+            "data_source": "api_usage_logs",
         },
         "can_modify": _can_modify_budget(current_user),
         "optimizer_status": {
@@ -264,13 +239,6 @@ async def update_budget(
     current_user: dict = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
-    """
-    Update daily budget limits.
-
-    Requires admin or sovereign role.
-    - Persists to system_settings (survives restarts; new value IS the new default)
-    - Updates in-memory IdleBudgetManager immediately (no restart needed)
-    """
     if not _can_modify_budget(current_user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -282,10 +250,7 @@ async def update_budget(
     old_token_limit = idle_budget.daily_token_limit
     old_cost_limit = idle_budget.daily_cost_limit
 
-    # 1. Persist to DB → becomes permanent default
     _persist_budget_limits(db, request.daily_token_limit, request.daily_cost_limit)
-
-    # 2. Update in-memory immediately → takes effect right now
     idle_budget.update_limits(
         daily_token_limit=request.daily_token_limit,
         daily_cost_limit=request.daily_cost_limit,
@@ -384,30 +349,16 @@ async def get_pending_users(
 @router.get("/admin/users")
 async def get_all_users(
     include_pending: bool = False,
-    # D1 (pagination readiness): Optional server-side search filters by username
-    # or email. Avoids loading the full user list into memory and filtering
-    # client-side, which breaks at scale.
     search: Optional[str] = Query(None, description="Filter by username or email (case-insensitive)"),
-    # Pagination params are optional for now so the current frontend client is
-    # not broken. Pass limit/offset when you implement the paginated table.
     limit: int = Query(200, ge=1, le=500, description="Max users to return (default 200)"),
     offset: int = Query(0, ge=0, description="Pagination offset"),
     admin: dict = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    """
-    Get approved users with optional server-side search and pagination.
-
-    Query params:
-      search  — case-insensitive filter on username or email
-      limit   — max records to return (default 200, max 500)
-      offset  — pagination offset for future paginated table
-    """
     query = db.query(User)
     if not include_pending:
         query = query.filter(User.is_pending == False)
 
-    # Server-side search — avoids pulling all rows into Python just to filter
     if search:
         term = f"%{search.lower()}%"
         query = query.filter(
@@ -442,7 +393,6 @@ async def approve_user(
     user.is_pending = False
     user.is_active = True
 
-    # C1 + C12: persist audit entry for user approval
     audit_entry = AuditLog.log(
         level=AuditLevel.INFO,
         category=AuditCategory.AUTHENTICATION,
@@ -476,7 +426,6 @@ async def reject_user(
 
     db.delete(user)
 
-    # C1 + C12: persist audit entry before committing the delete
     audit_entry = AuditLog.log(
         level=AuditLevel.WARNING,
         category=AuditCategory.AUTHENTICATION,
@@ -510,7 +459,6 @@ async def delete_user(
 
     db.delete(user)
 
-    # C1 + C12: persist audit entry before committing the delete
     audit_entry = AuditLog.log(
         level=AuditLevel.WARNING,
         category=AuditCategory.AUTHORIZATION,
@@ -531,9 +479,6 @@ async def delete_user(
 @router.post("/admin/users/{user_id}/change-password")
 async def change_user_password(
     user_id: str,
-    # C2: Use Pydantic body model instead of a bare query-string parameter.
-    #     Previously `new_password: str` was resolved from the query string,
-    #     exposing the password in server access logs and browser history.
     request: AdminPasswordChangeRequest,
     admin: dict = Depends(require_admin),
     db: Session = Depends(get_db),
@@ -543,7 +488,6 @@ async def change_user_password(
     user.hashed_password = User.hash_password(request.new_password)
     user.updated_at = datetime.now(timezone.utc)
 
-    # C1 + C12: persist audit entry
     audit_entry = AuditLog.log(
         level=AuditLevel.WARNING,
         category=AuditCategory.AUTHENTICATION,
@@ -561,10 +505,6 @@ async def change_user_password(
     return {"success": True, "message": f"Password changed for user {user.username}"}
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# D6: POST /api/v1/admin/users/{user_id}/role
-# ──────────────────────────────────────────────────────────────────────────────
-
 @router.post("/admin/users/{user_id}/role")
 async def change_user_role(
     user_id: str,
@@ -572,14 +512,6 @@ async def change_user_role(
     admin: dict = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    """
-    Change a user's RBAC role.
-
-    - Validates against VALID_ROLES (primary_sovereign, deputy_sovereign, observer).
-    - Syncs the is_admin flag: primary_sovereign → is_admin=True, others → False.
-    - Admins cannot change their own role.
-    - Audit-logged at WARNING level because role changes are high-privilege operations.
-    """
     if request.new_role not in VALID_ROLES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -596,11 +528,9 @@ async def change_user_role(
     old_role = user.effective_role
 
     user.role = request.new_role
-    # Keep is_admin in sync: only primary_sovereign carries admin privileges
     user.is_admin = (request.new_role == ROLE_PRIMARY_SOVEREIGN)
     user.updated_at = datetime.now(timezone.utc)
 
-    # C1: persist audit entry
     audit_entry = AuditLog.log(
         level=AuditLevel.WARNING,
         category=AuditCategory.AUTHORIZATION,
@@ -640,9 +570,6 @@ async def get_slow_queries(
     admin: dict = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    """
-    Return top N slowest queries aggregated from pg_stat_statements.
-    """
     from backend.services.slow_query_service import get_slow_queries as fetch_slow_queries
     import dataclasses
 
@@ -659,8 +586,9 @@ async def get_slow_queries(
             detail=f"Failed to fetch slow queries: {str(e)}"
         )
 
+
 # ──────────────────────────────────────────────────────────────────────────────
-# GET /admin/config-history/{entity_type}/{entity_id}
+# Config history / restore (unchanged)
 # ──────────────────────────────────────────────────────────────────────────────
 
 @router.get("/admin/config-history/{entity_type}/{entity_id}")
@@ -673,9 +601,6 @@ async def get_config_history(
     history = ConfigVersioningService.get_config_history(entity_type, entity_id)
     return {"history": history}
 
-# ──────────────────────────────────────────────────────────────────────────────
-# POST /admin/config-restore/{entity_type}/{entity_id}
-# ──────────────────────────────────────────────────────────────────────────────
 
 @router.post("/admin/config-restore/{entity_type}/{entity_id}")
 async def restore_config_snapshot(
@@ -696,8 +621,6 @@ async def restore_config_snapshot(
         channel = db.query(ExternalChannel).filter(ExternalChannel.id == entity_id).first()
         if not channel:
             raise HTTPException(status_code=404, detail="Channel not found")
-        
-        # update fields from snapshot
         for key in ["name", "config", "default_agent_id", "auto_create_tasks", "require_approval", "status"]:
             if key in snapshot:
                 setattr(channel, key, snapshot[key])
@@ -707,17 +630,9 @@ async def restore_config_snapshot(
         config = db.query(UserModelConfig).filter(UserModelConfig.id == entity_id).first()
         if not config:
             raise HTTPException(status_code=404, detail="Model config not found")
-        
         for key in ["provider_name", "config_name", "api_base_url", "local_server_url", "default_model", "available_models", "is_default", "max_tokens", "temperature", "top_p", "timeout_seconds", "status"]:
             if key in snapshot:
                 setattr(config, key, snapshot[key])
-                
-        # Issue 5 fix: never restore encrypted API key fields from a Git
-        # snapshot. The snapshot may contain a rotated or revoked key, and
-        # silently writing it back to the DB would put an invalid credential
-        # into live service with no warning.  The masked value is cosmetic
-        # only so it's also skipped — let it stay consistent with whatever
-        # key is currently configured.
         _skipped_key_fields = [k for k in ("api_key_encrypted", "api_key_masked") if k in snapshot]
         if _skipped_key_fields:
             import logging as _log
@@ -741,7 +656,6 @@ async def restore_config_snapshot(
         article = db.query(ConstitutionArticle).filter(ConstitutionArticle.id == entity_id).first()
         if not article:
             raise HTTPException(status_code=404, detail="Constitution Article not found")
-            
         for key in ["text", "commentary", "tier"]:
             if key in snapshot:
                 setattr(article, key, snapshot[key])
@@ -765,3 +679,169 @@ async def restore_config_snapshot(
             else []
         ),
     }
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Phase 17.1 — DDoS Blocklist Management
+# ──────────────────────────────────────────────────────────────────────────────
+
+def _get_redis_sync():
+    """
+    Return a synchronous Redis client for admin endpoints.
+    Uses the same REDIS_URL as the rest of the application.
+    """
+    import os
+    import redis as redis_lib
+    redis_url = os.getenv("REDIS_URL", "redis://redis:6379/0")
+    return redis_lib.from_url(redis_url, decode_responses=True)
+
+
+@router.get(
+    "/admin/blocked-ips",
+    response_model=List[BlockedIPResponse],
+    summary="Phase 17.1 — List currently blocked IPs",
+    description=(
+        "Returns all IPs in the Redis blocklist with their remaining TTL. "
+        "Uses SCAN so it is safe on large keyspaces. "
+        "Requires admin privileges."
+    ),
+)
+async def list_blocked_ips(
+    admin: dict = Depends(require_admin),
+):
+    """
+    Phase 17.1: List all IPs currently in the Redis blocklist.
+
+    Uses cursor-based SCAN (non-blocking) and pipelines all TTL calls in a
+    single round-trip. Results are sorted by remaining TTL ascending so the
+    IPs closest to expiry appear first.
+    """
+    try:
+        r = _get_redis_sync()
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Redis unavailable: {exc}",
+        )
+
+    results: list[BlockedIPResponse] = []
+    cursor = 0
+
+    try:
+        while True:
+            cursor, keys = r.scan(cursor, match="agentium:blocked:ips:*", count=100)
+
+            if keys:
+                # Pipeline all TTL lookups in one round-trip
+                pipe = r.pipeline(transaction=False)
+                for k in keys:
+                    pipe.ttl(k)
+                ttls = pipe.execute()
+
+                for key, ttl in zip(keys, ttls):
+                    # key format: "agentium:blocked:ips:{ip}"
+                    ip = key.split(":")[-1]
+                    results.append(BlockedIPResponse(ip=ip, ttl_seconds=int(ttl)))
+
+            if cursor == 0:
+                break
+
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to scan blocked IPs: {exc}",
+        )
+    finally:
+        try:
+            r.close()
+        except Exception:
+            pass
+
+    # Sort by TTL ascending: IPs expiring soonest shown first
+    results.sort(key=lambda r: r.ttl_seconds)
+    return results
+
+
+@router.delete(
+    "/admin/blocked-ips/{ip}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Phase 17.1 — Manually unblock an IP",
+    description=(
+        "Admin kill-switch: removes the IP from the Redis blocklist immediately. "
+        "Also clears the 4xx error counters so Celery does not re-block on the "
+        "next detection cycle. The action is audit-logged."
+    ),
+)
+async def unblock_ip(
+    ip: str,
+    admin: dict = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """
+    Phase 17.1: Manually unblock an IP.
+
+    - Deletes the blocklist key immediately.
+    - Clears the 4xx sliding-window counter keys so the IP isn't re-blocked
+      by the Celery task before its legitimate counters reset naturally.
+    - Writes an AuditLog entry for compliance traceability.
+    """
+    try:
+        r = _get_redis_sync()
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Redis unavailable: {exc}",
+        )
+
+    try:
+        block_key = f"agentium:blocked:ips:{ip}"
+        deleted = r.delete(block_key)
+
+        if not deleted:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"IP {ip} is not currently in the blocklist.",
+            )
+
+        # Clear 4xx counters so Celery won't immediately re-block this IP
+        r.delete(f"agentium:4xx:{ip}", f"agentium:4xx:{ip}:wsum")
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to unblock IP: {exc}",
+        )
+    finally:
+        try:
+            r.close()
+        except Exception:
+            pass
+
+    # Audit the manual unblock action
+    try:
+        audit_entry = AuditLog.log(
+            level=AuditLevel.WARNING,
+            category=AuditCategory.SECURITY,
+            actor_type="admin",
+            actor_id=admin.get("username", "unknown"),
+            action="ip_manually_unblocked",
+            target_type="ip_address",
+            target_id=ip,
+            description=f"Admin manually unblocked IP: {ip}",
+            meta_data={
+                "ip": ip,
+                "unblocked_by": admin.get("username", "unknown"),
+            },
+        )
+        db.add(audit_entry)
+        db.commit()
+    except Exception as audit_exc:
+        # Non-fatal: the unblock succeeded — don't roll it back over an audit failure
+        import logging as _log
+        _log.getLogger(__name__).warning(
+            "unblock_ip: audit log write failed (non-fatal): %s", audit_exc
+        )
+
+    # 204 No Content — no response body needed

@@ -2,11 +2,16 @@
 Task execution handlers for Celery.
 Includes: task execution, constitution review, idle processing, 
 self-healing execution loop, data retention, and channel message retry.
+
+Phase 17.1 additions:
+- detect_suspicious_patterns: reads Redis 4xx weighted-sum counters, auto-blocks
+  IPs over threshold, writes AuditLog entries for every block decision.
 """
 import logging
 import asyncio
 import json
 import os
+import time
 from typing import Optional, Dict, Any, List
 from dataclasses import asdict
 from datetime import datetime, timedelta
@@ -36,30 +41,25 @@ logger = logging.getLogger(__name__)
 # DEDICATED CELERY DATABASE CONFIGURATION
 # ═══════════════════════════════════════════════════════════
 
-# Get database URL from environment (same as main app)
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
     "postgresql://postgres:postgres@postgres:5432/agentium"
 )
 
-# Create a separate engine for Celery workers with NullPool
-# This is CRITICAL: disables connection pooling for fork-based concurrency
 celery_engine = create_engine(
     DATABASE_URL,
-    poolclass=NullPool,        # No connection pooling - fresh connections per task
-    pool_pre_ping=True,        # Validate connections before use
+    poolclass=NullPool,
+    pool_pre_ping=True,
     echo=False,
     future=True
 )
 
-# Create session factory bound to Celery engine
 CelerySessionLocal = sessionmaker(
     autocommit=False,
     autoflush=False,
     bind=celery_engine
 )
 
-# Optional: Use scoped_session for thread safety in concurrent tasks
 CeleryScopedSession = scoped_session(CelerySessionLocal)
 
 
@@ -79,11 +79,6 @@ def get_task_db():
     Context manager for database sessions in Celery tasks.
     Uses dedicated Celery engine with NullPool to avoid connection
     corruption across forked worker processes.
-
-    Decorator order matters: @retry must be the outermost decorator so it
-    can catch OperationalError raised inside the context manager body.
-    Previously @contextmanager was outermost which meant @retry wrapped a
-    raw generator and never saw the exception.
     """
     db = CelerySessionLocal()
     try:
@@ -100,8 +95,6 @@ def get_task_db():
 # ═══════════════════════════════════════════════════════════
 # Core Task Execution
 # ═══════════════════════════════════════════════════════════
-
-# In execute_task_async function, replace with:
 
 @celery_app.task(bind=True, max_retries=3)
 def execute_task_async(self, task_id: str, agent_id: str):
@@ -151,8 +144,7 @@ def execute_task_async(self, task_id: str, agent_id: str):
             except Exception as learning_exc:
                 logger.error(f"Real-Time Learning extraction failed for task {task_id}: {learning_exc}")
 
-            # Phase 16.2: Validation Boost — reset decay clock for
-            # knowledge entries that were retrieved and used successfully.
+            # Phase 16.2: Validation Boost
             try:
                 retrieved_ids = (
                     (task.execution_context or {}).get("retrieved_learning_ids")
@@ -170,9 +162,6 @@ def execute_task_async(self, task_id: str, agent_id: str):
             except Exception as boost_exc:
                 logger.debug(f"Validation boost skipped for task {task_id}: {boost_exc}")
 
-            # No explicit db.commit() here — get_task_db() commits automatically
-            # on clean exit. A redundant commit here would mask rollback errors.
-
             return {
                 "status": "completed",
                 "task_id": task_id,
@@ -181,9 +170,6 @@ def execute_task_async(self, task_id: str, agent_id: str):
             
         except Exception as exc:
             logger.error(f"Task execution failed: {exc}")
-            
-            # Record failure for used skills
-            # (Would need to track which skills were attempted)
             
             # Phase 13.4: Anti-Pattern Early Warning
             try:
@@ -206,9 +192,6 @@ def execute_task_async(self, task_id: str, agent_id: str):
                             warning_msg = f"Anti-Pattern Detected: Similar failure occurred {similar_count} times. Error: {str(exc)[:100]}"
                             logger.warning(warning_msg)
 
-                            # Broadcast warning over WebSocket — use asyncio.run() which
-                            # is safe in a sync Celery worker and avoids the deprecated
-                            # get_event_loop() / set_event_loop() pattern.
                             try:
                                 asyncio.run(manager.broadcast({
                                     "type": "pattern_warning",
@@ -221,7 +204,6 @@ def execute_task_async(self, task_id: str, agent_id: str):
                             except Exception:
                                 pass
 
-                            # Increment impact tracker for anti-patterns finding
                             try:
                                 import redis.asyncio as aioredis
                                 redis_url = os.getenv("REDIS_URL", "redis://redis:6379/0")
@@ -239,7 +221,6 @@ def execute_task_async(self, task_id: str, agent_id: str):
             except Exception as eval_exc:
                 logger.error(f"Anti-pattern evaluation failed: {eval_exc}")
 
-            # Phase 13.2: Exponential backoff — 1→2→4→8→16→32→60s cap
             countdown = min(2 ** self.request.retries, 60)
             logger.info(f"Retrying task {task_id} in {countdown}s (attempt {self.request.retries + 1})")
             raise self.retry(exc=exc, countdown=countdown)
@@ -260,7 +241,7 @@ def process_idle_tasks():
 
 
 # ═══════════════════════════════════════════════════════════
-# Self-Healing Execution Loop (NEW)
+# Self-Healing Execution Loop
 # ═══════════════════════════════════════════════════════════
 
 @celery_app.task
@@ -271,7 +252,6 @@ def handle_task_escalation():
     """
     with get_task_db() as db:
         try:
-            # Find all escalated tasks
             escalated_tasks = db.query(Task).filter(
                 Task.status == TaskStatus.ESCALATED,
                 Task.is_active == True
@@ -280,7 +260,6 @@ def handle_task_escalation():
             if not escalated_tasks:
                 return {"processed": 0}
             
-            # Get Council members for deliberation
             council_members = db.query(CouncilMember).filter_by(is_active=True).all()
             head = db.query(HeadOfCouncil).filter_by(agentium_id="00001").first()
             
@@ -289,17 +268,9 @@ def handle_task_escalation():
             for task in escalated_tasks:
                 logger.info(f"Processing escalated task {task.agentium_id}: {task.title}")
                 
-                # Create Council deliberation for escalated task
                 try:
-                    # Start deliberation
                     deliberation = task.start_deliberation([m.agentium_id for m in council_members[:3]])
                     db.add(deliberation)
-                    
-                    # Simulate Council decision (in production, this would be actual voting)
-                    # Decision options:
-                    # 1. LIQUIDATE: Cancel the task
-                    # 2. MODIFY_SCOPE: Update description and retry
-                    # 3. ALLOCATE_RESOURCES: Spawn additional agents
                     
                     decision = _simulate_council_decision(task)
                     
@@ -311,20 +282,16 @@ def handle_task_escalation():
                         result = "liquidated"
                         
                     elif decision == "modify_scope":
-                        # Modify task description and retry
                         task.description += "\n[Modified by Council after escalation]"
-                        task.retry_count = 0  # Reset retries
+                        task.retry_count = 0
                         task.error_count = 0
                         task.set_status(TaskStatus.IN_PROGRESS, "Council", "Scope modified, retrying")
                         result = "modified_and_retrying"
                         
                     elif decision == "allocate_resources":
-                        # Spawn additional agents (simulated)
                         task.set_status(TaskStatus.IN_PROGRESS, "Council", "Additional resources allocated")
-                        # In production: actually spawn new 3xxxx agents
                         result = "resources_allocated"
                     
-                    # Log the decision
                     AuditLog.log(
                         db=db,
                         level=AuditLevel.INFO,
@@ -369,38 +336,21 @@ def handle_task_escalation():
 
 
 def _simulate_council_decision(task: Task) -> str:
-    """
-    Simulate Council decision for escalated task.
-    In production, this would be actual democratic voting.
-    """
-    # Simple heuristic for demo:
-    # - If task has been retried many times, liquidate
-    # - If task is important (high priority), allocate resources
-    # - Otherwise, modify scope and retry
-    
     if task.retry_count >= task.max_retries:
         if task.priority in [TaskPriority.CRITICAL, TaskPriority.SOVEREIGN]:
             return "allocate_resources"
         else:
             return "liquidate"
-    
     return "modify_scope"
 
 
 # ═══════════════════════════════════════════════════════════
-# Data Retention & Sovereign Optimization (NEW)
+# Data Retention & Sovereign Optimization
 # ═══════════════════════════════════════════════════════════
 
 @celery_app.task
 def sovereign_data_retention():
-    """
-    Daily data retention and cleanup task.
-    - Delete completed tasks older than 30 days (preserving audit snapshots)
-    - Remove orphan embeddings from vector DB
-    - Compress execution logs
-    - Archive constitutional history
-    - Remove ethos of deleted agents
-    """
+    """Daily data retention and cleanup task."""
     with get_task_db() as db:
         try:
             results = {
@@ -413,7 +363,6 @@ def sovereign_data_retention():
             
             cutoff_date = datetime.utcnow() - timedelta(days=30)
             
-            # 1. Archive completed tasks older than 30 days
             old_tasks = db.query(Task).filter(
                 Task.status.in_([TaskStatus.COMPLETED, TaskStatus.CANCELLED, TaskStatus.FAILED]),
                 Task.completed_at < cutoff_date,
@@ -422,7 +371,6 @@ def sovereign_data_retention():
             
             for task in old_tasks:
                 try:
-                    # Create audit snapshot before soft-delete
                     AuditLog.log(
                         db=db,
                         level=AuditLevel.INFO,
@@ -435,75 +383,53 @@ def sovereign_data_retention():
                         before_state=task.to_dict(),
                         description=f"Task archived after 30 days: {task.agentium_id}"
                     )
-                    
-                    # Soft delete (mark inactive)
                     task.is_active = False
                     results["tasks_archived"] += 1
-                    
                 except Exception as e:
                     results["errors"].append(f"Failed to archive task {task.agentium_id}: {e}")
             
-            # 2. Remove orphan embeddings (those without active tasks)
             try:
                 from backend.core.vector_store import get_vector_store
                 vector_store = get_vector_store()
+                active_task_ids = [t.agentium_id for t in db.query(Task).filter(Task.is_active == True).all()]
                 
-                # Get all active task IDs
-                active_task_ids = [t.agentium_id for t in db.query(Task).filter(
-                    Task.is_active == True
-                ).all()]
-                
-                # Check staging collection for orphans
                 try:
                     staging = vector_store.get_collection("staging")
                     staging_docs = staging.get()
-                    
                     if staging_docs and staging_docs['ids']:
                         for doc_id, metadata in zip(staging_docs['ids'], staging_docs['metadatas']):
                             task_ref = metadata.get('submission_id', '') if metadata else ''
-                            # If referenced task doesn't exist or is inactive, remove embedding
                             if task_ref and not any(t.startswith(task_ref) for t in active_task_ids):
                                 staging.delete(ids=[doc_id])
                                 results["embeddings_removed"] += 1
                 except Exception as e:
                     results["errors"].append(f"Vector cleanup error: {e}")
-                    
             except Exception as e:
                 results["errors"].append(f"Vector store error: {e}")
             
-            # 3. Compress old execution logs (older than 90 days)
             log_cutoff = datetime.utcnow() - timedelta(days=90)
             old_logs = db.query(AuditLog).filter(
                 AuditLog.created_at < log_cutoff,
                 AuditLog.category == AuditCategory.GOVERNANCE
             ).limit(1000).all()
             
-            # Mark as compressed (in production, move to archive table)
             for log in old_logs:
                 if log.action_details is None:
                     log.action_details = {}
                 if isinstance(log.action_details, dict):
                     log.action_details['_compressed'] = True
-            
             results["logs_compressed"] = len(old_logs)
             
-            # 4. Remove ethos of deleted/inactive agents
             try:
-                inactive_agents = db.query(Agent).filter(
-                    Agent.is_active == False
-                ).all()
-                
+                inactive_agents = db.query(Agent).filter(Agent.is_active == False).all()
                 for agent in inactive_agents:
-                    # Clear ethos (stored as JSON field on Agent)
                     if hasattr(agent, 'ethos') and agent.ethos:
-                        agent.ethos = {}  # Or move to archive
+                        agent.ethos = {}
                         results["ethos_removed"] += 1
-                        
             except Exception as e:
                 results["errors"].append(f"Ethos cleanup error: {e}")
             
             db.commit()
-            
             logger.info(f"Data retention complete: {results}")
             return {
                 "status": "completed",
@@ -517,18 +443,14 @@ def sovereign_data_retention():
 
 
 # ═══════════════════════════════════════════════════════════
-# Auto-Scaling Governance (NEW)
+# Auto-Scaling Governance
 # ═══════════════════════════════════════════════════════════
 
 @celery_app.task
 def auto_scale_check():
-    """
-    Monitor queue depth and trigger auto-scaling if needed.
-    If pending tasks exceed threshold, request Council micro-vote to spawn agents.
-    """
+    """Monitor queue depth and trigger auto-scaling if needed."""
     with get_task_db() as db:
         try:
-            # Count pending tasks
             pending_count = db.query(Task).filter(
                 Task.status.in_([
                     TaskStatus.PENDING,
@@ -539,17 +461,14 @@ def auto_scale_check():
                 Task.is_active == True
             ).count()
             
-            threshold = 10  # Configurable threshold
+            threshold = 10
             
             if pending_count > threshold:
                 logger.info(f"Queue depth {pending_count} exceeds threshold {threshold}, requesting scaling")
                 
-                # Request Council micro-vote for scaling
-                # In production: actual vote, here we simulate approval
                 head = db.query(HeadOfCouncil).filter_by(agentium_id="00001").first()
                 
                 if head:
-                    # Log scaling decision
                     AuditLog.log(
                         db=db,
                         level=AuditLevel.INFO,
@@ -561,11 +480,10 @@ def auto_scale_check():
                         after_state={
                             "pending_count": pending_count,
                             "threshold": threshold,
-                            "recommended_agents": 3  # Spawn 3 new 3xxxx agents
+                            "recommended_agents": 3
                         }
                     )
                     
-                    # Spawn recommended_agents new task agents under the Head
                     recommended_agents = 3
                     spawned = 0
                     spawn_errors = []
@@ -603,15 +521,12 @@ def auto_scale_check():
 
 
 # ═══════════════════════════════════════════════════════════
-# Reasoning Recovery Watchdog (Gap 2)
+# Reasoning Recovery Watchdog
 # ═══════════════════════════════════════════════════════════
 
 @celery_app.task
 def check_stalled_reasoning():
-    """
-    Watchdog: detect stalled reasoning traces and re-queue their tasks.
-    Runs every 60 s via beat schedule.
-    """
+    """Watchdog: detect stalled reasoning traces and re-queue their tasks."""
     with get_task_db() as db:
         try:
             from backend.services.reasoning_trace_service import reasoning_trace_service
@@ -630,7 +545,6 @@ def check_stalled_reasoning():
                     results.append({"task_id": task_id, "action": "skipped_not_found"})
                     continue
 
-                # Cap re-queues: track in execution_context
                 exec_ctx = task.execution_context or {}
                 resume_count = exec_ctx.get("stalled_resume_count", 0)
                 if resume_count >= 3:
@@ -646,7 +560,6 @@ def check_stalled_reasoning():
                 task.execution_context = exec_ctx
                 db.commit()
 
-                # Re-queue the task for execution
                 execute_task_async.delay(task_id, agent_id)
                 logger.info(
                     f"check_stalled_reasoning: re-queued stalled task {task_id} "
@@ -671,10 +584,7 @@ def check_stalled_reasoning():
 
 @celery_app.task(bind=True, max_retries=3)
 def retry_channel_message(self, message_id: str, agent_id: str, content: str, rich_media_dict: Dict[str, Any] = None):
-    """
-    Retry sending a failed channel message.
-    Called by circuit breaker when initial send fails.
-    """
+    """Retry sending a failed channel message."""
     with get_task_db() as db:
         try:
             from backend.services.channel_manager import ChannelManager, circuit_breaker, RichMediaContent
@@ -817,7 +727,6 @@ def start_imap_receivers():
     from backend.services.channel_manager import imap_receiver
     
     with get_task_db() as db:
-        # Don't use joinedload - it can cause issues with NullPool in some SQLAlchemy versions
         email_channels = db.query(ExternalChannel).filter(
             ExternalChannel.channel_type == ChannelType.EMAIL,
             ExternalChannel.status == ChannelStatus.ACTIVE
@@ -825,7 +734,6 @@ def start_imap_receivers():
         
         channel_configs = []
         for channel in email_channels:
-            # Safely handle config that might be string or dict
             config = channel.config
             if isinstance(config, str):
                 try:
@@ -863,7 +771,6 @@ def start_imap_receivers():
 @celery_app.task
 def send_channel_heartbeat():
     """Send periodic heartbeat to all active channels."""
-    
     with get_task_db() as db:
         cutoff_time = datetime.utcnow() - timedelta(hours=24)
         
@@ -871,13 +778,9 @@ def send_channel_heartbeat():
             ExternalChannel.status == ChannelStatus.ACTIVE,
             ExternalChannel.last_message_at > cutoff_time
         ).all()
-        
-        channel_ids = [ch.id for ch in active_channels]  # kept for return value logging
 
         now = datetime.utcnow()
         heartbeats_sent = 0
-        # Iterate directly over the already-loaded objects — avoids N+1 queries
-        # that re-fetched each channel by ID in a loop.
         for channel in active_channels:
             try:
                 channel.updated_at = now
@@ -913,8 +816,6 @@ def broadcast_to_channels(channel_ids: list, message: str, agent_id: str):
                     status="pending"
                 )
                 db.add(test_msg)
-                # Flush to get test_msg.id without committing yet —
-                # a single commit after the loop is safer than one per channel.
                 db.flush()
 
                 success = ChannelManager.send_response(
@@ -938,9 +839,6 @@ def broadcast_to_channels(channel_ids: list, message: str, agent_id: str):
                     "error": str(e)
                 })
 
-        # Single commit for all channels — get_task_db() also auto-commits on
-        # clean exit, but being explicit here documents the intent.
-        # (get_task_db auto-commit is a no-op if already committed.)
         return {
             "total": len(channel_ids),
             "successful": sum(1 for r in results if r.get('success')),
@@ -955,14 +853,9 @@ def broadcast_to_channels(channel_ids: list, message: str, agent_id: str):
 
 @celery_app.task(name='backend.services.tasks.task_executor.check_escalation_timeouts')
 def check_escalation_timeouts():
-    """
-    Auto-escalation timer: finds IN_PROGRESS tasks whose
-    escalation_timeout_seconds has elapsed and escalates them.
-    """
     with get_task_db() as db:
         try:
             now = datetime.utcnow()
-            # Get all in-progress, non-idle tasks
             tasks = db.query(Task).filter(
                 Task.status == TaskStatus.IN_PROGRESS,
                 Task.is_idle_task == False,
@@ -978,9 +871,6 @@ def check_escalation_timeouts():
                 if elapsed > timeout:
                     try:
                         task.status = TaskStatus.ESCALATED
-                        # Reassign to a new list — SQLAlchemy does not detect in-place
-                        # mutations on JSON columns. flag_modified() ensures the ORM
-                        # marks the column dirty even if the object identity is the same.
                         new_history_entry = {
                             'from': TaskStatus.IN_PROGRESS.value,
                             'to': TaskStatus.ESCALATED.value,
@@ -1001,7 +891,6 @@ def check_escalation_timeouts():
 
             if escalated:
                 db.commit()
-                logger.info(f"⏰ Auto-escalation: {escalated} tasks escalated")
 
             return {"escalated": escalated, "checked": len(tasks)}
 
@@ -1012,16 +901,10 @@ def check_escalation_timeouts():
 
 @celery_app.task(name='backend.services.tasks.task_executor.process_dependency_graph')
 def process_dependency_graph():
-    """
-    Dependency graph processor: for each parent task with TaskDependency rows,
-    checks which child tasks are ready (all dependencies of lower order are
-    complete) and dispatches them.
-    """
     with get_task_db() as db:
         try:
             from backend.models.entities.task import TaskDependency
 
-            # Get all pending dependency records
             pending_deps = db.query(TaskDependency).filter(
                 TaskDependency.status == "pending",
             ).all()
@@ -1029,18 +912,15 @@ def process_dependency_graph():
             if not pending_deps:
                 return {"dispatched": 0}
 
-            # Group by parent task
             by_parent = {}
             for dep in pending_deps:
                 by_parent.setdefault(dep.parent_task_id, []).append(dep)
 
             dispatched = 0
             for parent_id, deps in by_parent.items():
-                # Sort by dependency_order
                 deps.sort(key=lambda d: d.dependency_order)
 
                 for dep in deps:
-                    # Check: all deps with lower order for this parent must be complete
                     lower_complete = db.query(TaskDependency).filter(
                         TaskDependency.parent_task_id == parent_id,
                         TaskDependency.dependency_order < dep.dependency_order,
@@ -1048,41 +928,26 @@ def process_dependency_graph():
                     ).count()
 
                     if lower_complete > 0:
-                        continue  # Dependencies not yet met
+                        continue
 
-                    # Check if child task is still pending
                     child = db.query(Task).filter_by(
                         id=dep.child_task_id, is_active=True
                     ).first()
 
                     if not child or child.status != TaskStatus.PENDING:
-                        # Already started or completed
                         if child and child.status in (TaskStatus.COMPLETED, TaskStatus.CANCELLED):
                             dep.status = "completed"
                         continue
 
-                    # Dispatch the child task
                     try:
                         child.status = TaskStatus.IN_PROGRESS
                         child.started_at = datetime.utcnow()
                         dep.status = "dispatched"
                         dispatched += 1
 
-                        # Actually queue the task for execution — previously this was
-                        # missing, leaving child tasks perpetually stuck in IN_PROGRESS
-                        # with no Celery worker ever picking them up.
                         assigned_agent_id = getattr(child, 'assigned_agent_id', None)
                         if assigned_agent_id:
                             execute_task_async.delay(child.agentium_id, assigned_agent_id)
-                            logger.info(
-                                f"📊 DAG: dispatched child task {child.agentium_id} "
-                                f"(order={dep.dependency_order}) for parent {parent_id}"
-                            )
-                        else:
-                            logger.warning(
-                                f"📊 DAG: child task {child.agentium_id} has no assigned_agent_id "
-                                f"— marked IN_PROGRESS but not queued for execution"
-                            )
                     except Exception as e:
                         logger.warning(f"Failed to dispatch child task: {e}")
 
@@ -1102,10 +967,6 @@ def process_dependency_graph():
 
 @celery_app.task(name='backend.services.tasks.task_executor.agent_heartbeat')
 def agent_heartbeat():
-    """
-    Heartbeat task: update last_heartbeat_at for all active/working agents.
-    Runs every 60 seconds via Celery beat.
-    """
     with get_task_db() as db:
         try:
             from backend.services.self_healing_service import SelfHealingService
@@ -1119,10 +980,6 @@ def agent_heartbeat():
 
 @celery_app.task(name='backend.services.tasks.task_executor.detect_crashed_agents')
 def detect_crashed_agents():
-    """
-    Crash detection: find agents with stale heartbeats and trigger recovery.
-    Runs every 30 seconds via Celery beat.
-    """
     with get_task_db() as db:
         try:
             from backend.services.self_healing_service import SelfHealingService
@@ -1132,8 +989,6 @@ def detect_crashed_agents():
                     f"🚨 Crash detection: {result['detected']} crashed, "
                     f"{result['recovered']} recovered"
                 )
-            
-            # Phase 13.2: Trigger degradation check after crash detection
             SelfHealingService.check_degradation_triggers(db)
             return result
         except Exception as e:
@@ -1143,18 +998,12 @@ def detect_crashed_agents():
 
 @celery_app.task(name='backend.services.tasks.task_executor.self_diagnostic_daily')
 def self_diagnostic_daily():
-    """
-    Daily self-diagnostic: check DB, Redis, ChromaDB, stale tasks.
-    Proposes constitutional amendment if repeated violations detected.
-    Runs once per day (86400s) via Celery beat.
-    """
     with get_task_db() as db:
         try:
             from backend.services.self_healing_service import SelfHealingService
             result = SelfHealingService.run_self_diagnostics(db)
             issues_count = len(result.get("issues", []))
-            is_healthy = issues_count == 0
-            health_str = "HEALTHY" if is_healthy else f"{issues_count} issue(s)"
+            health_str = "HEALTHY" if issues_count == 0 else f"{issues_count} issue(s)"
             logger.info(f"🔍 Self-diagnostic: {health_str}")
             return result
         except Exception as e:
@@ -1164,11 +1013,6 @@ def self_diagnostic_daily():
 
 @celery_app.task(name='backend.services.tasks.task_executor.critical_path_guardian')
 def critical_path_guardian():
-    """
-    Critical path protection: tag DAG ancestors of CRITICAL/SOVEREIGN tasks
-    and reserve agent slots for these chains.
-    Runs every 120 seconds via Celery beat.
-    """
     with get_task_db() as db:
         try:
             from backend.services.self_healing_service import SelfHealingService
@@ -1183,13 +1027,13 @@ def critical_path_guardian():
             logger.error(f"critical_path_guardian failed: {e}")
             return {"error": str(e)}
 
+
 # ═══════════════════════════════════════════════════════════
 # Phase 13.4 — Continuous Self-Improvement Engine
 # ═══════════════════════════════════════════════════════════
 
 @celery_app.task(name='backend.services.tasks.task_executor.knowledge_consolidation')
 def knowledge_consolidation():
-    """Weekly knowledge pruning and decay via AutonomousLearningEngine decay_outdated_learnings."""
     with get_task_db() as db:
         try:
             from backend.services.autonomous_learning import get_learning_engine
@@ -1198,9 +1042,9 @@ def knowledge_consolidation():
             logger.error(f"knowledge_consolidation failed: {e}")
             return {"error": str(e)}
 
+
 @celery_app.task(name='backend.services.tasks.task_executor.performance_optimization')
 def performance_optimization():
-    """Weekly task to query slow tasks and generate condensation suggestions."""
     with get_task_db() as db:
         try:
             from backend.services.self_improvement_service import self_improvement_service
@@ -1209,16 +1053,13 @@ def performance_optimization():
             logger.error(f"performance_optimization failed: {e}")
             return {"error": str(e)}
 
+
 # ═══════════════════════════════════════════════════════════
 # Phase 13.3 — Predictive Auto-Scaling Tasks
 # ═══════════════════════════════════════════════════════════
 
 @celery_app.task(name='backend.services.tasks.task_executor.metrics_snapshot')
 def metrics_snapshot():
-    """
-    Takes a snapshot of current system metrics for predictive scaling.
-    Runs every 5 minutes.
-    """
     with get_task_db() as db:
         try:
             from backend.services.predictive_scaling import predictive_scaling_service
@@ -1228,29 +1069,20 @@ def metrics_snapshot():
             logger.error(f"metrics_snapshot failed: {e}")
             return {"error": str(e)}
 
+
 @celery_app.task(name='backend.services.tasks.task_executor.predictive_scale')
 def predictive_scale():
-    """
-    Evaluates historical metrics to predict load and pre-spawn/liquidate agents.
-    Also enforces token budget and time-based policies.
-    Runs every 5 minutes.
-    """
     with get_task_db() as db:
         try:
             from backend.services.predictive_scaling import predictive_scaling_service
-            # 1. Evaluate token budget limits (may pause non-critical tasks)
             predictive_scaling_service.enforce_token_budget_guard(db)
-            
-            # 2. Get predictions based on moving averages
             predictions = predictive_scaling_service.get_predictions()
-            
-            # 3. Make pre-spawn or pre-liquidation decisions
             predictive_scaling_service.evaluate_scaling(db, predictions)
-            
             return {"status": "success", "predictions": predictions}
         except Exception as e:
             logger.error(f"predictive_scale failed: {e}")
             return {"error": str(e)}
+
 
 # ═══════════════════════════════════════════════════════════
 # Phase 13.6 — Intelligent Event Processing Tasks
@@ -1258,11 +1090,6 @@ def predictive_scale():
 
 @celery_app.task(name='backend.services.tasks.task_executor.threshold_event_check')
 def threshold_event_check():
-    """
-    Evaluate all active threshold triggers against live Redis metrics.
-    Fires actions when configured conditions are met.
-    Runs every 60 seconds via Celery beat.
-    """
     with get_task_db() as db:
         try:
             from backend.services.event_processor import EventProcessorService
@@ -1280,11 +1107,6 @@ def threshold_event_check():
 
 @celery_app.task(name='backend.services.tasks.task_executor.external_api_poll')
 def external_api_poll():
-    """
-    Poll all active api_poll triggers for data changes.
-    Fires actions when the response hash changes from the previous poll.
-    Runs every 60 seconds via Celery beat.
-    """
     with get_task_db() as db:
         try:
             from backend.services.event_processor import EventProcessorService
@@ -1306,20 +1128,12 @@ def external_api_poll():
 
 @celery_app.task(name='backend.services.tasks.task_executor.anomaly_detection')
 def anomaly_detection():
-    """
-    Anomaly detection: compute Z-scores for system metrics vs 7-day baseline.
-    Auto-remediates known failure patterns via MonitoringService.
-    Runs every 5 minutes via Celery beat.
-    """
     with get_task_db() as db:
         try:
             from backend.services.monitoring_service import MonitoringService
             result = MonitoringService.detect_anomalies(db)
             if result["anomalies_detected"] > 0:
-                logger.warning(
-                    f"🔍 Anomaly detection: {result['anomalies_detected']} anomalies found"
-                )
-                # Auto-remediate known patterns
+                logger.warning(f"🔍 Anomaly detection: {result['anomalies_detected']} anomalies found")
                 for anomaly in result["anomalies"]:
                     try:
                         fix_result = MonitoringService.auto_remediate(anomaly, db)
@@ -1330,7 +1144,6 @@ def anomaly_detection():
                             )
                     except Exception as e:
                         logger.error(f"Auto-remediation failed for {anomaly}: {e}")
-
             return result
         except Exception as e:
             logger.error(f"anomaly_detection failed: {e}")
@@ -1339,16 +1152,10 @@ def anomaly_detection():
 
 @celery_app.task(name='backend.services.tasks.task_executor.sla_monitor')
 def sla_monitor():
-    """
-    SLA monitor: track time-to-resolution per priority and broadcast
-    breach events.
-    Runs every 60 seconds via Celery beat.
-    """
     with get_task_db() as db:
         try:
             from backend.services.monitoring_service import MonitoringService
             result = MonitoringService.get_sla_metrics(db)
-            # Log any breaches
             for priority, data in result.get("sla_by_priority", {}).items():
                 if data.get("compliance_pct", 100) < 80.0 and data.get("total", 0) > 0:
                     logger.warning(
@@ -1360,18 +1167,13 @@ def sla_monitor():
             logger.error(f"sla_monitor failed: {e}")
             return {"error": str(e)}
 
+
 # ══════════════════════════════════════════════════════════════════════════════
 # Phase 16 — Wait & Poll
 # ══════════════════════════════════════════════════════════════════════════════
 
 @celery_app.task(name='backend.services.tasks.task_executor.poll_wait_conditions')
 def poll_wait_conditions():
-    """
-    Evaluate every ACTIVE WaitCondition and resume or expire parent tasks.
-
-    Runs every 30 seconds via Celery Beat.
-    Delegates all logic to WaitPollService so the Celery layer stays thin.
-    """
     with get_task_db() as db:
         try:
             from backend.services.wait_poll_service import WaitPollService
@@ -1383,13 +1185,13 @@ def poll_wait_conditions():
             logger.error(f"poll_wait_conditions failed: {exc}", exc_info=True)
             return {"error": str(exc)}
 
+
 # ══════════════════════════════════════════════════════════════════════════════
-# Phase 16.1 — Database Connection Pool Tuning & Slow Query Logging
+# Phase 16.1 — Slow Query Logging
 # ══════════════════════════════════════════════════════════════════════════════
 
 @celery_app.task(name='backend.services.tasks.task_executor.log_slow_query_summary_daily')
 def log_slow_query_summary_daily():
-    """Daily evaluation to parse slow queries and log to AuditLog."""
     with get_task_db() as db:
         try:
             from backend.services.slow_query_service import get_slow_queries, get_summary
@@ -1412,47 +1214,28 @@ def log_slow_query_summary_daily():
                         "top_slow_queries": [dataclasses.asdict(q) for q in queries]
                     }
                 )
-                logger.info(f"Logged slow query summary with {len(queries)} offending queries")
-            else:
-                logger.info("No slow queries > 500ms found for daily summary.")
-                
             return {
                 "status": "completed",
                 "queries_found": len(queries),
                 "summary": summary
             }
-
         except Exception as e:
             logger.error(f"Error in log_slow_query_summary_daily: {e}")
             return {"error": str(e)}
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# Phase 16.2 — Learning Decay for Outdated Knowledge Patterns
+# Phase 16.2 — Learning Decay
 # ══════════════════════════════════════════════════════════════════════════════
 
 @celery_app.task(name='backend.services.tasks.task_executor.decay_learnings')
 def decay_learnings():
-    """
-    Weekly exponential decay on knowledge entries in ChromaDB.
-
-    Phase 16.2: Applies ``decay_score = max(0.1, score × 0.95 ^ days)``
-    to all documents in ``task_patterns`` and ``best_practices`` whose
-    ``last_validated_at`` is older than 30 days.  Prunes entries whose
-    ``decay_score`` drops below 0.1.  Also runs the legacy Phase 10.4
-    flat confidence decay for backward compatibility.
-
-    Runs weekly (604800 s) via Celery Beat.
-    """
     with get_task_db() as db:
         try:
             from backend.services.autonomous_learning import get_learning_engine
             result = get_learning_engine().decay_outdated_learnings(db)
 
-            # Audit trail for observability
-            total_affected = (
-                result.get("decayed", 0) + result.get("pruned", 0)
-            )
+            total_affected = result.get("decayed", 0) + result.get("pruned", 0)
             if total_affected > 0:
                 AuditLog.log(
                     db=db,
@@ -1471,29 +1254,17 @@ def decay_learnings():
 
             logger.info(f"📉 Learning decay completed: {result}")
             return result
-
         except Exception as e:
             logger.error(f"decay_learnings failed: {e}")
             return {"error": str(e)}
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# Phase 16.3 — Cross-Document Citation Graph: Periodic Tasks
+# Phase 16.3 — Cross-Document Citation Graph
 # ══════════════════════════════════════════════════════════════════════════════
 
 @celery_app.task(name='backend.services.tasks.task_executor.update_citation_boosts')
 def update_citation_boosts():
-    """
-    Recompute citation_boost metadata for ChromaDB documents.
-
-    Phase 16.3: For each document in task_patterns, best_practices, and
-    council_memory collections, compute a boost multiplier based on how
-    often it has been cited in the citation_edges table.
-
-    Formula: min(1.3, 1.0 + 0.05 * citation_count)
-
-    Runs every 6 hours via Celery Beat.
-    """
     with get_task_db() as db:
         try:
             from backend.services.citation_graph_service import get_citation_graph_service
@@ -1501,15 +1272,7 @@ def update_citation_boosts():
 
             cg = get_citation_graph_service()
             vs = get_vector_store()
-
-            collections_to_boost = [
-                "constitution",
-                "ethos",
-                "task_patterns",
-                "best_practices",
-                "council_memory",
-            ]
-
+            collections_to_boost = ["constitution", "ethos", "task_patterns", "best_practices", "council_memory"]
             total_updated = 0
 
             for coll_key in collections_to_boost:
@@ -1518,62 +1281,34 @@ def update_citation_boosts():
                     existing = collection.get()
                     if not existing or not existing.get("ids"):
                         continue
-
                     doc_ids = existing["ids"]
                     boosts = cg.compute_citation_boost(db, doc_ids)
-
                     if not boosts:
                         continue
-
-                    # Update metadata in batches
                     ids_to_update = []
                     metas_to_update = []
-
                     for i, doc_id in enumerate(doc_ids):
                         if doc_id in boosts:
-                            meta = (
-                                existing["metadatas"][i]
-                                if existing.get("metadatas") and i < len(existing["metadatas"])
-                                else {}
-                            ) or {}
+                            meta = (existing["metadatas"][i] if existing.get("metadatas") and i < len(existing["metadatas"]) else {}) or {}
                             meta["citation_boost"] = round(boosts[doc_id], 4)
                             ids_to_update.append(doc_id)
                             metas_to_update.append(meta)
-
                     if ids_to_update:
-                        collection.update(
-                            ids=ids_to_update,
-                            metadatas=metas_to_update,
-                        )
+                        collection.update(ids=ids_to_update, metadatas=metas_to_update)
                         total_updated += len(ids_to_update)
-
                 except Exception as coll_exc:
-                    logger.debug(
-                        "Phase 16.3: boost update skipped for %s: %s",
-                        coll_key, coll_exc,
-                    )
+                    logger.debug("Phase 16.3: boost update skipped for %s: %s", coll_key, coll_exc)
 
             if total_updated > 0:
                 AuditLog.log(
-                    db=db,
-                    level=AuditLevel.INFO,
-                    category=AuditCategory.SYSTEM,
-                    actor_type="system",
-                    actor_id="CITATION_GRAPH",
+                    db=db, level=AuditLevel.INFO, category=AuditCategory.SYSTEM,
+                    actor_type="system", actor_id="CITATION_GRAPH",
                     action="citation_boost_update",
-                    description=(
-                        f"Phase 16.3: Updated citation_boost for "
-                        f"{total_updated} ChromaDB documents"
-                    ),
+                    description=f"Phase 16.3: Updated citation_boost for {total_updated} ChromaDB documents",
                     after_state={"updated": total_updated},
                 )
-
-            logger.info(
-                "📊 Citation boost update completed: %d documents updated",
-                total_updated,
-            )
+            logger.info("📊 Citation boost update completed: %d documents updated", total_updated)
             return {"updated": total_updated}
-
         except Exception as e:
             logger.error(f"update_citation_boosts failed: {e}")
             return {"error": str(e)}
@@ -1581,39 +1316,162 @@ def update_citation_boosts():
 
 @celery_app.task(name='backend.services.tasks.task_executor.cleanup_citation_edges')
 def cleanup_citation_edges():
-    """
-    Delete citation edges older than 90 days.
-
-    Phase 16.3: Retention cleanup to prevent unbounded table growth.
-    Runs weekly via Celery Beat.
-    """
     with get_task_db() as db:
         try:
             from backend.services.citation_graph_service import get_citation_graph_service
             cg = get_citation_graph_service()
             deleted = cg.cleanup_old_edges(db, retention_days=90)
-
             if deleted > 0:
                 AuditLog.log(
-                    db=db,
-                    level=AuditLevel.INFO,
-                    category=AuditCategory.SYSTEM,
-                    actor_type="system",
-                    actor_id="CITATION_GRAPH",
+                    db=db, level=AuditLevel.INFO, category=AuditCategory.SYSTEM,
+                    actor_type="system", actor_id="CITATION_GRAPH",
                     action="citation_edge_cleanup",
-                    description=(
-                        f"Phase 16.3: Cleaned up {deleted} citation edges "
-                        f"older than 90 days"
-                    ),
+                    description=f"Phase 16.3: Cleaned up {deleted} citation edges older than 90 days",
                     after_state={"deleted": deleted},
                 )
-
-            logger.info(
-                "🧹 Citation edge cleanup completed: %d edges removed",
-                deleted,
-            )
+            logger.info("🧹 Citation edge cleanup completed: %d edges removed", deleted)
             return {"deleted": deleted}
-
         except Exception as e:
             logger.error(f"cleanup_citation_edges failed: {e}")
             return {"error": str(e)}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Phase 17.1 — Suspicious Pattern Detection
+# ══════════════════════════════════════════════════════════════════════════════
+
+# Thresholds — tunable without code changes via env vars
+_BLOCK_THRESHOLD   = int(os.getenv("DDOS_BLOCK_THRESHOLD",   "100"))
+_BLOCK_TTL_SECONDS = int(os.getenv("DDOS_BLOCK_TTL_SECONDS", "3600"))
+
+
+@celery_app.task(
+    name="backend.services.tasks.task_executor.detect_suspicious_patterns",
+    bind=True,
+    max_retries=2,
+    default_retry_delay=30,
+    ignore_result=False,
+)
+def detect_suspicious_patterns(self):
+    """
+    Phase 17.1: Scan Redis 4xx weighted-sum counters and auto-block IPs that
+    exceed the abuse threshold within the 5-minute sliding window.
+
+    Strategy:
+    1. SCAN for all agentium:4xx:{ip}:wsum keys (non-blocking, cursor-based).
+    2. Pipeline-fetch all wsum values in a single round-trip.
+    3. Pipeline-write SET blocklist + DELETE counter keys for all abusers.
+    4. Bulk-insert AuditLog rows so every block decision is traceable.
+
+    Key design choices:
+    - SCAN instead of KEYS: safe on large keyspaces, non-blocking.
+    - Pipeline writes: all Redis operations in one round-trip.
+    - Counter reset after block: prevents the next cycle from re-blocking the
+      same IP based on stale data that has already been acted upon.
+    - Env-var thresholds: ops can tune without a code deploy.
+    """
+    import redis as redis_sync
+
+    redis_url = os.getenv("REDIS_URL", "redis://redis:6379/0")
+    r = redis_sync.from_url(redis_url, decode_responses=True)
+
+    blocked: list[str] = []
+
+    try:
+        # ── 1. SCAN for all weighted-sum keys ─────────────────────────────────
+        cursor = 0
+        candidates: list[tuple[str, float]] = []   # [(ip, weighted_score), ...]
+
+        while True:
+            cursor, keys = r.scan(cursor, match="agentium:4xx:*:wsum", count=200)
+
+            if keys:
+                # Pipeline: fetch all wsum values in one round-trip
+                pipe = r.pipeline(transaction=False)
+                for k in keys:
+                    pipe.get(k)
+                values = pipe.execute()
+
+                for key, raw in zip(keys, values):
+                    if raw is None:
+                        continue
+                    try:
+                        score = float(raw)
+                    except (ValueError, TypeError):
+                        continue
+
+                    if score >= _BLOCK_THRESHOLD:
+                        # key format: "agentium:4xx:{ip}:wsum"
+                        parts = key.split(":")
+                        if len(parts) >= 4:
+                            ip = parts[2]
+                            candidates.append((ip, score))
+
+            if cursor == 0:
+                break   # SCAN complete
+
+        # ── 2. Pipeline-write all blocks ──────────────────────────────────────
+        if candidates:
+            pipe = r.pipeline(transaction=False)
+            for ip, _score in candidates:
+                pipe.set(f"agentium:blocked:ips:{ip}", 1, ex=_BLOCK_TTL_SECONDS)
+                # Reset both keys so the next cycle starts from zero for this IP
+                pipe.delete(f"agentium:4xx:{ip}", f"agentium:4xx:{ip}:wsum")
+            pipe.execute()
+
+            blocked = [ip for ip, _ in candidates]
+
+            # ── 3. Audit log — bulk insert ─────────────────────────────────────
+            with get_task_db() as db:
+                now_ts = time.time()
+                db.bulk_save_objects([
+                    AuditLog(
+                        event_type="IP_AUTO_BLOCKED",
+                        level=AuditLevel.WARNING,
+                        category=AuditCategory.SECURITY,
+                        actor_type="system",
+                        actor_id="DDOS_DETECTOR",
+                        action="ip_auto_blocked",
+                        target_type="ip_address",
+                        target_id=ip,
+                        description=(
+                            f"Phase 17.1: Auto-blocked {ip} "
+                            f"(weighted 4xx score: {score:.1f}, "
+                            f"threshold: {_BLOCK_THRESHOLD}, "
+                            f"TTL: {_BLOCK_TTL_SECONDS}s)"
+                        ),
+                        after_state={
+                            "ip": ip,
+                            "weighted_score": score,
+                            "threshold": _BLOCK_THRESHOLD,
+                            "ttl_seconds": _BLOCK_TTL_SECONDS,
+                        },
+                        created_at=now_ts,
+                    )
+                    for ip, score in candidates
+                ])
+
+            logger.warning(
+                "Phase 17.1: auto-blocked %d IP(s): %s",
+                len(blocked),
+                ", ".join(blocked[:10]) + ("…" if len(blocked) > 10 else ""),
+            )
+
+        else:
+            logger.debug("Phase 17.1: detect_suspicious_patterns — no IPs over threshold")
+
+        return {
+            "blocked_ips": blocked,
+            "count": len(blocked),
+            "threshold": _BLOCK_THRESHOLD,
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+
+    except Exception as exc:
+        logger.error("detect_suspicious_patterns failed: %s", exc)
+        raise self.retry(exc=exc)
+    finally:
+        try:
+            r.close()
+        except Exception:
+            pass

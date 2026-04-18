@@ -8,11 +8,13 @@ from datetime import datetime, timezone
 from threading import Lock
 from time import time
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.orm import Session
 from typing import Optional
+
+from backend.core.rate_limit import limiter
 
 from backend.models.database import get_db
 from backend.core.auth import (
@@ -105,8 +107,10 @@ class ChangePasswordRequest(BaseModel):
 # ── Routes ────────────────────────────────────────────────────────────────────
 
 @router.post("/signup", response_model=SignupResponse)
+@limiter.limit("5/minute", error_message="Too many signup attempts. Please wait 60 s.")
 async def signup(
-    request: SignupRequest,
+    request: Request,
+    payload: SignupRequest,
     db: Session = Depends(get_db),
 ):
     """
@@ -114,8 +118,8 @@ async def signup(
     Creates a pending user account that requires admin approval.
     """
     existing_user = db.query(User).filter(
-        (User.username == request.username) |
-        (User.email == request.email)
+        (User.username == payload.username) |
+        (User.email == payload.email)
     ).first()
 
     if existing_user:
@@ -126,9 +130,9 @@ async def signup(
 
     user = User.create_user(
         db=db,
-        username=request.username,
-        email=request.email,
-        password=request.password,
+        username=payload.username,
+        email=payload.email,
+        password=payload.password,
     )
 
     # C1: db.add() so this entry is actually persisted.
@@ -136,12 +140,12 @@ async def signup(
         level=AuditLevel.INFO,
         category=AuditCategory.AUTHENTICATION,
         actor_type="user",
-        actor_id=request.username,
+        actor_id=payload.username,
         action="signup_request",
-        description=f"New user registered: {request.username} (pending approval)",
+        description=f"New user registered: {payload.username} (pending approval)",
         meta_data={
             "user_id": user.id,
-            "email": request.email,
+            "email": payload.email,
             "auto_approved": False,
         },
     )
@@ -170,8 +174,10 @@ def sovereign_request():
 
 
 @router.post("/login", response_model=LoginResponse)
+@limiter.limit("5/minute", error_message="Too many login attempts. Please wait 60 s.")
 async def login(
-    request: LoginRequest,
+    request: Request,
+    payload: LoginRequest,
     db: Session = Depends(get_db),
 ):
     """
@@ -181,21 +187,21 @@ async def login(
     # B3: enforce rate limit before any credential check so that enumeration
     #     and brute-force attempts are blocked regardless of whether the
     #     username exists.
-    _check_rate_limit(request.username)
+    _check_rate_limit(payload.username)
 
     # First try database authentication
-    user = User.authenticate(db, request.username, request.password)
+    user = User.authenticate(db, payload.username, payload.password)
     SOVEREIGN_REQUEST = sovereign_request()
 
     # Fallback to sovereign credentials for backward compatibility
     if not user:
-        if request.username in SOVEREIGN_REQUEST:
-            if SOVEREIGN_REQUEST[request.username] == request.password:
+        if payload.username in SOVEREIGN_REQUEST:
+            if SOVEREIGN_REQUEST[payload.username] == payload.password:
                 # Successful sovereign login — clear the rate-limit counter
-                _clear_rate_limit(request.username)
+                _clear_rate_limit(payload.username)
 
                 token_data = {
-                    "sub": request.username,
+                    "sub": payload.username,
                     "role": "sovereign",
                     "is_admin": True,
                     "is_active": True,
@@ -208,7 +214,7 @@ async def login(
                     level=AuditLevel.INFO,
                     category=AuditCategory.AUTHENTICATION,
                     actor_type="user",
-                    actor_id=request.username,
+                    actor_id=payload.username,
                     action="login_success",
                     description="Sovereign user logged in successfully",
                 )
@@ -220,7 +226,7 @@ async def login(
                     refresh_token=refresh_token,
                     token_type="bearer",
                     user={
-                        "username": request.username,
+                        "username": payload.username,
                         "role": "sovereign",
                         "is_admin": True,
                     },
@@ -231,7 +237,7 @@ async def login(
             level=AuditLevel.WARNING,
             category=AuditCategory.AUTHENTICATION,
             actor_type="user",
-            actor_id=request.username,
+            actor_id=payload.username,
             action="login_failed",
             description="Failed login attempt",
             success=False,
@@ -251,7 +257,7 @@ async def login(
             level=AuditLevel.WARNING,
             category=AuditCategory.AUTHENTICATION,
             actor_type="user",
-            actor_id=request.username,
+            actor_id=payload.username,
             action="login_failed_inactive",
             description="Login attempt on inactive/pending account",
             success=False,
@@ -270,7 +276,7 @@ async def login(
         )
 
     # Successful DB login — clear rate-limit counter for this username
-    _clear_rate_limit(request.username)
+    _clear_rate_limit(payload.username)
 
     # D3: Record the last login timestamp
     user.last_login_at = datetime.now(timezone.utc)
@@ -307,21 +313,23 @@ async def login(
 
 
 @router.post("/refresh", response_model=LoginResponse)
+@limiter.limit("5/minute", error_message="Too many token refresh attempts. Please wait.")
 async def refresh_token_endpoint(
-    request: RefreshRequest,
+    request: Request,
+    payload: RefreshRequest,
     db: Session = Depends(get_db),
 ):
     """Refresh access token using a valid refresh token."""
-    payload = verify_token(request.refresh_token)
+    token_payload = verify_token(payload.refresh_token)
 
-    if not payload or payload.get("type") != "refresh":
+    if not token_payload or token_payload.get("type") != "refresh":
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired refresh token",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    username = payload.get("sub")
+    username = token_payload.get("sub")
     if not username:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -330,10 +338,10 @@ async def refresh_token_endpoint(
 
     token_data = {
         "sub": username,
-        "user_id": payload.get("user_id"),
-        "role": payload.get("role", "user"),
-        "is_admin": payload.get("is_admin", False),
-        "is_active": payload.get("is_active", True),
+        "user_id": token_payload.get("user_id"),
+        "role": token_payload.get("role", "user"),
+        "is_admin": token_payload.get("is_admin", False),
+        "is_active": token_payload.get("is_active", True),
     }
 
     new_access_token  = create_access_token(token_data)
@@ -400,8 +408,10 @@ async def verify_token_endpoint(
 
 
 @router.post("/change-password")
+@limiter.limit("5/minute", error_message="Too many password change attempts. Please wait.")
 async def change_password(
-    request: ChangePasswordRequest,
+    request: Request,
+    payload: ChangePasswordRequest,
     current_user: dict = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
@@ -429,7 +439,7 @@ async def change_password(
             detail="User not found",
         )
 
-    if not User.verify_password(request.old_password, user.hashed_password):
+    if not User.verify_password(payload.old_password, user.hashed_password):
         # C1: persist failed audit, then raise
         audit_entry = AuditLog.log(
             level=AuditLevel.WARNING,
@@ -448,7 +458,7 @@ async def change_password(
             detail="Current password is incorrect",
         )
 
-    user.hashed_password = User.hash_password(request.new_password)
+    user.hashed_password = User.hash_password(payload.new_password)
     user.updated_at = datetime.now(timezone.utc)
 
     # C1: persist success audit in the same commit as the password change

@@ -663,12 +663,12 @@ Build a self-governing AI ecosystem where agents operate under constitutional la
 
 ### 17.1 Application-Layer DDoS Hardening
 
-- [ ] **Rate Limiting Enhancement** — move from IP-only rate limiting to layered limits: per-IP (existing), per-user (authenticated), per-endpoint category (auth endpoints stricter than read endpoints)
-- [ ] Add `slowapi` (or custom FastAPI middleware) for endpoint-specific limits: `POST /auth/*` → 5 req/min; `POST /tasks` → 30 req/min; general API → 200 req/min
-- [ ] **Payload Size Limits** — enforce max request body size (default 1 MB) via FastAPI middleware; separate larger limit for file upload endpoints
-- [ ] **Suspicious Pattern Detection** — Celery beat every 5 min: query request logs for IPs with > 100 4xx responses in 5 min → auto-add to Redis blocklist (`agentium:blocked:ips`) with 1 h TTL
-- [ ] Nginx config (`nginx.conf`): add `limit_req_zone` and `limit_conn_zone` directives as a first line of defense before FastAPI
-- [ ] `GET /admin/blocked-ips` — list currently blocked IPs with TTL; `DELETE /admin/blocked-ips/{ip}` — manual unblock
+- [x] **Rate Limiting Enhancement** — move from IP-only rate limiting to layered limits: per-IP (existing), per-user (authenticated), per-endpoint category (auth endpoints stricter than read endpoints)
+- [x] Add `slowapi` (or custom FastAPI middleware) for endpoint-specific limits: `POST /auth/*` → 5 req/min; `POST /tasks` → 30 req/min; general API → 200 req/min
+- [x] **Payload Size Limits** — enforce max request body size (default 1 MB) via FastAPI middleware; separate larger limit for file upload endpoints
+- [x] **Suspicious Pattern Detection** — Celery beat every 5 min: query request logs for IPs with > 100 4xx responses in 5 min → auto-add to Redis blocklist (`agentium:blocked:ips`) with 1 h TTL
+- [x] Nginx config (`nginx.conf`): add `limit_req_zone` and `limit_conn_zone` directives as a first line of defense before FastAPI
+- [x] `GET /admin/blocked-ips` — list currently blocked IPs with TTL; `DELETE /admin/blocked-ips/{ip}` — manual unblock
 
 ### 17.2 System-Wide UI Polish
 

@@ -209,6 +209,20 @@ celery_app.conf.beat_schedule = {
         'task': 'backend.celery_app.broadcast_channel_health',
         'schedule': 300.0,  # every 5 minutes — aligns with health-check-every-5-minutes
     },
+
+    # ── Phase 17.1: Application-Layer DDoS Hardening ──────────────────────────
+    # Queries the Redis 4xx weighted-sum counters written by ErrorCounterMiddleware.
+    # IPs whose weighted score exceeds BLOCK_THRESHOLD (100) within the 5-minute
+    # sliding window are auto-added to the blocklist with a 1-hour TTL and their
+    # block decision is written to AuditLog for traceability.
+    'suspicious-pattern-detection': {
+        'task': 'backend.services.tasks.task_executor.detect_suspicious_patterns',
+        'schedule': 300.0,   # every 5 minutes
+        'options': {
+            'queue': 'monitoring',   # isolate from business-logic queues
+            'expires': 280,          # drop if still queued after 280s (next cycle imminent)
+        },
+    },
 }
 
 
@@ -284,28 +298,6 @@ def broadcast_channel_health():
 
     Runs every 5 minutes via Celery Beat (co-scheduled with
     check_channel_health so the broadcast reflects freshly-updated metrics).
-
-    WebSocket payload:
-        {
-            "type":     "channel_health_update",
-            "channels": [
-                {
-                    "channel_id":       "<uuid>",
-                    "channel_name":     "<str>",
-                    "channel_type":     "<str>",
-                    "status":           "<str>",
-                    "health":           { ... },
-                    "rate_limit_status": { ... }
-                },
-                ...
-            ],
-            "count":     <int>,
-            "timestamp": "<ISO>"
-        }
-
-    Frontend subscribes to 'channel_health_update' in ChannelsPage and
-    invalidates the 'all-channel-metrics' React Query cache so the health
-    cards refresh without a full page reload.
     """
     import asyncio
     from datetime import datetime
@@ -373,7 +365,6 @@ def broadcast_channel_health():
                 loop.close()
 
         except Exception as exc:
-            # Non-fatal: frontend falls back to its 30 s refetchInterval
             logger.debug("[ChannelHealth] WebSocket broadcast skipped (non-fatal): %s", exc)
 
     except Exception as exc:
@@ -605,6 +596,7 @@ def on_worker_ready(**kwargs):
     print("   Task Execution Architecture: Governance Alignment active")
     print("   Phase 15.2: MCP stats broadcast registered (every 30s)")
     print("   Phase 15.3: Channel health broadcast registered (every 5m)")
+    print("   Phase 17.1: Suspicious pattern detection registered (every 5m)")
     print("   Federation tasks registered: deliver_federated_task, federation_heartbeat, "
           "federation_cleanup_stale, send_federation_result")
 
