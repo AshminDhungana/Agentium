@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { lifecycleService, BulkLiquidateDryRunResult, BulkLiquidateResult } from '../../services/agents';
-import { X, Trash2, AlertCircle, Loader2, Eye, CheckCircle2, SkipForward } from 'lucide-react';
+import { X, Trash2, AlertCircle, Eye, CheckCircle2, SkipForward } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 interface BulkLiquidateModalProps {
     onClose:   () => void;
@@ -127,7 +128,7 @@ export const BulkLiquidateModal: React.FC<BulkLiquidateModalProps> = ({
                                     className={`flex-1 px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-sm flex items-center justify-center gap-2`}
                                 >
                                     {isLoading
-                                        ? <><Loader2 className="w-4 h-4 animate-spin" /> Scanning…</>
+                                        ? <><LoadingSpinner size="sm" /> Scanning…</>
                                         : <><Eye className="w-4 h-4" /> Preview Idle Agents</>
                                     }
                                 </button>
@@ -223,7 +224,7 @@ export const BulkLiquidateModal: React.FC<BulkLiquidateModalProps> = ({
                                     className="flex-1 px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-sm flex items-center justify-center gap-2"
                                 >
                                     {isLoading
-                                        ? <><Loader2 className="w-4 h-4 animate-spin" /> Liquidating…</>
+                                        ? <><LoadingSpinner size="sm" /> Liquidating…</>
                                         : <><Trash2 className="w-4 h-4" /> Confirm Liquidation</>
                                     }
                                 </button>

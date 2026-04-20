@@ -6,8 +6,10 @@ import {
 import { 
     Activity, Cpu, Zap, Settings, TrendingUp, AlertCircle, PlayCircle, StopCircle 
 } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { showToast } from '@/hooks/useToast';
 import { useAuthStore } from '@/store/authStore';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { History } from 'lucide-react';
 
 // WebSocket subscription placeholder, relying on polling instead
 // import { useWebSocket } from '@/contexts/WebSocketContext';
@@ -74,7 +76,7 @@ export const ScalingDashboard: React.FC = () => {
 
     const handleOverride = async (action: 'spawn' | 'liquidate') => {
         if (!isAdmin) {
-            toast.error("Admin permissions required.");
+            showToast.error("Admin permissions required.");
             return;
         }
         setIsSubmitting(true);
@@ -84,10 +86,10 @@ export const ScalingDashboard: React.FC = () => {
                 count: overrideCount,
                 tier: overrideTier
             });
-            toast.success(`Manual ${action} initiated successfully.`);
+            showToast.success(`Manual ${action} initiated successfully.`);
             fetchData();
         } catch (error) {
-            toast.error(`Failed to execute ${action} override`);
+            showToast.error(`Failed to execute ${action} override`);
         } finally {
             setIsSubmitting(false);
         }
@@ -127,9 +129,8 @@ export const ScalingDashboard: React.FC = () => {
                 )}
             </div>
 
-            {/* KPI Cards */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="p-4 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
+                <div className="p-4 bg-white dark:bg-[#161b27] rounded-xl shadow-sm border border-gray-100 dark:border-[#1e2535] transition-colors duration-200">
                     <div className="flex items-center gap-3 mb-2">
                         <div className="p-2 bg-blue-100 dark:bg-blue-900/50 rounded-lg">
                             <Cpu className="text-blue-600 dark:text-blue-400 w-5 h-5" />
@@ -141,7 +142,7 @@ export const ScalingDashboard: React.FC = () => {
                     </div>
                 </div>
 
-                <div className="p-4 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
+                <div className="p-4 bg-white dark:bg-[#161b27] rounded-xl shadow-sm border border-gray-100 dark:border-[#1e2535] transition-colors duration-200">
                     <div className="flex items-center gap-3 mb-2">
                         <div className="p-2 bg-purple-100 dark:bg-purple-900/50 rounded-lg">
                             <Activity className="text-purple-600 dark:text-purple-400 w-5 h-5" />
@@ -153,7 +154,7 @@ export const ScalingDashboard: React.FC = () => {
                     </div>
                 </div>
 
-                <div className="p-4 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
+                <div className="p-4 bg-white dark:bg-[#161b27] rounded-xl shadow-sm border border-gray-100 dark:border-[#1e2535] transition-colors duration-200">
                     <div className="flex items-center gap-3 mb-2">
                         <div className="p-2 bg-yellow-100 dark:bg-yellow-900/50 rounded-lg">
                             <Zap className="text-yellow-600 dark:text-yellow-400 w-5 h-5" />
@@ -163,7 +164,7 @@ export const ScalingDashboard: React.FC = () => {
                     <div className="text-3xl font-bold text-gray-900 dark:text-white">
                         ${tokenSpend.toFixed(2)}
                     </div>
-                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 mt-2">
+                    <div className="w-full bg-gray-200 dark:bg-[#1e2535] rounded-full h-1.5 mt-2">
                         <div 
                             className={`h-1.5 rounded-full ${budgetPercentage > 80 ? 'bg-red-500' : 'bg-green-500'}`} 
                             style={{ width: `${budgetPercentage}%` }}
@@ -171,7 +172,7 @@ export const ScalingDashboard: React.FC = () => {
                     </div>
                 </div>
 
-                <div className="p-4 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
+                <div className="p-4 bg-white dark:bg-[#161b27] rounded-xl shadow-sm border border-gray-100 dark:border-[#1e2535] transition-colors duration-200">
                     <div className="flex items-center gap-3 mb-2">
                         <div className="p-2 bg-green-100 dark:bg-green-900/50 rounded-lg">
                             <Settings className="text-green-600 dark:text-green-400 w-5 h-5" />
@@ -186,7 +187,7 @@ export const ScalingDashboard: React.FC = () => {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Chart */}
-                <div className="lg:col-span-2 p-6 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
+                <div className="lg:col-span-2 p-6 bg-white dark:bg-[#161b27] rounded-xl shadow-sm border border-gray-100 dark:border-[#1e2535] transition-colors duration-200">
                     <h2 className="text-lg font-bold mb-4 text-gray-900 dark:text-white flex items-center gap-2">
                         Load Prediction Forward-Look
                     </h2>
@@ -228,7 +229,7 @@ export const ScalingDashboard: React.FC = () => {
                 </div>
 
                 {/* Manual Override Panel */}
-                <div className="p-6 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
+                <div className="p-6 bg-white dark:bg-[#161b27] rounded-xl shadow-sm border border-gray-100 dark:border-[#1e2535] transition-colors duration-200">
                     <h2 className="text-lg font-bold mb-4 text-gray-900 dark:text-white flex items-center gap-2">
                         Manual Override
                     </h2>
@@ -248,7 +249,7 @@ export const ScalingDashboard: React.FC = () => {
                                     max="20"
                                     value={overrideCount}
                                     onChange={(e) => setOverrideCount(Number(e.target.value))}
-                                    className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white"
+                                    className="w-full px-3 py-2 bg-gray-50 dark:bg-[#0f1117] border border-gray-300 dark:border-[#1e2535] rounded-lg focus:ring-2 focus:ring-blue-500/40 text-gray-900 dark:text-white transition-colors duration-200 focus:outline-none"
                                 />
                             </div>
                             <div>
@@ -258,7 +259,7 @@ export const ScalingDashboard: React.FC = () => {
                                 <select 
                                     value={overrideTier}
                                     onChange={(e) => setOverrideTier(Number(e.target.value))}
-                                    className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white"
+                                    className="w-full px-3 py-2 bg-gray-50 dark:bg-[#0f1117] border border-gray-300 dark:border-[#1e2535] rounded-lg focus:ring-2 focus:ring-blue-500/40 text-gray-900 dark:text-white transition-colors duration-200 focus:outline-none"
                                 >
                                     <option value={1}>Tier 1 (Critical)</option>
                                     <option value={2}>Tier 2 (High)</option>
@@ -266,7 +267,7 @@ export const ScalingDashboard: React.FC = () => {
                                 </select>
                             </div>
                             
-                            <div className="pt-4 grid grid-cols-2 gap-3 border-t border-gray-100 dark:border-gray-700">
+                            <div className="pt-4 grid grid-cols-2 gap-3 border-t border-gray-100 dark:border-[#1e2535]">
                                 <button
                                     onClick={() => handleOverride('spawn')}
                                     disabled={isSubmitting}
@@ -288,18 +289,20 @@ export const ScalingDashboard: React.FC = () => {
             </div>
 
             {/* History Timeline */}
-            <div className="p-6 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
+            <div className="p-6 bg-white dark:bg-[#161b27] rounded-xl shadow-sm border border-gray-100 dark:border-[#1e2535] transition-colors duration-200">
                 <h2 className="text-lg font-bold mb-4 text-gray-900 dark:text-white flex items-center gap-2">
                     Scaling Activity Log
                 </h2>
                 {history.length === 0 ? (
-                    <div className="text-gray-500 dark:text-gray-400 text-sm py-8 text-center bg-gray-50 dark:bg-gray-900/50 rounded-lg">
-                        No recent scaling events recorded.
-                    </div>
+                    <EmptyState
+                        icon={History}
+                        title="No scaling history"
+                        description="No recent scaling events recorded."
+                    />
                 ) : (
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm text-left">
-                            <thead className="text-xs text-gray-500 uppercase bg-gray-50 dark:bg-gray-900 dark:text-gray-400">
+                            <thead className="text-xs text-gray-500 uppercase bg-gray-50 dark:bg-[#0f1117]/50 dark:text-gray-400">
                                 <tr>
                                     <th className="px-4 py-3 rounded-tl-lg">Time</th>
                                     <th className="px-4 py-3">Action</th>
@@ -309,7 +312,7 @@ export const ScalingDashboard: React.FC = () => {
                             </thead>
                             <tbody>
                                 {history.map((event, i) => (
-                                    <tr key={i} className="border-b dark:border-gray-700 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                                    <tr key={i} className="border-b dark:border-[#1e2535] last:border-0 hover:bg-gray-50 dark:hover:bg-[#1e2535]/50 transition-colors">
                                         <td className="px-4 py-3 text-gray-500 dark:text-gray-400">
                                             {new Date(event.created_at).toLocaleString()}
                                         </td>
@@ -323,7 +326,7 @@ export const ScalingDashboard: React.FC = () => {
                                             <span className={`px-2 py-1 rounded text-xs font-medium ${
                                                 event.level?.toLowerCase() === 'info' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' :
                                                 event.level?.toLowerCase() === 'warning' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300' :
-                                                'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+                                                'bg-gray-100 text-gray-800 dark:bg-[#1e2535] dark:text-gray-300'
                                             }`}>
                                                 {event.level?.toUpperCase() || 'INFO'}
                                             </span>

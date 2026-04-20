@@ -4,14 +4,13 @@
  */
 
 import React, { useState, useCallback } from 'react';
-import toast from 'react-hot-toast';
+import { showToast } from '@/hooks/useToast';
 import {
     Upload,
     FileJson,
     AlertCircle,
     CheckCircle2,
     X,
-    Loader2,
     ShieldCheck,
     GitBranch,
     AlertTriangle,
@@ -24,6 +23,7 @@ import {
     ImportResult,
     ImportOptions,
 } from '../../services/checkpoints';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 // ─── Conflict Resolution Options ─────────────────────────────────────────────
 
@@ -104,7 +104,7 @@ export const CheckpointImportModal: React.FC<CheckpointImportModalProps> = ({
             setStep('validate');
             validateFile(droppedFile);
         } else {
-            toast.error('Please upload a valid JSON file');
+            showToast.error('Please upload a valid JSON file');
         }
     }, []);
 
@@ -116,7 +116,7 @@ export const CheckpointImportModal: React.FC<CheckpointImportModalProps> = ({
                 setStep('validate');
                 validateFile(selectedFile);
             } else {
-                toast.error('Please upload a valid JSON file');
+                showToast.error('Please upload a valid JSON file');
             }
         }
     }, []);
@@ -130,12 +130,12 @@ export const CheckpointImportModal: React.FC<CheckpointImportModalProps> = ({
             setValidation(result);
             
             if (result.valid) {
-                toast.success('Checkpoint validation passed');
+                showToast.success('Checkpoint validation passed');
             } else {
-                toast.error(`Validation failed: ${result.errors.join(', ')}`);
+                showToast.error(`Validation failed: ${result.errors.join(', ')}`);
             }
         } catch (err: any) {
-            toast.error(err?.response?.data?.detail || 'Validation failed');
+            showToast.error(err?.response?.data?.detail || 'Validation failed');
         } finally {
             setIsValidating(false);
         }
@@ -152,15 +152,15 @@ export const CheckpointImportModal: React.FC<CheckpointImportModalProps> = ({
             setImportResult(result);
             
             if (result.success) {
-                toast.success('Checkpoint imported successfully');
+                showToast.success('Checkpoint imported successfully');
                 setStep('complete');
                 onImportSuccess(result);
             } else {
-                toast.error('Import completed with conflicts');
+                showToast.error('Import completed with conflicts');
                 setStep('resolve');
             }
         } catch (err: any) {
-            toast.error(err?.response?.data?.detail || 'Import failed');
+            showToast.error(err?.response?.data?.detail || 'Import failed');
         } finally {
             setIsImporting(false);
         }
@@ -477,13 +477,13 @@ export const CheckpointImportModal: React.FC<CheckpointImportModalProps> = ({
                     <div className="flex items-center gap-2">
                         {isValidating && (
                             <>
-                                <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
+                                <LoadingSpinner size="sm" />
                                 <span className="text-xs text-slate-500">Validating...</span>
                             </>
                         )}
                         {isImporting && (
                             <>
-                                <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
+                                <LoadingSpinner size="sm" />
                                 <span className="text-xs text-slate-500">Importing...</span>
                             </>
                         )}
@@ -518,7 +518,7 @@ export const CheckpointImportModal: React.FC<CheckpointImportModalProps> = ({
                                 >
                                     {isImporting ? (
                                         <>
-                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                            <LoadingSpinner size="sm" />
                                             Importing...
                                         </>
                                     ) : (

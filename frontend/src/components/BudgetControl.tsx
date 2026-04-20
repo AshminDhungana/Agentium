@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Coins, DollarSign, Shield, AlertTriangle } from 'lucide-react';
 import { api } from '@/services/api';
 import { useAuthStore } from '@/store/authStore';
-import toast from 'react-hot-toast';
+import { showToast } from '@/hooks/useToast';
 
 interface BudgetStatus {
     current_limits: {
@@ -58,13 +58,13 @@ export default function BudgetControl() {
                 daily_cost_limit: parseFloat(costInput),
             });
             setSuccess(true);
-            toast.success('Budget updated successfully!');
+            showToast.success('Budget updated successfully!');
             await fetchBudget();
             setTimeout(() => setSuccess(false), 3000);
         } catch (error: any) {
             const msg = error.response?.data?.detail || 'Failed to update budget';
             setUpdateError(msg);
-            toast.error(msg);
+            showToast.error(msg);
         } finally {
             setLoading(false);
         }

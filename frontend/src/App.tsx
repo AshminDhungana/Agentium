@@ -12,8 +12,9 @@ import { LoginPage } from '@/pages/LoginPage';
 import { SignupPage } from '@/pages/SignupPage';
 import { SovereignRoute } from '@/components/SovereignRoute';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Shield, Loader2 } from 'lucide-react';
+import { Shield } from 'lucide-react';
 import { modelsApi } from '@/services/models';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 // ── Session key ───────────────────────────────────────────────────────────────
 // Marks that the model-redirect check has already fired for this login session.
@@ -110,7 +111,7 @@ function AppWithRedirect() {
                 position="top-right"
                 toastOptions={{
                     duration: 4000,
-                    className: 'dark:bg-gray-800 dark:text-white',
+                    className: 'dark:bg-[#161b27] dark:text-white border dark:border-[#1e2535]',
                     style: { background: '#1f2937', color: '#fff' },
                 }}
             />
@@ -189,12 +190,12 @@ const ABTestingPage    = lazy(() => import('@/pages/ABTestingPage').then(m => ({
 // Full-screen spinner shown while checkAuth() is in-flight on page load
 function AppLoader() {
   return (
-    <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+    <div className="min-h-screen bg-white dark:bg-[#0f1117] flex items-center justify-center">
       <div className="flex flex-col items-center gap-3">
         <div className="w-12 h-12 rounded-2xl bg-blue-600 flex items-center justify-center">
           <Shield className="w-6 h-6 text-white" />
         </div>
-        <Loader2 className="w-6 h-6 animate-spin text-blue-400" />
+        <LoadingSpinner size="md" />
       </div>
     </div>
   );

@@ -6,7 +6,6 @@ import React, { useState, useEffect } from 'react';
 import {
     AlertCircle,
     Check,
-    Loader2,
     Server,
     Key,
     Globe,
@@ -20,6 +19,7 @@ import {
 import { modelsApi } from '@/services/models';
 import { getProviderFormGradient, ProviderFormIcon } from '@/constants/providerMeta';
 import type { ModelConfig, ProviderInfo, ProviderType } from '@/types';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 // ─── Error helper ─────────────────────────────────────────────────────────────
 //
@@ -399,7 +399,7 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
                     {/* Provider grid */}
                     {isLoadingProviders ? (
                         <div className="flex items-center justify-center py-24" aria-live="polite" aria-busy="true">
-                            <Loader2 className="w-7 h-7 animate-spin text-blue-600 dark:text-blue-400" aria-hidden="true" />
+                            <LoadingSpinner size="md" />
                             <span className="ml-3 text-sm text-gray-500 dark:text-gray-400">Loading providers…</span>
                         </div>
                     ) : (
@@ -716,7 +716,7 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
                                         className="px-3 py-2.5 bg-blue-600 hover:bg-blue-700 dark:hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors duration-150 flex items-center gap-1.5 whitespace-nowrap shadow-sm"
                                     >
                                         {fetchingModels
-                                            ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+                                            ? <LoadingSpinner size="sm" />
                                             : <Download className="w-4 h-4" aria-hidden="true" />
                                         }
                                         {fetchingModels ? 'Fetching…' : 'Fetch'}
@@ -732,7 +732,7 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
                                         className="px-3 py-2.5 bg-blue-600 hover:bg-blue-700 dark:hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors duration-150 flex items-center gap-1.5 whitespace-nowrap shadow-sm"
                                     >
                                         {fetchingModels
-                                            ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+                                            ? <LoadingSpinner size="sm" />
                                             : <Download className="w-4 h-4" aria-hidden="true" />
                                         }
                                         {fetchingModels ? 'Fetching…' : 'Fetch'}
@@ -822,7 +822,7 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
                             className="w-full py-2.5 bg-gray-100 dark:bg-[#1e2535] hover:bg-gray-200 dark:hover:bg-[#2a3347] text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-[#2a3347] rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed"
                         >
                             {testing ? (
-                                <><Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />Testing Connection…</>
+                                <><LoadingSpinner size="sm" />Testing Connection…</>
                             ) : (
                                 <><TestTube className="w-4 h-4" aria-hidden="true" />Test Connection</>
                             )}
@@ -844,7 +844,7 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
                                 aria-label={initialConfig ? 'Update configuration' : 'Create configuration'}
                                 className="flex-1 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 dark:hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors duration-150 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm"
                             >
-                                {isLoading && <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />}
+                                {isLoading && <LoadingSpinner size="sm" />}
                                 {initialConfig ? 'Update Configuration' : 'Create Configuration'}
                             </button>
                         </div>

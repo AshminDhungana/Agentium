@@ -14,7 +14,7 @@ import {
     Info,
     Users,
 } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { showToast } from '@/hooks/useToast';
 import UserManagement from './Usermanagement';
 // C14: password strength logic extracted into a reusable hook
 import { usePasswordStrength } from '@/hooks/usePasswordStrength';
@@ -91,11 +91,11 @@ export function SettingsPage() {
         try {
             const success = await changePassword(data.currentPassword, data.newPassword);
             if (success) {
-                toast.success('Password changed successfully', { icon: '🔒', duration: 3000 });
+                showToast.success('Password changed successfully');
                 reset();
             } else {
                 const currentError = useAuthStore.getState().error;
-                toast.error(currentError || 'Failed to change password');
+                showToast.error(currentError || 'Failed to change password');
             }
         } catch (error: any) {
             let message = 'Failed to change password';
@@ -104,7 +104,7 @@ export function SettingsPage() {
                     ? error.response.data.detail.map((e: any) => e.msg).join(', ')
                     : String(error.response.data.detail);
             }
-            toast.error(message);
+            showToast.error(message);
         } finally {
             setIsSubmitting(false);
         }

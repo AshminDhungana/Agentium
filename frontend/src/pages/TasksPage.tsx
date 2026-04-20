@@ -63,7 +63,8 @@ import {
     Network,
     Monitor,
 } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { showToast } from '@/hooks/useToast';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { CheckpointTimeline } from '../components/checkpoints/CheckpointTimeline';
 import { BranchDiffView } from '../components/checkpoints/BranchDiffView';
 import { AutoDelegationPanel } from '../components/tasks/AutoDelegationPanel';
@@ -356,10 +357,10 @@ const CriticSummaryDots: React.FC<{ reviews: CritiqueReview[] }> = ({ reviews })
                     <div key={type} className="relative group flex items-center">
                         <span className={`w-2 h-2 rounded-full inline-block ${VERDICT_DOT_COLOR[verdict] ?? 'bg-gray-300'}`} />
                         <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:flex flex-col items-center z-20 pointer-events-none">
-                            <div className="bg-gray-900 dark:bg-gray-700 text-white text-[10px] rounded px-2 py-1 whitespace-nowrap shadow-lg">
+                            <div className="bg-gray-900 dark:bg-[#1e2535] text-white text-[10px] rounded px-2 py-1 whitespace-nowrap shadow-lg">
                                 {meta?.label ?? type}: {verdict}
                             </div>
-                            <div className="w-1.5 h-1.5 bg-gray-900 dark:bg-gray-700 rotate-45 -mt-0.5" />
+                            <div className="w-1.5 h-1.5 bg-gray-900 dark:bg-[#1e2535] rotate-45 -mt-0.5" />
                         </div>
                     </div>
                 );
@@ -665,7 +666,7 @@ const TaskSubtaskAccordion: React.FC<{ task: Task }> = ({ task }) => {
                 setExpanded(autoExpand);
                 autoExpand.forEach(id => loadReviewsForSubtask(id));
             })
-            .catch(() => toast.error('Failed to load subtasks'))
+            .catch(() => showToast.error('Failed to load subtasks'))
             .finally(() => setLoading(false));
     }, [task.id, loadReviewsForSubtask]);
 
@@ -837,9 +838,9 @@ const MainTaskCard: React.FC<{ task: Task; onUpdated?: (updated: Task) => void; 
             const updated = await tasksService.updateTask(task.id, payload);
             onUpdated?.(updated);
             setIsEditing(false);
-            toast.success('Task updated');
+            showToast.success('Task updated');
         } catch (err: any) {
-            toast.error(err?.response?.data?.detail ?? 'Failed to update task');
+            showToast.error(err?.response?.data?.detail ?? 'Failed to update task');
         } finally {
             setIsSaving(false);
         }
@@ -891,7 +892,7 @@ const MainTaskCard: React.FC<{ task: Task; onUpdated?: (updated: Task) => void; 
                                 <select
                                     value={editPriority}
                                     onChange={e => setEditPriority(e.target.value)}
-                                    className="text-xs font-semibold uppercase rounded px-2 py-0.5 border border-gray-300 dark:border-gray-600 bg-white dark:bg-[#1e2535] text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                    className="text-xs font-semibold uppercase rounded px-2 py-0.5 border border-gray-300 dark:border-[#2a3347] bg-white dark:bg-[#1e2535] text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-400"
                                 >
                                     {/* FIX 1: use module-scope constant */}
                                     {PRIORITY_OPTIONS_LIST.map(p => (
@@ -967,8 +968,8 @@ const MainTaskCard: React.FC<{ task: Task; onUpdated?: (updated: Task) => void; 
                                     <button
                                         onClick={() =>
                                             tasksService.retryTask(task.id)
-                                                .then(() => toast.success('Task queued for retry'))
-                                                .catch(() => toast.error('Retry failed'))
+                                                .then(() => showToast.success('Task queued for retry'))
+                                                .catch(() => showToast.error('Retry failed'))
                                         }
                                         className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-500/20 transition-colors"
                                     >
@@ -980,8 +981,8 @@ const MainTaskCard: React.FC<{ task: Task; onUpdated?: (updated: Task) => void; 
                                     <button
                                         onClick={() =>
                                             tasksService.escalateTask(task.id, 'Manual escalation')
-                                                .then(() => toast.success('Task escalated'))
-                                                .catch(() => toast.error('Escalation failed'))
+                                                .then(() => showToast.success('Task escalated'))
+                                                .catch(() => showToast.error('Escalation failed'))
                                         }
                                         className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-500/20 transition-colors"
                                     >
@@ -1214,7 +1215,7 @@ const PreferenceValueEditor: React.FC<{
                     className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                         value === true
                             ? 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400 border border-green-300 dark:border-green-500/30'
-                            : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
+                            : 'bg-gray-100 text-gray-600 dark:bg-[#1e2535] dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
                     }`}
                 >
                     Yes
@@ -1224,7 +1225,7 @@ const PreferenceValueEditor: React.FC<{
                     className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                         value === false
                             ? 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400 border border-red-300 dark:border-red-500/30'
-                            : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
+                            : 'bg-gray-100 text-gray-600 dark:bg-[#1e2535] dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
                     }`}
                 >
                     No
@@ -1247,8 +1248,8 @@ const PreferenceValueEditor: React.FC<{
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={handleKeyDown}
                 autoFocus
-                className="flex-1 px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg
-                    bg-white dark:bg-gray-700 text-gray-900 dark:text-white
+                className="flex-1 px-3 py-1.5 text-sm border border-gray-300 dark:border-[#2a3347] rounded-lg
+                    bg-white dark:bg-[#1e2535] text-gray-900 dark:text-white
                     focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                 placeholder={dataType === 'json' || dataType === 'array' ? 'Enter valid JSON...' : 'Enter value...'}
             />
@@ -1324,7 +1325,7 @@ const PreferenceCard: React.FC<{
                         <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
                             preference.editable
                                 ? 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400'
-                                : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'
+                                : 'bg-gray-100 text-gray-600 dark:bg-[#1e2535] dark:text-gray-400'
                         }`}>
                             {preference.editable ? 'Editable' : 'Read-only'}
                         </span>
@@ -1379,7 +1380,7 @@ const PreferenceCard: React.FC<{
                                     </button>
                                     <button
                                         onClick={() => setConfirmingDelete(false)}
-                                        className="px-2 py-1 text-[10px] font-medium rounded-md bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                                        className="px-2 py-1 text-[10px] font-medium rounded-md bg-gray-100 dark:bg-[#1e2535] text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
                                     >
                                         Cancel
                                     </button>
@@ -1410,7 +1411,7 @@ const PreferenceCard: React.FC<{
                 ) : (
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                            <code className="px-2 py-1 bg-gray-100 dark:bg-gray-800 rounded text-sm font-mono
+                            <code className="px-2 py-1 bg-gray-100 dark:bg-[#161b27] rounded text-sm font-mono
                                 text-gray-800 dark:text-gray-200">
                                 {formatPreferenceValue(preference.value, preference.data_type)}
                             </code>
@@ -1418,7 +1419,7 @@ const PreferenceCard: React.FC<{
                                       bg-${color}-100 interpolation which Tailwind purges in production builds */}
                             <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
                                 DATA_TYPE_BADGE_CLASSES[DATA_TYPE_LABELS[preference.data_type]?.color]
-                                    ?? 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'
+                                    ?? 'bg-gray-100 text-gray-600 dark:bg-[#1e2535] dark:text-gray-400'
                             }`}>
                                 {DATA_TYPE_LABELS[preference.data_type]?.label || preference.data_type}
                             </span>
@@ -1433,7 +1434,7 @@ const PreferenceCard: React.FC<{
             </div>
 
             {showHistory && (
-                <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
+                <div className="mt-3 pt-3 border-t border-gray-100 dark:border-[#1e2535]">
                     <h5 className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-1">
                         <History className="w-3 h-3" />
                         Recent Changes
@@ -1441,7 +1442,7 @@ const PreferenceCard: React.FC<{
                     {loadingHistory ? (
                         <div className="space-y-2">
                             {[...Array(2)].map((_, i) => (
-                                <div key={i} className="h-8 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />
+                                <div key={i} className="h-8 bg-gray-100 dark:bg-[#161b27] rounded animate-pulse" />
                             ))}
                         </div>
                     ) : history.length === 0 ? (
@@ -1524,10 +1525,10 @@ const PreferencesTab: React.FC = () => {
     const handleUpdate = async (key: string, value: any, reason?: string) => {
         try {
             await preferencesService.updatePreference(key, value);
-            toast.success('Preference updated');
+            showToast.success('Preference updated');
             loadPreferences();
         } catch (err: any) {
-            toast.error(err.response?.data?.detail || 'Failed to update preference');
+            showToast.error(err.response?.data?.detail || 'Failed to update preference');
         }
     };
 
@@ -1535,10 +1536,10 @@ const PreferencesTab: React.FC = () => {
     const handleDelete = async (key: string) => {
         try {
             await preferencesService.deletePreference(key);
-            toast.success('Preference deleted');
+            showToast.success('Preference deleted');
             loadPreferences();
         } catch (err: any) {
-            toast.error(err.response?.data?.detail || 'Failed to delete preference');
+            showToast.error(err.response?.data?.detail || 'Failed to delete preference');
         }
     };
 
@@ -1551,7 +1552,7 @@ const PreferencesTab: React.FC = () => {
                 category: newPref.category,
                 description: newPref.description,
             });
-            toast.success('Preference created');
+            showToast.success('Preference created');
             setShowCreateModal(false);
             setNewPref({
                 key: '',
@@ -1564,7 +1565,7 @@ const PreferencesTab: React.FC = () => {
             });
             loadPreferences();
         } catch (err: any) {
-            toast.error(err.response?.data?.detail || 'Failed to create preference');
+            showToast.error(err.response?.data?.detail || 'Failed to create preference');
         }
     };
 
@@ -1573,7 +1574,7 @@ const PreferencesTab: React.FC = () => {
             await preferencesService.admin.initializeSystem();
             loadPreferences();
         } catch (err: any) {
-            toast.error(err.response?.data?.detail || 'Failed to initialize defaults');
+            showToast.error(err.response?.data?.detail || 'Failed to initialize defaults');
         }
     };
 
@@ -1581,10 +1582,10 @@ const PreferencesTab: React.FC = () => {
         setOptimizing(true);
         try {
             await preferencesService.admin.optimize();
-            toast.success('Optimization complete');
+            showToast.success('Optimization complete');
             loadPreferences();
         } catch (err: any) {
-            toast.error(err.response?.data?.detail || 'Failed to optimize');
+            showToast.error(err.response?.data?.detail || 'Failed to optimize');
         } finally {
             setOptimizing(false);
         }
@@ -1629,7 +1630,7 @@ const PreferencesTab: React.FC = () => {
                     <button
                         onClick={loadDefaults}
                         className="px-3 py-2 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-400
-                            bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700
+                            bg-gray-100 dark:bg-[#161b27] hover:bg-gray-200 dark:hover:bg-gray-700
                             transition-colors flex items-center gap-1.5"
                     >
                         <Database className="w-4 h-4" />
@@ -1690,7 +1691,7 @@ const PreferencesTab: React.FC = () => {
 
             {/* Defaults Panel */}
             {showDefaults && (
-                <div className="bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                <div className="bg-gray-50 dark:bg-[#161b27]/50 border border-gray-200 dark:border-[#1e2535] rounded-lg p-4">
                     <div className="flex items-center justify-between mb-3">
                         <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">System Defaults</h3>
                         <button onClick={handleInitializeDefaults} className="text-xs text-blue-600 dark:text-blue-400 hover:underline">
@@ -1699,7 +1700,7 @@ const PreferencesTab: React.FC = () => {
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-xs">
                         {Object.entries(defaults).slice(0, 12).map(([key, value]) => (
-                            <div key={key} className="flex items-center gap-2 p-2 bg-white dark:bg-gray-700 rounded">
+                            <div key={key} className="flex items-center gap-2 p-2 bg-white dark:bg-[#1e2535] rounded">
                                 <code className="text-gray-600 dark:text-gray-400 truncate">{key}</code>
                                 <span className="text-gray-400">=</span>
                                 <code className="text-blue-600 dark:text-blue-400 truncate">
@@ -1724,7 +1725,7 @@ const PreferencesTab: React.FC = () => {
                     className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
                         categoryFilter === ''
                             ? 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400'
-                            : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+                            : 'bg-gray-100 text-gray-600 dark:bg-[#161b27] dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
                     }`}
                 >
                     All ({preferences.length})
@@ -1737,7 +1738,7 @@ const PreferencesTab: React.FC = () => {
                         className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors flex items-center gap-1 ${
                             categoryFilter === cat
                                 ? 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400'
-                                : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+                                : 'bg-gray-100 text-gray-600 dark:bg-[#161b27] dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
                         }`}
                     >
                         {CATEGORY_META[cat]?.icon && (
@@ -1766,7 +1767,7 @@ const PreferencesTab: React.FC = () => {
             {loading ? (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                     {[...Array(4)].map((_, i) => (
-                        <div key={i} className="h-32 rounded-lg bg-gray-100 dark:bg-gray-800 animate-pulse" />
+                        <div key={i} className="h-32 rounded-lg bg-gray-100 dark:bg-[#161b27] animate-pulse" />
                     ))}
                 </div>
             ) : filteredPreferences.length === 0 ? (
@@ -1813,8 +1814,8 @@ const PreferencesTab: React.FC = () => {
                                     value={newPref.key}
                                     onChange={(e) => setNewPref({ ...newPref, key: e.target.value })}
                                     placeholder="e.g., ui.custom_setting"
-                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
-                                        bg-white dark:bg-gray-700 text-gray-900 dark:text-white
+                                    className="w-full px-3 py-2 border border-gray-300 dark:border-[#2a3347] rounded-lg
+                                        bg-white dark:bg-[#1e2535] text-gray-900 dark:text-white
                                         focus:ring-2 focus:ring-blue-500 outline-none"
                                 />
                             </div>
@@ -1825,8 +1826,8 @@ const PreferencesTab: React.FC = () => {
                                     value={newPref.value}
                                     onChange={(e) => setNewPref({ ...newPref, value: e.target.value })}
                                     placeholder="Preference value"
-                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
-                                        bg-white dark:bg-gray-700 text-gray-900 dark:text-white
+                                    className="w-full px-3 py-2 border border-gray-300 dark:border-[#2a3347] rounded-lg
+                                        bg-white dark:bg-[#1e2535] text-gray-900 dark:text-white
                                         focus:ring-2 focus:ring-blue-500 outline-none"
                                 />
                             </div>
@@ -1836,8 +1837,8 @@ const PreferencesTab: React.FC = () => {
                                     <select aria-label="Category"
                                         value={newPref.category}
                                         onChange={(e) => setNewPref({ ...newPref, category: e.target.value })}
-                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
-                                            bg-white dark:bg-gray-700 text-gray-900 dark:text-white
+                                        className="w-full px-3 py-2 border border-gray-300 dark:border-[#2a3347] rounded-lg
+                                            bg-white dark:bg-[#1e2535] text-gray-900 dark:text-white
                                             focus:ring-2 focus:ring-blue-500 outline-none"
                                     >
                                         {PREFERENCE_CATEGORIES.map(cat => (
@@ -1850,8 +1851,8 @@ const PreferencesTab: React.FC = () => {
                                     <select aria-label="Data Type"
                                         value={newPref.dataType}
                                         onChange={(e) => setNewPref({ ...newPref, dataType: e.target.value })}
-                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
-                                            bg-white dark:bg-gray-700 text-gray-900 dark:text-white
+                                        className="w-full px-3 py-2 border border-gray-300 dark:border-[#2a3347] rounded-lg
+                                            bg-white dark:bg-[#1e2535] text-gray-900 dark:text-white
                                             focus:ring-2 focus:ring-blue-500 outline-none"
                                     >
                                         <option value="string">String</option>
@@ -1870,8 +1871,8 @@ const PreferencesTab: React.FC = () => {
                                     onChange={(e) => setNewPref({ ...newPref, description: e.target.value })}
                                     placeholder="Optional description..."
                                     rows={2}
-                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
-                                        bg-white dark:bg-gray-700 text-gray-900 dark:text-white
+                                    className="w-full px-3 py-2 border border-gray-300 dark:border-[#2a3347] rounded-lg
+                                        bg-white dark:bg-[#1e2535] text-gray-900 dark:text-white
                                         focus:ring-2 focus:ring-blue-500 outline-none resize-none"
                                 />
                             </div>
@@ -1932,7 +1933,7 @@ const CriticCard: React.FC<{ critic: CriticAgentStats }> = React.memo(({ critic 
                     </div>
                 </div>
                 <div className="flex flex-col items-end gap-1.5">
-                    <span className={`w-2 h-2 rounded-full ${isActive ? 'bg-green-400' : 'bg-gray-300 dark:bg-gray-600'}`} title={critic.status} />
+                    <span className={`w-2 h-2 rounded-full ${isActive ? 'bg-green-400' : 'bg-gray-300 dark:bg-[#2a3347]'}`} title={critic.status} />
                     {critic.preferred_review_model && (
                         <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${meta.badge}`}>
                             {critic.preferred_review_model.split(':')[1] ?? critic.preferred_review_model}
@@ -1996,7 +1997,7 @@ const CriticsTab: React.FC<{ onStatsLoaded?: (count: number) => void }> = ({ onS
             // FIX 11: surface the real count to the parent for the tab badge
             onStatsLoaded?.(data.total_critics);
         } catch {
-            toast.error('Failed to load critic stats');
+            showToast.error('Failed to load critic stats');
         } finally {
             setLoading(false);
             setRefreshing(false);
@@ -2014,7 +2015,7 @@ const CriticsTab: React.FC<{ onStatsLoaded?: (count: number) => void }> = ({ onS
             const data = await criticsService.getTaskReviews(inspectTask.trim());
             setInspectReviews(data.reviews ?? []);
         } catch {
-            toast.error('Failed to load reviews');
+            showToast.error('Failed to load reviews');
         } finally {
             setInspectLoading(false);
         }
@@ -2076,12 +2077,13 @@ const CriticsTab: React.FC<{ onStatsLoaded?: (count: number) => void }> = ({ onS
 
                 {/* critics is absent when all ephemeral instances have been terminated */}
                 {(stats.critics ?? []).length === 0 ? (
-                    <div className="bg-white dark:bg-[#161b27] rounded-xl border border-dashed border-gray-200 dark:border-[#2a3347] p-8 text-center">
-                        <ShieldCheck className="w-8 h-8 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
-                        <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">No active critic agents</p>
-                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                            Critics spawn per-task (7xxxx code · 8xxxx output · 9xxxx plan) and terminate on completion
-                        </p>
+                    <div className="bg-white dark:bg-[#161b27] rounded-xl border border-dashed border-gray-200 dark:border-[#2a3347] py-2">
+                        <EmptyState
+                            icon={ShieldCheck}
+                            title="No active critic agents"
+                            description="Critics spawn per-task (7xxxx code · 8xxxx output · 9xxxx plan) and terminate on completion"
+                            size="sm"
+                        />
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -2180,7 +2182,7 @@ export const TasksPage: React.FC = () => {
             setActiveCount(active.length);
         } catch (err) {
             console.error(err);
-            toast.error('Failed to load tasks');
+            showToast.error('Failed to load tasks');
         } finally {
             setIsLoading(false);
             setIsRefreshing(false);
@@ -2196,7 +2198,7 @@ export const TasksPage: React.FC = () => {
         };
         await tasksService.createTask(requestData);
         await loadTasks();
-        toast.success('Task created successfully');
+        showToast.success('Task created successfully');
     };
 
     const stats = {
@@ -2360,7 +2362,7 @@ export const TasksPage: React.FC = () => {
                                     title={hideSystem ? 'System tasks hidden — click to show' : 'System tasks visible — click to hide'}
                                     className={`px-3 py-1 rounded-full text-xs font-medium border transition-all duration-150 ${
                                         hideSystem
-                                            ? 'bg-gray-500 text-white border-gray-500 dark:bg-gray-600 dark:border-gray-600'
+                                            ? 'bg-gray-500 text-white border-gray-500 dark:bg-[#2a3347] dark:border-[#2a3347]'
                                             : 'bg-white dark:bg-[#161b27] text-gray-600 dark:text-gray-400 border-gray-200 dark:border-[#2a3347] hover:border-gray-300 dark:hover:border-[#3a4560]'
                                     }`}
                                 >
@@ -2383,25 +2385,13 @@ export const TasksPage: React.FC = () => {
                                     ))}
                                 </div>
                             ) : tasks.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center py-16 text-center">
-                                    <div className="w-14 h-14 rounded-xl bg-gray-100 dark:bg-[#1e2535] border border-gray-200 dark:border-[#2a3347] flex items-center justify-center mb-4">
-                                        <ListTodo className="w-6 h-6 text-gray-400 dark:text-gray-500" />
-                                    </div>
-                                    <p className="text-gray-900 dark:text-white font-medium mb-1">
-                                        {filterStatus ? `No ${filterStatus} tasks` : 'No tasks yet'}
-                                    </p>
-                                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
-                                        {filterStatus ? 'Try a different filter or create a new task' : 'Create your first task to get started'}
-                                    </p>
-                                    {!filterStatus && (
-                                        <button
-                                            onClick={() => setShowCreateModal(true)}
-                                            className="bg-blue-600 hover:bg-blue-700 dark:hover:bg-blue-500 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors duration-150 text-sm font-medium shadow-sm"
-                                        >
-                                            <Plus className="w-4 h-4" />
-                                            New Task
-                                        </button>
-                                    )}
+                                <div className="py-10">
+                                    <EmptyState
+                                        icon={ListTodo}
+                                        title={filterStatus ? `No ${filterStatus} tasks` : 'No tasks yet'}
+                                        description={filterStatus ? 'Try a different filter or create a new task' : 'Create your first task to get started'}
+                                        action={!filterStatus ? { label: 'New Task', onClick: () => setShowCreateModal(true) } : undefined}
+                                    />
                                 </div>
                             ) : (
                                 <div className="space-y-4">
@@ -2566,7 +2556,7 @@ export const TasksPage: React.FC = () => {
                         // Preserves scroll position, expanded cards, and active tab state.
                         setShowImportModal(false);
                         await loadTasks(true);
-                        toast.success('Checkpoint imported — task list refreshed');
+                        showToast.success('Checkpoint imported — task list refreshed');
                     }}
                 />
             )}

@@ -17,7 +17,7 @@
  */
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import toast from 'react-hot-toast';
+import { showToast } from '@/hooks/useToast';
 import { adminService, type User } from '@/services/admin';
 import { useAuthStore } from '@/store/authStore';
 
@@ -135,7 +135,7 @@ export function useUserManagement(
         } catch (err: any) {
             const msg = err?.response?.data?.detail ?? 'Failed to load users. Please try again.';
             setError(msg);
-            toast.error(msg);
+            showToast.error(msg);
         } finally {
             setLoading(false);
         }
@@ -168,21 +168,21 @@ export function useUserManagement(
     const handleApprove = useCallback(async (userId: string, username: string) => {
         try {
             await adminService.approveUser(userId);
-            toast.success(`${username} approved successfully`, { icon: '✅', duration: 3000 });
+            showToast.success(`${username} approved successfully`);
             await fetchUsers();
         } catch (err: any) {
-            toast.error(err?.response?.data?.detail ?? 'Failed to approve user');
+            showToast.error(err?.response?.data?.detail ?? 'Failed to approve user');
         }
     }, [fetchUsers]);
 
     const handleReject = useCallback(async (userId: string, username: string) => {
         try {
             await adminService.rejectUser(userId);
-            toast.success(`${username}'s request rejected`, { icon: '❌', duration: 3000 });
+            showToast.success(`${username}'s request rejected`);
             setConfirmingReject(prev => { const n = new Set(prev); n.delete(userId); return n; });
             await fetchUsers();
         } catch (err: any) {
-            toast.error(err?.response?.data?.detail ?? 'Failed to reject user');
+            showToast.error(err?.response?.data?.detail ?? 'Failed to reject user');
             setConfirmingReject(prev => { const n = new Set(prev); n.delete(userId); return n; });
         }
     }, [fetchUsers]);
@@ -190,16 +190,16 @@ export function useUserManagement(
     const handleDelete = useCallback(async (userId: string, username: string) => {
         // Guard: cannot delete own account
         if (currentUser?.id && userId === currentUser.id) {
-            toast.error('You cannot delete your own account');
+            showToast.error('You cannot delete your own account');
             return;
         }
         try {
             await adminService.deleteUser(userId);
-            toast.success(`${username} deleted successfully`);
+            showToast.success(`${username} deleted successfully`);
             setConfirmingDelete(prev => { const n = new Set(prev); n.delete(userId); return n; });
             await fetchUsers();
         } catch (err: any) {
-            toast.error(err?.response?.data?.detail ?? 'Failed to delete user');
+            showToast.error(err?.response?.data?.detail ?? 'Failed to delete user');
             setConfirmingDelete(prev => { const n = new Set(prev); n.delete(userId); return n; });
         }
     }, [fetchUsers, currentUser?.id]);
@@ -218,7 +218,7 @@ export function useUserManagement(
         setChangingRole(userId);
         try {
             await adminService.changeUserRole(userId, newRole);
-            toast.success(`Role updated for ${username}`, { icon: '🛡️', duration: 3000 });
+            showToast.success(`Role updated for ${username}`);
 
             // Optimistic update — no full refetch needed for a single field change
             setApprovedUsers(prev =>
@@ -233,7 +233,7 @@ export function useUserManagement(
             setRoleChangeSuccess(userId);
             setTimeout(() => setRoleChangeSuccess(s => s === userId ? null : s), 2000);
         } catch (err: any) {
-            toast.error(err?.response?.data?.detail ?? 'Failed to update role');
+            showToast.error(err?.response?.data?.detail ?? 'Failed to update role');
         } finally {
             setChangingRole(null);
         }
@@ -251,10 +251,10 @@ export function useUserManagement(
         setIsChangingPassword(true);
         try {
             await adminService.changeUserPassword(userId, newPassword);
-            toast.success(`Password changed for ${username}`, { icon: '🔐', duration: 3000 });
+            showToast.success(`Password changed for ${username}`);
             return true;
         } catch (err: any) {
-            toast.error(err?.response?.data?.detail ?? 'Failed to change password');
+            showToast.error(err?.response?.data?.detail ?? 'Failed to change password');
             return false;
         } finally {
             setIsChangingPassword(false);

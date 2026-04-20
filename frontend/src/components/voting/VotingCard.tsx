@@ -31,10 +31,10 @@ export function VotingCard({ item, isSelected, onClick, isAmendment }: VotingCar
     return (
         <div
             onClick={onClick}
-            className={`group bg-white dark:bg-gray-900 rounded-xl border transition-all duration-150 cursor-pointer p-5 ${
+            className={`group bg-white dark:bg-[#161b27] rounded-xl border transition-all duration-200 cursor-pointer p-5 ${
                 isSelected
                     ? 'border-blue-500 dark:border-blue-500 ring-1 ring-blue-500/30 shadow-md'
-                    : 'border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 hover:shadow-sm'
+                    : 'border-gray-200 dark:border-[#1e2535] hover:border-gray-300 dark:hover:border-[#2a3347] hover:shadow-sm'
             }`}
         >
             <div className="flex items-start justify-between gap-4">
@@ -90,7 +90,7 @@ export function VotingCard({ item, isSelected, onClick, isAmendment }: VotingCar
 
             {/* Mini tally bar */}
             <div className="mt-3">
-                <div className="relative h-1.5 rounded-full overflow-hidden bg-gray-100 dark:bg-gray-800">
+                <div className="relative h-1.5 rounded-full overflow-hidden bg-gray-100 dark:bg-[#1e2535]">
                     <div className="absolute inset-0 flex">
                         <div
                             className="bg-green-500"

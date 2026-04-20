@@ -1,9 +1,10 @@
 // src/pages/SignupPage.tsx
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { AlertCircle, Loader2, CheckCircle, ArrowLeft, Eye, EyeOff } from 'lucide-react';
+import { AlertCircle, CheckCircle, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
-import toast from 'react-hot-toast';
+import { showToast } from '@/hooks/useToast';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 export function SignupPage() {
     const [username, setUsername]               = useState('');
@@ -72,22 +73,19 @@ export function SignupPage() {
 
             if (result.success) {
                 setSuccess(true);
-                toast.success('Signup request submitted! Awaiting admin approval.', {
-                    duration: 4000,
-                    icon: '✅',
-                });
+                showToast.success('Signup request submitted! Awaiting admin approval.');
                 // B7: store ref so the cleanup effect can cancel this
                 redirectTimerRef.current = setTimeout(() => navigate('/login'), 3000);
             } else {
                 setError(result.message);
-                toast.error(result.message, { duration: 4000 });
+                showToast.error(result.message);
             }
         } catch {
             // authStore.signup() absorbs errors and returns them in result.message,
             // so this catch is a safety net for truly unexpected throws.
             const msg = 'An unexpected error occurred. Please try again.';
             setError(msg);
-            toast.error(msg, { duration: 4000 });
+            showToast.error(msg);
         } finally {
             setIsLoading(false);
         }
@@ -97,8 +95,8 @@ export function SignupPage() {
         return (
             <>
                 {/* Success Card */}
-                <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-8 text-center backdrop-blur-sm">
-                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/30 mb-4">
+                <div className="bg-white dark:bg-[#161b27] rounded-2xl shadow-xl border border-gray-200 dark:border-[#1e2535] p-8 text-center backdrop-blur-sm">
+                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 dark:bg-green-500/10 mb-4">
                         <CheckCircle className="w-8 h-8 text-green-600 dark:text-green-400" />
                     </div>
                     <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
@@ -119,7 +117,7 @@ export function SignupPage() {
     return (
         <>
             {/* Signup Card */}
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-8 backdrop-blur-sm">
+            <div className="bg-white dark:bg-[#161b27] rounded-2xl shadow-xl border border-gray-200 dark:border-[#1e2535] p-8 backdrop-blur-sm">
                 <div className="mb-6">
                     <Link
                         to="/login"
@@ -154,7 +152,7 @@ export function SignupPage() {
                             type="text"
                             value={username}
                             onChange={(e) => setUsername(e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all"
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-[#2a3347] rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-[#0f1117] text-gray-900 dark:text-white transition-all"
                             placeholder="Choose a username"
                             required
                             autoComplete="username"
@@ -178,7 +176,7 @@ export function SignupPage() {
                             type="email"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all"
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-[#2a3347] rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-[#0f1117] text-gray-900 dark:text-white transition-all"
                             placeholder="your.email@example.com"
                             required
                             autoComplete="email"
@@ -200,7 +198,7 @@ export function SignupPage() {
                                 type={showPassword ? 'text' : 'password'}
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
-                                className="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all"
+                                className="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-[#2a3347] rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-[#0f1117] text-gray-900 dark:text-white transition-all"
                                 placeholder="Choose a password"
                                 required
                                 autoComplete="new-password"
@@ -237,11 +235,11 @@ export function SignupPage() {
                                 type={showConfirmPassword ? 'text' : 'password'}
                                 value={confirmPassword}
                                 onChange={(e) => setConfirmPassword(e.target.value)}
-                                className={`w-full px-3 py-2 pr-10 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all ${
+                                className={`w-full px-3 py-2 pr-10 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-[#0f1117] text-gray-900 dark:text-white transition-all ${
                                     // B10: real-time visual cue on the confirm field border
                                     passwordsDoNotMatch
                                         ? 'border-red-400 dark:border-red-500'
-                                        : 'border-gray-300 dark:border-gray-600'
+                                        : 'border-gray-300 dark:border-[#2a3347]'
                                 }`}
                                 placeholder="Confirm your password"
                                 required
@@ -305,7 +303,7 @@ export function SignupPage() {
                     >
                         {isLoading ? (
                             <>
-                                <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+                                <LoadingSpinner size="sm" />
                                 Submitting Request...
                             </>
                         ) : (
@@ -314,7 +312,7 @@ export function SignupPage() {
                     </button>
                 </form>
 
-                <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+                <div className="mt-6 pt-6 border-t border-gray-200 dark:border-[#1e2535]">
                     <p className="text-sm text-center text-gray-600 dark:text-gray-400">
                         Already have an account?{' '}
                         <Link

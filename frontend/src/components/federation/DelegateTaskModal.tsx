@@ -5,8 +5,9 @@
 // The parent controls visibility by conditionally mounting this component.
 
 import { useState } from 'react';
-import { Send, Loader2, AlertCircle } from 'lucide-react';
+import { Send, AlertCircle } from 'lucide-react';
 import type { PeerInstance, DelegateTaskRequest } from '@/services/federation';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 
@@ -212,7 +213,7 @@ export function DelegateTaskModal({ peers, isSubmitting, onClose, onSubmit }: De
                         >
                             {isSubmitting ? (
                                 <>
-                                    <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+                                    <LoadingSpinner size="sm" />
                                     Delegating…
                                 </>
                             ) : (

@@ -9,11 +9,10 @@ import {
     AlertTriangle,
     CheckCircle,
     Send,
-    Loader2,
     Search,
     Activity,
 } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { showToast } from '@/hooks/useToast';
 import { useAuthStore } from '@/store/authStore';
 import {
     federationService,
@@ -29,6 +28,7 @@ import { getFedTaskStatusColors } from '@/utils/statusColors';
 import { PeerTable } from '@/components/federation/PeerTable';
 import { AddPeerModal } from '@/components/federation/AddPeerModal';
 import { DelegateTaskModal } from '@/components/federation/DelegateTaskModal';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 // ── Module-scope helpers (not recreated on every render) ──────────────────────
 
@@ -89,7 +89,7 @@ export function FederationPage() {
             setPeers(data);
         } catch (error: unknown) {
             console.error('Failed to fetch peers:', error);
-            toast.error(error instanceof Error ? error.message : 'Failed to load peers');
+            showToast.error(error instanceof Error ? error.message : 'Failed to load peers');
         } finally {
             setPeersLoading(false);
         }
@@ -102,7 +102,7 @@ export function FederationPage() {
             setTasks(data);
         } catch (error: unknown) {
             console.error('Failed to fetch tasks:', error);
-            toast.error(error instanceof Error ? error.message : 'Failed to load tasks');
+            showToast.error(error instanceof Error ? error.message : 'Failed to load tasks');
         } finally {
             setTasksLoading(false);
         }
@@ -115,11 +115,11 @@ export function FederationPage() {
         setSubmitting(true);
         try {
             await federationService.registerPeer(data);
-            toast.success(`Peer "${data.name}" registered successfully`);
+            showToast.success(`Peer "${data.name}" registered successfully`);
             setShowAddPeerModal(false);
             await fetchPeers();
         } catch (error: unknown) {
-            toast.error(error instanceof Error ? error.message : 'Failed to register peer');
+            showToast.error(error instanceof Error ? error.message : 'Failed to register peer');
         } finally {
             setSubmitting(false);
         }
@@ -131,11 +131,11 @@ export function FederationPage() {
         setSubmitting(true);
         try {
             await federationService.deletePeer(peerId);
-            toast.success(`Peer "${peerName}" removed successfully`);
+            showToast.success(`Peer "${peerName}" removed successfully`);
             setDeletingPeerId(null);
             await fetchPeers();
         } catch (error: unknown) {
-            toast.error(error instanceof Error ? error.message : 'Failed to remove peer');
+            showToast.error(error instanceof Error ? error.message : 'Failed to remove peer');
         } finally {
             setSubmitting(false);
         }
@@ -146,11 +146,11 @@ export function FederationPage() {
         const peerName = peers.find(p => p.id === peerId)?.name ?? peerId;
         try {
             await federationService.updatePeerTrust(peerId, trustLevel);
-            toast.success(`Trust level for "${peerName}" updated to ${trustLevel}`);
+            showToast.success(`Trust level for "${peerName}" updated to ${trustLevel}`);
             // Refresh to get the authoritative DB value
             await fetchPeers();
         } catch (error: unknown) {
-            toast.error(error instanceof Error ? error.message : 'Failed to update trust level');
+            showToast.error(error instanceof Error ? error.message : 'Failed to update trust level');
             // Re-fetch to revert optimistic UI if any
             await fetchPeers();
         }
@@ -161,11 +161,11 @@ export function FederationPage() {
         setSubmitting(true);
         try {
             const result = await federationService.delegateTask(data);
-            toast.success(`Task delegated successfully (ID: ${result.id})`);
+            showToast.success(`Task delegated successfully (ID: ${result.id})`);
             setShowDelegateTaskModal(false);
             await fetchTasks();
         } catch (error: unknown) {
-            toast.error(error instanceof Error ? error.message : 'Failed to delegate task');
+            showToast.error(error instanceof Error ? error.message : 'Failed to delegate task');
         } finally {
             setSubmitting(false);
         }
@@ -350,7 +350,7 @@ export function FederationPage() {
                                     className="px-4 py-2.5 border border-gray-200 dark:border-[#1e2535] rounded-lg text-sm font-medium text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-[#2a3347] hover:bg-gray-50 dark:hover:bg-[#1e2535] transition-all duration-150 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     {peersLoading
-                                        ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+                                        ? <LoadingSpinner size="sm" />
                                         : <RefreshCw className="w-4 h-4" aria-hidden="true" />
                                     }
                                     Refresh
@@ -413,7 +413,7 @@ export function FederationPage() {
                                     className="px-4 py-2.5 border border-gray-200 dark:border-[#1e2535] rounded-lg text-sm font-medium text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-[#2a3347] hover:bg-gray-50 dark:hover:bg-[#1e2535] transition-all duration-150 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     {tasksLoading
-                                        ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+                                        ? <LoadingSpinner size="sm" />
                                         : <RefreshCw className="w-4 h-4" aria-hidden="true" />
                                     }
                                     Refresh
@@ -435,7 +435,7 @@ export function FederationPage() {
                         <div className="bg-white dark:bg-[#161b27] rounded-xl border border-gray-200 dark:border-[#1e2535] shadow-sm dark:shadow-[0_2px_16px_rgba(0,0,0,0.25)] overflow-hidden transition-colors duration-200">
                             {tasksLoading ? (
                                 <div className="p-16 text-center">
-                                    <Loader2 className="w-8 h-8 animate-spin text-indigo-600 dark:text-indigo-400 mx-auto mb-4" aria-hidden="true" />
+                                    <LoadingSpinner size="lg" />
                                     <p className="text-sm text-gray-500 dark:text-gray-400">Loading tasks…</p>
                                 </div>
                             ) : tasks.length === 0 ? (

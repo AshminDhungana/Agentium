@@ -12,10 +12,12 @@ import { DragDropProvider } from '../context/DragDropContext';
 import { useWebSocketStore } from '@/store/websocketStore';
 import { VALID_AGENT_TYPES, AGENT_TYPE_LABELS, AGENT_TYPE_COLORS, isAgentWsEvent } from '../constants/agents';
 import {
-    LayoutGrid, List, Users, AlertCircle, Loader2, RefreshCw,
+    LayoutGrid, List, Users, AlertCircle, RefreshCw,
     BarChart2, ChevronLeft, ChevronRight as ChevronRightIcon,
 } from 'lucide-react';
-import { toast } from 'react-hot-toast';
+import { showToast } from '@/hooks/useToast';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -145,7 +147,7 @@ const ReassignModal: React.FC<ReassignModalProps> = ({
 
             {validating ? (
                 <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <LoadingSpinner size="xs" />
                     Validating capabilities…
                 </div>
             ) : validationError ? (
@@ -225,7 +227,7 @@ export const AgentsPage: React.FC = () => {
             dispatch({ type: 'SET_AGENTS', agents: (data || []).map(normalizeAgent) });
         } catch (err) {
             console.error('Failed to load agents:', err);
-            if (!silent) toast.error('Failed to load agents');
+            if (!silent) showToast.error('Failed to load agents');
             dispatch({ type: 'SET_LOADING',    value: false });
             dispatch({ type: 'SET_REFRESHING', value: false });
         }
@@ -240,7 +242,7 @@ export const AgentsPage: React.FC = () => {
             .catch(err => {
                 if (!cancelled) {
                     console.error('Failed to load agents:', err);
-                    toast.error('Failed to load agents');
+                    showToast.error('Failed to load agents');
                     dispatch({ type: 'SET_LOADING', value: false });
                 }
             });
@@ -387,7 +389,7 @@ export const AgentsPage: React.FC = () => {
                 description:        `${childType.replace(/_/g, ' ')} spawned via UI: ${name}`,
                 parent_agentium_id: spawnParent.agentium_id,
             });
-            toast.success('Agent spawned successfully');
+            showToast.success('Agent spawned successfully');
             await loadAgents(true);
         } catch (err) {
             dispatch({
@@ -419,7 +421,7 @@ export const AgentsPage: React.FC = () => {
 
         try {
             await agentsService.terminateAgent(terminateTarget.agentium_id, reason, authorizedById);
-            toast.success(`${terminateTarget.name} terminated`);
+            showToast.success(`${terminateTarget.name} terminated`);
             dispatch({ type: 'SET_TERMINATE_TARGET', agent: null });
             await loadAgents(true);
             setDashboardKey(k => k + 1);
@@ -441,7 +443,7 @@ export const AgentsPage: React.FC = () => {
             promoted_by_agentium_id: promotedByAgentiumId,
             reason,
         });
-        toast.success(`${promoteTarget.name} promoted to Lead Agent`);
+        showToast.success(`${promoteTarget.name} promoted to Lead Agent`);
         dispatch({ type: 'SET_PROMOTE_TARGET', agent: null });
         await loadAgents(true);
         setDashboardKey(k => k + 1);
@@ -452,7 +454,7 @@ export const AgentsPage: React.FC = () => {
     // ─────────────────────────────────────────────────────────────────────────
 
     const handleBulkLiquidateSuccess = async (count: number) => {
-        toast.success(`${count} idle agent${count !== 1 ? 's' : ''} liquidated`);
+        showToast.success(`${count} idle agent${count !== 1 ? 's' : ''} liquidated`);
         await loadAgents(true);
         setDashboardKey(k => k + 1);
     };
@@ -503,11 +505,11 @@ export const AgentsPage: React.FC = () => {
                 new_parent_id: newParent.agentium_id,
                 reason:        'Manual reassignment via drag-and-drop',
             });
-            toast.success(`${agent.name} moved under ${newParent.name}`);
+            showToast.success(`${agent.name} moved under ${newParent.name}`);
             await loadAgents(true);
         } catch (err: unknown) {
             const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-            toast.error(detail || 'Reassignment failed');
+            showToast.error(detail || 'Reassignment failed');
             await loadAgents(true);
         }
     };
@@ -617,20 +619,17 @@ export const AgentsPage: React.FC = () => {
 
                     {isLoading ? (
                         <div className="flex flex-col items-center justify-center h-40 gap-3 text-slate-400 dark:text-slate-500">
-                            <Loader2 className="w-6 h-6 animate-spin" />
-                            <span className="text-sm">Loading agents…</span>
+                            <LoadingSpinner size="md" label="Loading agents…" />
                         </div>
 
                     ) : agents.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center h-40 gap-3 text-slate-400 dark:text-slate-500">
-                            <Users className="w-10 h-10 opacity-30" />
-                            <div className="text-center">
-                                <p className="text-sm font-medium text-slate-600 dark:text-slate-400">No agents yet</p>
-                                <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
-                                    The system is not initialized. Spawn the Head of Council first.
-                                </p>
+                            <div className="max-w-md mx-auto pt-10">
+                                <EmptyState
+                                    icon={Users}
+                                    title="No agents yet"
+                                    description="The system is not initialized. Spawn the Head of Council first."
+                                />
                             </div>
-                        </div>
 
                     ) : viewMode === 'tree' ? (
                         headOfCouncil ? (

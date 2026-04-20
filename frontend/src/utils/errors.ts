@@ -17,7 +17,7 @@
  *
  * @example
  * } catch (err: unknown) {
- *   toast.error(getErrorMessage(err));
+ *   showToast.error(getErrorMessage(err));
  * }
  */
 export function getErrorMessage(err: unknown): string {

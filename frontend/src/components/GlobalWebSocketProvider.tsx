@@ -2,7 +2,7 @@
 import { useEffect } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { useWebSocketStore } from '@/store/websocketStore';
-import { Loader2 } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 export function GlobalWebSocketProvider({ children }: { children: React.ReactNode }) {
     const { user, isInitialized } = useAuthStore();
@@ -38,7 +38,7 @@ export function GlobalWebSocketProvider({ children }: { children: React.ReactNod
         <>
             {showBanner && (
                 <div className="fixed bottom-4 right-4 z-50 bg-amber-500/90 text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 animate-in fade-in slide-in-from-bottom-4 backdrop-blur-sm pointer-events-none">
-                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <LoadingSpinner size="md" />
                     <div>
                         <div className="text-sm font-semibold">Reconnecting to Server...</div>
                         {error && <div className="text-xs opacity-90 mt-0.5">{error}</div>}

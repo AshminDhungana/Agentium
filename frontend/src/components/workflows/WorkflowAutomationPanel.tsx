@@ -3,7 +3,7 @@ import { api } from '@/services/api';
 import { WorkflowBuilder } from './WorkflowBuilder';
 import { Button } from "@/components/ui/button";
 import { Plus, Play, Info, CheckCircle, Clock, AlertTriangle, XCircle, Search, Power } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { showToast } from '@/hooks/useToast';
 
 export const WorkflowAutomationPanel: React.FC = () => {
   const [workflows, setWorkflows] = useState<any[]>([]);
@@ -53,7 +53,7 @@ export const WorkflowAutomationPanel: React.FC = () => {
       const res = await api.get('/api/v1/workflows/');
       setWorkflows(res.data);
     } catch (e) {
-      toast.error('Failed to load workflows');
+      showToast.error('Failed to load workflows');
     } finally {
       setLoading(false);
     }
@@ -66,23 +66,23 @@ export const WorkflowAutomationPanel: React.FC = () => {
         template_json: template,
         schedule_cron: cron || undefined
       });
-      toast.success('Workflow created');
+      showToast.success('Workflow created');
       setView('list');
     } catch (e) {
-      toast.error('Failed to save workflow');
+      showToast.error('Failed to save workflow');
     }
   };
 
   const handleExecute = async (id: string) => {
     try {
       const res = await api.post(`/api/v1/workflows/${id}/execute`, { context: {} });
-      toast.success('Execution started');
+      showToast.success('Execution started');
       setSelectedWorkflowId(id);
       setExecutionId(res.data.id);
       setExecutionStatus(res.data);
       setView('executions');
     } catch (e) {
-      toast.error('Trigger failed');
+      showToast.error('Trigger failed');
     }
   };
 
@@ -104,7 +104,7 @@ export const WorkflowAutomationPanel: React.FC = () => {
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Button variant="ghost" onClick={() => setView('list')} className="text-gray-500 dark:text-gray-400 px-2 py-1 h-auto text-xs border border-gray-200 dark:border-gray-700">Back</Button>
+            <Button variant="ghost" onClick={() => setView('list')} className="text-gray-500 dark:text-gray-400 px-2 py-1 h-auto text-xs border border-gray-200 dark:border-[#1e2535]">Back</Button>
             <h2 className="text-xl font-bold text-gray-900 dark:text-white">Live Execution: <span className="text-indigo-400 font-mono text-lg">{executionId?.split('-')[0]}</span></h2>
           </div>
           <div className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${

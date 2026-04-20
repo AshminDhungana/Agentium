@@ -9,7 +9,6 @@ import {
     Plus,
     Trash2,
     RefreshCw,
-    Loader2,
     UserPlus,
     Search,
     Crown,
@@ -21,10 +20,11 @@ import {
     XCircle,
     ScrollText,
 } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { showToast } from '@/hooks/useToast';
 import { useAuthStore } from '@/store/authStore';
 import { rbacService, Delegation, RBACUser } from '@/services/rbac';
 import { AuditTrailTab } from '@/components/rbac/AuditTrailTab';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -199,7 +199,7 @@ function RBACManagementInner() {
             setDelegations(resolvedUsers.flatMap((u) => u.active_delegations ?? []));
         } catch (error) {
             console.error('Failed to fetch RBAC data:', error);
-            toast.error('Failed to load RBAC data');
+            showToast.error('Failed to load RBAC data');
         } finally {
             setLoading(false);
         }
@@ -218,7 +218,7 @@ function RBACManagementInner() {
                 delegationReason || undefined,
                 delegationExpiry || undefined,
             );
-            toast.success('Capability delegated successfully');
+            showToast.success('Capability delegated successfully');
             setShowDelegateModal(false);
             setSelectedGrantee('');
             setSelectedCapabilities([]);
@@ -226,7 +226,7 @@ function RBACManagementInner() {
             setDelegationExpiry('');
             fetchData();
         } catch (error: any) {
-            toast.error(error.response?.data?.detail || 'Failed to delegate capability');
+            showToast.error(error.response?.data?.detail || 'Failed to delegate capability');
         } finally {
             setDelegating(false);
         }
@@ -243,10 +243,10 @@ function RBACManagementInner() {
         setRevokingId(delegationId);
         try {
             await rbacService.revokeDelegation(delegationId);
-            toast.success('Delegation revoked');
+            showToast.success('Delegation revoked');
             fetchData();
         } catch (error: any) {
-            toast.error(error.response?.data?.detail || 'Failed to revoke delegation');
+            showToast.error(error.response?.data?.detail || 'Failed to revoke delegation');
         } finally {
             setRevokingId(null);
         }
@@ -387,7 +387,7 @@ function RBACManagementInner() {
                         <div className="bg-white dark:bg-[#161b27] rounded-xl border border-gray-200 dark:border-[#1e2535] shadow-sm dark:shadow-[0_2px_16px_rgba(0,0,0,0.25)] overflow-hidden transition-colors duration-200">
                             {loading ? (
                                 <div className="p-16 text-center">
-                                    <Loader2 className="w-8 h-8 animate-spin text-purple-600 dark:text-purple-400 mx-auto mb-4" />
+                                    <LoadingSpinner size="lg" />
                                     <p className="text-sm text-gray-500 dark:text-gray-400">
                                         Loading users...
                                     </p>
@@ -568,7 +568,7 @@ function RBACManagementInner() {
                                                                     className="px-2.5 py-1 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-xs font-medium rounded-lg transition-colors duration-150 flex items-center gap-1"
                                                                 >
                                                                     {revokingId === delegation.id && (
-                                                                        <Loader2 className="w-3 h-3 animate-spin" />
+                                                                        <LoadingSpinner size="xs" />
                                                                     )}
                                                                     Yes, revoke
                                                                 </button>
@@ -807,7 +807,7 @@ function RBACManagementInner() {
                                     className="flex-1 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 dark:hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors duration-150 shadow-sm flex items-center justify-center gap-2"
                                 >
                                     {delegating && (
-                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                        <LoadingSpinner size="sm" />
                                     )}
                                     Delegate
                                 </button>

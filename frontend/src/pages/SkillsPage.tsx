@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import toast from 'react-hot-toast';
+import { showToast } from '@/hooks/useToast';
 import { skillsApi, Skill, SkillSearchResult } from '../services/skills';
 import { 
   Search, BookOpen, Tag, BarChart3, CheckCircle, Plus, Trash2, 
-  Edit3, X, Save, AlertTriangle, Code2, Layers, Cpu, Loader2,
-  ChevronDown, ChevronUp, MoreVertical, RefreshCw, Network
+  Edit3, X, Save, AlertTriangle, Code2, Layers, Cpu, ChevronDown, ChevronUp, MoreVertical, RefreshCw, Network
 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { CitationGraph } from '@/components/knowledge/CitationGraph';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 // Extended skill interface for creation
 interface SkillFormData {
@@ -140,10 +140,10 @@ export const SkillsPage: React.FC = () => {
       setFormData(INITIAL_FORM_DATA);
       loadPopularSkills();
       loadMySubmissions();
-      toast.success(canAutoVerify ? 'Skill created and verified!' : 'Skill submitted for review.');
+      showToast.success(canAutoVerify ? 'Skill created and verified!' : 'Skill submitted for review.');
     } catch (error) {
       console.error('Failed to create skill:', error);
-      toast.error('Failed to create skill. Please check all required fields.');
+      showToast.error('Failed to create skill. Please check all required fields.');
     } finally {
       setSubmitting(false);
     }
@@ -171,10 +171,10 @@ export const SkillsPage: React.FC = () => {
       loadPopularSkills();
       loadMySubmissions();
       clearSearch();
-      toast.success('Skill updated successfully.');
+      showToast.success('Skill updated successfully.');
     } catch (error) {
       console.error('Failed to update skill:', error);
-      toast.error('Failed to update skill.');
+      showToast.error('Failed to update skill.');
     } finally {
       setSubmitting(false);
     }
@@ -187,10 +187,10 @@ export const SkillsPage: React.FC = () => {
       loadPopularSkills();
       loadMySubmissions();
       clearSearch();
-      toast.success('Skill deleted.');
+      showToast.success('Skill deleted.');
     } catch (error) {
       console.error('Failed to delete skill:', error);
-      toast.error('Failed to delete skill. You may not have permission.');
+      showToast.error('Failed to delete skill. You may not have permission.');
     }
   };
 
@@ -353,7 +353,7 @@ export const SkillsPage: React.FC = () => {
                 disabled={loading || !query.trim()}
                 className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 dark:hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm"
               >
-                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                {loading ? <LoadingSpinner size="sm" /> : <Search className="w-4 h-4" />}
                 Search
               </button>
               {results.length > 0 && (
@@ -852,7 +852,7 @@ export const SkillsPage: React.FC = () => {
                     disabled={submitting || !formData.display_name || !formData.description || formData.steps.filter(s => s.trim()).length === 0}
                     className="flex items-center gap-2 px-6 py-2 bg-blue-600 hover:bg-blue-700 dark:hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
                   >
-                    {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                    {submitting ? <LoadingSpinner size="sm" /> : <Save className="w-4 h-4" />}
                     Update Skill
                   </button>
                 ) : (
@@ -863,7 +863,7 @@ export const SkillsPage: React.FC = () => {
                         disabled={submitting || !formData.display_name || !formData.description || formData.steps.filter(s => s.trim()).length === 0}
                         className="flex items-center gap-2 px-4 py-2 bg-gray-200 dark:bg-[#2a3347] text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-[#3a4357] rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Submit for Review'}
+                        {submitting ? <LoadingSpinner size="sm" /> : 'Submit for Review'}
                       </button>
                     )}
                     <button
@@ -871,7 +871,7 @@ export const SkillsPage: React.FC = () => {
                       disabled={submitting || !formData.display_name || !formData.description || formData.steps.filter(s => s.trim()).length === 0}
                       className="flex items-center gap-2 px-6 py-2 bg-blue-600 hover:bg-blue-700 dark:hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
                     >
-                      {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                      {submitting ? <LoadingSpinner size="sm" /> : <Save className="w-4 h-4" />}
                       {canAutoVerify ? 'Create & Verify' : 'Create Skill'}
                     </button>
                   </div>

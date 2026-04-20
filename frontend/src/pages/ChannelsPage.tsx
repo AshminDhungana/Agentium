@@ -30,7 +30,6 @@ import {
     RefreshCw,
     Trash2,
     ChevronRight,
-    Loader2,
     X,
     Copy,
     CheckCircle,
@@ -46,9 +45,11 @@ import {
     SlidersHorizontal,
 } from 'lucide-react';
 import { format } from 'date-fns';
-import toast from 'react-hot-toast';
+import { showToast } from '@/hooks/useToast';
 import { QRCodeSVG } from 'qrcode.react';
 import { useNavigate } from 'react-router-dom';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { EmptyState } from '@/components/ui/EmptyState';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // MODAL STATE — useReducer replaces 6 scattered useState hooks (#10)
@@ -111,13 +112,13 @@ function ChannelMetricsSection({ channelId, metricsData, isLoading }: ChannelMet
     const resetMutation = useMutation({
         mutationFn: () => channelMetricsApi.resetChannel(channelId),
         onSuccess: () => {
-            toast.success('Channel reset successfully');
+            showToast.success('Channel reset successfully');
             setConfirmingReset(false);
             // Invalidate the shared batched query (#3)
             queryClient.invalidateQueries({ queryKey: ['all-channel-metrics'] });
         },
         onError: () => {
-            toast.error('Failed to reset channel');
+            showToast.error('Failed to reset channel');
             setConfirmingReset(false);
         },
     });
@@ -126,7 +127,7 @@ function ChannelMetricsSection({ channelId, metricsData, isLoading }: ChannelMet
         return (
             <div className="pt-4 border-t border-gray-100 dark:border-[#1e2535]">
                 <div className="flex items-center gap-2 text-sm text-gray-500">
-                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <LoadingSpinner size="sm" />
                     Loading health metrics...
                 </div>
             </div>
@@ -175,7 +176,7 @@ function ChannelMetricsSection({ channelId, metricsData, isLoading }: ChannelMet
                                     disabled={resetMutation.isPending}
                                     className="text-xs px-2 py-0.5 rounded bg-red-100 dark:bg-red-500/10 text-red-700 dark:text-red-400 hover:bg-red-200 transition-colors disabled:opacity-50"
                                 >
-                                    {resetMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Yes'}
+                                    {resetMutation.isPending ? <LoadingSpinner size="xs" /> : 'Yes'}
                                 </button>
                                 <button
                                     onClick={() => setConfirmingReset(false)}
@@ -257,14 +258,14 @@ function TestMessageModal({ channel, onClose }: TestModalProps) {
     const colors  = colorMap[typeDef?.color ?? 'blue'];
 
     const handleSend = async () => {
-        if (!recipient.trim()) { toast.error('Recipient required'); return; }
+        if (!recipient.trim()) { showToast.error('Recipient required'); return; }
         setSending(true);
         try {
             await api.post(`/api/v1/channels/${channel.id}/send`, { recipient, content });
-            toast.success('Test message sent!');
+            showToast.success('Test message sent!');
             onClose();
         } catch (err: any) {
-            toast.error(err?.response?.data?.detail ?? 'Send failed');
+            showToast.error(err?.response?.data?.detail ?? 'Send failed');
         } finally {
             setSending(false);
         }
@@ -329,7 +330,7 @@ function TestMessageModal({ channel, onClose }: TestModalProps) {
                         disabled={sending}
                         className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 dark:hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
                     >
-                        {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                        {sending ? <LoadingSpinner size="sm" /> : <Send className="w-4 h-4" />}
                         Send Message
                     </button>
                 </div>
@@ -390,7 +391,7 @@ export function ChannelsPage() {
     // ── QR polling hook (#2) ───────────────────────────────────────────────────
     const { startPolling, stopPolling } = useQRPolling({
         onAuthenticated: useCallback(() => {
-            toast.success('WhatsApp connected successfully!');
+            showToast.success('WhatsApp connected successfully!');
             dispatchModal({ type: 'CLOSE' });
             queryClient.invalidateQueries({ queryKey: ['channels'] });
         }, [queryClient]),
@@ -444,7 +445,7 @@ export function ChannelsPage() {
             api.post('/api/v1/channels/', data).then(r => r.data),
         onSuccess: (data: Channel & { webhook_url?: string }) => {
             queryClient.invalidateQueries({ queryKey: ['channels'] });
-            toast.success('Channel created successfully');
+            showToast.success('Channel created successfully');
             if (data.type === 'whatsapp' && data.config?.provider === 'web_bridge') {
                 dispatchModal({ type: 'ENTER_QR_STEP' });
                 startPolling(data.id);
@@ -452,14 +453,14 @@ export function ChannelsPage() {
                 closeModal();
             }
         },
-        onError: (err: any) => toast.error(err.response?.data?.detail || 'Failed to create channel'),
+        onError: (err: any) => showToast.error(err.response?.data?.detail || 'Failed to create channel'),
     });
 
     const deleteMutation = useMutation({
         mutationFn: (id: string) => api.delete(`/api/v1/channels/${id}`),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['channels'] });
-            toast.success('Channel deleted');
+            showToast.success('Channel deleted');
         },
     });
 
@@ -470,9 +471,9 @@ export function ChannelsPage() {
             queryClient.invalidateQueries({ queryKey: ['channels'] });
             setEditingSenders(null);
             setSenderInput('');
-            toast.success('Allowed senders updated');
+            showToast.success('Allowed senders updated');
         },
-        onError: () => toast.error('Failed to update allowed senders'),
+        onError: () => showToast.error('Failed to update allowed senders'),
     });
 
     // #5 — scoped loading: only the button on the tested card spins
@@ -482,11 +483,11 @@ export function ChannelsPage() {
             return api.post(`/api/v1/channels/${id}/test`).then(r => r.data);
         },
         onSuccess: (data: any) => {
-            if (data.success) toast.success('Connection successful!');
-            else toast.error(`Connection failed: ${data.error ?? 'Unknown error'}`);
+            if (data.success) showToast.success('Connection successful!');
+            else showToast.error(`Connection failed: ${data.error ?? 'Unknown error'}`);
             queryClient.invalidateQueries({ queryKey: ['channels'] });
         },
-        onError:   (err: any) => toast.error(err.response?.data?.detail || 'Test failed'),
+        onError:   (err: any) => showToast.error(err.response?.data?.detail || 'Test failed'),
         onSettled: () => setTestingChannelId(null),
     });
 
@@ -494,7 +495,7 @@ export function ChannelsPage() {
         mutationFn: ({ id, provider }: { id: string; provider: WhatsAppProvider }) =>
             api.post(`/api/v1/channels/${id}/whatsapp/switch-provider?new_provider=${provider}`).then(r => r.data),
         onSuccess: (data) => {
-            toast.success(`Switched to ${data.provider === 'cloud_api' ? 'Cloud API' : 'Web Bridge'}`);
+            showToast.success(`Switched to ${data.provider === 'cloud_api' ? 'Cloud API' : 'Web Bridge'}`);
             queryClient.invalidateQueries({ queryKey: ['channels'] });
             setShowProviderSwitch(null);
             if (data.provider === 'web_bridge' && data.channel_id) {
@@ -503,7 +504,7 @@ export function ChannelsPage() {
                 startPolling(data.channel_id);
             }
         },
-        onError: (err: any) => toast.error(err.response?.data?.detail || 'Failed to switch provider'),
+        onError: (err: any) => showToast.error(err.response?.data?.detail || 'Failed to switch provider'),
     });
 
     // ── Form submit ────────────────────────────────────────────────────────────
@@ -542,7 +543,7 @@ export function ChannelsPage() {
 
     const handleCopyWebhook = (url: string) => {
         navigator.clipboard.writeText(url);
-        toast.success('Webhook URL copied');
+        showToast.success('Webhook URL copied');
     };
 
     const handleViewLog = (channelId: string) =>
@@ -615,26 +616,18 @@ export function ChannelsPage() {
             {/* ── Channel grid ─────────────────────────────────────────────── */}
             {isLoading ? (
                 <div className="flex items-center justify-center h-64">
-                    <Loader2 className="w-8 h-8 animate-spin text-blue-600 dark:text-blue-400" />
+                    <LoadingSpinner size="lg" />
                 </div>
 
             ) : channels.length === 0 ? (
-                <div className="text-center py-16 bg-gray-50 dark:bg-[#161b27] rounded-2xl border border-dashed border-gray-300 dark:border-[#1e2535] transition-colors duration-200">
-                    <div className="w-16 h-16 mx-auto rounded-full bg-blue-100 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 flex items-center justify-center mb-4">
-                        <Plus className="w-8 h-8 text-blue-600 dark:text-blue-400" />
-                    </div>
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">No channels connected</h3>
-                    <p className="text-gray-500 dark:text-gray-400 text-sm mb-5">
-                        Connect WhatsApp, Slack, Discord, Signal and more
-                    </p>
-                    <button
-                        onClick={() => dispatchModal({ type: 'OPEN' })}
-                        className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 dark:hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors duration-150"
-                    >
-                        Add Your First Channel
-                    </button>
+                <div className="bg-white dark:bg-[#161b27] rounded-2xl border border-gray-200 dark:border-[#1e2535] border-dashed">
+                    <EmptyState
+                        icon={Plus}
+                        title="No channels connected"
+                        description="Connect WhatsApp, Slack, Discord, Signal and more"
+                        action={{ label: 'Add Your First Channel', onClick: () => dispatchModal({ type: 'OPEN' }) }}
+                    />
                 </div>
-
             ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                     {channels.map(channel => {
@@ -970,7 +963,7 @@ export function ChannelsPage() {
                                         </div>
                                     ) : (
                                         <div className="w-[250px] h-[250px] rounded-2xl bg-gray-100 dark:bg-[#0f1117] border border-gray-200 dark:border-[#1e2535] flex flex-col items-center justify-center gap-3">
-                                            <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+                                            <LoadingSpinner size="lg" />
                                             <p className="text-xs text-gray-500 dark:text-gray-400">Waiting for QR code…</p>
                                         </div>
                                     )}
@@ -983,7 +976,7 @@ export function ChannelsPage() {
                                     </ol>
 
                                     <div className="flex items-center gap-2 text-xs text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-500/10 border border-orange-200 dark:border-orange-500/20 rounded-lg px-3 py-2 w-full max-w-xs">
-                                        <Loader2 className="w-3.5 h-3.5 animate-spin flex-shrink-0" />
+                                        <LoadingSpinner size="xs" />
                                         Waiting for scan… refreshes every 10 s
                                     </div>
 
@@ -1161,7 +1154,7 @@ export function ChannelsPage() {
                                                 className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 dark:hover:bg-blue-500 disabled:opacity-50 text-white rounded-lg transition-all duration-150 text-sm font-medium shadow-sm dark:shadow-blue-900/30"
                                             >
                                                 {createMutation.isPending ? (
-                                                    <><Loader2 className="w-4 h-4 animate-spin" /> {whatsappProvider === 'web_bridge' && selectedType === 'whatsapp' ? 'Generating QR…' : 'Connecting…'}</>
+                                                    <><LoadingSpinner size="sm" /> {whatsappProvider === 'web_bridge' && selectedType === 'whatsapp' ? 'Generating QR…' : 'Connecting…'}</>
                                                 ) : (
                                                     <><CheckCircle className="w-4 h-4" /> {whatsappProvider === 'web_bridge' && selectedType === 'whatsapp' ? 'Connect & Show QR' : 'Connect'}</>
                                                 )}

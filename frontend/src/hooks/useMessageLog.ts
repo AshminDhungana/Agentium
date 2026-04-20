@@ -20,7 +20,7 @@ import {
   ChannelMessage,
   MessageLogFilters,
 } from '@/services/channelMessages';
-import toast from 'react-hot-toast';
+import { showToast } from '@/hooks/useToast';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -85,7 +85,7 @@ export function useMessageLog(): UseMessageLogReturn {
       })
       .catch(() => {
         // Surface the error so users know why the dropdown is empty.
-        toast.error('Could not load channels for filter');
+        showToast.error('Could not load channels for filter');
       });
   }, []);
 
@@ -114,7 +114,7 @@ export function useMessageLog(): UseMessageLogReturn {
         if (err instanceof Error && err.name === 'AbortError') return;
         // Axios uses a code instead of name for cancellations.
         if (err && typeof err === 'object' && 'code' in err && (err as any).code === 'ERR_CANCELED') return;
-        toast.error('Failed to load message log');
+        showToast.error('Failed to load message log');
       } finally {
         setLoading(false);
       }
@@ -152,12 +152,12 @@ export function useMessageLog(): UseMessageLogReturn {
     setReplayingId(messageId);
     try {
       await channelMessagesApi.replayMessage(messageId);
-      toast.success('Message re-queued for processing');
+      showToast.success('Message re-queued for processing');
       // Await the refresh so the updated status is visible before the
       // button re-enables (was fire-and-forget in the original).
       await fetchMessages(filters);
     } catch {
-      toast.error('Replay failed');
+      showToast.error('Replay failed');
     } finally {
       setReplayingId(null);
     }
@@ -168,10 +168,10 @@ export function useMessageLog(): UseMessageLogReturn {
     try {
       const res = await channelMessagesApi.replayFailed(filters.channel_id);
       // Wording clarified: messages are queued, not instantly processed.
-      toast.success(`${res.queued} failed message(s) queued for replay`);
+      showToast.success(`${res.queued} failed message(s) queued for replay`);
       setTimeout(() => fetchMessages(filters), 2500);
     } catch {
-      toast.error('Bulk replay failed');
+      showToast.error('Bulk replay failed');
     } finally {
       setBulkReplaying(false);
     }

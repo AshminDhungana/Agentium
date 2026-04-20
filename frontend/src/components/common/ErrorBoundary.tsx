@@ -116,7 +116,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
             return (
                 <div className="flex-1 w-full h-full min-h-[400px] flex flex-col items-center justify-center p-6 animate-in fade-in duration-300">
-                    <div className="max-w-md w-full bg-white dark:bg-gray-900 border border-red-200 dark:border-red-900/50 rounded-2xl shadow-lg p-8 text-center">
+                    <div className="max-w-md w-full bg-white dark:bg-[#0f1117] border border-red-200 dark:border-red-900/50 rounded-2xl shadow-lg p-8 text-center">
                         <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-200 dark:border-red-800/50">
                             <AlertTriangle className="w-8 h-8 text-red-600 dark:text-red-400" />
                         </div>
@@ -125,7 +125,7 @@ export class ErrorBoundary extends Component<Props, State> {
                             A critical rendering error occurred in this view. We've automatically logged this issue.
                         </p>
                         
-                        <div className="bg-gray-50 dark:bg-gray-950 rounded-lg p-3 text-left overflow-hidden mb-6 border border-gray-200 dark:border-gray-800">
+                        <div className="bg-gray-50 dark:bg-gray-950 rounded-lg p-3 text-left overflow-hidden mb-6 border border-gray-200 dark:border-[#1e2535]">
                             <p className="text-xs font-mono text-red-600 dark:text-red-400 truncate w-full">
                                 {this.state.error?.toString()}
                             </p>
@@ -134,7 +134,7 @@ export class ErrorBoundary extends Component<Props, State> {
                         <div className="flex flex-wrap gap-3 justify-center">
                             <button 
                                 onClick={() => window.location.reload()}
-                                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-900 dark:text-white text-sm font-semibold rounded-lg transition-colors"
+                                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-[#161b27] dark:hover:bg-gray-700 text-gray-900 dark:text-white text-sm font-semibold rounded-lg transition-colors"
                             >
                                 Reload Page
                             </button>

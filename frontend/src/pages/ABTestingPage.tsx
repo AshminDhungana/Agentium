@@ -2,12 +2,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import toast from 'react-hot-toast';
+import { showToast } from '@/hooks/useToast';
 import {
   FlaskConical, Plus, X, Play, BarChart3, Clock, DollarSign,
   Trophy, ChevronRight, RefreshCw, Trash2, StopCircle,
-  TrendingUp, Zap, CheckCircle2, AlertCircle, Loader2,
-  Target, Layers, Activity, Shield, AlertTriangle,
+  TrendingUp, Zap, CheckCircle2, AlertCircle, Target, Layers, Activity, Shield, AlertTriangle,
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -25,6 +24,7 @@ import {
   ExperimentStatus,
   PaginatedExperiments,
 } from '@/services/abTesting';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 // ── Colour palette ────────────────────────────────────────────────────────────
 
@@ -266,7 +266,7 @@ function CreateExperimentModal({
       iterations,
     }),
     onSuccess: () => { onCreated(); onClose(); },
-    onError: (err: Error) => toast.error(err.message),
+    onError: (err: Error) => showToast.error(err.message),
   });
 
   const toggleConfig = (id: string) =>
@@ -420,7 +420,7 @@ function CreateExperimentModal({
               disabled={!isValid || isPending}
               className="flex items-center gap-2 px-5 py-2 bg-indigo-600 dark:bg-indigo-500 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 dark:hover:bg-indigo-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-md shadow-indigo-500/25"
             >
-              {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+              {isPending ? <LoadingSpinner size="sm" /> : <Play className="w-4 h-4" />}
               {isPending ? 'Starting…' : 'Run Experiment'}
             </button>
           </div>
@@ -464,7 +464,7 @@ function QuickTestModal({ onClose }: { onClose: () => void }) {
       setLaunchedId(data.id);
       queryClient.invalidateQueries({ queryKey: ['experiments'] });
     },
-    onError: (err: Error) => toast.error(err.message),
+    onError: (err: Error) => showToast.error(err.message),
   });
 
   const toggleConfig = (id: string) =>
@@ -498,7 +498,7 @@ function QuickTestModal({ onClose }: { onClose: () => void }) {
           <div className="p-6 space-y-4">
             {!isDone ? (
               <div className="flex flex-col items-center py-10 gap-4">
-                <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+                <LoadingSpinner size="lg" />
                 <p className="text-sm text-slate-500 dark:text-slate-400">Running experiment…</p>
                 <StatusBadge status={resultExp?.status ?? 'pending'} />
               </div>
@@ -622,7 +622,7 @@ function QuickTestModal({ onClose }: { onClose: () => void }) {
                 disabled={!isValid || isPending}
                 className="flex items-center gap-2 px-5 py-2 bg-amber-500 text-white text-sm font-medium rounded-lg hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
+                {isPending ? <LoadingSpinner size="sm" /> : <Zap className="w-4 h-4" />}
                 {isPending ? 'Launching…' : 'Run Quick Test'}
               </button>
             </div>
@@ -661,7 +661,7 @@ function ExperimentDetailPanel({
       refetch();
       queryClient.invalidateQueries({ queryKey: ['experiments'] });
     },
-    onError: (err: Error) => toast.error(err.message),
+    onError: (err: Error) => showToast.error(err.message),
   });
 
   // Build radar data from model comparisons
@@ -709,7 +709,7 @@ function ExperimentDetailPanel({
         <div className="overflow-y-auto flex-1 p-6 space-y-6">
           {isLoading || !exp ? (
             <div className="flex items-center justify-center py-20">
-              <Loader2 className="w-6 h-6 animate-spin text-indigo-500" />
+              <LoadingSpinner size="md" />
             </div>
           ) : (
             <>
@@ -919,7 +919,7 @@ function RecommendationsPanel() {
 
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-5 h-5 animate-spin text-indigo-500" />
+          <LoadingSpinner size="md" />
         </div>
       ) : recommendations.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -1052,9 +1052,9 @@ export function ABTestingPage() {
     mutationFn: (id: string) => abTestingApi.deleteExperiment(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['experiments'] });
-      toast.success('Experiment deleted');
+      showToast.success('Experiment deleted');
     },
-    onError: (err: Error) => toast.error(err.message),
+    onError: (err: Error) => showToast.error(err.message),
   });
 
   // ── Conditional render AFTER all hooks ─────────────────────────────────────
@@ -1152,7 +1152,7 @@ export function ABTestingPage() {
             {/* Grid */}
             {isLoading ? (
               <div className="flex items-center justify-center py-20">
-                <Loader2 className="w-6 h-6 animate-spin text-indigo-500" />
+                <LoadingSpinner size="md" />
               </div>
             ) : experiments.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-24 text-center">

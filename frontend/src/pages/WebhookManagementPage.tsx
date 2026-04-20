@@ -12,8 +12,7 @@ import {
     FileText,
     AlertCircle,
     Clock,
-    X,
-    Loader2
+    X
 } from 'lucide-react';
 import {
   listWebhookSubscriptions,
@@ -26,6 +25,7 @@ import {
   WebhookSubscription,
   WebhookDelivery,
 } from '../services/webhookService';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 const WebhookManagementPage: React.FC = () => {
   const [subscriptions, setSubscriptions] = useState<WebhookSubscription[]>([]);
@@ -129,7 +129,7 @@ const WebhookManagementPage: React.FC = () => {
   if (loading) {
       return (
           <div className="flex flex-col items-center justify-center p-16">
-              <Loader2 className="w-8 h-8 animate-spin text-purple-600 dark:text-purple-400 mb-4" />
+              <LoadingSpinner size="lg" />
               <p className="text-sm text-gray-500 dark:text-gray-400">Loading webhooks...</p>
           </div>
       );

@@ -16,7 +16,6 @@ import {
     Globe,
     Clock,
     X,
-    Loader2,
     CheckCircle,
     XCircle,
     RefreshCw,
@@ -28,6 +27,7 @@ import {
     Search,
     Filter,
 } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -379,7 +379,7 @@ export const EventTriggerManager: React.FC = () => {
     if (loading) {
         return (
             <div className="flex flex-col items-center justify-center p-16">
-                <Loader2 className="w-8 h-8 animate-spin text-indigo-600 dark:text-indigo-400 mb-4" />
+                <LoadingSpinner size="lg" />
                 <p className="text-sm text-gray-500 dark:text-gray-400">Loading event processing…</p>
             </div>
         );
@@ -876,7 +876,7 @@ export const EventTriggerManager: React.FC = () => {
                                                 className="px-3 py-1.5 text-xs font-medium bg-amber-50 hover:bg-amber-100 dark:bg-amber-500/10 dark:hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-500/20 rounded-lg transition-colors duration-150 flex items-center gap-1.5 disabled:opacity-50"
                                             >
                                                 {retrying === log.id ? (
-                                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                    <LoadingSpinner size="xs" />
                                                 ) : (
                                                     <RotateCcw className="w-3.5 h-3.5" />
                                                 )}

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Agent } from '../../types';
-import { X, AlertTriangle, Loader2, Trash2 } from 'lucide-react';
+import { X, AlertTriangle, Trash2 } from 'lucide-react';
 import { AGENT_REASON_MIN_LENGTH, AGENT_REASON_MAX_LENGTH } from '../../constants/agents';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 interface TerminateAgentModalProps {
     agent:     Agent;
@@ -166,7 +167,7 @@ export const TerminateAgentModal: React.FC<TerminateAgentModalProps> = ({
                             className="flex-1 px-4 py-2.5 bg-rose-600 hover:bg-rose-700 dark:hover:bg-rose-500 text-white text-sm font-medium rounded-lg transition-colors duration-150 disabled:opacity-40 disabled:cursor-not-allowed shadow-sm flex items-center justify-center gap-2"
                         >
                             {isLoading ? (
-                                <><Loader2 className="w-4 h-4 animate-spin" /> Terminating…</>
+                                <><LoadingSpinner size="sm" /> Terminating…</>
                             ) : (
                                 <><Trash2 className="w-4 h-4" /> Terminate Agent</>
                             )}

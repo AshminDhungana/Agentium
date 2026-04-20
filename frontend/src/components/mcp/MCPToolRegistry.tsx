@@ -18,7 +18,6 @@ import {
     Server,
     ChevronDown,
     ChevronUp,
-    Loader2,
     Hash,
     BarChart2,
     TrendingUp,
@@ -28,6 +27,7 @@ import { api } from '@/services/api';
 import { mcpToolsApi, MCPToolStats } from '@/services/mcpToolsApi';
 import { useAuthStore } from '@/store/authStore';
 import { useWebSocketStore } from '@/store/websocketStore';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 // ── Shared input style ────────────────────────────────────────────────────────
 
@@ -244,7 +244,7 @@ function ProposeModal({ onClose, onProposed }: ProposeModalProps) {
                         disabled={loading || !form.name || !form.description || !form.server_url}
                         className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
                     >
-                        {loading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                        {loading && <LoadingSpinner size="xs" />}
                         Submit Proposal
                     </button>
                 </div>
@@ -287,7 +287,7 @@ function AuditDrawer({ tool, onClose }: { tool: MCPTool; onClose: () => void }) 
                 <div className="overflow-y-auto flex-1 divide-y divide-gray-100 dark:divide-[#1e2535]">
                     {loading && (
                         <div className="flex items-center justify-center py-12">
-                            <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
+                            <LoadingSpinner size="md" />
                         </div>
                     )}
                     {!loading && entries.length === 0 && (
@@ -498,7 +498,7 @@ function ToolCard({ tool, stats, onRefresh, currentUser }: ToolCardProps) {
                                 className="p-2 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition-colors disabled:opacity-40"
                             >
                                 {healthLoading
-                                    ? <Loader2 className="w-4 h-4 animate-spin" />
+                                    ? <LoadingSpinner size="sm" />
                                     : <Activity className="w-4 h-4" />
                                 }
                             </button>
@@ -585,7 +585,7 @@ function ToolCard({ tool, stats, onRefresh, currentUser }: ToolCardProps) {
                                     disabled={approving}
                                     className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors disabled:opacity-40"
                                 >
-                                    {approving ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle className="w-3 h-3" />}
+                                    {approving ? <LoadingSpinner size="xs" /> : <CheckCircle className="w-3 h-3" />}
                                     Approve (Council)
                                 </button>
                             )}
@@ -615,7 +615,7 @@ function ToolCard({ tool, stats, onRefresh, currentUser }: ToolCardProps) {
                                                 disabled={revoking || !revokeReason.trim()}
                                                 className="px-3 py-1.5 text-xs bg-red-600 hover:bg-red-700 text-white rounded-lg disabled:opacity-40 flex items-center gap-1"
                                             >
-                                                {revoking && <Loader2 className="w-3 h-3 animate-spin" />}
+                                                {revoking && <LoadingSpinner size="xs" />}
                                                 Confirm
                                             </button>
                                             <button
@@ -871,7 +871,7 @@ export function MCPToolRegistry() {
                 {/* ── Tool list ── */}
                 {loading ? (
                     <div className="flex items-center justify-center py-20">
-                        <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
+                        <LoadingSpinner size="md" />
                     </div>
                 ) : filtered.length === 0 ? (
                     <div className="text-center py-20">

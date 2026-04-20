@@ -10,7 +10,6 @@ import {
     Shield,
     Wifi,
     WifiOff,
-    Loader2,
     ChevronDown,
     ChevronUp,
     Zap,
@@ -21,7 +20,8 @@ import {
 } from 'lucide-react';
 import { api } from '@/services/api';
 import { useAuthStore } from '@/store/authStore';
-import toast from 'react-hot-toast';
+import { showToast } from '@/hooks/useToast';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -212,7 +212,7 @@ export default function APIKeyHealth() {
 
         try {
             await api.post(`/api/v1/api-keys/${keyId}/recover`, { force });
-            toast.success('Key recovery successful');
+            showToast.success('Key recovery successful');
             await fetchHealthData();
         } catch (err: any) {
             const msg = err.response?.data?.detail || 'Recovery failed';
@@ -221,7 +221,7 @@ export default function APIKeyHealth() {
                 setForceCooldownMsg(msg);
                 setForceRecoveryPendingId(keyId);
             } else {
-                toast.error(msg);
+                showToast.error(msg);
             }
         } finally {
             setRecoveringKeys(prev => {
@@ -282,7 +282,7 @@ export default function APIKeyHealth() {
         return (
             <div className="w-full bg-white dark:bg-[#161b27] border border-gray-200 dark:border-[#1e2535] rounded-xl shadow-sm dark:shadow-[0_2px_16px_rgba(0,0,0,0.25)] p-8">
                 <div className="flex items-center justify-center gap-3">
-                    <Loader2 className="w-5 h-5 animate-spin text-blue-600 dark:text-blue-400" />
+                    <LoadingSpinner size="md" />
                     <span className="text-sm text-gray-500 dark:text-gray-400">Loading API key health...</span>
                 </div>
             </div>
@@ -585,7 +585,7 @@ export default function APIKeyHealth() {
                                                                             className="flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-[#161b27] border border-gray-200 dark:border-[#1e2535] hover:border-green-300 dark:hover:border-green-500/30 text-gray-700 dark:text-gray-300 text-xs font-medium rounded-lg transition-colors disabled:opacity-50"
                                                                         >
                                                                             {isRecovering
-                                                                                ? <><Loader2 className="w-3 h-3 animate-spin" /> Recovering...</>
+                                                                                ? <><LoadingSpinner size="xs" /> Recovering...</>
                                                                                 : <><RotateCcw className="w-3 h-3" /> Recover</>
                                                                             }
                                                                         </button>
@@ -613,7 +613,7 @@ export default function APIKeyHealth() {
                                                                             className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-medium rounded-lg transition-colors disabled:opacity-50"
                                                                         >
                                                                             {isRecovering
-                                                                                ? <><Loader2 className="w-3 h-3 animate-spin" /> Forcing...</>
+                                                                                ? <><LoadingSpinner size="xs" /> Forcing...</>
                                                                                 : <><RotateCcw className="w-3 h-3" /> Force Recovery</>
                                                                             }
                                                                         </button>

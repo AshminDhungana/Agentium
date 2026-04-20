@@ -26,7 +26,6 @@ import {
     XCircle,
     Clock,
     AlertTriangle,
-    Loader2,
     ChevronLeft,
     ChevronRight,
     Search,
@@ -43,7 +42,8 @@ import type {
 } from '@/types';
 import { CircuitBreakerBadge } from './CircuitBreakerBadge';
 import { getHealthBadgeProps } from '@/utils/channelHealth';
-import toast from 'react-hot-toast';
+import { showToast } from '@/hooks/useToast';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -108,7 +108,7 @@ function HealthTab({ channel }: { channel: Channel }) {
     if (isLoading || metricsLoading) {
         return (
             <div className="flex items-center justify-center py-12">
-                <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
+                <LoadingSpinner size="md" />
             </div>
         );
     }
@@ -303,12 +303,12 @@ function LogsTab({ channel }: { channel: Channel }) {
                     <span className="text-xs font-semibold text-gray-600 dark:text-gray-400">
                         {total} message{total !== 1 ? 's' : ''}
                     </span>
-                    {isFetching && <Loader2 className="w-3 h-3 animate-spin text-blue-400" />}
+                    {isFetching && <LoadingSpinner size="xs" />}
                 </div>
 
                 {isLoading ? (
                     <div className="flex items-center justify-center py-8">
-                        <Loader2 className="w-5 h-5 animate-spin text-blue-400" />
+                        <LoadingSpinner size="md" />
                     </div>
                 ) : messages.length === 0 ? (
                     <div className="py-8 text-center text-sm text-gray-400 dark:text-gray-500">
@@ -399,10 +399,10 @@ function SettingsTab({ channel }: { channel: Channel }) {
     const saveMutation = useMutation({
         mutationFn: () => channelMetricsApi.updateChannelSettings(channel.id, local),
         onSuccess: () => {
-            toast.success('Settings saved');
+            showToast.success('Settings saved');
             queryClient.invalidateQueries({ queryKey: ['channels'] });
         },
-        onError: () => toast.error('Failed to save settings'),
+        onError: () => showToast.error('Failed to save settings'),
     });
 
     const addKeyword = () => {
@@ -593,7 +593,7 @@ function SettingsTab({ channel }: { channel: Channel }) {
                 className="w-full flex items-center justify-center gap-2 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors"
             >
                 {saveMutation.isPending
-                    ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</>
+                    ? <><LoadingSpinner size="sm" /> Saving…</>
                     : 'Save settings'
                 }
             </button>

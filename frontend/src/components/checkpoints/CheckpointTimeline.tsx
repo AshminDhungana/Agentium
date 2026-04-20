@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import toast from 'react-hot-toast';
+import { showToast } from '@/hooks/useToast';
 import { Download, Upload } from 'lucide-react';
 import {
     Clock,
@@ -9,7 +9,6 @@ import {
     ChevronDown,
     ChevronRight,
     CheckCircle2,
-    Loader2,
     Milestone,
     AlertCircle,
     Search,
@@ -18,6 +17,7 @@ import {
 } from 'lucide-react';
 import { checkpointsService, Checkpoint, CheckpointPhase } from '../../services/checkpoints';
 import { CheckpointDiffModal } from './CheckpointDiffModal';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 // ─── Phase metadata ──────────────────────────────────────────────────────────
 
@@ -136,9 +136,9 @@ const CheckpointRow: React.FC<CheckpointRowProps> = ({
             a.click();
             document.body.removeChild(a);
             window.URL.revokeObjectURL(url);
-            toast.success('Checkpoint exported successfully');
+            showToast.success('Checkpoint exported successfully');
         } catch (err: any) {
-            toast.error(err?.response?.data?.detail || 'Failed to export checkpoint');
+            showToast.error(err?.response?.data?.detail || 'Failed to export checkpoint');
         } finally {
             setIsExporting(false);
         }
@@ -147,7 +147,7 @@ const CheckpointRow: React.FC<CheckpointRowProps> = ({
     const handleBranch = async (e: React.MouseEvent) => {
         e.stopPropagation();
         if (!branchName.trim()) {
-            toast.error('Please enter a branch name');
+            showToast.error('Please enter a branch name');
             return;
         }
         setIsBranching(true);
@@ -263,7 +263,7 @@ const CheckpointRow: React.FC<CheckpointRowProps> = ({
                                         hover:bg-emerald-100 dark:hover:bg-emerald-500/25
                                         disabled:opacity-50 transition-colors duration-150"
                                 >
-                                    {isExporting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+                                    {isExporting ? <LoadingSpinner size="xs" /> : <Download className="w-3 h-3" />}
                                     {isExporting ? 'Exporting…' : 'Export'}
                                 </button>
                                 {/* Restore */}
@@ -277,7 +277,7 @@ const CheckpointRow: React.FC<CheckpointRowProps> = ({
                                         disabled:opacity-50 transition-colors duration-150"
                                 >
                                     {isRestoring
-                                        ? <Loader2 className="w-3 h-3 animate-spin" />
+                                        ? <LoadingSpinner size="xs" />
                                         : <RotateCcw className="w-3 h-3" />
                                     }
                                     {isRestoring ? 'Restoring…' : 'Restore'}
@@ -321,7 +321,7 @@ const CheckpointRow: React.FC<CheckpointRowProps> = ({
                                             transition-colors duration-150"
                                     >
                                         {isBranching
-                                            ? <Loader2 className="w-3 h-3 animate-spin" />
+                                            ? <LoadingSpinner size="xs" />
                                             : <GitBranch className="w-3 h-3" />
                                         }
                                         {isBranching ? 'Creating…' : 'Create'}
@@ -412,7 +412,7 @@ export const CheckpointTimeline: React.FC<CheckpointTimelineProps> = ({
         } catch (err: any) {
             const msg = err?.response?.data?.detail || err?.message || 'Failed to load checkpoints';
             setError(msg);
-            if (!silent) toast.error(msg);
+            if (!silent) showToast.error(msg);
         } finally {
             setIsLoading(false);
             setIsRefreshing(false);
@@ -424,11 +424,11 @@ export const CheckpointTimeline: React.FC<CheckpointTimelineProps> = ({
     const handleRestore = async (checkpointId: string) => {
         try {
             await checkpointsService.resumeFromCheckpoint(checkpointId);
-            toast.success('Task restored to checkpoint');
+            showToast.success('Task restored to checkpoint');
             onRestore?.(checkpointId);
             load(true);
         } catch (err: any) {
-            toast.error(err?.response?.data?.detail || 'Failed to restore checkpoint');
+            showToast.error(err?.response?.data?.detail || 'Failed to restore checkpoint');
             throw err;
         }
     };
@@ -436,18 +436,18 @@ export const CheckpointTimeline: React.FC<CheckpointTimelineProps> = ({
     const handleBranch = async (checkpointId: string, name: string) => {
         try {
             await checkpointsService.branchFromCheckpoint(checkpointId, name);
-            toast.success(`Branch "${name}" created`);
+            showToast.success(`Branch "${name}" created`);
             onBranch?.(checkpointId, name);
             load(true);
         } catch (err: any) {
-            toast.error(err?.response?.data?.detail || 'Failed to create branch');
+            showToast.error(err?.response?.data?.detail || 'Failed to create branch');
             throw err;
         }
     };
 
     const openCompareSelector = () => {
         if (availableBranches.length < 2) {
-            toast.error('You need at least 2 branches to compare.');
+            showToast.error('You need at least 2 branches to compare.');
             return;
         }
         setCompareLeft(availableBranches[0]);
@@ -459,7 +459,7 @@ export const CheckpointTimeline: React.FC<CheckpointTimelineProps> = ({
     if (isLoading) {
         return (
             <div className="flex flex-col items-center justify-center py-12 gap-3 text-slate-400 dark:text-slate-500">
-                <Loader2 className="w-6 h-6 animate-spin" />
+                <LoadingSpinner size="md" />
                 <span className="text-sm">Loading checkpoints…</span>
             </div>
         );

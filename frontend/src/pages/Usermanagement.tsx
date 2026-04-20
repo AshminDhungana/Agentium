@@ -7,7 +7,6 @@ import {
     Key,
     Shield,
     Clock,
-    Loader2,
     UserCheck,
     Mail,
     Calendar,
@@ -17,9 +16,10 @@ import {
     RefreshCw,
     CheckCircle2,
 } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { showToast } from '@/hooks/useToast';
 import { useAuthStore } from '@/store/authStore';
 import { useUserManagement, ROLE_OPTIONS, type User } from '@/hooks/useUserManagement';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 
@@ -105,7 +105,7 @@ export default function UserManagement({
         return (
             <div className="flex items-center justify-center py-24">
                 <div className="flex flex-col items-center gap-3">
-                    <Loader2 className="w-8 h-8 animate-spin text-blue-600 dark:text-blue-400" />
+                    <LoadingSpinner size="lg" />
                     <span className="text-sm text-gray-500 dark:text-gray-400">Loading users…</span>
                 </div>
             </div>
@@ -366,7 +366,7 @@ export default function UserManagement({
                                                             ))}
                                                         </select>
                                                         {changingRole === user.id ? (
-                                                            <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 animate-spin text-blue-500 pointer-events-none" />
+                                                            <LoadingSpinner size="xs" />
                                                         ) : (
                                                             <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400 pointer-events-none" />
                                                         )}
@@ -746,7 +746,7 @@ function PasswordModal({
                     >
                         {isSubmitting ? (
                             <>
-                                <Loader2 className="w-4 h-4 animate-spin" />
+                                <LoadingSpinner size="sm" />
                                 Updating…
                             </>
                         ) : (

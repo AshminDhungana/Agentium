@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { X, FileText, AlertCircle, Loader2, Sparkles } from 'lucide-react';
+import { X, FileText, AlertCircle, Sparkles } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 interface CreateTaskModalProps {
     onConfirm: (data: { 
@@ -340,7 +341,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ onConfirm, onC
                         >
                             {isLoading ? (
                                 <>
-                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    <LoadingSpinner size="sm" />
                                     Creating...
                                 </>
                             ) : (

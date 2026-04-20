@@ -15,7 +15,6 @@
 
 import React, { useState } from 'react';
 import {
-    Loader2,
     CheckCircle,
     XCircle,
     Plus,
@@ -28,6 +27,7 @@ import {
     BookOpen,
     Activity,
 } from 'lucide-react';
+import { EmptyState } from '@/components/ui/EmptyState';
 
 import { isVotingActive } from '../services/voting';
 import { VotingInterface } from '../components/council/VotingInterface';
@@ -39,6 +39,7 @@ import { DetailPanel } from '../components/voting/DetailPanel';
 import { ConstitutionTab } from '../components/voting/ConstitutionTab';
 import { GovernanceTab } from '../components/voting/GovernanceTab';
 import { ProposeAmendmentModal } from '../components/voting/ProposeAmendmentModal';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 // ── Tab type ──────────────────────────────────────────────────────────────────
 
@@ -69,11 +70,8 @@ export const VotingPage: React.FC = () => {
 
     if (isLoading) {
         return (
-            <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center">
-                <div className="flex flex-col items-center gap-3">
-                    <Loader2 className="w-8 h-8 animate-spin text-blue-600 dark:text-blue-400" />
-                    <span className="text-sm text-gray-500 dark:text-gray-400">Loading voting data…</span>
-                </div>
+            <div className="min-h-screen bg-gray-50 dark:bg-[#0f1117] flex items-center justify-center">
+                <LoadingSpinner size="lg" label="Loading voting data…" className="text-blue-600 dark:text-blue-400" />
             </div>
         );
     }
@@ -99,7 +97,7 @@ export const VotingPage: React.FC = () => {
     return (
         // CountdownTickProvider wraps the entire page so all cards share one timer
         <CountdownTickProvider>
-            <div className="min-h-screen bg-gray-50 dark:bg-gray-950 p-6 transition-colors duration-200">
+            <div className="min-h-screen bg-gray-50 dark:bg-[#0f1117] p-6 transition-colors duration-200">
                 <div className="max-w-7xl mx-auto">
 
                     {/* ── Header ─────────────────────────────────────────────── */}
@@ -120,7 +118,7 @@ export const VotingPage: React.FC = () => {
                         <div className="flex items-center gap-2">
                             <button
                                 onClick={() => loadData(true)}
-                                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 transition-colors"
+                                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-[#1e2535] text-gray-500 dark:text-gray-400 transition-colors duration-200"
                                 title="Refresh now"
                             >
                                 <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
@@ -173,7 +171,7 @@ export const VotingPage: React.FC = () => {
                         ].map(({ label, value, Icon, color, bg }) => (
                             <div
                                 key={label}
-                                className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4 flex items-center gap-3"
+                                className="bg-white dark:bg-[#161b27] rounded-xl border border-gray-200 dark:border-[#1e2535] p-4 flex items-center gap-3 transition-colors duration-200"
                             >
                                 <div className={`w-10 h-10 rounded-lg ${bg} flex items-center justify-center`}>
                                     <Icon className={`w-5 h-5 ${color}`} />
@@ -194,7 +192,7 @@ export const VotingPage: React.FC = () => {
                     )}
 
                     {/* ── Tab Navigation ─────────────────────────────────────── */}
-                    <div className="flex border-b border-gray-200 dark:border-gray-700 mb-6 gap-1 overflow-x-auto">
+                    <div className="flex border-b border-gray-200 dark:border-[#1e2535] mb-6 gap-1 overflow-x-auto">
                         {tabs.map(({ id, label, Icon, count }) => (
                             <button
                                 key={id}
@@ -214,7 +212,7 @@ export const VotingPage: React.FC = () => {
                                     <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${
                                         activeTab === id
                                             ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400'
-                                            : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'
+                                            : 'bg-gray-100 dark:bg-[#1e2535] text-gray-500 dark:text-gray-400'
                                     }`}>
                                         {count}
                                     </span>
@@ -240,10 +238,13 @@ export const VotingPage: React.FC = () => {
                                 {activeTab === 'amendments' && (
                                     <>
                                         {activeAmendments.length === 0 && (
-                                            <div className="text-center py-16 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800">
-                                                <FileText className="w-14 h-14 mx-auto mb-3 text-gray-300 dark:text-gray-700" />
-                                                <p className="font-medium text-gray-700 dark:text-gray-300 mb-1">No active amendments</p>
-                                                <p className="text-sm text-gray-500 dark:text-gray-400">Propose a constitutional amendment to get started</p>
+                                            <div className="bg-white dark:bg-[#161b27] rounded-xl border border-gray-200 dark:border-[#1e2535]">
+                                                <EmptyState
+                                                    icon={FileText}
+                                                    title="No active amendments"
+                                                    description="Propose a constitutional amendment to get started"
+                                                    action={{ label: 'Propose Amendment', onClick: () => setShowProposalModal(true) }}
+                                                />
                                             </div>
                                         )}
                                         {activeAmendments.map(a => (
@@ -262,10 +263,12 @@ export const VotingPage: React.FC = () => {
                                 {activeTab === 'deliberations' && (
                                     <>
                                         {activeDeliberations.length === 0 && (
-                                            <div className="text-center py-16 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800">
-                                                <MessageSquare className="w-14 h-14 mx-auto mb-3 text-gray-300 dark:text-gray-700" />
-                                                <p className="font-medium text-gray-700 dark:text-gray-300 mb-1">No active deliberations</p>
-                                                <p className="text-sm text-gray-500 dark:text-gray-400">Task deliberations will appear here</p>
+                                            <div className="bg-white dark:bg-[#161b27] rounded-xl border border-gray-200 dark:border-[#1e2535]">
+                                                <EmptyState
+                                                    icon={MessageSquare}
+                                                    title="No active deliberations"
+                                                    description="Task deliberations will appear here"
+                                                />
                                             </div>
                                         )}
                                         {activeDeliberations.map(d => (
@@ -284,10 +287,12 @@ export const VotingPage: React.FC = () => {
                                 {activeTab === 'history' && (
                                     <>
                                         {closedAmendments.length + closedDeliberations.length === 0 && (
-                                            <div className="text-center py-16 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800">
-                                                <History className="w-14 h-14 mx-auto mb-3 text-gray-300 dark:text-gray-700" />
-                                                <p className="font-medium text-gray-700 dark:text-gray-300 mb-1">No vote history yet</p>
-                                                <p className="text-sm text-gray-500 dark:text-gray-400">Completed votes will appear here</p>
+                                            <div className="bg-white dark:bg-[#161b27] rounded-xl border border-gray-200 dark:border-[#1e2535]">
+                                                <EmptyState
+                                                    icon={History}
+                                                    title="No vote history yet"
+                                                    description="Completed votes will appear here"
+                                                />
                                             </div>
                                         )}
                                         {[...closedAmendments, ...closedDeliberations]
@@ -319,7 +324,7 @@ export const VotingPage: React.FC = () => {
                                         onVoteSuccess={() => loadData(true)}
                                     />
                                 ) : (
-                                    <div className="hidden lg:flex flex-col items-center justify-center py-24 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 border-dashed text-gray-400 dark:text-gray-600">
+                                    <div className="hidden lg:flex flex-col items-center justify-center py-24 bg-white dark:bg-[#161b27] rounded-xl border border-gray-200 dark:border-[#1e2535] border-dashed text-gray-400 dark:text-gray-500">
                                         <BarChart2 className="w-12 h-12 mb-3" />
                                         <p className="text-sm font-medium">Select an item to view details</p>
                                         <p className="text-xs mt-1">Click any card to see the diff, tally, and vote</p>

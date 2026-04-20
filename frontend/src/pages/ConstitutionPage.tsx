@@ -2,15 +2,16 @@ import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { constitutionService } from '@/services/constitution';
 import { votingService, AmendmentVoting } from '@/services/voting';
 import { Constitution, ConstitutionArticle } from '@/types';
-import { toast } from 'react-hot-toast';
+import { showToast } from '@/hooks/useToast';
+import { EmptyState } from '@/components/ui/EmptyState';
 import {
     BookOpen, AlertTriangle, Save, RotateCcw,
     Check, X, Clock, Shield, Edit3, FileText,
     ChevronDown, ChevronUp, Sliders, Lock,
-    Search, Download, GitPullRequest, Loader2,
-    Highlighter, XCircle, History, CheckCircle2,
+    Search, Download, GitPullRequest, Highlighter, XCircle, History, CheckCircle2,
     RefreshCw, Users,
 } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 // ─── Module-level constants ────────────────────────────────────────────────────
 // Declared outside the component so they are never recreated on re-render.
@@ -323,7 +324,7 @@ export function ConstitutionPage() {
             const axiosErr = err as { response?: { data?: { detail?: string } }; message?: string };
             const msg = axiosErr?.response?.data?.detail ?? axiosErr?.message ?? 'Failed to load constitution';
             setError(msg);
-            toast.error('Failed to load constitution');
+            showToast.error('Failed to load constitution');
             setConstitution(DEFAULT_CONSTITUTION);
             setEditedConstitution(structuredClone(DEFAULT_CONSTITUTION));
         } finally {
@@ -346,7 +347,7 @@ export function ConstitutionPage() {
             const passed   = passedResult.status  === 'fulfilled' ? passedResult.value  : [];
 
             if (ratifiedResult.status === 'rejected' || passedResult.status === 'rejected') {
-                toast.error('Some amendment history could not be loaded');
+                showToast.error('Some amendment history could not be loaded');
             }
 
             // Merge, deduplicate by id, sort newest first
@@ -374,7 +375,7 @@ export function ConstitutionPage() {
         // Validate BEFORE setting saving state to avoid a flash of the spinner
         // on a validation-only failure path.
         if (!editedConstitution.preamble?.trim()) {
-            toast.error('Preamble cannot be empty');
+            showToast.error('Preamble cannot be empty');
             return;
         }
         try {
@@ -387,12 +388,12 @@ export function ConstitutionPage() {
                     : [],
                 sovereign_preferences: editedConstitution.sovereign_preferences as Record<string, unknown>,
             });
-            toast.success('Constitution updated successfully');
+            showToast.success('Constitution updated successfully');
             setIsEditing(false);
             await loadConstitution();
         } catch (err: unknown) {
             const axiosErr = err as { response?: { data?: { detail?: string } } };
-            toast.error(axiosErr?.response?.data?.detail ?? 'Update failed');
+            showToast.error(axiosErr?.response?.data?.detail ?? 'Update failed');
         } finally {
             setSaving(false);
         }
@@ -406,7 +407,7 @@ export function ConstitutionPage() {
     // ── Propose amendment ──────────────────────────────────────────────────
     const handleProposalSubmit = async () => {
         if (!proposalForm.title.trim() || !proposalForm.diff.trim()) {
-            toast.error('Title and diff are required');
+            showToast.error('Title and diff are required');
             return;
         }
         setIsSubmittingProposal(true);
@@ -418,12 +419,12 @@ export function ConstitutionPage() {
                 rationale:            proposalForm.rationale.trim(),
                 voting_period_hours:  48,
             });
-            toast.success('Amendment proposal submitted for council vote');
+            showToast.success('Amendment proposal submitted for council vote');
             setShowProposalModal(false);
             setProposalForm(EMPTY_PROPOSAL);
         } catch (err: unknown) {
             const axiosErr = err as { response?: { data?: { detail?: string } } };
-            toast.error(axiosErr?.response?.data?.detail ?? 'Failed to submit proposal');
+            showToast.error(axiosErr?.response?.data?.detail ?? 'Failed to submit proposal');
         } finally {
             setIsSubmittingProposal(false);
         }
@@ -480,10 +481,10 @@ export function ConstitutionPage() {
                 win.focus();
                 setTimeout(() => { win.print(); }, 500);
             } else {
-                toast.error('Popup blocked — please allow popups for PDF export');
+                showToast.error('Popup blocked — please allow popups for PDF export');
             }
         } catch {
-            toast.error('PDF export failed');
+            showToast.error('PDF export failed');
         } finally {
             setIsExportingPdf(false);
         }
@@ -493,16 +494,7 @@ export function ConstitutionPage() {
     if (loading) {
         return (
             <div className="flex items-center justify-center h-80">
-                <div className="text-center space-y-4">
-                    <div className="relative mx-auto w-14 h-14">
-                        <div className="absolute inset-0 rounded-full border-4 border-gray-200 dark:border-[#1e2535]" />
-                        <div className="absolute inset-0 rounded-full border-4 border-blue-500 border-t-transparent animate-spin" />
-                        <Shield className="absolute inset-0 m-auto h-5 w-5 text-blue-500 dark:text-blue-400" />
-                    </div>
-                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400 tracking-wide uppercase">
-                        Loading Constitution…
-                    </p>
-                </div>
+                <LoadingSpinner size="lg" label="Loading Constitution…" />
             </div>
         );
     }
@@ -587,7 +579,7 @@ export function ConstitutionPage() {
                             className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 bg-white dark:bg-[#161b27] border border-gray-200 dark:border-[#1e2535] rounded-xl hover:bg-gray-50 dark:hover:bg-[#1e2535] disabled:opacity-50 transition-all duration-150"
                         >
                             {isExportingPdf
-                                ? <Loader2 className="h-4 w-4 animate-spin" />
+                                ? <LoadingSpinner size="sm" />
                                 : <Download className="h-4 w-4" />
                             }
                             Export PDF
@@ -781,13 +773,16 @@ export function ConstitutionPage() {
 
                             {amendmentsLoading ? (
                                 <div className="flex items-center justify-center py-10 gap-2 text-gray-400 dark:text-gray-500">
-                                    <Loader2 className="w-5 h-5 animate-spin" />
+                                    <LoadingSpinner size="md" />
                                     <span className="text-sm">Loading history…</span>
                                 </div>
                             ) : amendments.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center py-10 text-gray-400 dark:text-gray-500 gap-2">
-                                    <History className="w-8 h-8 opacity-40" />
-                                    <p className="text-sm">No concluded amendments yet.</p>
+                                <div className="py-6">
+                                    <EmptyState
+                                        icon={History}
+                                        title="No concluded amendments yet"
+                                        size="sm"
+                                    />
                                 </div>
                             ) : (
                                 <div className="space-y-0">
@@ -1094,7 +1089,7 @@ export function ConstitutionPage() {
                                     className="flex-1 px-4 py-2.5 bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                                 >
                                     {isSubmittingProposal
-                                        ? <Loader2 className="w-4 h-4 animate-spin" />
+                                        ? <LoadingSpinner size="sm" />
                                         : <GitPullRequest className="w-4 h-4" />
                                     }
                                     {isSubmittingProposal ? 'Submitting…' : 'Submit Proposal'}

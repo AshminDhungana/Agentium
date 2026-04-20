@@ -2,8 +2,8 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { lifecycleService, CapacityData, LifecycleStats, CapacityTier } from '../../services/agents';
 import {
     BarChart2, Zap, TrendingUp, Trash2, RefreshCw, AlertTriangle,
-    Shield, Users, Brain, Terminal, Loader2,
-} from 'lucide-react';
+    Shield, Users, Brain, Terminal, } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 interface LifecycleDashboardProps {
     /** Called when user clicks "Promote" CTA from the stats panel */
@@ -141,7 +141,7 @@ export const LifecycleDashboard: React.FC<LifecycleDashboardProps> = ({
     if (isLoading) {
         return (
             <div className="flex items-center justify-center py-10 gap-2 text-slate-400 dark:text-slate-500">
-                <Loader2 className="w-5 h-5 animate-spin" />
+                <LoadingSpinner size="md" />
                 <span className="text-sm">Loading lifecycle data…</span>
             </div>
         );

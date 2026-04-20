@@ -2,8 +2,9 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
-import { AlertCircle, Loader2, Eye, EyeOff } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { AlertCircle, Eye, EyeOff } from 'lucide-react';
+import { showToast } from '@/hooks/useToast';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 export function LoginPage() {
     const [username, setUsername] = useState('');
@@ -30,10 +31,10 @@ export function LoginPage() {
                 welcomeMsg = `Welcome, ${user.username}`;
             }
 
-            toast.success(welcomeMsg);
+            showToast.success(welcomeMsg);
             navigate('/');
         }
-        // B15: removed toast.error('Invalid credentials') — the inline error
+        // B15: removed showToast.error('Invalid credentials') — the inline error
         // banner from the store's `error` state already surfaces this to the
         // user. Showing both a toast AND a banner was a duplicate notification.
     };
@@ -41,7 +42,7 @@ export function LoginPage() {
     return (
         <>
             {/* Login Card */}
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-8 backdrop-blur-sm">
+            <div className="bg-white dark:bg-[#161b27] rounded-2xl shadow-xl border border-gray-200 dark:border-[#1e2535] p-8 backdrop-blur-sm">
                 <div className="mb-6">
                     <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
                         Welcome Back
@@ -66,7 +67,7 @@ export function LoginPage() {
                             type="text"
                             value={username}
                             onChange={(e) => setUsername(e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all"
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-[#2a3347] rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-[#0f1117] text-gray-900 dark:text-white transition-all"
                             placeholder="Enter username"
                             required
                             autoComplete="username"
@@ -89,7 +90,7 @@ export function LoginPage() {
                                 type={showPassword ? 'text' : 'password'}
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
-                                className="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all"
+                                className="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-[#2a3347] rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-[#0f1117] text-gray-900 dark:text-white transition-all"
                                 placeholder="Enter password"
                                 required
                                 autoComplete="current-password"
@@ -129,7 +130,7 @@ export function LoginPage() {
                     >
                         {isLoading ? (
                             <>
-                                <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+                                <LoadingSpinner size="sm" />
                                 Signing in...
                             </>
                         ) : (
@@ -138,7 +139,7 @@ export function LoginPage() {
                     </button>
                 </form>
 
-                <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+                <div className="mt-6 pt-6 border-t border-gray-200 dark:border-[#1e2535]">
                     <p className="text-sm text-center text-gray-600 dark:text-gray-400">
                         Don't have an account?{' '}
                         <Link

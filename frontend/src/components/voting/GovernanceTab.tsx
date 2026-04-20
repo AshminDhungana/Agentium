@@ -6,11 +6,12 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import toast from 'react-hot-toast';
+import { showToast } from '@/hooks/useToast';
 import {
-    Loader2, AlertCircle, Activity, PauseCircle, PlayCircle,
+    AlertCircle, Activity, PauseCircle, PlayCircle,
 } from 'lucide-react';
 import { api } from '../../services/api';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 interface IdleStatus {
     enabled: boolean;
@@ -52,10 +53,10 @@ export function GovernanceTab() {
         setIsPausing(true);
         try {
             await api.post('/api/v1/governance/idle/pause');
-            toast.success('Idle governance paused');
+            showToast.success('Idle governance paused');
             await loadStatus();
         } catch (err: any) {
-            toast.error(err.response?.data?.detail || 'Failed to pause governance');
+            showToast.error(err.response?.data?.detail || 'Failed to pause governance');
         } finally {
             setIsPausing(false);
         }
@@ -65,10 +66,10 @@ export function GovernanceTab() {
         setIsResuming(true);
         try {
             await api.post('/api/v1/governance/idle/resume');
-            toast.success('Idle governance resumed');
+            showToast.success('Idle governance resumed');
             await loadStatus();
         } catch (err: any) {
-            toast.error(err.response?.data?.detail || 'Failed to resume governance');
+            showToast.error(err.response?.data?.detail || 'Failed to resume governance');
         } finally {
             setIsResuming(false);
         }
@@ -76,9 +77,8 @@ export function GovernanceTab() {
 
     if (isLoading) {
         return (
-            <div className="flex items-center justify-center py-24 text-gray-400 dark:text-gray-600">
-                <Loader2 className="w-6 h-6 animate-spin mr-2" />
-                Loading governance status…
+            <div className="flex items-center justify-center py-24 text-gray-400 dark:text-gray-500">
+                <LoadingSpinner size="md" label="Loading governance status…" />
             </div>
         );
     }
@@ -103,12 +103,12 @@ export function GovernanceTab() {
 
     return (
         <div className="space-y-4">
-            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6">
+            <div className="bg-white dark:bg-[#161b27] rounded-xl border border-gray-200 dark:border-[#1e2535] p-6">
                 <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-3">
                         <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
                             !status.enabled
-                                ? 'bg-gray-100 dark:bg-gray-800'
+                                ? 'bg-gray-100 dark:bg-[#1e2535]'
                                 : status.paused
                                 ? 'bg-amber-50 dark:bg-amber-900/20'
                                 : 'bg-green-50 dark:bg-green-900/20'
@@ -133,7 +133,7 @@ export function GovernanceTab() {
                                 disabled={isResuming}
                                 className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-medium transition-colors disabled:opacity-50"
                             >
-                                {isResuming ? <Loader2 className="w-4 h-4 animate-spin" /> : <PlayCircle className="w-4 h-4" />}
+                                {isResuming ? <LoadingSpinner size="sm" /> : <PlayCircle className="w-4 h-4" />}
                                 {isResuming ? 'Resuming…' : 'Resume'}
                             </button>
                         ) : (
@@ -142,7 +142,7 @@ export function GovernanceTab() {
                                 disabled={isPausing}
                                 className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium transition-colors disabled:opacity-50"
                             >
-                                {isPausing ? <Loader2 className="w-4 h-4 animate-spin" /> : <PauseCircle className="w-4 h-4" />}
+                                {isPausing ? <LoadingSpinner size="sm" /> : <PauseCircle className="w-4 h-4" />}
                                 {isPausing ? 'Pausing…' : 'Pause'}
                             </button>
                         )
@@ -157,13 +157,13 @@ export function GovernanceTab() {
                         </div>
                     )}
                     {status.cycle_count !== undefined && (
-                        <div className="bg-gray-50 dark:bg-gray-800/60 rounded-lg p-3">
+                        <div className="bg-gray-50 dark:bg-[#0f1117]/60 rounded-lg p-3">
                             <p className="text-xs text-gray-500 dark:text-gray-400">Cycles Run</p>
                             <p className="text-xl font-bold text-gray-900 dark:text-white">{status.cycle_count}</p>
                         </div>
                     )}
                     {status.last_run && (
-                        <div className="bg-gray-50 dark:bg-gray-800/60 rounded-lg p-3">
+                        <div className="bg-gray-50 dark:bg-[#0f1117]/60 rounded-lg p-3">
                             <p className="text-xs text-gray-500 dark:text-gray-400">Last Run</p>
                             <p className="text-sm font-medium text-gray-900 dark:text-white">
                                 {new Date(status.last_run).toLocaleString()}
@@ -171,7 +171,7 @@ export function GovernanceTab() {
                         </div>
                     )}
                     {status.next_run && !status.paused && (
-                        <div className="bg-gray-50 dark:bg-gray-800/60 rounded-lg p-3">
+                        <div className="bg-gray-50 dark:bg-[#0f1117]/60 rounded-lg p-3">
                             <p className="text-xs text-gray-500 dark:text-gray-400">Next Run</p>
                             <p className="text-sm font-medium text-gray-900 dark:text-white">
                                 {new Date(status.next_run).toLocaleString()}

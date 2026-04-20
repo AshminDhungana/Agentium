@@ -12,9 +12,10 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { knowledgeApi, CitationNode, CitationEdge, TopCitedDoc } from '../../services/knowledge';
 import {
-  Search, RefreshCw, Loader2, Network, BarChart3,
+  Search, RefreshCw, Network, BarChart3,
   ZoomIn, ZoomOut, Maximize2, Info, TrendingUp,
 } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 // ── Colour palette per collection ──────────────────────────────────────────
 const COLLECTION_COLORS: Record<string, string> = {
@@ -219,7 +220,7 @@ export const CitationGraph: React.FC = () => {
             disabled={loading || !searchQuery.trim()}
             className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 dark:hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm"
           >
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Network className="w-4 h-4" />}
+            {loading ? <LoadingSpinner size="sm" /> : <Network className="w-4 h-4" />}
             Explore
           </button>
           <button
@@ -296,7 +297,7 @@ export const CitationGraph: React.FC = () => {
               </div>
             ) : loading ? (
               <div className="absolute inset-0 flex items-center justify-center text-gray-400 dark:text-gray-500 gap-2">
-                <Loader2 className="w-6 h-6 animate-spin" />
+                <LoadingSpinner size="md" />
                 <span className="text-sm">Loading graph…</span>
               </div>
             ) : (
@@ -496,7 +497,7 @@ export const CitationGraph: React.FC = () => {
             <div className="max-h-[360px] overflow-y-auto">
               {statsLoading ? (
                 <div className="flex items-center justify-center py-8 text-gray-400 dark:text-gray-500 gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <LoadingSpinner size="sm" />
                   <span className="text-sm">Loading…</span>
                 </div>
               ) : topCited.length === 0 ? (

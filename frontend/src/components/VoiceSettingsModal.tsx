@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Mic, Trash2, Loader2, Play, Square, Settings2 } from 'lucide-react';
+import { X, Mic, Trash2, Play, Square, Settings2 } from 'lucide-react';
 import { voiceApi } from '@/services/voiceApi';
-import toast from 'react-hot-toast';
+import { showToast } from '@/hooks/useToast';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 interface SpeakerProfile {
     id: string;
@@ -40,7 +41,7 @@ export function VoiceSettingsModal({ onClose }: VoiceSettingsModalProps) {
             const res = await voiceApi.getSpeakers();
             setSpeakers(res.speakers || []);
         } catch (error) {
-            toast.error('Failed to load speaker profiles');
+            showToast.error('Failed to load speaker profiles');
         } finally {
             setIsLoading(false);
         }
@@ -48,7 +49,7 @@ export function VoiceSettingsModal({ onClose }: VoiceSettingsModalProps) {
 
     const startRecording = async () => {
         if (!speakerName.trim()) {
-            toast.error('Please enter a name for the speaker profile');
+            showToast.error('Please enter a name for the speaker profile');
             return;
         }
         try {
@@ -72,7 +73,7 @@ export function VoiceSettingsModal({ onClose }: VoiceSettingsModalProps) {
             setRecordingTime(0);
             recordingIntervalRef.current = setInterval(() => setRecordingTime(p => p + 1), 1000);
         } catch (error: any) {
-            toast.error('Microphone access denied or error occurred');
+            showToast.error('Microphone access denied or error occurred');
         }
     };
 
@@ -95,11 +96,11 @@ export function VoiceSettingsModal({ onClose }: VoiceSettingsModalProps) {
         setIsRegistering(true);
         try {
             await voiceApi.registerSpeaker(blob, speakerName.trim());
-            toast.success('Speaker enrolled successfully');
+            showToast.success('Speaker enrolled successfully');
             setSpeakerName('');
             await loadSpeakers();
         } catch (error: any) {
-            toast.error('Failed to enroll speaker profile. Audio might be too short or unclear.');
+            showToast.error('Failed to enroll speaker profile. Audio might be too short or unclear.');
         } finally {
             setIsRegistering(false);
         }
@@ -108,10 +109,10 @@ export function VoiceSettingsModal({ onClose }: VoiceSettingsModalProps) {
     const handleDelete = async (id: string) => {
         try {
             await voiceApi.deleteSpeaker(id);
-            toast.success('Speaker profile deleted');
+            showToast.success('Speaker profile deleted');
             await loadSpeakers();
         } catch (error) {
-            toast.error('Failed to delete speaker');
+            showToast.error('Failed to delete speaker');
         }
     };
 
@@ -163,7 +164,7 @@ export function VoiceSettingsModal({ onClose }: VoiceSettingsModalProps) {
                                             : 'bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50'
                                     }`}
                                 >
-                                    {isRegistering ? <Loader2 className="w-4 h-4 animate-spin" /> : isRecording ? <Square className="w-4 h-4" fill="currentColor"/> : <Mic className="w-4 h-4" />}
+                                    {isRegistering ? <LoadingSpinner size="sm" /> : isRecording ? <Square className="w-4 h-4" fill="currentColor"/> : <Mic className="w-4 h-4" />}
                                     {isRegistering ? 'Processing' : isRecording ? 'Stop Recording' : 'Start Enroll'}
                                 </button>
                             </div>
@@ -174,7 +175,7 @@ export function VoiceSettingsModal({ onClose }: VoiceSettingsModalProps) {
                         <h3 className="text-md font-semibold text-gray-900 dark:text-white mb-3">Enrolled Profiles</h3>
                         {isLoading ? (
                             <div className="flex items-center justify-center py-8">
-                                <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+                                <LoadingSpinner size="md" />
                             </div>
                         ) : speakers.length === 0 ? (
                             <div className="text-center py-6 border border-dashed border-gray-200 dark:border-[#1e2535] rounded-2xl">

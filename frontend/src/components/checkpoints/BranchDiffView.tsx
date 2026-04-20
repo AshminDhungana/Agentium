@@ -7,12 +7,11 @@
  */
 
 import React, { useState, useCallback } from 'react';
-import toast from 'react-hot-toast';
+import { showToast } from '@/hooks/useToast';
 import {
     GitBranch,
     GitCompareArrows,
     RefreshCw,
-    Loader2,
     AlertCircle,
     ChevronDown,
     ChevronRight,
@@ -34,6 +33,7 @@ import {
     ArtifactDiff,
     DiffStatus,
 } from '../../services/checkpoints';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 // ─── Diff status config ───────────────────────────────────────────────────────
 
@@ -341,7 +341,7 @@ const BranchInputBar: React.FC<BranchInputBarProps> = ({
                         transition-colors duration-150
                     "
                 >
-                    {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <GitCompareArrows className="w-4 h-4" />}
+                    {isLoading ? <LoadingSpinner size="sm" /> : <GitCompareArrows className="w-4 h-4" />}
                     {isLoading ? 'Comparing…' : 'Compare'}
                 </button>
             </div>
@@ -389,7 +389,7 @@ export const BranchDiffView: React.FC<BranchDiffViewProps> = ({
         } catch (err: any) {
             const msg = err?.response?.data?.detail || err?.message || 'Comparison failed';
             setError(msg);
-            toast.error(msg);
+            showToast.error(msg);
         } finally {
             setIsLoading(false);
         }

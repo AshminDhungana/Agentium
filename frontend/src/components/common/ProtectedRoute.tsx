@@ -1,6 +1,7 @@
 import { Navigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
-import { Shield, Loader2 } from 'lucide-react';
+import { Shield } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 interface ProtectedRouteProps {
     children: React.ReactNode;
@@ -37,7 +38,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
                     <div className="w-12 h-12 rounded-2xl bg-blue-600 flex items-center justify-center">
                         <Shield className="w-6 h-6 text-white" />
                     </div>
-                    <Loader2 className="w-6 h-6 animate-spin text-blue-400" />
+                    <LoadingSpinner size="md" />
                 </div>
             </div>
         );

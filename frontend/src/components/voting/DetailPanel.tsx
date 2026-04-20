@@ -12,9 +12,9 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
-import toast from 'react-hot-toast';
+import { showToast } from '@/hooks/useToast';
 import {
-    Loader2, CheckCircle, XCircle, Clock, Users,
+    CheckCircle, XCircle, Clock, Users,
     ThumbsUp, ThumbsDown, Minus, MessageSquare,
     BookOpen, AlertCircle, X, ChevronDown, UserCheck, Shield,
 } from 'lucide-react';
@@ -31,6 +31,7 @@ import {
 } from '../../services/voting';
 import { QuorumBar } from './QuorumBar';
 import { useCountdownTick } from '../../hooks/useCountdownTick';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 interface DetailPanelProps {
     item: AmendmentVoting | TaskDeliberation;
@@ -113,12 +114,12 @@ export function DetailPanel({ item, onClose, onVoteSuccess }: DetailPanelProps) 
             } else {
                 await votingService.castDeliberationVote(item.id, confirmedVote);
             }
-            toast.success(`Vote cast: ${confirmedVote}`);
+            showToast.success(`Vote cast: ${confirmedVote}`);
             onVoteSuccess(); // triggers parent refresh; clears optimistic state via re-render
         } catch (err: any) {
             // Revert optimistic update on error
             setOptimisticItem(null);
-            toast.error(err.response?.data?.detail || 'Failed to cast vote');
+            showToast.error(err.response?.data?.detail || 'Failed to cast vote');
         } finally {
             if (isMountedRef.current) setIsVoting(false);
         }
@@ -131,27 +132,27 @@ export function DetailPanel({ item, onClose, onVoteSuccess }: DetailPanelProps) 
 
     const handleDelegate = async () => {
         if (!delegateTarget.trim()) {
-            toast.error('Please enter a delegate agent ID');
+            showToast.error('Please enter a delegate agent ID');
             return;
         }
         setIsDelegating(true);
         try {
             await votingService.sponsorAmendment(item.id);
-            toast.success(`Authority delegated to ${delegateTarget.trim()}`);
+            showToast.success(`Authority delegated to ${delegateTarget.trim()}`);
             setDelegateEnabled(false);
             setDelegateTarget('');
             onVoteSuccess();
         } catch (err: any) {
-            toast.error(err.response?.data?.detail || 'Failed to delegate authority');
+            showToast.error(err.response?.data?.detail || 'Failed to delegate authority');
         } finally {
             if (isMountedRef.current) setIsDelegating(false);
         }
     };
 
     return (
-        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden shadow-lg">
+        <div className="bg-white dark:bg-[#161b27] rounded-xl border border-gray-200 dark:border-[#1e2535] overflow-hidden shadow-lg">
             {/* Header */}
-            <div className="flex items-start justify-between p-6 border-b border-gray-100 dark:border-gray-800">
+            <div className="flex items-start justify-between p-6 border-b border-gray-100 dark:border-[#1e2535]">
                 <div className="flex-1 min-w-0 pr-4">
                     <div className="flex items-center gap-2 mb-1">
                         <span
@@ -169,7 +170,7 @@ export function DetailPanel({ item, onClose, onVoteSuccess }: DetailPanelProps) 
                             </span>
                         )}
                         {isLoadingDetails && (
-                            <Loader2 className="w-3.5 h-3.5 animate-spin text-gray-400" />
+                            <LoadingSpinner size="xs" className="text-gray-400" />
                         )}
                     </div>
                     <h2 className="text-xl font-bold text-gray-900 dark:text-white">
@@ -189,7 +190,7 @@ export function DetailPanel({ item, onClose, onVoteSuccess }: DetailPanelProps) 
                 <button
                     aria-label="close"
                     onClick={onClose}
-                    className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors flex-shrink-0"
+                    className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-[#1e2535] text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors duration-200 flex-shrink-0"
                 >
                     <X className="w-5 h-5" />
                 </button>
@@ -210,7 +211,7 @@ export function DetailPanel({ item, onClose, onVoteSuccess }: DetailPanelProps) 
                 {isAmendment && displayItem.diff_markdown && (
                     <div>
                         <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Proposed Changes</h3>
-                        <div className="bg-gray-50 dark:bg-gray-800/60 rounded-lg p-4 font-mono text-xs leading-relaxed overflow-x-auto">
+                        <div className="bg-gray-50 dark:bg-[#0f1117]/60 rounded-lg p-4 font-mono text-xs leading-relaxed overflow-x-auto">
                             {(displayItem.diff_markdown as string).split('\n').map((line: string, i: number) => (
                                 <div
                                     key={i}
@@ -235,7 +236,7 @@ export function DetailPanel({ item, onClose, onVoteSuccess }: DetailPanelProps) 
                         <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-1">
                             <BookOpen className="w-4 h-4" /> Debate Document
                         </h3>
-                        <div className="bg-gray-50 dark:bg-gray-800/60 rounded-lg p-4 text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap max-h-48 overflow-y-auto">
+                        <div className="bg-gray-50 dark:bg-[#0f1117]/60 rounded-lg p-4 text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap max-h-48 overflow-y-auto">
                             {(details as AmendmentDetails).debate_document}
                         </div>
                     </div>
@@ -244,11 +245,11 @@ export function DetailPanel({ item, onClose, onVoteSuccess }: DetailPanelProps) 
                 {/* Deliberation metadata */}
                 {!isAmendment && deliDetails && (
                     <div className="grid grid-cols-2 gap-3">
-                        <div className="bg-gray-50 dark:bg-gray-800/60 rounded-lg p-3">
+                        <div className="bg-gray-50 dark:bg-[#0f1117]/60 rounded-lg p-3">
                             <p className="text-xs text-gray-500 dark:text-gray-400">Required approvals</p>
                             <p className="text-lg font-bold text-gray-900 dark:text-white">{deliDetails.required_approvals}</p>
                         </div>
-                        <div className="bg-gray-50 dark:bg-gray-800/60 rounded-lg p-3">
+                        <div className="bg-gray-50 dark:bg-[#0f1117]/60 rounded-lg p-3">
                             <p className="text-xs text-gray-500 dark:text-gray-400">Min quorum</p>
                             <p className="text-lg font-bold text-gray-900 dark:text-white">{deliDetails.min_quorum}</p>
                         </div>
@@ -317,7 +318,7 @@ export function DetailPanel({ item, onClose, onVoteSuccess }: DetailPanelProps) 
                         {showIndividualVotes && (
                             <div className="mt-2 space-y-1.5 max-h-40 overflow-y-auto pr-1">
                                 {deliDetails.individual_votes.map((v, i) => (
-                                    <div key={i} className="flex items-center justify-between text-xs bg-gray-50 dark:bg-gray-800/60 rounded-lg px-3 py-2">
+                                    <div key={i} className="flex items-center justify-between text-xs bg-gray-50 dark:bg-[#0f1117]/60 rounded-lg px-3 py-2">
                                         <span className="font-mono text-gray-700 dark:text-gray-300">{v.voter_id}</span>
                                         <div className="flex items-center gap-2">
                                             {v.rationale && (
@@ -328,7 +329,7 @@ export function DetailPanel({ item, onClose, onVoteSuccess }: DetailPanelProps) 
                                                     ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
                                                     : v.vote === 'against'
                                                     ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
-                                                    : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
+                                                    : 'bg-gray-100 dark:bg-[#1e2535] text-gray-600 dark:text-gray-400'
                                             }`}>
                                                 {v.vote}
                                             </span>
@@ -348,7 +349,7 @@ export function DetailPanel({ item, onClose, onVoteSuccess }: DetailPanelProps) 
                         </h3>
                         <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                             {displayItem.discussion_thread.map((entry: any, i: number) => (
-                                <div key={i} className="bg-gray-50 dark:bg-gray-800/60 rounded-lg p-3 text-xs">
+                                <div key={i} className="bg-gray-50 dark:bg-[#0f1117]/60 rounded-lg p-3 text-xs">
                                     <div className="flex items-center justify-between mb-1">
                                         <span className="font-mono font-medium text-gray-700 dark:text-gray-300">{entry.agent}</span>
                                         <span className="text-gray-400 dark:text-gray-500">
@@ -417,7 +418,7 @@ export function DetailPanel({ item, onClose, onVoteSuccess }: DetailPanelProps) 
                                 <button
                                     onClick={() => handleVoteClick('abstain')}
                                     disabled={isVoting}
-                                    className="flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg bg-gray-50 dark:bg-gray-800/60 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 font-medium text-sm transition-colors border border-gray-200 dark:border-gray-700 disabled:opacity-50"
+                                    className="flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg bg-gray-50 dark:bg-[#0f1117]/60 hover:bg-gray-100 dark:hover:bg-[#1e2535] text-gray-700 dark:text-gray-300 font-medium text-sm transition-colors duration-200 border border-gray-200 dark:border-[#1e2535] disabled:opacity-50"
                                 >
                                     <Minus className="w-4 h-4" />
                                     Abstain
@@ -439,16 +440,13 @@ export function DetailPanel({ item, onClose, onVoteSuccess }: DetailPanelProps) 
                                         disabled={isVoting}
                                         className="px-4 py-2 text-sm font-medium rounded-lg bg-amber-600 hover:bg-amber-700 text-white disabled:opacity-50 flex items-center gap-1.5"
                                     >
-                                        {isVoting
-                                            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                            : null
-                                        }
+                                        {isVoting && <LoadingSpinner size="xs" />}
                                         {isVoting ? 'Submitting…' : 'Confirm'}
                                     </button>
                                     <button
                                         onClick={() => setPendingVote(null)}
                                         disabled={isVoting}
-                                        className="px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 disabled:opacity-50"
+                                        className="px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 dark:border-[#1e2535] hover:bg-gray-100 dark:hover:bg-[#1e2535] text-gray-700 dark:text-gray-300 disabled:opacity-50 transition-colors duration-200"
                                     >
                                         Cancel
                                     </button>
@@ -462,7 +460,7 @@ export function DetailPanel({ item, onClose, onVoteSuccess }: DetailPanelProps) 
                         </div>
 
                         {/* Delegate Authority */}
-                        <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800">
+                        <div className="mt-4 pt-4 border-t border-gray-100 dark:border-[#1e2535]">
                             <label className="flex items-center gap-2.5 cursor-pointer select-none group">
                                 <div className="relative">
                                     <input
@@ -474,7 +472,7 @@ export function DetailPanel({ item, onClose, onVoteSuccess }: DetailPanelProps) 
                                     <div className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors duration-150 ${
                                         delegateEnabled
                                             ? 'bg-blue-600 border-blue-600'
-                                            : 'border-gray-300 dark:border-gray-600 group-hover:border-blue-400'
+                                            : 'border-gray-300 dark:border-[#1e2535] group-hover:border-blue-400'
                                     }`}>
                                         {delegateEnabled && (
                                             <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 10 8">
@@ -498,7 +496,7 @@ export function DetailPanel({ item, onClose, onVoteSuccess }: DetailPanelProps) 
                                         placeholder="Delegate agent ID (e.g. 10002)…"
                                         value={delegateTarget}
                                         onChange={e => setDelegateTarget(e.target.value)}
-                                        className="flex-1 px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition-colors duration-150"
+                                        className="flex-1 px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-[#1e2535] bg-white dark:bg-[#0f1117] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition-colors duration-150"
                                     />
                                     <button
                                         onClick={handleDelegate}
@@ -506,7 +504,7 @@ export function DetailPanel({ item, onClose, onVoteSuccess }: DetailPanelProps) 
                                         className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors duration-150"
                                     >
                                         {isDelegating
-                                            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                            ? <LoadingSpinner size="xs" />
                                             : <Shield className="w-3.5 h-3.5" />
                                         }
                                         {isDelegating ? 'Delegating…' : 'Delegate'}

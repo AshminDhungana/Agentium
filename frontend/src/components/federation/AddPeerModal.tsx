@@ -4,8 +4,9 @@
 // The parent controls visibility by conditionally mounting this component.
 
 import { useState } from 'react';
-import { Plus, Loader2 } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import type { RegisterPeerRequest } from '@/services/federation';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 
@@ -207,7 +208,7 @@ export function AddPeerModal({ isSubmitting, onClose, onSubmit }: AddPeerModalPr
                         >
                             {isSubmitting ? (
                                 <>
-                                    <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+                                    <LoadingSpinner size="sm" />
                                     Adding…
                                 </>
                             ) : (

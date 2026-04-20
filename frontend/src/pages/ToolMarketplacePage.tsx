@@ -20,7 +20,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import toast from "react-hot-toast";
+import { showToast } from '@/hooks/useToast';
 import {
   Search,
   Package,
@@ -42,8 +42,7 @@ import {
   Code2,
   Users,
   RefreshCw,
-  Loader2,
-} from "lucide-react";
+  } from "lucide-react";
 
 import { toolManagementApi } from "../services/plugins";
 import type {
@@ -56,6 +55,7 @@ import type {
   AgentUsageResponse,
   VoteChoice,
 } from "../types/toolManagement";
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 // ── Shared input className ────────────────────────────────────────────────────
 const INPUT =
@@ -161,7 +161,7 @@ function ConfirmRow({
         disabled={isPending}
         className="px-3 py-1 text-xs rounded-md bg-red-600 hover:bg-red-700 text-white disabled:opacity-50 flex items-center gap-1 transition-colors"
       >
-        {isPending && <Loader2 className="w-3 h-3 animate-spin" />}
+        {isPending && <LoadingSpinner size="xs" />}
         {label}
       </button>
     </div>
@@ -270,7 +270,7 @@ function MarketplaceTab() {
         (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ??
         (e as Error)?.message ??
         "Browse failed";
-      toast.error(msg);
+      showToast.error(msg);
     }
     setBrowsing(false);
   }, [search, category, page]);
@@ -283,10 +283,10 @@ function MarketplaceTab() {
     setPendingAction(key);
     try {
       await fn();
-      toast.success(successMsg);
+      showToast.success(successMsg);
       browse();
     } catch (e: unknown) {
-      toast.error(
+      showToast.error(
         (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ??
           (e as Error)?.message ??
           `${key} failed`,
@@ -450,7 +450,7 @@ function MarketplaceTab() {
               }
               className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 dark:hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              {pendingAction === "Publish" && <Loader2 className="w-4 h-4 animate-spin" />}
+              {pendingAction === "Publish" && <LoadingSpinner size="sm" />}
               Publish →
             </button>
           </div>
@@ -485,7 +485,7 @@ function MarketplaceTab() {
               }
               className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 dark:hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              {pendingAction === "StageImport" && <Loader2 className="w-4 h-4 animate-spin" />}
+              {pendingAction === "StageImport" && <LoadingSpinner size="sm" />}
               Stage Import
             </button>
 
@@ -529,7 +529,7 @@ function MarketplaceTab() {
                 }
                 className="w-full px-4 py-2 bg-green-600 hover:bg-green-700 dark:hover:bg-green-500 text-white rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {pendingAction === "FinalizeImport" && <Loader2 className="w-4 h-4 animate-spin" />}
+                {pendingAction === "FinalizeImport" && <LoadingSpinner size="sm" />}
                 Finalize Import ✓
               </button>
             </div>
@@ -573,7 +573,7 @@ function MarketplaceTab() {
               }
               className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 dark:hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              {pendingAction === "Rate" && <Loader2 className="w-4 h-4 animate-spin" />}
+              {pendingAction === "Rate" && <LoadingSpinner size="sm" />}
               Submit Rating
             </button>
           </div>
@@ -670,10 +670,10 @@ function ToolsTab() {
     setPendingAction(key);
     try {
       await fn();
-      toast.success(successMsg);
+      showToast.success(successMsg);
       refresh();
     } catch (e: unknown) {
-      toast.error(
+      showToast.error(
         (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ??
           (e as Error)?.message ??
           `${key} failed`,
@@ -847,7 +847,7 @@ function ToolsTab() {
               }
               className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 dark:hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              {pendingAction === "Propose" && <Loader2 className="w-4 h-4 animate-spin" />}
+              {pendingAction === "Propose" && <LoadingSpinner size="sm" />}
               Propose Tool
             </button>
           </div>
@@ -905,7 +905,7 @@ function ToolsTab() {
               }
               className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 dark:hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              {pendingAction === "Vote" && <Loader2 className="w-4 h-4 animate-spin" />}
+              {pendingAction === "Vote" && <LoadingSpinner size="sm" />}
               Cast Vote
             </button>
           </div>
@@ -971,7 +971,7 @@ function ToolsTab() {
               }
               className="w-full px-4 py-2 bg-green-600 hover:bg-green-700 dark:hover:bg-green-500 text-white rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              {pendingAction === "Execute" && <Loader2 className="w-4 h-4 animate-spin" />}
+              {pendingAction === "Execute" && <LoadingSpinner size="sm" />}
               ▶ Execute
             </button>
           </div>
@@ -1090,7 +1090,7 @@ function ToolsTab() {
                 }
                 className="w-full px-4 py-2 bg-green-600 hover:bg-green-700 dark:hover:bg-green-500 text-white rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {pendingAction === "Restore" && <Loader2 className="w-4 h-4 animate-spin" />}
+                {pendingAction === "Restore" && <LoadingSpinner size="sm" />}
                 ↺ Restore
               </button>
             </div>
@@ -1126,9 +1126,9 @@ function VersionsTab() {
     setPendingAction(key);
     try {
       await fn();
-      toast.success(successMsg);
+      showToast.success(successMsg);
     } catch (e: unknown) {
-      toast.error(
+      showToast.error(
         (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ??
           (e as Error)?.message ??
           `${key} failed`,
@@ -1169,7 +1169,7 @@ function VersionsTab() {
             }
             className="px-4 py-2 bg-blue-600 hover:bg-blue-700 dark:hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 flex items-center gap-2"
           >
-            {pendingAction === "Changelog" && <Loader2 className="w-4 h-4 animate-spin" />}
+            {pendingAction === "Changelog" && <LoadingSpinner size="sm" />}
             Load Changelog
           </button>
         </div>
@@ -1261,7 +1261,7 @@ function VersionsTab() {
             }
             className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 dark:hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 flex items-center justify-center gap-2"
           >
-            {pendingAction === "Diff" && <Loader2 className="w-4 h-4 animate-spin" />}
+            {pendingAction === "Diff" && <LoadingSpinner size="sm" />}
             Get Diff
           </button>
           {diff != null && (
@@ -1317,7 +1317,7 @@ function VersionsTab() {
               }
               className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 dark:hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              {pendingAction === "ProposeUpdate" && <Loader2 className="w-4 h-4 animate-spin" />}
+              {pendingAction === "ProposeUpdate" && <LoadingSpinner size="sm" />}
               Propose Update
             </button>
           </div>
@@ -1370,7 +1370,7 @@ function VersionsTab() {
               }
               className="w-full px-4 py-2 bg-green-600 hover:bg-green-700 dark:hover:bg-green-500 text-white rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              {pendingAction === "ApproveUpdate" && <Loader2 className="w-4 h-4 animate-spin" />}
+              {pendingAction === "ApproveUpdate" && <LoadingSpinner size="sm" />}
               ✓ Approve Update
             </button>
           </div>
@@ -1459,10 +1459,10 @@ function SunsetTab() {
     setPendingAction(key);
     try {
       await fn();
-      toast.success(successMsg);
+      showToast.success(successMsg);
       refresh();
     } catch (e: unknown) {
-      toast.error(
+      showToast.error(
         (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ??
           (e as Error)?.message ??
           `${key} failed`,
@@ -1505,7 +1505,7 @@ function SunsetTab() {
               }
               className="px-4 py-2 bg-orange-600 hover:bg-orange-700 dark:hover:bg-orange-500 text-white rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 flex items-center gap-2"
             >
-              {pendingAction === "SunsetCleanup" && <Loader2 className="w-4 h-4 animate-spin" />}
+              {pendingAction === "SunsetCleanup" && <LoadingSpinner size="sm" />}
               Run Sunset Cleanup
             </button>
           </div>
@@ -1609,7 +1609,7 @@ function SunsetTab() {
               }
               className="w-full px-4 py-2 bg-orange-600 hover:bg-orange-700 dark:hover:bg-orange-500 text-white rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              {pendingAction === "ScheduleSunset" && <Loader2 className="w-4 h-4 animate-spin" />}
+              {pendingAction === "ScheduleSunset" && <LoadingSpinner size="sm" />}
               Schedule Sunset
             </button>
           </div>
@@ -1770,7 +1770,7 @@ function AnalyticsTab() {
               }
               className="px-4 py-2 bg-blue-600 hover:bg-blue-700 dark:hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 flex items-center gap-2"
             >
-              {pendingSection === "report" && <Loader2 className="w-4 h-4 animate-spin" />}
+              {pendingSection === "report" && <LoadingSpinner size="sm" />}
               {pendingSection === "report" ? "Loading…" : "Load Report"}
             </button>
           </div>
@@ -1848,7 +1848,7 @@ function AnalyticsTab() {
               }
               className="px-4 py-2 bg-blue-600 hover:bg-blue-700 dark:hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 flex items-center gap-2"
             >
-              {pendingSection === "errors" && <Loader2 className="w-4 h-4 animate-spin" />}
+              {pendingSection === "errors" && <LoadingSpinner size="sm" />}
               Fetch
             </button>
           </div>
@@ -1919,7 +1919,7 @@ function AnalyticsTab() {
               }
               className="px-4 py-2 bg-blue-600 hover:bg-blue-700 dark:hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 flex items-center gap-2"
             >
-              {pendingSection === "agent" && <Loader2 className="w-4 h-4 animate-spin" />}
+              {pendingSection === "agent" && <LoadingSpinner size="sm" />}
               Fetch
             </button>
           </div>
@@ -1969,7 +1969,7 @@ function AnalyticsTab() {
               }
               className="px-4 py-2 bg-blue-600 hover:bg-blue-700 dark:hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 flex items-center gap-2"
             >
-              {pendingSection === "tool" && <Loader2 className="w-4 h-4 animate-spin" />}
+              {pendingSection === "tool" && <LoadingSpinner size="sm" />}
               Fetch Stats
             </button>
           </div>

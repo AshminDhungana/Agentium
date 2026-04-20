@@ -7,8 +7,8 @@ import {
     AlertTriangle,
     Activity,
     Server,
-    Loader2,
-} from 'lucide-react';
+    } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 interface BudgetStatus {
     current_limits: {
@@ -121,7 +121,7 @@ export const FinancialBurnDashboard: React.FC = () => {
     if (isLoading) {
         return (
             <div className="flex flex-col items-center justify-center py-20 gap-3 text-slate-400 dark:text-slate-500">
-                <Loader2 className="w-8 h-8 animate-spin" />
+                <LoadingSpinner size="lg" />
                 <span>Loading financial metrics...</span>
             </div>
         );

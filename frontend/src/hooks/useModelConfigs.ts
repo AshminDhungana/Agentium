@@ -20,7 +20,7 @@
  */
 
 import { useState, useCallback, useEffect } from 'react';
-import toast from 'react-hot-toast';
+import { showToast } from '@/hooks/useToast';
 import { modelsApi } from '@/services/models';
 import type { ModelConfig } from '@/types';
 import { getErrorMessage } from '@/utils/errors';
@@ -97,9 +97,9 @@ export function useModelConfigs() {
             await modelsApi.deleteConfig(id);
             // Optimistic removal — no full reload needed for a delete
             setConfigs(prev => prev.filter(c => c.id !== id));
-            toast.success('Configuration deleted');
+            showToast.success('Configuration deleted');
         } catch (err: unknown) {
-            toast.error('Failed to delete: ' + getErrorMessage(err));
+            showToast.error('Failed to delete: ' + getErrorMessage(err));
         } finally {
             endAction(id);
         }
@@ -113,7 +113,7 @@ export function useModelConfigs() {
                 prev.map(c => ({ ...c, is_default: c.id === id }))
             );
         } catch (err: unknown) {
-            toast.error('Failed to set default: ' + getErrorMessage(err));
+            showToast.error('Failed to set default: ' + getErrorMessage(err));
             // Re-sync from server so UI is accurate
             await loadConfigs();
         }
@@ -124,14 +124,14 @@ export function useModelConfigs() {
         try {
             const result = await modelsApi.testConfig(id);
             if (result.success) {
-                toast.success(`✅ Connected · ${result.latency_ms}ms · ${result.model}`);
+                showToast.success(`✅ Connected · ${result.latency_ms}ms · ${result.model}`);
             } else {
-                toast.error(`Connection failed: ${result.error}`);
+                showToast.error(`Connection failed: ${result.error}`);
             }
             // Reload to reflect updated status field from the server
             await loadConfigs();
         } catch (err: unknown) {
-            toast.error('Test failed — check your API key and network: ' + getErrorMessage(err));
+            showToast.error('Test failed — check your API key and network: ' + getErrorMessage(err));
         } finally {
             endAction(id);
         }
@@ -141,12 +141,12 @@ export function useModelConfigs() {
         startAction(id, 'fetching');
         try {
             const result = await modelsApi.fetchModels(id);
-            toast.success(`Fetched ${result.count} models from ${result.provider}`);
+            showToast.success(`Fetched ${result.count} models from ${result.provider}`);
             // Single authoritative reload — no need for an optimistic update
             // on top of a full server sync
             await loadConfigs();
         } catch (err: unknown) {
-            toast.error('Failed to fetch models: ' + getErrorMessage(err));
+            showToast.error('Failed to fetch models: ' + getErrorMessage(err));
         } finally {
             endAction(id);
         }
@@ -173,7 +173,7 @@ export function useModelConfigs() {
             try {
                 const { voiceApi } = await import('@/services/voiceApi');
                 voiceApi.clearStatusCache();
-                toast.success('Voice features now available with OpenAI provider!');
+                showToast.success('Voice features now available with OpenAI provider!');
             } catch {
                 // Non-critical — voice feature may not be available in this build
             }

@@ -12,7 +12,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import toast from 'react-hot-toast';
+import { showToast } from '@/hooks/useToast';
 import { channelMetricsApi } from '@/services/channelMetrics';
 import type { ChannelMetricsResponse } from '@/types';
 
@@ -56,12 +56,12 @@ export function useChannelMetrics(channelId: string): UseChannelMetricsReturn {
     const resetMutation = useMutation({
         mutationFn: () => channelMetricsApi.resetChannel(channelId),
         onSuccess: () => {
-            toast.success('Channel reset successfully');
+            showToast.success('Channel reset successfully');
             queryClient.invalidateQueries({ queryKey: ['channel-metrics', channelId] });
             // Also invalidate the batched query used by ChannelsPage
             queryClient.invalidateQueries({ queryKey: ['all-channel-metrics'] });
         },
-        onError: () => toast.error('Failed to reset channel'),
+        onError: () => showToast.error('Failed to reset channel'),
     });
 
     return {

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Task } from '../../types';
-import { Clock, User, Zap, CheckCircle2, AlertCircle, Loader2, MessageSquare, RefreshCw, Monitor } from 'lucide-react';
+import { Clock, User, Zap, CheckCircle2, AlertCircle, MessageSquare, RefreshCw, Monitor } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 interface TaskCardProps {
     task: Task;
@@ -32,7 +33,7 @@ const STATUS_CONFIG: Record<string, {
     in_progress: {
         bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200',
         darkBg: 'dark:bg-blue-500/10', darkText: 'dark:text-blue-300', darkBorder: 'dark:border-blue-500/20',
-        icon: <Loader2 className="w-3 h-3 animate-spin" />, label: 'In Progress'
+        icon: <LoadingSpinner size="xs" />, label: 'In Progress'
     },
     executing: {
         bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200',

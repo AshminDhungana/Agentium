@@ -6,8 +6,9 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Loader2, AlertCircle, BookOpen } from 'lucide-react';
+import { AlertCircle, BookOpen } from 'lucide-react';
 import { api } from '../../services/api';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 export function ConstitutionTab() {
     const [constitution, setConstitution] = useState<string | null>(null);
@@ -32,9 +33,8 @@ export function ConstitutionTab() {
 
     if (isLoading) {
         return (
-            <div className="flex items-center justify-center py-24 text-gray-400 dark:text-gray-600">
-                <Loader2 className="w-6 h-6 animate-spin mr-2" />
-                Loading constitution…
+            <div className="flex items-center justify-center py-24 text-gray-400 dark:text-gray-500">
+                <LoadingSpinner size="md" label="Loading constitution…" />
             </div>
         );
     }
@@ -49,8 +49,8 @@ export function ConstitutionTab() {
     }
 
     return (
-        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-800">
+        <div className="bg-white dark:bg-[#161b27] rounded-xl border border-gray-200 dark:border-[#1e2535] overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-[#1e2535]">
                 <div className="flex items-center gap-2">
                     <BookOpen className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
                     <h2 className="text-base font-semibold text-gray-900 dark:text-white">

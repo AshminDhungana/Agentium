@@ -8,9 +8,10 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Mic, MicOff, Loader2, X, Terminal, Copy, Check } from 'lucide-react';
+import { Mic, MicOff, X, Terminal, Copy, Check } from 'lucide-react';
 import { voiceBridgeService, BridgeStatus } from '@/services/voiceBridge';
 import { useAuthStore } from '@/store/authStore';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 // ── OS Detection ─────────────────────────────────────────────────────────────
 
@@ -116,7 +117,7 @@ function InstallNotification({ info, onClose }: InstallNotificationProps) {
       className="
         fixed bottom-20 left-4 z-50 w-[340px]
         bg-white dark:bg-[#0d1117]
-        border border-gray-200 dark:border-gray-700
+        border border-gray-200 dark:border-[#1e2535]
         rounded-xl shadow-lg dark:shadow-2xl
         animate-in slide-in-from-bottom-4 fade-in duration-300
       "
@@ -154,7 +155,7 @@ function InstallNotification({ info, onClose }: InstallNotificationProps) {
             <p className="text-[10px] text-gray-400 dark:text-gray-500 mb-1 uppercase tracking-wide">
               {item.caption}
             </p>
-            <div className="group flex items-center gap-2 bg-gray-50 dark:bg-black/50 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2">
+            <div className="group flex items-center gap-2 bg-gray-50 dark:bg-black/50 border border-gray-200 dark:border-[#1e2535] rounded-lg px-3 py-2">
               <code className="flex-1 text-[11px] text-green-600 dark:text-green-400 font-mono break-all leading-relaxed">
                 {item.cmd}
               </code>
@@ -174,7 +175,7 @@ function InstallNotification({ info, onClose }: InstallNotificationProps) {
       </div>
 
       {/* Footer */}
-      <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between">
+      <div className="px-4 py-3 border-t border-gray-100 dark:border-[#1e2535] flex items-center justify-between">
         <p className="text-[10px] text-gray-400 dark:text-gray-600">
           After running, click the mic icon to reconnect.
         </p>
@@ -299,7 +300,7 @@ export function VoiceIndicator({ iconOnly = false }: VoiceIndicatorProps) {
         aria-pressed={effectiveStatus === 'connected'}
       >
         {effectiveStatus === 'connecting' ? (
-          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          <LoadingSpinner size="xs" />
         ) : effectiveStatus === 'connected' ? (
           <span className="relative flex h-3.5 w-3.5 items-center justify-center">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60" />

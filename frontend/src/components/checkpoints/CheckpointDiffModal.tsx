@@ -1,5 +1,6 @@
+import { showToast } from '@/hooks/useToast';
 import React, { useState, useEffect } from 'react';
-import { Loader2, AlertCircle, X, ChevronRight, ChevronDown, Plus, Minus, FileText } from 'lucide-react';
+import { AlertCircle, X, ChevronRight, ChevronDown, Plus, Minus, FileText } from 'lucide-react';
 import { checkpointsService, BranchCompareResult, FieldDiff, AgentStateDiff, ArtifactDiff } from '../../services/checkpoints';
 import { toast } from 'react-hot-toast';
 
@@ -113,7 +114,7 @@ export const CheckpointDiffModal: React.FC<CheckpointDiffModalProps> = ({
                 if (isMounted) {
                     const msg = err?.response?.data?.detail || err?.message || 'Failed to compare branches';
                     setError(msg);
-                    toast.error(msg);
+                    showToast.error(msg);
                 }
             } finally {
                 if (isMounted) setIsLoading(false);
@@ -171,7 +172,7 @@ export const CheckpointDiffModal: React.FC<CheckpointDiffModalProps> = ({
                 {/* Body elements */}
                 {isLoading ? (
                     <div className="flex-1 flex flex-col items-center justify-center p-12 text-slate-400">
-                        <Loader2 className="w-8 h-8 animate-spin mb-4" />
+                        <LoadingSpinner size="lg" />
                         <p>Computing diffs...</p>
                     </div>
                 ) : error ? (
@@ -301,3 +302,4 @@ export const CheckpointDiffModal: React.FC<CheckpointDiffModalProps> = ({
 
 // Required wrapper to provide GitBranch icon
 import { GitBranch } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';

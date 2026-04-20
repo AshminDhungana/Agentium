@@ -1,5 +1,5 @@
 import axios from 'axios';
-import toast from 'react-hot-toast';
+import { showToast } from '@/hooks/useToast';
 
 const API_URL = import.meta.env.VITE_API_BASE_URL || '';
 
@@ -50,18 +50,18 @@ api.interceptors.response.use(
                 });
             }
         } else if (status === 403) {
-            toast.error(`Permission Denied: ${message}`);
+            showToast.error(`Permission Denied: ${message}`);
         } else if (status === 404) {
             // Suppress 404 toasts for GET requests — handled by the component.
             if (error.config?.method !== 'get') {
-                toast.error(`Not Found: ${message}`);
+                showToast.error(`Not Found: ${message}`);
             }
         } else if (status >= 500) {
             // Suppress server-error toasts for endpoints that handle 5xx themselves.
             const silentPaths = ['/api/v1/chat/history'];
             const isSilent = silentPaths.some((p) => error.config?.url?.includes(p));
             if (!isSilent) {
-                toast.error(`Server Error: ${message}`);
+                showToast.error(`Server Error: ${message}`);
             }
         } else if (status === 429) {
             // Rate limited — retry after the suggested delay (default 5 s).
@@ -79,11 +79,11 @@ api.interceptors.response.use(
                 });
             } else {
                 // Exceeded retry budget — surface error to caller.
-                toast.error('Rate limit exceeded. Please try again later.');
+                showToast.error('Rate limit exceeded. Please try again later.');
             }
         } else if (status !== undefined && status !== 401) {
             // 400, 422, etc. — show the detail message.
-            toast.error(message);
+            showToast.error(message);
         }
 
         return Promise.reject(error);

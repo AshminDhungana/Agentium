@@ -7,7 +7,7 @@
  * All errors are caught internally; the rest of the app is never affected.
  */
 
-import toast from 'react-hot-toast';
+import { showToast } from '@/hooks/useToast';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -69,7 +69,7 @@ class VoiceBridgeService {
 
       // Any other error (401, 503, parse failure) — surface to the user.
       console.warn('[voiceBridge] Could not fetch voice token:', err);
-      toast.error('Voice bridge: failed to get token — running in text mode');
+      showToast.error('Voice bridge: failed to get token — running in text mode');
       this._setStatus('error');
       return;
     }
@@ -184,7 +184,7 @@ class VoiceBridgeService {
         this.retryTimer = setTimeout(() => this._openSocket(token), delay);
       } else {
         console.warn('[voiceBridge] Max reconnect attempts reached — going offline');
-        toast.error('Voice bridge disconnected — text chat unaffected');
+        showToast.error('Voice bridge disconnected — text chat unaffected');
         this._setStatus('offline');
       }
     };

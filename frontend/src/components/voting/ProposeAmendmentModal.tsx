@@ -8,9 +8,10 @@
  */
 
 import React, { useState } from 'react';
-import { Loader2, AlertCircle, Shield, X } from 'lucide-react';
+import { AlertCircle, Shield, X } from 'lucide-react';
 import { votingService, AmendmentProposal } from '../../services/voting';
-import toast from 'react-hot-toast';
+import { showToast } from '@/hooks/useToast';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 interface ProposeAmendmentModalProps {
     onClose: () => void;
@@ -55,11 +56,11 @@ export function ProposeAmendmentModal({ onClose, onSuccess }: ProposeAmendmentMo
         setIsSubmitting(true);
         try {
             await votingService.proposeAmendment(form);
-            toast.success('Amendment proposed successfully!');
+            showToast.success('Amendment proposed successfully!');
             onSuccess();
             onClose();
         } catch (error: any) {
-            toast.error(
+            showToast.error(
                 `Failed to propose amendment: ${error.response?.data?.detail || error.message}`
             );
         } finally {
@@ -69,7 +70,7 @@ export function ProposeAmendmentModal({ onClose, onSuccess }: ProposeAmendmentMo
 
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white dark:bg-gray-900 rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+            <div className="bg-white dark:bg-[#161b27] rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-gray-200 dark:border-[#1e2535]">
                 <div className="p-6">
                     {/* Header */}
                     <div className="flex justify-between items-center mb-6">
@@ -81,7 +82,7 @@ export function ProposeAmendmentModal({ onClose, onSuccess }: ProposeAmendmentMo
                         </div>
                         <button
                             aria-label="close"
-                            className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+                            className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-[#1e2535] text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors duration-200"
                             onClick={onClose}
                         >
                             <X className="w-5 h-5" />
@@ -96,10 +97,10 @@ export function ProposeAmendmentModal({ onClose, onSuccess }: ProposeAmendmentMo
                             </label>
                             <input
                                 type="text"
-                                className={`w-full px-4 py-2 border rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 transition ${
+                                className={`w-full px-4 py-2 border rounded-lg bg-white dark:bg-[#0f1117] text-gray-900 dark:text-white focus:outline-none focus:ring-2 transition-colors duration-200 ${
                                     errors.title
                                         ? 'border-red-400 focus:ring-red-400/30'
-                                        : 'border-gray-300 dark:border-gray-600 focus:ring-blue-500/40'
+                                        : 'border-gray-300 dark:border-[#1e2535] focus:ring-blue-500/40'
                                 }`}
                                 placeholder="Brief title for the amendment"
                                 value={form.title}
@@ -119,7 +120,7 @@ export function ProposeAmendmentModal({ onClose, onSuccess }: ProposeAmendmentMo
                                 Proposed Changes (Diff) <span className="text-red-500">*</span>
                             </label>
                             <textarea
-                                className={`w-full px-4 py-2 border rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-mono text-sm focus:outline-none focus:ring-2 transition ${
+                                className={`w-full px-4 py-2 border rounded-lg bg-white dark:bg-[#0f1117] text-gray-900 dark:text-white font-mono text-sm focus:outline-none focus:ring-2 transition-colors duration-200 ${
                                     errors.diff_markdown
                                         ? 'border-red-400 focus:ring-red-400/30'
                                         : 'border-gray-300 dark:border-gray-600 focus:ring-blue-500/40'
@@ -136,8 +137,8 @@ export function ProposeAmendmentModal({ onClose, onSuccess }: ProposeAmendmentMo
                                 <p className="text-xs text-red-600 dark:text-red-400 mt-1">{errors.diff_markdown}</p>
                             ) : (
                                 <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                                    Use <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded">+</code> to add and{' '}
-                                    <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded">-</code> to remove content
+                                    Use <code className="bg-gray-100 dark:bg-[#1e2535] px-1 rounded">+</code> to add and{' '}
+                                    <code className="bg-gray-100 dark:bg-[#1e2535] px-1 rounded">-</code> to remove content
                                 </p>
                             )}
                         </div>
@@ -148,7 +149,7 @@ export function ProposeAmendmentModal({ onClose, onSuccess }: ProposeAmendmentMo
                                 Rationale <span className="text-red-500">*</span>
                             </label>
                             <textarea
-                                className={`w-full px-4 py-2 border rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 transition ${
+                                className={`w-full px-4 py-2 border rounded-lg bg-white dark:bg-[#0f1117] text-gray-900 dark:text-white focus:outline-none focus:ring-2 transition-colors duration-200 ${
                                     errors.rationale
                                         ? 'border-red-400 focus:ring-red-400/30'
                                         : 'border-gray-300 dark:border-gray-600 focus:ring-blue-500/40'
@@ -173,7 +174,7 @@ export function ProposeAmendmentModal({ onClose, onSuccess }: ProposeAmendmentMo
                             </label>
                             <select
                                 aria-label="voting period"
-                                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40 transition"
+                                className="w-full px-4 py-2 border border-gray-300 dark:border-[#1e2535] rounded-lg bg-white dark:bg-[#0f1117] text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40 transition-colors duration-200"
                                 value={form.voting_period_hours}
                                 onChange={e => setForm(f => ({ ...f, voting_period_hours: parseInt(e.target.value) }))}
                             >
@@ -195,7 +196,7 @@ export function ProposeAmendmentModal({ onClose, onSuccess }: ProposeAmendmentMo
                         {/* Actions */}
                         <div className="flex justify-end gap-3 pt-2">
                             <button
-                                className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 font-medium text-sm transition-colors"
+                                className="px-4 py-2 border border-gray-300 dark:border-[#1e2535] rounded-lg hover:bg-gray-100 dark:hover:bg-[#1e2535] text-gray-700 dark:text-gray-300 font-medium text-sm transition-colors duration-200"
                                 onClick={onClose}
                                 disabled={isSubmitting}
                             >
@@ -206,7 +207,7 @@ export function ProposeAmendmentModal({ onClose, onSuccess }: ProposeAmendmentMo
                                 onClick={handleSubmit}
                                 disabled={isSubmitting}
                             >
-                                {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
+                                {isSubmitting && <LoadingSpinner size="sm" />}
                                 {isSubmitting ? 'Submitting…' : 'Submit Proposal'}
                             </button>
                         </div>

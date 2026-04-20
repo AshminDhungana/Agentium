@@ -12,15 +12,15 @@ import {
     XCircle,
     AlertTriangle,
     Clock,
-    Loader2,
     Shield,
     WifiOff,
     Download,
     Activity,
 } from 'lucide-react';
 import { api } from '@/services/api';
-import toast from 'react-hot-toast';
+import { showToast } from '@/hooks/useToast';
 import { useAuthStore } from '@/store/authStore';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -236,23 +236,23 @@ export function MobilePage() {
                 platform: newDevice.platform,
                 token: newDevice.token,
             });
-            toast.success('Device registered successfully');
+            showToast.success('Device registered successfully');
             setShowAddDeviceModal(false);
             setNewDevice({ platform: 'ios', token: '' });
             fetchDevices();
         } catch (error) {
-            toast.error(getErrorMessage(error, 'Failed to register device'));
+            showToast.error(getErrorMessage(error, 'Failed to register device'));
         }
     };
 
     const handleUnregisterDevice = async (token: string) => {
         try {
             await api.delete(`/api/v1/mobile/register-device/${token}`);
-            toast.success('Device unregistered');
+            showToast.success('Device unregistered');
             setConfirmDeleteToken(null);
             fetchDevices();
         } catch (error) {
-            toast.error(getErrorMessage(error, 'Failed to unregister device'));
+            showToast.error(getErrorMessage(error, 'Failed to unregister device'));
         }
     };
 
@@ -260,10 +260,10 @@ export function MobilePage() {
         setSavingPrefs(true);
         try {
             await api.put('/api/v1/mobile/notifications/preferences', editingPrefs);
-            toast.success('Preferences saved');
+            showToast.success('Preferences saved');
             setPreferences(editingPrefs);
         } catch (error) {
-            toast.error(getErrorMessage(error, 'Failed to save preferences'));
+            showToast.error(getErrorMessage(error, 'Failed to save preferences'));
         } finally {
             setSavingPrefs(false);
         }
@@ -277,12 +277,12 @@ export function MobilePage() {
                     : '/api/v1/mobile/offline/task-queue';
             const response = await api.get(endpoint);
             if (type === 'constitution') {
-                toast.success(`Constitution synced: v${response.data.version}`);
+                showToast.success(`Constitution synced: v${response.data.version}`);
             } else {
-                toast.success(`${response.data.total_queued} tasks queued for offline`);
+                showToast.success(`${response.data.total_queued} tasks queued for offline`);
             }
         } catch (error) {
-            toast.error(getErrorMessage(error, 'Failed to sync'));
+            showToast.error(getErrorMessage(error, 'Failed to sync'));
         }
     };
 
@@ -453,7 +453,7 @@ export function MobilePage() {
 
                         {dashboardLoading ? (
                             <div className="p-16 text-center">
-                                <Loader2 className="w-8 h-8 animate-spin text-emerald-600 dark:text-emerald-400 mx-auto mb-4" />
+                                <LoadingSpinner size="lg" />
                                 <p className="text-sm text-gray-500 dark:text-gray-400">Loading...</p>
                             </div>
                         ) : dashboard ? (
@@ -569,7 +569,7 @@ export function MobilePage() {
 
                             {devicesLoading ? (
                                 <div className="p-16 text-center">
-                                    <Loader2 className="w-8 h-8 animate-spin text-blue-600 dark:text-blue-400 mx-auto mb-4" />
+                                    <LoadingSpinner size="lg" />
                                     <p className="text-sm text-gray-500 dark:text-gray-400">Loading devices...</p>
                                 </div>
                             ) : devices.length === 0 ? (
@@ -672,7 +672,7 @@ export function MobilePage() {
 
                         {prefsLoading ? (
                             <div className="p-16 text-center">
-                                <Loader2 className="w-8 h-8 animate-spin text-purple-600 dark:text-purple-400 mx-auto mb-4" />
+                                <LoadingSpinner size="lg" />
                                 <p className="text-sm text-gray-500 dark:text-gray-400">Loading preferences...</p>
                             </div>
                         ) : (
@@ -752,7 +752,7 @@ export function MobilePage() {
                                         disabled={savingPrefs || !hasUnsavedChanges}
                                         className="w-full px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 dark:hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors duration-150 shadow-sm flex items-center justify-center gap-2"
                                     >
-                                        {savingPrefs && <Loader2 className="w-4 h-4 animate-spin" />}
+                                        {savingPrefs && <LoadingSpinner size="sm" />}
                                         {savingPrefs ? 'Saving…' : 'Save Preferences'}
                                     </button>
                                 </div>

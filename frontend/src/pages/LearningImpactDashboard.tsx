@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Sparkles, TrendingUp, AlertTriangle, Cpu, RefreshCw, CheckCircle, Wrench } from 'lucide-react';
+import { Sparkles, TrendingUp, AlertTriangle, Cpu, RefreshCw, CheckCircle, Wrench, Search } from 'lucide-react';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 interface ImpactStats {
   success_rate_delta: number;
@@ -58,7 +60,7 @@ export function LearningImpactDashboard() {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64 text-gray-500 dark:text-gray-400">
-        <RefreshCw className="w-8 h-8 animate-spin" />
+        <LoadingSpinner size="lg" />
       </div>
     );
   }
@@ -170,9 +172,11 @@ export function LearningImpactDashboard() {
             </div>
           ))}
           {patterns.length === 0 && (
-            <div className="p-6 text-center text-gray-500 dark:text-gray-400">
-              No recent patterns discovered.
-            </div>
+            <EmptyState
+              icon={Search}
+              title="No patterns discovered"
+              description="No recent patterns discovered."
+            />
           )}
         </div>
       </div>

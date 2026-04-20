@@ -11,7 +11,7 @@ import type { Message, MessageMetadata, MessageAttachment as Attachment } from '
 import { inboxApi, UnifiedConversation, UnifiedMessage } from '@/services/inboxApi';
 import { api } from '@/services/api';
 import {
-    Send, Crown, Bot, AlertCircle, Loader2, Wifi, WifiOff, CheckCircle,
+    Send, Crown, Bot, AlertCircle, Wifi, WifiOff, CheckCircle,
     RefreshCw, Paperclip, Image as ImageIcon, File, X, Mic, MicOff, Pause,
     Download, Copy, Sparkles, Code, FileText, Video, Music, Archive,
     Maximize2, MoreHorizontal, Smile, Plus, MessageCircle, Smartphone,
@@ -19,7 +19,7 @@ import {
     FolderOpen, Trash2, Eye, UploadCloud, HardDrive, Search, Filter,
 } from 'lucide-react';
 import { format, isToday, isYesterday } from 'date-fns';
-import toast from 'react-hot-toast';
+import { showToast } from '@/hooks/useToast';
 import { fileApi, UploadedFile as ApiUploadedFile } from '@/services/fileApi';
 import { voiceApi } from '@/services/voiceApi';
 import { chatApi } from '@/services/chatApi';
@@ -27,6 +27,8 @@ import { localVoice } from '@/services/localVoice';
 import { useVoiceBridge } from '@/hooks/useVoiceBridge';
 import { VoiceInteractionEvent } from '@/services/voiceBridge';
 import { VoiceSettingsModal } from '@/components/VoiceSettingsModal';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -277,7 +279,7 @@ export function ChatPage() {
                 // useEffect below (Issue 3).
                 setMessages((prev) => [...prev, newMessage]);
                 if (msg.metadata?.task_created) {
-                    toast.success(`Task ${msg.metadata.task_id} created`);
+                    showToast.success(`Task ${msg.metadata.task_id} created`);
                 }
             }
         });
@@ -410,7 +412,7 @@ export function ChatPage() {
         } catch (error) {
             if ((error as any)?.name === 'AbortError' || (error as any)?.name === 'CanceledError') return;
             console.error('[ChatPage] Failed to load chat history:', error);
-            toast.error('Could not load chat history — your new messages will still work.');
+            showToast.error('Could not load chat history — your new messages will still work.');
         }
     }, [trackId]);
 
@@ -418,7 +420,7 @@ export function ChatPage() {
         e.preventDefault();
         if (!input.trim() && uploadedFiles.length === 0) return;
         if (!isConnected) {
-            toast.error('Not connected to Head of Council');
+            showToast.error('Not connected to Head of Council');
             return;
         }
 
@@ -496,7 +498,7 @@ export function ChatPage() {
                 () => stopRecording(),
             );
         } catch (err: any) {
-            toast.error(err.message || 'Microphone access denied');
+            showToast.error(err.message || 'Microphone access denied');
             stopRecording();
         }
     };
@@ -516,7 +518,7 @@ export function ChatPage() {
                     const result = await voiceApi.transcribe(blob, selectedLanguage || undefined);
                     if (result.text) setInput((p) => p + (p ? ' ' : '') + result.text);
                 } catch (e: any) {
-                    toast.error(e.message || 'Transcription failed');
+                    showToast.error(e.message || 'Transcription failed');
                 }
             };
 
@@ -525,7 +527,7 @@ export function ChatPage() {
             setRecordingTime(0);
             recordingIntervalRef.current = setInterval(() => setRecordingTime((p) => p + 1), 1000);
         } catch (err: any) {
-            toast.error(err.message || 'Microphone access denied');
+            showToast.error(err.message || 'Microphone access denied');
         }
     };
 
@@ -554,32 +556,32 @@ export function ChatPage() {
             setIsSpeaking(null);
             return;
         }
-        const toastId = toast.loading('Generating speech…');
+        const toastId = showToast.loading('Generating speech…');
         try {
             setIsSpeaking(messageId);
             const audioBlob = await voiceApi.synthesize({ text: content, voice: (selectedVoice || 'alloy') as 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer' });
-            toast.dismiss(toastId);
+            showToast.dismiss(toastId);
             if (audioBlob && audioBlob.size > 0) {
                 const audioUrl = URL.createObjectURL(audioBlob);
                 const audio = new Audio(audioUrl);
                 audioPlayerRef.current = audio;
                 audio.onended = () => { setIsSpeaking(null); URL.revokeObjectURL(audioUrl); };
-                audio.onerror = () => { setIsSpeaking(null); URL.revokeObjectURL(audioUrl); toast.error('Audio playback failed'); };
+                audio.onerror = () => { setIsSpeaking(null); URL.revokeObjectURL(audioUrl); showToast.error('Audio playback failed'); };
                 audio.play();
             } else {
                 // Local browser TTS — synthesize already played it
                 setIsSpeaking(null);
             }
         } catch (error: any) {
-            toast.dismiss(toastId);
-            toast.error(error.message || 'Speech synthesis failed');
+            showToast.dismiss(toastId);
+            showToast.error(error.message || 'Speech synthesis failed');
             setIsSpeaking(null);
         }
     };
 
     const copyMessage = (content: string) => {
         navigator.clipboard.writeText(content);
-        toast.success('Copied');
+        showToast.success('Copied');
     };
 
     // ── File upload ───────────────────────────────────────────────────────────
@@ -617,7 +619,7 @@ export function ChatPage() {
                     delete next[id];
                     return next;
                 });
-                toast.error(`Upload failed: ${error.message}`);
+                showToast.error(`Upload failed: ${error.message}`);
             }
         }
     };
@@ -636,7 +638,7 @@ export function ChatPage() {
                 const a = document.createElement('a');
                 a.href = attachment.data; a.download = attachment.name;
                 document.body.appendChild(a); a.click(); document.body.removeChild(a);
-                toast.success('Downloaded');
+                showToast.success('Downloaded');
             } else if (attachment.url) {
                 // Issue 8: use the authenticated api service so protected file URLs
                 // get the correct Authorization header and 401s are handled globally.
@@ -646,10 +648,10 @@ export function ChatPage() {
                 a.href = url; a.download = attachment.name;
                 document.body.appendChild(a); a.click(); document.body.removeChild(a);
                 window.URL.revokeObjectURL(url);
-                toast.success('Downloaded');
+                showToast.success('Downloaded');
             }
         } catch (err: any) {
-            toast.error(err.response?.data?.detail || err.message || 'Download failed');
+            showToast.error(err.response?.data?.detail || err.message || 'Download failed');
         }
     };
 
@@ -663,7 +665,7 @@ export function ChatPage() {
             setConversations(res.conversations);
         } catch (err: any) {
             if (err?.name === 'AbortError' || err?.name === 'CanceledError') return;
-            toast.error(err.message || 'Failed to load conversations');
+            showToast.error(err.message || 'Failed to load conversations');
         } finally {
             if (!signal?.aborted) setInboxLoading(false);
         }
@@ -676,9 +678,9 @@ export function ChatPage() {
             await inboxApi.reply(selectedId, replyContent.trim());
             setReplyContent('');
             await loadConversations();
-            toast.success('Reply sent');
+            showToast.success('Reply sent');
         } catch (err: any) {
-            toast.error(err.response?.data?.detail || err.message || 'Failed to send reply');
+            showToast.error(err.response?.data?.detail || err.message || 'Failed to send reply');
         } finally {
             setIsSending(false);
         }
@@ -742,9 +744,9 @@ export function ChatPage() {
         for (const file of Array.from(files)) {
             try {
                 await fileApi.uploadFiles([file]);
-                toast.success(`${file.name} uploaded`);
+                showToast.success(`${file.name} uploaded`);
             } catch (e: any) {
-                toast.error(`Failed: ${e.message}`);
+                showToast.error(`Failed: ${e.message}`);
             }
         }
         loadBrowserFiles();
@@ -755,10 +757,10 @@ export function ChatPage() {
         try {
             // Issue 7: use fileApi so the auth header is handled consistently
             await fileApi.deleteFile(storedName);
-            toast.success('File deleted');
+            showToast.success('File deleted');
             loadBrowserFiles();
         } catch (e: any) {
-            toast.error(e.response?.data?.detail || e.message || 'Delete failed');
+            showToast.error(e.response?.data?.detail || e.message || 'Delete failed');
         } finally {
             setDeletingFile(null);
         }
@@ -904,7 +906,7 @@ export function ChatPage() {
                                 )}
                                 {activeTab === 'ai' && isConnecting && (
                                     <div className="flex items-center gap-2 text-sm text-gray-400 dark:text-gray-500">
-                                        <Loader2 className="w-4 h-4 animate-spin" /> Connecting…
+                                        <LoadingSpinner size="sm" /> Connecting…
                                     </div>
                                 )}
 
@@ -917,7 +919,7 @@ export function ChatPage() {
                                             ? 'text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-500/10 border-yellow-200 dark:border-yellow-500/20'
                                             : 'text-gray-400 dark:text-gray-500 bg-gray-50 dark:bg-[#1e2535] border-gray-200 dark:border-[#1e2535]'
                                     }`} title={`Voice bridge: ${bridgeStatus}`}>
-                                        {bridgeStatus === 'connecting' ? <Loader2 className="w-3 h-3 animate-spin" />
+                                        {bridgeStatus === 'connecting' ? <LoadingSpinner size="xs" />
                                          : bridgeStatus === 'connected' ? <Mic className="w-3 h-3" />
                                          : <MicOff className="w-3 h-3" />}
                                         <span className="capitalize">{bridgeStatus === 'connected' ? 'Voice' : bridgeStatus}</span>
@@ -966,16 +968,12 @@ export function ChatPage() {
                         <div className="flex-1 overflow-y-auto px-4 py-6">
                             <div className="max-w-3xl mx-auto space-y-6">
                                 {messages.length === 0 && (
-                                    <div className="flex flex-col items-center justify-center h-64 text-center">
-                                        <div className="w-16 h-16 bg-blue-100 dark:bg-blue-500/10 rounded-3xl flex items-center justify-center mb-4">
-                                            <Crown className="w-8 h-8 text-blue-500 dark:text-blue-400" />
-                                        </div>
-                                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Head of Council</h3>
-                                        <p className="text-gray-500 dark:text-gray-400 text-sm max-w-sm">
-                                            {isConnected
-                                                ? 'Send a message to your Head of Council.'
-                                                : 'Connect to start chatting.'}
-                                        </p>
+                                    <div className="h-64 flex items-center justify-center">
+                                        <EmptyState
+                                            icon={Crown}
+                                            title="Head of Council"
+                                            description={isConnected ? 'Send a message to your Head of Council.' : 'Connect to start chatting.'}
+                                        />
                                     </div>
                                 )}
 
@@ -1051,7 +1049,7 @@ export function ChatPage() {
                                                 {uf.isUploading && (
                                                     uploadProgress[uf.id] !== undefined
                                                         ? <span className="text-xs text-blue-500 font-mono w-8 text-right tabular-nums">{uploadProgress[uf.id]}%</span>
-                                                        : <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-500" />
+                                                        : <LoadingSpinner size="xs" />
                                                 )}
                                                 {uf.uploadError && <span title={uf.uploadError}><AlertCircle className="w-3.5 h-3.5 text-red-500" /></span>}
                                                 {!uf.isUploading && !uf.uploadError && (
@@ -1145,15 +1143,12 @@ export function ChatPage() {
                         <div className="w-80 flex-shrink-0 bg-white dark:bg-[#161b27] border-r border-gray-200 dark:border-[#1e2535] flex flex-col">
                             <div className="p-4 border-b border-gray-200 dark:border-[#1e2535] flex items-center justify-between">
                                 <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Active Conversations</h2>
-                                {inboxLoading && <Loader2 className="w-4 h-4 animate-spin text-gray-400" />}
+                                {inboxLoading && <LoadingSpinner size="sm" className="text-gray-400" />}
                             </div>
                             <div className="flex-1 overflow-y-auto divide-y divide-gray-100 dark:divide-[#1e2535]">
                                 {conversations.length === 0 && !inboxLoading ? (
-                                    <div className="p-8 text-center">
-                                        <div className="w-12 h-12 bg-gray-100 dark:bg-[#1e2535] rounded-2xl flex items-center justify-center mx-auto mb-3">
-                                            <Inbox className="w-6 h-6 text-gray-400 dark:text-gray-500" />
-                                        </div>
-                                        <p className="text-sm text-gray-500 dark:text-gray-400">No active conversations</p>
+                                    <div className="p-8">
+                                        <EmptyState icon={Inbox} title="No active conversations" size="sm" />
                                     </div>
                                 ) : conversations.map((conv) => {
                                     const latestMsg   = conv.messages?.at(-1);
@@ -1230,7 +1225,7 @@ export function ChatPage() {
                                             <button onClick={handleSendReply}
                                                 disabled={!replyContent.trim() || isSending}
                                                 className="p-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-200 dark:disabled:bg-[#1e2535] disabled:cursor-not-allowed text-white disabled:text-gray-400 dark:disabled:text-gray-600 rounded-xl transition-all duration-150">
-                                                {isSending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+                                                {isSending ? <LoadingSpinner size="md" /> : <Send className="w-5 h-5" />}
                                             </button>
                                         </div>
                                         <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">Reply will be routed to the user's original channel.</p>
@@ -1238,10 +1233,7 @@ export function ChatPage() {
                                 </>
                             ) : (
                                 <div className="flex-1 flex items-center justify-center">
-                                    <div className="text-center">
-                                        <Inbox className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
-                                        <p className="text-gray-500 dark:text-gray-400 text-sm">Select a conversation</p>
-                                    </div>
+                                    <EmptyState icon={Inbox} title="Select a conversation" />
                                 </div>
                             )}
                         </div>
@@ -1307,14 +1299,14 @@ export function ChatPage() {
 
                             {browserLoading ? (
                                 <div className="flex items-center justify-center h-48">
-                                    <Loader2 className="w-8 h-8 animate-spin text-violet-500" />
+                                    <LoadingSpinner size="lg" className="text-violet-500" />
                                 </div>
                             ) : filteredFiles.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center h-48 text-center">
-                                    <FolderOpen className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
-                                    <p className="text-gray-500 dark:text-gray-400 text-sm">
-                                        {browserSearch ? 'No files match your search' : 'No files uploaded yet'}
-                                    </p>
+                                <div className="h-48 flex items-center justify-center">
+                                    <EmptyState
+                                        icon={FolderOpen}
+                                        title={browserSearch ? 'No files match your search' : 'No files uploaded yet'}
+                                    />
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
@@ -1344,7 +1336,7 @@ export function ChatPage() {
                                                 <button onClick={() => handleDeleteFile(f.stored_name)}
                                                     disabled={deletingFile === f.stored_name}
                                                     className="p-2 bg-red-500/80 hover:bg-red-500 rounded-lg text-white transition-colors" title="Delete">
-                                                    {deletingFile === f.stored_name ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                                                    {deletingFile === f.stored_name ? <LoadingSpinner size="sm" /> : <Trash2 className="w-4 h-4" />}
                                                 </button>
                                             </div>
                                         </div>

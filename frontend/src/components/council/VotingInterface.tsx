@@ -9,7 +9,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import toast from 'react-hot-toast';
+import { showToast } from '@/hooks/useToast';
 import {
     votingService,
     AmendmentVoting,
@@ -18,7 +18,8 @@ import {
     isVotingActive,
     getStatusColor,
 } from '../../services/voting';
-import { Loader2, ThumbsUp, ThumbsDown, Minus, Clock, Users, CheckCircle } from 'lucide-react';
+import { ThumbsUp, ThumbsDown, Minus, Clock, Users, CheckCircle } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 interface VotingInterfaceProps {
     embedded?: boolean;
@@ -82,14 +83,14 @@ export const VotingInterface: React.FC<VotingInterfaceProps> = ({ embedded = fal
         setIsVoting(true);
         try {
             await votingService.castVote(amendmentId, castVote, rationale || undefined);
-            toast.success(`Vote cast: ${castVote}`);
+            showToast.success(`Vote cast: ${castVote}`);
             setCastVote(null);
             setRationale('');
             setSelectedAmendment(null);
             await loadAmendments();
             onVoteCast?.(amendmentId);
         } catch (error: any) {
-            toast.error(`Failed to cast vote: ${error.response?.data?.detail || error.message}`);
+            showToast.error(`Failed to cast vote: ${error.response?.data?.detail || error.message}`);
         } finally {
             setIsVoting(false);
         }
@@ -101,7 +102,7 @@ export const VotingInterface: React.FC<VotingInterfaceProps> = ({ embedded = fal
     if (isLoading) {
         return (
             <div className="flex items-center justify-center p-8">
-                <Loader2 className="w-6 h-6 animate-spin text-blue-600 mr-2" />
+                <LoadingSpinner size="md" />
                 <span className="text-sm text-gray-500 dark:text-gray-400">Loading active votes...</span>
             </div>
         );
@@ -131,7 +132,7 @@ export const VotingInterface: React.FC<VotingInterfaceProps> = ({ embedded = fal
                     {activeAmendments.map((amendment) => (
                         <div
                             key={amendment.id}
-                            className={`bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 cursor-pointer transition-shadow hover:shadow-sm ${
+                            className={`bg-white dark:bg-[#161b27] rounded-lg border border-gray-200 dark:border-[#1e2535] p-4 cursor-pointer transition-shadow hover:shadow-sm ${
                                 selectedAmendment?.id === amendment.id ? 'ring-2 ring-blue-500' : ''
                             }`}
                             onClick={() => setSelectedAmendment(prev =>
@@ -171,7 +172,7 @@ export const VotingInterface: React.FC<VotingInterfaceProps> = ({ embedded = fal
                                     </span>
                                     <span className="text-red-600 font-medium">Against: {amendment.votes_against}</span>
                                 </div>
-                                <div className="flex h-2 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-700">
+                                <div className="flex h-2 rounded-full overflow-hidden bg-gray-200 dark:bg-[#1e2535]">
                                     {totalVotes(amendment) > 0 && (
                                         <>
                                             <div
@@ -194,7 +195,7 @@ export const VotingInterface: React.FC<VotingInterfaceProps> = ({ embedded = fal
                             {/* Vote Actions — only when this card is selected */}
                             {selectedAmendment?.id === amendment.id && (
                                 <div
-                                    className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700"
+                                    className="mt-4 pt-4 border-t border-gray-200 dark:border-[#1e2535]"
                                     onClick={e => e.stopPropagation()}
                                 >
                                     <p className="text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
@@ -202,9 +203,9 @@ export const VotingInterface: React.FC<VotingInterfaceProps> = ({ embedded = fal
                                     </p>
                                     <div className="flex gap-2 mb-3">
                                         {([ 
-                                            { type: 'for' as VoteType,     Icon: ThumbsUp,   active: 'bg-green-600 text-white', inactive: 'bg-gray-100 dark:bg-gray-700 hover:bg-green-100 dark:hover:bg-green-900' },
-                                            { type: 'against' as VoteType, Icon: ThumbsDown, active: 'bg-red-600 text-white',   inactive: 'bg-gray-100 dark:bg-gray-700 hover:bg-red-100 dark:hover:bg-red-900'   },
-                                            { type: 'abstain' as VoteType, Icon: Minus,      active: 'bg-gray-600 text-white',  inactive: 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600' },
+                                            { type: 'for' as VoteType,     Icon: ThumbsUp,   active: 'bg-green-600 text-white', inactive: 'bg-gray-100 dark:bg-[#1e2535] hover:bg-green-100 dark:hover:bg-green-900' },
+                                            { type: 'against' as VoteType, Icon: ThumbsDown, active: 'bg-red-600 text-white',   inactive: 'bg-gray-100 dark:bg-[#1e2535] hover:bg-red-100 dark:hover:bg-red-900'   },
+                                            { type: 'abstain' as VoteType, Icon: Minus,      active: 'bg-gray-600 text-white',  inactive: 'bg-gray-100 dark:bg-[#1e2535] hover:bg-gray-200 dark:hover:bg-gray-600' },
                                         ]).map(({ type, Icon, active, inactive }) => (
                                             <button
                                                 key={type}
@@ -220,7 +221,7 @@ export const VotingInterface: React.FC<VotingInterfaceProps> = ({ embedded = fal
                                     {castVote && (
                                         <>
                                             <textarea
-                                                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-blue-500/40 resize-none"
+                                                className="w-full p-2 border border-gray-300 dark:border-[#2a3347] rounded-lg bg-white dark:bg-[#0f1117] text-gray-900 dark:text-white text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-blue-500/40 resize-none"
                                                 placeholder="Optional: Provide rationale for your vote..."
                                                 value={rationale}
                                                 onChange={(e) => setRationale(e.target.value)}
@@ -231,7 +232,7 @@ export const VotingInterface: React.FC<VotingInterfaceProps> = ({ embedded = fal
                                                 onClick={() => handleVote(amendment.id)}
                                                 disabled={isVoting}
                                             >
-                                                {isVoting && <Loader2 className="w-4 h-4 animate-spin" />}
+                                                {isVoting && <LoadingSpinner size="sm" />}
                                                 {isVoting ? 'Submitting...' : 'Submit Vote'}
                                             </button>
                                         </>

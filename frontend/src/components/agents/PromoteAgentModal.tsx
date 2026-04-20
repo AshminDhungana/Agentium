@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Agent } from '../../types';
-import { X, TrendingUp, AlertCircle, Loader2, Brain } from 'lucide-react';
+import { X, TrendingUp, AlertCircle, Brain } from 'lucide-react';
 import { AGENT_REASON_MIN_LENGTH, AGENT_REASON_MAX_LENGTH } from '../../constants/agents';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 interface PromoteAgentModalProps {
     agent:     Agent;       // Task agent to promote (3xxxx)
@@ -167,7 +168,7 @@ export const PromoteAgentModal: React.FC<PromoteAgentModalProps> = ({
                             className="flex-1 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 dark:hover:bg-emerald-500 text-white text-sm font-medium rounded-lg transition-colors duration-150 disabled:opacity-40 disabled:cursor-not-allowed shadow-sm flex items-center justify-center gap-2"
                         >
                             {isLoading ? (
-                                <><Loader2 className="w-4 h-4 animate-spin" /> Promoting…</>
+                                <><LoadingSpinner size="sm" /> Promoting…</>
                             ) : (
                                 <><TrendingUp className="w-4 h-4" /> Promote Agent</>
                             )}

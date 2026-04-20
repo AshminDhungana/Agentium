@@ -11,7 +11,6 @@ import {
     Activity,
     ShieldCheck,
     AlertTriangle,
-    Loader2,
     RefreshCw,
     Clock,
     Cpu,
@@ -25,6 +24,8 @@ import {
     ShieldAlert,
     Wrench
 } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { PageSkeleton } from '@/components/ui/PageSkeleton';
 
 const KNOWN_MONITOR_IDS  = ['00001', '00002', '00003'];
 const REFRESH_INTERVAL_MS = 30_000;
@@ -58,7 +59,7 @@ function SeverityBadge({ severity }: { severity: string }) {
         severity === 'critical' ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300' :
         severity === 'major'    ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300' :
         severity === 'moderate' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300' :
-                                  'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300';
+                                  'bg-gray-100 text-gray-600 dark:bg-[#1e2535] dark:text-gray-300';
     return (
         <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${cls}`}>
             {severity}
@@ -70,7 +71,7 @@ function StatusBadge({ status }: { status: string }) {
     const cls =
         status === 'open'     ? 'bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400' :
         status === 'resolved' ? 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
-                                'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400';
+                                'bg-gray-100 text-gray-500 dark:bg-[#1e2535] dark:text-gray-400';
     return (
         <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${cls}`}>
             {status}
@@ -172,7 +173,7 @@ function ViolationsTab({ initialViolations }: ViolationsTabProps) {
                     aria-label="Filter status"
                     value={filterStatus}
                     onChange={e => setFilterStatus(e.target.value)}
-                    className="text-sm border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-1.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="text-sm border border-gray-200 dark:border-[#1e2535] rounded-lg px-3 py-1.5 bg-white dark:bg-[#161b27] text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                     <option value="">All statuses</option>
                     <option value="open">Open</option>
@@ -184,7 +185,7 @@ function ViolationsTab({ initialViolations }: ViolationsTabProps) {
                     aria-label="Filter severity"
                     value={filterSeverity}
                     onChange={e => setFilterSeverity(e.target.value)}
-                    className="text-sm border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-1.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="text-sm border border-gray-200 dark:border-[#1e2535] rounded-lg px-3 py-1.5 bg-white dark:bg-[#161b27] text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                     <option value="">All severities</option>
                     <option value="critical">Critical</option>
@@ -202,7 +203,7 @@ function ViolationsTab({ initialViolations }: ViolationsTabProps) {
                     </button>
                 )}
 
-                {isLoading && <Loader2 className="w-4 h-4 animate-spin text-blue-500" />}
+                {isLoading && <LoadingSpinner size="sm" />}
             </div>
 
             {/* Error state for filter fetch failures */}
@@ -224,7 +225,7 @@ function ViolationsTab({ initialViolations }: ViolationsTabProps) {
                     {violations.map((v: ViolationReport) => (
                         <div
                             key={v.id}
-                            className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5 shadow-sm"
+                            className="bg-white dark:bg-[#0f1117] rounded-xl border border-gray-200 dark:border-[#1e2535] p-5 shadow-sm"
                         >
                             <div className="flex items-start justify-between gap-4">
                                 <div className="flex-1 min-w-0">
@@ -248,7 +249,7 @@ function ViolationsTab({ initialViolations }: ViolationsTabProps) {
                                         className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800/60 hover:bg-green-100 dark:hover:bg-green-900/50 transition-colors disabled:opacity-50"
                                     >
                                         {resolvingId === v.id
-                                            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                            ? <LoadingSpinner size="xs" />
                                             : <CheckCircle className="w-3.5 h-3.5" />
                                         }
                                         Resolve
@@ -263,7 +264,7 @@ function ViolationsTab({ initialViolations }: ViolationsTabProps) {
             {/* Resolve Modal */}
             {resolveModal.open && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-                    <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 w-full max-w-md p-6">
+                    <div className="bg-white dark:bg-[#0f1117] rounded-xl shadow-2xl border border-gray-200 dark:border-[#1e2535] w-full max-w-md p-6">
                         <h3 className="text-base font-bold text-gray-900 dark:text-white mb-1">Resolve Violation</h3>
                         <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
                             Provide resolution notes before marking this violation as resolved.
@@ -273,7 +274,7 @@ function ViolationsTab({ initialViolations }: ViolationsTabProps) {
                             onChange={e => { setResolutionNotes(e.target.value); setResolveError(null); }}
                             placeholder="Describe how the violation was addressed..."
                             rows={4}
-                            className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
+                            className="w-full text-sm border border-gray-200 dark:border-[#1e2535] rounded-lg px-3 py-2 bg-white dark:bg-[#161b27] text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
                         />
                         {resolveError && (
                             <p className="text-xs text-red-600 dark:text-red-400 mt-2">{resolveError}</p>
@@ -290,7 +291,7 @@ function ViolationsTab({ initialViolations }: ViolationsTabProps) {
                                 disabled={!!resolvingId}
                                 className="px-4 py-2 rounded-lg text-sm font-semibold bg-green-600 hover:bg-green-700 text-white transition-colors disabled:opacity-50 flex items-center gap-2"
                             >
-                                {resolvingId ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                                {resolvingId ? <LoadingSpinner size="sm" /> : <CheckCircle className="w-4 h-4" />}
                                 Confirm Resolve
                             </button>
                         </div>
@@ -345,7 +346,7 @@ function RecoveryTab() {
     };
 
     if (isLoading) {
-        return <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-blue-500" /></div>;
+        return <div className="flex justify-center py-12"><LoadingSpinner size="lg" /></div>;
     }
 
     return (
@@ -375,8 +376,8 @@ function RecoveryTab() {
             </div>
 
             {/* Events Feed */}
-            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden">
-                <div className="border-b border-gray-200 dark:border-gray-800 px-6 py-4 flex items-center justify-between bg-gray-50 dark:bg-gray-800/50">
+            <div className="bg-white dark:bg-[#0f1117] rounded-xl border border-gray-200 dark:border-[#1e2535] shadow-sm overflow-hidden">
+                <div className="border-b border-gray-200 dark:border-[#1e2535] px-6 py-4 flex items-center justify-between bg-gray-50 dark:bg-[#161b27]/50">
                     <h2 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
                         <HeartPulse className="w-5 h-5 text-rose-500" />
                         Self-Healing Activity Log
@@ -413,9 +414,9 @@ function RecoveryTab() {
                                                 <button
                                                     onClick={() => handleRollback(ev.id, ev.after_state.checkpoint_id)}
                                                     disabled={!!isRollingBack}
-                                                    className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 transition"
+                                                    className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-[#161b27] dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-[#1e2535] transition"
                                                 >
-                                                    {isRollingBack === ev.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5 text-rose-500" />}
+                                                    {isRollingBack === ev.id ? <LoadingSpinner size="xs" /> : <RotateCcw className="w-3.5 h-3.5 text-rose-500" />}
                                                     Debug: Rollback to Checkpoint
                                                 </button>
                                             </div>
@@ -454,7 +455,7 @@ function OperationsTab() {
     }, [loadData]);
 
     if (isLoading) {
-        return <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-blue-500" /></div>;
+        return <div className="flex justify-center py-12"><LoadingSpinner size="lg" /></div>;
     }
 
     return (
@@ -474,7 +475,7 @@ function OperationsTab() {
                     { title: "Events", pct: data?.events?.health_pct || 0 },
                     { title: "Budget", pct: data?.budget?.health_pct || 0 },
                 ].map((item, i) => (
-                    <div key={i} className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4 shadow-sm flex flex-col items-center">
+                    <div key={i} className="bg-white dark:bg-[#0f1117] rounded-xl border border-gray-200 dark:border-[#1e2535] p-4 shadow-sm flex flex-col items-center">
                         <HealthRing score={item.pct} />
                         <div className={`text-lg font-bold mt-2 ${item.pct >= 90 ? 'text-green-600 dark:text-green-400' : item.pct >= 70 ? 'text-yellow-600 dark:text-yellow-400' : 'text-red-600 dark:text-red-400'}`}>
                             {item.pct}%
@@ -485,7 +486,7 @@ function OperationsTab() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden shadow-sm">
+                <div className="bg-white dark:bg-[#0f1117] rounded-xl border border-gray-200 dark:border-[#1e2535] overflow-hidden shadow-sm">
                     <div className="bg-blue-50 dark:bg-blue-950/50 border-b border-blue-100 dark:border-blue-900/60 px-6 py-4">
                         <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
                             <Activity className="w-4 h-4 text-blue-500" />
@@ -494,25 +495,25 @@ function OperationsTab() {
                     </div>
                     <div className="p-6">
                         <div className="grid grid-cols-2 gap-4">
-                            <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                            <div className="p-4 bg-gray-50 dark:bg-[#161b27] rounded-lg">
                                 <p className="text-xs text-gray-500 dark:text-gray-400">Scaling Actions (24h)</p>
                                 <p className="text-xl font-bold dark:text-white">{data?.scaling_events_24h ?? 0}</p>
                             </div>
-                            <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                            <div className="p-4 bg-gray-50 dark:bg-[#161b27] rounded-lg">
                                 <p className="text-xs text-gray-500 dark:text-gray-400">Total Tasks (24h)</p>
                                 <p className="text-xl font-bold dark:text-white">{data?.tasks?.total_24h ?? 0}</p>
                             </div>
-                            <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                            <div className="p-4 bg-gray-50 dark:bg-[#161b27] rounded-lg">
                                 <p className="text-xs text-gray-500 dark:text-gray-400">Budget Spent ($)</p>
                                 <p className="text-xl font-bold text-indigo-600 dark:text-indigo-400">${data?.budget?.cost_used_usd?.toFixed(2) ?? '0.00'}</p>
                             </div>
-                            <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                            <div className="p-4 bg-gray-50 dark:bg-[#161b27] rounded-lg">
                                 <p className="text-xs text-gray-500 dark:text-gray-400">Capacity Forecast (24h)</p>
                                 <p className="text-xl font-bold text-purple-600 dark:text-purple-400">
                                     {(data?.capacity_forecast?.next_24h !== undefined ? Math.round(data.capacity_forecast.next_24h) : 'N/A')}
                                 </p>
                             </div>
-                            <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                            <div className="p-4 bg-gray-50 dark:bg-[#161b27] rounded-lg">
                                 <p className="text-xs text-gray-500 dark:text-gray-400">Frontend Errors (24h)</p>
                                 <p className="text-xl font-bold text-red-600 dark:text-red-400">{data?.frontend_errors_24h ?? 0}</p>
                             </div>
@@ -520,7 +521,7 @@ function OperationsTab() {
                     </div>
                 </div>
 
-                <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden shadow-sm">
+                <div className="bg-white dark:bg-[#0f1117] rounded-xl border border-gray-200 dark:border-[#1e2535] overflow-hidden shadow-sm">
                     <div className="bg-orange-50 dark:bg-orange-950/50 border-b border-orange-100 dark:border-orange-900/60 px-6 py-4">
                         <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
                             <AlertTriangle className="w-4 h-4 text-orange-500" />
@@ -570,7 +571,7 @@ function SLATab() {
 
     useEffect(() => { loadData(); }, [loadData]);
 
-    if (isLoading) return <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-blue-500" /></div>;
+    if (isLoading) return <div className="flex justify-center py-12"><LoadingSpinner size="lg" /></div>;
 
     const items = Object.entries(data?.sla_by_priority || {});
 
@@ -581,7 +582,7 @@ function SLATab() {
                     const pct = v.compliance_pct;
                     const isBreach = pct < 80;
                     return (
-                        <div key={priority} className={`bg-white dark:bg-gray-900 rounded-xl border p-6 shadow-sm ${isBreach ? 'border-red-300 dark:border-red-800' : 'border-gray-200 dark:border-gray-800'}`}>
+                        <div key={priority} className={`bg-white dark:bg-[#0f1117] rounded-xl border p-6 shadow-sm ${isBreach ? 'border-red-300 dark:border-red-800' : 'border-gray-200 dark:border-[#1e2535]'}`}>
                             <div className="flex items-center gap-3 mb-2">
                                 <div className="w-2 h-2 rounded-full" style={{ backgroundColor: priority === 'critical' || priority === 'sovereign' ? '#ef4444' : priority === 'high' ? '#f97316' : '#3b82f6' }} />
                                 <h3 className="font-bold uppercase text-gray-900 dark:text-white">{priority} Priority</h3>
@@ -639,11 +640,11 @@ function IncidentsTab() {
         }
     };
 
-    if (isLoading) return <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-blue-500" /></div>;
+    if (isLoading) return <div className="flex justify-center py-12"><LoadingSpinner size="lg" /></div>;
 
     return (
-        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-500">
-            <div className="border-b border-gray-200 dark:border-gray-800 px-6 py-4 flex items-center justify-between">
+        <div className="bg-white dark:bg-[#0f1117] rounded-xl border border-gray-200 dark:border-[#1e2535] shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-500">
+            <div className="border-b border-gray-200 dark:border-[#1e2535] px-6 py-4 flex items-center justify-between">
                 <h2 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
                     <Wrench className="w-5 h-5 text-indigo-500" />
                     Auto-Remediated Incidents
@@ -662,7 +663,7 @@ function IncidentsTab() {
                 ) : (
                     <div className="space-y-4">
                         {logs.map((log: any) => (
-                            <div key={log.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-gray-50 dark:bg-gray-800 text-sm">
+                            <div key={log.id} className="border border-gray-200 dark:border-[#1e2535] rounded-lg p-4 bg-gray-50 dark:bg-[#161b27] text-sm">
                                 <div className="flex justify-between items-start mb-2">
                                     <div className="font-bold text-gray-900 dark:text-white">{log.description}</div>
                                     <button
@@ -672,7 +673,7 @@ function IncidentsTab() {
                                         Revert
                                     </button>
                                 </div>
-                                <div className="text-xs text-gray-500 mt-2 font-mono break-all bg-white dark:bg-gray-900 p-2 rounded border border-gray-200 dark:border-gray-700">
+                                <div className="text-xs text-gray-500 mt-2 font-mono break-all bg-white dark:bg-[#0f1117] p-2 rounded border border-gray-200 dark:border-[#1e2535]">
                                     {JSON.stringify(log.after_state)}
                                 </div>
                                 <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">
@@ -708,7 +709,7 @@ function ChaosTab() {
     };
 
     return (
-        <div className="bg-white dark:bg-gray-900 rounded-xl border border-red-200 dark:border-red-900/50 shadow-sm p-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+        <div className="bg-white dark:bg-[#0f1117] rounded-xl border border-red-200 dark:border-red-900/50 shadow-sm p-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
             <h2 className="text-xl font-bold text-red-600 dark:text-red-400 mb-2 flex items-center gap-2">
                 <ShieldAlert /> Chaos Engineering Lab
             </h2>
@@ -717,21 +718,21 @@ function ChaosTab() {
             </p>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <div className="border border-gray-200 dark:border-gray-800 rounded-lg p-4">
+                <div className="border border-gray-200 dark:border-[#1e2535] rounded-lg p-4">
                     <h3 className="font-bold text-gray-900 dark:text-white mb-1">Agent Crash</h3>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mb-4 h-10">Suspends a random non-persistent idle task agent.</p>
                     <button onClick={() => handleChaos('agent_crash')} disabled={isLoading} className="w-full bg-red-600 hover:bg-red-700 text-white rounded text-sm py-1.5 font-bold disabled:opacity-50">
                         Inject Crash
                     </button>
                 </div>
-                <div className="border border-gray-200 dark:border-gray-800 rounded-lg p-4">
+                <div className="border border-gray-200 dark:border-[#1e2535] rounded-lg p-4">
                     <h3 className="font-bold text-gray-900 dark:text-white mb-1">API Timeout</h3>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mb-4 h-10">Simulates LLM API timeouts for 60 seconds.</p>
                     <button onClick={() => handleChaos('api_timeout')} disabled={isLoading} className="w-full bg-red-600 hover:bg-red-700 text-white rounded text-sm py-1.5 font-bold disabled:opacity-50">
                         Inject Timeout
                     </button>
                 </div>
-                <div className="border border-gray-200 dark:border-gray-800 rounded-lg p-4">
+                <div className="border border-gray-200 dark:border-[#1e2535] rounded-lg p-4">
                     <h3 className="font-bold text-gray-900 dark:text-white mb-1">DB Connection Loss</h3>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mb-4 h-10">Simulates DB failure for diagnostic routines.</p>
                     <button onClick={() => handleChaos('db_connection_loss')} disabled={isLoading} className="w-full bg-red-600 hover:bg-red-700 text-white rounded text-sm py-1.5 font-bold disabled:opacity-50">
@@ -774,11 +775,11 @@ function SlowQueriesTab() {
 
     useEffect(() => { loadData(); }, [loadData]);
 
-    if (isLoading) return <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-blue-500" /></div>;
+    if (isLoading) return <div className="flex justify-center py-12"><LoadingSpinner size="lg" /></div>;
 
     return (
-        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-500">
-            <div className="border-b border-gray-200 dark:border-gray-800 px-6 py-4 flex items-center justify-between">
+        <div className="bg-white dark:bg-[#0f1117] rounded-xl border border-gray-200 dark:border-[#1e2535] shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-500">
+            <div className="border-b border-gray-200 dark:border-[#1e2535] px-6 py-4 flex items-center justify-between">
                 <h2 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
                     <Clock className="w-5 h-5 text-purple-500" />
                     Slow Queries
@@ -805,7 +806,7 @@ function SlowQueriesTab() {
                         <div className="overflow-x-auto">
                             <table className="w-full text-left border-collapse">
                                 <thead>
-                                    <tr className="border-b border-gray-200 dark:border-gray-800 text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/50">
+                                    <tr className="border-b border-gray-200 dark:border-[#1e2535] text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-[#161b27]/50">
                                         <th className="p-3 font-semibold rounded-tl-lg">Query Preview</th>
                                         <th className="p-3 font-semibold">Avg Duration (ms)</th>
                                         <th className="p-3 font-semibold">Calls</th>
@@ -815,7 +816,7 @@ function SlowQueriesTab() {
                                 </thead>
                                 <tbody>
                                     {queries.map((q, idx) => (
-                                        <tr key={idx} className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                                        <tr key={idx} className="border-b border-gray-100 dark:border-[#1e2535] hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                                             <td className="p-3 font-mono text-xs max-w-sm overflow-hidden text-ellipsis whitespace-nowrap text-gray-800 dark:text-gray-200" title={q.query_preview}>
                                                 {q.query_preview}
                                             </td>
@@ -935,10 +936,9 @@ export const MonitoringPage: React.FC = () => {
 
     if (isLoading) {
         return (
-            <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center">
-                <div className="flex flex-col items-center gap-3">
-                    <Loader2 className="w-8 h-8 animate-spin text-blue-600 dark:text-blue-400" />
-                    <span className="text-sm text-gray-500 dark:text-gray-400">Loading metrics...</span>
+            <div className="min-h-screen bg-white dark:bg-[#0f1117] pt-6">
+                <div className="max-w-7xl mx-auto">
+                    <PageSkeleton variant="cards" />
                 </div>
             </div>
         );
@@ -984,7 +984,7 @@ export const MonitoringPage: React.FC = () => {
                                     aria-label="Monitor ID"
                                     value={monitorId}
                                     onChange={e => setMonitorId(e.target.value)}
-                                    className="appearance-none text-sm border border-gray-200 dark:border-gray-700 rounded-lg pl-3 pr-8 py-1.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+                                    className="appearance-none text-sm border border-gray-200 dark:border-[#1e2535] rounded-lg pl-3 pr-8 py-1.5 bg-white dark:bg-[#161b27] text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
                                 >
                                     {KNOWN_MONITOR_IDS.map(id => (
                                         <option key={id} value={id}>#{id}</option>
@@ -1035,12 +1035,12 @@ export const MonitoringPage: React.FC = () => {
                 )}
 
                 {/* ── Tabs ────────────────────────────────────────────────── */}
-                <div className="flex gap-1 mb-6 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-1 w-fit shadow-sm max-w-full overflow-x-auto">
+                <div className="flex gap-1 mb-6 bg-white dark:bg-[#0f1117] border border-gray-200 dark:border-[#1e2535] rounded-xl p-1 w-fit shadow-sm max-w-full overflow-x-auto">
                     {(['operations', 'dashboard', 'violations', 'recovery', 'sla', 'incidents', 'chaos', 'slow_queries'] as Tab[]).map(tab => (
                         <button
                             key={tab}
                             onClick={() => setActiveTab(tab)}
-                            className={`px-3 py-2 rounded-lg text-sm font-medium capitalize transition-colors whitespace-nowrap ${
+                            className={`px-3 py-2 rounded-lg text-sm font-medium capitalize transition-all duration-200 whitespace-nowrap ${
                                 activeTab === tab
                                     ? 'bg-blue-600 text-white shadow-sm'
                                     : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
@@ -1065,7 +1065,7 @@ export const MonitoringPage: React.FC = () => {
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
 
                             {/* System Health */}
-                            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6 shadow-sm flex items-center gap-4">
+                            <div className="bg-white dark:bg-[#0f1117] rounded-xl border border-gray-200 dark:border-[#1e2535] p-6 shadow-sm flex items-center gap-4">
                                 <div className="relative flex-shrink-0">
                                     <HealthRing score={systemHealth} />
                                     <span className={`absolute inset-0 flex items-center justify-center text-xs font-bold ${healthColor}`}>
@@ -1082,7 +1082,7 @@ export const MonitoringPage: React.FC = () => {
                             </div>
 
                             {/* Active Alerts */}
-                            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6 shadow-sm">
+                            <div className="bg-white dark:bg-[#0f1117] rounded-xl border border-gray-200 dark:border-[#1e2535] p-6 shadow-sm">
                                 <div className="flex items-center justify-between">
                                     <div>
                                         <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Active Alerts</p>
@@ -1093,14 +1093,14 @@ export const MonitoringPage: React.FC = () => {
                                             {activeAlerts === 0 ? 'No issues detected' : `${activeAlerts} requiring attention`}
                                         </p>
                                     </div>
-                                    <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${activeAlerts > 0 ? 'bg-red-100 dark:bg-red-900/30' : 'bg-gray-100 dark:bg-gray-800'}`}>
+                                    <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${activeAlerts > 0 ? 'bg-red-100 dark:bg-red-900/30' : 'bg-gray-100 dark:bg-[#161b27]'}`}>
                                         <AlertTriangle className={`w-6 h-6 ${activeAlerts > 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-400 dark:text-gray-500'}`} />
                                     </div>
                                 </div>
                             </div>
 
                             {/* Agents Reporting */}
-                            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6 shadow-sm">
+                            <div className="bg-white dark:bg-[#0f1117] rounded-xl border border-gray-200 dark:border-[#1e2535] p-6 shadow-sm">
                                 <div className="flex items-center justify-between">
                                     <div>
                                         <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Agents Reporting</p>
@@ -1126,7 +1126,7 @@ export const MonitoringPage: React.FC = () => {
                                 </h2>
                                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                                     {Object.entries(healthBreakdown).map(([tier, score]) => (
-                                        <div key={tier} className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-3 flex items-center gap-3">
+                                        <div key={tier} className="bg-white dark:bg-[#0f1117] rounded-lg border border-gray-200 dark:border-[#1e2535] p-3 flex items-center gap-3">
                                             <div className={`w-8 h-8 rounded-md flex items-center justify-center ${
                                                 (score as number) >= 90 ? 'bg-green-100 dark:bg-green-900/30' : 'bg-yellow-100 dark:bg-yellow-900/30'
                                             }`}>
@@ -1148,7 +1148,7 @@ export const MonitoringPage: React.FC = () => {
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
                             {/* Recent Violations (summary) */}
-                            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden">
+                            <div className="bg-white dark:bg-[#0f1117] rounded-xl border border-gray-200 dark:border-[#1e2535] shadow-sm overflow-hidden">
                                 <div className="bg-yellow-50 dark:bg-yellow-950/50 border-b border-yellow-100 dark:border-yellow-900/60 px-6 py-4 flex items-center justify-between">
                                     <h2 className="text-base font-bold text-gray-900 dark:text-yellow-100 flex items-center gap-2">
                                         <AlertTriangle className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
@@ -1175,7 +1175,7 @@ export const MonitoringPage: React.FC = () => {
                                             {violations.map((v: ViolationReport) => (
                                                 <div
                                                     key={v.id}
-                                                    className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700"
+                                                    className="bg-gray-50 dark:bg-[#161b27] rounded-lg p-4 border border-gray-200 dark:border-[#1e2535]"
                                                 >
                                                     <div className="flex items-start justify-between gap-4">
                                                         <div className="flex-1">
@@ -1205,7 +1205,7 @@ export const MonitoringPage: React.FC = () => {
                             </div>
 
                             {/* Agent Health Reports */}
-                            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden">
+                            <div className="bg-white dark:bg-[#0f1117] rounded-xl border border-gray-200 dark:border-[#1e2535] shadow-sm overflow-hidden">
                                 <div className="bg-blue-50 dark:bg-blue-950/50 border-b border-blue-100 dark:border-blue-900/60 px-6 py-4 flex items-center justify-between">
                                     <h2 className="text-base font-bold text-gray-900 dark:text-blue-100 flex items-center gap-2">
                                         <Activity className="w-5 h-5 text-blue-600 dark:text-blue-400" />
@@ -1226,7 +1226,7 @@ export const MonitoringPage: React.FC = () => {
                                                 return (
                                                     <div
                                                         key={report.id}
-                                                        className="flex items-center gap-4 bg-gray-50 dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700"
+                                                        className="flex items-center gap-4 bg-gray-50 dark:bg-[#161b27] p-4 rounded-lg border border-gray-200 dark:border-[#1e2535]"
                                                     >
                                                         <div className="relative flex-shrink-0">
                                                             <HealthRing score={report.health_score} />

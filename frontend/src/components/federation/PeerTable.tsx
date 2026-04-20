@@ -6,7 +6,7 @@
 //  - aria-labels on all icon-only buttons
 //  - Status + trust badges sourced from statusColors.ts
 
-import { Globe, ExternalLink, Trash2, CheckCircle, AlertTriangle, XCircle, Clock, Loader2 } from 'lucide-react';
+import { Globe, ExternalLink, Trash2, CheckCircle, AlertTriangle, XCircle, Clock } from 'lucide-react';
 import type { PeerInstance, TrustLevel } from '@/services/federation';
 import { getPeerStatusColors } from '@/utils/statusColors';
 import { federationService } from '@/services/federation';

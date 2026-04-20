@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import toast from 'react-hot-toast';
+import { showToast } from '@/hooks/useToast';
 import { api } from '@/services/api';
 
 export interface MessageAttachment {
@@ -207,7 +207,7 @@ export const useChatStore = create<ChatState>()(
                     }));
 
                     if (response.task_created) {
-                        toast.success(`Task ${response.task_id} created`);
+                        showToast.success(`Task ${response.task_id} created`);
                     }
 
                 } catch (error: any) {
@@ -227,7 +227,7 @@ export const useChatStore = create<ChatState>()(
                         currentStreamingMessage: ''
                     }));
 
-                    toast.error('Failed to send message');
+                    showToast.error('Failed to send message');
                 }
             },
 
@@ -291,7 +291,7 @@ export const useChatStore = create<ChatState>()(
                     }));
 
                     if (metadata.task_created) {
-                        toast.success(`Task ${metadata.task_id} created`);
+                        showToast.success(`Task ${metadata.task_id} created`);
                     }
 
                 } catch (error: any) {
@@ -311,7 +311,7 @@ export const useChatStore = create<ChatState>()(
                         currentStreamingMessage: ''
                     }));
 
-                    toast.error('Failed to send message');
+                    showToast.error('Failed to send message');
                 }
             },
 

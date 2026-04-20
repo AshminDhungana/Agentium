@@ -26,7 +26,7 @@
  */
 
 import { create } from 'zustand';
-import toast from 'react-hot-toast';
+import { showToast } from '@/hooks/useToast';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -454,11 +454,8 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
                         const currentPath = window.location.pathname;
                         if (currentPath !== '/chat') {
                             const existingToastId = get()._activeToastId;
-                            if (existingToastId) toast.dismiss(existingToastId);
-                            const toastId = toast.success('New message from Head of Council', {
-                                duration: 5_000,
-                                icon: '👑',
-                            });
+                            if (existingToastId) showToast.dismiss(existingToastId);
+                            const toastId = showToast.success('New message from Head of Council');
                             set({ _activeToastId: toastId });
                         }
                     }

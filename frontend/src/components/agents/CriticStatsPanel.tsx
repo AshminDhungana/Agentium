@@ -8,7 +8,8 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { api } from '../../services/api';
-import { ShieldAlert, RefreshCw, Loader2 } from 'lucide-react';
+import { ShieldAlert, RefreshCw } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 interface CriticTypeStats {
     count: number;
@@ -64,7 +65,7 @@ export const CriticStatsPanel: React.FC = () => {
     if (loading) {
         return (
             <div className="flex items-center gap-2 text-slate-400 dark:text-slate-500 py-4">
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <LoadingSpinner size="sm" />
                 <span className="text-xs">Loading critic stats…</span>
             </div>
         );

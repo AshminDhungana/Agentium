@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useBackendStore } from '@/store/backendStore';
-import { Wifi, WifiOff, Loader2 } from 'lucide-react';
+import { Wifi, WifiOff } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 interface ConnectionStatusProps {
     compact?: boolean;
@@ -25,7 +26,7 @@ export function ConnectionStatus({ compact = false }: ConnectionStatusProps) {
     const getStatusIcon = () => {
         switch (status.status) {
             case 'connected':    return <Wifi className="w-4 h-4" />;
-            case 'connecting':   return <Loader2 className="w-4 h-4 animate-spin" />;
+            case 'connecting':   return <LoadingSpinner size="sm" />;
             case 'disconnected': return <WifiOff className="w-4 h-4" />;
         }
     };

@@ -12,7 +12,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import toast from 'react-hot-toast';
+import { showToast } from '@/hooks/useToast';
 import {
     votingService,
     AmendmentVoting,
@@ -90,7 +90,7 @@ export function useVotingData(): UseVotingDataReturn {
         } catch (error) {
             if (!isMountedRef.current) return;
             console.error('Failed to load voting data:', error);
-            if (!silent) toast.error('Failed to load voting data');
+            if (!silent) showToast.error('Failed to load voting data');
         } finally {
             if (isMountedRef.current) {
                 setIsLoading(false);

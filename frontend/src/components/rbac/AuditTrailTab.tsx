@@ -6,12 +6,12 @@ import {
     ArrowUpCircle,
     ChevronLeft,
     ChevronRight,
-    Loader2,
     Search,
     Shield,
     XCircle,
 } from 'lucide-react';
 import { auditService, AuditLog } from '@/services/audit';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -144,7 +144,7 @@ export function AuditTrailTab() {
             {/* ── Body ──────────────────────────────────────────────────────── */}
             {loading ? (
                 <div className="flex items-center justify-center py-20">
-                    <Loader2 className="w-5 h-5 text-gray-400 animate-spin" />
+                    <LoadingSpinner size="md" />
                 </div>
             ) : logs.length === 0 ? (
                 <div className="p-16 text-center">
