@@ -12,6 +12,8 @@ Agentium/
 │       ├── Dockerfile                # WhatsApp bridge container
 │       ├── package.json              # Node.js dependencies
 │       └── package-lock.json
+├── voice-bridge/                     # Voice bridge functionality
+├── scripts/                          # Build and utility scripts
 ├── backend/                          # Python FastAPI backend
 │   ├── alembic/                      # Database migrations
 │   │   ├── env.py                   # Alembic environment config
@@ -70,8 +72,7 @@ Agentium/
 │   │   │   ├── webhooks.py          # Webhook handlers
 │   │   │   ├── websocket.py         # WebSocket endpoints
 │   │   │   ├── workflows.py         # Workflow automation
-│   │   │   ├── knowledge.py          # Knowledge base & citation graph
-│   │   │   └── browser.py          # Browser automation
+│   │   │   └── knowledge.py         # Knowledge base & citation graph
 │   │   ├── schemas/                 # Pydantic schemas
 │   │   │   ├── checkpoint.py
 │   │   │   ├── messages.py
@@ -87,6 +88,8 @@ Agentium/
 │   │   ├── config.py                # Configuration
 │   │   ├── constitutional_guard.py  # Constitutional governance
 │   │   ├── observer_middleware.py   # Observer middleware
+│   │   ├── rate_limit.py            # Rate limiting
+│   │   ├── redis.py                 # Redis client
 │   │   ├── security/                # Security module
 │   │   │   ├── __init__.py
 │   │   │   └── execution_guard.py   # Execution safety
@@ -142,6 +145,8 @@ Agentium/
 │   ├── scripts/                     # Backend utility scripts
 │   │   ├── __init__.py
 │   │   ├── create_initial_admin.py  # Admin setup
+│   │   ├── entrypoint.sh            # Container entrypoint
+│   │   ├── gen_secrets.py           # Secret generation
 │   │   ├── init_db.py               # Database init
 │   │   ├── init_vector_db.py        # Vector DB init
 │   │   └── verify_channels.py       # Channel verification
@@ -171,6 +176,7 @@ Agentium/
 │   │   ├── chat_service.py         # Chat handling
 │   │   ├── checkpoint_service.py   # Checkpoint management
 │   │   ├── clarification_service.py # Clarification requests
+│   │   ├── config_versioning.py    # Config versioning
 │   │   ├── context_manager.py      # Context handling
 │   │   ├── critic_agents.py        # Critic agent logic
 │   │   ├── db_maintenance.py       # Database maintenance
@@ -197,8 +203,8 @@ Agentium/
 │   │   │   ├── __init__.py
 │   │   │   └── health_checks.py
 │   │   ├── monitoring_service.py    # System monitoring
-│   │   ├── slow_query_service.py    # Slow query logging
 │   │   ├── persistent_council.py    # Persistent council
+│   │   ├── slow_query_service.py    # Slow query logging
 │   │   ├── plugin_marketplace_service.py # Plugin marketplace
 │   │   ├── predictive_scaling.py   # Predictive auto-scaling
 │   │   ├── prompt_template_manager.py # Prompt templates
@@ -353,6 +359,7 @@ Agentium/
 │   │   │   │   ├── Toggle.tsx
 │   │   │   │   └── WidgetErrorFallback.tsx
 │   │   │   ├── VoiceIndicator.tsx
+│   │   │   ├── VoiceSettingsModal.tsx # Voice settings
 │   │   │   └── workflows/           # Workflow UI
 │   │   │       ├── WorkflowAutomationPanel.tsx
 │   │   │       └── WorkflowBuilder.tsx
@@ -499,9 +506,6 @@ Agentium/
 ├── voice-bridge/                     # Voice bridge functionality
 ├── .env                              # Environment variables (do not commit)
 ├── .gitignore
-├── .github/
-│   └── workflows/
-│       └── docker-image.yml          # CI/CD Docker image workflow
 ├── CONTRIBUTING.md                   # Contributing guidelines
 ├── LICENSE
 ├── Makefile                          # Build automation
