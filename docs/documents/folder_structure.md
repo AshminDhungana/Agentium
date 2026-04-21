@@ -49,7 +49,7 @@ Agentium/
 │   │   │   ├── files.py             # File operations
 │   │   │   ├── inbox.py             # Unified inbox
 │   │   │   ├── improvements.py      # Self-improvement engine
-│   │   │   ├── knowledge.py         # Knowledge base
+│   │   │   ├── knowledge.py         # Knowledge base & citation graph
 │   │   │   ├── lifecycle_routes.py  # Lifecycle management
 │   │   │   ├── mcp_tools.py         # MCP tools
 │   │   │   ├── mobile.py            # Mobile integration
@@ -71,8 +71,7 @@ Agentium/
 │   │   │   ├── wait_poll.py         # Wait/poll endpoints
 │   │   │   ├── webhooks.py          # Webhook handlers
 │   │   │   ├── websocket.py         # WebSocket endpoints
-│   │   │   ├── workflows.py         # Workflow automation
-│   │   │   └── knowledge.py         # Knowledge base & citation graph
+│   │   │   └── workflows.py         # Workflow automation
 │   │   ├── schemas/                 # Pydantic schemas
 │   │   │   ├── checkpoint.py
 │   │   │   ├── messages.py
@@ -512,6 +511,7 @@ Agentium/
 ├── README.md
 ├── docker-compose.yml                # Main compose file
 ├── docker-compose.remote-executor.yml
+├── package-lock.json
 └── package.json                      # Root package (metadata)
 ```
 
