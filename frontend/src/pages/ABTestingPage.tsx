@@ -664,6 +664,18 @@ function ExperimentDetailPanel({
     onError: (err: Error) => showToast.error(err.message),
   });
 
+  // Detect dark mode for chart primitives (same pattern as ScalingDashboard)
+  const [isDark, setIsDark] = useState(
+    typeof window !== 'undefined' && document.documentElement.classList.contains('dark')
+  );
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
+
   // Build radar data from model comparisons
   const models = exp?.comparison?.model_comparisons?.models ?? [];
   const radarData = models.length > 0
@@ -737,8 +749,8 @@ function ExperimentDetailPanel({
                     </h3>
                     <ResponsiveContainer width="100%" height={220}>
                       <RadarChart data={radarData}>
-                        <PolarGrid stroke="#e2e8f0" />
-                        <PolarAngleAxis dataKey="metric" tick={{ fontSize: 11, fill: '#94a3b8' }} />
+                        <PolarGrid stroke={isDark ? '#334155' : '#e2e8f0'} />
+                        <PolarAngleAxis dataKey="metric" tick={{ fontSize: 11, fill: isDark ? '#94a3b8' : '#64748b' }} />
                         {models.map((m, i) => (
                           <Radar
                             key={m.config_id}
@@ -764,8 +776,14 @@ function ExperimentDetailPanel({
                         <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#94a3b8' }} />
                         <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} />
                         <Tooltip
-                          contentStyle={{ background: '#1e2535', border: 'none', borderRadius: 8, fontSize: 12 }}
-                          labelStyle={{ color: '#e2e8f0' }}
+                          contentStyle={{
+                            background: isDark ? '#1e2535' : '#ffffff',
+                            border: isDark ? 'none' : '1px solid #e2e8f0',
+                            borderRadius: 8,
+                            fontSize: 12,
+                            color: isDark ? '#f1f5f9' : '#0f172a',
+                          }}
+                          labelStyle={{ color: isDark ? '#e2e8f0' : '#374151' }}
                         />
                         <Bar dataKey="latency" radius={[4, 4, 0, 0]}>
                           {models.map((_, i) => (

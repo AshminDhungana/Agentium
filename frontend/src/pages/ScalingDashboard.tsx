@@ -312,7 +312,7 @@ export const ScalingDashboard: React.FC = () => {
                             </thead>
                             <tbody>
                                 {history.map((event, i) => (
-                                    <tr key={i} className="border-b dark:border-[#1e2535] last:border-0 hover:bg-gray-50 dark:hover:bg-[#1e2535]/50 transition-colors">
+                                    <tr key={i} className="border-b border-gray-100 dark:border-[#1e2535] last:border-0 hover:bg-gray-50 dark:hover:bg-[#1e2535]/50 transition-colors">
                                         <td className="px-4 py-3 text-gray-500 dark:text-gray-400">
                                             {new Date(event.created_at).toLocaleString()}
                                         </td>

@@ -785,7 +785,7 @@ function SlowQueriesTab() {
                     Slow Queries
                 </h2>
                 <div className="flex gap-2 text-gray-500">
-                    <a href="https://www.postgresql.org/docs/current/using-explain.html" target="_blank" rel="noreferrer" className="text-xs font-semibold px-3 py-1.5 dark:text-gray-300 hover:text-gray-900 border border-gray-200 rounded-lg shrink-0">EXPLAIN Docs</a>
+                    <a href="https://www.postgresql.org/docs/current/using-explain.html" target="_blank" rel="noreferrer" className="text-xs font-semibold px-3 py-1.5 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white border border-gray-200 dark:border-[#1e2535] rounded-lg shrink-0 transition-colors">EXPLAIN Docs</a>
                     <button onClick={loadData} className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400">
                         Refresh
                     </button>
