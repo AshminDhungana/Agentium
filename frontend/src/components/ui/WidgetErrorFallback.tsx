@@ -27,7 +27,7 @@ export function WidgetErrorFallback({ widgetName, onRetry }: WidgetErrorFallback
             {onRetry && (
                 <button
                     onClick={onRetry}
-                    className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-300 rounded-lg hover:bg-red-200 dark:hover:bg-red-500/30 transition-colors duration-150"
+                    className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-300 rounded-lg hover:bg-red-200 dark:hover:bg-red-500/30 transition-all duration-200"
                 >
                     <RefreshCw className="w-3 h-3" aria-hidden="true" />
                     Retry

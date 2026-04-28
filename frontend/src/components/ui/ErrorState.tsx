@@ -32,7 +32,7 @@ export function ErrorState({
             {onRetry && (
                 <button
                     onClick={onRetry}
-                    className="flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:underline transition-colors"
+                    className="flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:underline transition-all duration-200"
                 >
                     <RefreshCw className="w-3 h-3" />
                     Try again

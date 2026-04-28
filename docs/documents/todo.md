@@ -672,7 +672,7 @@ Build a self-governing AI ecosystem where agents operate under constitutional la
 
 ### 17.2 System-Wide UI Polish
 
-- [ ] **Dark Mode Consistency** — audit all pages for hardcoded `bg-white`, `text-black`, `border-gray-*` without `dark:` variants; replace with semantic tokens using the existing dark mode system
+- [x] **Dark Mode Consistency** — audit all pages for hardcoded `bg-white`, `text-black`, `border-gray-*` without `dark:` variants; replace with semantic tokens using the existing dark mode system
 - [ ] **Animations & Transitions** — add `transition-all duration-200` to all interactive elements (buttons, cards, modals, dropdowns) where missing; add skeleton loading states to all data-fetching components that don't already have them
 - [ ] **Empty States** — design and implement empty state illustrations/messages for: agent list (no agents), task list (no tasks), inbox (no messages), knowledge base (no documents), workflow list (no workflows)
 - [ ] **Toast Notifications** — standardize success/error/info toasts across all forms (currently inconsistent between pages); use a single shared `useToast()` hook

@@ -56,7 +56,7 @@ export function EmptyState({
             {action && (
                 <button
                     onClick={action.onClick}
-                    className="mt-4 px-4 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 hover:bg-blue-100 dark:hover:bg-blue-500/20 rounded-lg transition-colors duration-200"
+                    className="mt-4 px-4 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 hover:bg-blue-100 dark:hover:bg-blue-500/20 rounded-lg transition-all duration-200"
                 >
                     {action.label}
                 </button>
