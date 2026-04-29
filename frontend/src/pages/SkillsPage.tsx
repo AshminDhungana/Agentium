@@ -8,6 +8,7 @@ import {
 import { useAuthStore } from '@/store/authStore';
 import { CitationGraph } from '@/components/knowledge/CitationGraph';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { EmptyState } from '@/components/ui/EmptyState';
 
 // Extended skill interface for creation
 interface SkillFormData {
@@ -409,11 +410,14 @@ export const SkillsPage: React.FC = () => {
               ))}
             </div>
             {popularSkills.length === 0 && (
-              <div className="text-center py-12 bg-white dark:bg-[#161b27] rounded-xl border border-gray-200 dark:border-[#1e2535]">
-                <div className="w-12 h-12 bg-gray-100 dark:bg-[#1e2535] border border-gray-200 dark:border-[#2a3347] rounded-xl flex items-center justify-center mx-auto mb-3">
-                  <BookOpen className="w-5 h-5 text-gray-400 dark:text-gray-500" />
-                </div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">No skills available</p>
+              <div className="bg-white dark:bg-[#161b27] rounded-xl border border-gray-200 dark:border-[#1e2535]">
+                <EmptyState
+                  illustration="knowledge"
+                  icon={BookOpen}
+                  title="No skills available"
+                  description="Add your first skill to build the knowledge library."
+                  action={{ label: 'Add Skill', onClick: () => { setEditingSkill(null); setFormData(INITIAL_FORM_DATA); setIsCreateModalOpen(true); } }}
+                />
               </div>
             )}
           </div>
@@ -436,17 +440,14 @@ export const SkillsPage: React.FC = () => {
             </button>
           </div>
           {mySubmissions.length === 0 ? (
-            <div className="text-center py-12 bg-white dark:bg-[#161b27] rounded-xl border border-gray-200 dark:border-[#1e2535]">
-              <div className="w-12 h-12 bg-gray-100 dark:bg-[#1e2535] border border-gray-200 dark:border-[#2a3347] rounded-xl flex items-center justify-center mx-auto mb-3">
-                <Layers className="w-5 h-5 text-gray-400 dark:text-gray-500" />
-              </div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">No submissions yet</p>
-              <button
-                onClick={() => setActiveTab('browse')}
-                className="mt-3 text-sm text-blue-600 dark:text-blue-400 hover:underline"
-              >
-                Browse and create your first skill
-              </button>
+            <div className="bg-white dark:bg-[#161b27] rounded-xl border border-gray-200 dark:border-[#1e2535]">
+              <EmptyState
+                illustration="knowledge"
+                icon={Layers}
+                title="No submissions yet"
+                description="You haven't contributed any skills yet. Browse the library and create your first skill."
+                action={{ label: 'Browse Skills', onClick: () => setActiveTab('browse') }}
+              />
             </div>
           ) : (
             <div className="grid gap-4">

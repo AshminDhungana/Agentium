@@ -1148,7 +1148,13 @@ export function ChatPage() {
                             <div className="flex-1 overflow-y-auto divide-y divide-gray-100 dark:divide-[#1e2535]">
                                 {conversations.length === 0 && !inboxLoading ? (
                                     <div className="p-8">
-                                        <EmptyState icon={Inbox} title="No active conversations" size="sm" />
+                                        <EmptyState
+                                            illustration="inbox"
+                                            icon={Inbox}
+                                            title="No active conversations"
+                                            description="When users message your agents through connected channels, their conversations will appear here."
+                                            size="sm"
+                                        />
                                     </div>
                                 ) : conversations.map((conv) => {
                                     const latestMsg   = conv.messages?.at(-1);

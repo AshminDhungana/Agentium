@@ -4,6 +4,7 @@ import { WorkflowBuilder } from './WorkflowBuilder';
 import { Button } from "@/components/ui/button";
 import { Plus, Play, CheckCircle, Clock, XCircle, Power } from 'lucide-react';
 import { showToast } from '@/hooks/useToast';
+import { EmptyState } from '@/components/ui/EmptyState';
 
 export const WorkflowAutomationPanel: React.FC = () => {
   const [workflows, setWorkflows]               = useState<any[]>([]);
@@ -205,21 +206,14 @@ export const WorkflowAutomationPanel: React.FC = () => {
       {loading ? (
         <div className="text-gray-500 animate-pulse">Loading…</div>
       ) : workflows.length === 0 ? (
-        <div className="
-          bg-white dark:bg-[#161b27]
-          border border-gray-200 dark:border-[#1e2535]
-          rounded-xl p-8 text-center
-        ">
-          <p className="text-gray-500 mb-4">
-            No workflows found. Create an automated sequence to save time.
-          </p>
-          <Button
-            onClick={() => setView('create')}
-            variant="outline"
-            className="border-indigo-500 text-indigo-400 hover:bg-indigo-500/10"
-          >
-            <Plus className="w-4 h-4 mr-2" /> Create First Workflow
-          </Button>
+        <div className="bg-white dark:bg-[#161b27] border border-gray-200 dark:border-[#1e2535] rounded-xl">
+          <EmptyState
+            illustration="workflows"
+            icon={Power}
+            title="No workflows yet"
+            description="Create an automated sequence to orchestrate multi-step agent tasks."
+            action={{ label: 'Create First Workflow', onClick: () => setView('create') }}
+          />
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

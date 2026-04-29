@@ -1,5 +1,4 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-// FIX 7: Import shared types instead of declaring them locally
 import {
     Task,
     UserPreference,
@@ -8,9 +7,7 @@ import {
     CriticAgentStats,
     CriticStatsResponse,
 } from '../types';
-// FIX 5: Import criticsService so components use the service layer, not raw api.get()
 import { tasksService, criticsService, CreateTaskRequest, UpdateTaskRequest } from '../services/tasks';
-// FIX 5: api import removed — all data fetching now goes through service methods
 import { preferencesService, PREFERENCE_CATEGORIES, DATA_TYPE_LABELS, formatPreferenceValue, parsePreferenceValue } from '../services/preferences';
 import { TaskCard } from '../components/tasks/TaskCard';
 import { CreateTaskModal } from '../components/tasks/CreateTaskModal';
@@ -2387,6 +2384,7 @@ export const TasksPage: React.FC = () => {
                             ) : tasks.length === 0 ? (
                                 <div className="py-10">
                                     <EmptyState
+                                        illustration="tasks"
                                         icon={ListTodo}
                                         title={filterStatus ? `No ${filterStatus} tasks` : 'No tasks yet'}
                                         description={filterStatus ? 'Try a different filter or create a new task' : 'Create your first task to get started'}

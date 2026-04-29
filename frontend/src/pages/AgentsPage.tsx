@@ -625,9 +625,10 @@ export const AgentsPage: React.FC = () => {
                     ) : agents.length === 0 ? (
                             <div className="max-w-md mx-auto pt-10">
                                 <EmptyState
+                                    illustration="agents"
                                     icon={Users}
                                     title="No agents yet"
-                                    description="The system is not initialized. Spawn the Head of Council first."
+                                    description="Your AI workforce hasn't been initialized yet. Spawn the Head of Council to begin building your agent hierarchy."
                                 />
                             </div>
 
