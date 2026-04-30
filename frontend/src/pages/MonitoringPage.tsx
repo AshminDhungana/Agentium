@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { PageSkeleton } from '@/components/ui/PageSkeleton';
+import { showToast } from '@/hooks/useToast';
 
 const KNOWN_MONITOR_IDS  = ['00001', '00002', '00003'];
 const REFRESH_INTERVAL_MS = 30_000;
@@ -336,10 +337,10 @@ function RecoveryTab() {
         setIsRollingBack(eventId);
         try {
             await monitoringService.rollbackFromCheckpoint(checkpointId);
-            alert(`Successfully rolled back to checkpoint ${checkpointId}`);
+            showToast.success(`Successfully rolled back to checkpoint ${checkpointId}`);
             loadData();
         } catch (err: any) {
-            alert(err?.response?.data?.detail || 'Rollback failed');
+            showToast.error(err?.response?.data?.detail || 'Rollback failed');
         } finally {
             setIsRollingBack(null);
         }
@@ -633,10 +634,10 @@ function IncidentsTab() {
         if (!confirm('Revert this auto-remediated action via AuditLog?')) return;
         try {
             await monitoringService.rollbackAction(auditId);
-            alert('Revert logged successfully.');
+            showToast.success('Revert logged successfully.');
             loadData();
         } catch (err: any) {
-            alert(err?.response?.data?.detail || 'Revert failed.');
+            showToast.error(err?.response?.data?.detail || 'Revert failed.');
         }
     };
 

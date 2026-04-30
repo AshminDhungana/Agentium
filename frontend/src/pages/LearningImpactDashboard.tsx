@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Sparkles, TrendingUp, AlertTriangle, Cpu, RefreshCw, CheckCircle, Wrench, Search } from 'lucide-react';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { showToast } from '@/hooks/useToast';
 
 interface ImpactStats {
   success_rate_delta: number;
@@ -39,6 +40,7 @@ export function LearningImpactDashboard() {
       setPatterns(dataPatterns.patterns || []);
     } catch (error) {
       console.error('Failed to fetch learning impact data', error);
+      showToast.error('Failed to load learning impact data');
     } finally {
       setLoading(false);
     }
@@ -48,10 +50,10 @@ export function LearningImpactDashboard() {
     setTriggering(true);
     try {
       await fetch('/api/v1/improvements/consolidate', { method: 'POST' });
-      alert("Manual knowledge consolidation triggered successfully!");
+      showToast.success('Manual knowledge consolidation triggered successfully!');
     } catch (e) {
       console.error(e);
-      alert("Error triggering consolidation.");
+      showToast.error('Error triggering consolidation.');
     } finally {
       setTriggering(false);
     }

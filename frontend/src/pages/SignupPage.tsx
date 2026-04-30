@@ -78,14 +78,12 @@ export function SignupPage() {
                 redirectTimerRef.current = setTimeout(() => navigate('/login'), 3000);
             } else {
                 setError(result.message);
-                showToast.error(result.message);
             }
         } catch {
             // authStore.signup() absorbs errors and returns them in result.message,
             // so this catch is a safety net for truly unexpected throws.
             const msg = 'An unexpected error occurred. Please try again.';
             setError(msg);
-            showToast.error(msg);
         } finally {
             setIsLoading(false);
         }

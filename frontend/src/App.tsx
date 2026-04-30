@@ -107,14 +107,7 @@ function AppWithRedirect() {
 
     return (
         <>
-            <Toaster
-                position="top-right"
-                toastOptions={{
-                    duration: 4000,
-                    className: 'dark:bg-[#161b27] dark:text-white border dark:border-[#1e2535]',
-                    style: { background: '#1f2937', color: '#fff' },
-                }}
-            />
+            <Toaster position="top-right" />
 
             <GlobalWebSocketProvider>
                 <ErrorBoundary variant="page" fallbackHeading="Application Error">

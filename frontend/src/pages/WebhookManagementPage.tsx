@@ -14,6 +14,7 @@ import {
     Clock,
     X
 } from 'lucide-react';
+import { showToast } from '@/hooks/useToast';
 import {
   listWebhookSubscriptions,
   createWebhookSubscription,
@@ -52,6 +53,7 @@ const WebhookManagementPage: React.FC = () => {
       setSupportedEvents(events);
     } catch (err) {
       console.error('Failed to load webhooks:', err);
+      showToast.error('Failed to load webhook subscriptions');
     } finally {
       setLoading(false);
     }
@@ -77,6 +79,7 @@ const WebhookManagementPage: React.FC = () => {
       await loadSubscriptions();
     } catch (err) {
       console.error('Failed to create webhook:', err);
+      showToast.error('Failed to create webhook');
     }
   };
 
@@ -88,6 +91,7 @@ const WebhookManagementPage: React.FC = () => {
       if (selectedSub === id) setSelectedSub(null);
     } catch (err) {
       console.error('Failed to delete:', err);
+      showToast.error('Failed to delete webhook');
     }
   };
 
@@ -97,16 +101,19 @@ const WebhookManagementPage: React.FC = () => {
       await loadSubscriptions();
     } catch (err) {
       console.error('Failed to toggle:', err);
+      showToast.error('Failed to toggle webhook');
     }
   };
 
   const handleTest = async (id: string) => {
     try {
       const result = await testWebhook(id);
-      alert(`Test ${result.status}: HTTP ${result.status_code || 'N/A'}${result.error ? ` — ${result.error}` : ''}`);
+      const msg = `Test ${result.status}: HTTP ${result.status_code || 'N/A'}${result.error ? ` — ${result.error}` : ''}`;
+      result.status === 'success' ? showToast.success(msg) : showToast.error(msg);
       if (selectedSub === id) await loadDeliveries(id);
     } catch (err) {
       console.error('Test failed:', err);
+      showToast.error('Webhook test failed');
     }
   };
 
@@ -117,6 +124,7 @@ const WebhookManagementPage: React.FC = () => {
       setSelectedSub(subId);
     } catch (err) {
       console.error('Failed to load deliveries:', err);
+      showToast.error('Failed to load delivery logs');
     }
   };
 

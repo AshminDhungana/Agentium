@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plus, Trash, Save } from "lucide-react";
+import { showToast } from '@/hooks/useToast';
 
 interface StepConfig {
   step_index: number;
@@ -55,7 +56,7 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ initialTemplat
 
   const handleSave = () => {
     if (!name.trim()) {
-      alert('Workflow Name is required');
+      showToast.warning('Workflow Name is required');
       return;
     }
     onSave(name, { steps }, cron);

@@ -43,6 +43,14 @@ const info = (message: string) =>
         style: TOAST_STYLE,
     });
 
+const warning = (message: string) =>
+    toast(message, {
+        duration: 4000,
+        icon: '⚠️',
+        style: TOAST_STYLE,
+        iconTheme: { primary: '#f59e0b', secondary: '#fff' },
+    });
+
 const loading = (message: string) =>
     toast.loading(message, {
         style: TOAST_STYLE,
@@ -56,6 +64,7 @@ export const showToast = {
     success,
     error,
     info,
+    warning,
     loading,
     dismiss: toast.dismiss,
     promise: toast.promise,
