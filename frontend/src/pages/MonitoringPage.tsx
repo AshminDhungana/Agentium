@@ -164,7 +164,7 @@ function ViolationsTab({ initialViolations }: ViolationsTabProps) {
     return (
         <div>
             {/* Filters */}
-            <div className="flex flex-wrap items-center gap-3 mb-6">
+            <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3 mb-6">
                 <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
                     <Filter className="w-4 h-4" />
                     <span className="font-medium">Filters:</span>
@@ -354,7 +354,7 @@ function RecoveryTab() {
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
             {/* System Status Banner */}
             <div className={`rounded-xl border p-6 shadow-sm ${status?.system_mode === 'degraded' ? 'bg-orange-50 dark:bg-orange-950/30 border-orange-200 dark:border-orange-800/50' : 'bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800/50'}`}>
-                <div className="flex items-start gap-4">
+                <div className="flex flex-col sm:flex-row items-start gap-4">
                     <div className={`p-3 rounded-lg flex-shrink-0 ${status?.system_mode === 'degraded' ? 'bg-orange-100 dark:bg-orange-900/50' : 'bg-green-100 dark:bg-green-900/50'}`}>
                         {status?.system_mode === 'degraded' ? <ShieldAlert className="w-6 h-6 text-orange-600 dark:text-orange-400" /> : <ShieldCheck className="w-6 h-6 text-green-600 dark:text-green-400" />}
                     </div>
@@ -468,7 +468,7 @@ function OperationsTab() {
                 </button>
             </div>
 
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                 {[
                     { title: "Agents", pct: data?.agents?.health_pct || 0 },
                     { title: "Tasks", pct: data?.tasks?.health_pct || 0 },
@@ -495,7 +495,7 @@ function OperationsTab() {
                         </h3>
                     </div>
                     <div className="p-6">
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="p-4 bg-gray-50 dark:bg-[#161b27] rounded-lg">
                                 <p className="text-xs text-gray-500 dark:text-gray-400">Scaling Actions (24h)</p>
                                 <p className="text-xl font-bold dark:text-white">{data?.scaling_events_24h ?? 0}</p>

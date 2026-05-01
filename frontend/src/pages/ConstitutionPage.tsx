@@ -531,7 +531,7 @@ export function ConstitutionPage() {
 
     // ── Render ─────────────────────────────────────────────────────────────
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-[#0f1117] px-6 py-8 transition-colors duration-200">
+        <div className="min-h-screen bg-gray-50 dark:bg-[#0f1117] px-4 sm:px-6 py-6 sm:py-8 transition-colors duration-200">
             <div className="max-w-4xl mx-auto space-y-6">
 
                 {/* ── Page Header ─────────────────────────────────────────── */}
@@ -569,7 +569,7 @@ export function ConstitutionPage() {
                     </div>
 
                     {/* Action buttons */}
-                    <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-shrink-0 flex-wrap">
                         {/* PDF Export */}
                         <button
                             onClick={handleExportPdf}
@@ -714,7 +714,7 @@ export function ConstitutionPage() {
                 )}
 
                 {/* ── Stats Row ────────────────────────────────────────────── */}
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     {[
                         { label: 'Articles',     value: articleCount,    icon: FileText, color: 'blue'   },
                         { label: 'Prohibitions', value: prohibitedCount, icon: Lock,     color: 'red'    },

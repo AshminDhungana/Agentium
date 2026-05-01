@@ -1828,7 +1828,7 @@ const PreferencesTab: React.FC = () => {
                                         focus:ring-2 focus:ring-blue-500 outline-none"
                                 />
                             </div>
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Category</label>
                                     <select aria-label="Category"
@@ -1949,7 +1949,7 @@ const CriticCard: React.FC<{ critic: CriticAgentStats }> = React.memo(({ critic 
                 <MiniBar value={critic.approval_rate} color={meta.bar} />
             </div>
 
-            <div className="grid grid-cols-3 gap-2 pt-3 border-t border-gray-100 dark:border-[#1e2535]">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-3 border-t border-gray-100 dark:border-[#1e2535]">
                 {[
                     { label: 'Reviews',   value: critic.reviews_completed },
                     { label: 'Vetoes',    value: critic.vetoes_issued },
@@ -2040,7 +2040,7 @@ const CriticsTab: React.FC<{ onStatsLoaded?: (count: number) => void }> = ({ onS
     return (
         <div className="mt-6 space-y-6">
             {/* Overall stats */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {overallCards.map(c => (
                     <div key={c.label} className="bg-white dark:bg-[#161b27] rounded-xl border border-gray-200 dark:border-[#1e2535] p-5 hover:border-gray-300 dark:hover:border-[#2a3347] hover:shadow-md dark:hover:shadow-[0_4px_20px_rgba(0,0,0,0.35)] transition-all duration-150">
                         <div className="flex items-center justify-between mb-3">

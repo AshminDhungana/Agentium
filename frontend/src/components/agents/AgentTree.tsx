@@ -248,7 +248,7 @@ export const AgentTree: React.FC<AgentTreeProps> = React.memo(({
         // h-full works when the parent has overflow-hidden + fixed height.
         <div
             ref={parentRef}
-            className="w-full overflow-y-auto"
+            className="w-full overflow-auto"
             style={{ height: '100%', minHeight: '400px' }}
         >
             <div
@@ -260,7 +260,7 @@ export const AgentTree: React.FC<AgentTreeProps> = React.memo(({
             >
                 {virtualizer.getVirtualItems().map((virtualItem) => {
                     const node       = virtualItems[virtualItem.index];
-                    const leftOffset = node.level * 40; // 40 px per indent level
+                    const leftOffset = node.level * 28; // 28 px per indent level
 
                     return (
                         <div
@@ -278,7 +278,7 @@ export const AgentTree: React.FC<AgentTreeProps> = React.memo(({
                                 paddingBottom: '16px', // measured by measureElement → correct spacing
                             }}
                         >
-                            <div style={{ marginLeft: `${leftOffset}px`, width: `calc(100% - ${leftOffset}px)` }}>
+                            <div style={{ marginLeft: `${leftOffset}px`, width: `calc(100% - ${leftOffset}px)`, minWidth: '300px' }}>
 
                                 {/* ── Critic section header ─────────────────── */}
                                 {node.isCriticHeader ? (
@@ -328,7 +328,7 @@ export const AgentTree: React.FC<AgentTreeProps> = React.memo(({
                                         {node.level > 0 && (
                                             <div
                                                 className="absolute pointer-events-none"
-                                                style={{ left: '-20px', top: 0, width: '20px', height: '28px' }}
+                                                style={{ left: '-16px', top: 0, width: '16px', height: '28px' }}
                                                 aria-hidden="true"
                                             >
                                                 {/* Vertical stub — top of item to elbow */}
@@ -339,7 +339,7 @@ export const AgentTree: React.FC<AgentTreeProps> = React.memo(({
                                                 {/* Horizontal elbow */}
                                                 <div
                                                     className="absolute border-t-2 border-slate-200 dark:border-slate-700"
-                                                    style={{ left: 0, top: '27px', width: '20px' }}
+                                                    style={{ left: 0, top: '27px', width: '16px' }}
                                                 />
                                             </div>
                                         )}

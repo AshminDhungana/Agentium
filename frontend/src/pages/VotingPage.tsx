@@ -101,7 +101,7 @@ export const VotingPage: React.FC = () => {
                 <div className="max-w-7xl mx-auto">
 
                     {/* ── Header ─────────────────────────────────────────────── */}
-                    <div className="mb-6 flex items-center justify-between">
+                    <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <div className="flex items-center gap-3">
                             <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center shadow-lg">
                                 <Gavel className="w-7 h-7 text-white" />
@@ -115,7 +115,7 @@ export const VotingPage: React.FC = () => {
                                 </p>
                             </div>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 self-start sm:self-auto w-full sm:w-auto">
                             <button
                                 onClick={() => loadData(true)}
                                 className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-[#1e2535] text-gray-500 dark:text-gray-400 transition-colors duration-200"
@@ -124,7 +124,7 @@ export const VotingPage: React.FC = () => {
                                 <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
                             </button>
                             <button
-                                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm transition-colors"
+                                className="flex items-center justify-center flex-1 sm:flex-none gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm transition-colors"
                                 onClick={() => setShowProposalModal(true)}
                             >
                                 <Plus className="w-4 h-4" />
@@ -232,7 +232,7 @@ export const VotingPage: React.FC = () => {
                     {isListTab && (
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
                             {/* Left: item list */}
-                            <div className="space-y-3">
+                            <div className={`space-y-3 ${selectedItem ? 'hidden lg:block' : 'block'}`}>
 
                                 {/* Amendments tab */}
                                 {activeTab === 'amendments' && (
