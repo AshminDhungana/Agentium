@@ -19,6 +19,7 @@ import {
 import { ModelConfigForm } from '@/components/models/ModelConfigForm';
 import { ModelCard } from '@/components/models/ModelCard';
 import { ModelCardSkeleton } from '@/components/models/ModelCardSkeleton';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { useModelConfigs } from '@/hooks/useModelConfigs';
 import { formatTokenCount } from '@/utils/time';
 
@@ -158,7 +159,7 @@ const ModelsPageInner: React.FC = () => {
                 aria-busy="true"
             >
                 <div className="flex flex-col items-center gap-3">
-                    <div className="w-12 h-12 border-4 border-blue-200 dark:border-blue-500/30 border-t-blue-600 dark:border-t-blue-400 rounded-full animate-spin" />
+                    <LoadingSpinner size="xl" className="text-blue-600 dark:text-blue-400" />
                     <p className="text-gray-500 dark:text-gray-400 text-sm">Loading configurations…</p>
                 </div>
             </div>

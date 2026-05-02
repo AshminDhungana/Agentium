@@ -1007,7 +1007,7 @@ export const MonitoringPage: React.FC = () => {
                             title="Refresh now"
                             aria-label="Refresh monitoring data"
                         >
-                            <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                            {isRefreshing ? <LoadingSpinner size="sm" /> : <RefreshCw className="w-4 h-4" />}
                         </button>
                     </div>
                 </div>

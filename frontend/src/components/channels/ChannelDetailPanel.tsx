@@ -57,7 +57,7 @@ function StatusIcon({ status }: { status: string }) {
     switch (status) {
         case 'responded':  return <CheckCircle  className="w-3.5 h-3.5 text-green-500 shrink-0"  />;
         case 'failed':     return <XCircle      className="w-3.5 h-3.5 text-red-500 shrink-0"    />;
-        case 'processing': return <Clock        className="w-3.5 h-3.5 text-yellow-500 animate-spin shrink-0" />;
+        case 'processing': return <span className="text-yellow-500"><LoadingSpinner size="sm" /></span>;
         default:           return <AlertTriangle className="w-3.5 h-3.5 text-gray-400 shrink-0"  />;
     }
 }

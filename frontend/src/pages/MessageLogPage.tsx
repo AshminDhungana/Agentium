@@ -14,8 +14,9 @@ import {
   Search, Filter, RefreshCw, RotateCcw, ChevronLeft, ChevronRight,
   CheckCircle2, XCircle, Clock, AlertTriangle, Inbox,
   MessageSquare, Calendar, User, Hash, LayoutGrid,
-  ChevronDown, X, Play, AlertCircle, Zap, Loader2
+  ChevronDown, X, Play, AlertCircle, Zap
 } from "lucide-react";
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { useMessageLog, DEFAULT_FILTERS } from '@/hooks/useMessageLog';
 import { getRelativeTime } from '@/utils/time';
 import { ChannelMessage, MessageLogFilters } from '@/services/channelMessages';
@@ -39,7 +40,7 @@ const CHANNEL_ICONS: Record<string, string> = {
 
 const STATUS_CONFIG = {
   received:   { label: 'Received',   color: 'text-blue-600 dark:text-blue-400',      bg: 'bg-blue-100 dark:bg-blue-500/10',      icon: Clock       },
-  processing: { label: 'Processing', color: 'text-yellow-600 dark:text-yellow-400',  bg: 'bg-yellow-100 dark:bg-yellow-500/10',  icon: Loader2     },
+  processing: { label: 'Processing', color: 'text-yellow-600 dark:text-yellow-400',  bg: 'bg-yellow-100 dark:bg-yellow-500/10',  icon: Clock       },
   responded:  { label: 'Responded',  color: 'text-emerald-600 dark:text-emerald-400',bg: 'bg-emerald-100 dark:bg-emerald-500/10',icon: CheckCircle2 },
   failed:     { label: 'Failed',     color: 'text-red-600 dark:text-red-400',        bg: 'bg-red-100 dark:bg-red-500/10',        icon: XCircle     },
 };
@@ -56,7 +57,11 @@ function StatusBadge({ status }: { status: string }) {
   const Icon = cfg.icon;
   return (
     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${cfg.color} ${cfg.bg}`}>
-      <Icon className={`w-3 h-3 ${status === 'processing' ? 'animate-spin' : ''}`} />
+      {status === 'processing' ? (
+        <LoadingSpinner size="sm" />
+      ) : (
+        <Icon className="w-3 h-3" />
+      )}
       {cfg.label}
     </span>
   );
@@ -400,7 +405,6 @@ const MessageRow = memo(function MessageRow({ msg, onReplay, replayingId }: Mess
 // useState is still needed locally by FilterBar; import it here so the file
 // compiles without importing from React at the top (memo + useMemo already pull it in).
 import { useState } from 'react';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { EmptyState } from '@/components/ui/EmptyState';
 
 export function MessageLogPage() {
@@ -464,7 +468,11 @@ export function MessageLogPage() {
               className="p-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600/50 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
               aria-label="Refresh message log"
             >
-              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              {loading ? (
+                <LoadingSpinner size="sm" />
+              ) : (
+                <RefreshCw className="w-4 h-4" />
+              )}
             </button>
           </div>
         </div>

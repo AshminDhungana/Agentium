@@ -121,7 +121,11 @@ export const VotingPage: React.FC = () => {
                                 className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-[#1e2535] text-gray-500 dark:text-gray-400 transition-colors duration-200"
                                 title="Refresh now"
                             >
-                                <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                                {isRefreshing ? (
+                                    <LoadingSpinner size="sm" />
+                                ) : (
+                                    <RefreshCw className="w-4 h-4" />
+                                )}
                             </button>
                             <button
                                 className="flex items-center justify-center flex-1 sm:flex-none gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm transition-colors"

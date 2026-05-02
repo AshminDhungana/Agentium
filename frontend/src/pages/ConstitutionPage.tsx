@@ -631,7 +631,7 @@ export function ConstitutionPage() {
                                     className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 dark:hover:bg-blue-500 disabled:opacity-60 rounded-xl transition-all duration-150 shadow-sm shadow-blue-500/20 dark:shadow-blue-900/30"
                                 >
                                     {saving ? (
-                                        <div className="h-4 w-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                                        <LoadingSpinner size="sm" />
                                     ) : (
                                         <Save className="h-4 w-4" />
                                     )}
@@ -766,7 +766,11 @@ export function ConstitutionPage() {
                                         hover:bg-gray-50 dark:hover:bg-[#1e2535]
                                         disabled:opacity-50 transition-colors"
                                 >
-                                    <RefreshCw className={`h-3 w-3 ${amendmentsLoading ? 'animate-spin' : ''}`} />
+                                    {amendmentsLoading ? (
+                                        <LoadingSpinner size="sm" />
+                                    ) : (
+                                        <RefreshCw className="h-3 w-3" />
+                                    )}
                                     Refresh
                                 </button>
                             </div>

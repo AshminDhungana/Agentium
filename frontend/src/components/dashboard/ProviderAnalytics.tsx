@@ -9,6 +9,7 @@ import {
     TrendingUp, DollarSign, Zap, CheckCircle2,
     RefreshCw, ChevronDown, ChevronUp, AlertCircle, Clock,
 } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -178,7 +179,7 @@ export function ProviderAnalytics() {
                     </select>
 
                     <button onClick={fetchAll} disabled={loading} className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#1e2535] transition-colors" title="Refresh">
-                        <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+                        {loading ? <LoadingSpinner size="sm" /> : <RefreshCw className="w-3.5 h-3.5" />}
                     </button>
                     <button onClick={() => setExpanded(v => !v)} className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#1e2535] transition-colors">
                         {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
@@ -197,7 +198,7 @@ export function ProviderAnalytics() {
             {/* Loading */}
             {loading && (
                 <div className="px-6 py-10 flex items-center justify-center gap-2">
-                    <RefreshCw className="w-4 h-4 animate-spin text-indigo-400" />
+                    <LoadingSpinner size="md" />
                     <span className="text-sm text-gray-400">Loading analytics…</span>
                 </div>
             )}

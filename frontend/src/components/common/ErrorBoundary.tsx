@@ -1,5 +1,6 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { AlertTriangle, RotateCcw } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 interface Props {
     children: ReactNode;
@@ -107,7 +108,7 @@ export class ErrorBoundary extends Component<Props, State> {
                             disabled={this.state.isRetrying}
                             className="flex items-center justify-center gap-1.5 px-3 py-1.5 w-full bg-red-100 hover:bg-red-200 dark:bg-red-900/50 dark:hover:bg-red-900/70 text-red-800 dark:text-red-200 text-xs font-semibold rounded-lg transition-colors disabled:opacity-50"
                         >
-                            <RotateCcw className={`w-3 h-3 ${this.state.isRetrying ? 'animate-spin' : ''}`} />
+                            {this.state.isRetrying ? <LoadingSpinner size="sm" /> : <RotateCcw className="w-3 h-3" />}
                             {this.state.isRetrying ? 'Retrying...' : 'Retry'}
                         </button>
                     </div>
@@ -144,7 +145,7 @@ export class ErrorBoundary extends Component<Props, State> {
                                 className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50"
                             >
                                 {this.state.isRetrying ? (
-                                    <><RotateCcw className="w-4 h-4 animate-spin" /> Retrying...</>
+                                    <><LoadingSpinner size="sm" /> Retrying...</>
                                 ) : (
                                     <><RotateCcw className="w-4 h-4" /> Try Again</>
                                 )}

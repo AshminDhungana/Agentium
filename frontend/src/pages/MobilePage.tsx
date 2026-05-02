@@ -562,7 +562,7 @@ export function MobilePage() {
                                         title="Refresh"
                                         aria-label="Refresh device list"
                                     >
-                                        <RefreshCw className={`w-4 h-4 ${devicesLoading ? 'animate-spin' : ''}`} />
+                                        {devicesLoading ? <LoadingSpinner size="sm" /> : <RefreshCw className="w-4 h-4" />}
                                     </button>
                                 </div>
                             </div>

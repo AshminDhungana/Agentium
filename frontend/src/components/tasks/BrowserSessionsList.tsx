@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Monitor, RefreshCw } from 'lucide-react';
 import { browserApi, BrowserSessionInfo } from '../../services/browserApi';
 import { Task } from '../../types';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 interface BrowserSessionsListProps {
     tasks: Task[];
@@ -33,7 +34,7 @@ export const BrowserSessionsList: React.FC<BrowserSessionsListProps> = ({ tasks,
     if (loading && sessions.length === 0) {
         return (
             <div className="flex justify-center p-8">
-                <RefreshCw className="w-6 h-6 animate-spin text-gray-400" />
+                <LoadingSpinner size="lg" />
             </div>
         );
     }
@@ -64,7 +65,7 @@ export const BrowserSessionsList: React.FC<BrowserSessionsListProps> = ({ tasks,
                     onClick={loadSessions}
                     className="p-1.5 rounded-lg border border-gray-200 dark:border-[#1e2535] bg-white dark:bg-[#161b27] text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
                 >
-                    <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+                    {loading ? <LoadingSpinner size="sm" /> : <RefreshCw className="w-3.5 h-3.5" />}
                 </button>
             </div>
             

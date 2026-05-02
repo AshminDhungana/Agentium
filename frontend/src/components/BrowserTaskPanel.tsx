@@ -7,6 +7,7 @@
  */
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 interface BrowserTask {
   id: string;
@@ -264,14 +265,7 @@ const BrowserTaskPanel: React.FC = () => {
           </div>
         ) : isBusy ? (
           <div className="flex flex-col items-center gap-3 p-10">
-            {/* Spinner — kept as inline style only for the asymmetric border trick */}
-            <div
-              className="w-8 h-8 rounded-full animate-spin"
-              style={{
-                border: '3px solid rgba(139, 92, 246, 0.2)',
-                borderTopColor: '#a78bfa',
-              }}
-            />
+            <LoadingSpinner size="lg" className="text-violet-500 dark:text-violet-400" />
             <p className="text-gray-500 dark:text-slate-400 text-sm m-0">
               {task.status === 'navigating' ? 'Navigating…' : 'Capturing screenshot…'}
             </p>

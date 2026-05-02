@@ -534,7 +534,7 @@ export const CheckpointTimeline: React.FC<CheckpointTimelineProps> = ({
                             hover:bg-slate-50 dark:hover:bg-[#1e2535]
                             disabled:opacity-50 transition-colors duration-150"
                     >
-                        <RefreshCw className={`w-3 h-3 ${isRefreshing ? 'animate-spin' : ''}`} />
+                        {isRefreshing ? <LoadingSpinner size="sm" /> : <RefreshCw className="w-3 h-3" />}
                         Refresh
                     </button>
                 </div>

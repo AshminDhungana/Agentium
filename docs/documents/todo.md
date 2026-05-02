@@ -680,7 +680,7 @@ Build a self-governing AI ecosystem where agents operate under constitutional la
 
 ### 17.3 Mobile Responsiveness for Complex Pages
 
-- [ ] Audit breakpoints for: `TasksPage.tsx`, `AgentTree.tsx`, `VotingPage.tsx`, `MonitoringPage.tsx`, `ConstitutionPage.tsx` — all currently desktop-first
+- [x] Audit breakpoints for: `TasksPage.tsx`, `AgentTree.tsx`, `VotingPage.tsx`, `MonitoringPage.tsx`, `ConstitutionPage.tsx` — all currently desktop-first
 - [ ] `TasksPage.tsx` — collapse table view to card view below `md:` breakpoint; slide-over for task details instead of inline expansion
 - [ ] `AgentTree.tsx` — horizontal scroll for deep hierarchies on mobile; collapsible tier groups
 - [ ] `VotingPage.tsx` — stack vote cards vertically on mobile; move amendment diff to expandable accordion

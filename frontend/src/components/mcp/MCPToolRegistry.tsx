@@ -856,7 +856,7 @@ export function MCPToolRegistry() {
                             className="p-2 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition-colors"
                             title="Refresh"
                         >
-                            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                            {loading ? <LoadingSpinner size="sm" /> : <RefreshCw className="w-4 h-4" />}
                         </button>
                         <button
                             onClick={() => setShowPropose(true)}

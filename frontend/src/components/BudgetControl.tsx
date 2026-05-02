@@ -3,6 +3,7 @@ import { Coins, DollarSign, Shield, AlertTriangle } from 'lucide-react';
 import { api } from '@/services/api';
 import { useAuthStore } from '@/store/authStore';
 import { showToast } from '@/hooks/useToast';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 interface BudgetStatus {
     current_limits: {
@@ -257,7 +258,7 @@ export default function BudgetControl() {
                         >
                             {loading ? (
                                 <>
-                                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                    <LoadingSpinner size="sm" />
                                     Updating…
                                 </>
                             ) : (

@@ -61,6 +61,7 @@ import {
     Monitor,
 } from 'lucide-react';
 import { showToast } from '@/hooks/useToast';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { CheckpointTimeline } from '../components/checkpoints/CheckpointTimeline';
 import { BranchDiffView } from '../components/checkpoints/BranchDiffView';
@@ -377,7 +378,7 @@ const CriticReviewPanel: React.FC<{
     if (loading) {
         return (
             <div className="flex items-center justify-center py-6 gap-2 text-gray-400">
-                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                <LoadingSpinner size="sm" />
                 <span className="text-xs">Loading critic reviews…</span>
             </div>
         );
@@ -686,7 +687,7 @@ const TaskSubtaskAccordion: React.FC<{ task: Task }> = ({ task }) => {
     if (loading) {
         return (
             <div className="flex items-center gap-2 px-5 py-4 text-gray-400 dark:text-gray-500">
-                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                <LoadingSpinner size="sm" />
                 <span className="text-xs">Loading subtasks…</span>
             </div>
         );
@@ -1640,7 +1641,7 @@ const PreferencesTab: React.FC = () => {
                             bg-purple-50 dark:bg-purple-500/10 hover:bg-purple-100 dark:hover:bg-purple-500/20
                             transition-colors flex items-center gap-1.5 disabled:opacity-50"
                     >
-                        <Sparkles className={`w-4 h-4 ${optimizing ? 'animate-spin' : ''}`} />
+                        {optimizing ? <LoadingSpinner size="sm" /> : <Sparkles className="w-4 h-4" />}
                         Optimize
                     </button>
                     <button
@@ -2068,7 +2069,7 @@ const CriticsTab: React.FC<{ onStatsLoaded?: (count: number) => void }> = ({ onS
                         disabled={refreshing}
                         className="p-1.5 rounded-lg border border-gray-200 dark:border-[#1e2535] bg-white dark:bg-[#161b27] text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-[#1e2535] transition-all duration-150 disabled:opacity-50"
                     >
-                        <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+                        {refreshing ? <LoadingSpinner size="sm" /> : <RefreshCw className="w-3.5 h-3.5" />}
                     </button>
                 </div>
 
@@ -2111,7 +2112,7 @@ const CriticsTab: React.FC<{ onStatsLoaded?: (count: number) => void }> = ({ onS
                         disabled={!inspectTask.trim() || inspectLoading}
                         className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white text-sm font-medium rounded-lg transition-colors duration-150 flex items-center gap-2"
                     >
-                        {inspectLoading && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
+                        {inspectLoading && <LoadingSpinner size="sm" />}
                         Inspect
                     </button>
                 </div>
@@ -2230,7 +2231,7 @@ export const TasksPage: React.FC = () => {
                                 className="p-2 rounded-lg border border-gray-200 dark:border-[#1e2535] bg-white dark:bg-[#161b27] text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-[#1e2535] hover:border-gray-300 dark:hover:border-[#2a3347] transition-all duration-150 shadow-sm dark:shadow-[0_2px_8px_rgba(0,0,0,0.2)] disabled:opacity-50"
                                 title="Refresh"
                             >
-                                <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                                {isRefreshing ? <LoadingSpinner size="sm" /> : <RefreshCw className="w-4 h-4" />}
                             </button>
                             {activeTab === 'tasks' && (
                                 <button

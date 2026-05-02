@@ -576,7 +576,7 @@ export const AgentsPage: React.FC = () => {
                         title="Refresh"
                         className="p-2 rounded-lg border border-slate-200 dark:border-[#1e2535] bg-white dark:bg-[#161b27] text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-[#1e2535] disabled:opacity-50 transition-colors shadow-sm"
                     >
-                        <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                        {isRefreshing ? <LoadingSpinner size="sm" /> : <RefreshCw className="w-4 h-4" />}
                     </button>
 
                     <div className="flex rounded-lg overflow-hidden border border-slate-200 dark:border-[#1e2535] bg-slate-50 dark:bg-[#161b27] shadow-sm">

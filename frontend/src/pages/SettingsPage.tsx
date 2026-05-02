@@ -18,6 +18,7 @@ import { showToast } from '@/hooks/useToast';
 import UserManagement from './Usermanagement';
 // C14: password strength logic extracted into a reusable hook
 import { usePasswordStrength } from '@/hooks/usePasswordStrength';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 interface PasswordFormData {
     currentPassword: string;
@@ -409,7 +410,7 @@ export function SettingsPage() {
                                             >
                                                 {isSubmitting ? (
                                                     <>
-                                                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                                        <LoadingSpinner size="sm" />
                                                         Updating…
                                                     </>
                                                 ) : (

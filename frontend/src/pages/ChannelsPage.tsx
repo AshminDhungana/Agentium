@@ -708,7 +708,7 @@ export function ChannelsPage() {
                                                 title="Test connection"
                                                 className="p-2 text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition-all duration-150"
                                             >
-                                                <RefreshCw className={`w-4 h-4 ${testingChannelId === channel.id ? 'animate-spin' : ''}`} />
+                                                {testingChannelId === channel.id ? <LoadingSpinner size="sm" /> : <RefreshCw className="w-4 h-4" />}
                                             </button>
                                             <button
                                                 onClick={() => {

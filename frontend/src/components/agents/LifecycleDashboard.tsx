@@ -181,7 +181,7 @@ export const LifecycleDashboard: React.FC<LifecycleDashboardProps> = ({
                     title="Refresh"
                     className="p-1.5 rounded-lg border border-slate-200 dark:border-[#1e2535] text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1e2535] disabled:opacity-50 transition-colors"
                 >
-                    <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                    {isRefreshing ? <LoadingSpinner size="sm" /> : <RefreshCw className="w-3.5 h-3.5" />}
                 </button>
             </div>
 

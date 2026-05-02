@@ -229,7 +229,7 @@ export const CitationGraph: React.FC = () => {
             className="px-3 py-2.5 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/5 rounded-lg text-sm transition-colors duration-150"
             title="Refresh stats"
           >
-            <RefreshCw className={`w-4 h-4 ${statsLoading ? 'animate-spin' : ''}`} />
+            {statsLoading ? <LoadingSpinner size="sm" /> : <RefreshCw className="w-4 h-4" />}
           </button>
         </div>
       </div>

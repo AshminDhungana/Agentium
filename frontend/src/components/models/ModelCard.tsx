@@ -25,6 +25,7 @@ import {
 import type { ModelConfig } from '@/types';
 import { getProviderMeta } from '@/constants/providerMeta';
 import { formatTokenCount } from '@/utils/time';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -250,7 +251,7 @@ export const ModelCard: React.FC<ModelCardProps> = React.memo(({
                         className="flex-1 px-2.5 py-2 bg-blue-100 dark:bg-blue-500/10 hover:bg-blue-200 dark:hover:bg-blue-500/20 text-blue-700 dark:text-blue-400 rounded-lg text-xs font-medium transition-colors duration-150 flex items-center justify-center gap-1.5 disabled:opacity-50 border border-blue-200 dark:border-blue-500/20"
                     >
                         {isTesting
-                            ? <RefreshCw className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
+                            ? <LoadingSpinner size="sm" />
                             : <Play className="w-3.5 h-3.5" aria-hidden="true" />
                         }
                         {isTesting ? 'Testing…' : 'Test'}
@@ -264,10 +265,11 @@ export const ModelCard: React.FC<ModelCardProps> = React.memo(({
                         title="Fetch available models"
                         className="flex-1 px-2.5 py-2 bg-purple-100 dark:bg-purple-500/10 hover:bg-purple-200 dark:hover:bg-purple-500/20 text-purple-700 dark:text-purple-400 rounded-lg text-xs font-medium transition-colors duration-150 flex items-center justify-center gap-1.5 disabled:opacity-50 border border-purple-200 dark:border-purple-500/20"
                     >
-                        <RefreshCw
-                            className={`w-3.5 h-3.5 ${isFetching ? 'animate-spin' : ''}`}
-                            aria-hidden="true"
-                        />
+                        {isFetching ? (
+                            <LoadingSpinner size="sm" />
+                        ) : (
+                            <RefreshCw className="w-3.5 h-3.5" aria-hidden="true" />
+                        )}
                         {isFetching ? 'Fetching…' : 'Fetch'}
                     </button>
 
@@ -292,7 +294,7 @@ export const ModelCard: React.FC<ModelCardProps> = React.memo(({
                                 className="px-2.5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-medium transition-colors duration-150 disabled:opacity-50 flex items-center gap-1"
                             >
                                 {isDeleting
-                                    ? <RefreshCw className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
+                                    ? <LoadingSpinner size="sm" />
                                     : 'Confirm'
                                 }
                             </button>

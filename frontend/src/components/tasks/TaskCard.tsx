@@ -53,7 +53,7 @@ const STATUS_CONFIG: Record<string, {
     retrying: {
         bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200',
         darkBg: 'dark:bg-amber-500/10', darkText: 'dark:text-amber-300', darkBorder: 'dark:border-amber-500/20',
-        icon: <RefreshCw className="w-3 h-3 animate-spin" />, label: 'Retrying'
+        icon: <LoadingSpinner size="sm" />, label: 'Retrying'
     },
     escalated: {
         bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200',

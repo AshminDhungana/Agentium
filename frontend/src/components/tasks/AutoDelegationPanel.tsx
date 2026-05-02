@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Task } from '../../types';
 import { tasksService } from '../../services/tasks';
 import { Brain, RefreshCw, Users, ArrowRight, Zap, Shield } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 interface AutoDelegationPanelProps {
     task: Task;
@@ -71,7 +72,7 @@ export const AutoDelegationPanel: React.FC<AutoDelegationPanelProps> = ({ task, 
                         disabled:opacity-50 disabled:cursor-not-allowed
                         transition-colors duration-150"
                 >
-                    <RefreshCw className={`w-3.5 h-3.5 ${isRedelegating ? 'animate-spin' : ''}`} />
+                    {isRedelegating ? <LoadingSpinner size="sm" /> : <RefreshCw className="w-3.5 h-3.5" />}
                     {isRedelegating ? 'Delegating…' : 'Re-delegate'}
                 </button>
             </div>
