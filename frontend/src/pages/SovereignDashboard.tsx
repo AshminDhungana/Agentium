@@ -203,7 +203,7 @@ export function SovereignDashboard() {
     };
 
     // ── Access denied ────────────────────────────────────────────────────────
-    if (!user?.is_admin) {
+    if (!user?.isSovereign) {
         return (
             <div className="min-h-screen bg-gray-50 dark:bg-[#0f1117] flex items-center justify-center p-6 transition-colors duration-200">
                 <div className="text-center">

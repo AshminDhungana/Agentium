@@ -63,6 +63,7 @@ import {
 import { showToast } from '@/hooks/useToast';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { SlideOver } from '@/components/ui/SlideOver';
 import { CheckpointTimeline } from '../components/checkpoints/CheckpointTimeline';
 import { BranchDiffView } from '../components/checkpoints/BranchDiffView';
 import { AutoDelegationPanel } from '../components/tasks/AutoDelegationPanel';
@@ -785,9 +786,7 @@ const TaskSubtaskAccordion: React.FC<{ task: Task }> = ({ task }) => {
 // ─── Main Task Card ───────────────────────────────────────────────────────────
 
 // FIX 2: React.memo prevents re-renders when sibling tasks update
-const MainTaskCard: React.FC<{ task: Task; onUpdated?: (updated: Task) => void; onViewLive?: (task: Task) => void }> = React.memo(({ task, onUpdated, onViewLive }) => {
-    const [subtasksOpen, setSubtasksOpen]         = useState(false);
-    const [governanceOpen, setGovernanceOpen]     = useState(false);
+const MainTaskCard: React.FC<{ task: Task; onUpdated?: (updated: Task) => void; onViewLive?: (task: Task) => void; onOpenDetails?: (task: Task) => void }> = React.memo(({ task, onUpdated, onViewLive, onOpenDetails }) => {
     const [isEditing, setIsEditing]               = useState(false);
     const [isSaving, setIsSaving]                 = useState(false);
     const [editTitle, setEditTitle]               = useState(task.title);
@@ -856,13 +855,14 @@ const MainTaskCard: React.FC<{ task: Task; onUpdated?: (updated: Task) => void; 
         <div className="bg-white dark:bg-[#161b27] rounded-xl border border-gray-200 dark:border-[#1e2535] shadow-sm dark:shadow-[0_2px_16px_rgba(0,0,0,0.25)] overflow-hidden transition-colors duration-200">
 
             {/* ── Main task header ──────────────────────────────────────── */}
-            <div className="px-6 pt-5 pb-4 border-b border-gray-100 dark:border-[#1e2535]">
-                <div className="flex items-start gap-4">
-                    <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-500/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-                        <ListTodo className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                    </div>
+            <div className="px-5 md:px-6 pt-5 pb-4 border-b border-gray-100 dark:border-[#1e2535]">
+                <div className="flex flex-col md:flex-row items-start gap-4 md:gap-4">
+                    <div className="flex items-start gap-3 md:gap-4 flex-1 min-w-0 w-full">
+                        <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-500/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <ListTodo className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                        </div>
 
-                    <div className="flex-1 min-w-0">
+                        <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap mb-1">
                             {/* FIX 8: task.agentium_id is optional string — no as any */}
                             {task.agentium_id && (
@@ -931,8 +931,9 @@ const MainTaskCard: React.FC<{ task: Task; onUpdated?: (updated: Task) => void; 
                             )
                         )}
                     </div>
+                    </div>
 
-                    <div className="flex items-center gap-2 flex-shrink-0">
+                    <div className="flex flex-wrap items-center gap-2 flex-shrink-0 w-full md:w-auto pl-13 md:pl-0">
                         {isEditing ? (
                             <>
                                 <button
@@ -998,6 +999,13 @@ const MainTaskCard: React.FC<{ task: Task; onUpdated?: (updated: Task) => void; 
                                         View Live
                                     </button>
                                 )}
+                                <button
+                                    onClick={() => onOpenDetails?.(task)}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-500/20 transition-colors"
+                                >
+                                    <ListTodo className="w-3.5 h-3.5" />
+                                    Details
+                                </button>
                             </>
                         )}
                     </div>
@@ -1057,79 +1065,7 @@ const MainTaskCard: React.FC<{ task: Task; onUpdated?: (updated: Task) => void; 
                 )}
             </div>
 
-            {/* ── Subtasks section ──────────────────────────────────────── */}
-            <div>
-                <button
-                    onClick={() => setSubtasksOpen(o => !o)}
-                    className="w-full flex items-center gap-3 px-6 py-3 hover:bg-gray-50 dark:hover:bg-[#1e2535]/50 transition-colors duration-150 border-b border-gray-100 dark:border-[#1e2535] group"
-                >
-                    <CornerDownRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                    <span className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex-1 text-left">
-                        Subtasks &amp; Critic Reviews
-                    </span>
-                    <ChevronDown
-                        className={`w-4 h-4 text-gray-400 transition-transform duration-200 group-hover:text-gray-600 dark:group-hover:text-gray-300 ${subtasksOpen ? 'rotate-180' : ''}`}
-                    />
-                </button>
-                {subtasksOpen && <TaskSubtaskAccordion task={task} />}
-            </div>
-
-            {/* ── Governance details (collapsible) ─────────────────────── */}
-            {gov && (gov.constitutional_basis || gov.hierarchical_id || gov.parent_task_id) && (
-                <div className="border-t border-gray-100 dark:border-[#1e2535]">
-                    <button
-                        onClick={() => setGovernanceOpen(o => !o)}
-                        className="w-full flex items-center gap-3 px-6 py-3 hover:bg-gray-50 dark:hover:bg-[#1e2535]/50 transition-colors duration-150 group"
-                    >
-                        <Info className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                        <span className="text-sm font-medium text-gray-500 dark:text-gray-400 flex-1 text-left">
-                            Governance details
-                        </span>
-                        <ChevronDown
-                            className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${governanceOpen ? 'rotate-180' : ''}`}
-                        />
-                    </button>
-                    {governanceOpen && (
-                        <div className="px-6 pb-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            {gov.constitutional_basis && (
-                                <div>
-                                    <p className="text-[10px] uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-1">Constitutional basis</p>
-                                    <p className="text-xs text-gray-700 dark:text-gray-300">{gov.constitutional_basis}</p>
-                                </div>
-                            )}
-                            {gov.hierarchical_id && (
-                                <div>
-                                    <p className="text-[10px] uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-1">Hierarchical ID</p>
-                                    <p className="text-xs font-mono text-gray-700 dark:text-gray-300">{gov.hierarchical_id}</p>
-                                </div>
-                            )}
-                            {gov.parent_task_id && (
-                                <div>
-                                    <p className="text-[10px] uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-1">Parent task</p>
-                                    <p className="text-xs font-mono text-gray-700 dark:text-gray-300">{gov.parent_task_id}</p>
-                                </div>
-                            )}
-                            <div className="sm:col-span-2 flex items-center gap-3 pt-1 flex-wrap">
-                                {gov.council_approved && (
-                                    <span className="inline-flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
-                                        <CheckCircle className="w-3 h-3" /> Council approved
-                                    </span>
-                                )}
-                                {gov.head_approved && (
-                                    <span className="inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400">
-                                        <CheckCircle className="w-3 h-3" /> Head approved
-                                    </span>
-                                )}
-                                {gov.requires_deliberation && (
-                                    <span className="inline-flex items-center gap-1 text-xs text-purple-600 dark:text-purple-400">
-                                        <AlertTriangle className="w-3 h-3" /> Requires deliberation
-                                    </span>
-                                )}
-                            </div>
-                        </div>
-                    )}
-                </div>
-            )}
+            {/* Subtasks and Governance removed from inline view, now in SlideOver */}
 
             {/* ── Footer meta ──────────────────────────────────────────── */}
             <div className="px-6 py-3 bg-gray-50 dark:bg-[#0f1117] border-t border-gray-100 dark:border-[#1e2535] flex items-center justify-between">
@@ -1149,7 +1085,7 @@ const MainTaskCard: React.FC<{ task: Task; onUpdated?: (updated: Task) => void; 
                         </span>
                     )}
                 </div>
-                <span className="text-[10px] font-mono text-gray-300 dark:text-gray-700 select-all">
+                <span className="text-[10px] font-mono text-gray-300 dark:text-gray-700 select-all hidden sm:inline">
                     {task.id}
                 </span>
             </div>
@@ -2161,6 +2097,7 @@ export const TasksPage: React.FC = () => {
     // Phase 14.1
     const [selectedBrowserTask, setSelectedBrowserTask] = useState<string | null>(null);
     const [showLiveViewerTask, setShowLiveViewerTask] = useState<string | null>(null);
+    const [selectedTaskDetails, setSelectedTaskDetails] = useState<Task | null>(null);
 
     useEffect(() => { loadTasks(); }, [filterStatus, myTasksOnly, hideSystem]);
 
@@ -2402,6 +2339,7 @@ export const TasksPage: React.FC = () => {
                                                 setTasks(prev => prev.map(t => t.id === updated.id ? updated : t))
                                             }
                                             onViewLive={(t) => setShowLiveViewerTask(t.id)}
+                                            onOpenDetails={setSelectedTaskDetails}
                                         />
                                     ))}
                                 </div>
@@ -2567,6 +2505,75 @@ export const TasksPage: React.FC = () => {
                     onClose={() => setShowLiveViewerTask(null)}
                 />
             )}
+
+            <SlideOver
+                isOpen={!!selectedTaskDetails}
+                onClose={() => setSelectedTaskDetails(null)}
+                title={selectedTaskDetails?.title || 'Task Details'}
+                subtitle={selectedTaskDetails?.agentium_id || selectedTaskDetails?.id}
+                icon={ListTodo}
+            >
+                {selectedTaskDetails && (
+                    <div className="flex flex-col">
+                        <div className="p-6 bg-white dark:bg-[#161b27]">
+                            <p className="text-sm text-gray-700 dark:text-gray-300 mb-4 whitespace-pre-wrap">
+                                {selectedTaskDetails.description || 'No description provided.'}
+                            </p>
+                            
+                            {/* Governance */}
+                            {selectedTaskDetails.governance && (selectedTaskDetails.governance.constitutional_basis || selectedTaskDetails.governance.hierarchical_id || selectedTaskDetails.governance.parent_task_id) && (
+                                <div className="mt-4 p-4 rounded-xl border border-gray-200 dark:border-[#2a3347] bg-gray-50 dark:bg-[#0f1117]">
+                                    <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide flex items-center gap-2 mb-3">
+                                        <Info className="w-3.5 h-3.5" />
+                                        Governance Details
+                                    </h4>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        {selectedTaskDetails.governance.constitutional_basis && (
+                                            <div>
+                                                <p className="text-[10px] uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-1">Constitutional basis</p>
+                                                <p className="text-xs text-gray-700 dark:text-gray-300">{selectedTaskDetails.governance.constitutional_basis}</p>
+                                            </div>
+                                        )}
+                                        {selectedTaskDetails.governance.hierarchical_id && (
+                                            <div>
+                                                <p className="text-[10px] uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-1">Hierarchical ID</p>
+                                                <p className="text-xs font-mono text-gray-700 dark:text-gray-300">{selectedTaskDetails.governance.hierarchical_id}</p>
+                                            </div>
+                                        )}
+                                        {selectedTaskDetails.governance.parent_task_id && (
+                                            <div>
+                                                <p className="text-[10px] uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-1">Parent task</p>
+                                                <p className="text-xs font-mono text-gray-700 dark:text-gray-300">{selectedTaskDetails.governance.parent_task_id}</p>
+                                            </div>
+                                        )}
+                                        <div className="sm:col-span-2 flex items-center gap-3 pt-1 flex-wrap">
+                                            {selectedTaskDetails.governance.council_approved && (
+                                                <span className="inline-flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
+                                                    <CheckCircle className="w-3 h-3" /> Council approved
+                                                </span>
+                                            )}
+                                            {selectedTaskDetails.governance.head_approved && (
+                                                <span className="inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400">
+                                                    <CheckCircle className="w-3 h-3" /> Head approved
+                                                </span>
+                                            )}
+                                            {selectedTaskDetails.governance.requires_deliberation && (
+                                                <span className="inline-flex items-center gap-1 text-xs text-purple-600 dark:text-purple-400">
+                                                    <AlertTriangle className="w-3 h-3" /> Requires deliberation
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                        
+                        <div className="border-t border-gray-100 dark:border-[#1e2535]">
+                            <TaskSubtaskAccordion task={selectedTaskDetails} />
+                        </div>
+                    </div>
+                )}
+            </SlideOver>
         </div>
     );
 };

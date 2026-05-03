@@ -676,12 +676,12 @@ Build a self-governing AI ecosystem where agents operate under constitutional la
 - [x] **Animations & Transitions** — add `transition-all duration-200` to all interactive elements (buttons, cards, modals, dropdowns) where missing; add skeleton loading states to all data-fetching components that don't already have them
 - [x] **Empty States** — design and implement empty state illustrations/messages for: agent list (no agents), task list (no tasks), inbox (no messages), knowledge base (no documents), workflow list (no workflows)
 - [x] **Toast Notifications** — standardize success/error/info toasts across all forms (currently inconsistent between pages); use a single shared `useToast()` hook
-- [ ] **Loading Consistency** — replace all ad-hoc `Loader2` spinners with a unified `<LoadingSpinner size="sm|md|lg" />` component
+- [x] **Loading Consistency** — replace all ad-hoc `Loader2` spinners with a unified `<LoadingSpinner size="sm|md|lg" />` component
 
 ### 17.3 Mobile Responsiveness for Complex Pages
 
 - [x] Audit breakpoints for: `TasksPage.tsx`, `AgentTree.tsx`, `VotingPage.tsx`, `MonitoringPage.tsx`, `ConstitutionPage.tsx` — all currently desktop-first
-- [ ] `TasksPage.tsx` — collapse table view to card view below `md:` breakpoint; slide-over for task details instead of inline expansion
+- [x] `TasksPage.tsx` — collapse table view to card view below `md:` breakpoint; slide-over for task details instead of inline expansion
 - [ ] `AgentTree.tsx` — horizontal scroll for deep hierarchies on mobile; collapsible tier groups
 - [ ] `VotingPage.tsx` — stack vote cards vertically on mobile; move amendment diff to expandable accordion
 - [ ] `MonitoringPage.tsx` — stack metric cards to 1-column grid below `sm:`; health rings resize to 40px

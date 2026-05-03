@@ -31,7 +31,6 @@ const ROLE_PERMISSION_LABELS: Record<string, string> = {
     primary_sovereign: 'Full Access',
     deputy_sovereign:  'Elevated Access',
     observer:          'Read Only',
-    sovereign:         'Full Access',   // backdoor sovereign fallback
     admin:             'Full Access',   // legacy alias
     user:              'Standard',      // legacy alias
 };

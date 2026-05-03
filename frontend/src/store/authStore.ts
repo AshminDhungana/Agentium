@@ -8,7 +8,6 @@ type UserRole =
     | 'primary_sovereign'
     | 'deputy_sovereign'
     | 'observer'
-    | 'sovereign'   // sovereign backdoor fallback role
     | 'admin'       // legacy / convenience alias
     | 'user';       // legacy / convenience alias
 
@@ -81,7 +80,6 @@ function deriveIsSovereign(user: {
 }): boolean {
     if (user.is_sovereign === true) return true;
     if (user.role === 'primary_sovereign') return true;
-    if (user.role === 'sovereign') return true;
     return false;
 }
 
