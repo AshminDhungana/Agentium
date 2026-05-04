@@ -5,7 +5,7 @@
 import React, { useState, useMemo, useRef, useCallback } from 'react';
 import { Agent } from '../../types';
 import { AgentCard } from './AgentCard';
-import { ChevronRight, ChevronDown, ShieldAlert } from 'lucide-react';
+import { ChevronRight, ChevronDown, ShieldAlert, FoldVertical, UnfoldVertical, Layers } from 'lucide-react';
 import { useDragDrop } from '../../context/DragDropContext';
 import { isCriticAgentId } from '../../utils/agentIds';
 import { useVirtualizer } from '@tanstack/react-virtual';
@@ -146,6 +146,46 @@ export const AgentTree: React.FC<AgentTreeProps> = React.memo(({
     const [collapsedNodes, setCollapsedNodes] = useState<Set<string>>(new Set());
     const [criticExpanded, setCriticExpanded] = useState(true);
 
+    // ── Tier Toolbar logic ───────────────────────────────────────────────────
+    const agentDepths = useMemo(() => {
+        const depths = new Map<string, number>();
+        const traverse = (agentId: string, depth: number) => {
+            depths.set(agentId, depth);
+            const ag = agentsMap.get(agentId);
+            if (!ag || isCriticAgent(ag)) return;
+            const subIds = Array.isArray(ag.subordinates) ? ag.subordinates : [];
+            for (const subId of subIds) {
+                const sub = agentsMap.get(subId);
+                if (sub && !isCriticAgent(sub)) traverse(subId, depth + 1);
+            }
+        };
+        if (rootAgent) traverse(rootAgent.agentium_id, 0);
+        return depths;
+    }, [rootAgent, agentsMap]);
+
+    const absoluteMaxDepth = useMemo(() => {
+        let max = 0;
+        for (const d of agentDepths.values()) max = Math.max(max, d);
+        return max;
+    }, [agentDepths]);
+
+    const collapseToLevel = useCallback((targetLevel: number) => {
+        const nextCollapsed = new Set<string>();
+        for (const [agentId, depth] of agentDepths.entries()) {
+            if (depth >= targetLevel) {
+                nextCollapsed.add(agentId);
+            }
+        }
+        setCollapsedNodes(nextCollapsed);
+        if (targetLevel === 0) setCriticExpanded(false);
+        else setCriticExpanded(true);
+    }, [agentDepths]);
+
+    const expandAll = useCallback(() => {
+        setCollapsedNodes(new Set());
+        setCriticExpanded(true);
+    }, []);
+
     const toggleNode = useCallback((agentId: string) => {
         setCollapsedNodes(prev => {
             const next = new Set(prev);
@@ -216,6 +256,10 @@ export const AgentTree: React.FC<AgentTreeProps> = React.memo(({
 
     // ── Virtualizer ───────────────────────────────────────────────────────────
 
+    const maxExpandedLevel = useMemo(() => {
+        return flattenedNodes.reduce((max, node) => Math.max(max, node.level), 0);
+    }, [flattenedNodes]);
+
     const parentRef = useRef<HTMLDivElement>(null);
 
     const virtualizer = useVirtualizer({
@@ -244,20 +288,48 @@ export const AgentTree: React.FC<AgentTreeProps> = React.memo(({
     if (!rootAgent) return null;
 
     return (
-        // Scroll container must have a concrete height — set by parent (AgentsPage).
-        // h-full works when the parent has overflow-hidden + fixed height.
-        <div
-            ref={parentRef}
-            className="w-full overflow-auto"
-            style={{ height: '100%', minHeight: '400px' }}
-        >
+        <div className="flex flex-col w-full h-full">
+            {/* ── Tier Toolbar ───────────────────────────────────────────────────────── */}
+            {absoluteMaxDepth > 0 && (
+                <div className="flex items-center gap-2 mb-4 p-2 bg-slate-50 dark:bg-[#161b27] rounded-xl border border-slate-200 dark:border-slate-800 overflow-x-auto scrollbar-hide">
+                    <Layers className="w-4 h-4 text-slate-500 ml-2 flex-shrink-0" />
+                    <span className="text-sm font-medium text-slate-600 dark:text-slate-300 mr-2 flex-shrink-0">Tier Groups:</span>
+                    
+                    <button
+                        onClick={expandAll}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors flex-shrink-0"
+                    >
+                        <UnfoldVertical className="w-3.5 h-3.5" />
+                        Expand All
+                    </button>
+                    
+                    {Array.from({ length: absoluteMaxDepth + 1 }).map((_, level) => (
+                        <button
+                            key={level}
+                            onClick={() => collapseToLevel(level)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors flex-shrink-0"
+                        >
+                            <FoldVertical className="w-3.5 h-3.5" />
+                            Level {level + 1}
+                        </button>
+                    ))}
+                </div>
+            )}
+
+            {/* Scroll container must have a concrete height — set by parent (AgentsPage). */}
+            {/* flex-1 allows it to take remaining height below the toolbar */}
             <div
-                style={{
-                    height:   `${virtualizer.getTotalSize()}px`,
-                    width:    '100%',
-                    position: 'relative',
-                }}
+                ref={parentRef}
+                className="w-full flex-1 overflow-auto"
+                style={{ minHeight: '400px' }}
             >
+                <div
+                    style={{
+                        height:   `${virtualizer.getTotalSize()}px`,
+                        minWidth: `max(100%, ${340 + maxExpandedLevel * 28}px)`,
+                        position: 'relative',
+                    }}
+                >
                 {virtualizer.getVirtualItems().map((virtualItem) => {
                     const node       = virtualItems[virtualItem.index];
                     const leftOffset = node.level * 28; // 28 px per indent level
@@ -374,6 +446,7 @@ export const AgentTree: React.FC<AgentTreeProps> = React.memo(({
                     );
                 })}
             </div>
+        </div>
         </div>
     );
 });
