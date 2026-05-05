@@ -2,8 +2,6 @@
  * VotingCard
  *
  * Summary card for a single amendment or deliberation.
- * Improvement: uses useCountdownTick() from the shared provider instead of
- * mounting its own setInterval — eliminating per-card timer overhead.
  */
 
 import React from 'react';
@@ -31,11 +29,16 @@ export function VotingCard({ item, isSelected, onClick, isAmendment }: VotingCar
     return (
         <div
             onClick={onClick}
-            className={`group bg-white dark:bg-[#161b27] rounded-xl border transition-all duration-200 cursor-pointer p-5 ${
-                isSelected
+            className={`
+                group bg-white dark:bg-[#161b27] rounded-xl border
+                transition-all duration-200 cursor-pointer p-5
+                select-none
+                active:scale-[0.99] active:shadow-none
+                ${isSelected
                     ? 'border-blue-500 dark:border-blue-500 ring-1 ring-blue-500/30 shadow-md'
                     : 'border-gray-200 dark:border-[#1e2535] hover:border-gray-300 dark:hover:border-[#2a3347] hover:shadow-sm'
-            }`}
+                }
+            `}
         >
             <div className="flex items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
@@ -69,13 +72,15 @@ export function VotingCard({ item, isSelected, onClick, isAmendment }: VotingCar
                     {/* Meta */}
                     {isAmendment && (item as AmendmentVoting).sponsors?.length > 0 && (
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 flex items-center gap-1">
-                            <Users className="w-3 h-3" />
-                            {(item as AmendmentVoting).sponsors.join(', ')}
+                            <Users className="w-3 h-3 flex-shrink-0" />
+                            <span className="truncate">
+                                {(item as AmendmentVoting).sponsors.join(', ')}
+                            </span>
                         </p>
                     )}
                     {!isAmendment && (
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 flex items-center gap-1">
-                            <Users className="w-3 h-3" />
+                            <Users className="w-3 h-3 flex-shrink-0" />
                             {(item as TaskDeliberation).participating_members?.length ?? 0} participants
                         </p>
                     )}
@@ -106,7 +111,8 @@ export function VotingCard({ item, isSelected, onClick, isAmendment }: VotingCar
                         />
                     </div>
                 </div>
-                <div className="flex justify-between text-xs text-gray-400 dark:text-gray-500 mt-1">
+                {/* flex-wrap prevents this row from clipping on narrow screens */}
+                <div className="flex flex-wrap justify-between gap-x-2 text-xs text-gray-400 dark:text-gray-500 mt-1">
                     <span>{totalVotes} votes cast</span>
                     <span>
                         {totalEligible > 0 ? Math.round((totalVotes / totalEligible) * 100) : 0}% turnout

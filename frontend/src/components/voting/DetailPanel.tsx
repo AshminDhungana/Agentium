@@ -2,13 +2,6 @@
  * DetailPanel
  *
  * Expanded view for a selected amendment or deliberation.
- *
- * Improvements:
- * - Vote confirmation step: prevents accidental governance submissions
- * - Optimistic tally update: reflects vote instantly before server round-trip
- * - Shared countdown tick: no per-component interval
- * - Unmount guard: details fetch cancelled on unmount to prevent setState leak
- * - aria-live region: screen readers announce vote submission status
  */
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -52,6 +45,12 @@ export function DetailPanel({ item, onClose, onVoteSuccess }: DetailPanelProps) 
     const [showIndividualVotes, setShowIndividualVotes] = useState(false);
     // Optimistic tally override — reverted on error, cleared after server refresh
     const [optimisticItem, setOptimisticItem] = useState<typeof item | null>(null);
+
+    // Diff accordion — open by default on desktop (≥1024 px), closed on mobile.
+    // Initialised once on mount; user can toggle freely after that.
+    const [diffOpen, setDiffOpen] = useState<boolean>(() =>
+        typeof window !== 'undefined' && window.innerWidth >= 1024
+    );
 
     const isAmendment = 'sponsors' in item;
     const isMountedRef = useRef(true);
@@ -149,6 +148,16 @@ export function DetailPanel({ item, onClose, onVoteSuccess }: DetailPanelProps) 
         }
     };
 
+    // ── Diff helpers ──────────────────────────────────────────────────────────
+
+    // Count meaningful lines in the diff to surface in the accordion header.
+    const getDiffLineCounts = (diffMarkdown: string) => {
+        const lines = diffMarkdown.split('\n').filter(l => l.trim() !== '');
+        const added   = lines.filter(l => l.startsWith('+')).length;
+        const removed = lines.filter(l => l.startsWith('-')).length;
+        return { added, removed, total: lines.length };
+    };
+
     return (
         <div className="bg-white dark:bg-[#161b27] rounded-xl border border-gray-200 dark:border-[#1e2535] overflow-hidden shadow-lg">
             {/* Header */}
@@ -207,28 +216,80 @@ export function DetailPanel({ item, onClose, onVoteSuccess }: DetailPanelProps) 
                     </div>
                 )}
 
-                {/* Diff preview */}
-                {isAmendment && displayItem.diff_markdown && (
-                    <div>
-                        <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Proposed Changes</h3>
-                        <div className="bg-gray-50 dark:bg-[#0f1117]/60 rounded-lg p-4 font-mono text-xs leading-relaxed overflow-x-auto">
-                            {(displayItem.diff_markdown as string).split('\n').map((line: string, i: number) => (
-                                <div
-                                    key={i}
-                                    className={
-                                        line.startsWith('+')
-                                            ? 'text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 -mx-4 px-4'
-                                            : line.startsWith('-')
-                                            ? 'text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 -mx-4 px-4'
-                                            : 'text-gray-600 dark:text-gray-400'
-                                    }
-                                >
-                                    {line || '\u00A0'}
+                {/* ── Diff accordion ────────────────────────────────────────
+                    Collapsed by default on mobile, expanded by default on
+                    desktop. Toggling is purely local — no side effects.      */}
+                {isAmendment && displayItem.diff_markdown && (() => {
+                    const { added, removed, total } = getDiffLineCounts(displayItem.diff_markdown as string);
+                    return (
+                        <div className="rounded-lg border border-gray-200 dark:border-[#1e2535] overflow-hidden">
+                            {/* Accordion header — always visible */}
+                            <button
+                                type="button"
+                                onClick={() => setDiffOpen(o => !o)}
+                                className="w-full flex items-center justify-between px-4 py-3
+                                           bg-gray-50 dark:bg-[#0f1117]/60
+                                           hover:bg-gray-100 dark:hover:bg-[#1e2535]
+                                           transition-colors duration-150 text-left"
+                                aria-expanded={diffOpen}
+                            >
+                                <div className="flex items-center gap-2 min-w-0">
+                                    <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                                        Proposed Changes
+                                    </span>
+                                    {/* Compact diff stats — helps users gauge size before expanding */}
+                                    <div className="flex items-center gap-1.5 text-xs">
+                                        {added > 0 && (
+                                            <span className="px-1.5 py-0.5 rounded bg-green-100 dark:bg-green-900/30
+                                                             text-green-700 dark:text-green-400 font-mono font-medium">
+                                                +{added}
+                                            </span>
+                                        )}
+                                        {removed > 0 && (
+                                            <span className="px-1.5 py-0.5 rounded bg-red-100 dark:bg-red-900/30
+                                                             text-red-700 dark:text-red-400 font-mono font-medium">
+                                                -{removed}
+                                            </span>
+                                        )}
+                                        <span className="text-gray-400 dark:text-gray-500">
+                                            {total} lines
+                                        </span>
+                                    </div>
                                 </div>
-                            ))}
+                                <ChevronDown
+                                    className={`w-4 h-4 text-gray-400 flex-shrink-0 transition-transform duration-200 ${
+                                        diffOpen ? 'rotate-180' : ''
+                                    }`}
+                                />
+                            </button>
+
+                            {/* Accordion body — conditionally rendered */}
+                            {diffOpen && (
+                                <div className="bg-gray-50 dark:bg-[#0f1117]/60
+                                                overflow-x-auto
+                                                max-h-96 overflow-y-auto
+                                                border-t border-gray-200 dark:border-[#1e2535]">
+                                    <div className="p-4 font-mono text-xs leading-relaxed">
+                                        {(displayItem.diff_markdown as string).split('\n').map((line: string, i: number) => (
+                                            <div
+                                                key={i}
+                                                className={
+                                                    line.startsWith('+')
+                                                        ? 'text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 -mx-4 px-4'
+                                                        : line.startsWith('-')
+                                                        ? 'text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 -mx-4 px-4'
+                                                        : 'text-gray-600 dark:text-gray-400'
+                                                }
+                                            >
+                                                {line || '\u00A0'}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
-                    </div>
-                )}
+                    );
+                })()}
 
                 {/* Debate document */}
                 {isAmendment && (details as AmendmentDetails | null)?.debate_document && (

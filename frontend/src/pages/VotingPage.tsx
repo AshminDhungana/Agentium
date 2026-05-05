@@ -2,15 +2,6 @@
  * VotingPage
  *
  * Main page for constitutional amendment voting and task deliberations.
- *
- * Refactored to use extracted components and hooks:
- * - useVotingData: all data-fetching, WebSocket sync, auto-refresh
- * - CountdownTickProvider: single shared 1-second tick (replaces per-card intervals)
- * - VotingCard, DetailPanel, QuorumBar: extracted presentational components
- * - ConstitutionTab, GovernanceTab: extracted tab components
- * - ProposeAmendmentModal: extracted with inline field validation
- *
- * No behavior was changed — this is a structural refactor only.
  */
 
 import React, { useState } from 'react';
@@ -26,6 +17,7 @@ import {
     RefreshCw,
     BookOpen,
     Activity,
+    ChevronLeft,
 } from 'lucide-react';
 import { EmptyState } from '@/components/ui/EmptyState';
 
@@ -61,8 +53,8 @@ export const VotingPage: React.FC = () => {
         loadData,
     } = useVotingData();
 
-    const activeAmendments   = amendments.filter(isVotingActive);
-    const closedAmendments   = amendments.filter(a => !isVotingActive(a));
+    const activeAmendments    = amendments.filter(isVotingActive);
+    const closedAmendments    = amendments.filter(a => !isVotingActive(a));
     const activeDeliberations = deliberations.filter(isVotingActive);
     const closedDeliberations = deliberations.filter(d => !isVotingActive(d));
 
@@ -86,12 +78,12 @@ export const VotingPage: React.FC = () => {
         Icon: React.ComponentType<{ className?: string }>;
         count?: number;
     }[] = [
-        { id: 'amendments',    label: 'Amendments',        Icon: FileText,     count: activeAmendments.length    },
-        { id: 'deliberations', label: 'Task Deliberations',Icon: MessageSquare, count: activeDeliberations.length },
-        { id: 'history',       label: 'History',           Icon: History,
+        { id: 'amendments',    label: 'Amendments',         Icon: FileText,      count: activeAmendments.length    },
+        { id: 'deliberations', label: 'Task Deliberations', Icon: MessageSquare, count: activeDeliberations.length },
+        { id: 'history',       label: 'History',            Icon: History,
           count: closedAmendments.length + closedDeliberations.length },
-        { id: 'constitution',  label: 'Constitution',      Icon: BookOpen  },
-        { id: 'governance',    label: 'Governance',        Icon: Activity  },
+        { id: 'constitution',  label: 'Constitution',       Icon: BookOpen  },
+        { id: 'governance',    label: 'Governance',         Icon: Activity  },
     ];
 
     return (
@@ -182,7 +174,7 @@ export const VotingPage: React.FC = () => {
                                 </div>
                                 <div>
                                     <p className="text-2xl font-bold text-gray-900 dark:text-white">{value}</p>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400">{label}</p>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 leading-tight">{label}</p>
                                 </div>
                             </div>
                         ))}
@@ -235,7 +227,10 @@ export const VotingPage: React.FC = () => {
                     {/* ── List + Detail layout ────────────────────────────────── */}
                     {isListTab && (
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-                            {/* Left: item list */}
+
+                            {/* Left: item list
+                                On mobile: hidden when an item is selected (detail takes full width).
+                                On desktop: always visible (split-panel). */}
                             <div className={`space-y-3 ${selectedItem ? 'hidden lg:block' : 'block'}`}>
 
                                 {/* Amendments tab */}
@@ -318,8 +313,25 @@ export const VotingPage: React.FC = () => {
                                 )}
                             </div>
 
-                            {/* Right: detail panel */}
-                            <div>
+                            {/* Right: detail panel
+                                On mobile: only shown when an item is selected.
+                                On desktop: always shown (with empty-state placeholder when nothing selected). */}
+                            <div className={selectedItem ? 'block' : 'hidden lg:block'}>
+
+                                {/* Mobile-only back button — visible below lg breakpoint */}
+                                {selectedItem && (
+                                    <button
+                                        onClick={() => setSelectedItem(null)}
+                                        className="flex lg:hidden items-center gap-1.5 mb-4 text-sm font-medium
+                                                   text-blue-600 dark:text-blue-400
+                                                   hover:text-blue-700 dark:hover:text-blue-300
+                                                   transition-colors duration-150"
+                                    >
+                                        <ChevronLeft className="w-4 h-4" />
+                                        Back to list
+                                    </button>
+                                )}
+
                                 {selectedItem ? (
                                     <DetailPanel
                                         key={selectedItem.id}
@@ -328,7 +340,8 @@ export const VotingPage: React.FC = () => {
                                         onVoteSuccess={() => loadData(true)}
                                     />
                                 ) : (
-                                    <div className="hidden lg:flex flex-col items-center justify-center py-24 bg-white dark:bg-[#161b27] rounded-xl border border-gray-200 dark:border-[#1e2535] border-dashed text-gray-400 dark:text-gray-500">
+                                    /* Desktop-only empty state — already hidden on mobile via parent div */
+                                    <div className="flex flex-col items-center justify-center py-24 bg-white dark:bg-[#161b27] rounded-xl border border-gray-200 dark:border-[#1e2535] border-dashed text-gray-400 dark:text-gray-500">
                                         <BarChart2 className="w-12 h-12 mb-3" />
                                         <p className="text-sm font-medium">Select an item to view details</p>
                                         <p className="text-xs mt-1">Click any card to see the diff, tally, and vote</p>
