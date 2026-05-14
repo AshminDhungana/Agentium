@@ -31,7 +31,7 @@ export function VotingCard({ item, isSelected, onClick, isAmendment }: VotingCar
             onClick={onClick}
             className={`
                 group bg-white dark:bg-[#161b27] rounded-xl border
-                transition-all duration-200 cursor-pointer p-5
+                transition-all duration-200 cursor-pointer p-3.5 sm:p-5
                 select-none
                 active:scale-[0.99] active:shadow-none
                 ${isSelected

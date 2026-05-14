@@ -4,7 +4,7 @@
  * Main page for constitutional amendment voting and task deliberations.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     CheckCircle,
     XCircle,
@@ -17,9 +17,9 @@ import {
     RefreshCw,
     BookOpen,
     Activity,
-    ChevronLeft,
 } from 'lucide-react';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { SlideOver } from '@/components/ui/SlideOver';
 
 import { isVotingActive } from '../services/voting';
 import { VotingInterface } from '../components/council/VotingInterface';
@@ -43,6 +43,18 @@ export const VotingPage: React.FC = () => {
     const [activeTab, setActiveTab] = useState<Tab>('amendments');
     const [showProposalModal, setShowProposalModal] = useState(false);
 
+    // Desktop breakpoint: ≥1024px renders inline split-panel, <1024px uses SlideOver
+    const [isDesktop, setIsDesktop] = useState(() =>
+        typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches
+    );
+
+    useEffect(() => {
+        const mql = window.matchMedia('(min-width: 1024px)');
+        const handler = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
+        mql.addEventListener('change', handler);
+        return () => mql.removeEventListener('change', handler);
+    }, []);
+
     const {
         amendments,
         deliberations,
@@ -52,6 +64,8 @@ export const VotingPage: React.FC = () => {
         setSelectedItem,
         loadData,
     } = useVotingData();
+
+    const handleCloseDetail = useCallback(() => setSelectedItem(null), [setSelectedItem]);
 
     const activeAmendments    = amendments.filter(isVotingActive);
     const closedAmendments    = amendments.filter(a => !isVotingActive(a));
@@ -228,10 +242,8 @@ export const VotingPage: React.FC = () => {
                     {isListTab && (
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
 
-                            {/* Left: item list
-                                On mobile: hidden when an item is selected (detail takes full width).
-                                On desktop: always visible (split-panel). */}
-                            <div className={`space-y-3 ${selectedItem ? 'hidden lg:block' : 'block'}`}>
+                            {/* Card list — always visible */}
+                            <div className="space-y-3">
 
                                 {/* Amendments tab */}
                                 {activeTab === 'amendments' && (
@@ -313,41 +325,51 @@ export const VotingPage: React.FC = () => {
                                 )}
                             </div>
 
-                            {/* Right: detail panel
-                                On mobile: only shown when an item is selected.
-                                On desktop: always shown (with empty-state placeholder when nothing selected). */}
-                            <div className={selectedItem ? 'block' : 'hidden lg:block'}>
+                            {/* Desktop: inline detail panel (≥ lg) */}
+                            {isDesktop && (
+                                <div>
+                                    {selectedItem ? (
+                                        <DetailPanel
+                                            key={selectedItem.id}
+                                            item={selectedItem}
+                                            onClose={handleCloseDetail}
+                                            onVoteSuccess={() => loadData(true)}
+                                        />
+                                    ) : (
+                                        <div className="flex flex-col items-center justify-center py-24 bg-white dark:bg-[#161b27] rounded-xl border border-gray-200 dark:border-[#1e2535] border-dashed text-gray-400 dark:text-gray-500">
+                                            <BarChart2 className="w-12 h-12 mb-3" />
+                                            <p className="text-sm font-medium">Select an item to view details</p>
+                                            <p className="text-xs mt-1">Click any card to see the diff, tally, and vote</p>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
 
-                                {/* Mobile-only back button — visible below lg breakpoint */}
-                                {selectedItem && (
-                                    <button
-                                        onClick={() => setSelectedItem(null)}
-                                        className="flex lg:hidden items-center gap-1.5 mb-4 text-sm font-medium
-                                                   text-blue-600 dark:text-blue-400
-                                                   hover:text-blue-700 dark:hover:text-blue-300
-                                                   transition-colors duration-150"
-                                    >
-                                        <ChevronLeft className="w-4 h-4" />
-                                        Back to list
-                                    </button>
-                                )}
-
-                                {selectedItem ? (
-                                    <DetailPanel
-                                        key={selectedItem.id}
-                                        item={selectedItem}
-                                        onClose={() => setSelectedItem(null)}
-                                        onVoteSuccess={() => loadData(true)}
-                                    />
-                                ) : (
-                                    /* Desktop-only empty state — already hidden on mobile via parent div */
-                                    <div className="flex flex-col items-center justify-center py-24 bg-white dark:bg-[#161b27] rounded-xl border border-gray-200 dark:border-[#1e2535] border-dashed text-gray-400 dark:text-gray-500">
-                                        <BarChart2 className="w-12 h-12 mb-3" />
-                                        <p className="text-sm font-medium">Select an item to view details</p>
-                                        <p className="text-xs mt-1">Click any card to see the diff, tally, and vote</p>
-                                    </div>
-                                )}
-                            </div>
+                            {/* Mobile: SlideOver detail panel (< lg) */}
+                            {!isDesktop && (
+                                <SlideOver
+                                    isOpen={!!selectedItem}
+                                    onClose={handleCloseDetail}
+                                    title={
+                                        selectedItem
+                                            ? ('sponsors' in selectedItem
+                                                ? ((selectedItem as any).title || selectedItem.agentium_id)
+                                                : `Task: ${(selectedItem as any).task_id}`)
+                                            : ''
+                                    }
+                                    icon={Gavel}
+                                    subtitle="Vote details"
+                                >
+                                    {selectedItem && (
+                                        <DetailPanel
+                                            key={selectedItem.id}
+                                            item={selectedItem}
+                                            onClose={handleCloseDetail}
+                                            onVoteSuccess={() => loadData(true)}
+                                        />
+                                    )}
+                                </SlideOver>
+                            )}
                         </div>
                     )}
                 </div>

@@ -305,7 +305,7 @@ export function DetailPanel({ item, onClose, onVoteSuccess }: DetailPanelProps) 
 
                 {/* Deliberation metadata */}
                 {!isAmendment && deliDetails && (
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div className="bg-gray-50 dark:bg-[#0f1117]/60 rounded-lg p-3">
                             <p className="text-xs text-gray-500 dark:text-gray-400">Required approvals</p>
                             <p className="text-lg font-bold text-gray-900 dark:text-white">{deliDetails.required_approvals}</p>
@@ -459,7 +459,7 @@ export function DetailPanel({ item, onClose, onVoteSuccess }: DetailPanelProps) 
 
                         {/* Step 1: vote selection buttons (hidden while confirming) */}
                         {!pendingVote && (
-                            <div className="grid grid-cols-3 gap-2">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                                 <button
                                     onClick={() => handleVoteClick('for')}
                                     disabled={isVoting}

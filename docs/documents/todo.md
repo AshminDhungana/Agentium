@@ -683,7 +683,7 @@ Build a self-governing AI ecosystem where agents operate under constitutional la
 - [x] Audit breakpoints for: `TasksPage.tsx`, `AgentTree.tsx`, `VotingPage.tsx`, `MonitoringPage.tsx`, `ConstitutionPage.tsx` — all currently desktop-first
 - [x] `TasksPage.tsx` — collapse table view to card view below `md:` breakpoint; slide-over for task details instead of inline expansion
 - [x] `AgentTree.tsx` — horizontal scroll for deep hierarchies on mobile; collapsible tier groups
-- [ ] `VotingPage.tsx` — stack vote cards vertically on mobile; move amendment diff to expandable accordion
+- [x] `VotingPage.tsx` — stack vote cards vertically on mobile; move amendment diff to expandable accordion
 - [ ] `MonitoringPage.tsx` — stack metric cards to 1-column grid below `sm:`; health rings resize to 40px
 - [ ] New `WorkflowDesigner.tsx` (Phase 13.5) — canvas uses touch events (`onTouchStart/Move/End`) for drag-and-drop on tablet; view-only mode on phone
 
