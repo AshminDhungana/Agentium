@@ -35,17 +35,20 @@ type Tab = 'dashboard' | 'violations' | 'recovery' | 'operations' | 'sla' | 'inc
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function HealthRing({ score }: { score: number }) {
+function HealthRing({ score, size = 'md' }: { score: number; size?: 'sm' | 'md' }) {
     const color      = score >= 90 ? '#22c55e' : score >= 70 ? '#f59e0b' : '#ef4444';
-    const r          = 20;
+    const r          = size === 'sm' ? 15 : 20;
+    const svgSize    = size === 'sm' ? 40 : 52;
+    const center     = svgSize / 2;
+    const sw         = size === 'sm' ? 3 : 4;
     const circ       = 2 * Math.PI * r;
     const dashOffset = circ * (1 - score / 100);
     return (
-        <svg width="52" height="52" className="rotate-[-90deg]">
-            <circle cx="26" cy="26" r={r} stroke="#e5e7eb" strokeWidth="4" fill="none" className="dark:stroke-gray-700" />
+        <svg width={svgSize} height={svgSize} className="rotate-[-90deg]">
+            <circle cx={center} cy={center} r={r} stroke="#e5e7eb" strokeWidth={sw} fill="none" className="dark:stroke-gray-700" />
             <circle
-                cx="26" cy="26" r={r}
-                stroke={color} strokeWidth="4" fill="none"
+                cx={center} cy={center} r={r}
+                stroke={color} strokeWidth={sw} fill="none"
                 strokeDasharray={circ}
                 strokeDashoffset={dashOffset}
                 strokeLinecap="round"
@@ -477,7 +480,8 @@ function OperationsTab() {
                     { title: "Budget", pct: data?.budget?.health_pct || 0 },
                 ].map((item, i) => (
                     <div key={i} className="bg-white dark:bg-[#0f1117] rounded-xl border border-gray-200 dark:border-[#1e2535] p-4 shadow-sm flex flex-col items-center">
-                        <HealthRing score={item.pct} />
+                        <div className="block sm:hidden"><HealthRing score={item.pct} size="sm" /></div>
+                        <div className="hidden sm:block"><HealthRing score={item.pct} /></div>
                         <div className={`text-lg font-bold mt-2 ${item.pct >= 90 ? 'text-green-600 dark:text-green-400' : item.pct >= 70 ? 'text-yellow-600 dark:text-yellow-400' : 'text-red-600 dark:text-red-400'}`}>
                             {item.pct}%
                         </div>
@@ -961,7 +965,7 @@ export const MonitoringPage: React.FC = () => {
             <div className="max-w-7xl mx-auto">
 
                 {/* ── Header ─────────────────────────────────────────────── */}
-                <div className="mb-8 flex items-center justify-between">
+                <div className="mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
                         <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center shadow-lg">
                             <Activity className="w-7 h-7 text-white" />
@@ -1068,10 +1072,18 @@ export const MonitoringPage: React.FC = () => {
                             {/* System Health */}
                             <div className="bg-white dark:bg-[#0f1117] rounded-xl border border-gray-200 dark:border-[#1e2535] p-6 shadow-sm flex items-center gap-4">
                                 <div className="relative flex-shrink-0">
-                                    <HealthRing score={systemHealth} />
-                                    <span className={`absolute inset-0 flex items-center justify-center text-xs font-bold ${healthColor}`}>
-                                        {systemHealth}%
-                                    </span>
+                                    <div className="block sm:hidden">
+                                        <HealthRing score={systemHealth} size="sm" />
+                                        <span className={`absolute inset-0 flex items-center justify-center text-[9px] font-bold ${healthColor}`}>
+                                            {systemHealth}%
+                                        </span>
+                                    </div>
+                                    <div className="hidden sm:block">
+                                        <HealthRing score={systemHealth} />
+                                        <span className={`absolute inset-0 flex items-center justify-center text-xs font-bold ${healthColor}`}>
+                                            {systemHealth}%
+                                        </span>
+                                    </div>
                                 </div>
                                 <div>
                                     <p className="text-sm text-gray-500 dark:text-gray-400 mb-0.5">System Health</p>
@@ -1125,7 +1137,7 @@ export const MonitoringPage: React.FC = () => {
                                 <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
                                     Agent Tier Health
                                 </h2>
-                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                                     {Object.entries(healthBreakdown).map(([tier, score]) => (
                                         <div key={tier} className="bg-white dark:bg-[#0f1117] rounded-lg border border-gray-200 dark:border-[#1e2535] p-3 flex items-center gap-3">
                                             <div className={`w-8 h-8 rounded-md flex items-center justify-center ${
@@ -1230,10 +1242,18 @@ export const MonitoringPage: React.FC = () => {
                                                         className="flex items-center gap-4 bg-gray-50 dark:bg-[#161b27] p-4 rounded-lg border border-gray-200 dark:border-[#1e2535]"
                                                     >
                                                         <div className="relative flex-shrink-0">
-                                                            <HealthRing score={report.health_score} />
-                                                            <span className={`absolute inset-0 flex items-center justify-center text-[10px] font-bold ${isHealthy ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'}`}>
-                                                                {report.health_score}
-                                                            </span>
+                                                            <div className="block sm:hidden">
+                                                                <HealthRing score={report.health_score} size="sm" />
+                                                                <span className={`absolute inset-0 flex items-center justify-center text-[9px] font-bold ${isHealthy ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'}`}>
+                                                                    {report.health_score}
+                                                                </span>
+                                                            </div>
+                                                            <div className="hidden sm:block">
+                                                                <HealthRing score={report.health_score} />
+                                                                <span className={`absolute inset-0 flex items-center justify-center text-[10px] font-bold ${isHealthy ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'}`}>
+                                                                    {report.health_score}
+                                                                </span>
+                                                            </div>
                                                         </div>
                                                         <div className="flex-1 min-w-0">
                                                             <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
