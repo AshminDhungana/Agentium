@@ -294,6 +294,7 @@ export default function UserManagement({
                             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500 pointer-events-none" />
                             <input
                                 type="text"
+                                aria-label="Search users"
                                 placeholder="Search users by name or email…"
                                 value={rawSearch}
                                 onChange={(e) => setRawSearch(e.target.value)}
@@ -690,10 +691,11 @@ function PasswordModal({
                 {/* Body */}
                 <div className="p-6 space-y-4">
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                        <label htmlFor="new-password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                             New Password
                         </label>
                         <input
+                            id="new-password"
                             ref={firstInputRef}
                             type="password"
                             value={newPassword}
@@ -708,10 +710,11 @@ function PasswordModal({
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                        <label htmlFor="confirm-password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                             Confirm Password
                         </label>
                         <input
+                            id="confirm-password"
                             type="password"
                             value={confirmPassword}
                             onChange={(e) => onConfirmPasswordChange(e.target.value)}

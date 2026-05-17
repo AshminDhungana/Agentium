@@ -204,6 +204,7 @@ export const CheckpointImportModal: React.FC<CheckpointImportModalProps> = ({
                     </div>
                     <button
                         onClick={onClose}
+                        aria-label="Close"
                         className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#1e2535] rounded-lg transition-colors"
                     >
                         <X className="w-5 h-5" />

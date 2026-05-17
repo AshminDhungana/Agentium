@@ -272,11 +272,12 @@ export function SettingsPage() {
 
                                         {/* Current Password */}
                                         <div>
-                                            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                                            <label htmlFor="currentPassword" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                                                 Current Password
                                             </label>
                                             <div className="relative">
                                                 <input
+                                                    id="currentPassword"
                                                     type={showCurrentPassword ? 'text' : 'password'}
                                                     {...register('currentPassword', {
                                                         required: 'Current password is required',
@@ -315,11 +316,12 @@ export function SettingsPage() {
 
                                         {/* New Password */}
                                         <div>
-                                            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                                            <label htmlFor="newPassword" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                                                 New Password
                                             </label>
                                             <div className="relative">
                                                 <input
+                                                    id="newPassword"
                                                     type={showNewPassword ? 'text' : 'password'}
                                                     {...register('newPassword', {
                                                         required: 'New password is required',
@@ -369,11 +371,12 @@ export function SettingsPage() {
 
                                         {/* Confirm Password */}
                                         <div>
-                                            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                                            <label htmlFor="confirmPassword" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                                                 Confirm New Password
                                             </label>
                                             <div className="relative">
                                                 <input
+                                                    id="confirmPassword"
                                                     type={showConfirmPassword ? 'text' : 'password'}
                                                     {...register('confirmPassword', {
                                                         required: 'Please confirm your password',

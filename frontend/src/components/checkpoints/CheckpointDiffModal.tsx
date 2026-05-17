@@ -163,6 +163,7 @@ export const CheckpointDiffModal: React.FC<CheckpointDiffModalProps> = ({
                     </div>
                     <button 
                         onClick={onClose}
+                        aria-label="Close"
                         className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:text-slate-300 dark:hover:bg-[#1e2535] rounded-xl transition-colors"
                     >
                         <X className="w-5 h-5" />

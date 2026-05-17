@@ -289,6 +289,7 @@ function LogsTab({ channel }: { channel: Channel }) {
                     />
                     <button
                         onClick={applySearch}
+                        aria-label="Apply search"
                         className="px-2 py-1.5 bg-gray-100 dark:bg-[#1e2535] border border-gray-300 dark:border-[#2a3347] rounded-lg hover:bg-gray-200 dark:hover:bg-[#2a3347] transition-colors"
                     >
                         <Search className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400" />

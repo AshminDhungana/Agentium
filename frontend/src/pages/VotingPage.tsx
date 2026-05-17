@@ -126,6 +126,7 @@ export const VotingPage: React.FC = () => {
                                 onClick={() => loadData(true)}
                                 className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-[#1e2535] text-gray-500 dark:text-gray-400 transition-colors duration-200"
                                 title="Refresh now"
+                                aria-label="Refresh now"
                             >
                                 {isRefreshing ? (
                                     <LoadingSpinner size="sm" />

@@ -132,17 +132,17 @@ export const BrowserTaskViewer: React.FC<BrowserTaskViewerProps> = ({ taskId, on
                             {status === 'live' ? 'LIVE' : status === 'paused' ? 'PAUSED' : 'CONNECTING...'}
                         </div>
                         
-                        <button onClick={handleTogglePause} className="p-1.5 rounded-md hover:bg-gray-200 dark:hover:bg-[#1e2535] text-gray-500 dark:text-gray-400 transition-colors">
+                        <button onClick={handleTogglePause} aria-label={status === 'paused' ? 'Play' : 'Pause'} className="p-1.5 rounded-md hover:bg-gray-200 dark:hover:bg-[#1e2535] text-gray-500 dark:text-gray-400 transition-colors">
                             {status === 'paused' ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
                         </button>
 
                         {mode === 'modal' && (
                             <>
-                                <button onClick={() => setIsFullscreen(!isFullscreen)} className="p-1.5 rounded-md hover:bg-gray-200 dark:hover:bg-[#1e2535] text-gray-500 dark:text-gray-400 transition-colors">
+                                <button onClick={() => setIsFullscreen(!isFullscreen)} aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'} className="p-1.5 rounded-md hover:bg-gray-200 dark:hover:bg-[#1e2535] text-gray-500 dark:text-gray-400 transition-colors">
                                     {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
                                 </button>
                                 {onClose && (
-                                    <button onClick={onClose} className="p-1.5 rounded-md hover:bg-gray-200 dark:hover:bg-[#1e2535] text-gray-500 dark:text-gray-400 transition-colors ml-1">
+                                    <button onClick={onClose} aria-label="Close" className="p-1.5 rounded-md hover:bg-gray-200 dark:hover:bg-[#1e2535] text-gray-500 dark:text-gray-400 transition-colors ml-1">
                                         <X className="w-4 h-4" />
                                     </button>
                                 )}

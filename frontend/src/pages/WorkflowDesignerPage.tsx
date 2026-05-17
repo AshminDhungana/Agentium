@@ -382,6 +382,7 @@ function DesignerInner() {
         <div className="flex items-center gap-3 min-w-0">
           <button
             onClick={() => navigate('/tasks')}
+            aria-label="Back to tasks"
             className="p-2 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#1e2535] transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -406,6 +407,7 @@ function DesignerInner() {
           {!isDesktop && (
             <button
               onClick={() => setVersionSidebarOpen(v => !v)}
+              aria-label="Toggle version history"
               className={`
                 p-2 rounded-lg transition-colors
                 ${versionSidebarOpen
@@ -480,6 +482,7 @@ function DesignerInner() {
           {!isDesktop && (
             <button
               onClick={() => setShowMobilePalette(v => !v)}
+              aria-label="Toggle steps palette"
               className="
                 absolute bottom-5 right-5 z-20
                 w-14 h-14 rounded-2xl

@@ -1189,6 +1189,7 @@ const PreferenceValueEditor: React.FC<{
             />
             <button
                 onClick={handleSave}
+                aria-label="Save"
                 className="p-1.5 rounded-lg text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300
                     hover:bg-green-50 dark:hover:bg-green-500/10 transition-colors"
                 title="Save"
@@ -1197,6 +1198,7 @@ const PreferenceValueEditor: React.FC<{
             </button>
             <button
                 onClick={onCancel}
+                aria-label="Cancel"
                 className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300
                     hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                 title="Cancel"
@@ -1281,6 +1283,7 @@ const PreferenceCard: React.FC<{
                 <div className="flex items-center gap-1">
                     <button
                         onClick={loadHistory}
+                        aria-label="View history"
                         className={`p-1.5 rounded-lg transition-colors ${
                             showHistory
                                 ? 'bg-blue-100 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400'
@@ -1294,6 +1297,7 @@ const PreferenceCard: React.FC<{
                         <>
                             <button
                                 onClick={() => setIsEditing(!isEditing)}
+                                aria-label="Edit"
                                 className={`p-1.5 rounded-lg transition-colors ${
                                     isEditing
                                         ? 'bg-amber-100 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400'
@@ -1322,6 +1326,7 @@ const PreferenceCard: React.FC<{
                             ) : (
                                 <button
                                     onClick={() => setConfirmingDelete(true)}
+                                    aria-label="Delete"
                                     className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 dark:hover:text-red-400
                                         hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
                                     title="Delete"

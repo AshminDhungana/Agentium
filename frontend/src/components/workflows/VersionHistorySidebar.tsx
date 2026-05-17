@@ -111,6 +111,7 @@ export const VersionHistorySidebar: React.FC<VersionHistorySidebarProps> = ({
           onClick={onToggle}
           className="p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-[#1e2535] transition-colors"
           title="Close version history"
+          aria-label="Close version history"
         >
           <ChevronRight className="w-4 h-4" />
         </button>

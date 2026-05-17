@@ -352,6 +352,7 @@ export default function APIKeyHealth() {
                         onClick={fetchHealthData}
                         className="p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#1e2535] transition-colors"
                         title="Refresh now"
+                        aria-label="Refresh now"
                     >
                         <RefreshCw className="w-4 h-4" />
                     </button>

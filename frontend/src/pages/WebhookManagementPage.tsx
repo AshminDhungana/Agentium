@@ -211,8 +211,9 @@ const WebhookManagementPage: React.FC = () => {
           </h3>
           <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Endpoint URL</label>
+                <label htmlFor="endpoint-url" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Endpoint URL</label>
                 <input
+                  id="endpoint-url"
                   className="w-full px-4 py-2.5 border border-gray-200 dark:border-[#1e2535] rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-gray-50 dark:bg-[#0f1117] text-gray-900 dark:text-white text-sm transition-colors duration-150 outline-none"
                   type="url"
                   placeholder="https://your-server.com/webhook"
@@ -221,8 +222,9 @@ const WebhookManagementPage: React.FC = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Description (optional)</label>
+                <label htmlFor="webhook-description" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Description (optional)</label>
                 <input
+                  id="webhook-description"
                   className="w-full px-4 py-2.5 border border-gray-200 dark:border-[#1e2535] rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-gray-50 dark:bg-[#0f1117] text-gray-900 dark:text-white text-sm transition-colors duration-150 outline-none"
                   placeholder="e.g., Production task notifications"
                   value={formDescription}
