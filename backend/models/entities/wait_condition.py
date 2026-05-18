@@ -46,8 +46,8 @@ class WaitCondition(BaseEntity):
     task_id = Column(String(36), ForeignKey("tasks.id"), nullable=False, index=True)
 
     # ── Strategy ──────────────────────────────────────────────────────────
-    strategy     = Column(Enum(WaitStrategy),         nullable=False)
-    status       = Column(Enum(WaitConditionStatus),  nullable=False,
+    strategy     = Column(Enum(WaitStrategy, values_callable=lambda obj: [e.value for e in obj]),         nullable=False)
+    status       = Column(Enum(WaitConditionStatus, values_callable=lambda obj: [e.value for e in obj]),  nullable=False,
                           default=WaitConditionStatus.PENDING, index=True)
 
     # ── Strategy-specific configuration (JSON) ────────────────────────────

@@ -84,6 +84,7 @@ def upgrade() -> None:
         sa.Column("agentium_id", sa.String(20),  nullable=True,  unique=True),
         sa.Column("created_at",  sa.DateTime(),  nullable=True),
         sa.Column("updated_at",  sa.DateTime(),  nullable=True),
+        sa.Column("deleted_at",  sa.DateTime(),  nullable=True),
         sa.Column("is_active",   sa.Boolean(),   nullable=True,  server_default="true"),
 
         # Domain columns
