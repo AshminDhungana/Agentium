@@ -1,5 +1,6 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
+import { useFocusTrap } from '../../hooks/useFocusTrap';
 
 interface SlideOverProps {
     isOpen: boolean;
@@ -18,6 +19,9 @@ export const SlideOver: React.FC<SlideOverProps> = ({
     children,
     subtitle
 }) => {
+    const containerRef = useRef<HTMLDivElement>(null);
+    useFocusTrap(containerRef, isOpen);
+
     // Prevent body scroll when open
     useEffect(() => {
         if (isOpen) {
@@ -46,7 +50,7 @@ export const SlideOver: React.FC<SlideOverProps> = ({
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-[100] flex justify-end">
+        <div className="fixed inset-0 z-[100] flex justify-end" ref={containerRef}>
             {/* Backdrop */}
             <div 
                 className="absolute inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm transition-opacity"

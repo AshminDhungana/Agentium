@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Agent } from '../../types';
 import { X, TrendingUp, AlertCircle, Brain } from 'lucide-react';
 import { AGENT_REASON_MIN_LENGTH, AGENT_REASON_MAX_LENGTH } from '../../constants/agents';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { useFocusTrap } from '../../hooks/useFocusTrap';
 
 interface PromoteAgentModalProps {
     agent:     Agent;       // Task agent to promote (3xxxx)
@@ -26,6 +27,9 @@ export const PromoteAgentModal: React.FC<PromoteAgentModalProps> = ({
     const [reason,       setReason]       = useState('');
     const [isLoading,    setIsLoading]    = useState(false);
     const [error,        setError]        = useState<string | null>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    useFocusTrap(containerRef, true);
 
     // Only Council (1xxxx) and Head (0xxxx) can authorize a promotion
     const authorizers = agents.filter(a =>
@@ -53,7 +57,7 @@ export const PromoteAgentModal: React.FC<PromoteAgentModalProps> = ({
     };
 
     return (
-        <div className="fixed inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4" ref={containerRef}>
             <div className="bg-white dark:bg-[#161b27] rounded-2xl shadow-2xl dark:shadow-[0_24px_80px_rgba(0,0,0,0.7)] w-full max-w-md border border-gray-200 dark:border-[#1e2535]">
 
                 {/* ── Header ───────────────────────────────────────────── */}
@@ -68,7 +72,7 @@ export const PromoteAgentModal: React.FC<PromoteAgentModalProps> = ({
                         aria-label="Close"
                         onClick={onClose}
                         disabled={isLoading}
-                        className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#1e2535] transition-colors duration-150 disabled:opacity-40"
+                        className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#1e2535] transition-colors duration-150 disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                         <X className="w-4 h-4" />
                     </button>
@@ -157,7 +161,7 @@ export const PromoteAgentModal: React.FC<PromoteAgentModalProps> = ({
                             type="button"
                             onClick={onClose}
                             disabled={isLoading}
-                            className="flex-1 px-4 py-2.5 border border-gray-200 dark:border-[#1e2535] text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-[#1e2535] transition-all duration-150 disabled:opacity-40"
+                            className="flex-1 px-4 py-2.5 border border-gray-200 dark:border-[#1e2535] text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-[#1e2535] transition-all duration-150 disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         >
                             Cancel
                         </button>
@@ -165,7 +169,7 @@ export const PromoteAgentModal: React.FC<PromoteAgentModalProps> = ({
                             type="button"
                             onClick={handleSubmit}
                             disabled={!canSubmit}
-                            className="flex-1 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 dark:hover:bg-emerald-500 text-white text-sm font-medium rounded-lg transition-colors duration-150 disabled:opacity-40 disabled:cursor-not-allowed shadow-sm flex items-center justify-center gap-2"
+                            className="flex-1 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 dark:hover:bg-emerald-500 text-white text-sm font-medium rounded-lg transition-colors duration-150 disabled:opacity-40 disabled:cursor-not-allowed shadow-sm flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         >
                             {isLoading ? (
                                 <><LoadingSpinner size="sm" /> Promoting…</>

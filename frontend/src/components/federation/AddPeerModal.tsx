@@ -3,7 +3,8 @@
 // Owns its own form state internally; calls onSubmit with typed RegisterPeerRequest.
 // The parent controls visibility by conditionally mounting this component.
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
+import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { Plus } from 'lucide-react';
 import type { RegisterPeerRequest } from '@/services/federation';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
@@ -36,6 +37,9 @@ const DEFAULT_FORM = {
 
 export function AddPeerModal({ isSubmitting, onClose, onSubmit }: AddPeerModalProps) {
     const [form, setForm] = useState(DEFAULT_FORM);
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    useFocusTrap(containerRef, true);
 
     const set = (field: keyof typeof DEFAULT_FORM) =>
         (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
@@ -64,6 +68,7 @@ export function AddPeerModal({ isSubmitting, onClose, onSubmit }: AddPeerModalPr
             role="dialog"
             aria-modal="true"
             aria-labelledby="add-peer-modal-title"
+            ref={containerRef}
         >
             <div className="bg-white dark:bg-[#161b27] rounded-2xl shadow-2xl dark:shadow-[0_24px_80px_rgba(0,0,0,0.7)] max-w-lg w-full border border-gray-200 dark:border-[#1e2535]">
 
@@ -197,14 +202,14 @@ export function AddPeerModal({ isSubmitting, onClose, onSubmit }: AddPeerModalPr
                             type="button"
                             onClick={onClose}
                             disabled={isSubmitting}
-                            className="flex-1 px-4 py-2.5 border border-gray-200 dark:border-[#1e2535] text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-[#1e2535] hover:border-gray-300 dark:hover:border-[#2a3347] transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="flex-1 px-4 py-2.5 border border-gray-200 dark:border-[#1e2535] text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-[#1e2535] hover:border-gray-300 dark:hover:border-[#2a3347] transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500"
                         >
                             Cancel
                         </button>
                         <button
                             type="submit"
                             disabled={isSubmitting}
-                            className="flex-1 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 dark:hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors duration-150 shadow-sm flex items-center justify-center gap-2"
+                            className="flex-1 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 dark:hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors duration-150 shadow-sm flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         >
                             {isSubmitting ? (
                                 <>

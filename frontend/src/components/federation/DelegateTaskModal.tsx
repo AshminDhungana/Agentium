@@ -4,7 +4,8 @@
 // Validates that the payload is legal JSON before calling onSubmit.
 // The parent controls visibility by conditionally mounting this component.
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
+import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { Send, AlertCircle } from 'lucide-react';
 import type { PeerInstance, DelegateTaskRequest } from '@/services/federation';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
@@ -37,6 +38,9 @@ const DEFAULT_FORM = {
 
 export function DelegateTaskModal({ peers, isSubmitting, onClose, onSubmit }: DelegateTaskModalProps) {
     const [form, setForm] = useState(DEFAULT_FORM);
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    useFocusTrap(containerRef, true);
     /** Inline JSON parse error shown under the payload textarea. */
     const [payloadError, setPayloadError] = useState<string | null>(null);
 
@@ -83,6 +87,7 @@ export function DelegateTaskModal({ peers, isSubmitting, onClose, onSubmit }: De
             role="dialog"
             aria-modal="true"
             aria-labelledby="delegate-task-modal-title"
+            ref={containerRef}
         >
             <div className="bg-white dark:bg-[#161b27] rounded-2xl shadow-2xl dark:shadow-[0_24px_80px_rgba(0,0,0,0.7)] max-w-lg w-full border border-gray-200 dark:border-[#1e2535]">
 
@@ -202,14 +207,14 @@ export function DelegateTaskModal({ peers, isSubmitting, onClose, onSubmit }: De
                             type="button"
                             onClick={onClose}
                             disabled={isSubmitting}
-                            className="flex-1 px-4 py-2.5 border border-gray-200 dark:border-[#1e2535] text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-[#1e2535] hover:border-gray-300 dark:hover:border-[#2a3347] transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="flex-1 px-4 py-2.5 border border-gray-200 dark:border-[#1e2535] text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-[#1e2535] hover:border-gray-300 dark:hover:border-[#2a3347] transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500"
                         >
                             Cancel
                         </button>
                         <button
                             type="submit"
                             disabled={isSubmitting || activePeers.length === 0}
-                            className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 dark:hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors duration-150 shadow-sm flex items-center justify-center gap-2"
+                            className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 dark:hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors duration-150 shadow-sm flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         >
                             {isSubmitting ? (
                                 <>

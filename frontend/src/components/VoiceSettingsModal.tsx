@@ -3,6 +3,7 @@ import { X, Mic, Trash2, Play, Square, Settings2 } from 'lucide-react';
 import { voiceApi } from '@/services/voiceApi';
 import { showToast } from '@/hooks/useToast';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 
 interface SpeakerProfile {
     id: string;
@@ -29,6 +30,9 @@ export function VoiceSettingsModal({ onClose }: VoiceSettingsModalProps) {
     const audioStreamRef = useRef<MediaStream | null>(null);
     const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
     const chunksRef = useRef<Blob[]>([]);
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    useFocusTrap(containerRef, true);
 
     useEffect(() => {
         loadSpeakers();
@@ -118,7 +122,7 @@ export function VoiceSettingsModal({ onClose }: VoiceSettingsModalProps) {
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-            <div className="bg-white dark:bg-[#161b27] rounded-3xl w-full max-w-lg shadow-2xl flex flex-col max-h-[90vh]">
+            <div className="bg-white dark:bg-[#161b27] rounded-3xl w-full max-w-lg shadow-2xl flex flex-col max-h-[90vh]" ref={containerRef}>
                 <div className="p-6 border-b border-gray-100 dark:border-[#1e2535] flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-500/20 flex items-center justify-center">
@@ -126,7 +130,7 @@ export function VoiceSettingsModal({ onClose }: VoiceSettingsModalProps) {
                         </div>
                         <h2 className="text-lg font-bold text-gray-900 dark:text-white">Voice Settings</h2>
                     </div>
-                    <button onClick={onClose} aria-label="Close settings" title="Close" className="p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-[#1e2535] rounded-xl transition-colors">
+                    <button onClick={onClose} aria-label="Close settings" title="Close" className="p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-[#1e2535] rounded-xl transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500">
                         <X className="w-5 h-5" />
                     </button>
                 </div>
@@ -158,7 +162,7 @@ export function VoiceSettingsModal({ onClose }: VoiceSettingsModalProps) {
                                 <button
                                     onClick={isRecording ? stopRecording : startRecording}
                                     disabled={isRegistering}
-                                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
+                                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                                         isRecording
                                             ? 'bg-red-100 text-red-600 hover:bg-red-200 dark:bg-red-500/20 dark:text-red-400'
                                             : 'bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50'
@@ -195,7 +199,7 @@ export function VoiceSettingsModal({ onClose }: VoiceSettingsModalProps) {
                                             onClick={() => handleDelete(speaker.id)}
                                             aria-label={`Delete ${speaker.name}`}
                                             title="Delete"
-                                            className="p-2 text-gray-400 hover:bg-red-50 dark:hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400 rounded-lg transition-colors"
+                                            className="p-2 text-gray-400 hover:bg-red-50 dark:hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
                                         >
                                             <Trash2 className="w-4 h-4" />
                                         </button>

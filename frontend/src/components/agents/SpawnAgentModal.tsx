@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Agent } from '../../types';
 import { X, UserPlus, AlertCircle } from 'lucide-react';
 import { AGENT_DESC_MIN_LENGTH, AGENT_DESC_MAX_LENGTH, AGENT_NAME_MIN_LENGTH, AGENT_NAME_MAX_LENGTH } from '../../constants/agents';
+import { useFocusTrap } from '../../hooks/useFocusTrap';
 
 interface SpawnAgentModalProps {
     parent:    Agent;
@@ -26,6 +27,9 @@ export const SpawnAgentModal: React.FC<SpawnAgentModalProps> = ({ parent, onConf
     const [childType,   setChildType]   = useState<string>('');
     const [isLoading,   setIsLoading]   = useState(false);
     const [error,       setError]       = useState<string | null>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    useFocusTrap(containerRef, true);
 
     const getAllowedTypes = (): { value: string; label: string }[] => {
         switch (parent.agent_type) {
@@ -75,12 +79,12 @@ export const SpawnAgentModal: React.FC<SpawnAgentModalProps> = ({ parent, onConf
 
     if (allowedTypes.length === 0) {
         return (
-            <div className="fixed inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="fixed inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4" ref={containerRef}>
                 <div className="bg-white dark:bg-[#161b27] rounded-2xl shadow-2xl w-full max-w-sm border border-gray-200 dark:border-[#1e2535] p-6 space-y-4">
                     <p className="text-sm text-slate-600 dark:text-slate-400">
                         A <strong>{parentTypeLabel}</strong> cannot spawn subordinates.
                     </p>
-                    <button onClick={onClose} className="w-full px-4 py-2.5 border border-gray-200 dark:border-[#1e2535] text-sm font-medium rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-[#1e2535] transition-colors">
+                    <button onClick={onClose} className="w-full px-4 py-2.5 border border-gray-200 dark:border-[#1e2535] text-sm font-medium rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-[#1e2535] transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500">
                         Close
                     </button>
                 </div>
@@ -89,7 +93,7 @@ export const SpawnAgentModal: React.FC<SpawnAgentModalProps> = ({ parent, onConf
     }
 
     return (
-        <div className="fixed inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4" ref={containerRef}>
             <div className="bg-white dark:bg-[#161b27] rounded-2xl shadow-2xl dark:shadow-[0_24px_80px_rgba(0,0,0,0.7)] w-full max-w-md border border-gray-200 dark:border-[#1e2535]">
 
                 {/* ── Header ─────────────────────────────────────────────── */}
@@ -104,7 +108,7 @@ export const SpawnAgentModal: React.FC<SpawnAgentModalProps> = ({ parent, onConf
                         aria-label="Close"
                         onClick={onClose}
                         disabled={isLoading}
-                        className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#1e2535] transition-colors duration-150 disabled:opacity-40"
+                        className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#1e2535] transition-colors duration-150 disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                         <X className="w-4 h-4" />
                     </button>
@@ -212,14 +216,14 @@ export const SpawnAgentModal: React.FC<SpawnAgentModalProps> = ({ parent, onConf
                             type="button"
                             onClick={onClose}
                             disabled={isLoading}
-                            className="flex-1 px-4 py-2.5 border border-gray-200 dark:border-[#1e2535] text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-[#1e2535] hover:border-gray-300 dark:hover:border-[#2a3347] transition-all duration-150 disabled:opacity-40"
+                            className="flex-1 px-4 py-2.5 border border-gray-200 dark:border-[#1e2535] text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-[#1e2535] hover:border-gray-300 dark:hover:border-[#2a3347] transition-all duration-150 disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         >
                             Cancel
                         </button>
                         <button
                             type="submit"
                             disabled={!canSubmit}
-                            className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 dark:hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors duration-150 disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+                            className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 dark:hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors duration-150 disabled:opacity-40 disabled:cursor-not-allowed shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                         >
                             {isLoading ? 'Spawning…' : 'Spawn Agent'}
                         </button>

@@ -7,11 +7,12 @@
  * - Error cleared when user starts correcting a field
  */
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { AlertCircle, Shield, X } from 'lucide-react';
 import { votingService, AmendmentProposal } from '../../services/voting';
 import { showToast } from '@/hooks/useToast';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { useFocusTrap } from '../../hooks/useFocusTrap';
 
 interface ProposeAmendmentModalProps {
     onClose: () => void;
@@ -29,6 +30,9 @@ export function ProposeAmendmentModal({ onClose, onSuccess }: ProposeAmendmentMo
     const [form, setForm] = useState<AmendmentProposal>(EMPTY_FORM);
     const [errors, setErrors] = useState<Partial<Record<keyof AmendmentProposal, string>>>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    useFocusTrap(containerRef, true);
 
     // Validate all fields; return true if valid
     const validate = (): boolean => {
@@ -70,7 +74,7 @@ export function ProposeAmendmentModal({ onClose, onSuccess }: ProposeAmendmentMo
 
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white dark:bg-[#161b27] rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-gray-200 dark:border-[#1e2535]">
+            <div className="bg-white dark:bg-[#161b27] rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-gray-200 dark:border-[#1e2535]" ref={containerRef}>
                 <div className="p-6">
                     {/* Header */}
                     <div className="flex justify-between items-center mb-6">
@@ -82,7 +86,7 @@ export function ProposeAmendmentModal({ onClose, onSuccess }: ProposeAmendmentMo
                         </div>
                         <button
                             aria-label="close"
-                            className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-[#1e2535] text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors duration-200"
+                            className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-[#1e2535] text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
                             onClick={onClose}
                         >
                             <X className="w-5 h-5" />
@@ -196,14 +200,14 @@ export function ProposeAmendmentModal({ onClose, onSuccess }: ProposeAmendmentMo
                         {/* Actions */}
                         <div className="flex justify-end gap-3 pt-2">
                             <button
-                                className="px-4 py-2 border border-gray-300 dark:border-[#1e2535] rounded-lg hover:bg-gray-100 dark:hover:bg-[#1e2535] text-gray-700 dark:text-gray-300 font-medium text-sm transition-colors duration-200"
+                                className="px-4 py-2 border border-gray-300 dark:border-[#1e2535] rounded-lg hover:bg-gray-100 dark:hover:bg-[#1e2535] text-gray-700 dark:text-gray-300 font-medium text-sm transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 onClick={onClose}
                                 disabled={isSubmitting}
                             >
                                 Cancel
                             </button>
                             <button
-                                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm transition-colors disabled:opacity-50 flex items-center gap-2"
+                                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm transition-colors disabled:opacity-50 flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 onClick={handleSubmit}
                                 disabled={isSubmitting}
                             >

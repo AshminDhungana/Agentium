@@ -1,5 +1,6 @@
 import { showToast } from '@/hooks/useToast';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { AlertCircle, X, ChevronRight, ChevronDown, Plus, Minus, FileText } from 'lucide-react';
 import { checkpointsService, BranchCompareResult, FieldDiff, AgentStateDiff, ArtifactDiff } from '../../services/checkpoints';
 import { toast } from 'react-hot-toast';
@@ -103,6 +104,9 @@ export const CheckpointDiffModal: React.FC<CheckpointDiffModalProps> = ({
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<'task' | 'agents' | 'artifacts'>('task');
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    useFocusTrap(containerRef, true);
 
     useEffect(() => {
         let isMounted = true;
@@ -133,6 +137,7 @@ export const CheckpointDiffModal: React.FC<CheckpointDiffModalProps> = ({
         <div 
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
             onClick={onClose}
+            ref={containerRef}
         >
             <div 
                 className="bg-white dark:bg-[#161b27] border border-slate-200 dark:border-[#1e2535] rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col"
@@ -164,7 +169,7 @@ export const CheckpointDiffModal: React.FC<CheckpointDiffModalProps> = ({
                     <button 
                         onClick={onClose}
                         aria-label="Close"
-                        className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:text-slate-300 dark:hover:bg-[#1e2535] rounded-xl transition-colors"
+                        className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:text-slate-300 dark:hover:bg-[#1e2535] rounded-xl transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                         <X className="w-5 h-5" />
                     </button>
@@ -182,7 +187,7 @@ export const CheckpointDiffModal: React.FC<CheckpointDiffModalProps> = ({
                         <p className="text-rose-600 dark:text-rose-400 font-medium mb-2">{error}</p>
                         <button 
                             onClick={onClose}
-                            className="text-sm px-4 py-2 bg-slate-100 dark:bg-slate-800 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                            className="text-sm px-4 py-2 bg-slate-100 dark:bg-slate-800 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
                         >
                             Close
                         </button>
@@ -194,19 +199,19 @@ export const CheckpointDiffModal: React.FC<CheckpointDiffModalProps> = ({
                         <div className="flex px-6 space-x-4 border-b border-slate-200 dark:border-[#1e2535]">
                             <button
                                 onClick={() => setActiveTab('task')}
-                                className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'task' ? 'border-violet-500 text-violet-600 dark:text-violet-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                                className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 ${activeTab === 'task' ? 'border-violet-500 text-violet-600 dark:text-violet-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
                             >
                                 Task State {hasTaskDiffs ? <span className="ml-1 text-xs px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-600 dark:bg-violet-500/20 dark:text-violet-400">Changed</span> : ''}
                             </button>
                             <button
                                 onClick={() => setActiveTab('agents')}
-                                className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'agents' ? 'border-violet-500 text-violet-600 dark:text-violet-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                                className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 ${activeTab === 'agents' ? 'border-violet-500 text-violet-600 dark:text-violet-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
                             >
                                 Agent States {changedAgents.length > 0 ? <span className="ml-1 text-xs px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-600 dark:bg-violet-500/20 dark:text-violet-400">{changedAgents.length}</span> : ''}
                             </button>
                             <button
                                 onClick={() => setActiveTab('artifacts')}
-                                className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'artifacts' ? 'border-violet-500 text-violet-600 dark:text-violet-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                                className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 ${activeTab === 'artifacts' ? 'border-violet-500 text-violet-600 dark:text-violet-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
                             >
                                 Artifacts {changedArtifacts.length > 0 ? <span className="ml-1 text-xs px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-600 dark:bg-violet-500/20 dark:text-violet-400">{changedArtifacts.length}</span> : ''}
                             </button>

@@ -13,7 +13,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         className={`
           inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md font-medium
           transition-all duration-200 focus-visible:outline-none focus-visible:ring-2
-          focus-visible:ring-indigo-500 focus-visible:ring-offset-2
+          focus-visible:ring-blue-500 focus-visible:ring-offset-2
           focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900
           disabled:pointer-events-none disabled:opacity-50
           ${variant === "ghost"

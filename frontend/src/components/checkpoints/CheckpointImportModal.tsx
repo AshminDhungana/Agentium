@@ -3,7 +3,8 @@
  * Modal for importing checkpoints with validation and conflict resolution.
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
+import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { showToast } from '@/hooks/useToast';
 import {
     Upload,
@@ -81,6 +82,9 @@ export const CheckpointImportModal: React.FC<CheckpointImportModalProps> = ({
         conflictResolution: 'rename',
     });
     const [step, setStep] = useState<'upload' | 'validate' | 'resolve' | 'complete'>('upload');
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    useFocusTrap(containerRef, isOpen);
 
     // ─── File Handling ───────────────────────────────────────────────────────
 
@@ -185,7 +189,7 @@ export const CheckpointImportModal: React.FC<CheckpointImportModalProps> = ({
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" ref={containerRef}>
             <div className="bg-white dark:bg-[#161b27] rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
                 {/* Header */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-[#1e2535]">
@@ -205,7 +209,7 @@ export const CheckpointImportModal: React.FC<CheckpointImportModalProps> = ({
                     <button
                         onClick={onClose}
                         aria-label="Close"
-                        className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#1e2535] rounded-lg transition-colors"
+                        className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#1e2535] rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                         <X className="w-5 h-5" />
                     </button>
@@ -246,7 +250,7 @@ export const CheckpointImportModal: React.FC<CheckpointImportModalProps> = ({
                                 />
                                 <label
                                     htmlFor="checkpoint-file-input"
-                                    className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg cursor-pointer transition-colors"
+                                    className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg cursor-pointer transition-colors focus-within:ring-2 focus-within:ring-blue-500 focus-within:ring-offset-2"
                                 >
                                     <Upload className="w-4 h-4" />
                                     Select File
@@ -282,7 +286,7 @@ export const CheckpointImportModal: React.FC<CheckpointImportModalProps> = ({
                                 </div>
                                 <button
                                     onClick={handleReset}
-                                    className="text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                                    className="text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded"
                                 >
                                     Change
                                 </button>
@@ -369,7 +373,7 @@ export const CheckpointImportModal: React.FC<CheckpointImportModalProps> = ({
                                             value={options.targetBranch}
                                             onChange={(e) => setOptions({ ...options, targetBranch: e.target.value })}
                                             placeholder="e.g., imported-from-backup"
-                                            className="flex-1 px-3 py-2 text-sm border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100"
+                                            className="flex-1 px-3 py-2 text-sm border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                         />
                                     </div>
                                 </div>
@@ -397,7 +401,7 @@ export const CheckpointImportModal: React.FC<CheckpointImportModalProps> = ({
                                                     value={opt.value}
                                                     checked={options.conflictResolution === opt.value}
                                                     onChange={(e) => setOptions({ ...options, conflictResolution: e.target.value as ImportOptions['conflictResolution'] })}
-                                                    className="mt-0.5"
+                                                    className="mt-0.5 focus:ring-2 focus:ring-blue-500"
                                                 />
                                                 <div>
                                                     <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
@@ -493,7 +497,7 @@ export const CheckpointImportModal: React.FC<CheckpointImportModalProps> = ({
                         {step === 'upload' && (
                             <button
                                 onClick={onClose}
-                                className="px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
+                                className="px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-lg"
                             >
                                 Cancel
                             </button>
@@ -502,7 +506,7 @@ export const CheckpointImportModal: React.FC<CheckpointImportModalProps> = ({
                             <>
                                 <button
                                     onClick={handleReset}
-                                    className="px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
+                                    className="px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-lg"
                                 >
                                     Back
                                 </button>
@@ -510,7 +514,7 @@ export const CheckpointImportModal: React.FC<CheckpointImportModalProps> = ({
                                     onClick={handleImport}
                                     disabled={isImporting || (!validation?.valid && !options.skipValidation)}
                                     className={`
-                                        px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2
+                                        px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-blue-500
                                         ${(!validation?.valid && !options.skipValidation) || isImporting
                                             ? 'bg-slate-300 dark:bg-slate-600 cursor-not-allowed'
                                             : 'bg-blue-600 hover:bg-blue-700 text-white'
@@ -534,7 +538,7 @@ export const CheckpointImportModal: React.FC<CheckpointImportModalProps> = ({
                         {step === 'complete' && (
                             <button
                                 onClick={onClose}
-                                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg"
+                                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                             >
                                 Done
                             </button>
