@@ -185,7 +185,10 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, onClick, onViewLive })
                 </div>
                 
                 {/* Enhanced status badge with icon */}
-                <span className={`
+                <span 
+                    role="status" 
+                    aria-live="polite"
+                    className={`
                     flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border capitalize
                     ${statusConfig.bg} ${statusConfig.text} ${statusConfig.border}
                     ${statusConfig.darkBg} ${statusConfig.darkText} ${statusConfig.darkBorder}

@@ -97,7 +97,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
             if (variant === 'widget') {
                 return (
-                    <div className="w-full h-full min-h-[150px] flex flex-col items-center justify-center p-4 bg-red-50/50 dark:bg-red-950/20 border border-red-100 dark:border-red-900/50 rounded-xl text-center">
+                    <div role="alert" className="w-full h-full min-h-[150px] flex flex-col items-center justify-center p-4 bg-red-50/50 dark:bg-red-950/20 border border-red-100 dark:border-red-900/50 rounded-xl text-center">
                         <AlertTriangle className="w-8 h-8 text-red-500 mb-2 opacity-80" />
                         <h3 className="text-sm font-bold text-red-900 dark:text-red-300 mb-1">{fallbackHeading}</h3>
                         <p className="text-xs text-red-700 dark:text-red-400 mb-3 max-w-[200px] truncate opacity-80">
@@ -116,7 +116,7 @@ export class ErrorBoundary extends Component<Props, State> {
             }
 
             return (
-                <div className="flex-1 w-full h-full min-h-[400px] flex flex-col items-center justify-center p-6 animate-in fade-in duration-300">
+                <div role="alert" className="flex-1 w-full h-full min-h-[400px] flex flex-col items-center justify-center p-6 animate-in fade-in duration-300">
                     <div className="max-w-md w-full bg-white dark:bg-[#0f1117] border border-red-200 dark:border-red-900/50 rounded-2xl shadow-lg p-8 text-center">
                         <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-200 dark:border-red-800/50">
                             <AlertTriangle className="w-8 h-8 text-red-600 dark:text-red-400" />

@@ -350,7 +350,7 @@ export function DetailPanel({ item, onClose, onVoteSuccess }: DetailPanelProps) 
                 )}
 
                 {/* Vote tally */}
-                <div>
+                <div role="status" aria-live="polite">
                     <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Vote Tally</h3>
                     <QuorumBar
                         votesFor={displayItem.votes_for}

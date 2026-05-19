@@ -26,7 +26,7 @@ export function ErrorState({
     const textSize = size === 'sm' ? 'text-xs' : 'text-sm';
 
     return (
-        <div className={`flex flex-col items-center gap-2 ${py} text-center`}>
+        <div role="alert" className={`flex flex-col items-center gap-2 ${py} text-center`}>
             <AlertTriangle className={`${iconSize} text-amber-500 flex-shrink-0`} />
             <p className={`${textSize} text-gray-500 dark:text-gray-400`}>{message}</p>
             {onRetry && (

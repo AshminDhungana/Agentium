@@ -64,7 +64,7 @@ export function MessageLogViewer({ channelId, limit = 50 }: MessageLogViewerProp
                                 <th className="px-4 py-2 text-left">Time</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-100 dark:divide-[#1e2535]">
+                        <tbody className="divide-y divide-gray-100 dark:divide-[#1e2535]" role="status" aria-live="polite">
                             {messages.map((msg) => (
                                 <tr key={msg.id} className="hover:bg-gray-50 dark:hover:bg-[#0f1117]">
                                     <td className="px-4 py-2">{getStatusIcon(msg.status)}</td>

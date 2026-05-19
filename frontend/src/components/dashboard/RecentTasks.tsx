@@ -68,6 +68,7 @@ export function RecentTasks({ tasks, isLoading, isError, onRetry }: RecentTasksP
 
             {/* Rows */}
             <div
+                role="status"
                 className="divide-y divide-gray-100 dark:divide-[#1e2535]"
                 aria-live="polite"
                 aria-atomic="false"

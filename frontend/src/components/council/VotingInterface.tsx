@@ -164,7 +164,7 @@ export const VotingInterface: React.FC<VotingInterfaceProps> = ({ embedded = fal
                             </div>
 
                             {/* Vote Progress */}
-                            <div className="mb-3">
+                            <div className="mb-3" role="status" aria-live="polite">
                                 <div className="flex justify-between text-sm mb-1">
                                     <span className="text-green-600 font-medium">For: {amendment.votes_for}</span>
                                     <span className="text-gray-500 text-xs">

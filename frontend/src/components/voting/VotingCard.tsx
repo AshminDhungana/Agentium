@@ -94,7 +94,7 @@ export function VotingCard({ item, isSelected, onClick, isAmendment }: VotingCar
             </div>
 
             {/* Mini tally bar */}
-            <div className="mt-3">
+            <div className="mt-3" role="status" aria-live="polite">
                 <div className="relative h-1.5 rounded-full overflow-hidden bg-gray-100 dark:bg-[#1e2535]">
                     <div className="absolute inset-0 flex">
                         <div
