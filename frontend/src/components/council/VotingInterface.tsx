@@ -220,7 +220,8 @@ export const VotingInterface: React.FC<VotingInterfaceProps> = ({ embedded = fal
 
                                     {castVote && (
                                         <>
-                                            -gray-500 dark:border-[#2a3347] rounded-lg bg-white dark:bg-[#0f1117] text-gray-900 dark:text-white text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-blue-500/40 resize-none"
+                                            <textarea
+                                                className="w-full p-2 border border-gray-500 dark:border-[#2a3347] rounded-lg bg-white dark:bg-[#0f1117] text-gray-900 dark:text-white text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-blue-500/40 resize-none"
                                                 placeholder="Optional: Provide rationale for your vote..."
                                                 value={rationale}
                                                 onChange={(e) => setRationale(e.target.value)}

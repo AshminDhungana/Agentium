@@ -312,13 +312,17 @@ function MarketplaceTab() {
         <div className="flex gap-3 mb-4">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text--600 dark:text-gray-500" />
-            -gray-500 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all"
+            <input
+              aria-label="Search marketplace"
+              className="w-full pl-10 pr-4 py-2.5 bg-gray-50 dark:bg-[#0f1117] border border-gray-500 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all"
               placeholder="Search tools…"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
             />
           </div>
-          -gray-500 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all"
+          <input
+            aria-label="Category filter"
+            className="w-48 px-4 py-2.5 bg-gray-50 dark:bg-[#0f1117] border border-gray-500 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all"
             placeholder="Category"
             value={category}
             onChange={(e) => setCategory(e.target.value)}
@@ -813,7 +817,9 @@ function ToolsTab() {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                 Code
               </label>
-              -gray-500 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all resize-none font-mono"
+              <textarea
+                aria-label="Tool code"
+                className="w-full px-4 py-2 bg-gray-50 dark:bg-[#0f1117] border border-gray-500 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all resize-none font-mono"
                 rows={4}
                 value={propose.code}
                 onChange={(e) => setPropose((p) => ({ ...p, code: e.target.value }))}
@@ -930,7 +936,9 @@ function ToolsTab() {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                 kwargs (JSON)
               </label>
-              -gray-500 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all resize-none font-mono"
+              <textarea
+                aria-label="Tool kwargs JSON"
+                className="w-full px-4 py-2 bg-gray-50 dark:bg-[#0f1117] border border-gray-500 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all resize-none font-mono"
                 rows={3}
                 value={exec.kwargs}
                 onChange={(e) => setExec((x) => ({ ...x, kwargs: e.target.value }))}
@@ -1143,7 +1151,9 @@ function VersionsTab() {
         </div>
 
         <div className="flex gap-3">
-          -gray-500 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all"
+          <input
+            aria-label="Tool name for changelog"
+            className="flex-1 px-4 py-2 bg-gray-50 dark:bg-[#0f1117] border border-gray-500 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all"
             placeholder="Tool name"
             value={toolName}
             onChange={(e) => setToolName(e.target.value)}
@@ -1275,7 +1285,9 @@ function VersionsTab() {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                 New Code
               </label>
-              -gray-500 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all resize-none font-mono"
+              <textarea
+                aria-label="New code"
+                className="w-full px-4 py-2 bg-gray-50 dark:bg-[#0f1117] border border-gray-500 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all resize-none font-mono"
                 rows={4}
                 value={proposeUpd.new_code}
                 onChange={(e) => setProposeUpd((p) => ({ ...p, new_code: e.target.value }))}
@@ -1739,7 +1751,10 @@ function AnalyticsTab() {
           <div className="flex gap-3 items-center">
             <div className="flex items-center gap-2">
               <span className="text-sm text-gray-600 dark:text-gray-400">Days:</span>
-              -gray-500 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+              <input
+                aria-label="Report days"
+                type="number"
+                className="w-20 px-3 py-1.5 bg-gray-50 dark:bg-[#0f1117] border border-gray-500 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                 value={reportDays}
                 onChange={(e) => setReportDays(Number(e.target.value))}
               />
@@ -1808,12 +1823,17 @@ function AnalyticsTab() {
           </div>
 
           <div className="flex gap-3 mb-4">
-            -gray-500 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all"
+            <input
+              aria-label="Tool name filter for errors"
+              className="flex-1 px-4 py-2 bg-gray-50 dark:bg-[#0f1117] border border-gray-500 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all"
               placeholder="Tool name (optional)"
               value={errorTool}
               onChange={(e) => setErrorTool(e.target.value)}
             />
-            -gray-500 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+            <input
+              aria-label="Error limit"
+              type="number"
+              className="w-20 px-3 py-2 bg-gray-50 dark:bg-[#0f1117] border border-gray-500 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
               value={errorLimit}
               onChange={(e) => setErrorLimit(Number(e.target.value))}
             />
@@ -1874,12 +1894,17 @@ function AnalyticsTab() {
           </div>
 
           <div className="flex gap-3 mb-4">
-            -gray-500 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all"
+            <input
+              aria-label="Agent ID"
+              className="flex-1 px-4 py-2 bg-gray-50 dark:bg-[#0f1117] border border-gray-500 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all"
               placeholder="Agent ID"
               value={agentId}
               onChange={(e) => setAgentId(e.target.value)}
             />
-            -gray-500 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+            <input
+              aria-label="Agent usage days"
+              type="number"
+              className="w-20 px-3 py-2 bg-gray-50 dark:bg-[#0f1117] border border-gray-500 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
               value={agentDays}
               onChange={(e) => setAgentDays(Number(e.target.value))}
             />
@@ -1919,12 +1944,17 @@ function AnalyticsTab() {
           </div>
 
           <div className="flex gap-3 mb-4">
-            -gray-500 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all"
+            <input
+              aria-label="Tool name for analytics"
+              className="flex-1 px-4 py-2 bg-gray-50 dark:bg-[#0f1117] border border-gray-500 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all"
               placeholder="Tool name"
               value={perTool}
               onChange={(e) => setPerTool(e.target.value)}
             />
-            -gray-500 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+            <input
+              aria-label="Tool analytics days"
+              type="number"
+              className="w-20 px-3 py-2 bg-gray-50 dark:bg-[#0f1117] border border-gray-500 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
               value={toolDays}
               onChange={(e) => setToolDays(Number(e.target.value))}
             />

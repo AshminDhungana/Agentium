@@ -99,7 +99,12 @@ export function ProposeAmendmentModal({ onClose, onSuccess }: ProposeAmendmentMo
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                 Title <span className="text-red-600">*</span>
                             </label>
-                            -gray-500 dark:border-[#1e2535] focus:ring-blue-500/40'
+                            <input
+                                type="text"
+                                className={`w-full px-4 py-2 border rounded-lg bg-white dark:bg-[#0f1117] text-gray-900 dark:text-white focus:outline-none focus:ring-2 transition-colors duration-200 ${
+                                    errors.title
+                                        ? 'border-red-400 focus:ring-red-400/30'
+                                        : 'border-gray-500 dark:border-[#1e2535] focus:ring-blue-500/40'
                                 }`}
                                 placeholder="Brief title for the amendment"
                                 value={form.title}
@@ -118,7 +123,11 @@ export function ProposeAmendmentModal({ onClose, onSuccess }: ProposeAmendmentMo
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                 Proposed Changes (Diff) <span className="text-red-600">*</span>
                             </label>
-                            -gray-500 dark:border-gray-600 focus:ring-blue-500/40'
+                            <textarea
+                                className={`w-full px-4 py-2 border rounded-lg bg-white dark:bg-[#0f1117] text-gray-900 dark:text-white font-mono text-sm focus:outline-none focus:ring-2 transition-colors duration-200 ${
+                                    errors.diff_markdown
+                                        ? 'border-red-400 focus:ring-red-400/30'
+                                        : 'border-gray-500 dark:border-gray-600 focus:ring-blue-500/40'
                                 }`}
                                 placeholder={`+ Add new article\n- Remove old article`}
                                 rows={8}
@@ -143,7 +152,11 @@ export function ProposeAmendmentModal({ onClose, onSuccess }: ProposeAmendmentMo
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                 Rationale <span className="text-red-600">*</span>
                             </label>
-                            -gray-500 dark:border-gray-600 focus:ring-blue-500/40'
+                            <textarea
+                                className={`w-full px-4 py-2 border rounded-lg bg-white dark:bg-[#0f1117] text-gray-900 dark:text-white focus:outline-none focus:ring-2 transition-colors duration-200 ${
+                                    errors.rationale
+                                        ? 'border-red-400 focus:ring-red-400/30'
+                                        : 'border-gray-500 dark:border-gray-600 focus:ring-blue-500/40'
                                 }`}
                                 placeholder="Explain why this amendment should be adopted..."
                                 rows={4}
@@ -163,7 +176,9 @@ export function ProposeAmendmentModal({ onClose, onSuccess }: ProposeAmendmentMo
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                 Voting Period
                             </label>
-                            -gray-500 dark:border-[#1e2535] rounded-lg bg-white dark:bg-[#0f1117] text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40 transition-colors duration-200"
+                            <select
+                                aria-label="voting period"
+                                className="w-full px-4 py-2 border border-gray-500 dark:border-[#1e2535] rounded-lg bg-white dark:bg-[#0f1117] text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40 transition-colors duration-200"
                                 value={form.voting_period_hours}
                                 onChange={e => setForm(f => ({ ...f, voting_period_hours: parseInt(e.target.value) }))}
                             >

@@ -692,7 +692,7 @@ Build a self-governing AI ecosystem where agents operate under constitutional la
 - [x] **ARIA Labels** — audit all icon-only buttons (pencil, trash, settings gear, expand/collapse) and add `aria-label` attributes; audit all form inputs for associated `<label>` elements
 - [x] **Keyboard Navigation** — ensure all interactive elements are reachable via Tab; add `focus:ring-2 focus:ring-blue-500` to all focusable elements that are missing it; modals should trap focus while open (`focus-trap-react` or custom)
 - [x] **Screen Reader** — add `role="status"` and `aria-live="polite"` to real-time updating regions (task status, WebSocket event feed, vote tallies); add `role="alert"` to error messages
-- [ ] **Color Contrast** — run `axe-core` or `lighthouse --accessibility` audit; fix all elements below WCAG AA ratio (4.5:1 for text, 3:1 for UI components)
+- [x] **Color Contrast** — run `axe-core` or `lighthouse --accessibility` audit; fix all elements below WCAG AA ratio (4.5:1 for text, 3:1 for UI components)
 - [ ] Add `skipToContent` link as the first focusable element on every page
 
 ---

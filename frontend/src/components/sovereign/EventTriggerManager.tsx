@@ -258,7 +258,8 @@ export const EventTriggerManager: React.FC = () => {
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                 HMAC Secret (auto-generated if empty)
                             </label>
-                            -gray-500 dark:border-[#1e2535] rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-gray-50 dark:bg-[#0f1117] text-gray-900 dark:text-white text-sm transition-colors duration-150 outline-none"
+                            <input
+                                className="w-full px-4 py-2.5 border border-gray-500 dark:border-[#1e2535] rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-gray-50 dark:bg-[#0f1117] text-gray-900 dark:text-white text-sm transition-colors duration-150 outline-none"
                                 placeholder="Leave empty to auto-generate"
                                 value={formConfig.hmac_secret || ''}
                                 onChange={(e) => setFormConfig({ ...formConfig, hmac_secret: e.target.value })}
@@ -273,7 +274,8 @@ export const EventTriggerManager: React.FC = () => {
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                 Metric Key
                             </label>
-                            -gray-500 dark:border-[#1e2535] rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-gray-50 dark:bg-[#0f1117] text-gray-900 dark:text-white text-sm transition-colors duration-150 outline-none"
+                            <input
+                                className="w-full px-4 py-2.5 border border-gray-500 dark:border-[#1e2535] rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-gray-50 dark:bg-[#0f1117] text-gray-900 dark:text-white text-sm transition-colors duration-150 outline-none"
                                 placeholder="e.g. pending_tasks"
                                 value={formConfig.metric || ''}
                                 onChange={(e) => setFormConfig({ ...formConfig, metric: e.target.value })}
@@ -283,7 +285,8 @@ export const EventTriggerManager: React.FC = () => {
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                 Operator
                             </label>
-                            -gray-500 dark:border-[#1e2535] rounded-lg focus:ring-2 focus:ring-amber-500 bg-gray-50 dark:bg-[#0f1117] text-gray-900 dark:text-white text-sm transition-colors duration-150 outline-none"
+                            <select
+                                className="w-full px-4 py-2.5 border border-gray-500 dark:border-[#1e2535] rounded-lg focus:ring-2 focus:ring-amber-500 bg-gray-50 dark:bg-[#0f1117] text-gray-900 dark:text-white text-sm transition-colors duration-150 outline-none"
                                 title="Select comparison operator"
                                 value={formConfig.operator || 'gt'}
                                 onChange={(e) => setFormConfig({ ...formConfig, operator: e.target.value })}
@@ -299,7 +302,8 @@ export const EventTriggerManager: React.FC = () => {
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                 Value
                             </label>
-                            -gray-500 dark:border-[#1e2535] rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-gray-50 dark:bg-[#0f1117] text-gray-900 dark:text-white text-sm transition-colors duration-150 outline-none"
+                            <input
+                                className="w-full px-4 py-2.5 border border-gray-500 dark:border-[#1e2535] rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-gray-50 dark:bg-[#0f1117] text-gray-900 dark:text-white text-sm transition-colors duration-150 outline-none"
                                 type="number"
                                 placeholder="10"
                                 value={formConfig.value ?? ''}
@@ -310,7 +314,8 @@ export const EventTriggerManager: React.FC = () => {
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                 Cooldown (seconds)
                             </label>
-                            -gray-500 dark:border-[#1e2535] rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-gray-50 dark:bg-[#0f1117] text-gray-900 dark:text-white text-sm transition-colors duration-150 outline-none"
+                            <input
+                                className="w-full px-4 py-2.5 border border-gray-500 dark:border-[#1e2535] rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-gray-50 dark:bg-[#0f1117] text-gray-900 dark:text-white text-sm transition-colors duration-150 outline-none"
                                 type="number"
                                 placeholder="60"
                                 value={formConfig.cooldown_seconds ?? ''}
@@ -328,7 +333,8 @@ export const EventTriggerManager: React.FC = () => {
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                 URL to Poll
                             </label>
-                            -gray-500 dark:border-[#1e2535] rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-gray-50 dark:bg-[#0f1117] text-gray-900 dark:text-white text-sm transition-colors duration-150 outline-none"
+                            <input
+                                className="w-full px-4 py-2.5 border border-gray-500 dark:border-[#1e2535] rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-gray-50 dark:bg-[#0f1117] text-gray-900 dark:text-white text-sm transition-colors duration-150 outline-none"
                                 type="url"
                                 placeholder="https://api.example.com/status"
                                 value={formConfig.url || ''}
@@ -339,7 +345,8 @@ export const EventTriggerManager: React.FC = () => {
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                 Poll Interval (seconds)
                             </label>
-                            -gray-500 dark:border-[#1e2535] rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-gray-50 dark:bg-[#0f1117] text-gray-900 dark:text-white text-sm transition-colors duration-150 outline-none"
+                            <input
+                                className="w-full px-4 py-2.5 border border-gray-500 dark:border-[#1e2535] rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-gray-50 dark:bg-[#0f1117] text-gray-900 dark:text-white text-sm transition-colors duration-150 outline-none"
                                 type="number"
                                 placeholder="60"
                                 value={formConfig.poll_interval_seconds ?? ''}
@@ -356,7 +363,8 @@ export const EventTriggerManager: React.FC = () => {
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                             Cron Expression
                         </label>
-                        -gray-500 dark:border-[#1e2535] rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-gray-50 dark:bg-[#0f1117] text-gray-900 dark:text-white text-sm font-mono transition-colors duration-150 outline-none"
+                        <input
+                            className="w-full px-4 py-2.5 border border-gray-500 dark:border-[#1e2535] rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-gray-50 dark:bg-[#0f1117] text-gray-900 dark:text-white text-sm font-mono transition-colors duration-150 outline-none"
                             placeholder="*/5 * * * *"
                             value={formConfig.cron_expression || ''}
                             onChange={(e) => setFormConfig({ ...formConfig, cron_expression: e.target.value })}
@@ -527,7 +535,8 @@ export const EventTriggerManager: React.FC = () => {
                                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                         Trigger Name
                                     </label>
-                                    -gray-500 dark:border-[#1e2535] rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-gray-50 dark:bg-[#0f1117] text-gray-900 dark:text-white text-sm transition-colors duration-150 outline-none"
+                                    <input
+                                        className="w-full px-4 py-2.5 border border-gray-500 dark:border-[#1e2535] rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-gray-50 dark:bg-[#0f1117] text-gray-900 dark:text-white text-sm transition-colors duration-150 outline-none"
                                         placeholder="e.g., High CPU Alert"
                                         value={formName}
                                         onChange={(e) => setFormName(e.target.value)}
@@ -570,7 +579,8 @@ export const EventTriggerManager: React.FC = () => {
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                     Target Workflow ID (optional)
                                 </label>
-                                -gray-500 dark:border-[#1e2535] rounded-lg focus:ring-2 focus:ring-indigo-500 bg-gray-50 dark:bg-[#0f1117] text-gray-900 dark:text-white text-sm transition-colors duration-150 outline-none"
+                                <input
+                                    className="w-full px-4 py-2.5 border border-gray-500 dark:border-[#1e2535] rounded-lg focus:ring-2 focus:ring-indigo-500 bg-gray-50 dark:bg-[#0f1117] text-gray-900 dark:text-white text-sm transition-colors duration-150 outline-none"
                                     placeholder="Leave empty if no workflow target"
                                     value={formWorkflowId}
                                     onChange={(e) => setFormWorkflowId(e.target.value)}

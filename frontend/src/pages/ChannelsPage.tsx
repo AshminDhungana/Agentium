@@ -1119,7 +1119,12 @@ export function ChannelsPage() {
                                                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                                                         {field.label}{field.required && <span className="text-red-600 ml-1">*</span>}
                                                     </label>
-                                                    -gray-500 dark:border-[#1e2535] rounded-lg bg-white dark:bg-[#0f1117] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-600 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-500/50 focus:border-transparent outline-none transition-all duration-150 text-sm"
+                                                    <input
+                                                        name={field.name}
+                                                        type={field.type}
+                                                        required={field.required}
+                                                        placeholder={field.placeholder}
+                                                        className="w-full px-4 py-2.5 border border-gray-500 dark:border-[#1e2535] rounded-lg bg-white dark:bg-[#0f1117] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-600 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-500/50 focus:border-transparent outline-none transition-all duration-150 text-sm"
                                                     />
                                                     {field.help && <p className="mt-1 text-xs text-gray-600 dark:text-gray-500">{field.help}</p>}
                                                 </div>
@@ -1130,7 +1135,12 @@ export function ChannelsPage() {
                                                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                                                         {field.label}{field.required && <span className="text-red-600 ml-1">*</span>}
                                                     </label>
-                                                    -gray-500 dark:border-[#1e2535] rounded-lg bg-white dark:bg-[#0f1117] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-600 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-500/50 focus:border-transparent outline-none transition-all duration-150 text-sm"
+                                                    <input
+                                                        name={field.name}
+                                                        type={field.type}
+                                                        required={field.required}
+                                                        placeholder={field.placeholder}
+                                                        className="w-full px-4 py-2.5 border border-gray-500 dark:border-[#1e2535] rounded-lg bg-white dark:bg-[#0f1117] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-600 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-500/50 focus:border-transparent outline-none transition-all duration-150 text-sm"
                                                     />
                                                 </div>
                                             ))

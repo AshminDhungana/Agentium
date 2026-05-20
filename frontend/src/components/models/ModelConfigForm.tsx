@@ -800,7 +800,13 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
 
                         {/* Default checkbox */}
                         <label htmlFor="is_default" className="flex items-center gap-3 cursor-pointer group">
-                            -gray-500 dark:border-[#2a3347] text-blue-600 focus:ring-blue-500 bg-white dark:bg-[#0f1117]"
+                            <input
+                                id="is_default"
+                                type="checkbox"
+                                name="is_default"
+                                checked={formData.is_default}
+                                onChange={handleChange}
+                                className="w-4 h-4 rounded border-gray-500 dark:border-[#2a3347] text-blue-600 focus:ring-blue-500 bg-white dark:bg-[#0f1117]"
                             />
                             <span className="text-sm font-medium text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white transition-colors duration-150">
                                 Set as default configuration
