@@ -446,7 +446,7 @@ export function MainLayout() {
                         </button>
                         <div>
                             <h1 className="text-xl font-bold text-gray-900 dark:text-white">Agentium</h1>
-                            <p className="text-xs text-gray-500 dark:text-blue-400/70">AI Governance</p>
+                            <p className="text-xs text-gray-600 dark:text-blue-400/70">AI Governance</p>
                         </div>
                     </div>
                 </div>
@@ -473,7 +473,7 @@ export function MainLayout() {
                                     }`
                                 }
                             >
-                                <item.icon className={`w-[18px] h-[18px] flex-shrink-0 ${item.variant === 'danger' ? 'text-red-500' : ''}`} />
+                                <item.icon className={`w-[18px] h-[18px] flex-shrink-0 ${item.variant === 'danger' ? 'text-red-600' : ''}`} />
                                 <span className="flex-1">{item.label}</span>
                                 {item.badge !== undefined && (
                                     <span className="bg-red-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
@@ -494,7 +494,7 @@ export function MainLayout() {
                             <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
                                 {user?.username || 'User'}
                             </p>
-                            <p className="text-xs text-gray-500 dark:text-gray-400 capitalize">
+                            <p className="text-xs text-gray-600 dark:text-gray-400 capitalize">
                                 {user?.role || 'Member'}
                             </p>
                         </div>

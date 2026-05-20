@@ -35,28 +35,28 @@ export function ChannelMetricsCard({ metrics, healthStatus }: ChannelMetricsCard
           <div className="text-2xl font-bold text-gray-900 dark:text-white">
             {metrics.success_rate.toFixed(1)}%
           </div>
-          <div className="text-xs text-gray-500 dark:text-gray-400">Success Rate</div>
+          <div className="text-xs text-gray-600 dark:text-gray-400">Success Rate</div>
         </div>
         
         <div>
           <div className="text-2xl font-bold text-gray-900 dark:text-white">
             {metrics.failed_requests}
           </div>
-          <div className="text-xs text-gray-500 dark:text-gray-400">Failures</div>
+          <div className="text-xs text-gray-600 dark:text-gray-400">Failures</div>
         </div>
         
         <div>
           <div className="text-2xl font-bold text-gray-900 dark:text-white">
             {metrics.rate_limit_hits}
           </div>
-          <div className="text-xs text-gray-500 dark:text-gray-400">Rate Limits</div>
+          <div className="text-xs text-gray-600 dark:text-gray-400">Rate Limits</div>
         </div>
         
         <div>
           <div className="text-2xl font-bold text-gray-900 dark:text-white">
             {metrics.consecutive_failures}
           </div>
-          <div className="text-xs text-gray-500 dark:text-gray-400">Consecutive Failures</div>
+          <div className="text-xs text-gray-600 dark:text-gray-400">Consecutive Failures</div>
         </div>
       </div>
     </div>

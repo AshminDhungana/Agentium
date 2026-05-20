@@ -258,8 +258,7 @@ export const EventTriggerManager: React.FC = () => {
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                 HMAC Secret (auto-generated if empty)
                             </label>
-                            <input
-                                className="w-full px-4 py-2.5 border border-gray-200 dark:border-[#1e2535] rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-gray-50 dark:bg-[#0f1117] text-gray-900 dark:text-white text-sm transition-colors duration-150 outline-none"
+                            -gray-500 dark:border-[#1e2535] rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-gray-50 dark:bg-[#0f1117] text-gray-900 dark:text-white text-sm transition-colors duration-150 outline-none"
                                 placeholder="Leave empty to auto-generate"
                                 value={formConfig.hmac_secret || ''}
                                 onChange={(e) => setFormConfig({ ...formConfig, hmac_secret: e.target.value })}
@@ -274,8 +273,7 @@ export const EventTriggerManager: React.FC = () => {
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                 Metric Key
                             </label>
-                            <input
-                                className="w-full px-4 py-2.5 border border-gray-200 dark:border-[#1e2535] rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-gray-50 dark:bg-[#0f1117] text-gray-900 dark:text-white text-sm transition-colors duration-150 outline-none"
+                            -gray-500 dark:border-[#1e2535] rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-gray-50 dark:bg-[#0f1117] text-gray-900 dark:text-white text-sm transition-colors duration-150 outline-none"
                                 placeholder="e.g. pending_tasks"
                                 value={formConfig.metric || ''}
                                 onChange={(e) => setFormConfig({ ...formConfig, metric: e.target.value })}
@@ -285,8 +283,7 @@ export const EventTriggerManager: React.FC = () => {
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                 Operator
                             </label>
-                            <select
-                                className="w-full px-4 py-2.5 border border-gray-200 dark:border-[#1e2535] rounded-lg focus:ring-2 focus:ring-amber-500 bg-gray-50 dark:bg-[#0f1117] text-gray-900 dark:text-white text-sm transition-colors duration-150 outline-none"
+                            -gray-500 dark:border-[#1e2535] rounded-lg focus:ring-2 focus:ring-amber-500 bg-gray-50 dark:bg-[#0f1117] text-gray-900 dark:text-white text-sm transition-colors duration-150 outline-none"
                                 title="Select comparison operator"
                                 value={formConfig.operator || 'gt'}
                                 onChange={(e) => setFormConfig({ ...formConfig, operator: e.target.value })}
@@ -302,8 +299,7 @@ export const EventTriggerManager: React.FC = () => {
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                 Value
                             </label>
-                            <input
-                                className="w-full px-4 py-2.5 border border-gray-200 dark:border-[#1e2535] rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-gray-50 dark:bg-[#0f1117] text-gray-900 dark:text-white text-sm transition-colors duration-150 outline-none"
+                            -gray-500 dark:border-[#1e2535] rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-gray-50 dark:bg-[#0f1117] text-gray-900 dark:text-white text-sm transition-colors duration-150 outline-none"
                                 type="number"
                                 placeholder="10"
                                 value={formConfig.value ?? ''}
@@ -314,8 +310,7 @@ export const EventTriggerManager: React.FC = () => {
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                 Cooldown (seconds)
                             </label>
-                            <input
-                                className="w-full px-4 py-2.5 border border-gray-200 dark:border-[#1e2535] rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-gray-50 dark:bg-[#0f1117] text-gray-900 dark:text-white text-sm transition-colors duration-150 outline-none"
+                            -gray-500 dark:border-[#1e2535] rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-gray-50 dark:bg-[#0f1117] text-gray-900 dark:text-white text-sm transition-colors duration-150 outline-none"
                                 type="number"
                                 placeholder="60"
                                 value={formConfig.cooldown_seconds ?? ''}
@@ -333,8 +328,7 @@ export const EventTriggerManager: React.FC = () => {
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                 URL to Poll
                             </label>
-                            <input
-                                className="w-full px-4 py-2.5 border border-gray-200 dark:border-[#1e2535] rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-gray-50 dark:bg-[#0f1117] text-gray-900 dark:text-white text-sm transition-colors duration-150 outline-none"
+                            -gray-500 dark:border-[#1e2535] rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-gray-50 dark:bg-[#0f1117] text-gray-900 dark:text-white text-sm transition-colors duration-150 outline-none"
                                 type="url"
                                 placeholder="https://api.example.com/status"
                                 value={formConfig.url || ''}
@@ -345,8 +339,7 @@ export const EventTriggerManager: React.FC = () => {
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                 Poll Interval (seconds)
                             </label>
-                            <input
-                                className="w-full px-4 py-2.5 border border-gray-200 dark:border-[#1e2535] rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-gray-50 dark:bg-[#0f1117] text-gray-900 dark:text-white text-sm transition-colors duration-150 outline-none"
+                            -gray-500 dark:border-[#1e2535] rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-gray-50 dark:bg-[#0f1117] text-gray-900 dark:text-white text-sm transition-colors duration-150 outline-none"
                                 type="number"
                                 placeholder="60"
                                 value={formConfig.poll_interval_seconds ?? ''}
@@ -363,13 +356,12 @@ export const EventTriggerManager: React.FC = () => {
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                             Cron Expression
                         </label>
-                        <input
-                            className="w-full px-4 py-2.5 border border-gray-200 dark:border-[#1e2535] rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-gray-50 dark:bg-[#0f1117] text-gray-900 dark:text-white text-sm font-mono transition-colors duration-150 outline-none"
+                        -gray-500 dark:border-[#1e2535] rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-gray-50 dark:bg-[#0f1117] text-gray-900 dark:text-white text-sm font-mono transition-colors duration-150 outline-none"
                             placeholder="*/5 * * * *"
                             value={formConfig.cron_expression || ''}
                             onChange={(e) => setFormConfig({ ...formConfig, cron_expression: e.target.value })}
                         />
-                        <p className="text-xs text-gray-400 mt-1">e.g., "*/5 * * * *" for every 5 minutes</p>
+                        <p className="text-xs text--600 mt-1">e.g., "*/5 * * * *" for every 5 minutes</p>
                     </div>
                 );
         }
@@ -380,7 +372,7 @@ export const EventTriggerManager: React.FC = () => {
         return (
             <div className="flex flex-col items-center justify-center p-16">
                 <LoadingSpinner size="lg" />
-                <p className="text-sm text-gray-500 dark:text-gray-400">Loading event processing…</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Loading event processing…</p>
             </div>
         );
     }
@@ -396,7 +388,7 @@ export const EventTriggerManager: React.FC = () => {
                             Intelligent Event Processing
                         </h2>
                     </div>
-                    <p className="text-gray-500 dark:text-gray-400 text-sm">
+                    <p className="text-gray-600 dark:text-gray-400 text-sm">
                         Automatically react to webhooks, threshold breaches, and external API changes.
                     </p>
                 </div>
@@ -459,14 +451,14 @@ export const EventTriggerManager: React.FC = () => {
                         >
                             <div className="flex items-center gap-2 mb-2">
                                 <Icon className={`w-5 h-5 ${kpi.color}`} />
-                                <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                <span className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
                                     {kpi.label}
                                 </span>
                             </div>
                             <p className={`text-2xl font-bold ${kpi.color}`}>
                                 {kpi.value}
                                 {kpi.total !== undefined && (
-                                    <span className="text-sm font-normal text-gray-400 dark:text-gray-500">
+                                    <span className="text-sm font-normal text--600 dark:text-gray-500">
                                         {' '}/ {kpi.total}
                                     </span>
                                 )}
@@ -518,7 +510,7 @@ export const EventTriggerManager: React.FC = () => {
                                 </>
                             )}
                         </button>
-                        <span className="text-gray-500 dark:text-gray-400 text-sm">
+                        <span className="text-gray-600 dark:text-gray-400 text-sm">
                             {triggers.length} trigger{triggers.length !== 1 ? 's' : ''}
                         </span>
                     </div>
@@ -535,8 +527,7 @@ export const EventTriggerManager: React.FC = () => {
                                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                         Trigger Name
                                     </label>
-                                    <input
-                                        className="w-full px-4 py-2.5 border border-gray-200 dark:border-[#1e2535] rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-gray-50 dark:bg-[#0f1117] text-gray-900 dark:text-white text-sm transition-colors duration-150 outline-none"
+                                    -gray-500 dark:border-[#1e2535] rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-gray-50 dark:bg-[#0f1117] text-gray-900 dark:text-white text-sm transition-colors duration-150 outline-none"
                                         placeholder="e.g., High CPU Alert"
                                         value={formName}
                                         onChange={(e) => setFormName(e.target.value)}
@@ -579,8 +570,7 @@ export const EventTriggerManager: React.FC = () => {
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                     Target Workflow ID (optional)
                                 </label>
-                                <input
-                                    className="w-full px-4 py-2.5 border border-gray-200 dark:border-[#1e2535] rounded-lg focus:ring-2 focus:ring-indigo-500 bg-gray-50 dark:bg-[#0f1117] text-gray-900 dark:text-white text-sm transition-colors duration-150 outline-none"
+                                -gray-500 dark:border-[#1e2535] rounded-lg focus:ring-2 focus:ring-indigo-500 bg-gray-50 dark:bg-[#0f1117] text-gray-900 dark:text-white text-sm transition-colors duration-150 outline-none"
                                     placeholder="Leave empty if no workflow target"
                                     value={formWorkflowId}
                                     onChange={(e) => setFormWorkflowId(e.target.value)}
@@ -606,7 +596,7 @@ export const EventTriggerManager: React.FC = () => {
                             <p className="text-gray-900 dark:text-white font-medium mb-1">
                                 No event triggers configured
                             </p>
-                            <p className="text-sm text-gray-500 dark:text-gray-400">
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
                                 Create a trigger to automate reactions to webhooks, thresholds, or API changes.
                             </p>
                         </div>
@@ -653,7 +643,7 @@ export const EventTriggerManager: React.FC = () => {
                                                             {meta.label}
                                                         </span>
                                                     </div>
-                                                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                                                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                                                         Fired {trigger.fire_count} time{trigger.fire_count !== 1 ? 's' : ''}
                                                         {trigger.last_fired_at && (
                                                             <> · Last: {new Date(trigger.last_fired_at).toLocaleString()}</>
@@ -723,7 +713,7 @@ export const EventTriggerManager: React.FC = () => {
                                                                 className="shrink-0 p-1 hover:bg-gray-100 dark:hover:bg-[#1e2535] rounded transition-colors"
                                                                 title="Copy URL"
                                                             >
-                                                                <Copy className="w-3.5 h-3.5 text-gray-400" />
+                                                                <Copy className="w-3.5 h-3.5 text--600" />
                                                             </button>
                                                         </div>
                                                     </div>
@@ -731,19 +721,19 @@ export const EventTriggerManager: React.FC = () => {
 
                                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
                                                     <div className="text-xs">
-                                                        <span className="text-gray-500 dark:text-gray-400">ID:</span>{' '}
+                                                        <span className="text-gray-600 dark:text-gray-400">ID:</span>{' '}
                                                         <span className="font-mono text-gray-700 dark:text-gray-300">{trigger.agentium_id}</span>
                                                     </div>
                                                     <div className="text-xs">
-                                                        <span className="text-gray-500 dark:text-gray-400">Max fires/min:</span>{' '}
+                                                        <span className="text-gray-600 dark:text-gray-400">Max fires/min:</span>{' '}
                                                         <span className="text-gray-700 dark:text-gray-300">{trigger.max_fires_per_minute}</span>
                                                     </div>
                                                     <div className="text-xs">
-                                                        <span className="text-gray-500 dark:text-gray-400">Pause duration:</span>{' '}
+                                                        <span className="text-gray-600 dark:text-gray-400">Pause duration:</span>{' '}
                                                         <span className="text-gray-700 dark:text-gray-300">{trigger.pause_duration_seconds}s</span>
                                                     </div>
                                                     <div className="text-xs">
-                                                        <span className="text-gray-500 dark:text-gray-400">Created:</span>{' '}
+                                                        <span className="text-gray-600 dark:text-gray-400">Created:</span>{' '}
                                                         <span className="text-gray-700 dark:text-gray-300">
                                                             {new Date(trigger.created_at).toLocaleDateString()}
                                                         </span>
@@ -765,7 +755,7 @@ export const EventTriggerManager: React.FC = () => {
                     {/* Filters */}
                     <div className="flex items-center gap-3 flex-wrap">
                         <div className="flex items-center gap-2 bg-white dark:bg-[#161b27] border border-gray-200 dark:border-[#1e2535] rounded-lg px-3 py-2">
-                            <Filter className="w-4 h-4 text-gray-400" />
+                            <Filter className="w-4 h-4 text--600" />
                             <select
                                 className="bg-transparent text-sm text-gray-700 dark:text-gray-300 outline-none"
                                 title="Filter by event log status"
@@ -786,14 +776,14 @@ export const EventTriggerManager: React.FC = () => {
                         >
                             <RefreshCw className="w-3.5 h-3.5" /> Apply
                         </button>
-                        <span className="text-xs text-gray-400 dark:text-gray-500">
+                        <span className="text-xs text--600 dark:text-gray-500">
                             {logs.length} log entries
                         </span>
                     </div>
 
                     {logs.length === 0 ? (
                         <div className="text-center py-12 bg-white dark:bg-[#161b27] rounded-xl border border-gray-200 dark:border-[#1e2535]">
-                            <p className="text-gray-500 dark:text-gray-400 text-sm">No event logs found.</p>
+                            <p className="text-gray-600 dark:text-gray-400 text-sm">No event logs found.</p>
                         </div>
                     ) : (
                         <div className="space-y-2">
@@ -816,14 +806,14 @@ export const EventTriggerManager: React.FC = () => {
                                                 {triggerName}
                                             </span>
                                             {log.correlation_id && (
-                                                <span className="font-mono text-xs text-gray-400 dark:text-gray-500">
+                                                <span className="font-mono text-xs text--600 dark:text-gray-500">
                                                     {log.correlation_id.slice(0, 8)}…
                                                 </span>
                                             )}
                                         </div>
-                                        <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
+                                        <div className="flex items-center gap-3 text-xs text-gray-600 dark:text-gray-400">
                                             {log.error && (
-                                                <span className="text-red-500 dark:text-red-400 max-w-[200px] truncate" title={log.error}>
+                                                <span className="text-red-600 dark:text-red-400 max-w-[200px] truncate" title={log.error}>
                                                     {log.error}
                                                 </span>
                                             )}
@@ -846,7 +836,7 @@ export const EventTriggerManager: React.FC = () => {
                                 <CheckCircle className="w-6 h-6 text-green-600 dark:text-green-400" />
                             </div>
                             <p className="text-gray-900 dark:text-white font-medium">No dead letters</p>
-                            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                                 All events are processing successfully.
                             </p>
                         </div>
@@ -862,11 +852,11 @@ export const EventTriggerManager: React.FC = () => {
                                     >
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center gap-2">
-                                                <XCircle className="w-4 h-4 text-red-500 dark:text-red-400" />
+                                                <XCircle className="w-4 h-4 text-red-600 dark:text-red-400" />
                                                 <span className="font-medium text-gray-900 dark:text-white">
                                                     {triggerName}
                                                 </span>
-                                                <span className="text-xs text-gray-400 dark:text-gray-500">
+                                                <span className="text-xs text--600 dark:text-gray-500">
                                                     Retries: {log.retry_count}
                                                 </span>
                                             </div>
@@ -888,7 +878,7 @@ export const EventTriggerManager: React.FC = () => {
                                                 {log.error}
                                             </p>
                                         )}
-                                        <p className="text-xs text-gray-400 dark:text-gray-500">
+                                        <p className="text-xs text--600 dark:text-gray-500">
                                             {new Date(log.created_at).toLocaleString()}
                                         </p>
                                     </div>

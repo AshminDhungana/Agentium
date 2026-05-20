@@ -87,7 +87,7 @@ export const WorkflowAutomationPanel: React.FC = () => {
           <Button
             variant="ghost"
             onClick={() => setView('list')}
-            className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+            className="text-gray-600 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
           >
             ← Back
           </Button>
@@ -111,7 +111,7 @@ export const WorkflowAutomationPanel: React.FC = () => {
               variant="ghost"
               onClick={() => setView('list')}
               className="
-                text-gray-500 dark:text-gray-400
+                text-gray-600 dark:text-gray-400
                 px-2 py-1 h-auto text-xs
                 border border-gray-200 dark:border-[#1e2535]
               "
@@ -120,7 +120,7 @@ export const WorkflowAutomationPanel: React.FC = () => {
             </Button>
             <h2 className="text-xl font-bold text-gray-900 dark:text-white">
               Live Execution:{' '}
-              <span className="text-indigo-400 font-mono text-lg">
+              <span className="text--600 font-mono text-lg">
                 {executionId?.split('-')[0]}
               </span>
             </h2>
@@ -128,10 +128,10 @@ export const WorkflowAutomationPanel: React.FC = () => {
 
           <div className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
             executionStatus.status === 'COMPLETED'
-              ? 'bg-green-500/20 text-green-400'
+              ? 'bg-green-500/20 text--600'
               : executionStatus.status === 'FAILED'
-              ? 'bg-red-500/20 text-red-400'
-              : 'bg-indigo-500/20 text-indigo-400'
+              ? 'bg-red-500/20 text--600'
+              : 'bg-indigo-500/20 text--600'
           }`}>
             {executionStatus.status}
           </div>
@@ -154,15 +154,15 @@ export const WorkflowAutomationPanel: React.FC = () => {
           <div className="flex flex-col items-center justify-center py-8">
             {!isDone && <ActivityPulse />}
             {executionStatus.status === 'COMPLETED' && (
-              <CheckCircle className="w-16 h-16 text-green-500 mb-4" />
+              <CheckCircle className="w-16 h-16 text-green-700 mb-4" />
             )}
             {executionStatus.status === 'FAILED' && (
-              <XCircle className="w-16 h-16 text-red-500 mb-4" />
+              <XCircle className="w-16 h-16 text-red-600 mb-4" />
             )}
             <h3 className="text-2xl font-semibold mt-6 text-gray-900 dark:text-white">
               {isDone ? `Execution ${executionStatus.status}` : 'Processing Workflow…'}
             </h3>
-            <p className="text-gray-500 mt-2 font-mono text-sm max-w-sm text-center">
+            <p className="text-gray-600 mt-2 font-mono text-sm max-w-sm text-center">
               {isDone
                 ? 'Workflow run has concluded.'
                 : `Currently executing step index ${executionStatus.current_step_index}. The engine is actively orchestrating tasks.`}
@@ -170,7 +170,7 @@ export const WorkflowAutomationPanel: React.FC = () => {
           </div>
 
           <div className="mt-8 border-t border-gray-200 dark:border-[#1e2535] pt-6">
-            <h4 className="text-sm font-semibold text-gray-500 mb-4 uppercase tracking-wider">
+            <h4 className="text-sm font-semibold text-gray-600 mb-4 uppercase tracking-wider">
               Execution Context
             </h4>
             <pre className="
@@ -193,7 +193,7 @@ export const WorkflowAutomationPanel: React.FC = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-          <Power className="w-5 h-5 text-indigo-500" /> Workflow Templates
+          <Power className="w-5 h-5 text-indigo-600" /> Workflow Templates
         </h2>
         <Button
           onClick={() => setView('create')}
@@ -204,7 +204,7 @@ export const WorkflowAutomationPanel: React.FC = () => {
       </div>
 
       {loading ? (
-        <div className="text-gray-500 animate-pulse">Loading…</div>
+        <div className="text-gray-600 animate-pulse">Loading…</div>
       ) : workflows.length === 0 ? (
         <div className="bg-white dark:bg-[#161b27] border border-gray-200 dark:border-[#1e2535] rounded-xl">
           <EmptyState
@@ -242,14 +242,14 @@ export const WorkflowAutomationPanel: React.FC = () => {
                     v{wf.version}
                   </span>
                 </div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-4 line-clamp-2">
+                <p className="text-xs text-gray-600 dark:text-gray-400 mb-4 line-clamp-2">
                   {wf.description || 'No description provided.'}
                 </p>
-                <div className="flex items-center gap-4 text-xs text-gray-400 mb-4">
+                <div className="flex items-center gap-4 text-xs text--600 mb-4">
                   <div className="flex items-center gap-1">
                     <Clock className="w-3 h-3" /> {wf.schedule_cron || 'Manual'}
                   </div>
-                  <div className="flex items-center gap-1 bg-green-500/10 text-green-400 px-1.5 rounded">
+                  <div className="flex items-center gap-1 bg-green-500/10 text--600 px-1.5 rounded">
                     Active
                   </div>
                 </div>

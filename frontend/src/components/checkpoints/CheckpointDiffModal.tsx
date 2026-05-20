@@ -82,11 +82,11 @@ const FieldDiffView: React.FC<{ diff: FieldDiff }> = ({ diff }) => {
             ) : (
                 <div className="grid grid-cols-2 gap-2">
                     <div>
-                        <div className="text-xs text-slate-500 mb-1">Previous ({diff.key})</div>
+                        <div className="text-xs text-slate-600 mb-1">Previous ({diff.key})</div>
                         <ValueDisplay value={diff.left} isDiff type="removed" />
                     </div>
                     <div>
-                        <div className="text-xs text-slate-500 mb-1">New ({diff.key})</div>
+                        <div className="text-xs text-slate-600 mb-1">New ({diff.key})</div>
                         <ValueDisplay value={diff.right} isDiff type="added" />
                     </div>
                 </div>
@@ -148,13 +148,13 @@ export const CheckpointDiffModal: React.FC<CheckpointDiffModalProps> = ({
                     <div className="flex-1">
                         <div className="flex items-center gap-3">
                             <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                                <GitBranch className="w-5 h-5 text-violet-500" />
+                                <GitBranch className="w-5 h-5 text-violet-600" />
                                 Branch Comparison
                             </h2>
-                            <span className="text-slate-400 dark:text-slate-500 mx-1">/</span>
+                            <span className="text--600 dark:text-slate-500 mx-1">/</span>
                             <div className="flex items-center gap-2 font-mono text-sm">
                                 <span className="px-2 py-0.5 rounded bg-rose-100 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400 border border-rose-200 dark:border-rose-500/20">{leftBranch}</span>
-                                <ChevronRight className="w-4 h-4 text-slate-400" />
+                                <ChevronRight className="w-4 h-4 text--600" />
                                 <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20">{rightBranch}</span>
                             </div>
                         </div>
@@ -169,7 +169,7 @@ export const CheckpointDiffModal: React.FC<CheckpointDiffModalProps> = ({
                     <button 
                         onClick={onClose}
                         aria-label="Close"
-                        className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:text-slate-300 dark:hover:bg-[#1e2535] rounded-xl transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="p-2 text--600 hover:text-slate-600 hover:bg-slate-100 dark:hover:text-slate-300 dark:hover:bg-[#1e2535] rounded-xl transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                         <X className="w-5 h-5" />
                     </button>
@@ -177,13 +177,13 @@ export const CheckpointDiffModal: React.FC<CheckpointDiffModalProps> = ({
 
                 {/* Body elements */}
                 {isLoading ? (
-                    <div className="flex-1 flex flex-col items-center justify-center p-12 text-slate-400">
+                    <div className="flex-1 flex flex-col items-center justify-center p-12 text--600">
                         <LoadingSpinner size="lg" />
                         <p>Computing diffs...</p>
                     </div>
                 ) : error ? (
                     <div className="flex-1 flex flex-col items-center justify-center p-12 text-center">
-                        <AlertCircle className="w-10 h-10 text-rose-500 mb-4 opacity-80" />
+                        <AlertCircle className="w-10 h-10 text-rose-600 mb-4 opacity-80" />
                         <p className="text-rose-600 dark:text-rose-400 font-medium mb-2">{error}</p>
                         <button 
                             onClick={onClose}
@@ -199,19 +199,19 @@ export const CheckpointDiffModal: React.FC<CheckpointDiffModalProps> = ({
                         <div className="flex px-6 space-x-4 border-b border-slate-200 dark:border-[#1e2535]">
                             <button
                                 onClick={() => setActiveTab('task')}
-                                className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 ${activeTab === 'task' ? 'border-violet-500 text-violet-600 dark:text-violet-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                                className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 ${activeTab === 'task' ? 'border-violet-500 text-violet-600 dark:text-violet-400' : 'border-transparent text-slate-600 hover:text-slate-700 dark:hover:text-slate-300'}`}
                             >
                                 Task State {hasTaskDiffs ? <span className="ml-1 text-xs px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-600 dark:bg-violet-500/20 dark:text-violet-400">Changed</span> : ''}
                             </button>
                             <button
                                 onClick={() => setActiveTab('agents')}
-                                className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 ${activeTab === 'agents' ? 'border-violet-500 text-violet-600 dark:text-violet-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                                className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 ${activeTab === 'agents' ? 'border-violet-500 text-violet-600 dark:text-violet-400' : 'border-transparent text-slate-600 hover:text-slate-700 dark:hover:text-slate-300'}`}
                             >
                                 Agent States {changedAgents.length > 0 ? <span className="ml-1 text-xs px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-600 dark:bg-violet-500/20 dark:text-violet-400">{changedAgents.length}</span> : ''}
                             </button>
                             <button
                                 onClick={() => setActiveTab('artifacts')}
-                                className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 ${activeTab === 'artifacts' ? 'border-violet-500 text-violet-600 dark:text-violet-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                                className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 ${activeTab === 'artifacts' ? 'border-violet-500 text-violet-600 dark:text-violet-400' : 'border-transparent text-slate-600 hover:text-slate-700 dark:hover:text-slate-300'}`}
                             >
                                 Artifacts {changedArtifacts.length > 0 ? <span className="ml-1 text-xs px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-600 dark:bg-violet-500/20 dark:text-violet-400">{changedArtifacts.length}</span> : ''}
                             </button>
@@ -224,7 +224,7 @@ export const CheckpointDiffModal: React.FC<CheckpointDiffModalProps> = ({
                             {activeTab === 'task' && (
                                 <div className="space-y-2">
                                     {!hasTaskDiffs ? (
-                                        <div className="text-center py-8 text-slate-500 dark:text-slate-400">
+                                        <div className="text-center py-8 text-slate-600 dark:text-slate-400">
                                             No differences in Task State between these branches.
                                         </div>
                                     ) : (
@@ -241,7 +241,7 @@ export const CheckpointDiffModal: React.FC<CheckpointDiffModalProps> = ({
                             {activeTab === 'agents' && (
                                 <div className="space-y-4">
                                     {changedAgents.length === 0 ? (
-                                        <div className="text-center py-8 text-slate-500 dark:text-slate-400">
+                                        <div className="text-center py-8 text-slate-600 dark:text-slate-400">
                                             No differences in Agent States between these branches.
                                         </div>
                                     ) : (
@@ -258,7 +258,7 @@ export const CheckpointDiffModal: React.FC<CheckpointDiffModalProps> = ({
                                                         <FieldDiffView key={j} diff={d} />
                                                     ))}
                                                     {agentDiff.diffs.filter(d => d.status !== 'unchanged').length === 0 && (
-                                                        <div className="text-xs text-slate-500">No field-level diffs parsed.</div>
+                                                        <div className="text-xs text-slate-600">No field-level diffs parsed.</div>
                                                     )}
                                                 </div>
                                             </div>
@@ -271,14 +271,14 @@ export const CheckpointDiffModal: React.FC<CheckpointDiffModalProps> = ({
                             {activeTab === 'artifacts' && (
                                 <div className="space-y-4">
                                     {changedArtifacts.length === 0 ? (
-                                        <div className="text-center py-8 text-slate-500 dark:text-slate-400">
+                                        <div className="text-center py-8 text-slate-600 dark:text-slate-400">
                                             No differences in Artifacts between these branches.
                                         </div>
                                     ) : (
                                         changedArtifacts.map((artDiff, i) => (
                                             <div key={i} className="bg-white dark:bg-[#161b27] border border-slate-200 dark:border-[#1e2535] rounded-xl overflow-hidden shadow-sm">
                                                 <div className="px-5 py-3 border-b border-slate-100 dark:border-[#1e2535] bg-slate-50/80 dark:bg-[#1e2535]/30 flex items-center gap-3">
-                                                    <FileText className="w-4 h-4 text-slate-400" />
+                                                    <FileText className="w-4 h-4 text--600" />
                                                     <h3 className="font-mono text-sm font-bold text-slate-800 dark:text-slate-200 flex-1">
                                                         Artifact: {artDiff.key}
                                                     </h3>

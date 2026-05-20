@@ -383,7 +383,7 @@ function DesignerInner() {
           <button
             onClick={() => navigate('/tasks')}
             aria-label="Back to tasks"
-            className="p-2 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#1e2535] transition-colors"
+            className="p-2 rounded-lg text--600 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#1e2535] transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
           </button>
@@ -392,10 +392,10 @@ function DesignerInner() {
               {workflow.name}
             </h1>
             <div className="flex items-center gap-2 mt-0.5">
-              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 dark:bg-[#1e2535] dark:text-gray-400">
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 dark:bg-[#1e2535] dark:text-gray-400">
                 v{workflow.version}
               </span>
-              <span className="text-xs text-gray-400 dark:text-gray-500">
+              <span className="text-xs text--600 dark:text-gray-500">
                 {nodes.length} steps
               </span>
             </div>
@@ -412,7 +412,7 @@ function DesignerInner() {
                 p-2 rounded-lg transition-colors
                 ${versionSidebarOpen
                   ? 'bg-indigo-100 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-400'
-                  : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#1e2535]'
+                  : 'text--600 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#1e2535]'
                 }
               `}
             >
@@ -467,7 +467,7 @@ function DesignerInner() {
               className="dark:!bg-[#0a0d14]"
             />
             <Controls
-              className="!bg-white dark:!bg-[#161b27] !border-gray-200 dark:!border-[#1e2535] !shadow-lg !rounded-xl [&>button]:!bg-white [&>button]:dark:!bg-[#161b27] [&>button]:!border-gray-200 [&>button]:dark:!border-[#1e2535] [&>button]:!text-gray-600 [&>button]:dark:!text-gray-400 [&>button:hover]:!bg-gray-100 [&>button:hover]:dark:!bg-[#1e2535]"
+              className="!bg-white dark:!bg-[#161b27] !border-gray-200 dark:!border-[#1e2535] !shadow-lg !rounded-xl [&>button]:!bg-white [&>button]:dark:!bg-[#161b27] [&>button]:!border-gray-200 [&>button]:dark:!border-[#1e2535] [&>button]:!text-gray-600 [&>button]:dark:!text--600 [&>button:hover]:!bg-gray-100 [&>button:hover]:dark:!bg-[#1e2535]"
             />
             {isDesktop && (
               <MiniMap

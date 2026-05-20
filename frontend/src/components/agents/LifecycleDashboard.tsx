@@ -60,7 +60,7 @@ function CapacityCard({
     const { bg, border, text } = COLOR_MAP[color];
     const statusColor = tier.critical ? 'text-red-600 dark:text-red-400'
                       : tier.warning  ? 'text-amber-600 dark:text-amber-400'
-                      : 'text-slate-500 dark:text-slate-400';
+                      : 'text-slate-600 dark:text-slate-400';
     return (
         <div className={`rounded-xl border p-4 ${bg} ${border}`}>
             <div className="flex items-center justify-between mb-3">
@@ -75,7 +75,7 @@ function CapacityCard({
             <CapacityBar tier={tier} color={color} />
             <div className="flex justify-between mt-2">
                 <span className={`text-xs ${statusColor}`}>{tier.percentage}% used</span>
-                <span className="text-xs text-slate-400 dark:text-slate-500 font-mono">
+                <span className="text-xs text--600 dark:text-slate-500 font-mono">
                     {tier.used} / {tier.total}
                 </span>
             </div>
@@ -98,7 +98,7 @@ function EventStat({
             </div>
             <div>
                 <p className="text-lg font-bold text-slate-900 dark:text-white leading-none">{value}</p>
-                <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">{label}</p>
+                <p className="text-xs text--600 dark:text-slate-500 mt-0.5">{label}</p>
             </div>
         </div>
     );
@@ -140,7 +140,7 @@ export const LifecycleDashboard: React.FC<LifecycleDashboardProps> = ({
 
     if (isLoading) {
         return (
-            <div className="flex items-center justify-center py-10 gap-2 text-slate-400 dark:text-slate-500">
+            <div className="flex items-center justify-center py-10 gap-2 text--600 dark:text-slate-500">
                 <LoadingSpinner size="md" />
                 <span className="text-sm">Loading lifecycle data…</span>
             </div>
@@ -170,8 +170,8 @@ export const LifecycleDashboard: React.FC<LifecycleDashboardProps> = ({
             {/* ── Section header ───────────────────────────────────────── */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                    <BarChart2 className="w-4 h-4 text-slate-400 dark:text-slate-500" />
-                    <span className="text-xs font-semibold tracking-widest uppercase text-slate-400 dark:text-slate-500">
+                    <BarChart2 className="w-4 h-4 text--600 dark:text-slate-500" />
+                    <span className="text-xs font-semibold tracking-widest uppercase text--600 dark:text-slate-500">
                         Lifecycle
                     </span>
                 </div>
@@ -179,7 +179,7 @@ export const LifecycleDashboard: React.FC<LifecycleDashboardProps> = ({
                     onClick={() => load(true)}
                     disabled={isRefreshing}
                     title="Refresh"
-                    className="p-1.5 rounded-lg border border-slate-200 dark:border-[#1e2535] text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1e2535] disabled:opacity-50 transition-colors"
+                    className="p-1.5 rounded-lg border border-slate-200 dark:border-[#1e2535] text--600 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1e2535] disabled:opacity-50 transition-colors"
                 >
                     {isRefreshing ? <LoadingSpinner size="sm" /> : <RefreshCw className="w-3.5 h-3.5" />}
                 </button>

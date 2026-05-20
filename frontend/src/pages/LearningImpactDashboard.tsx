@@ -61,7 +61,7 @@ export function LearningImpactDashboard() {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-64 text-gray-500 dark:text-gray-400">
+      <div className="flex justify-center items-center h-64 text-gray-600 dark:text-gray-400">
         <LoadingSpinner size="lg" />
       </div>
     );
@@ -73,10 +73,10 @@ export function LearningImpactDashboard() {
       <div className="flex justify-between items-center bg-white dark:bg-[#161b27] p-6 rounded-xl border border-gray-200 dark:border-[#1e2535] shadow-sm">
         <div>
           <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-purple-500" />
+            <Sparkles className="w-5 h-5 text-purple-600" />
             Continuous Self-Improvement Engine
           </h2>
-          <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
+          <p className="text-gray-600 dark:text-gray-400 text-sm mt-1">
             Real-time learning metrics, anti-pattern detection, and knowledge consolidation.
           </p>
         </div>
@@ -106,7 +106,7 @@ export function LearningImpactDashboard() {
             <TrendingUp className="w-6 h-6 text-green-600 dark:text-green-400" />
           </div>
           <div>
-            <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">Success Rate Delta (7d)</p>
+            <p className="text-sm text-gray-600 dark:text-gray-400 font-medium">Success Rate Delta (7d)</p>
             <div className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
               +{stats?.success_rate_delta?.toFixed?.(1) || '0.0'}%
             </div>
@@ -117,7 +117,7 @@ export function LearningImpactDashboard() {
             <Wrench className="w-6 h-6 text-purple-600 dark:text-purple-400" />
           </div>
           <div>
-            <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">Auto-Generated Tools</p>
+            <p className="text-sm text-gray-600 dark:text-gray-400 font-medium">Auto-Generated Tools</p>
             <div className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
               {stats?.tools_generated || 0}
             </div>
@@ -128,7 +128,7 @@ export function LearningImpactDashboard() {
             <AlertTriangle className="w-6 h-6 text-red-600 dark:text-red-400" />
           </div>
           <div>
-            <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">Anti-Patterns Prevented</p>
+            <p className="text-sm text-gray-600 dark:text-gray-400 font-medium">Anti-Patterns Prevented</p>
             <div className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
               {stats?.anti_patterns_warned || 0}
             </div>
@@ -145,9 +145,9 @@ export function LearningImpactDashboard() {
           {patterns.map(p => (
             <div key={p.id} className="p-6 flex items-start gap-4">
               {p.type === 'best_practice' ? (
-                <CheckCircle className="w-5 h-5 text-green-500 shrink-0 mt-0.5" />
+                <CheckCircle className="w-5 h-5 text-green-700 shrink-0 mt-0.5" />
               ) : (
-                <AlertTriangle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+                <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
               )}
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-1">
@@ -156,14 +156,14 @@ export function LearningImpactDashboard() {
                   }`}>
                     {p.type === 'best_practice' ? 'BEST PRACTICE' : 'ANTI-PATTERN'}
                   </span>
-                  <span className="text-xs text-gray-500 dark:text-gray-400 font-mono">ID: {p.id}</span>
+                  <span className="text-xs text-gray-600 dark:text-gray-400 font-mono">ID: {p.id}</span>
                 </div>
                 <p className="text-gray-900 dark:text-white text-sm">
                   {p.content}
                 </p>
               </div>
               <div className="text-right">
-                <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Confidence</div>
+                <div className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Confidence</div>
                 <div className="w-24 bg-gray-200 dark:bg-[#2a3347] rounded-full h-2">
                   <div 
                     className={`h-2 rounded-full ${p.type === 'best_practice' ? 'bg-green-500' : 'bg-red-500'}`} 

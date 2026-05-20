@@ -102,12 +102,12 @@ export function PeerTable({
             <div className="bg-white dark:bg-[#161b27] rounded-xl border border-gray-200 dark:border-[#1e2535] shadow-sm dark:shadow-[0_2px_16px_rgba(0,0,0,0.25)] overflow-hidden transition-colors duration-200">
                 <div className="p-16 text-center">
                     <div className="w-14 h-14 rounded-xl bg-gray-100 dark:bg-[#1e2535] border border-gray-200 dark:border-[#2a3347] flex items-center justify-center mx-auto mb-4">
-                        <Globe className="w-6 h-6 text-gray-400 dark:text-gray-500" aria-hidden="true" />
+                        <Globe className="w-6 h-6 text--600 dark:text-gray-500" aria-hidden="true" />
                     </div>
                     <p className="text-gray-900 dark:text-white font-medium mb-1">
                         {hasSearch ? 'No Peers Found' : 'No Peer Instances'}
                     </p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
                         {hasSearch
                             ? 'Try a different search term.'
                             : 'Add a peer instance to start federation.'}
@@ -125,12 +125,12 @@ export function PeerTable({
                 <table className="w-full" aria-label="Registered peer instances">
                     <thead className="bg-gray-50 dark:bg-[#0f1117]">
                         <tr>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Peer</th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">URL</th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Trust Level</th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Last Heartbeat</th>
-                            <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">Peer</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">URL</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">Trust Level</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">Last Heartbeat</th>
+                            <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">Actions</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 dark:divide-[#1e2535]">
@@ -156,7 +156,7 @@ export function PeerTable({
                                                         {peer.name}
                                                     </span>
                                                     {peer.capabilities_shared && peer.capabilities_shared.length > 0 && (
-                                                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 truncate max-w-[160px]">
+                                                        <p className="text-xs text--600 dark:text-gray-500 mt-0.5 truncate max-w-[160px]">
                                                             {peer.capabilities_shared.join(', ')}
                                                         </p>
                                                     )}
@@ -175,7 +175,7 @@ export function PeerTable({
                                                     target="_blank"
                                                     rel="noopener noreferrer"
                                                     aria-label={`Open ${peer.name} in new tab`}
-                                                    className="text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 flex-shrink-0 transition-colors duration-150"
+                                                    className="text--600 hover:text-indigo-600 dark:hover:text--600 flex-shrink-0 transition-colors duration-150"
                                                 >
                                                     <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
                                                 </a>
@@ -205,7 +205,7 @@ export function PeerTable({
                                         </td>
 
                                         {/* Last heartbeat */}
-                                        <td className="px-6 py-4 text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                                        <td className="px-6 py-4 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">
                                             {federationService.formatHeartbeat(peer.last_heartbeat_at)}
                                         </td>
 

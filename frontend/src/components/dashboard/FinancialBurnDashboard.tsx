@@ -120,7 +120,7 @@ export const FinancialBurnDashboard: React.FC = () => {
 
     if (isLoading) {
         return (
-            <div className="flex flex-col items-center justify-center py-20 gap-3 text-slate-400 dark:text-slate-500">
+            <div className="flex flex-col items-center justify-center py-20 gap-3 text--600 dark:text-slate-500">
                 <LoadingSpinner size="lg" />
                 <span>Loading financial metrics...</span>
             </div>
@@ -173,14 +173,14 @@ export const FinancialBurnDashboard: React.FC = () => {
                             ${(usage.cost_used_today_usd ?? 0).toFixed(2)}
                         </span>
                     </div>
-                    <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-3">Today's Spend</p>
+                    <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-3">Today's Spend</p>
                     <div className="w-full bg-slate-100 dark:bg-[#1e2535] rounded-full h-1.5 overflow-hidden">
                         <div
                             className={`${getBarColor(usage.cost_percentage_used ?? 0)} h-full transition-all duration-500`}
                             style={{ width: `${Math.min(usage.cost_percentage_used ?? 0, 100)}%` }}
                         />
                     </div>
-                    <p className="text-xs text-slate-400 dark:text-slate-500 mt-2 flex justify-between">
+                    <p className="text-xs text--600 dark:text-slate-500 mt-2 flex justify-between">
                         <span>{(usage.cost_percentage_used ?? 0).toFixed(1)}% of limit</span>
                         <span>Max ${current_limits.daily_cost_limit}</span>
                     </p>
@@ -196,14 +196,14 @@ export const FinancialBurnDashboard: React.FC = () => {
                             {((usage.tokens_used_today ?? 0) / 1000).toFixed(1)}k
                         </span>
                     </div>
-                    <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-3">Tokens Used Today</p>
+                    <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-3">Tokens Used Today</p>
                     <div className="w-full bg-slate-100 dark:bg-[#1e2535] rounded-full h-1.5 overflow-hidden">
                         <div
                             className={`${getBarColor(usage.cost_percentage_tokens ?? 0)} h-full transition-all duration-500`}
                             style={{ width: `${Math.min(usage.cost_percentage_tokens ?? 0, 100)}%` }}
                         />
                     </div>
-                    <p className="text-xs text-slate-400 dark:text-slate-500 mt-2 flex justify-between">
+                    <p className="text-xs text--600 dark:text-slate-500 mt-2 flex justify-between">
                         <span>{(usage.cost_percentage_tokens ?? 0).toFixed(1)}% of limit</span>
                         <span>Max {((current_limits.daily_token_limit ?? 0) / 1000).toFixed(0)}k</span>
                     </p>
@@ -219,8 +219,8 @@ export const FinancialBurnDashboard: React.FC = () => {
                             ${(history.total_cost_usd ?? 0).toFixed(2)}
                         </span>
                     </div>
-                    <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">7-Day Total Spend</p>
-                    <p className="text-xs text-slate-400 dark:text-slate-500">
+                    <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-2">7-Day Total Spend</p>
+                    <p className="text-xs text--600 dark:text-slate-500">
                         Avg ${((history.total_cost_usd ?? 0) / (history.period_days || 1)).toFixed(2)} / day
                     </p>
                 </div>
@@ -235,8 +235,8 @@ export const FinancialBurnDashboard: React.FC = () => {
                             {history.total_requests ?? 0}
                         </span>
                     </div>
-                    <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">7-Day Total Requests</p>
-                    <p className="text-xs text-slate-400 dark:text-slate-500">
+                    <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-2">7-Day Total Requests</p>
+                    <p className="text-xs text--600 dark:text-slate-500">
                         {(history.total_requests ? (history.total_tokens / history.total_requests) : 0).toFixed(0)} avg tokens per req
                     </p>
                 </div>
@@ -252,7 +252,7 @@ export const FinancialBurnDashboard: React.FC = () => {
                 </div>
                 <div className="p-0 overflow-x-auto">
                     <table className="w-full text-sm text-left">
-                        <thead className="bg-slate-50 dark:bg-[#0f1117] text-slate-500 dark:text-slate-400">
+                        <thead className="bg-slate-50 dark:bg-[#0f1117] text-slate-600 dark:text-slate-400">
                             <tr>
                                 <th className="px-6 py-3 font-medium">Provider</th>
                                 <th className="px-6 py-3 font-medium">Cost (USD)</th>
@@ -279,7 +279,7 @@ export const FinancialBurnDashboard: React.FC = () => {
                             ))}
                             {Object.keys(history.by_provider).length === 0 && (
                                 <tr>
-                                    <td colSpan={4} className="px-6 py-8 text-center text-slate-500">
+                                    <td colSpan={4} className="px-6 py-8 text-center text-slate-600">
                                         No provider usage data available for this period.
                                     </td>
                                 </tr>

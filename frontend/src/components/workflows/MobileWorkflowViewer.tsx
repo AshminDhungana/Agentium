@@ -123,7 +123,7 @@ export const MobileWorkflowViewer: React.FC<MobileWorkflowViewerProps> = ({
         bg-indigo-50 dark:bg-indigo-500/10
         border-b border-indigo-200 dark:border-indigo-500/20
       ">
-        <Monitor className="w-4 h-4 text-indigo-500 flex-shrink-0" />
+        <Monitor className="w-4 h-4 text-indigo-600 flex-shrink-0" />
         <p className="text-xs text-indigo-700 dark:text-indigo-300 font-medium">
           Open on a larger screen to edit this workflow
         </p>
@@ -135,10 +135,10 @@ export const MobileWorkflowViewer: React.FC<MobileWorkflowViewerProps> = ({
           {workflowName}
         </h1>
         <div className="flex items-center gap-3 mt-1.5">
-          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-gray-100 text-gray-500 dark:bg-[#1e2535] dark:text-gray-400">
+          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-gray-100 text-gray-600 dark:bg-[#1e2535] dark:text-gray-400">
             v{version}
           </span>
-          <span className="text-xs text-gray-400 dark:text-gray-500">
+          <span className="text-xs text--600 dark:text-gray-500">
             {steps.length} step{steps.length !== 1 ? 's' : ''}
           </span>
         </div>
@@ -179,15 +179,15 @@ export const MobileWorkflowViewer: React.FC<MobileWorkflowViewerProps> = ({
                     {/* Content */}
                     <div className="flex-1 min-w-0 pt-0.5">
                       <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-mono text-gray-400 dark:text-gray-500">
+                        <span className="text-[10px] font-mono text--600 dark:text-gray-500">
                           #{step.step_index}
                         </span>
                         <span className={`text-xs font-bold uppercase tracking-wider ${cfg.accent}`}>
                           {cfg.label}
                         </span>
                         {isOpen
-                          ? <ChevronDown className="w-3 h-3 text-gray-400 ml-auto" />
-                          : <ChevronRight className="w-3 h-3 text-gray-400 ml-auto" />
+                          ? <ChevronDown className="w-3 h-3 text--600 ml-auto" />
+                          : <ChevronRight className="w-3 h-3 text--600 ml-auto" />
                         }
                       </div>
                       <p className="text-sm text-gray-700 dark:text-gray-300 mt-0.5 line-clamp-1">
@@ -211,7 +211,7 @@ export const MobileWorkflowViewer: React.FC<MobileWorkflowViewerProps> = ({
                         {step.on_success_step !== undefined && (
                           <div className="flex items-center gap-1.5 text-xs">
                             <span className="w-2 h-2 rounded-full bg-green-400 flex-shrink-0" />
-                            <span className="text-gray-500 dark:text-gray-400">
+                            <span className="text-gray-600 dark:text-gray-400">
                               On success → Step #{step.on_success_step}
                             </span>
                           </div>
@@ -219,7 +219,7 @@ export const MobileWorkflowViewer: React.FC<MobileWorkflowViewerProps> = ({
                         {step.on_failure_step !== undefined && (
                           <div className="flex items-center gap-1.5 text-xs">
                             <span className="w-2 h-2 rounded-full bg-red-400 flex-shrink-0" />
-                            <span className="text-gray-500 dark:text-gray-400">
+                            <span className="text-gray-600 dark:text-gray-400">
                               On failure → Step #{step.on_failure_step}
                             </span>
                           </div>

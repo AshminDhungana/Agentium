@@ -75,7 +75,7 @@ function StatusBadge({ status }: { status: string }) {
     const cls =
         status === 'open'     ? 'bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400' :
         status === 'resolved' ? 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
-                                'bg-gray-100 text-gray-500 dark:bg-[#1e2535] dark:text-gray-400';
+                                'bg-gray-100 text-gray-600 dark:bg-[#1e2535] dark:text-gray-400';
     return (
         <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${cls}`}>
             {status}
@@ -168,7 +168,7 @@ function ViolationsTab({ initialViolations }: ViolationsTabProps) {
         <div>
             {/* Filters */}
             <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3 mb-6">
-                <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                     <Filter className="w-4 h-4" />
                     <span className="font-medium">Filters:</span>
                 </div>
@@ -201,7 +201,7 @@ function ViolationsTab({ initialViolations }: ViolationsTabProps) {
                 {(filterStatus || filterSeverity) && (
                     <button
                         onClick={() => { setFilterStatus(''); setFilterSeverity(''); }}
-                        className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                        className="flex items-center gap-1 text-xs text--600 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
                     >
                         <XCircle className="w-3.5 h-3.5" /> Clear
                     </button>
@@ -219,10 +219,10 @@ function ViolationsTab({ initialViolations }: ViolationsTabProps) {
             {!fetchError && violations.length === 0 ? (
                 <div className="text-center py-16">
                     <div className="w-14 h-14 rounded-full bg-green-50 dark:bg-green-900/20 flex items-center justify-center mx-auto mb-3 border border-green-100 dark:border-green-800/40">
-                        <ShieldCheck className="w-7 h-7 text-green-500 dark:text-green-400" />
+                        <ShieldCheck className="w-7 h-7 text-green-700 dark:text-green-400" />
                     </div>
                     <p className="text-gray-900 dark:text-white font-medium mb-1">No violations found</p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Try adjusting filters or check back later</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Try adjusting filters or check back later</p>
                 </div>
             ) : (
                 <div className="space-y-3">
@@ -236,10 +236,10 @@ function ViolationsTab({ initialViolations }: ViolationsTabProps) {
                                     <div className="flex flex-wrap items-center gap-2 mb-2">
                                         <SeverityBadge severity={v.severity} />
                                         <StatusBadge   status={v.status}   />
-                                        <span className="text-xs text-gray-400 dark:text-gray-500 font-mono">{v.type}</span>
+                                        <span className="text-xs text--600 dark:text-gray-500 font-mono">{v.type}</span>
                                     </div>
                                     <p className="text-sm text-gray-900 dark:text-gray-100 mb-2">{v.description}</p>
-                                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-400 dark:text-gray-500">
+                                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text--600 dark:text-gray-500">
                                         <span>Reporter: <span className="font-mono text-gray-600 dark:text-gray-300">{v.reporter}</span></span>
                                         <span>Violator: <span className="font-mono text-gray-600 dark:text-gray-300">{v.violator}</span></span>
                                         {v.created_at && <span>{new Date(v.created_at).toLocaleString()}</span>}
@@ -270,7 +270,7 @@ function ViolationsTab({ initialViolations }: ViolationsTabProps) {
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
                     <div className="bg-white dark:bg-[#0f1117] rounded-xl shadow-2xl border border-gray-200 dark:border-[#1e2535] w-full max-w-md p-6">
                         <h3 className="text-base font-bold text-gray-900 dark:text-white mb-1">Resolve Violation</h3>
-                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
                             Provide resolution notes before marking this violation as resolved.
                         </p>
                         <textarea
@@ -383,7 +383,7 @@ function RecoveryTab() {
             <div className="bg-white dark:bg-[#0f1117] rounded-xl border border-gray-200 dark:border-[#1e2535] shadow-sm overflow-hidden">
                 <div className="border-b border-gray-200 dark:border-[#1e2535] px-6 py-4 flex items-center justify-between bg-gray-50 dark:bg-[#161b27]/50">
                     <h2 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                        <HeartPulse className="w-5 h-5 text-rose-500" />
+                        <HeartPulse className="w-5 h-5 text-rose-600" />
                         Self-Healing Activity Log
                     </h2>
                     <button onClick={loadData} className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 transition">
@@ -395,7 +395,7 @@ function RecoveryTab() {
                         <div className="text-center py-12">
                             <Wrench className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
                             <p className="text-gray-900 dark:text-white font-medium mb-1">No events recorded</p>
-                            <p className="text-sm text-gray-500 dark:text-gray-400">Self-healing actions will appear here when triggered.</p>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">Self-healing actions will appear here when triggered.</p>
                         </div>
                     ) : (
                         <div className="space-y-4">
@@ -405,7 +405,7 @@ function RecoveryTab() {
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-3 mb-1">
                                             <span className="text-sm font-bold text-gray-900 dark:text-white">{ev.action}</span>
-                                            <span className="text-xs font-medium text-gray-400 dark:text-gray-500">{new Date(ev.created_at).toLocaleString()}</span>
+                                            <span className="text-xs font-medium text--600 dark:text-gray-500">{new Date(ev.created_at).toLocaleString()}</span>
                                             {ev.level === 'critical' || ev.level === 'error' ? (
                                                 <span className="bg-red-100 text-red-700 text-[10px] px-2 py-0.5 rounded-full uppercase font-bold dark:bg-red-900/30 dark:text-red-400 border border-red-200 dark:border-red-800/40">Error</span>
                                             ) : null}
@@ -420,7 +420,7 @@ function RecoveryTab() {
                                                     disabled={!!isRollingBack}
                                                     className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-[#161b27] dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-[#1e2535] transition"
                                                 >
-                                                    {isRollingBack === ev.id ? <LoadingSpinner size="xs" /> : <RotateCcw className="w-3.5 h-3.5 text-rose-500" />}
+                                                    {isRollingBack === ev.id ? <LoadingSpinner size="xs" /> : <RotateCcw className="w-3.5 h-3.5 text-rose-600" />}
                                                     Debug: Rollback to Checkpoint
                                                 </button>
                                             </div>
@@ -485,7 +485,7 @@ function OperationsTab() {
                         <div className={`text-lg font-bold mt-2 ${item.pct >= 90 ? 'text-green-600 dark:text-green-400' : item.pct >= 70 ? 'text-yellow-600 dark:text-yellow-400' : 'text-red-600 dark:text-red-400'}`}>
                             {item.pct}%
                         </div>
-                        <div className="text-sm text-gray-500 dark:text-gray-400 font-medium">{item.title} Health</div>
+                        <div className="text-sm text-gray-600 dark:text-gray-400 font-medium">{item.title} Health</div>
                     </div>
                 ))}
             </div>
@@ -494,32 +494,32 @@ function OperationsTab() {
                 <div className="bg-white dark:bg-[#0f1117] rounded-xl border border-gray-200 dark:border-[#1e2535] overflow-hidden shadow-sm">
                     <div className="bg-blue-50 dark:bg-blue-950/50 border-b border-blue-100 dark:border-blue-900/60 px-6 py-4">
                         <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                            <Activity className="w-4 h-4 text-blue-500" />
+                            <Activity className="w-4 h-4 text-blue-600" />
                             Live Telemetry Summary
                         </h3>
                     </div>
                     <div className="p-6">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="p-4 bg-gray-50 dark:bg-[#161b27] rounded-lg">
-                                <p className="text-xs text-gray-500 dark:text-gray-400">Scaling Actions (24h)</p>
+                                <p className="text-xs text-gray-600 dark:text-gray-400">Scaling Actions (24h)</p>
                                 <p className="text-xl font-bold dark:text-white">{data?.scaling_events_24h ?? 0}</p>
                             </div>
                             <div className="p-4 bg-gray-50 dark:bg-[#161b27] rounded-lg">
-                                <p className="text-xs text-gray-500 dark:text-gray-400">Total Tasks (24h)</p>
+                                <p className="text-xs text-gray-600 dark:text-gray-400">Total Tasks (24h)</p>
                                 <p className="text-xl font-bold dark:text-white">{data?.tasks?.total_24h ?? 0}</p>
                             </div>
                             <div className="p-4 bg-gray-50 dark:bg-[#161b27] rounded-lg">
-                                <p className="text-xs text-gray-500 dark:text-gray-400">Budget Spent ($)</p>
+                                <p className="text-xs text-gray-600 dark:text-gray-400">Budget Spent ($)</p>
                                 <p className="text-xl font-bold text-indigo-600 dark:text-indigo-400">${data?.budget?.cost_used_usd?.toFixed(2) ?? '0.00'}</p>
                             </div>
                             <div className="p-4 bg-gray-50 dark:bg-[#161b27] rounded-lg">
-                                <p className="text-xs text-gray-500 dark:text-gray-400">Capacity Forecast (24h)</p>
+                                <p className="text-xs text-gray-600 dark:text-gray-400">Capacity Forecast (24h)</p>
                                 <p className="text-xl font-bold text-purple-600 dark:text-purple-400">
                                     {(data?.capacity_forecast?.next_24h !== undefined ? Math.round(data.capacity_forecast.next_24h) : 'N/A')}
                                 </p>
                             </div>
                             <div className="p-4 bg-gray-50 dark:bg-[#161b27] rounded-lg">
-                                <p className="text-xs text-gray-500 dark:text-gray-400">Frontend Errors (24h)</p>
+                                <p className="text-xs text-gray-600 dark:text-gray-400">Frontend Errors (24h)</p>
                                 <p className="text-xl font-bold text-red-600 dark:text-red-400">{data?.frontend_errors_24h ?? 0}</p>
                             </div>
                         </div>
@@ -529,14 +529,14 @@ function OperationsTab() {
                 <div className="bg-white dark:bg-[#0f1117] rounded-xl border border-gray-200 dark:border-[#1e2535] overflow-hidden shadow-sm">
                     <div className="bg-orange-50 dark:bg-orange-950/50 border-b border-orange-100 dark:border-orange-900/60 px-6 py-4">
                         <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                            <AlertTriangle className="w-4 h-4 text-orange-500" />
+                            <AlertTriangle className="w-4 h-4 text-orange-700" />
                             Active Anomalies
                         </h3>
                     </div>
                     <div className="p-6">
                         {data?.active_anomalies > 0 ? (
                             <div className="flex items-center gap-4 bg-orange-100/50 dark:bg-orange-900/30 rounded-lg p-4 border border-orange-200 dark:border-orange-800/50">
-                                <ShieldAlert className="w-8 h-8 text-orange-500" />
+                                <ShieldAlert className="w-8 h-8 text-orange-700" />
                                 <div>
                                     <h4 className="font-bold text-orange-900 dark:text-orange-300">{data.active_anomalies} Anomaly Detected</h4>
                                     <p className="text-sm text-orange-800 dark:text-orange-400">Check the Violations tab for details on anomalies waiting for remediation.</p>
@@ -544,9 +544,9 @@ function OperationsTab() {
                             </div>
                         ) : (
                             <div className="text-center py-6">
-                                <CheckCircle className="w-12 h-12 text-green-400 mx-auto mb-3" />
+                                <CheckCircle className="w-12 h-12 text--600 mx-auto mb-3" />
                                 <p className="text-gray-900 dark:text-white font-medium">No Anomalies Detected</p>
-                                <p className="text-sm text-gray-500 dark:text-gray-400">System operating within historical baseline limits.</p>
+                                <p className="text-sm text-gray-600 dark:text-gray-400">System operating within historical baseline limits.</p>
                             </div>
                         )}
                     </div>
@@ -595,11 +595,11 @@ function SLATab() {
                             <div className={`text-4xl font-bold my-4 ${pct >= 95 ? 'text-green-600' : pct >= 80 ? 'text-yellow-600' : 'text-red-600'}`}>
                                 {pct}%
                             </div>
-                            <p className="text-sm text-gray-500 dark:text-gray-400">
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
                                 {v.met} / {v.total} tasks met SLA target (30 day)
                             </p>
                             {v.breached > 0 && (
-                                <p className="text-xs text-red-500 mt-2 font-medium">{v.breached} tasks breached</p>
+                                <p className="text-xs text-red-600 mt-2 font-medium">{v.breached} tasks breached</p>
                             )}
                         </div>
                     );
@@ -607,7 +607,7 @@ function SLATab() {
             </div>
             {items.length === 0 && (
                 <div className="text-center py-12">
-                    <p className="text-gray-500 dark:text-gray-400">No SLA data available.</p>
+                    <p className="text-gray-600 dark:text-gray-400">No SLA data available.</p>
                 </div>
             )}
         </div>
@@ -651,7 +651,7 @@ function IncidentsTab() {
         <div className="bg-white dark:bg-[#0f1117] rounded-xl border border-gray-200 dark:border-[#1e2535] shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-500">
             <div className="border-b border-gray-200 dark:border-[#1e2535] px-6 py-4 flex items-center justify-between">
                 <h2 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                    <Wrench className="w-5 h-5 text-indigo-500" />
+                    <Wrench className="w-5 h-5 text-indigo-600" />
                     Auto-Remediated Incidents
                 </h2>
                 <button onClick={loadData} className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-400">
@@ -661,9 +661,9 @@ function IncidentsTab() {
             <div className="p-6">
                 {logs.length === 0 ? (
                     <div className="text-center py-12">
-                        <CheckCircle className="w-12 h-12 text-green-400 mx-auto mb-3" />
+                        <CheckCircle className="w-12 h-12 text--600 mx-auto mb-3" />
                         <p className="text-gray-900 dark:text-white font-medium">No Auto-Remediations</p>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">The zero-touch ops engine has not needed to intervene.</p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">The zero-touch ops engine has not needed to intervene.</p>
                     </div>
                 ) : (
                     <div className="space-y-4">
@@ -678,10 +678,10 @@ function IncidentsTab() {
                                         Revert
                                     </button>
                                 </div>
-                                <div className="text-xs text-gray-500 mt-2 font-mono break-all bg-white dark:bg-[#0f1117] p-2 rounded border border-gray-200 dark:border-[#1e2535]">
+                                <div className="text-xs text-gray-600 mt-2 font-mono break-all bg-white dark:bg-[#0f1117] p-2 rounded border border-gray-200 dark:border-[#1e2535]">
                                     {JSON.stringify(log.after_state)}
                                 </div>
-                                <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                                <div className="text-xs text-gray-600 dark:text-gray-400 mt-2">
                                     {new Date(log.created_at).toLocaleString()}
                                 </div>
                             </div>
@@ -718,28 +718,28 @@ function ChaosTab() {
             <h2 className="text-xl font-bold text-red-600 dark:text-red-400 mb-2 flex items-center gap-2">
                 <ShieldAlert /> Chaos Engineering Lab
             </h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
                 Warning: These tests inject real failures into the live system to verify automated response mechanisms. All actions are audit-logged.
             </p>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                 <div className="border border-gray-200 dark:border-[#1e2535] rounded-lg p-4">
                     <h3 className="font-bold text-gray-900 dark:text-white mb-1">Agent Crash</h3>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-4 h-10">Suspends a random non-persistent idle task agent.</p>
+                    <p className="text-xs text-gray-600 dark:text-gray-400 mb-4 h-10">Suspends a random non-persistent idle task agent.</p>
                     <button onClick={() => handleChaos('agent_crash')} disabled={isLoading} className="w-full bg-red-600 hover:bg-red-700 text-white rounded text-sm py-1.5 font-bold disabled:opacity-50">
                         Inject Crash
                     </button>
                 </div>
                 <div className="border border-gray-200 dark:border-[#1e2535] rounded-lg p-4">
                     <h3 className="font-bold text-gray-900 dark:text-white mb-1">API Timeout</h3>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-4 h-10">Simulates LLM API timeouts for 60 seconds.</p>
+                    <p className="text-xs text-gray-600 dark:text-gray-400 mb-4 h-10">Simulates LLM API timeouts for 60 seconds.</p>
                     <button onClick={() => handleChaos('api_timeout')} disabled={isLoading} className="w-full bg-red-600 hover:bg-red-700 text-white rounded text-sm py-1.5 font-bold disabled:opacity-50">
                         Inject Timeout
                     </button>
                 </div>
                 <div className="border border-gray-200 dark:border-[#1e2535] rounded-lg p-4">
                     <h3 className="font-bold text-gray-900 dark:text-white mb-1">DB Connection Loss</h3>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-4 h-10">Simulates DB failure for diagnostic routines.</p>
+                    <p className="text-xs text-gray-600 dark:text-gray-400 mb-4 h-10">Simulates DB failure for diagnostic routines.</p>
                     <button onClick={() => handleChaos('db_connection_loss')} disabled={isLoading} className="w-full bg-red-600 hover:bg-red-700 text-white rounded text-sm py-1.5 font-bold disabled:opacity-50">
                         Inject DB Failure
                     </button>
@@ -786,10 +786,10 @@ function SlowQueriesTab() {
         <div className="bg-white dark:bg-[#0f1117] rounded-xl border border-gray-200 dark:border-[#1e2535] shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-500">
             <div className="border-b border-gray-200 dark:border-[#1e2535] px-6 py-4 flex items-center justify-between">
                 <h2 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                    <Clock className="w-5 h-5 text-purple-500" />
+                    <Clock className="w-5 h-5 text-purple-600" />
                     Slow Queries
                 </h2>
-                <div className="flex gap-2 text-gray-500">
+                <div className="flex gap-2 text-gray-600">
                     <a href="https://www.postgresql.org/docs/current/using-explain.html" target="_blank" rel="noreferrer" className="text-xs font-semibold px-3 py-1.5 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white border border-gray-200 dark:border-[#1e2535] rounded-lg shrink-0 transition-colors">EXPLAIN Docs</a>
                     <button onClick={loadData} className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400">
                         Refresh
@@ -802,16 +802,16 @@ function SlowQueriesTab() {
                 
                 {!error && queries.length === 0 ? (
                     <div className="text-center py-12">
-                        <CheckCircle className="w-12 h-12 text-green-400 mx-auto mb-3" />
+                        <CheckCircle className="w-12 h-12 text--600 mx-auto mb-3" />
                         <p className="text-gray-900 dark:text-white font-medium">No Slow Queries</p>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">All database queries are running efficiently.</p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">All database queries are running efficiently.</p>
                     </div>
                 ) : (
                     !error && (
                         <div className="overflow-x-auto">
                             <table className="w-full text-left border-collapse">
                                 <thead>
-                                    <tr className="border-b border-gray-200 dark:border-[#1e2535] text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-[#161b27]/50">
+                                    <tr className="border-b border-gray-200 dark:border-[#1e2535] text-xs text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-[#161b27]/50">
                                         <th className="p-3 font-semibold rounded-tl-lg">Query Preview</th>
                                         <th className="p-3 font-semibold">Avg Duration (ms)</th>
                                         <th className="p-3 font-semibold">Calls</th>
@@ -826,13 +826,13 @@ function SlowQueriesTab() {
                                                 {q.query_preview}
                                             </td>
                                             <td className="p-3 text-sm text-gray-600 dark:text-gray-300">
-                                                <span className={`font-semibold ${q.avg_duration_ms > 1000 ? 'text-red-500' : 'text-yellow-600 dark:text-yellow-500'}`}>
+                                                <span className={`font-semibold ${q.avg_duration_ms > 1000 ? 'text-red-600' : 'text-yellow-600 dark:text-yellow-500'}`}>
                                                     {Number(q.avg_duration_ms).toFixed(2)}
                                                 </span>
                                             </td>
                                             <td className="p-3 text-sm text-gray-600 dark:text-gray-300">{q.call_count}</td>
                                             <td className="p-3 text-sm text-gray-600 dark:text-gray-300">{Number(q.rows_per_call).toFixed(1)}</td>
-                                            <td className="p-3 text-xs text-gray-500 dark:text-gray-400">
+                                            <td className="p-3 text-xs text-gray-600 dark:text-gray-400">
                                                 {q.last_seen ? new Date(q.last_seen).toLocaleString() : '—'}
                                             </td>
                                         </tr>
@@ -974,7 +974,7 @@ export const MonitoringPage: React.FC = () => {
                             <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
                                 System Monitoring
                             </h1>
-                            <p className="text-gray-500 dark:text-gray-400 text-sm">
+                            <p className="text-gray-600 dark:text-gray-400 text-sm">
                                 Real-time oversight of agent operations
                             </p>
                         </div>
@@ -983,7 +983,7 @@ export const MonitoringPage: React.FC = () => {
                     <div className="flex items-center gap-3">
                         {/* Monitor selector */}
                         <div className="relative flex items-center">
-                            <label className="text-xs text-gray-500 dark:text-gray-400 mr-2 hidden sm:block">Monitor:</label>
+                            <label className="text-xs text-gray-600 dark:text-gray-400 mr-2 hidden sm:block">Monitor:</label>
                             <div className="relative">
                                 <select
                                     aria-label="Monitor ID"
@@ -995,19 +995,19 @@ export const MonitoringPage: React.FC = () => {
                                         <option key={id} value={id}>#{id}</option>
                                     ))}
                                 </select>
-                                <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                                <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text--600" />
                             </div>
                         </div>
 
                         {lastUpdated && (
-                            <span className="hidden sm:flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500">
+                            <span className="hidden sm:flex items-center gap-1 text-xs text--600 dark:text-gray-500">
                                 <Clock className="w-3 h-3" />
                                 Updated {lastUpdated.toLocaleTimeString()}
                             </span>
                         )}
                         <button
                             onClick={() => loadDashboard(true)}
-                            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 transition-colors"
+                            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400 transition-colors"
                             title="Refresh now"
                             aria-label="Refresh monitoring data"
                         >
@@ -1048,7 +1048,7 @@ export const MonitoringPage: React.FC = () => {
                             className={`px-3 py-2 rounded-lg text-sm font-medium capitalize transition-all duration-200 whitespace-nowrap ${
                                 activeTab === tab
                                     ? 'bg-blue-600 text-white shadow-sm'
-                                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
                             }`}
                         >
                             {tab === 'violations' && activeAlerts > 0 ? (
@@ -1086,9 +1086,9 @@ export const MonitoringPage: React.FC = () => {
                                     </div>
                                 </div>
                                 <div>
-                                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-0.5">System Health</p>
+                                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-0.5">System Health</p>
                                     <p className={`text-2xl font-bold ${healthColor}`}>{systemHealth}%</p>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                    <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
                                         {systemHealth >= 90 ? 'Fully Operational' : systemHealth >= 70 ? 'Degraded' : 'Critical'}
                                     </p>
                                 </div>
@@ -1098,16 +1098,16 @@ export const MonitoringPage: React.FC = () => {
                             <div className="bg-white dark:bg-[#0f1117] rounded-xl border border-gray-200 dark:border-[#1e2535] p-6 shadow-sm">
                                 <div className="flex items-center justify-between">
                                     <div>
-                                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Active Alerts</p>
+                                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Active Alerts</p>
                                         <p className={`text-3xl font-bold ${activeAlerts > 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white'}`}>
                                             {activeAlerts}
                                         </p>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                        <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
                                             {activeAlerts === 0 ? 'No issues detected' : `${activeAlerts} requiring attention`}
                                         </p>
                                     </div>
                                     <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${activeAlerts > 0 ? 'bg-red-100 dark:bg-red-900/30' : 'bg-gray-100 dark:bg-[#161b27]'}`}>
-                                        <AlertTriangle className={`w-6 h-6 ${activeAlerts > 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-400 dark:text-gray-500'}`} />
+                                        <AlertTriangle className={`w-6 h-6 ${activeAlerts > 0 ? 'text-red-600 dark:text-red-400' : 'text--600 dark:text-gray-500'}`} />
                                     </div>
                                 </div>
                             </div>
@@ -1116,11 +1116,11 @@ export const MonitoringPage: React.FC = () => {
                             <div className="bg-white dark:bg-[#0f1117] rounded-xl border border-gray-200 dark:border-[#1e2535] p-6 shadow-sm">
                                 <div className="flex items-center justify-between">
                                     <div>
-                                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Agents Reporting</p>
+                                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Agents Reporting</p>
                                         <p className="text-3xl font-bold text-gray-900 dark:text-white">
                                             {healthReports.length}
                                         </p>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                        <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
                                             {healthReports.filter((r: AgentHealthReport) => r.health_score >= 90).length} healthy
                                         </p>
                                     </div>
@@ -1134,7 +1134,7 @@ export const MonitoringPage: React.FC = () => {
                         {/* Agent Health Breakdown */}
                         {Object.keys(healthBreakdown).length > 0 && (
                             <div className="mb-8">
-                                <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
+                                <h2 className="text-sm font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-3">
                                     Agent Tier Health
                                 </h2>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -1146,7 +1146,7 @@ export const MonitoringPage: React.FC = () => {
                                                 <Zap className={`w-4 h-4 ${(score as number) >= 90 ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'}`} />
                                             </div>
                                             <div>
-                                                <p className="text-xs text-gray-500 dark:text-gray-400 capitalize">{tier}</p>
+                                                <p className="text-xs text-gray-600 dark:text-gray-400 capitalize">{tier}</p>
                                                 <p className={`text-sm font-bold ${(score as number) >= 90 ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'}`}>
                                                     {score}%
                                                 </p>
@@ -1197,7 +1197,7 @@ export const MonitoringPage: React.FC = () => {
                                                                 <StatusBadge   status={v.status}   />
                                                             </div>
                                                             <p className="text-sm text-gray-900 dark:text-gray-100">{v.description}</p>
-                                                            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                                                            <p className="text-xs text--600 dark:text-gray-500 mt-1">
                                                                 {v.created_at ? new Date(v.created_at).toLocaleString() : '—'}
                                                             </p>
                                                         </div>
@@ -1208,10 +1208,10 @@ export const MonitoringPage: React.FC = () => {
                                     ) : (
                                         <div className="text-center py-10">
                                             <div className="w-14 h-14 rounded-full bg-green-50 dark:bg-green-900/20 flex items-center justify-center mx-auto mb-3 border border-green-100 dark:border-green-800/40">
-                                                <ShieldCheck className="w-7 h-7 text-green-500 dark:text-green-400" />
+                                                <ShieldCheck className="w-7 h-7 text-green-700 dark:text-green-400" />
                                             </div>
                                             <p className="text-gray-900 dark:text-white font-medium mb-1">No Violations Detected</p>
-                                            <p className="text-sm text-gray-500 dark:text-gray-400">All agents operating within guidelines</p>
+                                            <p className="text-sm text-gray-600 dark:text-gray-400">All agents operating within guidelines</p>
                                         </div>
                                     )}
                                 </div>
@@ -1259,10 +1259,10 @@ export const MonitoringPage: React.FC = () => {
                                                             <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
                                                                 Agent #{report.subject}
                                                             </p>
-                                                            <p className="text-xs text-gray-500 dark:text-gray-400 capitalize">{report.status}</p>
+                                                            <p className="text-xs text-gray-600 dark:text-gray-400 capitalize">{report.status}</p>
                                                         </div>
                                                         <div className="text-right flex-shrink-0">
-                                                            <div className="text-xs text-gray-500 dark:text-gray-400">Success Rate</div>
+                                                            <div className="text-xs text-gray-600 dark:text-gray-400">Success Rate</div>
                                                             <div className={`text-sm font-bold ${isHealthy ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'}`}>
                                                                 {report.metrics.success_rate}%
                                                             </div>
@@ -1274,10 +1274,10 @@ export const MonitoringPage: React.FC = () => {
                                     ) : (
                                         <div className="text-center py-10">
                                             <div className="w-14 h-14 rounded-full bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center mx-auto mb-3 border border-blue-100 dark:border-blue-800/40">
-                                                <CheckCircle className="w-7 h-7 text-blue-400 dark:text-blue-500" />
+                                                <CheckCircle className="w-7 h-7 text--600 dark:text-blue-500" />
                                             </div>
                                             <p className="text-gray-900 dark:text-white font-medium mb-1">No Health Reports</p>
-                                            <p className="text-sm text-gray-500 dark:text-gray-400">Agent monitoring will appear here</p>
+                                            <p className="text-sm text-gray-600 dark:text-gray-400">Agent monitoring will appear here</p>
                                         </div>
                                     )}
                                 </div>

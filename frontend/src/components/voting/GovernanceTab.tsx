@@ -77,7 +77,7 @@ export function GovernanceTab() {
 
     if (isLoading) {
         return (
-            <div className="flex items-center justify-center py-24 text-gray-400 dark:text-gray-500">
+            <div className="flex items-center justify-center py-24 text--600 dark:text-gray-500">
                 <LoadingSpinner size="md" label="Loading governance status…" />
             </div>
         );
@@ -85,7 +85,7 @@ export function GovernanceTab() {
 
     if (error || !status) {
         return (
-            <div className="flex flex-col items-center justify-center py-24 gap-2 text-red-500 dark:text-red-400">
+            <div className="flex flex-col items-center justify-center py-24 gap-2 text-red-600 dark:text-red-400">
                 <AlertCircle className="w-8 h-8" />
                 <p className="text-sm">{error ?? 'No data'}</p>
                 <button onClick={loadStatus} className="text-xs underline mt-1">Retry</button>
@@ -94,7 +94,7 @@ export function GovernanceTab() {
     }
 
     const statusColor = !status.enabled
-        ? 'text-gray-500'
+        ? 'text-gray-600'
         : status.paused
         ? 'text-amber-600 dark:text-amber-400'
         : 'text-green-600 dark:text-green-400';
@@ -158,13 +158,13 @@ export function GovernanceTab() {
                     )}
                     {status.cycle_count !== undefined && (
                         <div className="bg-gray-50 dark:bg-[#0f1117]/60 rounded-lg p-3">
-                            <p className="text-xs text-gray-500 dark:text-gray-400">Cycles Run</p>
+                            <p className="text-xs text-gray-600 dark:text-gray-400">Cycles Run</p>
                             <p className="text-xl font-bold text-gray-900 dark:text-white">{status.cycle_count}</p>
                         </div>
                     )}
                     {status.last_run && (
                         <div className="bg-gray-50 dark:bg-[#0f1117]/60 rounded-lg p-3">
-                            <p className="text-xs text-gray-500 dark:text-gray-400">Last Run</p>
+                            <p className="text-xs text-gray-600 dark:text-gray-400">Last Run</p>
                             <p className="text-sm font-medium text-gray-900 dark:text-white">
                                 {new Date(status.last_run).toLocaleString()}
                             </p>
@@ -172,7 +172,7 @@ export function GovernanceTab() {
                     )}
                     {status.next_run && !status.paused && (
                         <div className="bg-gray-50 dark:bg-[#0f1117]/60 rounded-lg p-3">
-                            <p className="text-xs text-gray-500 dark:text-gray-400">Next Run</p>
+                            <p className="text-xs text-gray-600 dark:text-gray-400">Next Run</p>
                             <p className="text-sm font-medium text-gray-900 dark:text-white">
                                 {new Date(status.next_run).toLocaleString()}
                             </p>

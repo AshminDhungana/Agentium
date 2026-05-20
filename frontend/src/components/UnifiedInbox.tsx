@@ -58,7 +58,7 @@ export function UnifiedInbox() {
                         <MessageCircle className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                     </div>
                     Unified Inbox
-                    <span className="text-xs font-normal text-gray-400 dark:text-gray-500">(Cross-Channel)</span>
+                    <span className="text-xs font-normal text--600 dark:text-gray-500">(Cross-Channel)</span>
                 </h3>
 
                 <div className="flex gap-1.5">
@@ -87,7 +87,7 @@ export function UnifiedInbox() {
                         >
                             <div className="flex items-start gap-4">
                                 <div className="w-10 h-10 rounded-lg bg-gray-100 dark:bg-[#1e2535] border border-gray-200 dark:border-[#2a3347] flex items-center justify-center flex-shrink-0">
-                                    <Icon className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                                    <Icon className="w-4 h-4 text-gray-600 dark:text-gray-400" />
                                 </div>
 
                                 <div className="flex-1 min-w-0">
@@ -95,7 +95,7 @@ export function UnifiedInbox() {
                                         <span className="text-sm font-semibold text-gray-900 dark:text-white">
                                             {msg.sender}
                                         </span>
-                                        <span className="text-xs text-gray-400 dark:text-gray-500">
+                                        <span className="text-xs text--600 dark:text-gray-500">
                                             via {msg.channelName}
                                         </span>
                                         <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${STATUS_CLASSES[msg.status] || STATUS_CLASSES.pending}`}>
@@ -107,7 +107,7 @@ export function UnifiedInbox() {
                                         {msg.content}
                                     </p>
 
-                                    <div className="flex flex-wrap items-center gap-4 text-xs text-gray-400 dark:text-gray-500">
+                                    <div className="flex flex-wrap items-center gap-4 text-xs text--600 dark:text-gray-500">
                                         <span>{format(msg.timestamp, 'h:mm a')}</span>
                                         {msg.assignedAgent && (
                                             <span className="flex items-center gap-1">

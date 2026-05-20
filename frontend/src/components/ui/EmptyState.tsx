@@ -54,7 +54,7 @@ export function EmptyState({
                 <div
                     className={`${iconBoxSize} rounded-2xl bg-gray-100 dark:bg-[#1e2535] border border-gray-200 dark:border-[#2a3347] flex items-center justify-center mb-4 transition-colors duration-200`}
                 >
-                    <Icon className={`${iconSize} text-gray-400 dark:text-gray-500`} />
+                    <Icon className={`${iconSize} text--600 dark:text-gray-500`} />
                 </div>
             )}
 
@@ -63,7 +63,7 @@ export function EmptyState({
             </h3>
 
             {description && (
-                <p className="text-sm text-gray-500 dark:text-gray-400 max-w-xs">
+                <p className="text-sm text-gray-600 dark:text-gray-400 max-w-xs">
                     {description}
                 </p>
             )}

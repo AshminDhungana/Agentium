@@ -57,7 +57,7 @@ export const AutoDelegationPanel: React.FC<AutoDelegationPanelProps> = ({ task, 
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                    <Brain className="w-5 h-5 text-violet-500 dark:text-violet-400" />
+                    <Brain className="w-5 h-5 text-violet-600 dark:text-violet-400" />
                     <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
                         Auto-Delegation
                     </h3>
@@ -87,7 +87,7 @@ export const AutoDelegationPanel: React.FC<AutoDelegationPanelProps> = ({ task, 
             {/* Complexity Score Gauge */}
             <div className="space-y-2">
                 <div className="flex items-center justify-between text-xs">
-                    <span className="text-gray-500 dark:text-gray-400 font-medium">Complexity</span>
+                    <span className="text-gray-600 dark:text-gray-400 font-medium">Complexity</span>
                     <span className="font-bold text-gray-900 dark:text-gray-100">
                         {score > 0 ? `${score}/10 · ${COMPLEXITY_LABELS[score] || ''}` : 'Not scored'}
                     </span>
@@ -112,8 +112,8 @@ export const AutoDelegationPanel: React.FC<AutoDelegationPanelProps> = ({ task, 
                     {/* Target Tier */}
                     {meta.target_tier && (
                         <div className="flex items-center gap-2 text-xs">
-                            <Shield className="w-3.5 h-3.5 text-blue-500 dark:text-blue-400" />
-                            <span className="text-gray-500 dark:text-gray-400">Target Tier:</span>
+                            <Shield className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                            <span className="text-gray-600 dark:text-gray-400">Target Tier:</span>
                             <span className="font-semibold text-gray-900 dark:text-gray-100">
                                 {meta.target_tier === '2' ? 'Lead Agent' : 'Task Agent'}
                             </span>
@@ -123,13 +123,13 @@ export const AutoDelegationPanel: React.FC<AutoDelegationPanelProps> = ({ task, 
                     {/* Assigned Agent */}
                     {meta.assigned_to && (
                         <div className="flex items-center gap-2 text-xs">
-                            <ArrowRight className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400" />
-                            <span className="text-gray-500 dark:text-gray-400">Assigned to:</span>
+                            <ArrowRight className="w-3.5 h-3.5 text-emerald-700 dark:text-emerald-400" />
+                            <span className="text-gray-600 dark:text-gray-400">Assigned to:</span>
                             <span className="font-mono font-semibold text-emerald-700 dark:text-emerald-300">
                                 {meta.assigned_to}
                             </span>
                             {meta.agent_score !== undefined && (
-                                <span className="text-gray-400 dark:text-gray-500">
+                                <span className="text--600 dark:text-gray-500">
                                     (score: {meta.agent_score})
                                 </span>
                             )}
@@ -139,7 +139,7 @@ export const AutoDelegationPanel: React.FC<AutoDelegationPanelProps> = ({ task, 
                     {/* Candidates List */}
                     {meta.candidates && meta.candidates.length > 0 && (
                         <div className="space-y-1.5">
-                            <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+                            <div className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400">
                                 <Users className="w-3.5 h-3.5" />
                                 <span className="font-medium">
                                     Candidate Agents ({meta.candidate_count})
@@ -178,7 +178,7 @@ export const AutoDelegationPanel: React.FC<AutoDelegationPanelProps> = ({ task, 
 
                     {/* Delegation time */}
                     {meta.delegated_at && (
-                        <p className="text-[10px] text-gray-400 dark:text-gray-600">
+                        <p className="text-[10px] text--600 dark:text-gray-600">
                             Delegated at {new Date(meta.delegated_at).toLocaleString()}
                         </p>
                     )}
@@ -186,7 +186,7 @@ export const AutoDelegationPanel: React.FC<AutoDelegationPanelProps> = ({ task, 
             )}
 
             {!meta && !error && (
-                <p className="text-xs text-gray-400 dark:text-gray-600 italic">
+                <p className="text-xs text--600 dark:text-gray-600 italic">
                     No delegation data yet. Click "Re-delegate" to auto-assign this task.
                 </p>
             )}

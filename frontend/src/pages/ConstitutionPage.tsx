@@ -115,8 +115,8 @@ function Section({
                     </div>
                     {collapsible && (
                         open
-                            ? <ChevronUp className="h-4 w-4 text-gray-400 dark:text-gray-500" />
-                            : <ChevronDown className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+                            ? <ChevronUp className="h-4 w-4 text--600 dark:text-gray-500" />
+                            : <ChevronDown className="h-4 w-4 text--600 dark:text-gray-500" />
                     )}
                 </button>
 
@@ -213,7 +213,7 @@ function ArticleCard({
                             <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
                                 {displayContent
                                     ? highlightText(displayContent, searchQuery)
-                                    : <span className="italic text-gray-400 dark:text-gray-600">No content defined.</span>
+                                    : <span className="italic text--600 dark:text-gray-600">No content defined.</span>
                                 }
                             </p>
                         )}
@@ -506,12 +506,12 @@ export function ConstitutionPage() {
         return (
             <div className="max-w-lg mx-auto mt-20 p-8 rounded-2xl border border-red-200 dark:border-red-500/20 bg-red-50 dark:bg-red-500/5 text-center shadow-sm dark:shadow-[0_2px_16px_rgba(0,0,0,0.25)]">
                 <div className="mx-auto mb-4 w-12 h-12 rounded-full bg-red-100 dark:bg-red-500/15 border border-red-200 dark:border-red-500/20 flex items-center justify-center">
-                    <AlertTriangle className="h-6 w-6 text-red-500 dark:text-red-400" />
+                    <AlertTriangle className="h-6 w-6 text-red-600 dark:text-red-400" />
                 </div>
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
                     Failed to Load Constitution
                 </h2>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
                     {error ?? 'An unexpected error occurred.'}
                 </p>
                 <button
@@ -554,7 +554,7 @@ export function ConstitutionPage() {
                                 <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-md bg-blue-100 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-500/20">
                                     {data.version}
                                 </span>
-                                <span className="inline-flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
+                                <span className="inline-flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400">
                                     <Clock className="h-3 w-3" />
                                     {new Date(data.effective_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                                 </span>
@@ -661,7 +661,7 @@ export function ConstitutionPage() {
                 {/* ── Search Bar ───────────────────────────────────────────── */}
                 {!isEditing && (
                     <div className="relative">
-                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500 pointer-events-none" />
+                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text--600 dark:text-gray-500 pointer-events-none" />
                         <input
                             type="text"
                             placeholder="Search articles by title or content…"
@@ -677,7 +677,7 @@ export function ConstitutionPage() {
                             <button
                                 aria-label="Clear search"
                                 onClick={() => setSearchQuery('')}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text--600 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
                             >
                                 <XCircle className="h-4 w-4" />
                             </button>
@@ -687,7 +687,7 @@ export function ConstitutionPage() {
 
                 {/* Search results count */}
                 {searchQuery && !isEditing && (
-                    <p className="text-xs text-gray-500 dark:text-gray-400 -mt-2">
+                    <p className="text-xs text-gray-600 dark:text-gray-400 -mt-2">
                         {Object.keys(filteredArticles).length} article{Object.keys(filteredArticles).length !== 1 ? 's' : ''} matching <strong>"{searchQuery}"</strong>
                         {recentlyAmendedKeys.size > 0 && (
                             <span className="ml-3 inline-flex items-center gap-1 text-amber-600 dark:text-amber-400">
@@ -733,7 +733,7 @@ export function ConstitutionPage() {
                                 <StatIcon className="h-5 w-5 flex-shrink-0" />
                                 <div>
                                     <p className="text-xl font-bold leading-none text-gray-900 dark:text-white">{value}</p>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{label}</p>
+                                    <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">{label}</p>
                                 </div>
                             </div>
                         );
@@ -752,7 +752,7 @@ export function ConstitutionPage() {
                                     Amendment History
                                 </h2>
                                 {!amendmentsLoading && (
-                                    <span className="text-xs text-gray-400 dark:text-gray-500">
+                                    <span className="text-xs text--600 dark:text-gray-500">
                                         {amendments.length} concluded
                                     </span>
                                 )}
@@ -762,7 +762,7 @@ export function ConstitutionPage() {
                                     aria-label="Refresh amendment history"
                                     className="ml-auto inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium
                                         border border-gray-200 dark:border-[#1e2535]
-                                        bg-white dark:bg-[#0f1117] text-gray-500 dark:text-gray-400
+                                        bg-white dark:bg-[#0f1117] text-gray-600 dark:text-gray-400
                                         hover:bg-gray-50 dark:hover:bg-[#1e2535]
                                         disabled:opacity-50 transition-colors"
                                 >
@@ -776,7 +776,7 @@ export function ConstitutionPage() {
                             </div>
 
                             {amendmentsLoading ? (
-                                <div className="flex items-center justify-center py-10 gap-2 text-gray-400 dark:text-gray-500">
+                                <div className="flex items-center justify-center py-10 gap-2 text--600 dark:text-gray-500">
                                     <LoadingSpinner size="md" />
                                     <span className="text-sm">Loading history…</span>
                                 </div>
@@ -835,7 +835,7 @@ export function ConstitutionPage() {
                                                                     {amendment.title ?? amendment.agentium_id}
                                                                 </p>
                                                                 {amendment.sponsors?.length > 0 && (
-                                                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                                                    <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
                                                                         Sponsored by {amendment.sponsors.join(', ')}
                                                                     </p>
                                                                 )}
@@ -845,13 +845,13 @@ export function ConstitutionPage() {
                                                                             <Users className="w-3 h-3" />
                                                                             ✓ {amendment.votes_for}
                                                                         </span>
-                                                                        <span className="text-red-500 dark:text-red-400 font-medium">✗ {amendment.votes_against}</span>
-                                                                        <span className="text-gray-400 dark:text-gray-500">— {amendment.votes_abstain}</span>
+                                                                        <span className="text-red-600 dark:text-red-400 font-medium">✗ {amendment.votes_against}</span>
+                                                                        <span className="text--600 dark:text-gray-500">— {amendment.votes_abstain}</span>
                                                                     </div>
                                                                 )}
                                                             </div>
                                                             <div className="flex-shrink-0 text-right">
-                                                                <p className="text-xs text-gray-400 dark:text-gray-500 flex items-center gap-1 justify-end">
+                                                                <p className="text-xs text--600 dark:text-gray-500 flex items-center gap-1 justify-end">
                                                                     <Clock className="w-3 h-3" />
                                                                     {date ? new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
                                                                 </p>
@@ -912,7 +912,7 @@ export function ConstitutionPage() {
                             />
                         ))}
                         {!isEditing && Object.keys(filteredArticles).length === 0 && searchQuery && (
-                            <div className="py-8 text-center text-sm text-gray-400 dark:text-gray-500 italic">
+                            <div className="py-8 text-center text-sm text--600 dark:text-gray-500 italic">
                                 No articles match "{searchQuery}"
                             </div>
                         )}
@@ -935,7 +935,7 @@ export function ConstitutionPage() {
                                 className="w-full h-32 p-4 rounded-xl border border-gray-300 dark:border-[#1e2535] bg-white dark:bg-[#0f1117] text-sm font-mono text-gray-700 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-red-500/40 dark:focus:ring-red-500/25 focus:border-red-500 dark:focus:border-red-500/50 resize-none transition duration-150"
                                 placeholder="One prohibited action per line…"
                             />
-                            <p className="text-xs text-gray-400 dark:text-gray-500">Enter one prohibited action per line.</p>
+                            <p className="text-xs text--600 dark:text-gray-500">Enter one prohibited action per line.</p>
                         </div>
                     ) : (
                         <div className="space-y-2">
@@ -946,14 +946,14 @@ export function ConstitutionPage() {
                                         className="flex items-start gap-3 px-4 py-3 rounded-xl bg-red-50 dark:bg-[#1e1215] border border-red-100 dark:border-red-500/20 transition-colors duration-200"
                                     >
                                         <div className="flex-shrink-0 mt-0.5 w-5 h-5 rounded-full bg-red-100 dark:bg-red-500/20 border border-red-200 dark:border-red-500/30 flex items-center justify-center">
-                                            <X className="h-3 w-3 text-red-500 dark:text-red-400" />
+                                            <X className="h-3 w-3 text-red-600 dark:text-red-400" />
                                         </div>
                                         <span className="text-sm text-gray-800 dark:text-gray-300 leading-relaxed">{action}</span>
                                     </div>
                                 ))
                             ) : (
                                 <div className="px-4 py-6 text-center rounded-xl border border-dashed border-gray-200 dark:border-[#1e2535]">
-                                    <p className="text-sm text-gray-400 dark:text-gray-500 italic">No prohibited actions defined.</p>
+                                    <p className="text-sm text--600 dark:text-gray-500 italic">No prohibited actions defined.</p>
                                 </div>
                             )}
                         </div>
@@ -968,7 +968,7 @@ export function ConstitutionPage() {
                                 key={key}
                                 className="px-4 py-3 rounded-xl bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-[#1e2535] transition-colors duration-200"
                             >
-                                <label className="block text-xs font-medium text-gray-500 dark:text-gray-500 tracking-wide capitalize mb-1.5">
+                                <label className="block text-xs font-medium text-gray-600 dark:text-gray-500 tracking-wide capitalize mb-1.5">
                                     {key.replace(/_/g, ' ')}
                                 </label>
                                 {isEditing ? (
@@ -996,7 +996,7 @@ export function ConstitutionPage() {
                 </Section>
 
                 {/* ── Footer ───────────────────────────────────────────────── */}
-                <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-4 rounded-xl bg-white dark:bg-[#161b27] border border-gray-200 dark:border-[#1e2535] text-xs text-gray-500 dark:text-gray-500 transition-colors duration-200">
+                <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-4 rounded-xl bg-white dark:bg-[#161b27] border border-gray-200 dark:border-[#1e2535] text-xs text-gray-600 dark:text-gray-500 transition-colors duration-200">
                     <span>
                         Created by <span className="font-medium text-gray-700 dark:text-gray-300">{data.created_by ?? 'System'}</span>
                     </span>
@@ -1023,7 +1023,7 @@ export function ConstitutionPage() {
                             </h2>
                             <button
                                 onClick={() => { setShowProposalModal(false); setProposalForm(EMPTY_PROPOSAL); }}
-                                className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#1e2535] transition-colors"
+                                className="w-8 h-8 rounded-lg flex items-center justify-center text--600 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#1e2535] transition-colors"
                                 aria-label="Close proposal modal"
                             >
                                 <X className="w-4 h-4" />
@@ -1034,7 +1034,7 @@ export function ConstitutionPage() {
                             {/* Title */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                                    Title <span className="text-red-500">*</span>
+                                    Title <span className="text-red-600">*</span>
                                 </label>
                                 <input
                                     type="text"
@@ -1048,7 +1048,7 @@ export function ConstitutionPage() {
                             {/* Diff Markdown */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                                    Proposed Changes (Markdown diff) <span className="text-red-500">*</span>
+                                    Proposed Changes (Markdown diff) <span className="text-red-600">*</span>
                                 </label>
                                 <textarea
                                     value={proposalForm.diff}

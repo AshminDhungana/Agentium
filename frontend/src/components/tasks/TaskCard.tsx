@@ -105,7 +105,7 @@ const PRIORITY_CONFIG: Record<string, {
     },
     low: { 
         dot: 'bg-gray-400', 
-        label: 'text-gray-500 dark:text-gray-400',
+        label: 'text-gray-600 dark:text-gray-400',
         darkDot: 'dark:bg-gray-500'
     },
 };
@@ -203,17 +203,17 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, onClick, onViewLive })
             <div className="pl-3">
                 <h3 className="
                     text-gray-900 dark:text-gray-100 font-semibold text-sm leading-snug line-clamp-2 mb-1
-                    group-hover:text-blue-600 dark:group-hover:text-blue-400
+                    group-hover:text-blue-600 dark:group-hover:text--600
                     transition-colors duration-200
                 ">
                     {task.governance?.hierarchical_id && (
-                        <span className="text-xs font-mono text-gray-400 dark:text-gray-500 mr-2">
+                        <span className="text-xs font-mono text--600 dark:text-gray-500 mr-2">
                             [{task.governance.hierarchical_id}]
                         </span>
                     )}
                     {task.title}
                 </h3>
-                <p className="text-gray-500 dark:text-gray-400 text-xs leading-relaxed line-clamp-3">
+                <p className="text-gray-600 dark:text-gray-400 text-xs leading-relaxed line-clamp-3">
                     {task.description}
                 </p>
             </div>
@@ -222,7 +222,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, onClick, onViewLive })
             {progress > 0 && progress < 100 && (
                 <div className="pl-3">
                     <div className="flex justify-between items-center mb-1">
-                        <span className="text-xs text-gray-500 dark:text-gray-400">Progress</span>
+                        <span className="text-xs text-gray-600 dark:text-gray-400">Progress</span>
                         <span className={`
                             text-xs font-semibold tabular-nums
                             ${isCompleted ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-700 dark:text-gray-300'}
@@ -262,7 +262,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, onClick, onViewLive })
             <div className="
                 flex items-center justify-between pt-2 border-t border-gray-100 dark:border-[#1e2535] mt-auto pl-3
             ">
-                <div className="flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500">
+                <div className="flex items-center gap-1 text-xs text--600 dark:text-gray-500">
                     <Clock className="w-3 h-3" />
                     {formattedDate}
                 </div>
@@ -316,7 +316,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, onClick, onViewLive })
                     </div>
                 ) : (
                     <div className="
-                        flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500
+                        flex items-center gap-1 text-xs text--600 dark:text-gray-500
                         bg-gray-50 dark:bg-[#0f1117] px-2 py-0.5 rounded-full
                         border border-gray-200 dark:border-[#1e2535]
                     ">

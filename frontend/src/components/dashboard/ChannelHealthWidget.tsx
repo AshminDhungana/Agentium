@@ -78,7 +78,7 @@ export function ChannelHealthWidget() {
                 <div className="text-sm font-medium text-gray-900 dark:text-white">
                   {channel.channel_name}
                 </div>
-                <div className="text-xs text-gray-500">
+                <div className="text-xs text-gray-600">
                   {channel.metrics.success_rate.toFixed(0)}% success • {channel.metrics.failed_requests} fails
                 </div>
               </div>
@@ -92,7 +92,7 @@ export function ChannelHealthWidget() {
         ))}
         
         {(channelMetrics?.channels.length || 0) === 0 && (
-          <div className="text-center py-4 text-sm text-gray-500">
+          <div className="text-center py-4 text-sm text-gray-600">
             No channels configured
           </div>
         )}

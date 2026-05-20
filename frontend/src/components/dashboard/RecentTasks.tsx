@@ -76,7 +76,7 @@ export function RecentTasks({ tasks, isLoading, isError, onRetry }: RecentTasksP
                 {isLoading ? (
                     Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} />)
                 ) : tasks.length === 0 ? (
-                    <div className="px-6 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+                    <div className="px-6 py-8 text-center text-sm text-gray-600 dark:text-gray-400">
                         No tasks yet
                     </div>
                 ) : (
@@ -93,13 +93,13 @@ export function RecentTasks({ tasks, isLoading, isError, onRetry }: RecentTasksP
                                         {task.title}
                                     </p>
                                     <div className="flex items-center gap-1.5 mt-0.5">
-                                        <span className="text-xs text-gray-400 dark:text-gray-500 capitalize">
+                                        <span className="text-xs text--600 dark:text-gray-500 capitalize">
                                             {task.priority}
                                         </span>
                                         {dateStr && (
                                             <>
                                                 <span className="text-xs text-gray-300 dark:text-gray-600">·</span>
-                                                <span className="text-xs text-gray-400 dark:text-gray-500">
+                                                <span className="text-xs text--600 dark:text-gray-500">
                                                     {dateStr}
                                                 </span>
                                             </>

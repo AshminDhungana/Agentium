@@ -146,7 +146,7 @@ const ReassignModal: React.FC<ReassignModalProps> = ({
             <h3 className="text-base font-semibold text-gray-900 dark:text-white">Confirm Reassignment</h3>
 
             {validating ? (
-                <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                     <LoadingSpinner size="xs" />
                     Validating capabilities…
                 </div>
@@ -525,15 +525,15 @@ export const AgentsPage: React.FC = () => {
             <div className="flex justify-between items-start mb-6">
                 <div>
                     <div className="flex items-center gap-2 mb-1">
-                        <Users className="w-4 h-4 text-slate-400 dark:text-slate-500" />
-                        <span className="text-xs font-semibold tracking-widest uppercase text-slate-400 dark:text-slate-500">
+                        <Users className="w-4 h-4 text--600 dark:text-slate-500" />
+                        <span className="text-xs font-semibold tracking-widest uppercase text--600 dark:text-slate-500">
                             Workforce
                         </span>
                     </div>
                     <h1 className="text-2xl font-bold text-slate-900 dark:text-white leading-tight">
                         Agent Hierarchy
                     </h1>
-                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+                    <p className="text-sm text-slate-600 dark:text-slate-400 mt-0.5">
                         Manage your AI workforce
                     </p>
 
@@ -561,7 +561,7 @@ export const AgentsPage: React.FC = () => {
                         onClick={() => dispatch({ type: 'TOGGLE_SIDEBAR' })}
                         title={sidebarOpen ? 'Hide lifecycle panel' : 'Show lifecycle panel'}
                         className={[
-                            'p-2 rounded-lg border text-slate-500 dark:text-slate-400 transition-colors shadow-sm',
+                            'p-2 rounded-lg border text-slate-600 dark:text-slate-400 transition-colors shadow-sm',
                             sidebarOpen
                                 ? 'bg-blue-50 dark:bg-blue-500/10 border-blue-200 dark:border-blue-500/20 text-blue-600 dark:text-blue-400'
                                 : 'border-slate-200 dark:border-[#1e2535] bg-white dark:bg-[#161b27] hover:bg-slate-50 dark:hover:bg-[#1e2535]',
@@ -574,7 +574,7 @@ export const AgentsPage: React.FC = () => {
                         onClick={() => loadAgents(true)}
                         disabled={isRefreshing}
                         title="Refresh"
-                        className="p-2 rounded-lg border border-slate-200 dark:border-[#1e2535] bg-white dark:bg-[#161b27] text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-[#1e2535] disabled:opacity-50 transition-colors shadow-sm"
+                        className="p-2 rounded-lg border border-slate-200 dark:border-[#1e2535] bg-white dark:bg-[#161b27] text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-[#1e2535] disabled:opacity-50 transition-colors shadow-sm"
                     >
                         {isRefreshing ? <LoadingSpinner size="sm" /> : <RefreshCw className="w-4 h-4" />}
                     </button>
@@ -589,7 +589,7 @@ export const AgentsPage: React.FC = () => {
                                     i === 0 ? 'border-r border-slate-200 dark:border-[#1e2535]' : '',
                                     viewMode === mode
                                         ? 'bg-white dark:bg-[#1e2535] text-slate-900 dark:text-white shadow-sm'
-                                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200',
+                                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200',
                                 ].join(' ')}
                             >
                                 {mode === 'tree' ? <LayoutGrid className="w-4 h-4" /> : <List className="w-4 h-4" />}
@@ -618,7 +618,7 @@ export const AgentsPage: React.FC = () => {
                 <div className="flex-1 overflow-hidden rounded-xl border border-slate-200 dark:border-[#1e2535] bg-white dark:bg-[#161b27] shadow-sm dark:shadow-[0_2px_20px_rgba(0,0,0,0.3)] transition-colors duration-200">
 
                     {isLoading ? (
-                        <div className="flex flex-col items-center justify-center h-40 gap-3 text-slate-400 dark:text-slate-500">
+                        <div className="flex flex-col items-center justify-center h-40 gap-3 text--600 dark:text-slate-500">
                             <LoadingSpinner size="md" label="Loading agents…" />
                         </div>
 

@@ -143,7 +143,7 @@ function FilterBar({ filters, channels, onChange, onReset }: FilterBarProps) {
         >
           {/* Channel */}
           <div>
-            <label className="text-xs text-slate-500 dark:text-slate-400 font-medium mb-1 block">Channel</label>
+            <label className="text-xs text-slate-600 dark:text-slate-400 font-medium mb-1 block">Channel</label>
             <select
               value={filters.channel_id ?? ''}
               onChange={e => onChange({ channel_id: e.target.value || undefined })}
@@ -160,7 +160,7 @@ function FilterBar({ filters, channels, onChange, onReset }: FilterBarProps) {
 
           {/* Channel type */}
           <div>
-            <label className="text-xs text-slate-500 dark:text-slate-400 font-medium mb-1 block">Channel Type</label>
+            <label className="text-xs text-slate-600 dark:text-slate-400 font-medium mb-1 block">Channel Type</label>
             <select
               value={filters.channel_type ?? ''}
               onChange={e => onChange({ channel_type: e.target.value || undefined })}
@@ -175,7 +175,7 @@ function FilterBar({ filters, channels, onChange, onReset }: FilterBarProps) {
 
           {/* Status */}
           <div>
-            <label className="text-xs text-slate-500 dark:text-slate-400 font-medium mb-1 block">Status</label>
+            <label className="text-xs text-slate-600 dark:text-slate-400 font-medium mb-1 block">Status</label>
             <div className="flex flex-wrap gap-1.5">
               {(['', 'received', 'processing', 'responded', 'failed'] as const).map(s => (
                 <button
@@ -195,7 +195,7 @@ function FilterBar({ filters, channels, onChange, onReset }: FilterBarProps) {
 
           {/* Outcome quick filters */}
           <div>
-            <label className="text-xs text-slate-500 dark:text-slate-400 font-medium mb-1 block">Outcome</label>
+            <label className="text-xs text-slate-600 dark:text-slate-400 font-medium mb-1 block">Outcome</label>
             <div className="flex gap-1.5">
               {[
                 { label: 'Any',         value: undefined },
@@ -220,7 +220,7 @@ function FilterBar({ filters, channels, onChange, onReset }: FilterBarProps) {
           {/* Date range */}
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="text-xs text-slate-500 dark:text-slate-400 font-medium mb-1 block">From</label>
+              <label className="text-xs text-slate-600 dark:text-slate-400 font-medium mb-1 block">From</label>
               <input
                 type="datetime-local"
                 value={filters.date_from?.slice(0, 16) ?? ''}
@@ -229,7 +229,7 @@ function FilterBar({ filters, channels, onChange, onReset }: FilterBarProps) {
               />
             </div>
             <div>
-              <label className="text-xs text-slate-500 dark:text-slate-400 font-medium mb-1 block">To</label>
+              <label className="text-xs text-slate-600 dark:text-slate-400 font-medium mb-1 block">To</label>
               <input
                 type="datetime-local"
                 value={filters.date_to?.slice(0, 16) ?? ''}
@@ -241,7 +241,7 @@ function FilterBar({ filters, channels, onChange, onReset }: FilterBarProps) {
 
           {/* Agent ID */}
           <div>
-            <label className="text-xs text-slate-500 dark:text-slate-400 font-medium mb-1 block">Agent ID</label>
+            <label className="text-xs text-slate-600 dark:text-slate-400 font-medium mb-1 block">Agent ID</label>
             <input
               type="text"
               placeholder="e.g. 10001"
@@ -254,7 +254,7 @@ function FilterBar({ filters, channels, onChange, onReset }: FilterBarProps) {
           <div className="flex justify-end pt-1">
             <button
               onClick={() => { onReset(); setOpen(false); }}
-              className="text-xs text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 flex items-center gap-1 transition-colors"
+              className="text-xs text-slate-600 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 flex items-center gap-1 transition-colors"
             >
               <X className="w-3 h-3" /> Clear all filters
             </button>
@@ -315,13 +315,13 @@ const MessageRow = memo(function MessageRow({ msg, onReplay, replayingId }: Mess
             </span>
             <ChannelBadge type={msg.channel_type} name={msg.channel_name} />
             {msg.task_id && (
-              <span className="text-xs text-slate-500 dark:text-slate-500 font-mono">
+              <span className="text-xs text-slate-600 dark:text-slate-500 font-mono">
                 #{msg.task_id.slice(0, 8)}
               </span>
             )}
           </div>
-          <p className="text-sm text-slate-500 dark:text-slate-400 truncate mt-0.5">
-            {msg.content || <em className="text-slate-400 dark:text-slate-600">no content</em>}
+          <p className="text-sm text-slate-600 dark:text-slate-400 truncate mt-0.5">
+            {msg.content || <em className="text--600 dark:text-slate-600">no content</em>}
           </p>
           {msg.last_error && (
             <p className="text-xs text-red-600 dark:text-red-400 truncate mt-0.5 flex items-center gap-1">
@@ -333,7 +333,7 @@ const MessageRow = memo(function MessageRow({ msg, onReplay, replayingId }: Mess
         {/* Right side */}
         <div className="flex items-center gap-3 flex-shrink-0">
           <StatusBadge status={msg.status} />
-          <span className="text-xs text-slate-500 dark:text-slate-500 w-16 text-right">
+          <span className="text-xs text-slate-600 dark:text-slate-500 w-16 text-right">
             {relativeTime}
           </span>
 
@@ -351,7 +351,7 @@ const MessageRow = memo(function MessageRow({ msg, onReplay, replayingId }: Mess
             </button>
           )}
 
-          <ChevronDown className={`w-4 h-4 text-slate-400 dark:text-slate-500 transition-transform ${expanded ? 'rotate-180' : ''}`} />
+          <ChevronDown className={`w-4 h-4 text--600 dark:text-slate-500 transition-transform ${expanded ? 'rotate-180' : ''}`} />
         </div>
       </div>
 
@@ -368,7 +368,7 @@ const MessageRow = memo(function MessageRow({ msg, onReplay, replayingId }: Mess
               ...(msg.task_id           ? [{ icon: LayoutGrid, label: 'Task',  value: msg.task_id           }] : []),
             ].map(({ icon: Icon, label, value }) => (
               <div key={label}>
-                <span className="text-xs text-slate-500 dark:text-slate-500 flex items-center gap-1 mb-0.5">
+                <span className="text-xs text-slate-600 dark:text-slate-500 flex items-center gap-1 mb-0.5">
                   <Icon className="w-3 h-3" /> {label}
                 </span>
                 <span className="text-xs text-slate-700 dark:text-slate-300 font-mono break-all">{value}</span>
@@ -378,7 +378,7 @@ const MessageRow = memo(function MessageRow({ msg, onReplay, replayingId }: Mess
 
           {msg.content && (
             <div>
-              <span className="text-xs text-slate-500 dark:text-slate-500 block mb-1">Full Content</span>
+              <span className="text-xs text-slate-600 dark:text-slate-500 block mb-1">Full Content</span>
               <pre className="text-xs text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-900/60 rounded-lg p-3 whitespace-pre-wrap break-words max-h-48 overflow-y-auto">
                 {msg.content}
               </pre>
@@ -442,7 +442,7 @@ export function MessageLogPage() {
             </div>
             <div>
               <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Message Log</h1>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
+              <p className="text-xs text-slate-600 dark:text-slate-400">
                 {total.toLocaleString()} message{total !== 1 ? 's' : ''} across all channels
               </p>
             </div>
@@ -465,7 +465,7 @@ export function MessageLogPage() {
             )}
             <button
               onClick={() => fetchMessages(filters)}
-              className="p-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600/50 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+              className="p-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600/50 text-slate-600 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
               aria-label="Refresh message log"
             >
               {loading ? (
@@ -481,7 +481,7 @@ export function MessageLogPage() {
         <div className="flex items-center gap-2 mt-3 flex-wrap">
           {/* Search */}
           <div className="relative flex-1 min-w-52">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text--600 dark:text-slate-500" />
             <input
               type="text"
               placeholder="Search messages, senders…"
@@ -501,7 +501,7 @@ export function MessageLogPage() {
           {hasActiveFilters && (
             <button
               onClick={handleReset}
-              className="flex items-center gap-1 px-2 py-2 rounded-lg text-xs text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+              className="flex items-center gap-1 px-2 py-2 rounded-lg text-xs text-slate-600 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
             >
               <X className="w-3.5 h-3.5" /> Clear
             </button>
@@ -566,7 +566,7 @@ export function MessageLogPage() {
       {/* Message list */}
       <div className="flex-1 overflow-y-auto px-6 py-4 space-y-2 bg-slate-50 dark:bg-[#0f1117] transition-colors duration-200">
         {loading && messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-slate-400 dark:text-slate-500">
+          <div className="flex flex-col items-center justify-center py-20 text--600 dark:text-slate-500">
             <LoadingSpinner size="lg" />
             <p className="text-sm">Loading messages…</p>
           </div>
@@ -591,25 +591,25 @@ export function MessageLogPage() {
       {/* Pagination */}
       {total > (filters.limit ?? 50) && (
         <div className="flex-shrink-0 flex items-center justify-between px-6 py-3 border-t border-slate-200 dark:border-slate-700/50 bg-white/80 dark:bg-[#0f1117]/80 transition-colors duration-200">
-          <span className="text-xs text-slate-500 dark:text-slate-500">
+          <span className="text-xs text-slate-600 dark:text-slate-500">
             Showing {(filters.offset ?? 0) + 1}–{Math.min((filters.offset ?? 0) + (filters.limit ?? 50), total)} of {total.toLocaleString()}
           </span>
           <div className="flex items-center gap-2">
             <button
               disabled={(filters.offset ?? 0) === 0}
               onClick={() => setFilters(p => ({ ...p, offset: Math.max(0, (p.offset ?? 0) - (p.limit ?? 50)) }))}
-              className="p-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600/50 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="p-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600/50 text-slate-600 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               aria-label="Previous page"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
-            <span className="text-xs text-slate-500 dark:text-slate-400 px-2">
+            <span className="text-xs text-slate-600 dark:text-slate-400 px-2">
               {currentPage} / {totalPages}
             </span>
             <button
               disabled={currentPage >= totalPages}
               onClick={() => setFilters(p => ({ ...p, offset: (p.offset ?? 0) + (p.limit ?? 50) }))}
-              className="p-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600/50 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="p-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600/50 text-slate-600 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               aria-label="Next page"
             >
               <ChevronRight className="w-4 h-4" />

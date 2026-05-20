@@ -81,7 +81,7 @@ function getStatusCfg(status: DiffStatus): StatusCfg {
                 rowBg: '',
                 leftBg: 'bg-slate-50 dark:bg-[#0f1117]',
                 rightBg: 'bg-slate-50 dark:bg-[#0f1117]',
-                badge: 'bg-slate-100 text-slate-500 dark:bg-slate-700/50 dark:text-slate-400',
+                badge: 'bg-slate-100 text-slate-600 dark:bg-slate-700/50 dark:text-slate-400',
                 label: 'Unchanged',
             };
     }
@@ -151,13 +151,13 @@ const Section: React.FC<{
                 onClick={() => setOpen(x => !x)}
                 className="w-full flex items-center gap-3 px-5 py-4 hover:bg-slate-50 dark:hover:bg-[#1e2535]/50 transition-colors text-left"
             >
-                <span className="text-slate-500 dark:text-slate-400">{icon}</span>
+                <span className="text-slate-600 dark:text-slate-400">{icon}</span>
                 <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{title}</p>
-                    {subtitle && <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{subtitle}</p>}
+                    {subtitle && <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{subtitle}</p>}
                 </div>
                 {badge}
-                {open ? <ChevronDown className="w-4 h-4 text-slate-400 flex-shrink-0" /> : <ChevronRight className="w-4 h-4 text-slate-400 flex-shrink-0" />}
+                {open ? <ChevronDown className="w-4 h-4 text--600 flex-shrink-0" /> : <ChevronRight className="w-4 h-4 text--600 flex-shrink-0" />}
             </button>
             {open && (
                 <div className="border-t border-slate-100 dark:border-[#1e2535]">
@@ -183,14 +183,14 @@ const AgentDiffBlock: React.FC<{ agent: AgentStateDiff; hideUnchanged: boolean }
                 onClick={() => setOpen(x => !x)}
                 className="w-full flex items-center gap-2.5 px-4 py-3 hover:bg-slate-50 dark:hover:bg-[#1e2535]/40 transition-colors text-left"
             >
-                <Bot className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                <Bot className="w-3.5 h-3.5 text--600 flex-shrink-0" />
                 <code className="text-xs font-mono text-slate-700 dark:text-slate-300 flex-1 truncate">{agent.agent_id}</code>
                 <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${cfg.badge}`}>
                     {cfg.icon}
                     {cfg.label}
                 </span>
-                <span className="text-xs text-slate-400">{visibleDiffs.length} field{visibleDiffs.length !== 1 ? 's' : ''}</span>
-                {open ? <ChevronDown className="w-3.5 h-3.5 text-slate-400" /> : <ChevronRight className="w-3.5 h-3.5 text-slate-400" />}
+                <span className="text-xs text--600">{visibleDiffs.length} field{visibleDiffs.length !== 1 ? 's' : ''}</span>
+                {open ? <ChevronDown className="w-3.5 h-3.5 text--600" /> : <ChevronRight className="w-3.5 h-3.5 text--600" />}
             </button>
             {open && visibleDiffs.length > 0 && (
                 <div className="border-t border-slate-100 dark:border-[#1e2535] mx-4 mb-3 mt-0 rounded-lg overflow-hidden border border-slate-200 dark:border-[#1e2535]">
@@ -200,7 +200,7 @@ const AgentDiffBlock: React.FC<{ agent: AgentStateDiff; hideUnchanged: boolean }
                 </div>
             )}
             {open && visibleDiffs.length === 0 && (
-                <p className="text-xs text-slate-400 dark:text-slate-600 px-4 pb-3">No differences.</p>
+                <p className="text-xs text--600 dark:text-slate-600 px-4 pb-3">No differences.</p>
             )}
         </div>
     );
@@ -221,13 +221,13 @@ const ArtifactDiffBlock: React.FC<{ artifact: ArtifactDiff; hideUnchanged: boole
                 onClick={() => setOpen(x => !x)}
                 className="w-full flex items-center gap-2.5 px-4 py-3 hover:bg-slate-50 dark:hover:bg-[#1e2535]/40 transition-colors text-left"
             >
-                <PackageOpen className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                <PackageOpen className="w-3.5 h-3.5 text--600 flex-shrink-0" />
                 <code className="text-xs font-mono text-slate-700 dark:text-slate-300 flex-1 truncate">{artifact.key}</code>
                 <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${cfg.badge}`}>
                     {cfg.icon}
                     {cfg.label}
                 </span>
-                {open ? <ChevronDown className="w-3.5 h-3.5 text-slate-400" /> : <ChevronRight className="w-3.5 h-3.5 text-slate-400" />}
+                {open ? <ChevronDown className="w-3.5 h-3.5 text--600" /> : <ChevronRight className="w-3.5 h-3.5 text--600" />}
             </button>
             {open && (
                 <div className="grid grid-cols-2 divide-x divide-slate-200 dark:divide-[#1e2535] border-t border-slate-100 dark:border-[#1e2535]">
@@ -293,7 +293,7 @@ const BranchInputBar: React.FC<BranchInputBarProps> = ({
             <div className="flex flex-wrap items-center gap-3">
                 {/* Left branch */}
                 <div className="flex items-center gap-2 flex-1 min-w-[140px]">
-                    <GitBranch className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                    <GitBranch className="w-4 h-4 text--600 flex-shrink-0" />
                     <input
                         type="text"
                         placeholder="Base branch (e.g. main)"
@@ -304,11 +304,11 @@ const BranchInputBar: React.FC<BranchInputBarProps> = ({
                 </div>
 
                 {/* Swap arrow */}
-                <GitCompareArrows className="w-5 h-5 text-slate-400 flex-shrink-0" />
+                <GitCompareArrows className="w-5 h-5 text--600 flex-shrink-0" />
 
                 {/* Right branch */}
                 <div className="flex items-center gap-2 flex-1 min-w-[140px]">
-                    <GitBranch className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                    <GitBranch className="w-4 h-4 text--600 flex-shrink-0" />
                     <input
                         type="text"
                         placeholder="Compare branch"
@@ -320,7 +320,7 @@ const BranchInputBar: React.FC<BranchInputBarProps> = ({
 
                 {/* Optional task filter */}
                 <div className="flex items-center gap-2 min-w-[160px]">
-                    <Hash className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                    <Hash className="w-4 h-4 text--600 flex-shrink-0" />
                     <input
                         type="text"
                         placeholder="Task ID (optional)"
@@ -405,10 +405,10 @@ export const BranchDiffView: React.FC<BranchDiffViewProps> = ({
             <div className="flex items-start justify-between gap-4">
                 <div>
                     <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-                        <GitCompareArrows className="w-5 h-5 text-blue-500" />
+                        <GitCompareArrows className="w-5 h-5 text-blue-600" />
                         Branch Diff
                     </h2>
-                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+                    <p className="text-sm text-slate-600 dark:text-slate-400 mt-0.5">
                         Side-by-side comparison of checkpoint state across branches
                     </p>
                 </div>
@@ -429,7 +429,7 @@ export const BranchDiffView: React.FC<BranchDiffViewProps> = ({
             {/* ── Error ───────────────────────────────────────────────────────── */}
             {error && (
                 <div className="flex items-start gap-3 rounded-xl border border-red-200 dark:border-red-500/25 bg-red-50 dark:bg-red-500/8 px-4 py-3">
-                    <AlertCircle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
+                    <AlertCircle className="w-4 h-4 text-red-600 mt-0.5 flex-shrink-0" />
                     <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
                 </div>
             )}
@@ -443,18 +443,18 @@ export const BranchDiffView: React.FC<BranchDiffViewProps> = ({
                             {/* Branch labels */}
                             <div className="flex items-center gap-3 text-sm">
                                 <div className="flex items-center gap-1.5">
-                                    <GitBranch className="w-3.5 h-3.5 text-slate-400" />
+                                    <GitBranch className="w-3.5 h-3.5 text--600" />
                                     <code className="font-mono font-semibold text-slate-700 dark:text-slate-200">{result.left_branch}</code>
-                                    <span className="text-[10px] text-slate-400 dark:text-slate-500 flex items-center gap-1">
+                                    <span className="text-[10px] text--600 dark:text-slate-500 flex items-center gap-1">
                                         <Clock className="w-3 h-3" />
                                         {new Date(result.left_created_at).toLocaleString()}
                                     </span>
                                 </div>
-                                <GitCompareArrows className="w-4 h-4 text-slate-400" />
+                                <GitCompareArrows className="w-4 h-4 text--600" />
                                 <div className="flex items-center gap-1.5">
-                                    <GitBranch className="w-3.5 h-3.5 text-slate-400" />
+                                    <GitBranch className="w-3.5 h-3.5 text--600" />
                                     <code className="font-mono font-semibold text-slate-700 dark:text-slate-200">{result.right_branch}</code>
-                                    <span className="text-[10px] text-slate-400 dark:text-slate-500 flex items-center gap-1">
+                                    <span className="text-[10px] text--600 dark:text-slate-500 flex items-center gap-1">
                                         <Clock className="w-3 h-3" />
                                         {new Date(result.right_created_at).toLocaleString()}
                                     </span>
@@ -467,18 +467,18 @@ export const BranchDiffView: React.FC<BranchDiffViewProps> = ({
                                 <SummaryBadge count={result.summary.removed} status="removed" />
                                 <SummaryBadge count={result.summary.changed} status="changed" />
                                 {totalChanges === 0 && (
-                                    <span className="text-xs text-slate-500 dark:text-slate-400">Branches are identical</span>
+                                    <span className="text-xs text-slate-600 dark:text-slate-400">Branches are identical</span>
                                 )}
                             </div>
                         </div>
 
                         {/* Column headers for side-by-side */}
                         <div className="grid grid-cols-2 gap-px mt-4 rounded-lg overflow-hidden border border-slate-200 dark:border-[#1e2535]">
-                            <div className="bg-slate-50 dark:bg-[#0f1117] px-4 py-2 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                            <div className="bg-slate-50 dark:bg-[#0f1117] px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
                                 <span className="w-2 h-2 rounded-full bg-slate-400 dark:bg-slate-600 inline-block" />
                                 {result.left_branch}
                             </div>
-                            <div className="bg-slate-50 dark:bg-[#0f1117] px-4 py-2 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5 border-l border-slate-200 dark:border-[#1e2535]">
+                            <div className="bg-slate-50 dark:bg-[#0f1117] px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5 border-l border-slate-200 dark:border-[#1e2535]">
                                 <span className="w-2 h-2 rounded-full bg-blue-500 inline-block" />
                                 {result.right_branch}
                             </div>
@@ -516,14 +516,14 @@ export const BranchDiffView: React.FC<BranchDiffViewProps> = ({
                         }
                     >
                         {result.task_state_diffs.length === 0 ? (
-                            <p className="text-xs text-slate-400 dark:text-slate-600 px-5 py-4">No task state recorded.</p>
+                            <p className="text-xs text--600 dark:text-slate-600 px-5 py-4">No task state recorded.</p>
                         ) : (
                             <div>
                                 {result.task_state_diffs.map(d => (
                                     <DiffRow key={d.key} diff={d} hideUnchanged={hideUnchanged} />
                                 ))}
                                 {hideUnchanged && result.task_state_diffs.every(d => d.status === 'unchanged') && (
-                                    <p className="text-xs text-slate-400 dark:text-slate-600 px-5 py-4">All fields identical.</p>
+                                    <p className="text-xs text--600 dark:text-slate-600 px-5 py-4">All fields identical.</p>
                                 )}
                             </div>
                         )}
@@ -543,7 +543,7 @@ export const BranchDiffView: React.FC<BranchDiffViewProps> = ({
                         }
                     >
                         {result.agent_state_diffs.length === 0 ? (
-                            <p className="text-xs text-slate-400 dark:text-slate-600 px-5 py-4">No agent states recorded.</p>
+                            <p className="text-xs text--600 dark:text-slate-600 px-5 py-4">No agent states recorded.</p>
                         ) : (
                             result.agent_state_diffs.map(a => (
                                 <AgentDiffBlock key={a.agent_id} agent={a} hideUnchanged={hideUnchanged} />
@@ -565,7 +565,7 @@ export const BranchDiffView: React.FC<BranchDiffViewProps> = ({
                         }
                     >
                         {result.artifact_diffs.length === 0 ? (
-                            <p className="text-xs text-slate-400 dark:text-slate-600 px-5 py-4">No artifacts recorded.</p>
+                            <p className="text-xs text--600 dark:text-slate-600 px-5 py-4">No artifacts recorded.</p>
                         ) : (
                             result.artifact_diffs.map(a => (
                                 <ArtifactDiffBlock key={a.key} artifact={a} hideUnchanged={hideUnchanged} />
@@ -577,7 +577,7 @@ export const BranchDiffView: React.FC<BranchDiffViewProps> = ({
 
             {/* ── Prompt state ─────────────────────────────────────────────────── */}
             {!result && !isLoading && !error && (
-                <div className="flex flex-col items-center justify-center py-16 gap-3 text-slate-400 dark:text-slate-600">
+                <div className="flex flex-col items-center justify-center py-16 gap-3 text--600 dark:text-slate-600">
                     <GitCompareArrows className="w-10 h-10 opacity-40" />
                     <p className="text-sm">Enter two branch names above and click Compare</p>
                     <p className="text-xs text-slate-300 dark:text-slate-700">

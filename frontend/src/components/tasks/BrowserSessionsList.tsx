@@ -44,7 +44,7 @@ export const BrowserSessionsList: React.FC<BrowserSessionsListProps> = ({ tasks,
             <div className="flex flex-col items-center justify-center p-12 bg-white dark:bg-[#161b27] rounded-xl border border-dashed border-gray-200 dark:border-[#2a3347]">
                 <Monitor className="w-12 h-12 text-gray-300 dark:text-gray-600 mb-4" />
                 <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">No Active Browser Sessions</h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400 text-center max-w-sm">
+                <p className="text-xs text-gray-600 dark:text-gray-400 text-center max-w-sm">
                     There are no agents currently interacting with a web browser. Launch a browser-based task to see live streams here.
                 </p>
                 <button 
@@ -63,7 +63,7 @@ export const BrowserSessionsList: React.FC<BrowserSessionsListProps> = ({ tasks,
                 <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Active Browser Sessions</h3>
                 <button 
                     onClick={loadSessions}
-                    className="p-1.5 rounded-lg border border-gray-200 dark:border-[#1e2535] bg-white dark:bg-[#161b27] text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+                    className="p-1.5 rounded-lg border border-gray-200 dark:border-[#1e2535] bg-white dark:bg-[#161b27] text--600 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
                 >
                     {loading ? <LoadingSpinner size="sm" /> : <RefreshCw className="w-3.5 h-3.5" />}
                 </button>
@@ -81,7 +81,7 @@ export const BrowserSessionsList: React.FC<BrowserSessionsListProps> = ({ tasks,
                             className="bg-white dark:bg-[#161b27] border border-gray-200 dark:border-[#1e2535] rounded-xl p-4 cursor-pointer hover:border-blue-400 dark:hover:border-blue-500 transition-colors group"
                         >
                             <div className="flex justify-between items-start mb-2">
-                                <Monitor className="w-5 h-5 text-violet-500" />
+                                <Monitor className="w-5 h-5 text-violet-600" />
                                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide
                                     ${session.status === 'active' ? 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400' : 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400'}`}>
                                     {session.status}
@@ -90,10 +90,10 @@ export const BrowserSessionsList: React.FC<BrowserSessionsListProps> = ({ tasks,
                             <h4 className="text-sm font-semibold text-gray-900 dark:text-white line-clamp-1 mb-1">
                                 {taskName}
                             </h4>
-                            <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-1 mb-3 font-mono">
+                            <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-1 mb-3 font-mono">
                                 {session.url || 'No URL loaded'}
                             </p>
-                            <div className="flex justify-between items-center text-[10px] text-gray-400 dark:text-gray-500">
+                            <div className="flex justify-between items-center text-[10px] text--600 dark:text-gray-500">
                                 <span>{session.fps} FPS Capture</span>
                                 <span>
                                     {session.started_at ? new Date(session.started_at).toLocaleTimeString() : ''}

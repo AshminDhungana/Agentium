@@ -204,7 +204,7 @@ const CheckpointRow: React.FC<CheckpointRowProps> = ({
                             </div>
 
                             {/* Agent + date */}
-                            <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                            <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
                                 <Milestone className="w-3 h-3 flex-shrink-0" />
                                 <span className="font-mono truncate">{checkpoint.agentium_id}</span>
                                 <span className="text-slate-300 dark:text-slate-600">·</span>
@@ -214,7 +214,7 @@ const CheckpointRow: React.FC<CheckpointRowProps> = ({
                         </div>
 
                         {/* Expand chevron */}
-                        <div className="flex-shrink-0 mt-0.5 text-slate-400 dark:text-slate-500">
+                        <div className="flex-shrink-0 mt-0.5 text--600 dark:text-slate-500">
                             {isExpanded
                                 ? <ChevronDown className="w-4 h-4" />
                                 : <ChevronRight className="w-4 h-4" />
@@ -231,7 +231,7 @@ const CheckpointRow: React.FC<CheckpointRowProps> = ({
                             {/* Task state preview */}
                             {hasState && (
                                 <div>
-                                    <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-2">
+                                    <p className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-widest mb-2">
                                         Task State Snapshot
                                     </p>
                                     <pre className="text-xs font-mono bg-slate-50 dark:bg-[#0f1117] border border-slate-200 dark:border-[#1e2535] rounded-lg p-3 max-h-40 overflow-auto text-slate-700 dark:text-slate-300 whitespace-pre-wrap break-all">
@@ -348,13 +348,13 @@ const CheckpointRow: React.FC<CheckpointRowProps> = ({
                                 <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100">
                                     State Inspector
                                 </h3>
-                                <p className="text-sm text-slate-500 dark:text-slate-400">
+                                <p className="text-sm text-slate-600 dark:text-slate-400">
                                     Checkpoint ID: {checkpoint.id}
                                 </p>
                             </div>
                             <button
                                 onClick={(e) => { e.stopPropagation(); setIsInspectorOpen(false); }}
-                                className="p-2 -mr-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-[#1e2535] dark:hover:text-slate-300 rounded-lg transition-colors"
+                                className="p-2 -mr-2 text--600 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-[#1e2535] dark:hover:text-slate-300 rounded-lg transition-colors"
                             >
                                 <X className="w-5 h-5" />
                             </button>
@@ -458,7 +458,7 @@ export const CheckpointTimeline: React.FC<CheckpointTimelineProps> = ({
     // ── Loading state ─────────────────────────────────────────────────────────
     if (isLoading) {
         return (
-            <div className="flex flex-col items-center justify-center py-12 gap-3 text-slate-400 dark:text-slate-500">
+            <div className="flex flex-col items-center justify-center py-12 gap-3 text--600 dark:text-slate-500">
                 <LoadingSpinner size="md" />
                 <span className="text-sm">Loading checkpoints…</span>
             </div>
@@ -469,7 +469,7 @@ export const CheckpointTimeline: React.FC<CheckpointTimelineProps> = ({
     if (error) {
         return (
             <div className="flex flex-col items-center justify-center py-12 gap-3">
-                <AlertCircle className="w-8 h-8 text-red-400 dark:text-red-500 opacity-60" />
+                <AlertCircle className="w-8 h-8 text--600 dark:text-red-500 opacity-60" />
                 <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
                 <button
                     onClick={() => load()}
@@ -484,10 +484,10 @@ export const CheckpointTimeline: React.FC<CheckpointTimelineProps> = ({
     // ── Empty state ───────────────────────────────────────────────────────────
     if (checkpoints.length === 0) {
         return (
-            <div className="flex flex-col items-center justify-center py-12 gap-3 text-slate-400 dark:text-slate-500">
+            <div className="flex flex-col items-center justify-center py-12 gap-3 text--600 dark:text-slate-500">
                 <Milestone className="w-8 h-8 opacity-40" />
                 <p className="text-sm">No checkpoints recorded yet.</p>
-                <p className="text-xs text-slate-400 dark:text-slate-600">
+                <p className="text-xs text--600 dark:text-slate-600">
                     Checkpoints are created automatically at plan, execution, and critique phases.
                 </p>
                 <button
@@ -509,7 +509,7 @@ export const CheckpointTimeline: React.FC<CheckpointTimelineProps> = ({
                     <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
                         Execution Timeline
                     </h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
                         {checkpoints.length} checkpoint{checkpoints.length !== 1 ? 's' : ''} recorded
                     </p>
                 </div>
@@ -586,7 +586,7 @@ export const CheckpointTimeline: React.FC<CheckpointTimelineProps> = ({
                                 </select>
                             </div>
 
-                            <div className="flex justify-center text-slate-400">
+                            <div className="flex justify-center text--600">
                                 <ArrowRightLeft className="w-4 h-4" />
                             </div>
 

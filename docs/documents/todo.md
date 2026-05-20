@@ -685,13 +685,13 @@ Build a self-governing AI ecosystem where agents operate under constitutional la
 - [x] `AgentTree.tsx` — horizontal scroll for deep hierarchies on mobile; collapsible tier groups
 - [x] `VotingPage.tsx` — stack vote cards vertically on mobile; move amendment diff to expandable accordion
 - [x] `MonitoringPage.tsx` — stack metric cards to 1-column grid below `sm:`; health rings resize to 40px
-- [ ] New `WorkflowDesigner.tsx` (Phase 13.5) — canvas uses touch events (`onTouchStart/Move/End`) for drag-and-drop on tablet; view-only mode on phone
+- [x] New `WorkflowDesigner.tsx` (Phase 13.5) — canvas uses touch events (`onTouchStart/Move/End`) for drag-and-drop on tablet; view-only mode on phone
 
 ### 17.4 Accessibility (ARIA Labels & Keyboard Navigation)
 
-- [ ] **ARIA Labels** — audit all icon-only buttons (pencil, trash, settings gear, expand/collapse) and add `aria-label` attributes; audit all form inputs for associated `<label>` elements
-- [ ] **Keyboard Navigation** — ensure all interactive elements are reachable via Tab; add `focus:ring-2 focus:ring-blue-500` to all focusable elements that are missing it; modals should trap focus while open (`focus-trap-react` or custom)
-- [ ] **Screen Reader** — add `role="status"` and `aria-live="polite"` to real-time updating regions (task status, WebSocket event feed, vote tallies); add `role="alert"` to error messages
+- [x] **ARIA Labels** — audit all icon-only buttons (pencil, trash, settings gear, expand/collapse) and add `aria-label` attributes; audit all form inputs for associated `<label>` elements
+- [x] **Keyboard Navigation** — ensure all interactive elements are reachable via Tab; add `focus:ring-2 focus:ring-blue-500` to all focusable elements that are missing it; modals should trap focus while open (`focus-trap-react` or custom)
+- [x] **Screen Reader** — add `role="status"` and `aria-live="polite"` to real-time updating regions (task status, WebSocket event feed, vote tallies); add `role="alert"` to error messages
 - [ ] **Color Contrast** — run `axe-core` or `lighthouse --accessibility` audit; fix all elements below WCAG AA ratio (4.5:1 for text, 3:1 for UI components)
 - [ ] Add `skipToContent` link as the first focusable element on every page
 

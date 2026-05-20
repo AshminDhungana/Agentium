@@ -71,7 +71,7 @@ export function VotingCard({ item, isSelected, onClick, isAmendment }: VotingCar
 
                     {/* Meta */}
                     {isAmendment && (item as AmendmentVoting).sponsors?.length > 0 && (
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 flex items-center gap-1">
+                        <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5 flex items-center gap-1">
                             <Users className="w-3 h-3 flex-shrink-0" />
                             <span className="truncate">
                                 {(item as AmendmentVoting).sponsors.join(', ')}
@@ -79,7 +79,7 @@ export function VotingCard({ item, isSelected, onClick, isAmendment }: VotingCar
                         </p>
                     )}
                     {!isAmendment && (
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 flex items-center gap-1">
+                        <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5 flex items-center gap-1">
                             <Users className="w-3 h-3 flex-shrink-0" />
                             {(item as TaskDeliberation).participating_members?.length ?? 0} participants
                         </p>
@@ -87,7 +87,7 @@ export function VotingCard({ item, isSelected, onClick, isAmendment }: VotingCar
                 </div>
 
                 <ChevronRight
-                    className={`w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5 transition-transform ${
+                    className={`w-4 h-4 text--600 flex-shrink-0 mt-0.5 transition-transform ${
                         isSelected ? 'rotate-90' : 'group-hover:translate-x-0.5'
                     }`}
                 />
@@ -112,7 +112,7 @@ export function VotingCard({ item, isSelected, onClick, isAmendment }: VotingCar
                     </div>
                 </div>
                 {/* flex-wrap prevents this row from clipping on narrow screens */}
-                <div className="flex flex-wrap justify-between gap-x-2 text-xs text-gray-400 dark:text-gray-500 mt-1">
+                <div className="flex flex-wrap justify-between gap-x-2 text-xs text--600 dark:text-gray-500 mt-1">
                     <span>{totalVotes} votes cast</span>
                     <span>
                         {totalEligible > 0 ? Math.round((totalVotes / totalEligible) * 100) : 0}% turnout

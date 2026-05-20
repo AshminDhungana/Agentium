@@ -104,7 +104,7 @@ export function DelegateTaskModal({ peers, isSubmitting, onClose, onSubmit }: De
                             >
                                 Delegate Task
                             </h3>
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                            <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
                                 Send a task to a peer instance for execution
                             </p>
                         </div>
@@ -128,11 +128,7 @@ export function DelegateTaskModal({ peers, isSubmitting, onClose, onSubmit }: De
                                 No active peers available to delegate to.
                             </div>
                         ) : (
-                            <select
-                                id="delegate-target-peer"
-                                value={form.target_peer_id}
-                                onChange={set('target_peer_id')}
-                                className="w-full px-4 py-2.5 border border-gray-200 dark:border-[#1e2535] rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-[#0f1117] text-gray-900 dark:text-white text-sm transition-colors duration-150"
+                            -gray-500 dark:border-[#1e2535] rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-[#0f1117] text-gray-900 dark:text-white text-sm transition-colors duration-150"
                                 required
                                 disabled={isSubmitting}
                             >
@@ -154,12 +150,7 @@ export function DelegateTaskModal({ peers, isSubmitting, onClose, onSubmit }: De
                         >
                             Original Task ID
                         </label>
-                        <input
-                            id="delegate-task-id"
-                            type="text"
-                            value={form.original_task_id}
-                            onChange={set('original_task_id')}
-                            className="w-full px-4 py-2.5 border border-gray-200 dark:border-[#1e2535] rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-[#0f1117] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 text-sm transition-colors duration-150"
+                        -gray-500 dark:border-[#1e2535] rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-[#0f1117] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 text-sm transition-colors duration-150"
                             placeholder="local-task-abc123"
                             required
                             disabled={isSubmitting}
@@ -173,16 +164,9 @@ export function DelegateTaskModal({ peers, isSubmitting, onClose, onSubmit }: De
                             className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5"
                         >
                             Payload{' '}
-                            <span className="text-gray-400 dark:text-gray-500 font-normal">(JSON object)</span>
+                            <span className="text--600 dark:text-gray-500 font-normal">(JSON object)</span>
                         </label>
-                        <textarea
-                            id="delegate-payload"
-                            value={form.payload}
-                            onChange={set('payload')}
-                            className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:border-blue-500 bg-white dark:bg-[#0f1117] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 text-sm transition-colors duration-150 font-mono resize-none ${
-                                payloadError
-                                    ? 'border-red-300 dark:border-red-500/40 focus:ring-red-500'
-                                    : 'border-gray-200 dark:border-[#1e2535] focus:ring-blue-500'
+                        -gray-500 dark:border-[#1e2535] focus:ring-blue-500'
                             }`}
                             placeholder='{"task": "analyze data", "priority": "high"}'
                             rows={4}

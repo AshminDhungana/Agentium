@@ -69,16 +69,16 @@ const getRoleIcon = (role: string) => {
     switch (role) {
         case 'primary_sovereign':
         case 'sovereign':
-            return <Crown className="w-4 h-4 text-yellow-500" />;
+            return <Crown className="w-4 h-4 text-yellow-800" />;
         case 'deputy_sovereign':
         case 'council':
-            return <Shield className="w-4 h-4 text-purple-500" />;
+            return <Shield className="w-4 h-4 text-purple-600" />;
         case 'lead':
-            return <UserCog className="w-4 h-4 text-blue-500" />;
+            return <UserCog className="w-4 h-4 text-blue-600" />;
         case 'task':
-            return <Users className="w-4 h-4 text-green-500" />;
+            return <Users className="w-4 h-4 text-green-700" />;
         default:
-            return <Eye className="w-4 h-4 text-gray-500" />;
+            return <Eye className="w-4 h-4 text-gray-600" />;
     }
 };
 
@@ -133,7 +133,7 @@ function AccessDenied() {
                 <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
                     Access Denied
                 </h2>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
+                <p className="text-sm text-gray-600 dark:text-gray-400">
                     Only Sovereign users can manage RBAC settings.
                 </p>
             </div>
@@ -276,7 +276,7 @@ function RBACManagementInner() {
                     <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-1">
                         Access Control
                     </h1>
-                    <p className="text-gray-500 dark:text-gray-400 text-sm">
+                    <p className="text-gray-600 dark:text-gray-400 text-sm">
                         Manage user roles, capabilities, and delegation.
                     </p>
                 </div>
@@ -292,7 +292,7 @@ function RBACManagementInner() {
                                 {users.length}
                             </span>
                         </div>
-                        <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Users</p>
+                        <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Users</p>
                     </div>
 
                     <div className="bg-white dark:bg-[#161b27] rounded-xl border border-gray-200 dark:border-[#1e2535] p-6 hover:border-gray-300 dark:hover:border-[#2a3347] hover:shadow-md dark:hover:shadow-[0_4px_20px_rgba(0,0,0,0.35)] transition-all duration-150">
@@ -306,7 +306,7 @@ function RBACManagementInner() {
                                 ).length}
                             </span>
                         </div>
-                        <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Sovereigns</p>
+                        <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Sovereigns</p>
                     </div>
 
                     <div className="bg-white dark:bg-[#161b27] rounded-xl border border-gray-200 dark:border-[#1e2535] p-6 hover:border-gray-300 dark:hover:border-[#2a3347] hover:shadow-md dark:hover:shadow-[0_4px_20px_rgba(0,0,0,0.35)] transition-all duration-150">
@@ -318,7 +318,7 @@ function RBACManagementInner() {
                                 {delegations.filter((d) => d.is_active).length}
                             </span>
                         </div>
-                        <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                        <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
                             Active Delegations
                         </p>
                     </div>
@@ -332,7 +332,7 @@ function RBACManagementInner() {
                                 {CAPABILITIES.length}
                             </span>
                         </div>
-                        <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Capabilities</p>
+                        <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Capabilities</p>
                     </div>
                 </div>
 
@@ -366,7 +366,7 @@ function RBACManagementInner() {
                     <>
                         <div className="flex flex-col sm:flex-row gap-4 mb-6">
                             <div className="relative flex-1">
-                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
+                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text--600 dark:text-gray-500" />
                                 <input
                                     type="text"
                                     placeholder="Search users..."
@@ -388,19 +388,19 @@ function RBACManagementInner() {
                             {loading ? (
                                 <div className="p-16 text-center">
                                     <LoadingSpinner size="lg" />
-                                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                                    <p className="text-sm text-gray-600 dark:text-gray-400">
                                         Loading users...
                                     </p>
                                 </div>
                             ) : filteredUsers.length === 0 ? (
                                 <div className="p-16 text-center">
                                     <div className="w-14 h-14 rounded-xl bg-gray-100 dark:bg-[#1e2535] border border-gray-200 dark:border-[#2a3347] flex items-center justify-center mx-auto mb-4">
-                                        <Users className="w-6 h-6 text-gray-400 dark:text-gray-500" />
+                                        <Users className="w-6 h-6 text--600 dark:text-gray-500" />
                                     </div>
                                     <p className="text-gray-900 dark:text-white font-medium mb-1">
                                         No Users Found
                                     </p>
-                                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                                    <p className="text-sm text-gray-600 dark:text-gray-400">
                                         {searchQuery
                                             ? 'Try a different search term'
                                             : 'No users in the system'}
@@ -411,16 +411,16 @@ function RBACManagementInner() {
                                     <table className="w-full">
                                         <thead className="bg-gray-50 dark:bg-[#0f1117]">
                                             <tr>
-                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
                                                     User
                                                 </th>
-                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
                                                     Role
                                                 </th>
-                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
                                                     Active Delegations
                                                 </th>
-                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
                                                     Status
                                                 </th>
                                             </tr>
@@ -441,7 +441,7 @@ function RBACManagementInner() {
                                                                     {userItem.username}
                                                                 </span>
                                                                 {userItem.email && (
-                                                                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+                                                                    <p className="text-xs text--600 dark:text-gray-500 mt-0.5">
                                                                         {userItem.email}
                                                                     </p>
                                                                 )}
@@ -506,12 +506,12 @@ function RBACManagementInner() {
                             {delegations.length === 0 ? (
                                 <div className="p-16 text-center">
                                     <div className="w-14 h-14 rounded-xl bg-gray-100 dark:bg-[#1e2535] border border-gray-200 dark:border-[#2a3347] flex items-center justify-center mx-auto mb-4">
-                                        <HandMetal className="w-6 h-6 text-gray-400 dark:text-gray-500" />
+                                        <HandMetal className="w-6 h-6 text--600 dark:text-gray-500" />
                                     </div>
                                     <p className="text-gray-900 dark:text-white font-medium mb-1">
                                         No Active Delegations
                                     </p>
-                                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                                    <p className="text-sm text-gray-600 dark:text-gray-400">
                                         Create a delegation to grant temporary capabilities
                                     </p>
                                 </div>
@@ -531,7 +531,7 @@ function RBACManagementInner() {
                                                         <p className="text-sm font-medium text-gray-900 dark:text-white">
                                                             Delegation {delegation.id.substring(0, 8)}
                                                         </p>
-                                                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                                                        <p className="text-xs text-gray-600 dark:text-gray-400">
                                                             {delegation.capabilities.length} capabilities •{' '}
                                                             Expires: {formatDate(delegation.expires_at)}
                                                         </p>
@@ -559,7 +559,7 @@ function RBACManagementInner() {
                                                     {delegation.is_active && (
                                                         confirmRevokeId === delegation.id ? (
                                                             <div className="flex items-center gap-2">
-                                                                <span className="text-xs text-gray-500 dark:text-gray-400">
+                                                                <span className="text-xs text-gray-600 dark:text-gray-400">
                                                                     Confirm revoke?
                                                                 </span>
                                                                 <button
@@ -604,12 +604,12 @@ function RBACManagementInner() {
                                                 ))}
                                             </div>
                                             {delegation.reason && (
-                                                <p className="mt-2 text-xs text-gray-400 dark:text-gray-500 italic">
+                                                <p className="mt-2 text-xs text--600 dark:text-gray-500 italic">
                                                     Reason: {delegation.reason}
                                                 </p>
                                             )}
                                             {delegation.granted_at && (
-                                                <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+                                                <p className="mt-1 text-xs text--600 dark:text-gray-500">
                                                     Granted: {formatDate(delegation.granted_at)}
                                                 </p>
                                             )}
@@ -633,7 +633,7 @@ function RBACManagementInner() {
                                     <h2 className="text-base font-semibold text-gray-900 dark:text-white">
                                         Available Capabilities
                                     </h2>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                    <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
                                         Capabilities that can be delegated to users
                                     </p>
                                 </div>
@@ -655,7 +655,7 @@ function RBACManagementInner() {
                                                 <p className="text-sm font-medium text-gray-900 dark:text-white">
                                                     {cap.name}
                                                 </p>
-                                                <p className="text-xs text-gray-500 dark:text-gray-400">
+                                                <p className="text-xs text-gray-600 dark:text-gray-400">
                                                     {cap.description}
                                                 </p>
                                             </div>
@@ -697,7 +697,7 @@ function RBACManagementInner() {
                                     <h3 className="text-base font-semibold text-gray-900 dark:text-white">
                                         New Delegation
                                     </h3>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                    <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
                                         Grant temporary capabilities to a user
                                     </p>
                                 </div>
@@ -749,7 +749,7 @@ function RBACManagementInner() {
                                                 <span className="text-sm text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white transition-colors">
                                                     {cap.name}
                                                 </span>
-                                                <span className="text-xs text-gray-400 dark:text-gray-500 ml-2">
+                                                <span className="text-xs text--600 dark:text-gray-500 ml-2">
                                                     {cap.description}
                                                 </span>
                                             </div>
@@ -761,7 +761,7 @@ function RBACManagementInner() {
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                                     Reason
-                                    <span className="text-gray-400 dark:text-gray-500 font-normal ml-1">
+                                    <span className="text--600 dark:text-gray-500 font-normal ml-1">
                                         (Optional)
                                     </span>
                                 </label>
@@ -777,7 +777,7 @@ function RBACManagementInner() {
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                                     Expires
-                                    <span className="text-gray-400 dark:text-gray-500 font-normal ml-1">
+                                    <span className="text--600 dark:text-gray-500 font-normal ml-1">
                                         (Optional)
                                     </span>
                                 </label>

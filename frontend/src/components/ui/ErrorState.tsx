@@ -27,8 +27,8 @@ export function ErrorState({
 
     return (
         <div role="alert" className={`flex flex-col items-center gap-2 ${py} text-center`}>
-            <AlertTriangle className={`${iconSize} text-amber-500 flex-shrink-0`} />
-            <p className={`${textSize} text-gray-500 dark:text-gray-400`}>{message}</p>
+            <AlertTriangle className={`${iconSize} text-amber-700 flex-shrink-0`} />
+            <p className={`${textSize} text-gray-600 dark:text-gray-400`}>{message}</p>
             {onRetry && (
                 <button
                     onClick={onRetry}

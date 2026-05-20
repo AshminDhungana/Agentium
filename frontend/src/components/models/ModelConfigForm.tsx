@@ -368,7 +368,7 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
                     {/* Back */}
                     <button
                         onClick={onCancel}
-                        className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white mb-8 transition-colors duration-150 group"
+                        className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white mb-8 transition-colors duration-150 group"
                         aria-label="Back to configurations"
                     >
                         <ChevronLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform duration-150" aria-hidden="true" />
@@ -380,7 +380,7 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
                         <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
                             Choose Your AI Provider
                         </h1>
-                        <p className="text-gray-500 dark:text-gray-400 text-sm">
+                        <p className="text-gray-600 dark:text-gray-400 text-sm">
                             Select from world-class AI providers or run models locally.
                         </p>
                     </div>
@@ -400,7 +400,7 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
                     {isLoadingProviders ? (
                         <div className="flex items-center justify-center py-24" aria-live="polite" aria-busy="true">
                             <LoadingSpinner size="md" />
-                            <span className="ml-3 text-sm text-gray-500 dark:text-gray-400">Loading providers…</span>
+                            <span className="ml-3 text-sm text-gray-600 dark:text-gray-400">Loading providers…</span>
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -436,7 +436,7 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
                                             <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-1">
                                                 {provider.display_name}
                                             </h3>
-                                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-3 leading-relaxed">
+                                            <p className="text-xs text-gray-600 dark:text-gray-400 mb-3 leading-relaxed">
                                                 {provider.description}
                                             </p>
 
@@ -455,7 +455,7 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
                                         </button>
                                     ))
                             ) : (
-                                <div className="col-span-full text-center py-16 text-sm text-gray-500 dark:text-gray-400">
+                                <div className="col-span-full text-center py-16 text-sm text-gray-600 dark:text-gray-400">
                                     No providers available. Please check your connection.
                                 </div>
                             )}
@@ -473,7 +473,7 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
                                 <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-1">
                                     Custom Provider
                                 </h3>
-                                <p className="text-xs text-gray-500 dark:text-gray-400">
+                                <p className="text-xs text-gray-600 dark:text-gray-400">
                                     Any OpenAI-compatible API endpoint
                                 </p>
                             </button>
@@ -495,7 +495,7 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
                 <button
                     onClick={() => setStep('provider')}
                     aria-label="Back to provider selection"
-                    className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white mb-8 transition-colors duration-150 group"
+                    className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white mb-8 transition-colors duration-150 group"
                 >
                     <ChevronLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform duration-150" aria-hidden="true" />
                     Change Provider
@@ -515,7 +515,7 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
                         <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-1">
                             Configure {selectedProvider?.display_name || 'Custom Provider'}
                         </h1>
-                        <p className="text-gray-500 dark:text-gray-400 text-sm">
+                        <p className="text-gray-600 dark:text-gray-400 text-sm">
                             Set up your API credentials and model preferences.
                         </p>
                     </div>
@@ -566,7 +566,7 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
                         {/* Configuration Name */}
                         <div>
                             <label htmlFor="config_name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                                Configuration Name <span className="text-red-500" aria-hidden="true">*</span>
+                                Configuration Name <span className="text-red-600" aria-hidden="true">*</span>
                             </label>
                             <input
                                 id="config_name"
@@ -585,7 +585,7 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
                         {isUniversal && (
                             <div>
                                 <label htmlFor="custom_provider_name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                                    Provider Name <span className="text-red-500" aria-hidden="true">*</span>
+                                    Provider Name <span className="text-red-600" aria-hidden="true">*</span>
                                 </label>
                                 <input
                                     id="custom_provider_name"
@@ -606,7 +606,7 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
                             <div>
                                 <label htmlFor="api_key" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 flex items-center gap-2">
                                     <Key className="w-4 h-4" aria-hidden="true" />
-                                    API Key <span className="text-red-500" aria-hidden="true">*</span>
+                                    API Key <span className="text-red-600" aria-hidden="true">*</span>
                                 </label>
                                 <input
                                     id="api_key"
@@ -621,7 +621,7 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
                                     autoComplete="new-password"
                                 />
                                 {initialConfig?.api_key_masked && !formData.api_key && (
-                                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1.5">
+                                    <p className="text-xs text--600 dark:text-gray-500 mt-1.5">
                                         Current: {initialConfig.api_key_masked} (leave empty to keep)
                                     </p>
                                 )}
@@ -633,7 +633,7 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
                             <div>
                                 <label htmlFor="api_base_url" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 flex items-center gap-2">
                                     <Globe className="w-4 h-4" aria-hidden="true" />
-                                    API Base URL <span className="text-red-500" aria-hidden="true">*</span>
+                                    API Base URL <span className="text-red-600" aria-hidden="true">*</span>
                                 </label>
                                 <input
                                     id="api_base_url"
@@ -664,7 +664,7 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
                                     onChange={handleChange}
                                     className={`${inputCls} font-mono`}
                                 />
-                                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1.5">
+                                <p className="text-xs text--600 dark:text-gray-500 mt-1.5">
                                     Default: Ollama (http://localhost:11434/v1). For LM Studio use http://localhost:1234/v1
                                 </p>
                             </div>
@@ -673,7 +673,7 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
                         {/* Model Selection */}
                         <div>
                             <label htmlFor="default_model" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                                Model <span className="text-red-500" aria-hidden="true">*</span>
+                                Model <span className="text-red-600" aria-hidden="true">*</span>
                             </label>
                             <div className="flex gap-2">
                                 {formData.available_models.length > 0 ? (
@@ -746,7 +746,7 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
                                     {formData.available_models.length} models available from {formData.provider}
                                 </p>
                             ) : (
-                                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1.5">
+                                <p className="text-xs text--600 dark:text-gray-500 mt-1.5">
                                     {isUniversal
                                         ? 'Enter the exact model name as expected by the API'
                                         : selectedProvider?.requires_api_key && !formData.api_key
@@ -760,7 +760,7 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
                         {/* Advanced Settings */}
                         <div className="bg-gray-50 dark:bg-[#0f1117] border border-gray-100 dark:border-[#1e2535] rounded-xl p-5">
                             <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                                <Settings className="w-4 h-4 text-gray-500 dark:text-gray-400" aria-hidden="true" />
+                                <Settings className="w-4 h-4 text-gray-600 dark:text-gray-400" aria-hidden="true" />
                                 Advanced Settings
                             </h4>
                             <div className="grid grid-cols-2 gap-4">
@@ -800,13 +800,7 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
 
                         {/* Default checkbox */}
                         <label htmlFor="is_default" className="flex items-center gap-3 cursor-pointer group">
-                            <input
-                                id="is_default"
-                                type="checkbox"
-                                name="is_default"
-                                checked={formData.is_default}
-                                onChange={handleChange}
-                                className="w-4 h-4 rounded border-gray-300 dark:border-[#2a3347] text-blue-600 focus:ring-blue-500 bg-white dark:bg-[#0f1117]"
+                            -gray-500 dark:border-[#2a3347] text-blue-600 focus:ring-blue-500 bg-white dark:bg-[#0f1117]"
                             />
                             <span className="text-sm font-medium text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white transition-colors duration-150">
                                 Set as default configuration

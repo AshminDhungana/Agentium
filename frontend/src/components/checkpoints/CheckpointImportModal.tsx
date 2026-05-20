@@ -201,7 +201,7 @@ export const CheckpointImportModal: React.FC<CheckpointImportModalProps> = ({
                             <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100">
                                 Import Checkpoint
                             </h3>
-                            <p className="text-sm text-slate-500 dark:text-slate-400">
+                            <p className="text-sm text-slate-600 dark:text-slate-400">
                                 Restore from backup or shared checkpoint
                             </p>
                         </div>
@@ -209,7 +209,7 @@ export const CheckpointImportModal: React.FC<CheckpointImportModalProps> = ({
                     <button
                         onClick={onClose}
                         aria-label="Close"
-                        className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#1e2535] rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="p-2 text--600 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#1e2535] rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                         <X className="w-5 h-5" />
                     </button>
@@ -233,12 +233,12 @@ export const CheckpointImportModal: React.FC<CheckpointImportModalProps> = ({
                                 `}
                             >
                                 <div className="w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto mb-4">
-                                    <FileJson className="w-8 h-8 text-slate-400" />
+                                    <FileJson className="w-8 h-8 text--600" />
                                 </div>
                                 <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                                     Drop checkpoint JSON file here
                                 </p>
-                                <p className="text-xs text-slate-500 dark:text-slate-500 mb-4">
+                                <p className="text-xs text-slate-600 dark:text-slate-500 mb-4">
                                     or click to browse files
                                 </p>
                                 <input
@@ -261,7 +261,7 @@ export const CheckpointImportModal: React.FC<CheckpointImportModalProps> = ({
                                 <h4 className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-2">
                                     Supported Formats
                                 </h4>
-                                <ul className="text-xs text-slate-500 dark:text-slate-400 space-y-1">
+                                <ul className="text-xs text-slate-600 dark:text-slate-400 space-y-1">
                                     <li>• Agentium checkpoint export (.json)</li>
                                     <li>• Includes task state, agent states, and artifacts</li>
                                     <li>• Integrity checksum validation</li>
@@ -275,18 +275,18 @@ export const CheckpointImportModal: React.FC<CheckpointImportModalProps> = ({
                         <div className="space-y-4">
                             {/* File info */}
                             <div className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
-                                <FileCheck className="w-5 h-5 text-slate-400" />
+                                <FileCheck className="w-5 h-5 text--600" />
                                 <div className="flex-1 min-w-0">
                                     <p className="text-sm font-medium text-slate-700 dark:text-slate-300 truncate">
                                         {file?.name}
                                     </p>
-                                    <p className="text-xs text-slate-500">
+                                    <p className="text-xs text-slate-600">
                                         {(file?.size ? (file.size / 1024).toFixed(1) : 0)} KB
                                     </p>
                                 </div>
                                 <button
                                     onClick={handleReset}
-                                    className="text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded"
+                                    className="text-xs text-slate-600 hover:text-slate-700 dark:hover:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded"
                                 >
                                     Change
                                 </button>
@@ -341,10 +341,10 @@ export const CheckpointImportModal: React.FC<CheckpointImportModalProps> = ({
 
                                 <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700">
                                     <div className="flex items-center gap-4 text-xs">
-                                        <span className="text-slate-500">
+                                        <span className="text-slate-600">
                                             Schema: <span className="font-mono text-slate-700 dark:text-slate-300">{validation.schema_version}</span>
                                         </span>
-                                        <span className="text-slate-500">
+                                        <span className="text-slate-600">
                                             Checksum: {validation.checksum_valid ? (
                                                 <span className="text-emerald-600 dark:text-emerald-400">Valid</span>
                                             ) : (
@@ -367,7 +367,7 @@ export const CheckpointImportModal: React.FC<CheckpointImportModalProps> = ({
                                         Target Branch (optional)
                                     </label>
                                     <div className="flex items-center gap-2">
-                                        <GitBranch className="w-4 h-4 text-slate-400" />
+                                        <GitBranch className="w-4 h-4 text--600" />
                                         <input
                                             type="text"
                                             value={options.targetBranch}
@@ -407,7 +407,7 @@ export const CheckpointImportModal: React.FC<CheckpointImportModalProps> = ({
                                                     <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
                                                         {opt.label}
                                                     </p>
-                                                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                                                    <p className="text-xs text-slate-600 dark:text-slate-400">
                                                         {opt.description}
                                                     </p>
                                                 </div>
@@ -444,7 +444,7 @@ export const CheckpointImportModal: React.FC<CheckpointImportModalProps> = ({
                                             <li key={i} className="text-xs text-red-600 dark:text-red-400">
                                                 <span className="font-medium">{conflict.type}:</span> {conflict.message}
                                                 <br />
-                                                <span className="text-slate-500">Resolution: {conflict.resolution}</span>
+                                                <span className="text-slate-600">Resolution: {conflict.resolution}</span>
                                             </li>
                                         ))}
                                     </ul>
@@ -462,12 +462,12 @@ export const CheckpointImportModal: React.FC<CheckpointImportModalProps> = ({
                             <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-2">
                                 Import Successful
                             </h3>
-                            <p className="text-sm text-slate-500 dark:text-slate-400">
+                            <p className="text-sm text-slate-600 dark:text-slate-400">
                                 Checkpoint has been successfully imported and is ready to use.
                             </p>
                             {importResult.checkpoint && (
                                 <div className="mt-4 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
-                                    <p className="text-xs text-slate-500">Checkpoint ID</p>
+                                    <p className="text-xs text-slate-600">Checkpoint ID</p>
                                     <code className="text-sm font-mono text-slate-700 dark:text-slate-300">
                                         {importResult.checkpoint.id}
                                     </code>
@@ -483,13 +483,13 @@ export const CheckpointImportModal: React.FC<CheckpointImportModalProps> = ({
                         {isValidating && (
                             <>
                                 <LoadingSpinner size="sm" />
-                                <span className="text-xs text-slate-500">Validating...</span>
+                                <span className="text-xs text-slate-600">Validating...</span>
                             </>
                         )}
                         {isImporting && (
                             <>
                                 <LoadingSpinner size="sm" />
-                                <span className="text-xs text-slate-500">Importing...</span>
+                                <span className="text-xs text-slate-600">Importing...</span>
                             </>
                         )}
                     </div>

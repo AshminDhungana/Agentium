@@ -283,7 +283,7 @@ export default function APIKeyHealth() {
             <div className="w-full bg-white dark:bg-[#161b27] border border-gray-200 dark:border-[#1e2535] rounded-xl shadow-sm dark:shadow-[0_2px_16px_rgba(0,0,0,0.25)] p-8">
                 <div className="flex items-center justify-center gap-3">
                     <LoadingSpinner size="md" />
-                    <span className="text-sm text-gray-500 dark:text-gray-400">Loading API key health...</span>
+                    <span className="text-sm text-gray-600 dark:text-gray-400">Loading API key health...</span>
                 </div>
             </div>
         );
@@ -328,7 +328,7 @@ export default function APIKeyHealth() {
                         <h2 className="text-base font-semibold text-gray-900 dark:text-white">
                             API Key Health
                         </h2>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                        <p className="text-xs text-gray-600 dark:text-gray-400">
                             Phase 5.4 Resilience & Failover System
                         </p>
                     </div>
@@ -350,7 +350,7 @@ export default function APIKeyHealth() {
 
                     <button
                         onClick={fetchHealthData}
-                        className="p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#1e2535] transition-colors"
+                        className="p-2 rounded-lg text-gray-600 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#1e2535] transition-colors"
                         title="Refresh now"
                         aria-label="Refresh now"
                     >
@@ -428,12 +428,12 @@ export default function APIKeyHealth() {
                 {/* ── Provider Details ────────────────────────────────────── */}
                 <div className="space-y-3">
                     <h3 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                        <Shield className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                        <Shield className="w-4 h-4 text-gray-600 dark:text-gray-400" />
                         Provider Status
                     </h3>
 
                     {Object.entries(report.providers).length === 0 ? (
-                        <div className="text-center py-8 text-sm text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-[#0f1117] rounded-xl border border-dashed border-gray-200 dark:border-[#1e2535]">
+                        <div className="text-center py-8 text-sm text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-[#0f1117] rounded-xl border border-dashed border-gray-200 dark:border-[#1e2535]">
                             No API keys configured.{' '}
                             <a href="/models" className="text-blue-600 dark:text-blue-400 hover:underline ml-1">
                                 Add your first key
@@ -462,7 +462,7 @@ export default function APIKeyHealth() {
                                                 <p className="text-sm font-semibold text-gray-900 dark:text-white">
                                                     {PROVIDER_NAMES[provider] || provider}
                                                 </p>
-                                                <p className="text-xs text-gray-500 dark:text-gray-400">
+                                                <p className="text-xs text-gray-600 dark:text-gray-400">
                                                     {data.total_keys} key{data.total_keys !== 1 ? 's' : ''} •{' '}
                                                     {data.healthy} healthy
                                                     {data.cooldown > 0 && ` • ${data.cooldown} in cooldown`}
@@ -484,8 +484,8 @@ export default function APIKeyHealth() {
                                             </div>
 
                                             {isExpanded
-                                                ? <ChevronUp className="w-4 h-4 text-gray-400 dark:text-gray-500" />
-                                                : <ChevronDown className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+                                                ? <ChevronUp className="w-4 h-4 text--600 dark:text-gray-500" />
+                                                : <ChevronDown className="w-4 h-4 text--600 dark:text-gray-500" />
                                             }
                                         </div>
                                     </button>
@@ -518,7 +518,7 @@ export default function APIKeyHealth() {
                                                                         <span className={`text-xs font-bold ${
                                                                             key.priority <= 2
                                                                                 ? 'text-blue-600 dark:text-blue-400'
-                                                                                : 'text-gray-500 dark:text-gray-400'
+                                                                                : 'text-gray-600 dark:text-gray-400'
                                                                         }`}>
                                                                             P{key.priority}
                                                                         </span>
@@ -531,7 +531,7 @@ export default function APIKeyHealth() {
                                                                                 {statusConfig.label}
                                                                             </span>
                                                                             {key.failure_count > 0 && (
-                                                                                <span className="text-xs text-gray-500 dark:text-gray-400">
+                                                                                <span className="text-xs text-gray-600 dark:text-gray-400">
                                                                                     ({key.failure_count} failures)
                                                                                 </span>
                                                                             )}
@@ -547,7 +547,7 @@ export default function APIKeyHealth() {
                                                                         {key.monthly_budget_usd > 0 && (
                                                                             <div className="mt-2">
                                                                                 <div className="flex items-center justify-between text-xs mb-1">
-                                                                                    <span className="text-gray-500 dark:text-gray-400">
+                                                                                    <span className="text-gray-600 dark:text-gray-400">
                                                                                         Budget: ${key.current_spend_usd.toFixed(2)} / ${key.monthly_budget_usd.toFixed(2)}
                                                                                     </span>
                                                                                     <span className={`font-medium ${
@@ -640,7 +640,7 @@ export default function APIKeyHealth() {
                 </div>
 
                 {/* ── Footer ───────────────────────────────────────────────── */}
-                <div className="flex items-center justify-between pt-4 border-t border-gray-100 dark:border-[#1e2535] text-xs text-gray-500 dark:text-gray-400">
+                <div className="flex items-center justify-between pt-4 border-t border-gray-100 dark:border-[#1e2535] text-xs text-gray-600 dark:text-gray-400">
                     <div className="flex items-center gap-4">
                         <span>Last updated: {lastUpdated.toLocaleTimeString()}</span>
                         {report.generated_at && (

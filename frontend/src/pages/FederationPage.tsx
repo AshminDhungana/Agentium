@@ -193,7 +193,7 @@ export function FederationPage() {
                     <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
                         Access Denied
                     </h2>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
                         Only Sovereign users can manage federation settings.
                     </p>
                 </div>
@@ -217,7 +217,7 @@ export function FederationPage() {
                             New
                         </span>
                     </div>
-                    <p className="text-gray-500 dark:text-gray-400 text-sm">
+                    <p className="text-gray-600 dark:text-gray-400 text-sm">
                         Manage peer instances and cross-instance task delegation.
                     </p>
                 </div>
@@ -235,7 +235,7 @@ export function FederationPage() {
                                 {peersLoading ? '—' : peerStats.total}
                             </span>
                         </div>
-                        <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Peers</p>
+                        <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Peers</p>
                     </div>
 
                     {/* Active Peers */}
@@ -248,7 +248,7 @@ export function FederationPage() {
                                 {peersLoading ? '—' : peerStats.active}
                             </span>
                         </div>
-                        <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Active</p>
+                        <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Active</p>
                     </div>
 
                     {/* Suspended Peers — operationally important to surface */}
@@ -261,7 +261,7 @@ export function FederationPage() {
                                 {peersLoading ? '—' : peerStats.suspended}
                             </span>
                         </div>
-                        <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Suspended</p>
+                        <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Suspended</p>
                     </div>
 
                     {/* Delegated Tasks */}
@@ -274,7 +274,7 @@ export function FederationPage() {
                                 {tasksLoading ? '—' : tasks.length}
                             </span>
                         </div>
-                        <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Delegated Tasks</p>
+                        <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Delegated Tasks</p>
                     </div>
                 </div>
 
@@ -332,7 +332,7 @@ export function FederationPage() {
                         {/* Toolbar */}
                         <div className="flex flex-col sm:flex-row gap-4 mb-6">
                             <div className="relative flex-1">
-                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" aria-hidden="true" />
+                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text--600 dark:text-gray-500" aria-hidden="true" />
                                 <input
                                     type="search"
                                     placeholder="Search peers by name or URL…"
@@ -385,7 +385,7 @@ export function FederationPage() {
                     <>
                         {/* Toolbar */}
                         <div className="flex items-center justify-between mb-6">
-                            <div className="flex gap-4 text-sm text-gray-500 dark:text-gray-400">
+                            <div className="flex gap-4 text-sm text-gray-600 dark:text-gray-400">
                                 {!tasksLoading && tasks.length > 0 && (
                                     <>
                                         <span>
@@ -436,17 +436,17 @@ export function FederationPage() {
                             {tasksLoading ? (
                                 <div className="p-16 text-center">
                                     <LoadingSpinner size="lg" />
-                                    <p className="text-sm text-gray-500 dark:text-gray-400">Loading tasks…</p>
+                                    <p className="text-sm text-gray-600 dark:text-gray-400">Loading tasks…</p>
                                 </div>
                             ) : tasks.length === 0 ? (
                                 <div className="p-16 text-center">
                                     <div className="w-14 h-14 rounded-xl bg-gray-100 dark:bg-[#1e2535] border border-gray-200 dark:border-[#2a3347] flex items-center justify-center mx-auto mb-4">
-                                        <Activity className="w-6 h-6 text-gray-400 dark:text-gray-500" aria-hidden="true" />
+                                        <Activity className="w-6 h-6 text--600 dark:text-gray-500" aria-hidden="true" />
                                     </div>
                                     <p className="text-gray-900 dark:text-white font-medium mb-1">
                                         No Delegated Tasks
                                     </p>
-                                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                                    <p className="text-sm text-gray-600 dark:text-gray-400">
                                         Delegate tasks to peer instances to distribute workload.
                                     </p>
                                 </div>
@@ -480,11 +480,11 @@ export function FederationPage() {
                                                         <div className="min-w-0">
                                                             <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
                                                                 Task{' '}
-                                                                <span className="font-mono text-xs text-gray-500 dark:text-gray-400">
+                                                                <span className="font-mono text-xs text-gray-600 dark:text-gray-400">
                                                                     {task.original_task_id}
                                                                 </span>
                                                             </p>
-                                                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                                            <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
                                                                 {isOutgoing ? '↑ Outgoing' : '↓ Incoming'}
                                                                 {' · '}
                                                                 {formatDate(task.delegated_at)}

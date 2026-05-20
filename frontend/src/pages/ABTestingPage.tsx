@@ -37,7 +37,7 @@ const STATUS_STYLES: Record<string, {
   running:   { bg: 'bg-blue-50',    text: 'text-blue-700',    dot: 'bg-blue-500 animate-pulse', darkBg: 'dark:bg-blue-500/10',   darkText: 'dark:text-blue-400',    darkDot: 'dark:bg-blue-400' },
   completed: { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500',          darkBg: 'dark:bg-emerald-500/10',  darkText: 'dark:text-emerald-400', darkDot: 'dark:bg-emerald-400' },
   failed:    { bg: 'bg-red-50',     text: 'text-red-700',     dot: 'bg-red-500',              darkBg: 'dark:bg-red-500/10',      darkText: 'dark:text-red-400',     darkDot: 'dark:bg-red-400' },
-  cancelled: { bg: 'bg-slate-100',  text: 'text-slate-500',   dot: 'bg-slate-300',            darkBg: 'dark:bg-slate-800',       darkText: 'dark:text-slate-400',   darkDot: 'dark:bg-slate-600' },
+  cancelled: { bg: 'bg-slate-100',  text: 'text-slate-600',   dot: 'bg-slate-300',            darkBg: 'dark:bg-slate-800',       darkText: 'dark:text-slate-400',   darkDot: 'dark:bg-slate-600' },
 };
 
 const MODEL_COLORS = ['#6366f1', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6', '#06b6d4'];
@@ -80,9 +80,9 @@ function MetricCard({ icon: Icon, label, value, sub }: {
         <Icon className="w-4.5 h-4.5 text-indigo-600 dark:text-indigo-400" size={18} />
       </div>
       <div>
-        <p className="text-xs text-slate-400 dark:text-slate-500 font-medium">{label}</p>
+        <p className="text-xs text--600 dark:text-slate-500 font-medium">{label}</p>
         <p className="text-lg font-bold text-slate-800 dark:text-white leading-tight">{value}</p>
-        {sub && <p className="text-xs text-slate-400 dark:text-slate-500">{sub}</p>}
+        {sub && <p className="text-xs text--600 dark:text-slate-500">{sub}</p>}
       </div>
     </div>
   );
@@ -104,11 +104,11 @@ function DeleteConfirmModal({
       <div className="bg-white dark:bg-[#161b27] rounded-2xl shadow-2xl border border-slate-100 dark:border-[#1e2535] w-full max-w-sm p-6">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-10 h-10 rounded-xl bg-red-50 dark:bg-red-500/10 flex items-center justify-center">
-            <AlertTriangle className="w-5 h-5 text-red-500 dark:text-red-400" />
+            <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
           </div>
           <div>
             <h3 className="font-bold text-slate-900 dark:text-white text-sm">Delete Experiment</h3>
-            <p className="text-xs text-slate-400 dark:text-slate-500">This action cannot be undone</p>
+            <p className="text-xs text--600 dark:text-slate-500">This action cannot be undone</p>
           </div>
         </div>
         <p className="text-sm text-slate-600 dark:text-slate-400 mb-5">
@@ -163,7 +163,7 @@ function ExperimentCard({
               onClick={e => { e.stopPropagation(); setConfirmDelete(true); }}
               className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all"
             >
-              <Trash2 className="w-3.5 h-3.5 text-red-400" />
+              <Trash2 className="w-3.5 h-3.5 text--600" />
             </button>
           )}
         </div>
@@ -172,7 +172,7 @@ function ExperimentCard({
           {experiment.name}
         </h3>
 
-        <div className="flex items-center gap-4 text-xs text-slate-400 dark:text-slate-500 mb-3">
+        <div className="flex items-center gap-4 text-xs text--600 dark:text-slate-500 mb-3">
           <span className="flex items-center gap-1">
             <Layers className="w-3.5 h-3.5" />
             {experiment.models_tested} models
@@ -192,17 +192,17 @@ function ExperimentCard({
               ✓ {experiment.completed_runs}
             </span>
             {experiment.failed_runs > 0 && (
-              <span className="text-red-500 dark:text-red-400">
+              <span className="text-red-600 dark:text-red-400">
                 ✗ {experiment.failed_runs}
               </span>
             )}
-            <span className="text-slate-400">/ {experiment.total_runs} runs</span>
+            <span className="text--600">/ {experiment.total_runs} runs</span>
           </div>
         )}
 
         {/* Progress bar */}
         <div>
-          <div className="flex justify-between text-xs text-slate-400 dark:text-slate-500 mb-1">
+          <div className="flex justify-between text-xs text--600 dark:text-slate-500 mb-1">
             <span>Progress</span>
             <span>{experiment.progress}%</span>
           </div>
@@ -219,7 +219,7 @@ function ExperimentCard({
           </div>
         </div>
 
-        <div className="mt-3 flex items-center text-xs text-indigo-500 dark:text-indigo-400 font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="mt-3 flex items-center text-xs text-indigo-600 dark:text-indigo-400 font-medium opacity-0 group-hover:opacity-100 transition-opacity">
           View details <ChevronRight className="w-3.5 h-3.5 ml-0.5" />
         </div>
       </div>
@@ -287,11 +287,11 @@ function CreateExperimentModal({
             </div>
             <div>
               <h2 className="text-lg font-bold text-slate-900 dark:text-white">New Experiment</h2>
-              <p className="text-xs text-slate-400 dark:text-slate-500">Compare models side-by-side</p>
+              <p className="text-xs text--600 dark:text-slate-500">Compare models side-by-side</p>
             </div>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-slate-100 dark:hover:bg-[#1e2535] rounded-lg transition-colors">
-            <X className="w-4 h-4 text-slate-400" />
+            <X className="w-4 h-4 text--600" />
           </button>
         </div>
 
@@ -307,7 +307,7 @@ function CreateExperimentModal({
           {/* Name */}
           <div>
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-              Experiment Name <span className="text-red-400">*</span>
+              Experiment Name <span className="text--600">*</span>
             </label>
             <input
               value={name}
@@ -320,7 +320,7 @@ function CreateExperimentModal({
           {/* Task template */}
           <div>
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-              Task / Prompt <span className="text-red-400">*</span>
+              Task / Prompt <span className="text--600">*</span>
             </label>
             <textarea
               value={taskTemplate}
@@ -334,7 +334,7 @@ function CreateExperimentModal({
           {/* System prompt */}
           <div>
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-              System Prompt <span className="text-slate-400 font-normal">(optional)</span>
+              System Prompt <span className="text--600 font-normal">(optional)</span>
             </label>
             <textarea
               value={systemPrompt}
@@ -348,8 +348,8 @@ function CreateExperimentModal({
           {/* Model selection */}
           <div>
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-              Models to compare <span className="text-red-400">*</span>
-              <span className="ml-1 text-xs text-slate-400 font-normal">(select at least 2)</span>
+              Models to compare <span className="text--600">*</span>
+              <span className="ml-1 text-xs text--600 font-normal">(select at least 2)</span>
             </label>
             <div className="grid grid-cols-2 gap-2">
               {models.map((m: { id: string; name?: string; default_model?: string }) => {
@@ -366,13 +366,13 @@ function CreateExperimentModal({
                   >
                     <span className="block font-semibold">{m.name || m.default_model || m.id}</span>
                     {m.default_model && m.name && (
-                      <span className="text-slate-400 dark:text-slate-500 font-normal">{m.default_model}</span>
+                      <span className="text--600 dark:text-slate-500 font-normal">{m.default_model}</span>
                     )}
                   </button>
                 );
               })}
               {models.length === 0 && (
-                <p className="col-span-2 text-xs text-slate-400 dark:text-slate-500 py-3 text-center">
+                <p className="col-span-2 text-xs text--600 dark:text-slate-500 py-3 text-center">
                   No model configurations found. Add one in the Models page.
                 </p>
               )}
@@ -404,7 +404,7 @@ function CreateExperimentModal({
 
         {/* Footer */}
         <div className="flex items-center justify-between p-6 border-t border-slate-100 dark:border-[#1e2535]">
-          <p className="text-xs text-slate-400 dark:text-slate-500">
+          <p className="text-xs text--600 dark:text-slate-500">
             {selectedConfigs.length} model{selectedConfigs.length !== 1 ? 's' : ''} selected
             · {selectedConfigs.length * iterations} total runs
           </p>
@@ -486,11 +486,11 @@ function QuickTestModal({ onClose }: { onClose: () => void }) {
             </div>
             <div>
               <h2 className="text-lg font-bold text-slate-900 dark:text-white">Quick A/B Test</h2>
-              <p className="text-xs text-slate-400 dark:text-slate-500">Fires in background — results shown when ready</p>
+              <p className="text-xs text--600 dark:text-slate-500">Fires in background — results shown when ready</p>
             </div>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-slate-100 dark:hover:bg-[#1e2535] rounded-lg transition-colors">
-            <X className="w-4 h-4 text-slate-400" />
+            <X className="w-4 h-4 text--600" />
           </button>
         </div>
 
@@ -499,7 +499,7 @@ function QuickTestModal({ onClose }: { onClose: () => void }) {
             {!isDone ? (
               <div className="flex flex-col items-center py-10 gap-4">
                 <LoadingSpinner size="lg" />
-                <p className="text-sm text-slate-500 dark:text-slate-400">Running experiment…</p>
+                <p className="text-sm text-slate-600 dark:text-slate-400">Running experiment…</p>
                 <StatusBadge status={resultExp?.status ?? 'pending'} />
               </div>
             ) : (
@@ -512,13 +512,13 @@ function QuickTestModal({ onClose }: { onClose: () => void }) {
                 {resultExp?.comparison?.winner && (
                   <div className="bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-100 dark:border-indigo-500/20 rounded-xl p-4">
                     <div className="flex items-center gap-2 mb-2">
-                      <Trophy className="w-4 h-4 text-amber-500" />
+                      <Trophy className="w-4 h-4 text-amber-700" />
                       <span className="text-sm font-semibold text-slate-800 dark:text-white">
                         Winner: {resultExp.comparison.winner.model}
                       </span>
                       <ScorePill score={resultExp.comparison.winner.confidence} label="conf" />
                     </div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                    <p className="text-xs text-slate-600 dark:text-slate-400">
                       {resultExp.comparison.winner.reason}
                     </p>
                   </div>
@@ -528,7 +528,7 @@ function QuickTestModal({ onClose }: { onClose: () => void }) {
                   <div className="overflow-x-auto">
                     <table className="w-full text-xs">
                       <thead>
-                        <tr className="text-slate-400 dark:text-slate-500 border-b border-slate-100 dark:border-[#1e2535]">
+                        <tr className="text--600 dark:text-slate-500 border-b border-slate-100 dark:border-[#1e2535]">
                           <th className="text-left py-2 pr-4">Model</th>
                           <th className="text-right pr-4">Quality</th>
                           <th className="text-right pr-4">Success</th>
@@ -541,9 +541,9 @@ function QuickTestModal({ onClose }: { onClose: () => void }) {
                           <tr key={m.config_id} className="border-b border-slate-50 dark:border-[#1e2535]">
                             <td className="py-2 pr-4 font-medium text-slate-800 dark:text-white">{m.model_name}</td>
                             <td className="py-2 pr-4 text-right"><ScorePill score={m.avg_quality_score} /></td>
-                            <td className="py-2 pr-4 text-right text-slate-500">{m.success_rate.toFixed(0)}%</td>
-                            <td className="py-2 pr-4 text-right text-slate-500">${m.avg_cost_usd.toFixed(5)}</td>
-                            <td className="py-2 text-right text-slate-500">{m.avg_latency_ms?.toLocaleString() ?? '—'}ms</td>
+                            <td className="py-2 pr-4 text-right text-slate-600">{m.success_rate.toFixed(0)}%</td>
+                            <td className="py-2 pr-4 text-right text-slate-600">${m.avg_cost_usd.toFixed(5)}</td>
+                            <td className="py-2 text-right text-slate-600">{m.avg_latency_ms?.toLocaleString() ?? '—'}ms</td>
                           </tr>
                         ))}
                       </tbody>
@@ -591,7 +591,7 @@ function QuickTestModal({ onClose }: { onClose: () => void }) {
 
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                Models <span className="text-xs text-slate-400 font-normal">(select at least 2)</span>
+                Models <span className="text-xs text--600 font-normal">(select at least 2)</span>
               </label>
               <div className="grid grid-cols-2 gap-2">
                 {models.map((m: { id: string; name?: string; default_model?: string }) => {
@@ -712,7 +712,7 @@ function ExperimentDetailPanel({
               </button>
             )}
             <button onClick={onClose} className="p-2 hover:bg-slate-100 dark:hover:bg-[#1e2535] rounded-lg transition-colors">
-              <X className="w-4 h-4 text-slate-400" />
+              <X className="w-4 h-4 text--600" />
             </button>
           </div>
         </div>
@@ -729,7 +729,7 @@ function ExperimentDetailPanel({
               {exp.comparison?.winner && (
                 <div className="bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-500/10 dark:to-purple-500/10 border border-indigo-100 dark:border-indigo-500/20 rounded-2xl p-5">
                   <div className="flex items-center gap-2 mb-2">
-                    <Trophy className="w-5 h-5 text-amber-500" />
+                    <Trophy className="w-5 h-5 text-amber-700" />
                     <span className="font-bold text-slate-900 dark:text-white">
                       Winner: {exp.comparison.winner.model}
                     </span>
@@ -744,7 +744,7 @@ function ExperimentDetailPanel({
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Radar */}
                   <div className="bg-slate-50 dark:bg-[#0f1117] rounded-xl p-4 border border-slate-100 dark:border-[#1e2535]">
-                    <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-3 uppercase tracking-wide">
+                    <h3 className="text-xs font-semibold text-slate-600 dark:text-slate-400 mb-3 uppercase tracking-wide">
                       Performance Radar
                     </h3>
                     <ResponsiveContainer width="100%" height={220}>
@@ -767,7 +767,7 @@ function ExperimentDetailPanel({
 
                   {/* Latency bar */}
                   <div className="bg-slate-50 dark:bg-[#0f1117] rounded-xl p-4 border border-slate-100 dark:border-[#1e2535]">
-                    <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-3 uppercase tracking-wide">
+                    <h3 className="text-xs font-semibold text-slate-600 dark:text-slate-400 mb-3 uppercase tracking-wide">
                       Avg Latency (ms)
                     </h3>
                     <ResponsiveContainer width="100%" height={220}>
@@ -800,13 +800,13 @@ function ExperimentDetailPanel({
               {models.length > 0 && (
                 <div>
                   <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3 flex items-center gap-2">
-                    <BarChart3 className="w-4 h-4 text-indigo-500" />
+                    <BarChart3 className="w-4 h-4 text-indigo-600" />
                     Model Comparison
                   </h3>
                   <div className="overflow-x-auto">
                     <table className="w-full text-xs">
                       <thead>
-                        <tr className="text-slate-400 dark:text-slate-500 border-b border-slate-100 dark:border-[#1e2535]">
+                        <tr className="text--600 dark:text-slate-500 border-b border-slate-100 dark:border-[#1e2535]">
                           <th className="text-left py-2 pr-4 font-medium">Model</th>
                           <th className="text-right pr-4 font-medium">Quality</th>
                           <th className="text-right pr-4 font-medium">Success</th>
@@ -823,7 +823,7 @@ function ExperimentDetailPanel({
                                 <div className="w-2 h-2 rounded-full" style={{ backgroundColor: MODEL_COLORS[i % MODEL_COLORS.length] }} />
                                 <span className="font-medium text-slate-800 dark:text-slate-200">{m.model_name}</span>
                                 {exp.comparison?.winner.config_id === m.config_id && (
-                                  <Trophy className="w-3 h-3 text-amber-500" />
+                                  <Trophy className="w-3 h-3 text-amber-700" />
                                 )}
                               </div>
                             </td>
@@ -831,9 +831,9 @@ function ExperimentDetailPanel({
                             <td className={`py-2.5 pr-4 text-right font-medium ${m.success_rate >= 80 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
                               {m.success_rate.toFixed(0)}%
                             </td>
-                            <td className="py-2.5 pr-4 text-right text-slate-500">{m.avg_tokens?.toLocaleString() ?? '—'}</td>
-                            <td className="py-2.5 pr-4 text-right text-slate-500">${m.avg_cost_usd?.toFixed(5) ?? '—'}</td>
-                            <td className="py-2.5 text-right text-slate-500">{m.avg_latency_ms?.toLocaleString() ?? '—'}ms</td>
+                            <td className="py-2.5 pr-4 text-right text-slate-600">{m.avg_tokens?.toLocaleString() ?? '—'}</td>
+                            <td className="py-2.5 pr-4 text-right text-slate-600">${m.avg_cost_usd?.toFixed(5) ?? '—'}</td>
+                            <td className="py-2.5 text-right text-slate-600">{m.avg_latency_ms?.toLocaleString() ?? '—'}ms</td>
                           </tr>
                         ))}
                       </tbody>
@@ -845,7 +845,7 @@ function ExperimentDetailPanel({
               {/* Individual Runs */}
               <div>
                 <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3 flex items-center gap-2">
-                  <Target className="w-4 h-4 text-indigo-500" />
+                  <Target className="w-4 h-4 text-indigo-600" />
                   Individual Runs ({exp.runs?.length ?? 0})
                 </h3>
                 <div className="space-y-2">
@@ -857,19 +857,19 @@ function ExperimentDetailPanel({
                         <StatusBadge status={run.status} />
                         {run.quality_score != null && <ScorePill score={run.quality_score} label="Q" />}
                         {run.latency_ms != null && (
-                          <span className="text-xs text-slate-400 dark:text-slate-500">{run.latency_ms.toLocaleString()}ms</span>
+                          <span className="text-xs text--600 dark:text-slate-500">{run.latency_ms.toLocaleString()}ms</span>
                         )}
                         {run.cost_usd != null && (
-                          <span className="text-xs text-slate-400 dark:text-slate-500">${run.cost_usd.toFixed(6)}</span>
+                          <span className="text-xs text--600 dark:text-slate-500">${run.cost_usd.toFixed(6)}</span>
                         )}
                       </div>
                       {run.output_preview && (
-                        <p className="text-xs text-slate-500 dark:text-slate-400 font-mono leading-relaxed bg-white dark:bg-[#161b27] rounded-lg p-2.5 border border-slate-100 dark:border-[#1e2535] line-clamp-3">
+                        <p className="text-xs text-slate-600 dark:text-slate-400 font-mono leading-relaxed bg-white dark:bg-[#161b27] rounded-lg p-2.5 border border-slate-100 dark:border-[#1e2535] line-clamp-3">
                           {run.output_preview}
                         </p>
                       )}
                       {run.error_message && (
-                        <p className="text-xs text-red-500 dark:text-red-400 mt-1 flex items-center gap-1">
+                        <p className="text-xs text-red-600 dark:text-red-400 mt-1 flex items-center gap-1">
                           <AlertCircle className="w-3 h-3 shrink-0" />
                           {run.error_message}
                         </p>
@@ -877,7 +877,7 @@ function ExperimentDetailPanel({
                     </div>
                   ))}
                   {(!exp.runs || exp.runs.length === 0) && (
-                    <p className="text-sm text-slate-400 dark:text-slate-500 text-center py-6">No runs yet.</p>
+                    <p className="text-sm text--600 dark:text-slate-500 text-center py-6">No runs yet.</p>
                   )}
                 </div>
               </div>
@@ -916,10 +916,10 @@ function RecommendationsPanel() {
     <div className="bg-white dark:bg-[#161b27] rounded-2xl border border-slate-100 dark:border-[#1e2535] shadow-sm dark:shadow-[0_2px_8px_rgba(0,0,0,0.2)]">
       <div className="flex items-center justify-between p-5 border-b border-slate-100 dark:border-[#1e2535]">
         <div className="flex items-center gap-2">
-          <TrendingUp className="w-4 h-4 text-indigo-500 dark:text-indigo-400" />
+          <TrendingUp className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
           <h2 className="font-semibold text-slate-800 dark:text-white text-sm">Model Recommendations</h2>
           {data && (
-            <span className="text-xs text-slate-400 dark:text-slate-500">{data.total_categories} categories</span>
+            <span className="text-xs text--600 dark:text-slate-500">{data.total_categories} categories</span>
           )}
         </div>
         <div className="flex items-center gap-2">
@@ -930,7 +930,7 @@ function RecommendationsPanel() {
             className="px-3 py-1.5 text-xs bg-slate-50 dark:bg-[#0f1117] border border-slate-200 dark:border-[#1e2535] rounded-lg text-slate-700 dark:text-slate-300 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 w-40"
           />
           <button onClick={() => refetch()} className="p-1.5 hover:bg-slate-100 dark:hover:bg-[#1e2535] rounded-lg transition-colors">
-            <RefreshCw className="w-3.5 h-3.5 text-slate-400" />
+            <RefreshCw className="w-3.5 h-3.5 text--600" />
           </button>
         </div>
       </div>
@@ -942,7 +942,7 @@ function RecommendationsPanel() {
       ) : recommendations.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <TrendingUp className="w-8 h-8 text-slate-300 dark:text-slate-600 mb-3" />
-          <p className="text-sm text-slate-400 dark:text-slate-500">No recommendations yet.</p>
+          <p className="text-sm text--600 dark:text-slate-500">No recommendations yet.</p>
           <p className="text-xs text-slate-300 dark:text-slate-600 mt-1">Complete experiments to generate recommendations.</p>
         </div>
       ) : (
@@ -951,28 +951,28 @@ function RecommendationsPanel() {
             <div key={rec.task_category} className="p-5 hover:bg-slate-50 dark:hover:bg-[#0f1117]/50 transition-colors">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wide mb-1">
+                  <p className="text-xs font-semibold text--600 dark:text-slate-500 uppercase tracking-wide mb-1">
                     {rec.task_category}
                   </p>
                   <div className="flex items-center gap-2">
-                    <Trophy className="w-3.5 h-3.5 text-amber-500" />
+                    <Trophy className="w-3.5 h-3.5 text-amber-700" />
                     <span className="font-semibold text-sm text-slate-800 dark:text-white">{rec.recommended_model}</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
                   <div className="text-right">
-                    <p className="text-xs text-slate-400 dark:text-slate-500">Quality</p>
+                    <p className="text-xs text--600 dark:text-slate-500">Quality</p>
                     <ScorePill score={rec.avg_quality_score} />
                   </div>
                   <div className="text-right">
-                    <p className="text-xs text-slate-400 dark:text-slate-500">Success</p>
+                    <p className="text-xs text--600 dark:text-slate-500">Success</p>
                     <p className={`text-sm font-bold ${rec.success_rate >= 80 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
                       {rec.success_rate.toFixed(0)}%
                     </p>
                   </div>
                 </div>
               </div>
-              <div className="mt-2 flex items-center gap-3 text-xs text-slate-400 dark:text-slate-500">
+              <div className="mt-2 flex items-center gap-3 text-xs text--600 dark:text-slate-500">
                 <span>{rec.avg_latency_ms?.toLocaleString() ?? '—'}ms avg latency</span>
                 <span>·</span>
                 <span>${rec.avg_cost_usd?.toFixed(5) ?? '—'} avg cost</span>
@@ -1003,7 +1003,7 @@ function AccessDenied() {
           <Shield className="w-9 h-9 text-red-600 dark:text-red-400" />
         </div>
         <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Access Denied</h2>
-        <p className="text-slate-500 dark:text-slate-400 text-sm">Only admin users can access A/B Testing.</p>
+        <p className="text-slate-600 dark:text-slate-400 text-sm">Only admin users can access A/B Testing.</p>
       </div>
     </div>
   );
@@ -1092,7 +1092,7 @@ export function ABTestingPage() {
             </div>
             <div>
               <h1 className="text-2xl font-bold text-slate-900 dark:text-white">A/B Model Testing</h1>
-              <p className="text-sm text-slate-400 dark:text-slate-500">Compare AI models on cost, speed &amp; quality</p>
+              <p className="text-sm text--600 dark:text-slate-500">Compare AI models on cost, speed &amp; quality</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -1132,7 +1132,7 @@ export function ABTestingPage() {
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all capitalize ${
                 activeTab === tab
                   ? 'bg-white dark:bg-[#0f1117] text-slate-800 dark:text-white shadow-sm'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
               }`}
             >
               {tab}
@@ -1153,7 +1153,7 @@ export function ABTestingPage() {
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all capitalize ${
                     statusFilter === f
                       ? 'bg-indigo-600 dark:bg-indigo-500 text-white'
-                      : 'bg-white dark:bg-[#161b27] text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-[#1e2535] hover:border-slate-300 dark:hover:border-[#2a3347]'
+                      : 'bg-white dark:bg-[#161b27] text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-[#1e2535] hover:border-slate-300 dark:hover:border-[#2a3347]'
                   }`}
                 >
                   {f || 'All'}
@@ -1163,7 +1163,7 @@ export function ABTestingPage() {
                 onClick={() => refetch()}
                 className="ml-auto p-2 hover:bg-white dark:hover:bg-[#161b27] rounded-lg border border-transparent hover:border-slate-200 dark:hover:border-[#1e2535] transition-all"
               >
-                <RefreshCw className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+                <RefreshCw className="w-4 h-4 text--600 dark:text-slate-500" />
               </button>
             </div>
 
@@ -1175,10 +1175,10 @@ export function ABTestingPage() {
             ) : experiments.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-24 text-center">
                 <div className="w-16 h-16 rounded-2xl bg-indigo-50 dark:bg-indigo-500/10 flex items-center justify-center mb-4">
-                  <FlaskConical className="w-7 h-7 text-indigo-400" />
+                  <FlaskConical className="w-7 h-7 text--600" />
                 </div>
                 <h3 className="font-semibold text-slate-700 dark:text-slate-300 mb-1">No experiments yet</h3>
-                <p className="text-sm text-slate-400 dark:text-slate-500 mb-5">Create your first A/B test to compare models</p>
+                <p className="text-sm text--600 dark:text-slate-500 mb-5">Create your first A/B test to compare models</p>
                 <button
                   onClick={() => setShowCreate(true)}
                   className="flex items-center gap-2 px-4 py-2 bg-indigo-600 dark:bg-indigo-500 text-white text-sm rounded-xl hover:bg-indigo-700 dark:hover:bg-indigo-400 transition-colors shadow-md"
@@ -1210,7 +1210,7 @@ export function ABTestingPage() {
                     >
                       ← Prev
                     </button>
-                    <span className="text-sm text-slate-500 dark:text-slate-400">
+                    <span className="text-sm text-slate-600 dark:text-slate-400">
                       Page {page + 1} of {totalPages}
                     </span>
                     <button

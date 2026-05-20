@@ -16,7 +16,7 @@ function TypeIcon({ type }: { type: Agent['agent_type'] }) {
         case 'council_member':  return <Users    className="w-4 h-4 text-blue-600 dark:text-blue-400"   />;
         case 'lead_agent':      return <Brain    className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />;
         case 'task_agent':      return <Terminal className="w-4 h-4 text-amber-600 dark:text-amber-400" />;
-        default:                return <Activity className="w-4 h-4 text-slate-500 dark:text-slate-400" />;
+        default:                return <Activity className="w-4 h-4 text-slate-600 dark:text-slate-400" />;
     }
 }
 
@@ -49,7 +49,7 @@ export const AgentListView: React.FC<AgentListViewProps> = React.memo(({
 
     if (displayAgents.length === 0) {
         return (
-            <p className="text-sm text-slate-400 dark:text-slate-500 text-center py-8">
+            <p className="text-sm text--600 dark:text-slate-500 text-center py-8">
                 No agents to display.
             </p>
         );
@@ -63,7 +63,7 @@ export const AgentListView: React.FC<AgentListViewProps> = React.memo(({
                         {['Agent', 'Type', 'Status', 'Subordinates', 'Tasks Done', 'Actions'].map(h => (
                             <th
                                 key={h}
-                                className="text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider py-3 px-4 first:pl-0"
+                                className="text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider py-3 px-4 first:pl-0"
                             >
                                 {h}
                             </th>
@@ -98,7 +98,7 @@ export const AgentListView: React.FC<AgentListViewProps> = React.memo(({
                                             <p className="font-medium text-slate-900 dark:text-slate-100 leading-none">
                                                 {agent.name}
                                             </p>
-                                            <p className="text-xs text-slate-400 dark:text-slate-500 font-mono mt-0.5">
+                                            <p className="text-xs text--600 dark:text-slate-500 font-mono mt-0.5">
                                                 {agent.agentium_id}
                                             </p>
                                         </div>

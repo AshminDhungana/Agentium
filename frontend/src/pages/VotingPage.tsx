@@ -116,7 +116,7 @@ export const VotingPage: React.FC = () => {
                                 <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
                                     Council Voting
                                 </h1>
-                                <p className="text-gray-500 dark:text-gray-400 text-sm">
+                                <p className="text-gray-600 dark:text-gray-400 text-sm">
                                     Constitutional amendments and task deliberations
                                 </p>
                             </div>
@@ -124,7 +124,7 @@ export const VotingPage: React.FC = () => {
                         <div className="flex items-center gap-2 self-start sm:self-auto w-full sm:w-auto">
                             <button
                                 onClick={() => loadData(true)}
-                                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-[#1e2535] text-gray-500 dark:text-gray-400 transition-colors duration-200"
+                                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-[#1e2535] text-gray-600 dark:text-gray-400 transition-colors duration-200"
                                 title="Refresh now"
                                 aria-label="Refresh now"
                             >
@@ -189,7 +189,7 @@ export const VotingPage: React.FC = () => {
                                 </div>
                                 <div>
                                     <p className="text-2xl font-bold text-gray-900 dark:text-white">{value}</p>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 leading-tight">{label}</p>
+                                    <p className="text-xs text-gray-600 dark:text-gray-400 leading-tight">{label}</p>
                                 </div>
                             </div>
                         ))}
@@ -210,7 +210,7 @@ export const VotingPage: React.FC = () => {
                                 className={`relative px-5 py-3 font-medium text-sm transition-colors flex items-center gap-2 whitespace-nowrap ${
                                     activeTab === id
                                         ? 'text-blue-600 dark:text-blue-400'
-                                        : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                                        : 'text-gray-600 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
                                 }`}
                                 onClick={() => {
                                     setActiveTab(id);
@@ -223,7 +223,7 @@ export const VotingPage: React.FC = () => {
                                     <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${
                                         activeTab === id
                                             ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400'
-                                            : 'bg-gray-100 dark:bg-[#1e2535] text-gray-500 dark:text-gray-400'
+                                            : 'bg-gray-100 dark:bg-[#1e2535] text-gray-600 dark:text-gray-400'
                                     }`}>
                                         {count}
                                     </span>
@@ -337,7 +337,7 @@ export const VotingPage: React.FC = () => {
                                             onVoteSuccess={() => loadData(true)}
                                         />
                                     ) : (
-                                        <div className="flex flex-col items-center justify-center py-24 bg-white dark:bg-[#161b27] rounded-xl border border-gray-200 dark:border-[#1e2535] border-dashed text-gray-400 dark:text-gray-500">
+                                        <div className="flex flex-col items-center justify-center py-24 bg-white dark:bg-[#161b27] rounded-xl border border-gray-200 dark:border-[#1e2535] border-dashed text--600 dark:text-gray-500">
                                             <BarChart2 className="w-12 h-12 mb-3" />
                                             <p className="text-sm font-medium">Select an item to view details</p>
                                             <p className="text-xs mt-1">Click any card to see the diff, tally, and vote</p>

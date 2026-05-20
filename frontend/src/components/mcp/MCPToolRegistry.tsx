@@ -112,7 +112,7 @@ const HEALTH_META: Record<string, { cls: string; dot: string }> = {
     healthy:  { cls: 'text-green-600 dark:text-green-400',   dot: 'bg-green-500 animate-pulse' },
     degraded: { cls: 'text-yellow-600 dark:text-yellow-400', dot: 'bg-yellow-500 animate-pulse' },
     down:     { cls: 'text-red-600 dark:text-red-400',       dot: 'bg-red-500' },
-    unknown:  { cls: 'text-gray-500 dark:text-gray-400',     dot: 'bg-gray-400' },
+    unknown:  { cls: 'text-gray-600 dark:text-gray-400',     dot: 'bg-gray-400' },
 };
 
 const CARD_COLORS: Record<string, { bg: string; text: string }> = {
@@ -199,7 +199,7 @@ function ProposeModal({ onClose, onProposed }: ProposeModalProps) {
                     </div>
                     <div>
                         <h3 className="text-base font-semibold text-gray-900 dark:text-white">Propose MCP Server</h3>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Creates a pending proposal for Council vote</p>
+                        <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">Creates a pending proposal for Council vote</p>
                     </div>
                 </div>
 
@@ -277,11 +277,11 @@ function AuditDrawer({ tool, onClose }: { tool: MCPTool; onClose: () => void }) 
                         </div>
                         <div>
                             <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Audit Log — {tool.name}</h3>
-                            <p className="text-xs text-gray-400 dark:text-gray-500">Last 100 invocations</p>
+                            <p className="text-xs text--600 dark:text-gray-500">Last 100 invocations</p>
                         </div>
                     </div>
                     <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-white/5 rounded-lg transition-colors" aria-label="Close audit log">
-                        <XCircle className="w-4 h-4 text-gray-400" />
+                        <XCircle className="w-4 h-4 text--600" />
                     </button>
                 </div>
                 <div className="overflow-y-auto flex-1 divide-y divide-gray-100 dark:divide-[#1e2535]">
@@ -291,22 +291,22 @@ function AuditDrawer({ tool, onClose }: { tool: MCPTool; onClose: () => void }) 
                         </div>
                     )}
                     {!loading && entries.length === 0 && (
-                        <div className="text-center py-12 text-sm text-gray-400">No invocations recorded yet.</div>
+                        <div className="text-center py-12 text-sm text--600">No invocations recorded yet.</div>
                     )}
                     {!loading && entries.map((e) => (
                         <div key={`${e.agent_id}-${e.timestamp}`} className="p-4 hover:bg-gray-50 dark:hover:bg-[#0f1117] transition-colors">
                             <div className="flex items-center gap-3 mb-1">
                                 {e.success
-                                    ? <CheckCircle className="w-4 h-4 text-green-500 shrink-0" />
-                                    : <XCircle    className="w-4 h-4 text-red-500 shrink-0" />
+                                    ? <CheckCircle className="w-4 h-4 text-green-700 shrink-0" />
+                                    : <XCircle    className="w-4 h-4 text-red-600 shrink-0" />
                                 }
                                 <span className="text-sm font-mono text-gray-800 dark:text-gray-200">{e.agent_id}</span>
-                                <span className="ml-auto text-xs text-gray-400">{fmtDate(e.timestamp)}</span>
+                                <span className="ml-auto text-xs text--600">{fmtDate(e.timestamp)}</span>
                             </div>
-                            <div className="ml-7 flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                            <div className="ml-7 flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
                                 <Hash className="w-3 h-3" />
                                 <code className="font-mono">{e.input_hash}</code>
-                                {e.error && <span className="text-red-500 truncate ml-2">— {e.error}</span>}
+                                {e.error && <span className="text-red-600 truncate ml-2">— {e.error}</span>}
                             </div>
                         </div>
                     ))}
@@ -322,7 +322,7 @@ function AuditDrawer({ tool, onClose }: { tool: MCPTool; onClose: () => void }) 
 function StatsRow({ stats }: { stats: MCPToolStats | null }) {
     if (!stats || stats.invocation_count === 0) {
         return (
-            <div className="flex items-center gap-1.5 text-xs text-gray-400 dark:text-gray-500 italic">
+            <div className="flex items-center gap-1.5 text-xs text--600 dark:text-gray-500 italic">
                 <BarChart2 className="w-3.5 h-3.5" />
                 No invocations recorded yet
             </div>
@@ -333,7 +333,7 @@ function StatsRow({ stats }: { stats: MCPToolStats | null }) {
         <div className="grid grid-cols-3 gap-3">
             {/* Invocations */}
             <div className="bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-lg px-3 py-2">
-                <div className="flex items-center gap-1.5 text-xs text-blue-500 dark:text-blue-400 mb-0.5">
+                <div className="flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 mb-0.5">
                     <TrendingUp className="w-3 h-3" />
                     Invocations
                 </div>
@@ -344,7 +344,7 @@ function StatsRow({ stats }: { stats: MCPToolStats | null }) {
 
             {/* Avg Latency */}
             <div className="bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-[#2a3347] rounded-lg px-3 py-2">
-                <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 mb-0.5">
+                <div className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400 mb-0.5">
                     <Activity className="w-3 h-3" />
                     Avg Latency
                 </div>
@@ -355,7 +355,7 @@ function StatsRow({ stats }: { stats: MCPToolStats | null }) {
 
             {/* Error Rate */}
             <div className="bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-[#2a3347] rounded-lg px-3 py-2">
-                <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 mb-0.5">
+                <div className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400 mb-0.5">
                     <AlertOctagon className="w-3 h-3" />
                     Error Rate
                 </div>
@@ -464,9 +464,9 @@ function ToolCard({ tool, stats, onRefresh, currentUser }: ToolCardProps) {
                                 )}
                             </div>
 
-                            <p className="text-xs text-gray-500 dark:text-gray-400 truncate mb-2">{tool.description}</p>
+                            <p className="text-xs text-gray-600 dark:text-gray-400 truncate mb-2">{tool.description}</p>
 
-                            <div className="flex items-center gap-4 text-xs text-gray-400 dark:text-gray-500 flex-wrap">
+                            <div className="flex items-center gap-4 text-xs text--600 dark:text-gray-500 flex-wrap">
                                 <span className="font-mono truncate max-w-[220px]">{tool.server_url}</span>
                                 <span className="flex items-center gap-1">
                                     <span className={`w-1.5 h-1.5 rounded-full ${health.dot}`} />
@@ -478,13 +478,13 @@ function ToolCard({ tool, stats, onRefresh, currentUser }: ToolCardProps) {
                                 </span>
                                 {/* Phase 15.2: inline invocation count from Redis */}
                                 {stats && stats.invocation_count > 0 && (
-                                    <span className="flex items-center gap-1 text-blue-500 dark:text-blue-400">
+                                    <span className="flex items-center gap-1 text-blue-600 dark:text-blue-400">
                                         <TrendingUp className="w-3 h-3" />
                                         {stats.invocation_count.toLocaleString()} live invocations
                                     </span>
                                 )}
                                 {tool.constitutional_article && (
-                                    <span className="text-blue-500 dark:text-blue-400">{tool.constitutional_article}</span>
+                                    <span className="text-blue-600 dark:text-blue-400">{tool.constitutional_article}</span>
                                 )}
                             </div>
                         </div>
@@ -495,7 +495,7 @@ function ToolCard({ tool, stats, onRefresh, currentUser }: ToolCardProps) {
                                 onClick={pingHealth}
                                 disabled={healthLoading}
                                 title="Check health"
-                                className="p-2 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition-colors disabled:opacity-40"
+                                className="p-2 text--600 hover:text-blue-600 dark:hover:text--600 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition-colors disabled:opacity-40"
                             >
                                 {healthLoading
                                     ? <LoadingSpinner size="sm" />
@@ -505,13 +505,13 @@ function ToolCard({ tool, stats, onRefresh, currentUser }: ToolCardProps) {
                             <button
                                 onClick={() => setShowAudit(true)}
                                 title="View audit log"
-                                className="p-2 text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-500/10 rounded-lg transition-colors"
+                                className="p-2 text--600 hover:text-purple-600 dark:hover:text--600 hover:bg-purple-50 dark:hover:bg-purple-500/10 rounded-lg transition-colors"
                             >
                                 <Eye className="w-4 h-4" />
                             </button>
                             <button
                                 onClick={() => setExpanded(v => !v)}
-                                className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/5 rounded-lg transition-colors"
+                                className="p-2 text--600 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/5 rounded-lg transition-colors"
                                 title={expanded ? 'Collapse details' : 'Expand details'}
                                 aria-label={expanded ? 'Collapse details' : 'Expand details'}
                             >
@@ -527,7 +527,7 @@ function ToolCard({ tool, stats, onRefresh, currentUser }: ToolCardProps) {
 
                         {/* Phase 15.2: Live stats section */}
                         <div>
-                            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                            <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
                                 <BarChart2 className="w-3.5 h-3.5" />
                                 Live Stats (Redis)
                             </p>
@@ -536,7 +536,7 @@ function ToolCard({ tool, stats, onRefresh, currentUser }: ToolCardProps) {
 
                         {/* DB stats grid (unchanged) */}
                         <div>
-                            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
+                            <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider mb-2">
                                 Database Counters
                             </p>
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -550,7 +550,7 @@ function ToolCard({ tool, stats, onRefresh, currentUser }: ToolCardProps) {
                         {/* Capabilities */}
                         {tool.capabilities.length > 0 && (
                             <div>
-                                <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">Capabilities</p>
+                                <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">Capabilities</p>
                                 <div className="flex flex-wrap gap-1.5">
                                     {tool.capabilities.map(cap => (
                                         <span key={cap} className="px-2 py-0.5 text-xs font-mono bg-gray-100 dark:bg-[#0f1117] border border-gray-200 dark:border-[#2a3347] text-gray-600 dark:text-gray-300 rounded-md">
@@ -562,7 +562,7 @@ function ToolCard({ tool, stats, onRefresh, currentUser }: ToolCardProps) {
                         )}
 
                         {/* Metadata */}
-                        <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
+                        <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs text-gray-600 dark:text-gray-400">
                             <MetaRow label="Proposed by"       value={tool.proposed_by || '—'} />
                             <MetaRow label="Proposed at"       value={fmtDate(tool.proposed_at)} />
                             {tool.approved_by       && <MetaRow label="Approved by"       value={tool.approved_by} />}
@@ -620,7 +620,7 @@ function ToolCard({ tool, stats, onRefresh, currentUser }: ToolCardProps) {
                                             </button>
                                             <button
                                                 onClick={() => { setShowRevokeInput(false); setRevokeReason(''); }}
-                                                className="px-3 py-1.5 text-xs text-gray-500 hover:bg-gray-100 dark:hover:bg-white/5 rounded-lg"
+                                                className="px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-100 dark:hover:bg-white/5 rounded-lg"
                                             >
                                                 Cancel
                                             </button>
@@ -643,7 +643,7 @@ function Field({ label, required, children }: { label: string; required?: boolea
     return (
         <div>
             <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">
-                {label}{required && <span className="text-red-500 ml-0.5">*</span>}
+                {label}{required && <span className="text-red-600 ml-0.5">*</span>}
             </label>
             {children}
         </div>
@@ -653,8 +653,8 @@ function Field({ label, required, children }: { label: string; required?: boolea
 function Stat({ label, value, warn }: { label: string; value: string; warn?: boolean }) {
     return (
         <div className="bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-[#2a3347] rounded-lg p-3">
-            <p className="text-xs text-gray-500 dark:text-gray-400">{label}</p>
-            <p className={`text-lg font-bold mt-0.5 ${warn && value !== '0' ? 'text-red-500 dark:text-red-400' : 'text-gray-900 dark:text-white'}`}>
+            <p className="text-xs text-gray-600 dark:text-gray-400">{label}</p>
+            <p className={`text-lg font-bold mt-0.5 ${warn && value !== '0' ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white'}`}>
                 {value}
             </p>
         </div>
@@ -664,7 +664,7 @@ function Stat({ label, value, warn }: { label: string; value: string; warn?: boo
 function MetaRow({ label, value }: { label: string; value: string }) {
     return (
         <div className="flex gap-1">
-            <span className="font-medium text-gray-400 dark:text-gray-500 shrink-0">{label}:</span>
+            <span className="font-medium text--600 dark:text-gray-500 shrink-0">{label}:</span>
             <span className="truncate text-gray-600 dark:text-gray-300">{value}</span>
         </div>
     );
@@ -674,7 +674,7 @@ function SummaryCard({ label, value, color }: { label: string; value: number; co
     const { bg, text } = CARD_COLORS[color] ?? CARD_COLORS.blue;
     return (
         <div className={`rounded-xl border border-gray-200 dark:border-[#1e2535] p-4 ${bg}`}>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{label}</p>
+            <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">{label}</p>
             <p className={`text-2xl font-bold ${text}`}>{value}</p>
         </div>
     );
@@ -807,7 +807,7 @@ export function MCPToolRegistry() {
                 </div>
 
                 {/* Phase 15.2: Stats health row */}
-                <div className="flex items-center gap-3 text-xs text-gray-400 dark:text-gray-500">
+                <div className="flex items-center gap-3 text-xs text--600 dark:text-gray-500">
                     <div className="flex items-center gap-1.5">
                         <div className={`w-2 h-2 rounded-full ${statsMap.size > 0 ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`} />
                         <span>
@@ -853,7 +853,7 @@ export function MCPToolRegistry() {
                     <div className="ml-auto flex items-center gap-2">
                         <button
                             onClick={() => { fetchTools(); fetchStats(); }}
-                            className="p-2 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition-colors"
+                            className="p-2 text--600 hover:text-blue-600 dark:hover:text--600 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition-colors"
                             title="Refresh"
                         >
                             {loading ? <LoadingSpinner size="sm" /> : <RefreshCw className="w-4 h-4" />}
@@ -876,9 +876,9 @@ export function MCPToolRegistry() {
                 ) : filtered.length === 0 ? (
                     <div className="text-center py-20">
                         <div className="w-14 h-14 bg-gray-100 dark:bg-[#1e2535] border border-gray-200 dark:border-[#2a3347] rounded-xl flex items-center justify-center mx-auto mb-3">
-                            <Server className="w-6 h-6 text-gray-400 dark:text-gray-500" />
+                            <Server className="w-6 h-6 text--600 dark:text-gray-500" />
                         </div>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
                             {search || statusFilter !== 'all' || tierFilter !== 'all'
                                 ? 'No tools match your filters.'
                                 : 'No MCP tools registered yet. Propose the first one!'}

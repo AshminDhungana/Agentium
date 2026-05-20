@@ -18,7 +18,7 @@ export function WidgetErrorFallback({ widgetName, onRetry }: WidgetErrorFallback
             className="flex flex-col items-center justify-center gap-3 p-6 bg-red-50 dark:bg-red-500/10 rounded-xl border border-red-200 dark:border-red-500/20 text-center"
         >
             <AlertTriangle
-                className="w-6 h-6 text-red-500 dark:text-red-400"
+                className="w-6 h-6 text-red-600 dark:text-red-400"
                 aria-hidden="true"
             />
             <p className="text-sm font-medium text-red-600 dark:text-red-400">

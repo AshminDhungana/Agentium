@@ -58,7 +58,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
                     <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
                         Access Denied
                     </h2>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
                         Only the Sovereign can access this area.
                     </p>
                 </div>

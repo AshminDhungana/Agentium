@@ -59,7 +59,7 @@ export function ConnectionStatus({ compact = false }: ConnectionStatusProps) {
                 {status.status}
             </span>
             {status.latency && (
-                <span className="text-xs text-gray-400 dark:text-gray-500 hidden md:inline">
+                <span className="text-xs text--600 dark:text-gray-500 hidden md:inline">
                     ({status.latency}ms)
                 </span>
             )}

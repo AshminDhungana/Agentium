@@ -137,7 +137,7 @@ export const ViolationCard: React.FC<ViolationCardProps> = ({
                         `}>
                             {config.label}
                         </span>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-1">
+                        <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 flex items-center gap-1">
                             <Clock className="w-3 h-3" />
                             {formatDate(violation.created_at)}
                         </p>
@@ -167,7 +167,7 @@ export const ViolationCard: React.FC<ViolationCardProps> = ({
             {/* Footer metadata */}
             <div className="pl-3 mt-4 pt-4 border-t border-gray-100 dark:border-[#1e2535]/50 flex items-center justify-between">
                 <div className="flex items-center gap-4 text-xs">
-                    <div className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
+                    <div className="flex items-center gap-1.5 text-gray-600 dark:text-gray-400">
                         <User className="w-3.5 h-3.5" />
                         <span className="font-mono text-gray-700 dark:text-gray-300">#{violation.violator}</span>
                     </div>

@@ -42,7 +42,7 @@ function CardInner({ title, value, icon: Icon, color, isLoading }: StatCardProps
                     )}
                 </span>
             </div>
-            <p className="text-sm font-medium text-gray-500 dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-300 transition-colors duration-150">
+            <p className="text-sm font-medium text-gray-600 dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-300 transition-colors duration-150">
                 {title}
             </p>
         </div>

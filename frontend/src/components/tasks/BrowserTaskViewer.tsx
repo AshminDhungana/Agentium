@@ -91,7 +91,7 @@ export const BrowserTaskViewer: React.FC<BrowserTaskViewerProps> = ({ taskId, on
                     <div className="flex flex-col items-center justify-center p-12 h-64">
                         <Monitor className="w-12 h-12 text-gray-300 dark:text-gray-600 mb-4" />
                         <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Stream Disconnected</h3>
-                        <p className="text-sm text-gray-500 max-w-sm text-center mt-2">
+                        <p className="text-sm text-gray-600 max-w-sm text-center mt-2">
                            The browser stream for this task is no longer active, or the task has completed.
                         </p>
                         {mode === 'modal' && onClose && (
@@ -112,13 +112,13 @@ export const BrowserTaskViewer: React.FC<BrowserTaskViewerProps> = ({ taskId, on
                 {/* Header / Title Bar */}
                 <div className="flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-[#0f1117] border-b border-gray-200 dark:border-[#1e2535]">
                     <div className="flex items-center gap-3 w-3/4">
-                        <Monitor className="w-5 h-5 text-violet-500" />
+                        <Monitor className="w-5 h-5 text-violet-600" />
                         <div className="flex-1 min-w-0">
                             <h3 className="text-sm font-semibold text-gray-900 dark:text-white truncate">
                                 {latestFrame?.title || 'Browser Session'}
                             </h3>
                             <div className="flex items-center gap-2 mt-0.5">
-                                <span className="text-[10px] text-gray-400 font-mono truncate max-w-md">
+                                <span className="text-[10px] text--600 font-mono truncate max-w-md">
                                     {latestFrame?.url || 'Waiting for URL...'}
                                 </span>
                             </div>
@@ -132,17 +132,17 @@ export const BrowserTaskViewer: React.FC<BrowserTaskViewerProps> = ({ taskId, on
                             {status === 'live' ? 'LIVE' : status === 'paused' ? 'PAUSED' : 'CONNECTING...'}
                         </div>
                         
-                        <button onClick={handleTogglePause} aria-label={status === 'paused' ? 'Play' : 'Pause'} className="p-1.5 rounded-md hover:bg-gray-200 dark:hover:bg-[#1e2535] text-gray-500 dark:text-gray-400 transition-colors">
+                        <button onClick={handleTogglePause} aria-label={status === 'paused' ? 'Play' : 'Pause'} className="p-1.5 rounded-md hover:bg-gray-200 dark:hover:bg-[#1e2535] text-gray-600 dark:text-gray-400 transition-colors">
                             {status === 'paused' ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
                         </button>
 
                         {mode === 'modal' && (
                             <>
-                                <button onClick={() => setIsFullscreen(!isFullscreen)} aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'} className="p-1.5 rounded-md hover:bg-gray-200 dark:hover:bg-[#1e2535] text-gray-500 dark:text-gray-400 transition-colors">
+                                <button onClick={() => setIsFullscreen(!isFullscreen)} aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'} className="p-1.5 rounded-md hover:bg-gray-200 dark:hover:bg-[#1e2535] text-gray-600 dark:text-gray-400 transition-colors">
                                     {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
                                 </button>
                                 {onClose && (
-                                    <button onClick={onClose} aria-label="Close" className="p-1.5 rounded-md hover:bg-gray-200 dark:hover:bg-[#1e2535] text-gray-500 dark:text-gray-400 transition-colors ml-1">
+                                    <button onClick={onClose} aria-label="Close" className="p-1.5 rounded-md hover:bg-gray-200 dark:hover:bg-[#1e2535] text-gray-600 dark:text-gray-400 transition-colors ml-1">
                                         <X className="w-4 h-4" />
                                     </button>
                                 )}
@@ -158,8 +158,8 @@ export const BrowserTaskViewer: React.FC<BrowserTaskViewerProps> = ({ taskId, on
                     <div className="flex-1 bg-black overflow-hidden relative flex items-center justify-center">
                         {status === 'connecting' && !latestFrame?.frame ? (
                              <div className="flex flex-col items-center gap-3">
-                                <RefreshCw className="w-6 h-6 animate-spin text-gray-500" />
-                                <span className="text-xs text-gray-500">Connecting to browser stream...</span>
+                                <RefreshCw className="w-6 h-6 animate-spin text-gray-600" />
+                                <span className="text-xs text-gray-600">Connecting to browser stream...</span>
                              </div>
                         ) : latestFrame?.frame ? (
                             <img 
@@ -169,7 +169,7 @@ export const BrowserTaskViewer: React.FC<BrowserTaskViewerProps> = ({ taskId, on
                                 style={{ transition: 'opacity 0.1s ease-in-out' }} 
                             />
                         ) : (
-                             <div className="text-gray-500 text-sm flex items-center gap-2">
+                             <div className="text-gray-600 text-sm flex items-center gap-2">
                                 <AlertCircle className="w-4 h-4" />
                                 No frame data available
                              </div>
@@ -189,7 +189,7 @@ export const BrowserTaskViewer: React.FC<BrowserTaskViewerProps> = ({ taskId, on
                         </div>
                         <div className="flex-1 overflow-y-auto p-3 space-y-3">
                             {(!latestFrame?.action_log || latestFrame.action_log.length === 0) ? (
-                                <p className="text-gray-400 italic text-center text-[11px] mt-4 font-sans">
+                                <p className="text--600 italic text-center text-[11px] mt-4 font-sans">
                                     Waiting for actions...
                                     <br/><br/>
                                     Browser interactions performed by the agent will appear here.
@@ -197,7 +197,7 @@ export const BrowserTaskViewer: React.FC<BrowserTaskViewerProps> = ({ taskId, on
                             ) : (
                                 [...latestFrame.action_log].reverse().map((entry, i) => (
                                     <div key={i} className="flex flex-col border-l-2 border-violet-400 dark:border-violet-500 pl-2">
-                                        <span className="text-[9px] text-gray-400 mb-0.5">
+                                        <span className="text-[9px] text--600 mb-0.5">
                                             {new Date(entry.timestamp).toLocaleTimeString()}
                                         </span>
                                         <span className="text-gray-800 dark:text-gray-300 leading-snug break-words">

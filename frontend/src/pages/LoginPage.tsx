@@ -100,7 +100,7 @@ export function LoginPage() {
                             <button
                                 type="button"
                                 onClick={() => setShowPassword((v) => !v)}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 rounded"
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text--600 hover:text-gray-600 dark:hover:text-gray-300 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 rounded"
                                 aria-label={showPassword ? 'Hide password' : 'Show password'}
                             >
                                 {showPassword
@@ -152,7 +152,7 @@ export function LoginPage() {
                 </div>
 
                 <div className="mt-4">
-                    <p className="text-xs text-center text-gray-500 dark:text-gray-400">
+                    <p className="text-xs text-center text-gray-600 dark:text-gray-400">
                         Intelligence requires governance
                     </p>
                 </div>

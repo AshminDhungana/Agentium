@@ -114,10 +114,10 @@ export const ScalingDashboard: React.FC = () => {
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                        <TrendingUp className="text-blue-500" />
+                        <TrendingUp className="text-blue-600" />
                         Predictive Auto-Scaling
                     </h1>
-                    <p className="text-gray-500 dark:text-gray-400 mt-1">
+                    <p className="text-gray-600 dark:text-gray-400 mt-1">
                         AI-driven capacity planning and proactive agent orchestration.
                     </p>
                 </div>
@@ -179,7 +179,7 @@ export const ScalingDashboard: React.FC = () => {
                         </div>
                         <span className="font-semibold text-gray-700 dark:text-gray-300">System Mode</span>
                     </div>
-                    <div className="text-xl font-bold text-green-500 mt-1">
+                    <div className="text-xl font-bold text-green-700 mt-1">
                         Auto-Scaling Active
                     </div>
                 </div>
@@ -234,7 +234,7 @@ export const ScalingDashboard: React.FC = () => {
                         Manual Override
                     </h2>
                     {!isAdmin ? (
-                        <div className="text-gray-500 dark:text-gray-400 text-sm">
+                        <div className="text-gray-600 dark:text-gray-400 text-sm">
                             You must be an Administrator or Sovereign to use manual overrides.
                         </div>
                     ) : (
@@ -302,7 +302,7 @@ export const ScalingDashboard: React.FC = () => {
                 ) : (
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm text-left">
-                            <thead className="text-xs text-gray-500 uppercase bg-gray-50 dark:bg-[#0f1117]/50 dark:text-gray-400">
+                            <thead className="text-xs text-gray-600 uppercase bg-gray-50 dark:bg-[#0f1117]/50 dark:text-gray-400">
                                 <tr>
                                     <th className="px-4 py-3 rounded-tl-lg">Time</th>
                                     <th className="px-4 py-3">Action</th>
@@ -313,7 +313,7 @@ export const ScalingDashboard: React.FC = () => {
                             <tbody>
                                 {history.map((event, i) => (
                                     <tr key={i} className="border-b border-gray-100 dark:border-[#1e2535] last:border-0 hover:bg-gray-50 dark:hover:bg-[#1e2535]/50 transition-colors">
-                                        <td className="px-4 py-3 text-gray-500 dark:text-gray-400">
+                                        <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
                                             {new Date(event.created_at).toLocaleString()}
                                         </td>
                                         <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">

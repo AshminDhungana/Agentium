@@ -33,7 +33,7 @@ export function ConstitutionTab() {
 
     if (isLoading) {
         return (
-            <div className="flex items-center justify-center py-24 text-gray-400 dark:text-gray-500">
+            <div className="flex items-center justify-center py-24 text--600 dark:text-gray-500">
                 <LoadingSpinner size="md" label="Loading constitution…" />
             </div>
         );
@@ -41,7 +41,7 @@ export function ConstitutionTab() {
 
     if (error) {
         return (
-            <div className="flex flex-col items-center justify-center py-24 gap-2 text-red-500 dark:text-red-400">
+            <div className="flex flex-col items-center justify-center py-24 gap-2 text-red-600 dark:text-red-400">
                 <AlertCircle className="w-8 h-8" />
                 <p className="text-sm">{error}</p>
             </div>
@@ -57,7 +57,7 @@ export function ConstitutionTab() {
                         Current Constitution
                     </h2>
                 </div>
-                <span className="text-xs text-gray-400 dark:text-gray-500">
+                <span className="text-xs text--600 dark:text-gray-500">
                     Read-only · Propose an amendment to modify
                 </span>
             </div>

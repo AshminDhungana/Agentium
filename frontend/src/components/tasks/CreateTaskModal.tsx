@@ -103,14 +103,14 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ onConfirm, onC
                             <h2 className="text-lg font-bold text-gray-900 dark:text-white">
                                 Create New Task
                             </h2>
-                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                            <p className="text-xs text-gray-600 dark:text-gray-400">
                                 Assign work to your AI workforce
                             </p>
                         </div>
                     </div>
                     <button aria-label="Close" 
                         onClick={onClose}
-                        className="p-2 rounded-lg text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#1e2535] transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="p-2 rounded-lg text--600 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#1e2535] transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                         <X className="w-5 h-5" />
                     </button>
@@ -142,7 +142,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ onConfirm, onC
                             />
                             {title && (
                                 <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                                    <Sparkles className="w-4 h-4 text-blue-500/50" />
+                                    <Sparkles className="w-4 h-4 text-blue-600/50" />
                                 </div>
                             )}
                         </div>
@@ -210,7 +210,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ onConfirm, onC
                                         </div>
                                         <p className={`
                                             text-xs mt-1 
-                                            ${isSelected ? `text-${color}-600/70 dark:text-${color}-400/70` : 'text-gray-500 dark:text-gray-500'}
+                                            ${isSelected ? `text-${color}-600/70 dark:text-${color}-400/70` : 'text-gray-600 dark:text-gray-500'}
                                         `}>
                                             {option.description}
                                         </p>
@@ -271,7 +271,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ onConfirm, onC
                         <div className="space-y-4 p-4 rounded-xl bg-gray-50 dark:bg-[#0f1117] border border-gray-100 dark:border-[#1e2535] animate-in fade-in slide-in-from-top-2 duration-300">
                             {/* Constitutional Basis */}
                             <div className="space-y-1.5">
-                                <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                                <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-600 dark:text-gray-400">
                                     Constitutional Basis
                                 </label>
                                 <input
@@ -286,7 +286,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ onConfirm, onC
                             <div className="grid grid-cols-2 gap-3">
                                 {/* Hierarchical ID */}
                                 <div className="space-y-1.5">
-                                    <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                                    <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-600 dark:text-gray-400">
                                         Hierarchical ID
                                     </label>
                                     <input
@@ -300,7 +300,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ onConfirm, onC
 
                                 {/* Parent Task ID */}
                                 <div className="space-y-1.5">
-                                    <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                                    <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-600 dark:text-gray-400">
                                         Parent Task ID
                                     </label>
                                     <input

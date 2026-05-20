@@ -103,7 +103,7 @@ export const VotingInterface: React.FC<VotingInterfaceProps> = ({ embedded = fal
         return (
             <div className="flex items-center justify-center p-8">
                 <LoadingSpinner size="md" />
-                <span className="text-sm text-gray-500 dark:text-gray-400">Loading active votes...</span>
+                <span className="text-sm text-gray-600 dark:text-gray-400">Loading active votes...</span>
             </div>
         );
     }
@@ -116,14 +116,14 @@ export const VotingInterface: React.FC<VotingInterfaceProps> = ({ embedded = fal
                         <CheckCircle className="w-5 h-5 text-blue-600" />
                         Active Council Votes
                     </h2>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
                         Real-time voting on constitutional amendments
                     </p>
                 </div>
             )}
 
             {activeAmendments.length === 0 ? (
-                <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                <div className="text-center py-8 text-gray-600 dark:text-gray-400">
                     <CheckCircle className="w-12 h-12 mx-auto mb-3 text-gray-300 dark:text-gray-600" />
                     <p>No active votes at this time.</p>
                 </div>
@@ -154,7 +154,7 @@ export const VotingInterface: React.FC<VotingInterfaceProps> = ({ embedded = fal
                                         >
                                             {amendment.status.toUpperCase()}
                                         </span>
-                                        <span className="text-xs text-gray-500 flex items-center gap-1">
+                                        <span className="text-xs text-gray-600 flex items-center gap-1">
                                             <Users className="w-3 h-3" />
                                             {amendment.eligible_voters?.length || 0} eligible
                                         </span>
@@ -167,7 +167,7 @@ export const VotingInterface: React.FC<VotingInterfaceProps> = ({ embedded = fal
                             <div className="mb-3" role="status" aria-live="polite">
                                 <div className="flex justify-between text-sm mb-1">
                                     <span className="text-green-600 font-medium">For: {amendment.votes_for}</span>
-                                    <span className="text-gray-500 text-xs">
+                                    <span className="text-gray-600 text-xs">
                                         {totalVotes(amendment)} / {amendment.eligible_voters?.length || 0} voted
                                     </span>
                                     <span className="text-red-600 font-medium">Against: {amendment.votes_against}</span>
@@ -220,8 +220,7 @@ export const VotingInterface: React.FC<VotingInterfaceProps> = ({ embedded = fal
 
                                     {castVote && (
                                         <>
-                                            <textarea
-                                                className="w-full p-2 border border-gray-300 dark:border-[#2a3347] rounded-lg bg-white dark:bg-[#0f1117] text-gray-900 dark:text-white text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-blue-500/40 resize-none"
+                                            -gray-500 dark:border-[#2a3347] rounded-lg bg-white dark:bg-[#0f1117] text-gray-900 dark:text-white text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-blue-500/40 resize-none"
                                                 placeholder="Optional: Provide rationale for your vote..."
                                                 value={rationale}
                                                 onChange={(e) => setRationale(e.target.value)}

@@ -86,7 +86,7 @@ export function ProposeAmendmentModal({ onClose, onSuccess }: ProposeAmendmentMo
                         </div>
                         <button
                             aria-label="close"
-                            className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-[#1e2535] text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-[#1e2535] text--600 hover:text-gray-600 dark:hover:text-gray-200 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
                             onClick={onClose}
                         >
                             <X className="w-5 h-5" />
@@ -97,14 +97,9 @@ export function ProposeAmendmentModal({ onClose, onSuccess }: ProposeAmendmentMo
                         {/* Title */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                Title <span className="text-red-500">*</span>
+                                Title <span className="text-red-600">*</span>
                             </label>
-                            <input
-                                type="text"
-                                className={`w-full px-4 py-2 border rounded-lg bg-white dark:bg-[#0f1117] text-gray-900 dark:text-white focus:outline-none focus:ring-2 transition-colors duration-200 ${
-                                    errors.title
-                                        ? 'border-red-400 focus:ring-red-400/30'
-                                        : 'border-gray-300 dark:border-[#1e2535] focus:ring-blue-500/40'
+                            -gray-500 dark:border-[#1e2535] focus:ring-blue-500/40'
                                 }`}
                                 placeholder="Brief title for the amendment"
                                 value={form.title}
@@ -121,13 +116,9 @@ export function ProposeAmendmentModal({ onClose, onSuccess }: ProposeAmendmentMo
                         {/* Proposed Changes */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                Proposed Changes (Diff) <span className="text-red-500">*</span>
+                                Proposed Changes (Diff) <span className="text-red-600">*</span>
                             </label>
-                            <textarea
-                                className={`w-full px-4 py-2 border rounded-lg bg-white dark:bg-[#0f1117] text-gray-900 dark:text-white font-mono text-sm focus:outline-none focus:ring-2 transition-colors duration-200 ${
-                                    errors.diff_markdown
-                                        ? 'border-red-400 focus:ring-red-400/30'
-                                        : 'border-gray-300 dark:border-gray-600 focus:ring-blue-500/40'
+                            -gray-500 dark:border-gray-600 focus:ring-blue-500/40'
                                 }`}
                                 placeholder={`+ Add new article\n- Remove old article`}
                                 rows={8}
@@ -140,7 +131,7 @@ export function ProposeAmendmentModal({ onClose, onSuccess }: ProposeAmendmentMo
                             {errors.diff_markdown ? (
                                 <p className="text-xs text-red-600 dark:text-red-400 mt-1">{errors.diff_markdown}</p>
                             ) : (
-                                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                                <p className="text-xs text--600 dark:text-gray-500 mt-1">
                                     Use <code className="bg-gray-100 dark:bg-[#1e2535] px-1 rounded">+</code> to add and{' '}
                                     <code className="bg-gray-100 dark:bg-[#1e2535] px-1 rounded">-</code> to remove content
                                 </p>
@@ -150,13 +141,9 @@ export function ProposeAmendmentModal({ onClose, onSuccess }: ProposeAmendmentMo
                         {/* Rationale */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                Rationale <span className="text-red-500">*</span>
+                                Rationale <span className="text-red-600">*</span>
                             </label>
-                            <textarea
-                                className={`w-full px-4 py-2 border rounded-lg bg-white dark:bg-[#0f1117] text-gray-900 dark:text-white focus:outline-none focus:ring-2 transition-colors duration-200 ${
-                                    errors.rationale
-                                        ? 'border-red-400 focus:ring-red-400/30'
-                                        : 'border-gray-300 dark:border-gray-600 focus:ring-blue-500/40'
+                            -gray-500 dark:border-gray-600 focus:ring-blue-500/40'
                                 }`}
                                 placeholder="Explain why this amendment should be adopted..."
                                 rows={4}
@@ -176,9 +163,7 @@ export function ProposeAmendmentModal({ onClose, onSuccess }: ProposeAmendmentMo
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                 Voting Period
                             </label>
-                            <select
-                                aria-label="voting period"
-                                className="w-full px-4 py-2 border border-gray-300 dark:border-[#1e2535] rounded-lg bg-white dark:bg-[#0f1117] text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40 transition-colors duration-200"
+                            -gray-500 dark:border-[#1e2535] rounded-lg bg-white dark:bg-[#0f1117] text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40 transition-colors duration-200"
                                 value={form.voting_period_hours}
                                 onChange={e => setForm(f => ({ ...f, voting_period_hours: parseInt(e.target.value) }))}
                             >

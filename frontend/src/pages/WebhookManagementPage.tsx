@@ -138,7 +138,7 @@ const WebhookManagementPage: React.FC = () => {
       return (
           <div className="flex flex-col items-center justify-center p-16">
               <LoadingSpinner size="lg" />
-              <p className="text-sm text-gray-500 dark:text-gray-400">Loading webhooks...</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Loading webhooks...</p>
           </div>
       );
   }
@@ -152,7 +152,7 @@ const WebhookManagementPage: React.FC = () => {
                   Webhook Management
               </h1>
           </div>
-          <p className="text-gray-500 dark:text-gray-400 text-sm">
+          <p className="text-gray-600 dark:text-gray-400 text-sm">
             Manage outbound event webhooks. Agentium will POST events to your
             endpoints with HMAC-SHA256 signed payloads.
           </p>
@@ -197,7 +197,7 @@ const WebhookManagementPage: React.FC = () => {
             </>
           )}
         </button>
-        <span className="text-gray-500 dark:text-gray-400 text-sm">
+        <span className="text-gray-600 dark:text-gray-400 text-sm">
           {subscriptions.length} subscription{subscriptions.length !== 1 ? 's' : ''}
         </span>
       </div>
@@ -212,9 +212,7 @@ const WebhookManagementPage: React.FC = () => {
           <div className="space-y-4">
               <div>
                 <label htmlFor="endpoint-url" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Endpoint URL</label>
-                <input
-                  id="endpoint-url"
-                  className="w-full px-4 py-2.5 border border-gray-200 dark:border-[#1e2535] rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-gray-50 dark:bg-[#0f1117] text-gray-900 dark:text-white text-sm transition-colors duration-150 outline-none"
+                -gray-500 dark:border-[#1e2535] rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-gray-50 dark:bg-[#0f1117] text-gray-900 dark:text-white text-sm transition-colors duration-150 outline-none"
                   type="url"
                   placeholder="https://your-server.com/webhook"
                   value={formUrl}
@@ -223,9 +221,7 @@ const WebhookManagementPage: React.FC = () => {
               </div>
               <div>
                 <label htmlFor="webhook-description" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Description (optional)</label>
-                <input
-                  id="webhook-description"
-                  className="w-full px-4 py-2.5 border border-gray-200 dark:border-[#1e2535] rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-gray-50 dark:bg-[#0f1117] text-gray-900 dark:text-white text-sm transition-colors duration-150 outline-none"
+                -gray-500 dark:border-[#1e2535] rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-gray-50 dark:bg-[#0f1117] text-gray-900 dark:text-white text-sm transition-colors duration-150 outline-none"
                   placeholder="e.g., Production task notifications"
                   value={formDescription}
                   onChange={(e) => setFormDescription(e.target.value)}
@@ -288,7 +284,7 @@ const WebhookManagementPage: React.FC = () => {
                   </span>
                 </div>
                 {sub.description && (
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
                     {sub.description}
                   </p>
                 )}
@@ -338,7 +334,7 @@ const WebhookManagementPage: React.FC = () => {
                 </h4>
                 {deliveries.length === 0 ? (
                   <div className="bg-gray-50 dark:bg-[#0f1117] rounded-lg p-4 text-center border border-gray-200 dark:border-[#1e2535]">
-                     <p className="text-sm text-gray-500 dark:text-gray-400">No deliveries yet.</p>
+                     <p className="text-sm text-gray-600 dark:text-gray-400">No deliveries yet.</p>
                   </div>
                 ) : (
                   <div className="space-y-2">
@@ -349,16 +345,16 @@ const WebhookManagementPage: React.FC = () => {
                             <span className="font-mono text-xs px-2 py-0.5 rounded bg-blue-100 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400">
                                 {d.event_type}
                             </span>
-                            <span className={`font-medium ${d.delivered_at ? 'text-gray-600 dark:text-gray-300' : 'text-gray-500 dark:text-gray-400'}`}>
+                            <span className={`font-medium ${d.delivered_at ? 'text-gray-600 dark:text-gray-300' : 'text-gray-600 dark:text-gray-400'}`}>
                               {d.status_code ? `HTTP ${d.status_code}` : 'Pending'}
                             </span>
                           </div>
                           <div className="flex items-center gap-3 mt-2 sm:mt-0 text-xs">
-                            <span className="text-gray-500 dark:text-gray-400">
+                            <span className="text-gray-600 dark:text-gray-400">
                               Attempts: {d.attempts}/{d.max_attempts}
                             </span>
                             {d.error && (
-                              <span className="text-red-500 dark:text-red-400 max-w-[200px] truncate" title={d.error}>
+                              <span className="text-red-600 dark:text-red-400 max-w-[200px] truncate" title={d.error}>
                                   {d.error}
                               </span>
                             )}
@@ -389,7 +385,7 @@ const WebhookManagementPage: React.FC = () => {
             <p className="text-gray-900 dark:text-white font-medium mb-1">
                 No webhook subscriptions yet
             </p>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
                 Create one to receive real-time event notifications.
             </p>
         </div>

@@ -179,7 +179,7 @@ export function DetailPanel({ item, onClose, onVoteSuccess }: DetailPanelProps) 
                             </span>
                         )}
                         {isLoadingDetails && (
-                            <LoadingSpinner size="xs" className="text-gray-400" />
+                            <LoadingSpinner size="xs" className="text--600" />
                         )}
                     </div>
                     <h2 className="text-xl font-bold text-gray-900 dark:text-white">
@@ -189,7 +189,7 @@ export function DetailPanel({ item, onClose, onVoteSuccess }: DetailPanelProps) 
                     </h2>
                     {item.ended_at && (
                         <p className={`text-sm mt-1 flex items-center gap-1 ${
-                            active ? 'text-amber-600 dark:text-amber-400' : 'text-gray-500 dark:text-gray-400'
+                            active ? 'text-amber-600 dark:text-amber-400' : 'text-gray-600 dark:text-gray-400'
                         }`}>
                             <Clock className="w-3.5 h-3.5" />
                             {tick >= 0 && formatCountdown(item.ended_at)}
@@ -199,7 +199,7 @@ export function DetailPanel({ item, onClose, onVoteSuccess }: DetailPanelProps) 
                 <button
                     aria-label="close"
                     onClick={onClose}
-                    className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-[#1e2535] text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors duration-200 flex-shrink-0"
+                    className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-[#1e2535] text--600 hover:text-gray-600 dark:hover:text-gray-200 transition-colors duration-200 flex-shrink-0"
                 >
                     <X className="w-5 h-5" />
                 </button>
@@ -251,13 +251,13 @@ export function DetailPanel({ item, onClose, onVoteSuccess }: DetailPanelProps) 
                                                 -{removed}
                                             </span>
                                         )}
-                                        <span className="text-gray-400 dark:text-gray-500">
+                                        <span className="text--600 dark:text-gray-500">
                                             {total} lines
                                         </span>
                                     </div>
                                 </div>
                                 <ChevronDown
-                                    className={`w-4 h-4 text-gray-400 flex-shrink-0 transition-transform duration-200 ${
+                                    className={`w-4 h-4 text--600 flex-shrink-0 transition-transform duration-200 ${
                                         diffOpen ? 'rotate-180' : ''
                                     }`}
                                 />
@@ -307,11 +307,11 @@ export function DetailPanel({ item, onClose, onVoteSuccess }: DetailPanelProps) 
                 {!isAmendment && deliDetails && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div className="bg-gray-50 dark:bg-[#0f1117]/60 rounded-lg p-3">
-                            <p className="text-xs text-gray-500 dark:text-gray-400">Required approvals</p>
+                            <p className="text-xs text-gray-600 dark:text-gray-400">Required approvals</p>
                             <p className="text-lg font-bold text-gray-900 dark:text-white">{deliDetails.required_approvals}</p>
                         </div>
                         <div className="bg-gray-50 dark:bg-[#0f1117]/60 rounded-lg p-3">
-                            <p className="text-xs text-gray-500 dark:text-gray-400">Min quorum</p>
+                            <p className="text-xs text-gray-600 dark:text-gray-400">Min quorum</p>
                             <p className="text-lg font-bold text-gray-900 dark:text-white">{deliDetails.min_quorum}</p>
                         </div>
                         {deliDetails.head_overridden && (
@@ -383,7 +383,7 @@ export function DetailPanel({ item, onClose, onVoteSuccess }: DetailPanelProps) 
                                         <span className="font-mono text-gray-700 dark:text-gray-300">{v.voter_id}</span>
                                         <div className="flex items-center gap-2">
                                             {v.rationale && (
-                                                <span className="text-gray-400 dark:text-gray-500 truncate max-w-32">{v.rationale}</span>
+                                                <span className="text--600 dark:text-gray-500 truncate max-w-32">{v.rationale}</span>
                                             )}
                                             <span className={`px-2 py-0.5 rounded-full font-medium ${
                                                 v.vote === 'for'
@@ -413,7 +413,7 @@ export function DetailPanel({ item, onClose, onVoteSuccess }: DetailPanelProps) 
                                 <div key={i} className="bg-gray-50 dark:bg-[#0f1117]/60 rounded-lg p-3 text-xs">
                                     <div className="flex items-center justify-between mb-1">
                                         <span className="font-mono font-medium text-gray-700 dark:text-gray-300">{entry.agent}</span>
-                                        <span className="text-gray-400 dark:text-gray-500">
+                                        <span className="text--600 dark:text-gray-500">
                                             {new Date(entry.timestamp).toLocaleTimeString()}
                                         </span>
                                     </div>
@@ -545,7 +545,7 @@ export function DetailPanel({ item, onClose, onVoteSuccess }: DetailPanelProps) 
                                 <span className="text-sm text-gray-700 dark:text-gray-300 font-medium">
                                     Delegate my voting authority
                                 </span>
-                                <span className="text-xs text-gray-400 dark:text-gray-500">
+                                <span className="text-xs text--600 dark:text-gray-500">
                                     (proxy your vote to another council member)
                                 </span>
                             </label>

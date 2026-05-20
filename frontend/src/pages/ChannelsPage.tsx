@@ -126,7 +126,7 @@ function ChannelMetricsSection({ channelId, metricsData, isLoading }: ChannelMet
     if (isLoading) {
         return (
             <div className="pt-4 border-t border-gray-100 dark:border-[#1e2535]">
-                <div className="flex items-center gap-2 text-sm text-gray-500">
+                <div className="flex items-center gap-2 text-sm text-gray-600">
                     <LoadingSpinner size="sm" />
                     Loading health metrics...
                 </div>
@@ -203,25 +203,25 @@ function ChannelMetricsSection({ channelId, metricsData, isLoading }: ChannelMet
             <div className={`grid grid-cols-4 gap-3 p-3 rounded-xl border ${colors.bg} ${colors.border}`}>
                 <div className="text-center">
                     <div className={`text-lg font-bold ${colors.text}`}>{metrics.success_rate.toFixed(1)}%</div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">Success</div>
+                    <div className="text-xs text-gray-600 dark:text-gray-400">Success</div>
                 </div>
                 <div className="text-center">
                     <div className={`text-lg font-bold ${metrics.failed_requests > 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-700 dark:text-gray-300'}`}>
                         {metrics.failed_requests}
                     </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">Failures</div>
+                    <div className="text-xs text-gray-600 dark:text-gray-400">Failures</div>
                 </div>
                 <div className="text-center">
                     <div className={`text-lg font-bold ${metrics.rate_limit_hits > 0 ? 'text-yellow-600 dark:text-yellow-400' : 'text-gray-700 dark:text-gray-300'}`}>
                         {metrics.rate_limit_hits}
                     </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">Rate Limits</div>
+                    <div className="text-xs text-gray-600 dark:text-gray-400">Rate Limits</div>
                 </div>
                 <div className="text-center">
                     <div className={`text-lg font-bold ${metrics.consecutive_failures > 2 ? 'text-red-600 dark:text-red-400' : 'text-gray-700 dark:text-gray-300'}`}>
                         {metrics.consecutive_failures}
                     </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">Consecutive</div>
+                    <div className="text-xs text-gray-600 dark:text-gray-400">Consecutive</div>
                 </div>
             </div>
 
@@ -290,7 +290,7 @@ function TestMessageModal({ channel, onClose }: TestModalProps) {
                             <h2 id="test-msg-modal-title" className="text-base font-semibold text-gray-900 dark:text-white">
                                 Send Test Message
                             </h2>
-                            <p className="text-xs text-gray-500 dark:text-gray-400">{channel.name}</p>
+                            <p className="text-xs text-gray-600 dark:text-gray-400">{channel.name}</p>
                         </div>
                     </div>
                     <button
@@ -298,7 +298,7 @@ function TestMessageModal({ channel, onClose }: TestModalProps) {
                         aria-label="Close"
                         className="p-2 hover:bg-gray-100 dark:hover:bg-[#1e2535] rounded-lg transition-colors"
                     >
-                        <X className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                        <X className="w-4 h-4 text-gray-600 dark:text-gray-400" />
                     </button>
                 </div>
                 <div className="p-6 space-y-4">
@@ -565,7 +565,7 @@ export function ChannelsPage() {
                     <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-1">
                         Communication Channels
                     </h1>
-                    <p className="text-gray-500 dark:text-gray-400 text-sm">
+                    <p className="text-gray-600 dark:text-gray-400 text-sm">
                         Connect external platforms to your AI agents
                     </p>
                 </div>
@@ -607,7 +607,7 @@ export function ChannelsPage() {
                         className="bg-white dark:bg-[#161b27] p-5 rounded-xl border border-gray-200 dark:border-[#1e2535] shadow-sm dark:shadow-none transition-colors duration-200"
                     >
                         <div className={`text-2xl font-bold ${stat.valueClass}`}>{stat.value}</div>
-                        <div className="text-xs font-medium text-gray-500 dark:text-gray-500 mt-0.5 uppercase tracking-wide">
+                        <div className="text-xs font-medium text-gray-600 dark:text-gray-500 mt-0.5 uppercase tracking-wide">
                             {stat.label}
                         </div>
                     </div>
@@ -660,7 +660,7 @@ export function ChannelsPage() {
                                                 </h3>
                                                 <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                                                     <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${status.dot}`} />
-                                                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                                                    <p className="text-xs text-gray-600 dark:text-gray-400">
                                                         {typeDef?.name ?? channel.type} · {status.label}
                                                     </p>
                                                     {isWhatsApp && (
@@ -683,7 +683,7 @@ export function ChannelsPage() {
                                                 onClick={() => setSelectedChannel(channel)}
                                                 title="Health, logs & settings"
                                                 aria-label="Health, logs & settings"
-                                                className="p-2 text-gray-400 dark:text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 rounded-lg transition-all duration-150"
+                                                className="p-2 text--600 dark:text-gray-500 hover:text-indigo-600 dark:hover:text--600 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 rounded-lg transition-all duration-150"
                                             >
                                                 <SlidersHorizontal className="w-4 h-4" />
                                             </button>
@@ -691,7 +691,7 @@ export function ChannelsPage() {
                                                 onClick={() => handleViewLog(channel.id)}
                                                 title="View message log"
                                                 aria-label="View message log"
-                                                className="p-2 text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition-all duration-150"
+                                                className="p-2 text--600 dark:text-gray-500 hover:text-blue-600 dark:hover:text--600 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition-all duration-150"
                                             >
                                                 <Inbox className="w-4 h-4" />
                                             </button>
@@ -700,7 +700,7 @@ export function ChannelsPage() {
                                                     onClick={() => setShowProviderSwitch(channel.id)}
                                                     title="Switch provider"
                                                     aria-label="Switch provider"
-                                                    className="p-2 text-gray-400 dark:text-gray-500 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-500/10 rounded-lg transition-all duration-150"
+                                                    className="p-2 text--600 dark:text-gray-500 hover:text-purple-600 dark:hover:text--600 hover:bg-purple-50 dark:hover:bg-purple-500/10 rounded-lg transition-all duration-150"
                                                 >
                                                     <Server className="w-4 h-4" />
                                                 </button>
@@ -711,7 +711,7 @@ export function ChannelsPage() {
                                                 disabled={testingChannelId === channel.id}
                                                 title="Test connection"
                                                 aria-label="Test connection"
-                                                className="p-2 text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition-all duration-150"
+                                                className="p-2 text--600 dark:text-gray-500 hover:text-blue-600 dark:hover:text--600 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition-all duration-150"
                                             >
                                                 {testingChannelId === channel.id ? <LoadingSpinner size="sm" /> : <RefreshCw className="w-4 h-4" />}
                                             </button>
@@ -722,7 +722,7 @@ export function ChannelsPage() {
                                                 }}
                                                 title="Delete channel"
                                                 aria-label="Delete channel"
-                                                className="p-2 text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-all duration-150"
+                                                className="p-2 text--600 dark:text-gray-500 hover:text-red-600 dark:hover:text--600 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-all duration-150"
                                             >
                                                 <Trash2 className="w-4 h-4" />
                                             </button>
@@ -759,12 +759,12 @@ export function ChannelsPage() {
                                     {isWhatsApp && (
                                         <div className="p-3 bg-gray-50 dark:bg-[#0f1117] rounded-lg border border-gray-200 dark:border-[#1e2535]">
                                             <div className="flex items-center justify-between mb-2">
-                                                <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Provider</span>
+                                                <span className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Provider</span>
                                                 <span className={`text-xs font-semibold ${isBridge ? 'text-orange-600 dark:text-orange-400' : 'text-blue-600 dark:text-blue-400'}`}>
                                                     {isBridge ? 'Web Bridge (QR)' : 'Cloud API (Meta)'}
                                                 </span>
                                             </div>
-                                            <p className="text-xs text-gray-500 dark:text-gray-500">
+                                            <p className="text-xs text-gray-600 dark:text-gray-500">
                                                 {isBridge
                                                     ? 'Uses WebSocket bridge with QR authentication. Good for personal use.'
                                                     : 'Official Meta Business API. Required for production/business use.'}
@@ -775,7 +775,7 @@ export function ChannelsPage() {
                                     {/* Webhook URL */}
                                     {channel.config?.webhook_url && (
                                         <div>
-                                            <label className="block text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-2">
+                                            <label className="block text-xs font-semibold text--600 dark:text-gray-500 uppercase tracking-wider mb-2">
                                                 Webhook URL
                                             </label>
                                             <div className="flex gap-2">
@@ -788,7 +788,7 @@ export function ChannelsPage() {
                                                     aria-label="Copy webhook URL"
                                                     className="px-3 py-2 bg-gray-100 dark:bg-[#1e2535] hover:bg-gray-200 dark:hover:bg-[#2a3347] border border-gray-200 dark:border-[#1e2535] rounded-lg transition-all duration-150"
                                                 >
-                                                    <Copy className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400" />
+                                                    <Copy className="w-3.5 h-3.5 text-gray-600 dark:text-gray-400" />
                                                 </button>
                                             </div>
                                         </div>
@@ -796,19 +796,19 @@ export function ChannelsPage() {
 
                                     {/* Type-specific info */}
                                     {channel.type === 'signal' && channel.config?.number && (
-                                        <p className="text-xs text-gray-500 dark:text-gray-500">
+                                        <p className="text-xs text-gray-600 dark:text-gray-500">
                                             Number: <span className="font-mono text-gray-700 dark:text-gray-300">{channel.config.number}</span>
                                         </p>
                                     )}
                                     {channel.type === 'matrix' && channel.config?.homeserver_url && (
-                                        <p className="text-xs text-gray-500 dark:text-gray-500">
+                                        <p className="text-xs text-gray-600 dark:text-gray-500">
                                             Homeserver: <span className="font-mono text-gray-700 dark:text-gray-300">{channel.config.homeserver_url}</span>
                                         </p>
                                     )}
                                     {channel.type === 'imessage' && (
-                                        <p className="text-xs text-gray-500 dark:text-gray-500">
+                                        <p className="text-xs text-gray-600 dark:text-gray-500">
                                             Backend: <span className="font-mono text-gray-700 dark:text-gray-300">{channel.config?.backend ?? 'applescript'}</span>
-                                            {channel.config?.bb_url && <span className="text-gray-400 dark:text-gray-600"> · {channel.config.bb_url}</span>}
+                                            {channel.config?.bb_url && <span className="text--600 dark:text-gray-600"> · {channel.config.bb_url}</span>}
                                         </p>
                                     )}
 
@@ -832,7 +832,7 @@ export function ChannelsPage() {
                                     {isWhatsApp && (
                                         <div className="pt-3 border-t border-gray-100 dark:border-[#1e2535]">
                                             <div className="flex items-center justify-between mb-2">
-                                                <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Allowed Senders</span>
+                                                <span className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Allowed Senders</span>
                                                 <button
                                                     onClick={() => { setEditingSenders(channel.id); setSenderInput(''); }}
                                                     className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
@@ -851,7 +851,7 @@ export function ChannelsPage() {
                                                                         const updated = (channel.config?.allowed_senders || []).filter(s => s !== num);
                                                                         updateSendersMutation.mutate({ id: channel.id, senders: updated });
                                                                     }}
-                                                                    className="hover:text-red-500 ml-0.5"
+                                                                    className="hover:text-red-600 ml-0.5"
                                                                 >×</button>
                                                             </span>
                                                         ))}
@@ -877,7 +877,7 @@ export function ChannelsPage() {
                                                             Save
                                                         </button>
                                                     </div>
-                                                    <p className="text-xs text-gray-400 dark:text-gray-500">
+                                                    <p className="text-xs text--600 dark:text-gray-500">
                                                         Leave empty to accept messages from everyone.
                                                     </p>
                                                 </div>
@@ -898,15 +898,15 @@ export function ChannelsPage() {
                                     {/* Stats row */}
                                     <div className="flex items-center gap-5 pt-3 border-t border-gray-100 dark:border-[#1e2535]">
                                         <div className="text-sm">
-                                            <span className="text-gray-400 dark:text-gray-500 text-xs uppercase tracking-wide font-medium">Received </span>
+                                            <span className="text--600 dark:text-gray-500 text-xs uppercase tracking-wide font-medium">Received </span>
                                             <span className="font-semibold text-gray-900 dark:text-gray-100">{channel.stats?.received ?? 0}</span>
                                         </div>
                                         <div className="text-sm">
-                                            <span className="text-gray-400 dark:text-gray-500 text-xs uppercase tracking-wide font-medium">Sent </span>
+                                            <span className="text--600 dark:text-gray-500 text-xs uppercase tracking-wide font-medium">Sent </span>
                                             <span className="font-semibold text-gray-900 dark:text-gray-100">{channel.stats?.sent ?? 0}</span>
                                         </div>
                                         {channel.stats?.last_message && (
-                                            <div className="text-xs text-gray-400 dark:text-gray-500 ml-auto">
+                                            <div className="text-xs text--600 dark:text-gray-500 ml-auto">
                                                 {format(new Date(channel.stats.last_message), 'MMM d, h:mm a')}
                                             </div>
                                         )}
@@ -950,7 +950,7 @@ export function ChannelsPage() {
                                 onClick={closeModal}
                                 className="p-2 hover:bg-gray-100 dark:hover:bg-[#1e2535] rounded-lg transition-colors duration-150"
                             >
-                                <X className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                                <X className="w-4 h-4 text-gray-600 dark:text-gray-400" />
                             </button>
                         </div>
 
@@ -959,7 +959,7 @@ export function ChannelsPage() {
                             {qrStep ? (
                                 <div className="flex flex-col items-center gap-6 py-4">
                                     <div className="text-center">
-                                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                                             Scan this QR code with your WhatsApp app to link the account.
                                         </p>
                                     </div>
@@ -971,7 +971,7 @@ export function ChannelsPage() {
                                     ) : (
                                         <div className="w-[250px] h-[250px] rounded-2xl bg-gray-100 dark:bg-[#0f1117] border border-gray-200 dark:border-[#1e2535] flex flex-col items-center justify-center gap-3">
                                             <LoadingSpinner size="lg" />
-                                            <p className="text-xs text-gray-500 dark:text-gray-400">Waiting for QR code…</p>
+                                            <p className="text-xs text-gray-600 dark:text-gray-400">Waiting for QR code…</p>
                                         </div>
                                     )}
 
@@ -990,7 +990,7 @@ export function ChannelsPage() {
                                     <button
                                         type="button"
                                         onClick={closeModal}
-                                        className="px-4 py-2 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+                                        className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
                                     >
                                         Cancel
                                     </button>
@@ -1012,7 +1012,7 @@ export function ChannelsPage() {
                                                 </div>
                                                 <div className="min-w-0">
                                                     <h3 className="font-semibold text-gray-900 dark:text-gray-100 text-sm truncate">{type.name}</h3>
-                                                    <p className="text-xs text-gray-400 dark:text-gray-500 truncate">{type.description}</p>
+                                                    <p className="text-xs text--600 dark:text-gray-500 truncate">{type.description}</p>
                                                 </div>
                                             </button>
                                         );
@@ -1024,7 +1024,7 @@ export function ChannelsPage() {
                                 <div className="space-y-5">
                                     <button
                                         onClick={() => dispatchModal({ type: 'BACK' })}
-                                        className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors duration-150"
+                                        className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors duration-150"
                                     >
                                         <ChevronRight className="w-4 h-4 rotate-180" /> Back
                                     </button>
@@ -1039,7 +1039,7 @@ export function ChannelsPage() {
                                     {selectedType === 'whatsapp' && (
                                         <div className="p-4 bg-gray-50 dark:bg-[#0f1117] rounded-xl border border-gray-200 dark:border-[#1e2535]">
                                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-                                                Select Provider <span className="text-red-500">*</span>
+                                                Select Provider <span className="text-red-600">*</span>
                                             </label>
                                             <div className="grid grid-cols-2 gap-3">
                                                 <button
@@ -1052,12 +1052,12 @@ export function ChannelsPage() {
                                                     }`}
                                                 >
                                                     <div className="flex items-center gap-2 mb-1">
-                                                        <Server className={`w-4 h-4 ${whatsappProvider === 'cloud_api' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500'}`} />
+                                                        <Server className={`w-4 h-4 ${whatsappProvider === 'cloud_api' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-600'}`} />
                                                         <span className={`font-medium text-sm ${whatsappProvider === 'cloud_api' ? 'text-blue-900 dark:text-blue-100' : 'text-gray-700 dark:text-gray-300'}`}>
                                                             Cloud API
                                                         </span>
                                                     </div>
-                                                    <p className="text-xs text-gray-500 dark:text-gray-500">Official Meta API for business use</p>
+                                                    <p className="text-xs text-gray-600 dark:text-gray-500">Official Meta API for business use</p>
                                                 </button>
                                                 <button
                                                     type="button"
@@ -1069,12 +1069,12 @@ export function ChannelsPage() {
                                                     }`}
                                                 >
                                                     <div className="flex items-center gap-2 mb-1">
-                                                        <QrCode className={`w-4 h-4 ${whatsappProvider === 'web_bridge' ? 'text-orange-600 dark:text-orange-400' : 'text-gray-500'}`} />
+                                                        <QrCode className={`w-4 h-4 ${whatsappProvider === 'web_bridge' ? 'text-orange-600 dark:text-orange-400' : 'text-gray-600'}`} />
                                                         <span className={`font-medium text-sm ${whatsappProvider === 'web_bridge' ? 'text-orange-900 dark:text-orange-100' : 'text-gray-700 dark:text-gray-300'}`}>
                                                             Web Bridge
                                                         </span>
                                                     </div>
-                                                    <p className="text-xs text-gray-500 dark:text-gray-500">QR-based for personal/development</p>
+                                                    <p className="text-xs text-gray-600 dark:text-gray-500">QR-based for personal/development</p>
                                                 </button>
                                             </div>
 
@@ -1087,7 +1087,7 @@ export function ChannelsPage() {
                                                         </p>
                                                     </div>
                                                     <div className="p-2.5 bg-orange-50 dark:bg-orange-500/5 border border-orange-200 dark:border-orange-500/20 rounded-lg flex items-start gap-2">
-                                                        <AlertTriangle className="w-4 h-4 text-orange-500 dark:text-orange-400 flex-shrink-0 mt-0.5" />
+                                                        <AlertTriangle className="w-4 h-4 text-orange-700 dark:text-orange-400 flex-shrink-0 mt-0.5" />
                                                         <p className="text-xs text-orange-700 dark:text-orange-400">
                                                             Web Bridge uses unofficial methods. Use only for personal accounts, not business.
                                                         </p>
@@ -1101,7 +1101,7 @@ export function ChannelsPage() {
                                         {/* Channel name */}
                                         <div>
                                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                                                Channel Name <span className="text-red-500">*</span>
+                                                Channel Name <span className="text-red-600">*</span>
                                             </label>
                                             <input
                                                 name="name"
@@ -1117,30 +1117,20 @@ export function ChannelsPage() {
                                             (whatsappProvider === 'cloud_api' ? whatsAppCloudFields : whatsAppBridgeFields).map(field => (
                                                 <div key={field.name}>
                                                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                                                        {field.label}{field.required && <span className="text-red-500 ml-1">*</span>}
+                                                        {field.label}{field.required && <span className="text-red-600 ml-1">*</span>}
                                                     </label>
-                                                    <input
-                                                        name={field.name}
-                                                        type={field.type}
-                                                        required={field.required}
-                                                        placeholder={field.placeholder}
-                                                        className="w-full px-4 py-2.5 border border-gray-300 dark:border-[#1e2535] rounded-lg bg-white dark:bg-[#0f1117] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-600 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-500/50 focus:border-transparent outline-none transition-all duration-150 text-sm"
+                                                    -gray-500 dark:border-[#1e2535] rounded-lg bg-white dark:bg-[#0f1117] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-600 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-500/50 focus:border-transparent outline-none transition-all duration-150 text-sm"
                                                     />
-                                                    {field.help && <p className="mt-1 text-xs text-gray-500 dark:text-gray-500">{field.help}</p>}
+                                                    {field.help && <p className="mt-1 text-xs text-gray-600 dark:text-gray-500">{field.help}</p>}
                                                 </div>
                                             ))
                                         ) : (
                                             channelTypes.find(t => t.id === selectedType)?.fields.map(field => (
                                                 <div key={field.name}>
                                                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                                                        {field.label}{field.required && <span className="text-red-500 ml-1">*</span>}
+                                                        {field.label}{field.required && <span className="text-red-600 ml-1">*</span>}
                                                     </label>
-                                                    <input
-                                                        name={field.name}
-                                                        type={field.type}
-                                                        required={field.required}
-                                                        placeholder={field.placeholder}
-                                                        className="w-full px-4 py-2.5 border border-gray-300 dark:border-[#1e2535] rounded-lg bg-white dark:bg-[#0f1117] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-600 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-500/50 focus:border-transparent outline-none transition-all duration-150 text-sm"
+                                                    -gray-500 dark:border-[#1e2535] rounded-lg bg-white dark:bg-[#0f1117] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-600 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-500/50 focus:border-transparent outline-none transition-all duration-150 text-sm"
                                                     />
                                                 </div>
                                             ))
@@ -1189,7 +1179,7 @@ export function ChannelsPage() {
                             <h3 id="provider-switch-title" className="text-lg font-bold text-gray-900 dark:text-white">
                                 Switch WhatsApp Provider
                             </h3>
-                            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                                 This will disconnect the current session and switch authentication methods.
                             </p>
                         </div>
@@ -1200,10 +1190,10 @@ export function ChannelsPage() {
                                 className="w-full p-4 border-2 border-blue-200 dark:border-blue-500/30 hover:border-blue-500 dark:hover:border-blue-400 rounded-xl text-left transition-all group"
                             >
                                 <div className="flex items-center justify-between mb-2">
-                                    <span className="font-semibold text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400">Switch to Cloud API</span>
+                                    <span className="font-semibold text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text--600">Switch to Cloud API</span>
                                     <Server className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                                 </div>
-                                <p className="text-xs text-gray-500 dark:text-gray-400">Official Meta Business API. Best for production use.</p>
+                                <p className="text-xs text-gray-600 dark:text-gray-400">Official Meta Business API. Best for production use.</p>
                             </button>
 
                             <button
@@ -1212,10 +1202,10 @@ export function ChannelsPage() {
                                 className="w-full p-4 border-2 border-orange-200 dark:border-orange-500/30 hover:border-orange-500 dark:hover:border-orange-400 rounded-xl text-left transition-all group"
                             >
                                 <div className="flex items-center justify-between mb-2">
-                                    <span className="font-semibold text-gray-900 dark:text-white group-hover:text-orange-600 dark:group-hover:text-orange-400">Switch to Web Bridge</span>
+                                    <span className="font-semibold text-gray-900 dark:text-white group-hover:text-orange-600 dark:group-hover:text--600">Switch to Web Bridge</span>
                                     <QrCode className="w-5 h-5 text-orange-600 dark:text-orange-400" />
                                 </div>
-                                <p className="text-xs text-gray-500 dark:text-gray-400">QR-based authentication. For personal/development use.</p>
+                                <p className="text-xs text-gray-600 dark:text-gray-400">QR-based authentication. For personal/development use.</p>
                             </button>
 
                             <button

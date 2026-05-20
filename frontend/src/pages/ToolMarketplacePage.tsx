@@ -107,7 +107,7 @@ const StarRating = React.memo(function StarRating({
           key={s}
           onClick={() => onChange?.(s)}
           className={`text-lg ${onChange ? "cursor-pointer" : "cursor-default"} ${
-            s <= value ? "text-yellow-500" : "text-gray-300 dark:text-gray-600"
+            s <= value ? "text-yellow-800" : "text-gray-300 dark:text-gray-600"
           }`}
         >
           ★
@@ -127,7 +127,7 @@ function JsonBox({ data }: { data: unknown }) {
 
 function EmptyState({ message }: { message: string }) {
   return (
-    <div className="py-10 text-center text-sm text-gray-400 dark:text-gray-500">
+    <div className="py-10 text-center text-sm text--600 dark:text-gray-500">
       {message}
     </div>
   );
@@ -311,18 +311,14 @@ function MarketplaceTab() {
 
         <div className="flex gap-3 mb-4">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
-            <input
-              aria-label="Search marketplace"
-              className="w-full pl-10 pr-4 py-2.5 bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all"
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text--600 dark:text-gray-500" />
+            -gray-500 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all"
               placeholder="Search tools…"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
             />
           </div>
-          <input
-            aria-label="Category filter"
-            className="w-48 px-4 py-2.5 bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all"
+          -gray-500 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all"
             placeholder="Category"
             value={category}
             onChange={(e) => setCategory(e.target.value)}
@@ -335,11 +331,11 @@ function MarketplaceTab() {
           </button>
         </div>
 
-        {browsing && <div className="text-gray-500 dark:text-gray-400 text-sm">Loading…</div>}
+        {browsing && <div className="text-gray-600 dark:text-gray-400 text-sm">Loading…</div>}
 
         {result && !browsing && (
           <>
-            <div className="text-gray-500 dark:text-gray-400 text-xs mb-4">
+            <div className="text-gray-600 dark:text-gray-400 text-xs mb-4">
               {result.total ?? listings.length} listing(s) · page {page}
             </div>
 
@@ -358,11 +354,11 @@ function MarketplaceTab() {
                       </span>
                       <StatusPill status={l.status ?? "active"} />
                     </div>
-                    <div className="text-gray-500 dark:text-gray-400 text-xs mb-2">
+                    <div className="text-gray-600 dark:text-gray-400 text-xs mb-2">
                       {l.category} · {(l.tags ?? []).join(", ")}
                     </div>
                     <StarRating value={Math.round(l.average_rating ?? 0)} />
-                    <div className="text-gray-500 dark:text-gray-400 text-xs mt-2">
+                    <div className="text-gray-600 dark:text-gray-400 text-xs mt-2">
                       {l.download_count ?? 0} imports
                     </div>
                   </div>
@@ -378,7 +374,7 @@ function MarketplaceTab() {
               >
                 ← Prev
               </button>
-              <span className="text-gray-500 dark:text-gray-400 text-xs">Page {page}</span>
+              <span className="text-gray-600 dark:text-gray-400 text-xs">Page {page}</span>
               <button
                 onClick={() => setPage((p) => p + 1)}
                 disabled={listings.length < 12}
@@ -563,7 +559,7 @@ function MarketplaceTab() {
               </label>
               <div className="flex items-center gap-3">
                 <StarRating value={rateVal} onChange={setRateVal} />
-                <span className="text-gray-500 dark:text-gray-400 text-sm">{rateVal} / 5</span>
+                <span className="text-gray-600 dark:text-gray-400 text-sm">{rateVal} / 5</span>
               </div>
             </div>
             <button
@@ -724,7 +720,7 @@ function ToolsTab() {
           </div>
         </div>
 
-        {loading && <div className="text-gray-500 dark:text-gray-400 text-sm">Loading…</div>}
+        {loading && <div className="text-gray-600 dark:text-gray-400 text-sm">Loading…</div>}
 
         {!loading && rows.length === 0 && (
           <EmptyState message="No tools found." />
@@ -734,7 +730,7 @@ function ToolsTab() {
           <div className="overflow-x-auto">
             <table className="w-full border-collapse text-sm">
               <thead>
-                <tr className="text-gray-500 dark:text-gray-400 text-left border-b border-gray-200 dark:border-[#1e2535]">
+                <tr className="text-gray-600 dark:text-gray-400 text-left border-b border-gray-200 dark:border-[#1e2535]">
                   {["Name", "Description", "Status", "Version", "Tiers", "Actions"].map((h) => (
                     <th key={h} className="py-3 px-2 font-medium">
                       {h}
@@ -753,16 +749,16 @@ function ToolsTab() {
                       <td className="py-3 px-2 font-semibold text-gray-900 dark:text-white">
                         {name}
                       </td>
-                      <td className="py-3 px-2 text-gray-500 dark:text-gray-400 max-w-xs truncate">
+                      <td className="py-3 px-2 text-gray-600 dark:text-gray-400 max-w-xs truncate">
                         {row.description ?? "—"}
                       </td>
                       <td className="py-3 px-2">
                         <StatusPill status={row.status ?? "active"} />
                       </td>
-                      <td className="py-3 px-2 text-gray-500 dark:text-gray-400">
+                      <td className="py-3 px-2 text-gray-600 dark:text-gray-400">
                         v{row.version ?? row.current_version ?? 1}
                       </td>
-                      <td className="py-3 px-2 text-gray-500 dark:text-gray-400 text-xs">
+                      <td className="py-3 px-2 text-gray-600 dark:text-gray-400 text-xs">
                         {(row.authorized_tiers ?? []).join(", ")}
                       </td>
                       <td className="py-3 px-2">
@@ -817,9 +813,7 @@ function ToolsTab() {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                 Code
               </label>
-              <textarea
-                aria-label="Tool code"
-                className="w-full px-4 py-2 bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all resize-none font-mono"
+              -gray-500 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all resize-none font-mono"
                 rows={4}
                 value={propose.code}
                 onChange={(e) => setPropose((p) => ({ ...p, code: e.target.value }))}
@@ -936,9 +930,7 @@ function ToolsTab() {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                 kwargs (JSON)
               </label>
-              <textarea
-                aria-label="Tool kwargs JSON"
-                className="w-full px-4 py-2 bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all resize-none font-mono"
+              -gray-500 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all resize-none font-mono"
                 rows={3}
                 value={exec.kwargs}
                 onChange={(e) => setExec((x) => ({ ...x, kwargs: e.target.value }))}
@@ -1151,9 +1143,7 @@ function VersionsTab() {
         </div>
 
         <div className="flex gap-3">
-          <input
-            aria-label="Tool name for changelog"
-            className="flex-1 px-4 py-2 bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all"
+          -gray-500 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all"
             placeholder="Tool name"
             value={toolName}
             onChange={(e) => setToolName(e.target.value)}
@@ -1201,10 +1191,10 @@ function VersionsTab() {
                     </span>
                     <StatusPill status={v.status ?? "active"} />
                   </div>
-                  <div className="text-gray-500 dark:text-gray-400 text-xs mb-1">
+                  <div className="text-gray-600 dark:text-gray-400 text-xs mb-1">
                     {v.change_summary ?? v.summary ?? "—"}
                   </div>
-                  <div className="text-gray-500 dark:text-gray-400 text-xs">
+                  <div className="text-gray-600 dark:text-gray-400 text-xs">
                     By {v.proposed_by ?? v.created_by ?? "—"} · {v.created_at ?? ""}
                   </div>
                 </div>
@@ -1285,9 +1275,7 @@ function VersionsTab() {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                 New Code
               </label>
-              <textarea
-                aria-label="New code"
-                className="w-full px-4 py-2 bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all resize-none font-mono"
+              -gray-500 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all resize-none font-mono"
                 rows={4}
                 value={proposeUpd.new_code}
                 onChange={(e) => setProposeUpd((p) => ({ ...p, new_code: e.target.value }))}
@@ -1511,7 +1499,7 @@ function SunsetTab() {
           </div>
         </div>
 
-        {loading && <div className="text-gray-500 dark:text-gray-400 text-sm">Loading…</div>}
+        {loading && <div className="text-gray-600 dark:text-gray-400 text-sm">Loading…</div>}
 
         {!loading && rows.length === 0 && (
           <EmptyState message="No deprecated or sunset tools." />
@@ -1521,7 +1509,7 @@ function SunsetTab() {
           <div className="overflow-x-auto">
             <table className="w-full border-collapse text-sm">
               <thead>
-                <tr className="text-gray-500 dark:text-gray-400 text-left border-b border-gray-200 dark:border-[#1e2535]">
+                <tr className="text-gray-600 dark:text-gray-400 text-left border-b border-gray-200 dark:border-[#1e2535]">
                   {["Tool", "Status", "Deprecated By", "Sunset Date", "Reason", "Replacement"].map(
                     (h) => (
                       <th key={h} className="py-3 px-2 font-medium">
@@ -1543,13 +1531,13 @@ function SunsetTab() {
                     <td className="py-3 px-2">
                       <StatusPill status={t.status ?? "deprecated"} />
                     </td>
-                    <td className="py-3 px-2 text-gray-500 dark:text-gray-400">
+                    <td className="py-3 px-2 text-gray-600 dark:text-gray-400">
                       {(t as { deprecated_by?: string }).deprecated_by ?? "—"}
                     </td>
-                    <td className="py-3 px-2 text-gray-500 dark:text-gray-400">
+                    <td className="py-3 px-2 text-gray-600 dark:text-gray-400">
                       {(t as { sunset_date?: string }).sunset_date ?? "—"}
                     </td>
-                    <td className="py-3 px-2 text-gray-500 dark:text-gray-400">
+                    <td className="py-3 px-2 text-gray-600 dark:text-gray-400">
                       {t.reason ?? "—"}
                     </td>
                     <td className="py-3 px-2 text-blue-600 dark:text-blue-400">
@@ -1730,7 +1718,7 @@ function AnalyticsTab() {
     return (
       <div className="bg-white dark:bg-[#161b27] rounded-xl border border-gray-200 dark:border-[#1e2535] p-4 text-center shadow-sm dark:shadow-[0_2px_16px_rgba(0,0,0,0.25)]">
         <div className={`text-2xl font-bold ${color} tabular-nums`}>{value ?? "—"}</div>
-        <div className="text-gray-500 dark:text-gray-400 text-xs mt-1 uppercase tracking-wider">
+        <div className="text-gray-600 dark:text-gray-400 text-xs mt-1 uppercase tracking-wider">
           {label}
         </div>
       </div>
@@ -1750,11 +1738,8 @@ function AnalyticsTab() {
           </div>
           <div className="flex gap-3 items-center">
             <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-500 dark:text-gray-400">Days:</span>
-              <input
-                aria-label="Report days"
-                type="number"
-                className="w-20 px-3 py-1.5 bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+              <span className="text-sm text-gray-600 dark:text-gray-400">Days:</span>
+              -gray-500 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                 value={reportDays}
                 onChange={(e) => setReportDays(Number(e.target.value))}
               />
@@ -1823,17 +1808,12 @@ function AnalyticsTab() {
           </div>
 
           <div className="flex gap-3 mb-4">
-            <input
-              aria-label="Tool name filter for errors"
-              className="flex-1 px-4 py-2 bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all"
+            -gray-500 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all"
               placeholder="Tool name (optional)"
               value={errorTool}
               onChange={(e) => setErrorTool(e.target.value)}
             />
-            <input
-              aria-label="Error limit"
-              type="number"
-              className="w-20 px-3 py-2 bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+            -gray-500 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
               value={errorLimit}
               onChange={(e) => setErrorLimit(Number(e.target.value))}
             />
@@ -1867,11 +1847,11 @@ function AnalyticsTab() {
                       <span className="font-semibold text-red-600 dark:text-red-400 text-sm">
                         {e.tool_name}
                       </span>
-                      <span className="text-gray-500 dark:text-gray-400 text-xs">
+                      <span className="text-gray-600 dark:text-gray-400 text-xs">
                         {e.timestamp ?? e.called_at}
                       </span>
                     </div>
-                    <div className="text-gray-500 dark:text-gray-400 text-xs mt-1">
+                    <div className="text-gray-600 dark:text-gray-400 text-xs mt-1">
                       {e.error_message ?? e.error}
                     </div>
                   </div>
@@ -1894,17 +1874,12 @@ function AnalyticsTab() {
           </div>
 
           <div className="flex gap-3 mb-4">
-            <input
-              aria-label="Agent ID"
-              className="flex-1 px-4 py-2 bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all"
+            -gray-500 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all"
               placeholder="Agent ID"
               value={agentId}
               onChange={(e) => setAgentId(e.target.value)}
             />
-            <input
-              aria-label="Agent usage days"
-              type="number"
-              className="w-20 px-3 py-2 bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+            -gray-500 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
               value={agentDays}
               onChange={(e) => setAgentDays(Number(e.target.value))}
             />
@@ -1944,17 +1919,12 @@ function AnalyticsTab() {
           </div>
 
           <div className="flex gap-3 mb-4">
-            <input
-              aria-label="Tool name for analytics"
-              className="flex-1 px-4 py-2 bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all"
+            -gray-500 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all"
               placeholder="Tool name"
               value={perTool}
               onChange={(e) => setPerTool(e.target.value)}
             />
-            <input
-              aria-label="Tool analytics days"
-              type="number"
-              className="w-20 px-3 py-2 bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+            -gray-500 dark:border-[#2a3347] rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
               value={toolDays}
               onChange={(e) => setToolDays(Number(e.target.value))}
             />
@@ -1997,7 +1967,7 @@ function AnalyticsTab() {
                     className="bg-white dark:bg-[#161b27] rounded-xl border border-gray-200 dark:border-[#1e2535] p-4 text-center shadow-sm dark:shadow-[0_2px_16px_rgba(0,0,0,0.25)]"
                   >
                     <div className={`text-2xl font-bold ${c} tabular-nums`}>{(v as React.ReactNode) ?? "—"}</div>
-                    <div className="text-gray-500 dark:text-gray-400 text-xs mt-1 uppercase tracking-wider">
+                    <div className="text-gray-600 dark:text-gray-400 text-xs mt-1 uppercase tracking-wider">
                       {l}
                     </div>
                   </div>
@@ -2064,7 +2034,7 @@ export default function ToolMarketplacePage({ embedded = false }: ToolMarketplac
               className={`px-5 py-3 text-sm font-medium transition-all border-b-2 ${
                 active === i
                   ? "text-blue-600 dark:text-blue-400 border-blue-600 dark:border-blue-400"
-                  : "text-gray-500 dark:text-gray-400 border-transparent hover:text-gray-700 dark:hover:text-gray-300"
+                  : "text-gray-600 dark:text-gray-400 border-transparent hover:text-gray-700 dark:hover:text-gray-300"
               }`}
             >
               {t}

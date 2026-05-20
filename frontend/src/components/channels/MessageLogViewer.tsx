@@ -26,10 +26,10 @@ export interface MessageLogViewerProps {
 
 function getStatusIcon(status: string) {
     switch (status) {
-        case 'responded':  return <CheckCircle  className="w-4 h-4 text-green-500" />;
-        case 'failed':     return <XCircle      className="w-4 h-4 text-red-500"   />;
-        case 'processing': return <Clock        className="w-4 h-4 text-yellow-500 animate-spin" />;
-        default:           return <AlertTriangle className="w-4 h-4 text-gray-400" />;
+        case 'responded':  return <CheckCircle  className="w-4 h-4 text-green-700" />;
+        case 'failed':     return <XCircle      className="w-4 h-4 text-red-600"   />;
+        case 'processing': return <Clock        className="w-4 h-4 text-yellow-800 animate-spin" />;
+        default:           return <AlertTriangle className="w-4 h-4 text--600" />;
     }
 }
 
@@ -41,7 +41,7 @@ export function MessageLogViewer({ channelId, limit = 50 }: MessageLogViewerProp
     });
 
     if (isLoading) {
-        return <div className="text-sm text-gray-500">Loading logs...</div>;
+        return <div className="text-sm text-gray-600">Loading logs...</div>;
     }
 
     const messages = data?.messages ?? [];
@@ -53,10 +53,10 @@ export function MessageLogViewer({ channelId, limit = 50 }: MessageLogViewerProp
             </div>
             <div className="max-h-64 overflow-y-auto">
                 {messages.length === 0 ? (
-                    <div className="p-4 text-sm text-gray-500 text-center">No messages yet</div>
+                    <div className="p-4 text-sm text-gray-600 text-center">No messages yet</div>
                 ) : (
                     <table className="w-full text-sm">
-                        <thead className="bg-gray-50 dark:bg-[#0f1117] text-xs text-gray-500">
+                        <thead className="bg-gray-50 dark:bg-[#0f1117] text-xs text-gray-600">
                             <tr>
                                 <th className="px-4 py-2 text-left">Status</th>
                                 <th className="px-4 py-2 text-left">Sender</th>
@@ -74,7 +74,7 @@ export function MessageLogViewer({ channelId, limit = 50 }: MessageLogViewerProp
                                     <td className="px-4 py-2 text-gray-600 dark:text-gray-400 truncate max-w-xs">
                                         {msg.content}
                                     </td>
-                                    <td className="px-4 py-2 text-xs text-gray-400">
+                                    <td className="px-4 py-2 text-xs text--600">
                                         {format(new Date(msg.created_at), 'MMM d, HH:mm')}
                                     </td>
                                 </tr>

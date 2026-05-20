@@ -122,14 +122,14 @@ export function AuditTrailTab() {
                             <h2 className="text-base font-semibold text-gray-900 dark:text-white">
                                 Privilege Escalation Log
                             </h2>
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                            <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
                                 {loading ? 'Loading…' : `${total.toLocaleString()} event${total !== 1 ? 's' : ''} recorded`}
                             </p>
                         </div>
                     </div>
 
                     <div className="relative w-full sm:w-80">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text--600 dark:text-gray-500" />
                         <input
                             type="text"
                             placeholder="Search actor, target, or description…"
@@ -149,12 +149,12 @@ export function AuditTrailTab() {
             ) : logs.length === 0 ? (
                 <div className="p-16 text-center">
                     <div className="w-14 h-14 rounded-xl bg-gray-100 dark:bg-[#1e2535] border border-gray-200 dark:border-[#2a3347] flex items-center justify-center mx-auto mb-4">
-                        <Shield className="w-6 h-6 text-gray-400 dark:text-gray-500" />
+                        <Shield className="w-6 h-6 text--600 dark:text-gray-500" />
                     </div>
                     <p className="text-gray-900 dark:text-white font-medium mb-1">
                         No Escalation Events
                     </p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
                         {search
                             ? 'No events match your search query.'
                             : 'No privilege escalations have been recorded yet.'}
@@ -171,7 +171,7 @@ export function AuditTrailTab() {
                                         (col) => (
                                             <th
                                                 key={col}
-                                                className="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                                                className="px-6 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider"
                                             >
                                                 {col}
                                             </th>
@@ -190,7 +190,7 @@ export function AuditTrailTab() {
                                         >
                                             {/* Timestamp */}
                                             <td className="px-6 py-4 whitespace-nowrap">
-                                                <span className="text-xs font-mono text-gray-500 dark:text-gray-400">
+                                                <span className="text-xs font-mono text-gray-600 dark:text-gray-400">
                                                     {formatTimestamp(log.timestamp)}
                                                 </span>
                                             </td>
@@ -205,7 +205,7 @@ export function AuditTrailTab() {
                                                         <p className="text-xs font-medium text-gray-900 dark:text-white font-mono">
                                                             {truncateId(log.actor.id)}
                                                         </p>
-                                                        <p className="text-xs text-gray-400 dark:text-gray-500">
+                                                        <p className="text-xs text--600 dark:text-gray-500">
                                                             {log.actor.type}
                                                         </p>
                                                     </div>
@@ -228,12 +228,12 @@ export function AuditTrailTab() {
                                                         <p className="text-xs font-medium text-gray-900 dark:text-white font-mono">
                                                             {truncateId(log.target.id)}
                                                         </p>
-                                                        <p className="text-xs text-gray-400 dark:text-gray-500">
+                                                        <p className="text-xs text--600 dark:text-gray-500">
                                                             {log.target.type}
                                                         </p>
                                                     </div>
                                                 ) : (
-                                                    <span className="text-gray-400 dark:text-gray-500 text-xs">—</span>
+                                                    <span className="text--600 dark:text-gray-500 text-xs">—</span>
                                                 )}
                                             </td>
 
@@ -248,7 +248,7 @@ export function AuditTrailTab() {
 
                                             {/* Description */}
                                             <td className="px-6 py-4 max-w-xs">
-                                                <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                                                <p className="text-xs text-gray-600 dark:text-gray-400 truncate">
                                                     {log.description}
                                                 </p>
                                             </td>
@@ -296,7 +296,7 @@ export function AuditTrailTab() {
                                                                 {Array.isArray(log.metadata?.capabilities) &&
                                                                     log.metadata.capabilities.length > 0 && (
                                                                         <div>
-                                                                            <p className="text-xs font-medium text-gray-500 dark:text-gray-500 mb-1">
+                                                                            <p className="text-xs font-medium text-gray-600 dark:text-gray-500 mb-1">
                                                                                 Capabilities
                                                                             </p>
                                                                             <div className="flex flex-wrap gap-1">
@@ -316,14 +316,14 @@ export function AuditTrailTab() {
 
                                                                 {/* Reason */}
                                                                 {log.metadata?.reason && (
-                                                                    <p className="text-xs text-gray-500 dark:text-gray-400 italic">
+                                                                    <p className="text-xs text-gray-600 dark:text-gray-400 italic">
                                                                         Reason: {log.metadata.reason}
                                                                     </p>
                                                                 )}
 
                                                                 {/* Expiry */}
                                                                 {log.metadata?.expires_at && (
-                                                                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                                                                    <p className="text-xs text-gray-600 dark:text-gray-400">
                                                                         Expires:{' '}
                                                                         {formatTimestamp(log.metadata.expires_at)}
                                                                     </p>
@@ -331,7 +331,7 @@ export function AuditTrailTab() {
 
                                                                 {/* Delegation ID */}
                                                                 {log.metadata?.delegation_id && (
-                                                                    <p className="text-xs font-mono text-gray-400 dark:text-gray-500">
+                                                                    <p className="text-xs font-mono text--600 dark:text-gray-500">
                                                                         Delegation ID: {log.metadata.delegation_id}
                                                                     </p>
                                                                 )}
@@ -339,7 +339,7 @@ export function AuditTrailTab() {
                                                         )}
 
                                                         {/* Event ID */}
-                                                        <p className="text-xs font-mono text-gray-400 dark:text-gray-500 pt-1 border-t border-gray-200 dark:border-[#2a3347]">
+                                                        <p className="text-xs font-mono text--600 dark:text-gray-500 pt-1 border-t border-gray-200 dark:border-[#2a3347]">
                                                             Event ID: {log.id}
                                                         </p>
                                                     </div>
@@ -355,7 +355,7 @@ export function AuditTrailTab() {
                     {/* ── Pagination ────────────────────────────────────────── */}
                     {totalPages > 1 && (
                         <div className="px-6 py-4 border-t border-gray-100 dark:border-[#1e2535] flex items-center justify-between">
-                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                            <p className="text-xs text-gray-600 dark:text-gray-400">
                                 Showing {page * PAGE_SIZE + 1}–
                                 {Math.min((page + 1) * PAGE_SIZE, total)} of{' '}
                                 {total.toLocaleString()} events

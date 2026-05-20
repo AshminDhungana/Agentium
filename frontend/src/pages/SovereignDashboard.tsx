@@ -213,7 +213,7 @@ export function SovereignDashboard() {
                     <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
                         Access Denied
                     </h2>
-                    <p className="text-gray-500 dark:text-gray-400 text-sm">
+                    <p className="text-gray-600 dark:text-gray-400 text-sm">
                         Only Sovereign users can access this dashboard.
                     </p>
                 </div>
@@ -234,7 +234,7 @@ export function SovereignDashboard() {
                         ADMIN
                     </span>
                 </div>
-                <p className="text-gray-500 dark:text-gray-400 text-sm">
+                <p className="text-gray-600 dark:text-gray-400 text-sm">
                     Full system access and administrative controls.
                 </p>
             </div>
@@ -280,7 +280,7 @@ export function SovereignDashboard() {
                         })}
                     </div>
                 </div>
-                <p className="mt-2 ml-1 text-xs text-gray-400 dark:text-gray-500">
+                <p className="mt-2 ml-1 text-xs text--600 dark:text-gray-500">
                     {TABS.find((t) => t.id === activeTab)?.description}
                 </p>
             </div>

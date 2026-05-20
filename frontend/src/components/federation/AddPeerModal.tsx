@@ -85,7 +85,7 @@ export function AddPeerModal({ isSubmitting, onClose, onSubmit }: AddPeerModalPr
                             >
                                 Add Peer Instance
                             </h3>
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                            <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
                                 Register a new Agentium peer
                             </p>
                         </div>
@@ -103,12 +103,7 @@ export function AddPeerModal({ isSubmitting, onClose, onSubmit }: AddPeerModalPr
                         >
                             Peer Name
                         </label>
-                        <input
-                            id="peer-name"
-                            type="text"
-                            value={form.name}
-                            onChange={set('name')}
-                            className="w-full px-4 py-2.5 border border-gray-200 dark:border-[#1e2535] rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-[#0f1117] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 text-sm transition-colors duration-150"
+                        -gray-500 dark:border-[#1e2535] rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-[#0f1117] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 text-sm transition-colors duration-150"
                             placeholder="Engineering Dept"
                             required
                             disabled={isSubmitting}
@@ -123,12 +118,7 @@ export function AddPeerModal({ isSubmitting, onClose, onSubmit }: AddPeerModalPr
                         >
                             Base URL
                         </label>
-                        <input
-                            id="peer-base-url"
-                            type="url"
-                            value={form.base_url}
-                            onChange={set('base_url')}
-                            className="w-full px-4 py-2.5 border border-gray-200 dark:border-[#1e2535] rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-[#0f1117] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 text-sm transition-colors duration-150"
+                        -gray-500 dark:border-[#1e2535] rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-[#0f1117] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 text-sm transition-colors duration-150"
                             placeholder="https://agentium-dept.company.com"
                             required
                             disabled={isSubmitting}
@@ -143,12 +133,7 @@ export function AddPeerModal({ isSubmitting, onClose, onSubmit }: AddPeerModalPr
                         >
                             Shared Secret
                         </label>
-                        <input
-                            id="peer-secret"
-                            type="password"
-                            value={form.shared_secret}
-                            onChange={set('shared_secret')}
-                            className="w-full px-4 py-2.5 border border-gray-200 dark:border-[#1e2535] rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-[#0f1117] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 text-sm transition-colors duration-150"
+                        -gray-500 dark:border-[#1e2535] rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-[#0f1117] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 text-sm transition-colors duration-150"
                             placeholder="Enter shared secret"
                             required
                             disabled={isSubmitting}
@@ -163,11 +148,7 @@ export function AddPeerModal({ isSubmitting, onClose, onSubmit }: AddPeerModalPr
                         >
                             Trust Level
                         </label>
-                        <select
-                            id="peer-trust-level"
-                            value={form.trust_level}
-                            onChange={set('trust_level')}
-                            className="w-full px-4 py-2.5 border border-gray-200 dark:border-[#1e2535] rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-[#0f1117] text-gray-900 dark:text-white text-sm transition-colors duration-150"
+                        -gray-500 dark:border-[#1e2535] rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-[#0f1117] text-gray-900 dark:text-white text-sm transition-colors duration-150"
                             disabled={isSubmitting}
                         >
                             <option value="limited">Limited — standard task delegation</option>
@@ -183,14 +164,9 @@ export function AddPeerModal({ isSubmitting, onClose, onSubmit }: AddPeerModalPr
                             className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5"
                         >
                             Capabilities{' '}
-                            <span className="text-gray-400 dark:text-gray-500 font-normal">(comma-separated, optional)</span>
+                            <span className="text--600 dark:text-gray-500 font-normal">(comma-separated, optional)</span>
                         </label>
-                        <input
-                            id="peer-capabilities"
-                            type="text"
-                            value={form.capabilities}
-                            onChange={set('capabilities')}
-                            className="w-full px-4 py-2.5 border border-gray-200 dark:border-[#1e2535] rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-[#0f1117] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 text-sm transition-colors duration-150"
+                        -gray-500 dark:border-[#1e2535] rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-[#0f1117] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 text-sm transition-colors duration-150"
                             placeholder="task_delegation, knowledge_sharing"
                             disabled={isSubmitting}
                         />

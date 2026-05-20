@@ -23,11 +23,11 @@ const API_BASE = '/api/v1';
 
 // Maps each status to a self-contained Tailwind badge class string
 const STATUS_BADGE: Record<string, string> = {
-  idle:       'bg-gray-500/10 text-gray-500 border-gray-500/50',
-  navigating: 'bg-amber-500/10 text-amber-500 border-amber-500/50',
-  capturing:  'bg-blue-500/10  text-blue-500  border-blue-500/50',
-  complete:   'bg-emerald-500/10 text-emerald-500 border-emerald-500/50',
-  error:      'bg-red-500/10   text-red-500   border-red-500/50',
+  idle:       'bg-gray-500/10 text-gray-600 border-gray-500/50',
+  navigating: 'bg-amber-500/10 text-amber-700 border-amber-500/50',
+  capturing:  'bg-blue-500/10  text-blue-600  border-blue-500/50',
+  complete:   'bg-emerald-500/10 text-emerald-700 border-emerald-500/50',
+  error:      'bg-red-500/10   text-red-600   border-red-500/50',
 };
 
 const BrowserTaskPanel: React.FC = () => {
@@ -140,7 +140,7 @@ const BrowserTaskPanel: React.FC = () => {
           <svg
             width="20" height="20" viewBox="0 0 24 24"
             fill="none" stroke="currentColor" strokeWidth="2"
-            className="text-violet-400 shrink-0"
+            className="text--600 shrink-0"
           >
             <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
             <line x1="8" y1="21" x2="16" y2="21" />
@@ -189,7 +189,7 @@ const BrowserTaskPanel: React.FC = () => {
       </div>
 
       {/* ── Controls ──────────────────────────────────────────────────────── */}
-      <div className="flex justify-between items-center mb-3 text-sm text-gray-500 dark:text-slate-400">
+      <div className="flex justify-between items-center mb-3 text-sm text-gray-600 dark:text-slate-400">
         <label className="flex items-center gap-1.5 cursor-pointer select-none">
           <input
             type="checkbox"
@@ -217,14 +217,14 @@ const BrowserTaskPanel: React.FC = () => {
 
         {task.status !== 'idle' && (
           <div className="flex items-center gap-2.5">
-            <span className="text-violet-500 dark:text-violet-400 tabular-nums font-medium">
+            <span className="text-violet-600 dark:text-violet-400 tabular-nums font-medium">
               ⏱ {elapsed}s
             </span>
             <button
               onClick={handleStop}
               className="
                 bg-red-500/10 border border-red-500/40
-                text-red-500 dark:text-red-400
+                text-red-600 dark:text-red-400
                 rounded-md px-3 py-1 text-xs font-semibold
                 hover:bg-red-500/20 transition-colors cursor-pointer
               "
@@ -237,8 +237,8 @@ const BrowserTaskPanel: React.FC = () => {
 
       {/* ── Page title ────────────────────────────────────────────────────── */}
       {task.title && (
-        <p className="text-sm text-gray-500 dark:text-slate-400 mb-3 truncate">
-          <span className="font-semibold text-gray-400 dark:text-slate-500">Page:</span>{' '}
+        <p className="text-sm text-gray-600 dark:text-slate-400 mb-3 truncate">
+          <span className="font-semibold text--600 dark:text-slate-500">Page:</span>{' '}
           {task.title}
         </p>
       )}
@@ -259,14 +259,14 @@ const BrowserTaskPanel: React.FC = () => {
         ) : task.status === 'error' ? (
           <div className="flex flex-col items-center gap-2 p-10">
             <span className="text-3xl">⚠️</span>
-            <p className="text-red-500 dark:text-red-400 text-sm text-center max-w-xs m-0">
+            <p className="text-red-600 dark:text-red-400 text-sm text-center max-w-xs m-0">
               {task.error || 'Unknown error'}
             </p>
           </div>
         ) : isBusy ? (
           <div className="flex flex-col items-center gap-3 p-10">
-            <LoadingSpinner size="lg" className="text-violet-500 dark:text-violet-400" />
-            <p className="text-gray-500 dark:text-slate-400 text-sm m-0">
+            <LoadingSpinner size="lg" className="text-violet-600 dark:text-violet-400" />
+            <p className="text-gray-600 dark:text-slate-400 text-sm m-0">
               {task.status === 'navigating' ? 'Navigating…' : 'Capturing screenshot…'}
             </p>
           </div>
@@ -281,7 +281,7 @@ const BrowserTaskPanel: React.FC = () => {
               <line x1="8" y1="21" x2="16" y2="21" />
               <line x1="12" y1="17" x2="12" y2="21" />
             </svg>
-            <p className="text-gray-400 dark:text-gray-600 text-sm m-0">
+            <p className="text--600 dark:text-gray-600 text-sm m-0">
               Enter a URL above to start browsing
             </p>
           </div>
@@ -290,13 +290,13 @@ const BrowserTaskPanel: React.FC = () => {
 
       {/* ── Current URL ───────────────────────────────────────────────────── */}
       {task.url && (
-        <p className="text-xs text-gray-400 dark:text-slate-500 truncate m-0">
+        <p className="text-xs text--600 dark:text-slate-500 truncate m-0">
           <span className="font-semibold mr-1">URL:</span>
           <a
             href={task.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-indigo-500 dark:text-indigo-400 hover:underline"
+            className="text-indigo-600 dark:text-indigo-400 hover:underline"
           >
             {task.url}
           </a>

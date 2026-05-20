@@ -97,7 +97,7 @@ export function SystemTab() {
             {/* ── Error banner (C1) ──────────────────────────────────────── */}
             {error && (
                 <div className="flex items-center gap-3 p-4 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-xl mb-6">
-                    <AlertCircle className="w-4 h-4 text-red-500 dark:text-red-400 shrink-0" />
+                    <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0" />
                     <span className="text-sm text-red-600 dark:text-red-400 flex-1">{error}</span>
                     <button
                         onClick={() => { clearError(); refresh(); }}
@@ -122,7 +122,7 @@ export function SystemTab() {
                                 {systemStatus.cpu.usage.toFixed(1)}%
                             </span>
                         </div>
-                        <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3">
+                        <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-3">
                             CPU Usage
                         </p>
                         <div className="w-full bg-gray-200 dark:bg-[#1e2535] rounded-full h-1.5">
@@ -131,7 +131,7 @@ export function SystemTab() {
                                 style={{ width: `${systemStatus.cpu.usage}%` }}
                             />
                         </div>
-                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
+                        <p className="text-xs text--600 dark:text-gray-500 mt-2">
                             {systemStatus.cpu.cores} cores
                         </p>
                     </div>
@@ -146,7 +146,7 @@ export function SystemTab() {
                                 {systemStatus.memory.percentage.toFixed(1)}%
                             </span>
                         </div>
-                        <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3">
+                        <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-3">
                             Memory
                         </p>
                         <div className="w-full bg-gray-200 dark:bg-[#1e2535] rounded-full h-1.5">
@@ -155,7 +155,7 @@ export function SystemTab() {
                                 style={{ width: `${systemStatus.memory.percentage}%` }}
                             />
                         </div>
-                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
+                        <p className="text-xs text--600 dark:text-gray-500 mt-2">
                             {(systemStatus.memory.used / BYTES_PER_GB).toFixed(1)} /{' '}
                             {(systemStatus.memory.total / BYTES_PER_GB).toFixed(1)} GB
                         </p>
@@ -171,7 +171,7 @@ export function SystemTab() {
                                 {systemStatus.disk.percentage.toFixed(1)}%
                             </span>
                         </div>
-                        <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3">
+                        <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-3">
                             Disk Usage
                         </p>
                         <div className="w-full bg-gray-200 dark:bg-[#1e2535] rounded-full h-1.5">
@@ -180,7 +180,7 @@ export function SystemTab() {
                                 style={{ width: `${systemStatus.disk.percentage}%` }}
                             />
                         </div>
-                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
+                        <p className="text-xs text--600 dark:text-gray-500 mt-2">
                             {(systemStatus.disk.free / BYTES_PER_GB).toFixed(1)} GB free
                         </p>
                     </div>
@@ -195,10 +195,10 @@ export function SystemTab() {
                                 {Math.floor(systemStatus.uptime.seconds / 3600)}h
                             </span>
                         </div>
-                        <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3">
+                        <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-3">
                             System Uptime
                         </p>
-                        <p className="text-xs text-gray-400 dark:text-gray-500">
+                        <p className="text-xs text--600 dark:text-gray-500">
                             {Math.floor((systemStatus.uptime.seconds % 3600) / 60)} minutes running
                         </p>
                     </div>
@@ -217,7 +217,7 @@ export function SystemTab() {
                                 <h2 className="text-base font-semibold text-gray-900 dark:text-white">
                                     Container Management
                                 </h2>
-                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
                                     {runningContainers}/{containers.length} running
                                 </p>
                             </div>
@@ -236,19 +236,19 @@ export function SystemTab() {
                     <table className="w-full">
                         <thead className="bg-gray-50 dark:bg-[#0f1117]">
                             <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
                                     Container
                                 </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
                                     Status
                                 </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
                                     Image
                                 </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
                                     Created
                                 </th>
-                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
                                     Actions
                                 </th>
                             </tr>
@@ -263,7 +263,7 @@ export function SystemTab() {
                                         <div className="text-sm font-medium text-gray-900 dark:text-white">
                                             {container.name}
                                         </div>
-                                        <div className="text-xs text-gray-400 dark:text-gray-500 font-mono mt-0.5">
+                                        <div className="text-xs text--600 dark:text-gray-500 font-mono mt-0.5">
                                             {container.id.substring(0, 12)}
                                         </div>
                                     </td>
@@ -279,7 +279,7 @@ export function SystemTab() {
                                             {container.image}
                                         </span>
                                     </td>
-                                    <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
+                                    <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
                                         {new Date(container.created).toLocaleDateString()}
                                     </td>
                                     <td className="px-6 py-4">
@@ -326,9 +326,9 @@ export function SystemTab() {
                     {containers.length === 0 && (
                         <div className="text-center py-16">
                             <div className="w-14 h-14 bg-gray-100 dark:bg-[#1e2535] border border-gray-200 dark:border-[#2a3347] rounded-xl flex items-center justify-center mx-auto mb-3">
-                                <Terminal className="w-6 h-6 text-gray-400 dark:text-gray-500" />
+                                <Terminal className="w-6 h-6 text--600 dark:text-gray-500" />
                             </div>
-                            <p className="text-sm text-gray-500 dark:text-gray-400">
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
                                 No containers found
                             </p>
                         </div>
@@ -366,7 +366,7 @@ export function SystemTab() {
                                     {log.status}
                                 </span>
                             </div>
-                            <div className="flex items-center gap-4 text-xs text-gray-400 dark:text-gray-500 ml-7">
+                            <div className="flex items-center gap-4 text-xs text--600 dark:text-gray-500 ml-7">
                                 <span>{new Date(log.timestamp).toLocaleString()}</span>
                                 {log.executor && (
                                     <span>
@@ -383,9 +383,9 @@ export function SystemTab() {
                     {commandLogs.length === 0 && (
                         <div className="text-center py-16">
                             <div className="w-14 h-14 bg-gray-100 dark:bg-[#1e2535] border border-gray-200 dark:border-[#2a3347] rounded-xl flex items-center justify-center mx-auto mb-3">
-                                <CheckCircle className="w-6 h-6 text-gray-400 dark:text-gray-500" />
+                                <CheckCircle className="w-6 h-6 text--600 dark:text-gray-500" />
                             </div>
-                            <p className="text-sm text-gray-500 dark:text-gray-400">
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
                                 No command history
                             </p>
                         </div>

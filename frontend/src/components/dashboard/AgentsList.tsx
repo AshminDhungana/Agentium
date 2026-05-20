@@ -65,7 +65,7 @@ export function AgentsList({ agents, isLoading, isError, onRetry }: AgentsListPr
                 {isLoading ? (
                     Array.from({ length: 4 }).map((_, i) => <SkeletonRow key={i} />)
                 ) : agents.length === 0 ? (
-                    <div className="px-6 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+                    <div className="px-6 py-8 text-center text-sm text-gray-600 dark:text-gray-400">
                         No active agents
                     </div>
                 ) : (
@@ -86,7 +86,7 @@ export function AgentsList({ agents, isLoading, isError, onRetry }: AgentsListPr
                                         {agent.name}
                                     </p>
                                     {agent.current_task_title && (
-                                        <p className="text-xs text-gray-500 dark:text-gray-500 truncate">
+                                        <p className="text-xs text-gray-600 dark:text-gray-500 truncate">
                                             {agent.current_task_title}
                                         </p>
                                     )}

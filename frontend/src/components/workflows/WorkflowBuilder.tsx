@@ -105,7 +105,7 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ initialTemplat
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-sm text-gray-500 dark:text-slate-400 mb-1 block">
+              <label className="text-sm text-gray-600 dark:text-slate-400 mb-1 block">
                 Workflow Name
               </label>
               <input
@@ -117,7 +117,7 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ initialTemplat
               />
             </div>
             <div>
-              <label className="text-sm text-gray-500 dark:text-slate-400 mb-1 block">
+              <label className="text-sm text-gray-600 dark:text-slate-400 mb-1 block">
                 Cron Schedule (Optional)
               </label>
               <input
@@ -142,7 +142,7 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ initialTemplat
             <Button
               variant="ghost"
               size="icon"
-              className="absolute top-2 right-2 text-red-400 hover:text-red-300 hover:bg-red-400/10"
+              className="absolute top-2 right-2 text--600 hover:text-red-300 hover:bg-red-400/10"
               onClick={() => removeStep(idx)}
             >
               <Trash className="w-4 h-4" />
@@ -174,7 +174,7 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ initialTemplat
                   {step.type === 'TASK' && (
                     <>
                       <div>
-                        <label className="text-xs text-gray-500 dark:text-slate-500 mb-1 block">
+                        <label className="text-xs text-gray-600 dark:text-slate-500 mb-1 block">
                           Task Title
                         </label>
                         <input
@@ -187,7 +187,7 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ initialTemplat
                         />
                       </div>
                       <div>
-                        <label className="text-xs text-gray-500 dark:text-slate-500 mb-1 block">
+                        <label className="text-xs text-gray-600 dark:text-slate-500 mb-1 block">
                           Prompt
                         </label>
                         <textarea
@@ -203,7 +203,7 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ initialTemplat
                   )}
                   {step.type === 'DELAY' && (
                     <div>
-                      <label className="text-xs text-gray-500 dark:text-slate-500 mb-1 block">
+                      <label className="text-xs text-gray-600 dark:text-slate-500 mb-1 block">
                         Delay Seconds
                       </label>
                       <input
@@ -223,7 +223,7 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ initialTemplat
                 {/* Routing */}
                 <div className="col-span-4 space-y-3 border-l border-gray-200 dark:border-[#1e2535] pl-4">
                   <div>
-                    <label className="text-xs text-gray-500 dark:text-slate-500 mb-1 block">
+                    <label className="text-xs text-gray-600 dark:text-slate-500 mb-1 block">
                       On Success Step Index
                     </label>
                     <input
@@ -239,7 +239,7 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ initialTemplat
                   </div>
                   {(step.type === 'TASK' || step.type === 'CONDITION') && (
                     <div>
-                      <label className="text-xs text-gray-500 dark:text-slate-500 mb-1 block">
+                      <label className="text-xs text-gray-600 dark:text-slate-500 mb-1 block">
                         On Failure Step Index
                       </label>
                       <input

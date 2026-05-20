@@ -17,7 +17,7 @@ export function DashboardHeader() {
                 <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-1">
                     Welcome, {user?.username}
                 </h1>
-                <p className="text-gray-500 dark:text-gray-400 text-sm">
+                <p className="text-gray-600 dark:text-gray-400 text-sm">
                     Oversee your AI governance system from this command center.
                 </p>
             </div>

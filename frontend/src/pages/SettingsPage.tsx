@@ -127,7 +127,7 @@ export function SettingsPage() {
                     <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-1">
                         Settings
                     </h1>
-                    <p className="text-gray-500 dark:text-gray-400 text-sm">
+                    <p className="text-gray-600 dark:text-gray-400 text-sm">
                         Manage your account and system preferences.
                     </p>
                 </div>
@@ -200,7 +200,7 @@ export function SettingsPage() {
                                     {/* Account status */}
                                     <div className="w-full mt-6 pt-5 border-t border-gray-100 dark:border-[#1e2535]">
                                         <div className="flex items-center justify-between text-sm mb-3">
-                                            <span className="text-gray-500 dark:text-gray-400">Account Status</span>
+                                            <span className="text-gray-600 dark:text-gray-400">Account Status</span>
                                             <span className="flex items-center gap-1.5 text-green-600 dark:text-green-400 font-medium text-xs">
                                                 <CheckCircle2 className="w-3.5 h-3.5" />
                                                 Active
@@ -208,7 +208,7 @@ export function SettingsPage() {
                                         </div>
                                         {/* D3: last_login_at is now typed — no `as any` cast */}
                                         <div className="flex items-center justify-between text-sm">
-                                            <span className="text-gray-500 dark:text-gray-400">Last Login</span>
+                                            <span className="text-gray-600 dark:text-gray-400">Last Login</span>
                                             <span className="text-gray-900 dark:text-gray-100 font-medium text-xs">
                                                 {lastLoginDisplay}
                                             </span>
@@ -220,26 +220,26 @@ export function SettingsPage() {
                             {/* Account Info */}
                             <div className="bg-white dark:bg-[#161b27] rounded-xl border border-gray-200 dark:border-[#1e2535] p-6 shadow-sm dark:shadow-[0_2px_16px_rgba(0,0,0,0.25)] transition-colors duration-200">
                                 <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                                    <Info className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+                                    <Info className="w-4 h-4 text--600 dark:text-gray-500" />
                                     Account Info
                                 </h3>
                                 <div className="divide-y divide-gray-100 dark:divide-[#1e2535]">
                                     <div className="flex items-center justify-between py-2.5">
-                                        <span className="text-xs text-gray-500 dark:text-gray-400">User ID</span>
+                                        <span className="text-xs text-gray-600 dark:text-gray-400">User ID</span>
                                         <span className="text-xs font-mono text-gray-900 dark:text-gray-100">
                                             #{user?.id || '—'}
                                         </span>
                                     </div>
                                     {/* C11: Derived from actual role instead of hardcoded "Full Access" */}
                                     <div className="flex items-center justify-between py-2.5">
-                                        <span className="text-xs text-gray-500 dark:text-gray-400">Permissions</span>
+                                        <span className="text-xs text-gray-600 dark:text-gray-400">Permissions</span>
                                         <span className="text-xs text-gray-900 dark:text-gray-100">
                                             {permissionLabel}
                                         </span>
                                     </div>
                                     <div className="flex items-center justify-between py-2.5">
-                                        <span className="text-xs text-gray-500 dark:text-gray-400">2FA Status</span>
-                                        <span className="text-xs text-gray-400 dark:text-gray-500">Not Enabled</span>
+                                        <span className="text-xs text-gray-600 dark:text-gray-400">2FA Status</span>
+                                        <span className="text-xs text--600 dark:text-gray-500">Not Enabled</span>
                                     </div>
                                 </div>
                             </div>
@@ -259,7 +259,7 @@ export function SettingsPage() {
                                             <h2 className="text-base font-semibold text-gray-900 dark:text-white">
                                                 Change Password
                                             </h2>
-                                            <p className="text-sm text-gray-500 dark:text-gray-400">
+                                            <p className="text-sm text-gray-600 dark:text-gray-400">
                                                 Update your security credentials
                                             </p>
                                         </div>
@@ -288,7 +288,7 @@ export function SettingsPage() {
                                                 <button
                                                     type="button"
                                                     onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-150"
+                                                    className="absolute right-3 top-1/2 -translate-y-1/2 text--600 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-150"
                                                     aria-label={showCurrentPassword ? 'Hide password' : 'Show password'}
                                                 >
                                                     {showCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -308,7 +308,7 @@ export function SettingsPage() {
                                                 <div className="w-full border-t border-gray-200 dark:border-[#1e2535]" />
                                             </div>
                                             <div className="relative flex justify-center">
-                                                <span className="px-3 bg-white dark:bg-[#161b27] text-xs text-gray-400 dark:text-gray-500">
+                                                <span className="px-3 bg-white dark:bg-[#161b27] text-xs text--600 dark:text-gray-500">
                                                     New Password
                                                 </span>
                                             </div>
@@ -336,7 +336,7 @@ export function SettingsPage() {
                                                 <button
                                                     type="button"
                                                     onClick={() => setShowNewPassword(!showNewPassword)}
-                                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-150"
+                                                    className="absolute right-3 top-1/2 -translate-y-1/2 text--600 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-150"
                                                     aria-label={showNewPassword ? 'Hide password' : 'Show password'}
                                                 >
                                                     {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -347,7 +347,7 @@ export function SettingsPage() {
                                             {newPassword && (
                                                 <div className="mt-2.5 space-y-1.5">
                                                     <div className="flex items-center justify-between text-xs">
-                                                        <span className="text-gray-500 dark:text-gray-400">Password Strength</span>
+                                                        <span className="text-gray-600 dark:text-gray-400">Password Strength</span>
                                                         <span className={`font-semibold ${strengthTextColor}`}>
                                                             {strengthLabel}
                                                         </span>
@@ -389,7 +389,7 @@ export function SettingsPage() {
                                                 <button
                                                     type="button"
                                                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-150"
+                                                    className="absolute right-3 top-1/2 -translate-y-1/2 text--600 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-150"
                                                     aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
                                                 >
                                                     {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}

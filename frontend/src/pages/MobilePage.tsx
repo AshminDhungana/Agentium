@@ -111,7 +111,7 @@ function Toggle({
             <div>
                 <p className="text-sm font-medium text-gray-900 dark:text-white">{label}</p>
                 {description && (
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{description}</p>
+                    <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">{description}</p>
                 )}
             </div>
             <button
@@ -302,7 +302,7 @@ export function MobilePage() {
                     <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
                         Access Denied
                     </h2>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
                         Please log in to access mobile settings.
                     </p>
                 </div>
@@ -326,7 +326,7 @@ export function MobilePage() {
                             </span>
                         )}
                     </div>
-                    <p className="text-gray-500 dark:text-gray-400 text-sm">
+                    <p className="text-gray-600 dark:text-gray-400 text-sm">
                         Configure mobile app settings, devices, and offline sync.
                     </p>
                 </div>
@@ -354,7 +354,7 @@ export function MobilePage() {
                                 {dashboard?.status ?? 'offline'}
                             </span>
                         </div>
-                        <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                        <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
                             Connection Status
                         </p>
                     </div>
@@ -369,7 +369,7 @@ export function MobilePage() {
                                 {devices.length}
                             </span>
                         </div>
-                        <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                        <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
                             Registered Devices
                         </p>
                     </div>
@@ -384,7 +384,7 @@ export function MobilePage() {
                                 {dashboard?.tasks?.pending ?? 0}
                             </span>
                         </div>
-                        <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                        <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
                             Pending Tasks
                         </p>
                     </div>
@@ -399,7 +399,7 @@ export function MobilePage() {
                                 {dashboard?.active_votes ?? 0}
                             </span>
                         </div>
-                        <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                        <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
                             Active Votes
                         </p>
                     </div>
@@ -444,7 +444,7 @@ export function MobilePage() {
                                     <h2 className="text-base font-semibold text-gray-900 dark:text-white">
                                         Mobile Summary
                                     </h2>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                    <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
                                         Optimized data for mobile clients
                                     </p>
                                 </div>
@@ -454,13 +454,13 @@ export function MobilePage() {
                         {dashboardLoading ? (
                             <div className="p-16 text-center">
                                 <LoadingSpinner size="lg" />
-                                <p className="text-sm text-gray-500 dark:text-gray-400">Loading...</p>
+                                <p className="text-sm text-gray-600 dark:text-gray-400">Loading...</p>
                             </div>
                         ) : dashboard ? (
                             <div className="p-6">
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                     <div className="p-4 bg-gray-50 dark:bg-[#0f1117] rounded-lg">
-                                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                                        <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">
                                             Active Agents
                                         </p>
                                         <p className="text-xl font-bold text-gray-900 dark:text-white">
@@ -468,7 +468,7 @@ export function MobilePage() {
                                         </p>
                                     </div>
                                     <div className="p-4 bg-gray-50 dark:bg-[#0f1117] rounded-lg">
-                                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                                        <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">
                                             Pending Tasks
                                         </p>
                                         <p className="text-xl font-bold text-yellow-600 dark:text-yellow-400">
@@ -476,7 +476,7 @@ export function MobilePage() {
                                         </p>
                                     </div>
                                     <div className="p-4 bg-gray-50 dark:bg-[#0f1117] rounded-lg">
-                                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                                        <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">
                                             Failed Tasks
                                         </p>
                                         <p className="text-xl font-bold text-red-600 dark:text-red-400">
@@ -484,7 +484,7 @@ export function MobilePage() {
                                         </p>
                                     </div>
                                     <div className="p-4 bg-gray-50 dark:bg-[#0f1117] rounded-lg">
-                                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                                        <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">
                                             Active Votes
                                         </p>
                                         <p className="text-xl font-bold text-purple-600 dark:text-purple-400">
@@ -502,7 +502,7 @@ export function MobilePage() {
                                             <p className="text-sm font-medium text-gray-900 dark:text-white">
                                                 Role: {dashboard.role}
                                             </p>
-                                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                            <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
                                                 {dashboard.unread_notifications} unread notification
                                                 {dashboard.unread_notifications !== 1 ? 's' : ''}
                                             </p>
@@ -513,12 +513,12 @@ export function MobilePage() {
                         ) : (
                             <div className="p-16 text-center">
                                 <div className="w-14 h-14 rounded-xl bg-gray-100 dark:bg-[#1e2535] border border-gray-200 dark:border-[#2a3347] flex items-center justify-center mx-auto mb-4">
-                                    <AlertTriangle className="w-6 h-6 text-gray-400 dark:text-gray-500" />
+                                    <AlertTriangle className="w-6 h-6 text--600 dark:text-gray-500" />
                                 </div>
                                 <p className="text-gray-900 dark:text-white font-medium mb-1">
                                     No Data Available
                                 </p>
-                                <p className="text-sm text-gray-500 dark:text-gray-400">
+                                <p className="text-sm text-gray-600 dark:text-gray-400">
                                     Could not load mobile dashboard
                                 </p>
                             </div>
@@ -550,7 +550,7 @@ export function MobilePage() {
                                             <h2 className="text-base font-semibold text-gray-900 dark:text-white">
                                                 Registered Devices
                                             </h2>
-                                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                            <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
                                                 {devices.length} device
                                                 {devices.length !== 1 ? 's' : ''} registered
                                             </p>
@@ -558,7 +558,7 @@ export function MobilePage() {
                                     </div>
                                     <button
                                         onClick={fetchDevices}
-                                        className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#1e2535] rounded-lg transition-colors duration-150"
+                                        className="p-2 text--600 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#1e2535] rounded-lg transition-colors duration-150"
                                         title="Refresh"
                                         aria-label="Refresh device list"
                                     >
@@ -570,17 +570,17 @@ export function MobilePage() {
                             {devicesLoading ? (
                                 <div className="p-16 text-center">
                                     <LoadingSpinner size="lg" />
-                                    <p className="text-sm text-gray-500 dark:text-gray-400">Loading devices...</p>
+                                    <p className="text-sm text-gray-600 dark:text-gray-400">Loading devices...</p>
                                 </div>
                             ) : devices.length === 0 ? (
                                 <div className="p-16 text-center">
                                     <div className="w-14 h-14 rounded-xl bg-gray-100 dark:bg-[#1e2535] border border-gray-200 dark:border-[#2a3347] flex items-center justify-center mx-auto mb-4">
-                                        <Smartphone className="w-6 h-6 text-gray-400 dark:text-gray-500" />
+                                        <Smartphone className="w-6 h-6 text--600 dark:text-gray-500" />
                                     </div>
                                     <p className="text-gray-900 dark:text-white font-medium mb-1">
                                         No Devices Registered
                                     </p>
-                                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                                    <p className="text-sm text-gray-600 dark:text-gray-400">
                                         Register a device to receive push notifications
                                     </p>
                                 </div>
@@ -604,10 +604,10 @@ export function MobilePage() {
                                                                 {device.platform.toUpperCase()}
                                                             </span>
                                                         </div>
-                                                        <p className="text-xs font-mono text-gray-500 dark:text-gray-400 mt-1 truncate max-w-xs">
+                                                        <p className="text-xs font-mono text-gray-600 dark:text-gray-400 mt-1 truncate max-w-xs">
                                                             {device.token.substring(0, 32)}…
                                                         </p>
-                                                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+                                                        <p className="text-xs text--600 dark:text-gray-500 mt-0.5">
                                                             Registered {formatDate(device.registered_at)}
                                                         </p>
                                                     </div>
@@ -616,7 +616,7 @@ export function MobilePage() {
                                                 {/* Inline confirmation replaces window.confirm() */}
                                                 {confirmDeleteToken === device.token ? (
                                                     <div className="flex items-center gap-2 shrink-0">
-                                                        <span className="text-xs text-gray-500 dark:text-gray-400 mr-1">
+                                                        <span className="text-xs text-gray-600 dark:text-gray-400 mr-1">
                                                             Remove?
                                                         </span>
                                                         <button
@@ -663,7 +663,7 @@ export function MobilePage() {
                                     <h2 className="text-base font-semibold text-gray-900 dark:text-white">
                                         Notification Preferences
                                     </h2>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                    <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
                                         Choose which events trigger push notifications
                                     </p>
                                 </div>
@@ -673,7 +673,7 @@ export function MobilePage() {
                         {prefsLoading ? (
                             <div className="p-16 text-center">
                                 <LoadingSpinner size="lg" />
-                                <p className="text-sm text-gray-500 dark:text-gray-400">Loading preferences...</p>
+                                <p className="text-sm text-gray-600 dark:text-gray-400">Loading preferences...</p>
                             </div>
                         ) : (
                             <div className="p-6 space-y-3">
@@ -706,13 +706,13 @@ export function MobilePage() {
                                 <div className="pt-2">
                                     <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
                                         Quiet Hours
-                                        <span className="text-xs font-normal text-gray-400 dark:text-gray-500 ml-1">
+                                        <span className="text-xs font-normal text--600 dark:text-gray-500 ml-1">
                                             (suppress notifications during these hours)
                                         </span>
                                     </p>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
-                                            <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1.5">
+                                            <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1.5">
                                                 Start
                                             </label>
                                             <input
@@ -725,7 +725,7 @@ export function MobilePage() {
                                             />
                                         </div>
                                         <div>
-                                            <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1.5">
+                                            <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1.5">
                                                 End
                                             </label>
                                             <input
@@ -774,7 +774,7 @@ export function MobilePage() {
                                         <h2 className="text-base font-semibold text-gray-900 dark:text-white">
                                             Offline Data
                                         </h2>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                        <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
                                             Cache data for offline access
                                         </p>
                                     </div>
@@ -791,7 +791,7 @@ export function MobilePage() {
                                             <p className="text-sm font-medium text-gray-900 dark:text-white">
                                                 Constitution
                                             </p>
-                                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                                            <p className="text-xs text-gray-600 dark:text-gray-400">
                                                 Current constitution text for offline viewing
                                             </p>
                                         </div>
@@ -814,7 +814,7 @@ export function MobilePage() {
                                             <p className="text-sm font-medium text-gray-900 dark:text-white">
                                                 Task Queue
                                             </p>
-                                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                                            <p className="text-xs text-gray-600 dark:text-gray-400">
                                                 Pending tasks for offline viewing
                                             </p>
                                         </div>
@@ -864,7 +864,7 @@ export function MobilePage() {
                                     <h3 className="text-base font-semibold text-gray-900 dark:text-white">
                                         Register Device
                                     </h3>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                    <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
                                         Add a new mobile device for push notifications
                                     </p>
                                 </div>
@@ -905,7 +905,7 @@ export function MobilePage() {
                                     placeholder="Paste device push token here"
                                     required
                                 />
-                                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1.5">
+                                <p className="text-xs text--600 dark:text-gray-500 mt-1.5">
                                     Obtain this from the mobile app's device registration flow.
                                 </p>
                             </div>

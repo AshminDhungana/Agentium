@@ -61,11 +61,11 @@ export function QuickActions() {
                             <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
                                 {action.label}
                             </p>
-                            <p className="text-xs text-gray-500 dark:text-gray-500 mt-0.5">
+                            <p className="text-xs text-gray-600 dark:text-gray-500 mt-0.5">
                                 {action.description}
                             </p>
                         </div>
-                        <ChevronRight className="w-4 h-4 text-gray-400 dark:text-gray-600 group-hover:text-gray-600 dark:group-hover:text-gray-400 transition-colors duration-150 flex-shrink-0" />
+                        <ChevronRight className="w-4 h-4 text--600 dark:text-gray-600 group-hover:text-gray-600 dark:group-hover:text--600 transition-colors duration-150 flex-shrink-0" />
                     </Link>
                 ))}
             </div>

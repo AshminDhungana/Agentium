@@ -147,7 +147,7 @@ export const ModelCard: React.FC<ModelCardProps> = React.memo(({
                 {/* ── Model info ─────────────────────────────────────────── */}
                 <div className="space-y-2 mb-4">
                     <div className="flex items-center justify-between text-sm">
-                        <span className="text-gray-500 dark:text-gray-400">Model</span>
+                        <span className="text-gray-600 dark:text-gray-400">Model</span>
                         <span
                             className="font-mono text-xs text-gray-900 dark:text-gray-100 bg-gray-100 dark:bg-[#0f1117] border border-gray-200 dark:border-[#1e2535] px-2 py-0.5 rounded-md truncate max-w-[180px]"
                             title={config.default_model}
@@ -157,11 +157,11 @@ export const ModelCard: React.FC<ModelCardProps> = React.memo(({
                     </div>
                     {config.api_key_masked && (
                         <div className="flex items-center justify-between text-sm">
-                            <span className="text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
+                            <span className="text-gray-600 dark:text-gray-400 flex items-center gap-1.5">
                                 <Key className="w-3 h-3" aria-hidden="true" />
                                 API Key
                             </span>
-                            <span className="font-mono text-xs text-gray-400 dark:text-gray-500">
+                            <span className="font-mono text-xs text--600 dark:text-gray-500">
                                 {config.api_key_masked}
                             </span>
                         </div>
@@ -171,7 +171,7 @@ export const ModelCard: React.FC<ModelCardProps> = React.memo(({
                 {/* ── Available model tags ────────────────────────────────── */}
                 {config.available_models && config.available_models.length > 0 && (
                     <div className="mb-4">
-                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">Available Models</div>
+                        <div className="text-xs text-gray-600 dark:text-gray-400 mb-2">Available Models</div>
                         <div className="flex flex-wrap gap-1.5" role="list" aria-label="Available models">
                             {config.available_models.slice(0, 4).map((model) => (
                                 <span
@@ -190,7 +190,7 @@ export const ModelCard: React.FC<ModelCardProps> = React.memo(({
                                 <span
                                     role="listitem"
                                     aria-label={`${config.available_models.length - 4} more models`}
-                                    className="text-xs text-gray-400 dark:text-gray-500 px-2 py-0.5 bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-[#1e2535] rounded-md"
+                                    className="text-xs text--600 dark:text-gray-500 px-2 py-0.5 bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-[#1e2535] rounded-md"
                                 >
                                     +{config.available_models.length - 4}
                                 </span>
@@ -206,19 +206,19 @@ export const ModelCard: React.FC<ModelCardProps> = React.memo(({
                     aria-label="Usage statistics"
                 >
                     <div className="text-center px-3 py-2.5">
-                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Requests</div>
+                        <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">Requests</div>
                         <div className="text-sm font-bold text-gray-900 dark:text-white">
                             {(config.total_usage?.requests ?? 0).toLocaleString()}
                         </div>
                     </div>
                     <div className="text-center px-3 py-2.5 border-x border-gray-100 dark:border-[#1e2535]">
-                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Tokens</div>
+                        <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">Tokens</div>
                         <div className="text-sm font-bold text-gray-900 dark:text-white">
                             {formatTokenCount(config.total_usage?.tokens ?? 0)}
                         </div>
                     </div>
                     <div className="text-center px-3 py-2.5">
-                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Cost</div>
+                        <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">Cost</div>
                         <div className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
                             ${(config.total_usage?.cost_usd ?? 0).toFixed(2)}
                         </div>

@@ -127,7 +127,7 @@ function InstallNotification({ info, onClose }: InstallNotificationProps) {
       <div className="flex items-start justify-between px-4 pt-4 pb-2">
         <div className="flex items-center gap-2">
           <span className="flex h-6 w-6 items-center justify-center rounded-full bg-orange-100 dark:bg-orange-500/20">
-            <Terminal className="h-3.5 w-3.5 text-orange-500 dark:text-orange-400" />
+            <Terminal className="h-3.5 w-3.5 text-orange-700 dark:text-orange-400" />
           </span>
           <p className="text-sm font-semibold text-gray-900 dark:text-white leading-tight">
             Voice Bridge Not Running
@@ -135,7 +135,7 @@ function InstallNotification({ info, onClose }: InstallNotificationProps) {
         </div>
         <button
           onClick={onClose}
-          className="ml-2 mt-0.5 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors flex-shrink-0"
+          className="ml-2 mt-0.5 text--600 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors flex-shrink-0"
           aria-label="Dismiss"
         >
           <X className="h-4 w-4" />
@@ -144,7 +144,7 @@ function InstallNotification({ info, onClose }: InstallNotificationProps) {
 
       {/* Body */}
       <div className="px-4 pb-2">
-        <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed mb-3">
+        <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed mb-3">
           The local voice bridge isn't running on your{' '}
           <span className="text-gray-800 dark:text-gray-200 font-medium">{info.label}</span> machine.
           Start it with the command below:
@@ -152,7 +152,7 @@ function InstallNotification({ info, onClose }: InstallNotificationProps) {
 
         {info.commands.map((item, idx) => (
           <div key={idx} className="mb-2 last:mb-0">
-            <p className="text-[10px] text-gray-400 dark:text-gray-500 mb-1 uppercase tracking-wide">
+            <p className="text-[10px] text--600 dark:text-gray-500 mb-1 uppercase tracking-wide">
               {item.caption}
             </p>
             <div className="group flex items-center gap-2 bg-gray-50 dark:bg-black/50 border border-gray-200 dark:border-[#1e2535] rounded-lg px-3 py-2">
@@ -161,11 +161,11 @@ function InstallNotification({ info, onClose }: InstallNotificationProps) {
               </code>
               <button
                 onClick={() => handleCopy(item.cmd, idx)}
-                className="flex-shrink-0 text-gray-400 hover:text-gray-600 dark:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                className="flex-shrink-0 text--600 hover:text-gray-600 dark:text-gray-600 dark:hover:text-gray-300 transition-colors"
                 aria-label="Copy command"
               >
                 {copied === idx
-                  ? <Check className="h-3.5 w-3.5 text-green-500 dark:text-green-400" />
+                  ? <Check className="h-3.5 w-3.5 text-green-700 dark:text-green-400" />
                   : <Copy className="h-3.5 w-3.5" />
                 }
               </button>
@@ -176,12 +176,12 @@ function InstallNotification({ info, onClose }: InstallNotificationProps) {
 
       {/* Footer */}
       <div className="px-4 py-3 border-t border-gray-100 dark:border-[#1e2535] flex items-center justify-between">
-        <p className="text-[10px] text-gray-400 dark:text-gray-600">
+        <p className="text-[10px] text--600 dark:text-gray-600">
           After running, click the mic icon to reconnect.
         </p>
         <button
           onClick={onClose}
-          className="text-[11px] text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 font-medium transition-colors"
+          className="text-[11px] text-blue-600 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 font-medium transition-colors"
         >
           Got it
         </button>
@@ -264,10 +264,10 @@ export function VoiceIndicator({ iconOnly = false }: VoiceIndicatorProps) {
   const effectiveStatus: BridgeStatus = isDisabled ? 'offline' : status;
 
   const cfg: Record<BridgeStatus, { label: string; color: string; ring: string }> = {
-    offline:    { label: 'Voice offline',  color: 'text-gray-400 dark:text-gray-500',     ring: 'focus:ring-gray-500/30' },
-    connecting: { label: 'Connecting…',    color: 'text-amber-500 dark:text-amber-400',   ring: 'focus:ring-amber-500/30' },
-    connected:  { label: 'Voice ready',    color: 'text-emerald-500 dark:text-emerald-400', ring: 'focus:ring-emerald-500/30' },
-    error:      { label: 'Voice error',    color: 'text-red-500 dark:text-red-400',       ring: 'focus:ring-red-500/30' },
+    offline:    { label: 'Voice offline',  color: 'text--600 dark:text-gray-500',     ring: 'focus:ring-gray-500/30' },
+    connecting: { label: 'Connecting…',    color: 'text-amber-700 dark:text-amber-400',   ring: 'focus:ring-amber-500/30' },
+    connected:  { label: 'Voice ready',    color: 'text-emerald-700 dark:text-emerald-400', ring: 'focus:ring-emerald-500/30' },
+    error:      { label: 'Voice error',    color: 'text-red-600 dark:text-red-400',       ring: 'focus:ring-red-500/30' },
   };
 
   const { label, color, ring } = cfg[effectiveStatus];

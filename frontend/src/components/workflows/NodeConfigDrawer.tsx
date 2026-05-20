@@ -38,7 +38,7 @@ const selectCls = `
   transition-colors
 `;
 
-const labelCls = 'text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 block';
+const labelCls = 'text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5 block';
 
 // ── Component ───────────────────────────────────────────────────────────────
 
@@ -122,7 +122,7 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
 
         {/* Type-specific config */}
         <div className="space-y-4">
-          <h4 className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
+          <h4 className="text-xs font-bold text--600 dark:text-gray-500 uppercase tracking-widest">
             Configuration
           </h4>
 
@@ -231,7 +231,7 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
           )}
 
           {type === 'PARALLEL' && (
-            <p className="text-xs text-gray-400 dark:text-gray-500 italic">
+            <p className="text-xs text--600 dark:text-gray-500 italic">
               Parallel steps automatically fork execution. Connect multiple outgoing edges to define parallel branches.
             </p>
           )}
@@ -242,7 +242,7 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
 
         {/* Routing */}
         <div className="space-y-4">
-          <h4 className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
+          <h4 className="text-xs font-bold text--600 dark:text-gray-500 uppercase tracking-widest">
             Routing
           </h4>
           <div>
@@ -287,7 +287,7 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
           <Button
             variant="ghost"
             onClick={handleDelete}
-            className="text-red-500 hover:text-red-400 hover:bg-red-500/10"
+            className="text-red-600 hover:text--600 hover:bg-red-500/10"
           >
             <Trash2 className="w-4 h-4 mr-2" />
             Delete Step

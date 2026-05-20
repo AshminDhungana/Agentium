@@ -292,7 +292,7 @@ export const AgentTree: React.FC<AgentTreeProps> = React.memo(({
             {/* ── Tier Toolbar ───────────────────────────────────────────────────────── */}
             {absoluteMaxDepth > 0 && (
                 <div className="flex items-center gap-2 mb-4 p-2 bg-slate-50 dark:bg-[#161b27] rounded-xl border border-slate-200 dark:border-slate-800 overflow-x-auto scrollbar-hide">
-                    <Layers className="w-4 h-4 text-slate-500 ml-2 flex-shrink-0" />
+                    <Layers className="w-4 h-4 text-slate-600 ml-2 flex-shrink-0" />
                     <span className="text-sm font-medium text-slate-600 dark:text-slate-300 mr-2 flex-shrink-0">Tier Groups:</span>
                     
                     <button

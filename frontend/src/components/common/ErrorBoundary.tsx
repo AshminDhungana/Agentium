@@ -98,7 +98,7 @@ export class ErrorBoundary extends Component<Props, State> {
             if (variant === 'widget') {
                 return (
                     <div role="alert" className="w-full h-full min-h-[150px] flex flex-col items-center justify-center p-4 bg-red-50/50 dark:bg-red-950/20 border border-red-100 dark:border-red-900/50 rounded-xl text-center">
-                        <AlertTriangle className="w-8 h-8 text-red-500 mb-2 opacity-80" />
+                        <AlertTriangle className="w-8 h-8 text-red-600 mb-2 opacity-80" />
                         <h3 className="text-sm font-bold text-red-900 dark:text-red-300 mb-1">{fallbackHeading}</h3>
                         <p className="text-xs text-red-700 dark:text-red-400 mb-3 max-w-[200px] truncate opacity-80">
                             {this.state.error?.message}
@@ -122,7 +122,7 @@ export class ErrorBoundary extends Component<Props, State> {
                             <AlertTriangle className="w-8 h-8 text-red-600 dark:text-red-400" />
                         </div>
                         <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">{fallbackHeading}</h2>
-                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
                             A critical rendering error occurred in this view. We've automatically logged this issue.
                         </p>
                         

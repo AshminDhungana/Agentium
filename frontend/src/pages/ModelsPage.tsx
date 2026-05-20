@@ -59,7 +59,7 @@ class ModelConfigErrorBoundary extends Component<
                     <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
                         Something went wrong
                     </h2>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
                         An unexpected error occurred while rendering this page.
                     </p>
                     {this.state.message && (
@@ -110,7 +110,7 @@ const SummaryCard: React.FC<{
                 </div>
                 <span className="text-2xl font-bold text-gray-900 dark:text-white">{value}</span>
             </div>
-            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">{label}</p>
+            <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{label}</p>
         </div>
     );
 };
@@ -160,7 +160,7 @@ const ModelsPageInner: React.FC = () => {
             >
                 <div className="flex flex-col items-center gap-3">
                     <LoadingSpinner size="xl" className="text-blue-600 dark:text-blue-400" />
-                    <p className="text-gray-500 dark:text-gray-400 text-sm">Loading configurations…</p>
+                    <p className="text-gray-600 dark:text-gray-400 text-sm">Loading configurations…</p>
                 </div>
             </div>
         );
@@ -200,7 +200,7 @@ const ModelsPageInner: React.FC = () => {
                             <span>Add Provider</span>
                         </button>
                     </div>
-                    <p className="text-gray-500 dark:text-gray-400 text-sm">
+                    <p className="text-gray-600 dark:text-gray-400 text-sm">
                         Connect to powerful AI providers and manage your model fleet.
                     </p>
                 </div>
@@ -277,12 +277,12 @@ const ModelsPageInner: React.FC = () => {
                     // Empty state
                     <div className="text-center py-20" role="status">
                         <div className="inline-flex items-center justify-center w-20 h-20 bg-white dark:bg-[#161b27] border border-gray-200 dark:border-[#1e2535] rounded-2xl mb-6 shadow-sm dark:shadow-[0_2px_16px_rgba(0,0,0,0.25)]">
-                            <Settings className="w-9 h-9 text-gray-400 dark:text-gray-500" aria-hidden="true" />
+                            <Settings className="w-9 h-9 text--600 dark:text-gray-500" aria-hidden="true" />
                         </div>
                         <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
                             No Configurations Yet
                         </h3>
-                        <p className="text-gray-500 dark:text-gray-400 text-sm mb-8 max-w-md mx-auto">
+                        <p className="text-gray-600 dark:text-gray-400 text-sm mb-8 max-w-md mx-auto">
                             Get started by adding your first AI provider. Connect OpenAI, Claude, Gemini, Groq, or run models locally with Ollama.
                         </p>
                         <button
