@@ -107,6 +107,12 @@ function AppWithRedirect() {
 
     return (
         <>
+            <a 
+                href="#main-content" 
+                className="sr-only focus:not-sr-only focus:absolute focus:z-[9999] focus:p-4 focus:bg-blue-600 focus:text-white focus:top-0 focus:left-0 font-medium"
+            >
+                Skip to content
+            </a>
             <Toaster position="top-right" />
 
             <GlobalWebSocketProvider>
@@ -222,9 +228,9 @@ function AuthLayout() {
     }
   };
 
-  return (
-    <div className="min-h-screen relative flex flex-col items-center justify-center p-4">
-      <FlatMapAuthBackground variant={isSignup ? 'signup' : 'login'} />
+    return (
+        <div id="main-content" tabIndex={-1} className="min-h-screen relative flex flex-col items-center justify-center p-4 outline-none">
+            <FlatMapAuthBackground variant={isSignup ? 'signup' : 'login'} />
 
       <div className="text-center mb-8 relative z-10">
         <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-blue-600 text-white mb-4 transition-transform duration-500 hover:scale-110">

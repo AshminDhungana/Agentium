@@ -398,13 +398,6 @@ Results aggregated → Head → You (2–3 line response only)
 - [x] Autonomous learning — best practice and anti-pattern extraction from critic reviews
 - [ ] Testing and refinement of all the above features
 
-### Phase 11–12: Federation & SDK 🔮 FUTURE
-
-- [ ] Inter-Agentium federation protocol
-- [ ] Python SDK (`pip install agentium-sdk`)
-- [ ] TypeScript SDK (`npm install @agentium/sdk`)
-- [ ] All SDK calls produce identical audit trails to direct API calls
-
 ---
 
 ## 🛡️ Security & Ethics

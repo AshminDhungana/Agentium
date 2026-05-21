@@ -693,46 +693,7 @@ Build a self-governing AI ecosystem where agents operate under constitutional la
 - [x] **Keyboard Navigation** — ensure all interactive elements are reachable via Tab; add `focus:ring-2 focus:ring-blue-500` to all focusable elements that are missing it; modals should trap focus while open (`focus-trap-react` or custom)
 - [x] **Screen Reader** — add `role="status"` and `aria-live="polite"` to real-time updating regions (task status, WebSocket event feed, vote tallies); add `role="alert"` to error messages
 - [x] **Color Contrast** — run `axe-core` or `lighthouse --accessibility` audit; fix all elements below WCAG AA ratio (4.5:1 for text, 3:1 for UI components)
-- [ ] Add `skipToContent` link as the first focusable element on every page
-
----
-
-## 🧭 What's Left — Priority Queue
-
-### 🔴 High Priority
-
-1. **13.2** Agent crash detection and reincarnation service (`reincarnation_service.py`)
-2. **13.1** Task complexity analyzer and sub-task breakdown (`auto_delegation_service.py`)
-3. **13.3** Fix `auto_scale_check` stub — wire real `AgentLifecycleService.spawn_agent()` call
-   ~~4. **14.2** WebSocket reconnection with exponential backoff and server-side event buffer~~
-4. **14.3** Global frontend error boundaries wrapping all route-level pages
-5. **15.3** Channel health monitoring, message logs, and per-channel settings UI
-
-### 🟡 Medium Priority
-
-7. **13.6** Event trigger system (webhook receiver, threshold monitor, dead-letter queue)
-8. **13.4** Real-time learning writes and anti-pattern early warning
-9. **14.1** Live screenshot stream for browser tasks
-10. **15.1** Privilege escalation audit trail
-11. **15.2** Real-time MCP tool stats and sub-second revocation via Redis
-12. **13.5** Workflow automation pipeline (engine + designer UI)
-13. **7.x** Checkpoint diff view (branch comparison)
-14. **7.x** Drag-and-drop agent reassignment
-15. **15.4** Speaker identification for multi-user voice sessions
-16. **6.x** Real-time MCP usage stats; revoked tools unavailable in < 1 s
-
-### 🟢 Low Priority
-
-17. **13.7** Zero-Touch Operations Dashboard (depends on 13.1–13.6)
-18. **16.1** Connection pool tuning and slow query logging
-19. **16.2** Learning decay for outdated knowledge patterns
-20. **16.3** Cross-document citation graph for RAG
-21. **16.4** Git versioning backups for config files
-22. **17.1** Application-layer DDoS hardening
-23. **17.2** System-wide UI polish (dark mode consistency, animations, empty states)
-24. **17.3** Mobile responsiveness for complex pages
-25. **17.4** Accessibility (ARIA labels, keyboard navigation, color contrast)
-26. **9.x** Audit trail for privilege escalations (→ moved to Phase 15.1)
+- [x] Add `skipToContent` link as the first focusable element on every page
 
 ---
 
@@ -781,16 +742,4 @@ OpenAI TTS — Text-to-Speech
 
 ## Changelog
 
-### v1.2.0-alpha _(in progress)_
-
-- 🚧 Phase 13: Autonomous Agent Orchestration — planning complete, implementation starting with 13.2 Self-Healing
-- 🔮 Phase 14–17: Frontend Reliability, Platform Hardening, Database Optimization, DevSecOps
-
-### v1.1.0-alpha _(current stable)_
-
-- ✅ Phase 11: Multi-User RBAC, Federation, Plugin Marketplace, Mobile API — all implemented and tested
-- ✅ Phase 12: Python SDK, TypeScript SDK, Outbound Webhooks, Developer Portal
-
-### v0.7.0-alpha
-
-- ✅ Phases 0–10: Foundation through Advanced Intelligence (Browser, RAG, Voice, Autonomous Learning)
+### v0.9.0-alpha _(in progress)

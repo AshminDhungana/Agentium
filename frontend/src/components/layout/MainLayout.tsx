@@ -512,7 +512,7 @@ export function MainLayout() {
 
             {/* ── Main content ──────────────────────────────────────────── */}
             {/* position:relative anchors all absolutely-positioned children */}
-            <main className="flex-1 min-h-0 overflow-hidden relative">
+            <main id="main-content" tabIndex={-1} className="flex-1 min-h-0 overflow-hidden relative outline-none">
                 <KeepAliveOutlet />
             </main>
         </div>
