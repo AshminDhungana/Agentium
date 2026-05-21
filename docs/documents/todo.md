@@ -1,10 +1,10 @@
 # Agentium Implementation Roadmap
 
 **Project:** Agentium — Personal AI Agent Nation  
-**Version:** 1.2.0-alpha  
+**Version:** 0.0.9-alpha  
 **Architecture:** Dual-Storage (PostgreSQL + ChromaDB) with hierarchical agent orchestration  
-**Status:** Phase 12 ✅ Complete | Phase 13 🚧 In Progress  
-_Last Updated: 2026-03-13 · Maintainer: Ashmin Dhungana_
+**Status:** Phase 17 ✅ Complete | Phase 18 🚧 In Progress  
+_Last Updated: 2026-05-21 · Maintainer: Ashmin Dhungana_
 
 ---
 
@@ -36,6 +36,7 @@ Build a self-governing AI ecosystem where agents operate under constitutional la
 | 15    | Platform Hardening & Admin     | 🔮 Planned     |
 | 16    | Database & Advanced AI Logic   | 🔮 Planned     |
 | 17    | DevSecOps & Polish             | 🔮 Planned     |
+| 18    | Complete System Testing         | 🔮 Planned     |
 
 ---
 
@@ -694,6 +695,134 @@ Build a self-governing AI ecosystem where agents operate under constitutional la
 - [x] **Screen Reader** — add `role="status"` and `aria-live="polite"` to real-time updating regions (task status, WebSocket event feed, vote tallies); add `role="alert"` to error messages
 - [x] **Color Contrast** — run `axe-core` or `lighthouse --accessibility` audit; fix all elements below WCAG AA ratio (4.5:1 for text, 3:1 for UI components)
 - [x] Add `skipToContent` link as the first focusable element on every page
+
+## Phase 18: Complete System Testing & Production Readiness 🔮
+
+**Goal:** Validate the entire Agentium platform end-to-end across all 17 prior phases, resolve remaining technical debt, ship a clean and documented codebase, and confirm every acceptance criterion before public release.
+
+---
+
+### 18.1 End-to-End Integration Test Suite
+
+**Purpose:** Automated tests that exercise the full agent lifecycle, governance pipeline, orchestration engine, and all Phase 13–17 features in a single harness.
+
+#### Backend — Test Infrastructure (`backend/tests/integration/`)
+
+- [ ] **Test Fixture Factory** (`conftest.py`) — pytest fixtures for: a seeded PostgreSQL database with all migrations applied, a live ChromaDB instance, Redis flushed to a known state, Celery worker in eager mode (`CELERY_TASK_ALWAYS_EAGER=True`), and a mock AI provider returning deterministic responses
+- [ ] **Agent Lifecycle Suite** (`test_agent_lifecycle.py`) — spawn → assign task → complete task → verify ethos update → idle 7-day simulation → auto-termination Council vote; assert every state transition writes an `AuditLog` entry with correct `category` and `level`
+- [ ] **Governance Pipeline Suite** (`test_governance.py`) — constitutional check ALLOW / BLOCK / VOTE_REQUIRED paths; amendment propose → vote → ratify lifecycle; assert original constitution is never deletable via any API surface
+- [ ] **Orchestration Suite** (`test_orchestration.py`) — auto-delegation complexity scoring 1–10 maps to correct tier; sub-task DAG dispatches independent branches in parallel; simulated `last_heartbeat_at > 2 min` triggers crash detection and reincarnation from checkpoint; predictive scaling pre-spawns agents before a simulated surge
+- [ ] **Workflow Engine Suite** (`test_workflow_engine.py`) — 5-step workflow with `task → condition → parallel → human_approval → task`; cron trigger via `schedule_cron`; version increment on update; rollback to prior version; ETA estimation within 20% of actual
+- [ ] **RAG Pipeline Suite** (`test_rag.py`) — store → query → deduplication (cosine ≥ 0.95 skips); decay score applied at query time; citation graph BFS to depth 2 returns correct `{ nodes, edges }`; retrieved context is injected into agent prompt
+- [ ] **Multi-Channel Suite** (`test_channels.py`) — mock inbound message per channel type (Telegram, Discord, Slack, WhatsApp); verify loop prevention; assert `speaker_id` is attached to `ExternalMessage` after speaker identification
+- [ ] **Security Suite** (`test_security.py`) — expired JWT returns 401; observer role cannot mutate agents or tasks (403); rate limit returns 429 after threshold; HMAC-SHA256 webhook validation rejects tampered payload; XSS payload in task `description` is sanitized before storage
+
+#### CI Integration
+
+- [ ] Add `pytest-cov` to `requirements-dev.txt`; enforce minimum 80% line coverage on `backend/services/`; fail CI build below threshold
+- [ ] Add `pytest-asyncio` for all async FastAPI route tests using `httpx.AsyncClient` with `ASGITransport`
+- [ ] GitHub Actions job `integration-tests`: spin up `docker-compose -f docker-compose.test.yml up -d` (PostgreSQL + Redis + ChromaDB); run full suite; upload HTML coverage report as CI artifact
+- [ ] Create `docker-compose.test.yml` — ephemeral containers with no persistent volumes; `TESTING=true` env var disables external AI provider calls and activates mock responses
+
+---
+
+### 18.2 Feature Verification & Regression Testing
+
+**Purpose:** Systematically confirm each phase's acceptance criteria still holds after all cross-phase modifications, and close the remaining open items from Phases 6, 7, and 13.
+
+#### Outstanding Items from Prior Phases
+
+- [ ] **Phase 6 — MCP Revocation Sub-Second** — revoke a tool via `DELETE /mcp-tools/{id}/approve`; invoke the same tool within 1 second; confirm `403 Tool revoked` response sourced from Redis SET (`agentium:mcp:revoked`), not a DB query; assert no `SELECT` issued to PostgreSQL during revocation check
+- [ ] **Phase 7 — Drag-and-Drop Agent Reassignment** — implement in `AgentTree.tsx` via `react-dnd`; on drop, call `PATCH /agents/{id}/parent` with `new_parent_id`; run constitutional guard check before persisting; display validation toast on BLOCK verdict
+- [ ] **Phase 7 — Checkpoint Diff View** — implement `CheckpointDiffViewer.tsx` using Monaco Editor diff API (`createDiffEditor`); add `GET /checkpoints/{id}/diff?compare_to={id2}` backend route returning a unified diff of `context_window_snapshot` JSON; wire "Compare Branches" button in `CheckpointTimeline.tsx`
+- [ ] **Phase 13 — Success Criteria Walkthrough** — execute all 8 listed success criteria from §Phase 13 manually in staging; document pass/fail result per criterion; open a tracked GitHub Issue for any failure before marking Phase 18 complete
+
+#### Performance Regression Gate
+
+- [ ] Run `locust` load test at 1,000 concurrent users for 5 minutes against staging; assert: constitutional check p95 < 50 ms, task routing p95 < 100 ms, API p95 < 500 ms — matching Phase 8 targets
+- [ ] Celery throughput: assert ≥ 1,000 tasks/hour under the `locust` task-submission scenario; compare against Phase 8 baseline
+- [ ] ChromaDB `query_similar()` with 10,000 seeded documents: assert p95 < 200 ms; measure with `pytest-benchmark` and commit baseline to `benchmarks/`
+
+---
+
+### 18.3 Code Refactoring & Technical Debt Elimination
+
+**Purpose:** Consolidate duplicated logic, replace all remaining stubs with real implementations, and enforce consistent architectural patterns across all phases.
+
+#### Backend
+
+- [ ] **Service Layer DB Session Audit** — scan all `backend/services/` files for duplicated session-handling boilerplate; extract into a single `@with_db_session` decorator in `backend/core/dependencies.py` and apply uniformly
+- [ ] **Rate Limiting Consolidation** — merge Phase 17.1 `slowapi` endpoint limits, Phase 2 constitutional cache TTL logic, and Phase 4 per-channel rate limits into a unified `RateLimitMiddleware` class in `backend/core/middleware.py`; remove all redundant per-route rate limit decorators
+- [ ] **LLM Client Abstraction** — extract duplicated provider retry and failover logic from `agent_orchestrator.py`, `auto_delegation_service.py`, and `reincarnation_service.py` into a shared `LLMClient` class at `backend/core/llm_client.py`; wire circuit breaker integration and token tracking inside the client
+- [ ] **Celery Task Naming Convention** — audit all Celery task definitions for consistent `agentium.{module}.{task_name}` naming; update `celery_app.py` beat schedule entries to match; fix any autodiscovery gaps causing tasks to run under incorrect names
+- [ ] **Alembic Downgrade Coverage** — run `alembic check` against the live database; write missing `downgrade()` functions for any migration that only implements `upgrade()`; verify full round-trip `downgrade base → upgrade head` on a clean DB
+- [ ] **Pydantic v2 Migration** — replace deprecated `@validator` decorators with `@field_validator` and `.dict()` calls with `.model_dump()` across all `backend/schemas/` files; resolve all `PydanticDeprecatedSince20` warnings
+- [ ] **Error Response Standardization** — define typed exception classes in `backend/core/exceptions.py` mapped to HTTP status codes; replace all bare `raise HTTPException(...)` calls throughout routes with typed exceptions; enforce uniform response shape `{ "error": str, "code": str, "detail": dict | None }`
+
+#### Frontend
+
+- [ ] **API Client Consolidation** — audit `frontend/src/` for inline `fetch()` or `axios` calls outside `frontend/src/services/api.ts`; migrate all to typed request/response generics in the central API module
+- [ ] **Hook Deduplication** — merge overlapping `useWebSocket`, `usePolling`, and `useAutoRefresh` hooks into a single `useRealtimeData<T>(endpoint, wsEvent, pollIntervalMs)` hook in `frontend/src/hooks/`
+- [ ] **Dark Mode — Phase 13–15 New Pages** — audit `WorkflowDesigner.tsx`, `WorkflowExecutionMonitor.tsx`, `EventTriggerManager.tsx`, `ScalingDashboard.tsx`, and `LearningImpactDashboard.tsx` for hardcoded `bg-white` / `text-black` / `border-gray-*` without `dark:` variants; apply Phase 17.2 semantic token system
+- [ ] **Mobile Responsiveness — Phase 13–15 New Pages** — apply Phase 17.3 breakpoint patterns to `WorkflowsPage`, `WorkflowDesigner`, `ScalingDashboard`, and `EventTriggerManager`; collapse complex layouts below `md:`; test on 375px viewport
+- [ ] **Shared Component Enforcement** — replace all remaining ad-hoc `Loader2` spinner usages with `<LoadingSpinner>`; replace ad-hoc toast calls with `useToast()`; verify no page introduced after Phase 17 bypasses these shared components
+
+---
+
+### 18.4 Codebase Documentation
+
+**Purpose:** Ensure every public service, route, model, and component is self-documenting so a new contributor can onboard without prior context.
+
+#### Backend
+
+- [ ] **Service Docstrings** — every public method in `backend/services/` must have a Google-style docstring with `Args`, `Returns`, and `Raises` sections; add `interrogate` to CI (`interrogate backend/services/ --fail-under=90`)
+- [ ] **OpenAPI Enrichment** — add `summary`, `description`, `response_model`, and example `responses` annotations to every route missing them; confirm `/docs` renders complete documentation for all 80+ endpoints with sample request/response bodies
+- [ ] **Architecture Decision Records** — write `docs/adr/` entries (one Markdown file each) for: dual-storage rationale (PostgreSQL + ChromaDB), constitutional guard two-tier design, Celery over asyncio for background work, agent ID numbering scheme (`0xxxx / 1xxxx / 2xxxx / 3xxxx`), RAG decay scoring algorithm
+- [ ] **`CONTRIBUTING.md`** — document: local dev setup (`docker-compose up`), migration workflow (`alembic upgrade head`), test execution (`pytest`), and a full environment variable reference table with defaults and descriptions for all vars in `backend/.env.example`
+- [ ] **`ARCHITECTURE.md`** — Mermaid diagram of the full stack: services, data flows, WebSocket event bus, Celery beat task schedule, and all external integrations; include agent hierarchy visualization
+
+#### Frontend
+
+- [ ] **Component JSDoc** — every component in `frontend/src/components/` must have a JSDoc block documenting its `Props` interface, a usage example, and any WebSocket event types it subscribes to
+- [ ] **Storybook Setup** — add `@storybook/react` to dev dependencies; create stories for all shared components: `LoadingSpinner`, `ErrorBoundary`, `HealthRing`, `AgentCard`, `TaskCard`, `VoteCard`, `Toast`; add `npm run storybook` to `package.json`
+- [ ] **`README.md` Rewrite** — update root `README.md` to reflect v1.2.0-alpha feature set; include architecture overview, quick-start (`docker-compose up`), links to `/docs` (OpenAPI) and SDK packages (`agentium-sdk`, `@agentium/sdk`), and a link to the roadmap
+
+---
+
+### 18.5 Code Cleanup & Production Hardening
+
+**Purpose:** Remove all development artifacts, placeholder values, and debug code before release.
+
+#### Cleanup
+
+- [ ] **`TODO` / `FIXME` Audit** — run `grep -rn "TODO\|FIXME\|HACK\|XXX" backend/ frontend/`; for each hit: resolve inline, convert to a GitHub Issue with a link comment, or document rationale; target zero unresolved hits inside `backend/services/` and `frontend/src/components/`
+- [ ] **Placeholder Comment Removal** — remove all `# In production:`, `# TODO: replace with real implementation`, `# Stub`, and equivalent comments that describe missing functionality (the implementation must be complete before the comment is removed)
+- [ ] **Debug Artifact Purge** — grep for `print()` in Python and `console.log()` in TypeScript outside test files; replace with `logging.getLogger(__name__).debug()` and `logger.debug()` respectively; remove all hardcoded `localhost` URLs outside configuration files
+- [ ] **Secret Hygiene** — run `detect-secrets scan --baseline .secrets.baseline`; add baseline check to CI; fail build on any newly detected secret
+- [ ] **Dependency Audit** — run `pip-audit` against `requirements.txt` and `npm audit` against `frontend/package.json`; resolve all HIGH and CRITICAL CVEs; document accepted LOW / MEDIUM risks in `SECURITY.md`
+- [ ] **Dead Code Elimination** — run `vulture backend/ --min-confidence 80` to detect unused Python functions and variables; run `ts-prune` on the frontend; remove all confirmed dead code with no external references
+- [ ] **Docker Image Hardening** — switch `Dockerfile` to a non-root user (`USER agentium:agentium`); pin all base image tags to digests (`python:3.11-slim@sha256:...`); run `docker scout cves` and resolve HIGH / CRITICAL findings; verify final image size is minimized via multi-stage build
+
+#### Final Smoke Test
+
+- [ ] Deploy to a clean staging environment via `docker-compose up --build` with no pre-existing volumes; confirm all containers reach `healthy` status within 60 seconds
+- [ ] Verify all 5 monitoring health rings (`Agents / Tasks / Workflows / Events / Budget`) show green in `MonitoringPage.tsx` under no-load conditions
+- [ ] Confirm `/docs` OpenAPI spec loads without errors and all endpoints are fully documented with example payloads
+- [ ] Run `npx lighthouse-ci` in CI against the staging frontend; enforce ≥ 90 score on Performance, Accessibility, and Best Practices
+- [ ] Execute `alembic downgrade base && alembic upgrade head` against the staging database to verify full migration reversibility with no data errors
+
+---
+
+### Phase 18 — Success Criteria
+
+- [ ] Integration test suite passes in CI with ≥ 80% line coverage on `backend/services/`; zero test skips
+- [ ] All 8 Phase 13 acceptance criteria verified as passing end-to-end in staging
+- [ ] Outstanding Phase 6 and Phase 7 items (MCP revocation timing, agent reassignment, checkpoint diff) implemented and covered by integration tests
+- [ ] Zero unresolved `TODO` / `FIXME` / `HACK` comments in `backend/services/` and `frontend/src/components/`
+- [ ] Every public service method and every API route has a docstring or JSDoc block; `interrogate` reports ≥ 90% coverage
+- [ ] `pip-audit` and `npm audit` report no HIGH or CRITICAL CVEs
+- [ ] Lighthouse score ≥ 90 on Performance, Accessibility, and Best Practices on the staging frontend
+- [ ] Full migration round-trip (`downgrade base → upgrade head`) succeeds on a clean database with no errors
 
 ---
 
