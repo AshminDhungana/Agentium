@@ -208,7 +208,8 @@ cd Agentium
 
 # Launch the stack
 docker compose up -d
-# First build takes (10–30) minutes
+# First build takes (20–40) minutes
+# Depends on your internet speed and your PC performance
 
 # Watch initialization logs
 docker compose logs -f
@@ -301,8 +302,7 @@ Results aggregated → Head → You (2–3 line response only)
 
 ### Phase 0 to Phase 17 ✅ COMPLETE
 
-### Phase 18: Complete System Testing and Improvements 
-- [ ] Testing and refinement of all the features
+### Phase 18: Complete System Testing & Production Readiness (Ongoing)
 
 ---
 

@@ -1,0 +1,276 @@
+"""
+Fixture factory for integration tests.
+Connects to the running docker-compose stack on localhost.
+"""
+
+import os
+import json
+import pytest
+import pytest_asyncio
+from typing import Generator, AsyncGenerator
+from fastapi.testclient import TestClient
+from sqlalchemy import create_engine, text
+from sqlalchemy.orm import sessionmaker, Session
+import redis.asyncio as redis
+import redis as sync_redis
+
+# Set environment variables for the test session
+# This ensures that imported modules pick up the test configuration
+os.environ["DATABASE_URL"] = "postgresql://agentium:agentium@postgres:5432/agentium_test"
+os.environ["REDIS_URL"] = "redis://redis:6379/1"
+os.environ["CHROMA_HOST"] = "chromadb"
+os.environ["CHROMA_PORT"] = "8000"
+os.environ["CELERY_TASK_ALWAYS_EAGER"] = "true"
+
+from backend.main import app
+from backend.models.database import Base, get_db
+from backend.core.vector_store import get_vector_store, VectorStore
+from backend.services.initialization_service import InitializationService
+from backend.celery_app import celery_app
+from backend.models.entities.user import User
+
+# Engine for the test database
+# Use the default postgres db just to create the test db if it doesn't exist
+DEFAULT_URL = "postgresql://agentium:agentium@postgres:5432/agentium"
+TEST_DB_URL = os.environ["DATABASE_URL"]
+
+
+@pytest.fixture(scope="session")
+def db_engine():
+    """Create the test database and all tables, drop at the end."""
+    # Create test database if it doesn't exist
+    engine_default = create_engine(DEFAULT_URL, isolation_level="AUTOCOMMIT")
+    with engine_default.connect() as conn:
+        result = conn.execute(text("SELECT 1 FROM pg_database WHERE datname='agentium_test'")).fetchone()
+        if not result:
+            conn.execute(text("CREATE DATABASE agentium_test"))
+    engine_default.dispose()
+
+    # Create all tables in the test database
+    engine_test = create_engine(TEST_DB_URL)
+    
+    # Import all models to ensure they are registered with Base
+    import backend.models.entities
+    
+    Base.metadata.create_all(bind=engine_test)
+    
+    # Run any initial setup (e.g. creating default records if needed, though genesis handles most)
+    
+    yield engine_test
+    
+    # Drop all tables after the test session
+    Base.metadata.drop_all(bind=engine_test)
+    engine_test.dispose()
+
+
+@pytest.fixture(scope="function")
+def db_session(db_engine) -> Generator[Session, None, None]:
+    """Provide a transactional scope around a series of operations."""
+    connection = db_engine.connect()
+    # Begin a non-ORM transaction
+    transaction = connection.begin()
+    
+    # Bind an individual Session to the connection
+    session = Session(bind=connection, join_transaction_mode="create_savepoint")
+    
+    yield session
+    
+    # Rollback everything that happened with the Session above
+    session.close()
+    transaction.rollback()
+    connection.close()
+
+
+@pytest_asyncio.fixture(scope="function")
+async def seeded_db(db_session: Session) -> Session:
+    """Provide a database session fully seeded via the genesis protocol."""
+    # Ensure default admin exists
+    admin = db_session.query(User).filter(User.username == "admin").first()
+    if not admin:
+        admin = User(
+            username="admin",
+            email="admin@agentium.local",
+            hashed_password=User.hash_password("admin"),
+            is_active=True,
+            is_pending=False,
+            is_admin=True
+        )
+        db_session.add(admin)
+        db_session.flush()
+
+    init_service = InitializationService(db=db_session)
+    if not init_service.is_system_initialized():
+        # Temporarily mock the API key check to allow genesis to proceed in tests
+        original_check = init_service._has_any_active_api_key
+        init_service._has_any_active_api_key = lambda: True
+        
+        try:
+            await init_service.run_genesis_protocol(force=True, country_name="TestNation")
+        finally:
+            init_service._has_any_active_api_key = original_check
+            
+    return db_session
+
+
+@pytest.fixture(scope="function")
+def redis_client():
+    """Provide a flushed Redis database for the test."""
+    client = sync_redis.Redis.from_url(os.environ["REDIS_URL"])
+    client.flushdb()
+    
+    # Patch the application's redis functions if necessary,
+    # though setting the REDIS_URL env var before imports usually suffices.
+    yield client
+    
+    client.flushdb()
+    client.close()
+
+
+@pytest.fixture(scope="function")
+def vector_store():
+    """Provide a clean ChromaDB instance for testing."""
+    # Use the test host/port
+    vs = VectorStore(
+        host=os.environ["CHROMA_HOST"],
+        port=int(os.environ["CHROMA_PORT"])
+    )
+    
+    # Prefix collections so we can cleanly delete them
+    original_names = vs.collection_names.copy()
+    for key in vs.collection_names:
+        vs.collection_names[key] = f"test_{vs.collection_names[key]}"
+        
+    vs.initialize()
+    
+    # Clear collections if they exist from a prior run
+    for coll_name in vs.collection_names.values():
+        try:
+            coll = vs.client.get_collection(name=coll_name)
+            # Cannot easily delete collection directly in all versions, but we can delete the docs
+            # Or just delete the collection entirely
+            vs.client.delete_collection(name=coll_name)
+        except Exception:
+            pass
+            
+    # Re-initialize to create fresh empty collections
+    vs.initialize()
+    
+    yield vs
+    
+    # Teardown
+    for coll_name in vs.collection_names.values():
+        try:
+            vs.client.delete_collection(name=coll_name)
+        except Exception:
+            pass
+
+
+@pytest.fixture(scope="session")
+def celery_eager():
+    """Configure Celery to run tasks synchronously in-process."""
+    celery_app.conf.update(
+        task_always_eager=True,
+        task_eager_propagates=True,
+        task_store_eager_result=True,
+        broker_url="memory://",
+        result_backend="cache+memory://",
+    )
+    yield celery_app
+
+
+class MockCall:
+    def __init__(self, kwargs):
+        self.kwargs = kwargs
+        self.user_message = kwargs.get("user_message", "")
+        self.system_prompt = kwargs.get("system_prompt", kwargs.get("system_prompt_override", ""))
+
+
+class MockAIProvider:
+    def __init__(self):
+        self.calls = []
+        self.default_response = {
+            "content": "Mock deterministic response",
+            "tokens_used": 100,
+            "prompt_tokens": 60,
+            "completion_tokens": 40,
+            "latency_ms": 15,
+            "model": "mock-deterministic-v1",
+            "cost_usd": 0.001,
+            "finish_reason": "stop",
+        }
+        self.custom_responses = []
+
+    async def mock_generate(self, *args, **kwargs):
+        call = MockCall(kwargs)
+        self.calls.append(call)
+        
+        if self.custom_responses:
+            resp = self.custom_responses.pop(0)
+            # Merge with default to ensure required fields
+            full_resp = self.default_response.copy()
+            full_resp.update(resp)
+            return full_resp
+            
+        # Echo back some input for test verification
+        resp = self.default_response.copy()
+        resp["content"] = f"Mock response to: {call.user_message[:50]}..."
+        return resp
+        
+    @property
+    def call_count(self):
+        return len(self.calls)
+        
+    @property
+    def last_call(self):
+        return self.calls[-1] if self.calls else None
+        
+    def set_response(self, **kwargs):
+        self.custom_responses.append(kwargs)
+
+
+@pytest.fixture(scope="function")
+def mock_ai_provider(monkeypatch):
+    """Patch the ModelService to return deterministic mock responses."""
+    from backend.services.model_provider import ModelService
+    
+    mock = MockAIProvider()
+    
+    # Patch both generation methods used in the codebase
+    monkeypatch.setattr(ModelService, "generate_with_agent", mock.mock_generate)
+    monkeypatch.setattr(ModelService, "generate_with_agent_tools", mock.mock_generate)
+    
+    yield mock
+
+
+@pytest.fixture(scope="function")
+def client(db_session, redis_client, vector_store, celery_eager):
+    """FastAPI TestClient with dependency overrides."""
+    def override_get_db():
+        yield db_session
+
+    app.dependency_overrides[get_db] = override_get_db
+    
+    # Also patch the global get_vector_store to return our test instance
+    import backend.core.vector_store
+    original_get_vector_store = backend.core.vector_store.get_vector_store
+    backend.core.vector_store.get_vector_store = lambda: vector_store
+    
+    with TestClient(app) as test_client:
+        yield test_client
+        
+    # Restore override
+    backend.core.vector_store.get_vector_store = original_get_vector_store
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture(scope="function")
+def auth_headers(client, seeded_db):
+    """Return authorization headers for the default admin user."""
+    # Login to get JWT token
+    response = client.post(
+        "/api/v1/auth/login",
+        data={"username": "admin", "password": "admin"}
+    )
+    assert response.status_code == 200
+    token = response.json()["access_token"]
+    return {"Authorization": f"Bearer {token}"}
