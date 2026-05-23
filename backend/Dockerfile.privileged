@@ -94,8 +94,18 @@ RUN mkdir -p /tmp/.X11-unix && chmod 1777 /tmp/.X11-unix
 
 # Install Python dependencies
 COPY requirements.txt .
+
+# Pre-install PyTorch CPU-only before requirements.txt so pip never fetches the
+# 530 MB CUDA wheel from PyPI. CPU wheel is ~250 MB and served from the
+# official PyTorch CDN which is far more reliable for large downloads.
+# torchaudio version must match torch exactly.
 RUN pip install --upgrade pip setuptools wheel && \
-    pip install --no-cache-dir --default-timeout=600 --retries=5 -r requirements.txt && \
+    pip install --no-cache-dir \
+    --index-url https://download.pytorch.org/whl/cpu \
+    torch==2.11.0 \
+    torchaudio==2.11.0
+
+RUN pip install --no-cache-dir --default-timeout=600 --retries=5 -r requirements.txt && \
     pip install --no-cache-dir nodriver
 
 # Pre-download sentence-transformers model so runtime never hits HuggingFace
