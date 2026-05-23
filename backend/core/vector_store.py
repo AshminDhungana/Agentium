@@ -84,7 +84,16 @@ class VectorStore:
         "tool_skills": "tool_skills",
     }
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        host: Optional[str] = None,
+        port: Optional[int] = None,
+    ) -> None:
+        # Allow callers (e.g. test fixtures) to override the module-level
+        # globals so that a VectorStore pointed at the test ChromaDB instance
+        # can be constructed without mutating global state.
+        self._host: Optional[str] = host if host is not None else CHROMA_HOST
+        self._port: int = port if port is not None else CHROMA_PORT
         self._client: Optional[chromadb.ClientAPI] = None
         self._embedding_fn = AgentiumEmbeddingFunction()
         self._collections: Dict[str, chromadb.Collection] = {}
@@ -104,16 +113,16 @@ class VectorStore:
         if self._client is not None:
             return self._client
 
-        if CHROMA_HOST:
+        if self._host:
             # Production: connect to the dedicated ChromaDB container
             logger.info(
                 "Connecting to ChromaDB HTTP server at %s:%d",
-                CHROMA_HOST,
-                CHROMA_PORT,
+                self._host,
+                self._port,
             )
             self._client = chromadb.HttpClient(
-                host=CHROMA_HOST,
-                port=CHROMA_PORT,
+                host=self._host,
+                port=self._port,
             )
         else:
             # Development / CI: local persistent storage
@@ -743,8 +752,8 @@ class VectorStore:
             heartbeat = self.client.heartbeat()
             return {
                 "status": "healthy",
-                "mode": "http" if CHROMA_HOST else "local",
-                "host": CHROMA_HOST,
+                "mode": "http" if self._host else "local",
+                "host": self._host,
                 "persist_directory": CHROMA_PERSIST_DIR,
                 "collections": list(self._collections.keys()),
                 "heartbeat": heartbeat,
@@ -753,7 +762,7 @@ class VectorStore:
             return {
                 "status": "unhealthy",
                 "error": str(exc),
-                "mode": "http" if CHROMA_HOST else "local",
+                "mode": "http" if self._host else "local",
                 "persist_directory": CHROMA_PERSIST_DIR,
             }
 
@@ -773,8 +782,19 @@ def get_vector_store() -> VectorStore:
     return _vector_store
 
 
-# Public alias for backward compatibility (used by message_bus)
-vector_store = get_vector_store()
+# ---------------------------------------------------------------------------
+# Lazy module-level alias — backward compatibility for message_bus and any
+# other code that does:
+#   from backend.core.vector_store import vector_store
+#
+# Python 3.7+ supports module __getattr__ so the singleton is only created
+# on first *access*, never at import time.  This prevents the container from
+# crashing during testing or startup races when ChromaDB isn't yet reachable.
+# ---------------------------------------------------------------------------
+def __getattr__(name: str):  # noqa: N807
+    if name == "vector_store":
+        return get_vector_store()
+    raise AttributeError(f"module 'backend.core.vector_store' has no attribute {name!r}")
 
 
 @contextmanager

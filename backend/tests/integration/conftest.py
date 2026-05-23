@@ -135,19 +135,17 @@ def vector_store():
         port=int(os.environ["CHROMA_PORT"])
     )
     
-    # Prefix collections so we can cleanly delete them
-    original_names = vs.collection_names.copy()
-    for key in vs.collection_names:
-        vs.collection_names[key] = f"test_{vs.collection_names[key]}"
+    # Prefix collections so we can cleanly delete them after the test
+    original_names = vs.COLLECTIONS.copy()
+    for key in list(vs.COLLECTIONS.keys()):
+        vs.COLLECTIONS[key] = f"test_{vs.COLLECTIONS[key]}"
         
     vs.initialize()
     
     # Clear collections if they exist from a prior run
-    for coll_name in vs.collection_names.values():
+    for coll_name in vs.COLLECTIONS.values():
         try:
-            coll = vs.client.get_collection(name=coll_name)
-            # Cannot easily delete collection directly in all versions, but we can delete the docs
-            # Or just delete the collection entirely
+            vs.client.get_collection(name=coll_name)
             vs.client.delete_collection(name=coll_name)
         except Exception:
             pass
@@ -157,12 +155,15 @@ def vector_store():
     
     yield vs
     
-    # Teardown
-    for coll_name in vs.collection_names.values():
+    # Teardown: delete test collections
+    for coll_name in vs.COLLECTIONS.values():
         try:
             vs.client.delete_collection(name=coll_name)
         except Exception:
             pass
+    
+    # Restore original collection names on the class so other code isn't affected
+    vs.COLLECTIONS.update(original_names)
 
 
 @pytest.fixture(scope="session")
