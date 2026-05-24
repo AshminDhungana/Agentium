@@ -280,9 +280,18 @@ class SkillDB(BaseEntity):
     verified_at = Column(DateTime, nullable=True)
     rejection_reason = Column(String(500), nullable=True)
 
-    # Self-referential relationship for derived skills
+    # Self-referential relationship for derived skills.
+    # Fix 15 — remote_side=[skill_id] used the bare Column descriptor which is
+    # ambiguous at class-definition time and can confuse SQLAlchemy's join
+    # resolver.  String-based primaryjoin/remote_side plus an explicit
+    # foreign_keys list is the safe, unambiguous form recommended by SA docs
+    # for self-referential non-PK foreign keys.
     parent_skill = relationship(
-        "SkillDB", remote_side=[skill_id], backref="derived_skills"
+        "SkillDB",
+        foreign_keys="[SkillDB.parent_skill_id]",
+        primaryjoin="SkillDB.parent_skill_id == SkillDB.skill_id",
+        remote_side="SkillDB.skill_id",
+        backref="derived_skills",
     )
 
     def to_dict(self) -> Dict[str, Any]:
