@@ -44,7 +44,7 @@ class ExternalChannel(BaseEntity):
     __tablename__ = 'external_channels'
 
     # Multi-User Isolation
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=True)
+    user_id = Column(String(36), ForeignKey('users.id'), nullable=True)
 
     # Basic info
     name         = Column(String(100), nullable=False)

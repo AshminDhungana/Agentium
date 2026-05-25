@@ -43,7 +43,7 @@ def db_engine():
     with engine_default.connect() as conn:
         result = conn.execute(text("SELECT 1 FROM pg_database WHERE datname='agentium_test'")).fetchone()
         if not result:
-            conn.execute(text("CREATE DATABASE agentium_test"))
+            conn.execute(text("CREATE DATABASE agentium_test ENCODING 'UTF8' TEMPLATE template0"))
     engine_default.dispose()
 
     # Create all tables in the test database
@@ -134,35 +134,48 @@ def vector_store():
         host=os.environ["CHROMA_HOST"],
         port=int(os.environ["CHROMA_PORT"])
     )
-    
-    # Prefix collections so we can cleanly delete them after the test
+
+    # Prefix all collection names so test data is fully isolated from production.
     original_names = vs.COLLECTIONS.copy()
     for key in list(vs.COLLECTIONS.keys()):
         vs.COLLECTIONS[key] = f"test_{vs.COLLECTIONS[key]}"
-        
-    vs.initialize()
-    
-    # Clear collections if they exist from a prior run
+
+    # Purge any leftover test collections from a previous run BEFORE calling
+    # initialize().  The previous order was:
+    #
+    #   initialize()  → creates collections, caches Collection objects (UUID-A)
+    #   delete loop   → removes UUID-A from the server
+    #   initialize()  → may not refresh the internal cache; objects still hold
+    #                    UUID-A → every subsequent .add()/.query() returns 404
+    #
+    # Deleting first means initialize() runs exactly once and the cached
+    # Collection objects always point at live, valid server UUIDs.
     for coll_name in vs.COLLECTIONS.values():
         try:
-            vs.client.get_collection(name=coll_name)
             vs.client.delete_collection(name=coll_name)
         except Exception:
             pass
-            
-    # Re-initialize to create fresh empty collections
+
+    # Reset client and collection cache so that initialize() runs fully and
+    # re-populates _collections with live UUIDs.  Without this reset the
+    # early-return guard inside initialize() ("if self._client is not None:
+    #   return") would skip re-creation, leaving _collections full of stale
+    # UUID references pointing at the collections we just deleted.
+    vs._client = None
+    vs._collections = {}
+    # Single initialize — creates fresh, empty collections with correct UUIDs.
     vs.initialize()
-    
+
     yield vs
-    
-    # Teardown: delete test collections
+
+    # Teardown: remove test collections so the next run starts clean.
     for coll_name in vs.COLLECTIONS.values():
         try:
             vs.client.delete_collection(name=coll_name)
         except Exception:
             pass
-    
-    # Restore original collection names on the class so other code isn't affected
+
+    # Restore original collection names so production code is unaffected.
     vs.COLLECTIONS.update(original_names)
 
 

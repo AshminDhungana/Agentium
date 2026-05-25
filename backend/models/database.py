@@ -189,11 +189,6 @@ def check_health() -> dict:
 
 
 def _ensure_system_settings(db: Session):
-    """
-    Create the system_settings table if it doesn't exist and seed
-    default budget values. Uses raw SQL so it works before Alembic
-    has run the dedicated migration.
-    """
     db.execute(text("""
         CREATE TABLE IF NOT EXISTS system_settings (
             key         VARCHAR(128) PRIMARY KEY,
@@ -202,15 +197,36 @@ def _ensure_system_settings(db: Session):
             updated_at  TIMESTAMP    NOT NULL DEFAULT NOW()
         )
     """))
-
+    # Ensure key has a unique constraint even if table was created by a model without it
+    db.execute(text("""
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_constraint
+                WHERE conrelid = 'system_settings'::regclass
+                AND contype IN ('p', 'u')
+                AND conkey = ARRAY[
+                    (SELECT attnum FROM pg_attribute
+                     WHERE attrelid = 'system_settings'::regclass
+                     AND attname = 'key')
+                ]::smallint[]
+            ) THEN
+                ALTER TABLE system_settings ADD PRIMARY KEY (key);
+            END IF;
+        END $$;
+    """))
     db.execute(text("""
         INSERT INTO system_settings (key, value, description, updated_at)
-        VALUES
+        SELECT v.key, v.value, v.description, NOW()
+        FROM (VALUES
             ('daily_token_limit', '100000',
-             'Maximum tokens per day across all API providers', NOW()),
+             'Maximum tokens per day across all API providers'),
             ('daily_cost_limit',  '100.0',
-             'Maximum USD cost per day across all API providers', NOW())
-        ON CONFLICT (key) DO NOTHING
+             'Maximum USD cost per day across all API providers')
+        ) AS v(key, value, description)
+        WHERE NOT EXISTS (
+            SELECT 1 FROM system_settings s WHERE s.key = v.key
+        )
     """))
     db.commit()
 

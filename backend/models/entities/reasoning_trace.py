@@ -90,7 +90,7 @@ class ReasoningStepModel(BaseEntity):
     __tablename__ = "reasoning_steps"
 
     # ── Parent ────────────────────────────────────────────────────────────────
-    trace_db_id = Column(Integer, ForeignKey("reasoning_traces.id"), nullable=False, index=True)
+    trace_db_id = Column(String(36), ForeignKey("reasoning_traces.id"), nullable=False, index=True)
     trace       = relationship("ReasoningTraceModel", back_populates="steps")
 
     # ── Identity ──────────────────────────────────────────────────────────────

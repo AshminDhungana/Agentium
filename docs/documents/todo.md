@@ -36,7 +36,7 @@ Build a self-governing AI ecosystem where agents operate under constitutional la
 | 15    | Platform Hardening & Admin     | 🔮 Planned     |
 | 16    | Database & Advanced AI Logic   | 🔮 Planned     |
 | 17    | DevSecOps & Polish             | 🔮 Planned     |
-| 18    | Complete System Testing         | 🔮 Planned     |
+| 18    | Complete System Testing        | 🔮 Planned     |
 
 ---
 
@@ -708,7 +708,7 @@ Build a self-governing AI ecosystem where agents operate under constitutional la
 
 #### Backend — Test Infrastructure (`backend/tests/integration/`)
 
-- [ ] **Test Fixture Factory** (`conftest.py`) — pytest fixtures for: a seeded PostgreSQL database with all migrations applied, a live ChromaDB instance, Redis flushed to a known state, Celery worker in eager mode (`CELERY_TASK_ALWAYS_EAGER=True`), and a mock AI provider returning deterministic responses
+- [.] **Test Fixture Factory** (`conftest.py`) — pytest fixtures for: a seeded PostgreSQL database with all migrations applied, a live ChromaDB instance, Redis flushed to a known state, Celery worker in eager mode (`CELERY_TASK_ALWAYS_EAGER=True`), and a mock AI provider returning deterministic responses
 - [ ] **Agent Lifecycle Suite** (`test_agent_lifecycle.py`) — spawn → assign task → complete task → verify ethos update → idle 7-day simulation → auto-termination Council vote; assert every state transition writes an `AuditLog` entry with correct `category` and `level`
 - [ ] **Governance Pipeline Suite** (`test_governance.py`) — constitutional check ALLOW / BLOCK / VOTE_REQUIRED paths; amendment propose → vote → ratify lifecycle; assert original constitution is never deletable via any API surface
 - [ ] **Orchestration Suite** (`test_orchestration.py`) — auto-delegation complexity scoring 1–10 maps to correct tier; sub-task DAG dispatches independent branches in parallel; simulated `last_heartbeat_at > 2 min` triggers crash detection and reincarnation from checkpoint; predictive scaling pre-spawns agents before a simulated surge
@@ -869,6 +869,38 @@ OpenAI TTS — Text-to-Speech
 
 ---
 
+## Additional Features (To be Added Later)
+
+### 19.1 Multi-Select Checkbox Card (Chat-Window Only)
+
+When the system needs structured input from a user inside the **chat window**, it renders an inline multi-select checkbox card directly in the message thread. The user can select multiple options at once and confirm with a single click, keeping the conversation compact.
+
+This interaction is **exclusive to the chat window**. When the user is on an external channel such as WhatsApp, SMS, or email, the system falls back to a plain text message listing numbered options and asks for a comma-separated reply.
+
+---
+
+### Behavior
+
+- The card appears **inline** in the message thread, not as a centered modal overlay.
+- The user may select **one or more** options via checkboxes.
+- The **Confirm** button submits all selected values at once and dynamically shows the selection count.
+- If the question is optional, a **Skip** button is shown.
+- Once confirmed, the card collapses into a read-only summary bubble listing the selected labels.
+- If the user types a free-text message instead of interacting with the card, the card auto-dismisses and the text input is processed normally.
+- Only **one active checkbox card** may exist at a time; a new request replaces any previous unanswered card.
+
+---
+
+### Visual Design
+
+The card uses the existing Tailwind dark-mode design system with a rounded container, subtle border, and indigo accent colors for selected states. Selected options highlight with a tinted background and border. The Confirm button remains disabled when no options are selected on a required question.
+
+---
+
+### Data Payload
+
+The backend triggers the card with a structured payload containing the question text, a required flag, and an array of options each with an ID, display label, and internal value. An optional expiration timer can be included after which the card enters an expired state if left unanswered.
+
 ## Changelog
 
-### v0.9.0-alpha _(in progress)
+### v0.9.0-alpha \_(in progress)

@@ -28,7 +28,7 @@ from datetime import datetime, timezone
 from typing import List, Optional, Dict, Any
 
 from pydantic import BaseModel, Field, validator
-from sqlalchemy import Column, String, DateTime, JSON, Float, Integer, Boolean, ForeignKey
+from sqlalchemy import Column, String, DateTime, JSON, Float, Integer, Boolean, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import relationship
 
 from backend.models.entities.base import Base, BaseEntity
@@ -238,6 +238,11 @@ class SkillDB(BaseEntity):
     References ChromaDB for the full embedded content.
     """
     __tablename__ = "skills"
+    # Explicit UniqueConstraint ensures SQLAlchemy renders UNIQUE (skill_id)
+    # inside the CREATE TABLE body rather than as a separate post-DDL index.
+    # PostgreSQL validates the self-referential FK at CREATE TABLE time, so
+    # the unique constraint must be present inline -- not in a later statement.
+    __table_args__ = (UniqueConstraint("skill_id", name="uq_skills_skill_id"),)
 
     skill_id = Column(String(50), unique=True, nullable=False, index=True)
     skill_name = Column(String(100), nullable=False)

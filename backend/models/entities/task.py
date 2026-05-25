@@ -124,7 +124,11 @@ class Task(BaseEntity):
     assigned_task_agent_ids = Column(JSON, default=list)
     
     requires_deliberation = Column(Boolean, default=True)
-    deliberation_id = Column(String(36), ForeignKey('task_deliberations.id'), nullable=True)
+    deliberation_id = Column(
+    String(36),
+    ForeignKey('task_deliberations.id', use_alter=True, name='fk_tasks_deliberation_id'),
+    nullable=True,
+    )
     approved_by_council = Column(Boolean, default=False)
     approved_by_head = Column(Boolean, default=False)
     
