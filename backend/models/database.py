@@ -202,14 +202,10 @@ def _ensure_system_settings(db: Session):
         DO $$
         BEGIN
             IF NOT EXISTS (
-                SELECT 1 FROM pg_constraint
-                WHERE conrelid = 'system_settings'::regclass
-                AND contype IN ('p', 'u')
-                AND conkey = ARRAY[
-                    (SELECT attnum FROM pg_attribute
-                     WHERE attrelid = 'system_settings'::regclass
-                     AND attname = 'key')
-                ]::smallint[]
+                SELECT 1 FROM pg_constraint c
+                JOIN pg_namespace n ON n.oid = c.connamespace
+                WHERE c.conrelid = 'system_settings'::regclass
+                AND c.contype = 'p'
             ) THEN
                 ALTER TABLE system_settings ADD PRIMARY KEY (key);
             END IF;

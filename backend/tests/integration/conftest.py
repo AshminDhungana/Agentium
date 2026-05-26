@@ -21,6 +21,8 @@ os.environ["REDIS_URL"] = "redis://redis:6379/1"
 os.environ["CHROMA_HOST"] = "chromadb"
 os.environ["CHROMA_PORT"] = "8000"
 os.environ["CELERY_TASK_ALWAYS_EAGER"] = "true"
+os.environ["TESTING"] = "true"
+
 
 from backend.main import app
 from backend.models.database import Base, get_db

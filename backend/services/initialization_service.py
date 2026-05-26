@@ -301,7 +301,7 @@ class InitializationService:
             await self._grant_council_privileges(council)
             results["steps_completed"].append("council_privileges_granted")
 
-            self.db.commit()
+            self.db.commit() if not os.environ.get("TESTING") else self.db.flush()
             results["message"] = f"Agentium initialized: {selected_name}"
             return results
 
@@ -700,9 +700,17 @@ class InitializationService:
     async def _clear_existing_data(self) -> None:
         """Clear existing data."""
         try:
-            self.db.execute(text("TRUNCATE TABLE agents CASCADE"))
-            self.db.execute(text("TRUNCATE TABLE constitutions CASCADE"))
-            self.db.commit()
+            if os.environ.get("TESTING") == "true":
+                # Use DELETE (row-level locks) instead of TRUNCATE
+                # (ACCESS EXCLUSIVE lock) and flush instead of commit
+                # so the test fixture's savepoint can roll it back.
+                self.db.execute(text("DELETE FROM agents"))
+                self.db.execute(text("DELETE FROM constitutions"))
+                self.db.flush()
+            else:
+                self.db.execute(text("TRUNCATE TABLE agents CASCADE"))
+                self.db.execute(text("TRUNCATE TABLE constitutions CASCADE"))
+                self.db.commit()
         except Exception as e:
             self._log("ERROR", f"Clear failed: {e}")
 

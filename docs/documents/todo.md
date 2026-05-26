@@ -877,6 +877,16 @@ When the system needs structured input from a user inside the **chat window**, i
 
 This interaction is **exclusive to the chat window**. When the user is on an external channel such as WhatsApp, SMS, or email, the system falls back to a plain text message listing numbered options and asks for a comma-separated reply.
 
+### 19.2 Single-Use Agent Timer (Execution Wait)
+
+A short-lived timer the agent can invoke to pause and wait for a command or external process to finish.
+
+**Behavior:**
+
+- Agent determines the end time based on the running program's expected duration
+- Re-checks at most every **20 seconds** if the process hasn't completed
+- Automatically resumes once the wait condition is met or time expires
+
 ---
 
 ### Behavior

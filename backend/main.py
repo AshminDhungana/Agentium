@@ -319,20 +319,23 @@ async def lifespan(app: FastAPI):
     # ─────────────────────────────────────────────────────────────
     # 6. Start Idle Governance Engine & Background Monitors
     # ─────────────────────────────────────────────────────────────
-    try:
-        db = next(get_db())
+    if os.environ.get("TESTING") == "true":
+        logger.info("⏭️ TESTING mode — skipping Idle Governance & Background Monitors")
+    else:
         try:
-            await idle_governance.start(db)
-            MonitoringService.start_background_monitors()
-            DatabaseMaintenanceService.start_maintenance_monitors()
-            logger.info("✅ Idle Governance Engine and monitors started")
-            logger.info("   Eternal Council and Background Health Scanners active")
-            logger.info("   Database Maintenance & Backup Scanners active")
-        finally:
-            db.close()
-    except Exception as e:
-        logger.error(f"⚠️ Idle Governance Engine / Monitors start failed: {e}")
-        logger.error("   System will continue without full background loops")
+            db = next(get_db())
+            try:
+                await idle_governance.start(db)
+                MonitoringService.start_background_monitors()
+                DatabaseMaintenanceService.start_maintenance_monitors()
+                logger.info("✅ Idle Governance Engine and monitors started")
+                logger.info("   Eternal Council and Background Health Scanners active")
+                logger.info("   Database Maintenance & Backup Scanners active")
+            finally:
+                db.close()
+        except Exception as e:
+            logger.error(f"⚠️ Idle Governance Engine / Monitors start failed: {e}")
+            logger.error("   System will continue without full background loops")
 
     # ─────────────────────────────────────────────────────────────
     # 7. Initialize Capability Registry 
@@ -364,22 +367,25 @@ async def lifespan(app: FastAPI):
     # ─────────────────────────────────────────────────────────────
     # 9. Bootstrap Vector Knowledge Base 
     # ─────────────────────────────────────────────────────────────
-    try:
-        db = next(get_db())
+    if os.environ.get("TESTING") == "true":
+        logger.info("⏭️ TESTING mode — skipping Knowledge Base bootstrap")
+    else:
         try:
-            from backend.services.knowledge_service import get_knowledge_service
-            result = get_knowledge_service().initialize_knowledge_base(db)
-            logger.info(
-                "✅ Knowledge base bootstrapped — constitution: %s, "
-                "ethos: %d/%d embedded",
-                result["constitution_embedded"],
-                result["ethos_embedded"],
-                result["ethos_total"],
-            )
-        finally:
-            db.close()
-    except Exception as e:
-        logger.error("❌ Knowledge base bootstrap failed: %s", e)
+            db = next(get_db())
+            try:
+                from backend.services.knowledge_service import get_knowledge_service
+                result = get_knowledge_service().initialize_knowledge_base(db)
+                logger.info(
+                    "✅ Knowledge base bootstrapped — constitution: %s, "
+                    "ethos: %d/%d embedded",
+                    result["constitution_embedded"],
+                    result["ethos_embedded"],
+                    result["ethos_total"],
+                )
+            finally:
+                db.close()
+        except Exception as e:
+            logger.error("❌ Knowledge base bootstrap failed: %s", e)
 
     logger.info("🎉 Agentium startup complete!")
     logger.info("   Phase 17.1: DDoS hardening active — slowapi + blocklist + payload limits")
@@ -391,28 +397,29 @@ async def lifespan(app: FastAPI):
     # ─────────────────────────────────────────────────────────────
     logger.info("🛑 Shutting down Agentium...")
 
-    try:
-        await idle_governance.stop()
-        logger.info("✅ Idle Governance Engine stopped")
-    except Exception as e:
-        logger.error(f"❌ Error stopping Idle Governance: {e}")
-
-    # Final statistics
-    try:
-        db = next(get_db())
+    if os.environ.get("TESTING") != "true":
         try:
-            status = token_optimizer.get_status()
-            logger.info("📊 Final Statistics:")
-            logger.info(f"   - Total Tokens Saved (Idle): {idle_budget.total_tokens_saved:,}")
-            logger.info(f"   - Total Cost Saved (Idle): ${idle_budget.total_cost_saved_usd:.2f}")
-            logger.info(f"   - Active Budget Used: {status['budget_status']['cost_used_today_usd']:.2f}/{status['budget_status']['daily_cost_limit_usd']:.2f}")
-            if model_allocator:
-                allocation_report = model_allocator.get_allocation_report()
-                logger.info(f"   - Model Allocations: {allocation_report['total_agents']} agents")
-        finally:
-            db.close()
-    except Exception as e:
-        logger.error(f"❌ Could not generate final statistics: {e}")
+            await idle_governance.stop()
+            logger.info("✅ Idle Governance Engine stopped")
+        except Exception as e:
+            logger.error(f"❌ Error stopping Idle Governance: {e}")
+
+        # Final statistics
+        try:
+            db = next(get_db())
+            try:
+                status = token_optimizer.get_status()
+                logger.info("📊 Final Statistics:")
+                logger.info(f"   - Total Tokens Saved (Idle): {idle_budget.total_tokens_saved:,}")
+                logger.info(f"   - Total Cost Saved (Idle): ${idle_budget.total_cost_saved_usd:.2f}")
+                logger.info(f"   - Active Budget Used: {status['budget_status']['cost_used_today_usd']:.2f}/{status['budget_status']['daily_cost_limit_usd']:.2f}")
+                if model_allocator:
+                    allocation_report = model_allocator.get_allocation_report()
+                    logger.info(f"   - Model Allocations: {allocation_report['total_agents']} agents")
+            finally:
+                db.close()
+        except Exception as e:
+            logger.error(f"❌ Could not generate final statistics: {e}")
 
 
 # ── Create FastAPI app ─────────────────────────────────────────────────────────
