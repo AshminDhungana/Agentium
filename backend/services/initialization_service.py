@@ -2,7 +2,7 @@
 Initialization Service for Agentium.
 Genesis protocol - bootstraps the governance system from scratch.
 """
-
+import os
 import asyncio
 import json
 import logging
@@ -385,7 +385,6 @@ class InitializationService:
             vote = IndividualVote(
                 voter_agentium_id=member.agentium_id,
                 vote="for",
-                voted_at=datetime.utcnow(),
                 rationale=f"Genesis vote for '{country_name}'",
                 agentium_id=f"V{member.agentium_id}_GENESIS"
             )
@@ -395,7 +394,6 @@ class InitializationService:
         head_vote = IndividualVote(
             voter_agentium_id="00001",
             vote="for",
-            voted_at=datetime.utcnow(),
             rationale=f"Head ratifies '{country_name}'",
             agentium_id="V00001_GENESIS"
         )
