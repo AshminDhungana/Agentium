@@ -256,19 +256,17 @@ class InitializationService:
             results["steps_completed"].append("created_head_00001")
             self._log("INFO", f"Head 00001 created: {head.id}")
 
-            # Step 2: Create Council Members (2 Council + 1 Head = 3 votes for anti-tyranny)
+            # Step 2: Create Council Members
             council = await self._create_council_members()
             results["steps_completed"].append(f"created_council_members:{len(council)}")
             self._log("INFO", f"Created {len(council)} Council Members")
 
-            # Step 3: Democratic vote on country name (with user input timeout)
+            # Step 3: Determine country name
             if country_name:
-                # Pre-provided name (e.g., from API call)
                 selected_name = country_name.strip()
                 user_provided = True
                 self._log("INFO", f"Using provided country name: {selected_name}")
             else:
-                # Prompt user with timeout
                 user_name = await self._prompt_for_country_name(
                     timeout=self.COUNTRY_NAME_TIMEOUT_SECONDS
                 )
@@ -280,28 +278,31 @@ class InitializationService:
                     user_provided = False
                     self._log("INFO", "Country name prompt timed out, using default")
 
-            # Record the vote and notify
-            await self._vote_on_country_name(council, selected_name)
+            # Step 4: Load and customize constitution 
+            constitution = await self._load_constitution(selected_name, head, council)
+            results["constitution_version"] = constitution.version
+            results["steps_completed"].append("constitution_loaded")
+
+            # Step 5: Record the vote on country name 
+            await self._vote_on_country_name(council, selected_name, constitution)
             await self._notify_country_name_decision(selected_name, user_provided)
 
             results["country_name"] = selected_name
             results["user_provided"] = user_provided
             results["steps_completed"].append("country_name_voted")
 
-            # Step 4: Load and customize constitution
-            constitution = await self._load_constitution(selected_name, head, council)
-            results["constitution_version"] = constitution.version
-            results["steps_completed"].append("constitution_loaded")
-
-            # Step 5: Index to Vector DB
+            # Step 6: Index to Vector DB
             await self._index_to_vector_db(constitution, council)
             results["steps_completed"].append("vector_db_indexed")
 
-            # Step 6: Grant Council admin rights
+            # Step 7: Grant Council admin rights
             await self._grant_council_privileges(council)
             results["steps_completed"].append("council_privileges_granted")
 
-            self.db.commit() if not os.environ.get("TESTING") else self.db.flush()
+            if not os.environ.get("TESTING"):
+                self.db.commit()
+            else:
+                self.db.flush()
             results["message"] = f"Agentium initialized: {selected_name}"
             return results
 
@@ -378,18 +379,19 @@ class InitializationService:
     async def _vote_on_country_name(
         self,
         council: List[CouncilMember],
-        country_name: str
+        country_name: str,
+        constitution: Constitution,  # NEW parameter
     ) -> None:
         """Record democratic vote on country name."""
         from backend.models.entities.voting import AmendmentVoting, AmendmentStatus
         
-        # Create a genesis amendment voting record to serve as parent for the votes
+        # Use the actual constitution UUID (id), not the agentium_id
         genesis_voting = AmendmentVoting(
-            amendment_id="C00001",  # Will be created/updated in _load_constitution
+            amendment_id=constitution.id,  
             eligible_voters=[member.agentium_id for member in council] + ["00001"],
             required_votes=len(council) + 1,
             supermajority_threshold=60,
-            status=AmendmentStatus.RATIFIED,  # Genesis is auto-ratified
+            status=AmendmentStatus.RATIFIED,
             started_at=datetime.utcnow(),
             ended_at=datetime.utcnow(),
             votes_for=len(council) + 1,
@@ -399,26 +401,26 @@ class InitializationService:
             agentium_id="AVGEN1"
         )
         self.db.add(genesis_voting)
-        self.db.flush()  # Get the genesis_voting.id
+        self.db.flush()
         
-        # Record council votes
+        # Record council votes (unchanged)
         for member in council:
             vote = IndividualVote(
                 voter_agentium_id=member.agentium_id,
                 vote="for",
                 rationale=f"Genesis vote for '{country_name}'",
                 agentium_id=f"V{member.agentium_id}",
-                amendment_voting_id=genesis_voting.id  # <-- PARENT SET
+                amendment_voting_id=genesis_voting.id
             )
             self.db.add(vote)
 
-        # Record Head's ratification vote
+        # Record Head's ratification vote 
         head_vote = IndividualVote(
             voter_agentium_id="00001",
             vote="for",
             rationale=f"Head ratifies '{country_name}'",
             agentium_id="V00001",
-            amendment_voting_id=genesis_voting.id  # <-- PARENT SET
+            amendment_voting_id=genesis_voting.id
         )
         self.db.add(head_vote)
 
