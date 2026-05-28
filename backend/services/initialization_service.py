@@ -381,35 +381,46 @@ class InitializationService:
         country_name: str
     ) -> None:
         """Record democratic vote on country name."""
+        from backend.models.entities.voting import AmendmentVoting, AmendmentStatus
+        
+        # Create a genesis amendment voting record to serve as parent for the votes
+        genesis_voting = AmendmentVoting(
+            amendment_id="C00001",  # Will be created/updated in _load_constitution
+            eligible_voters=[member.agentium_id for member in council] + ["00001"],
+            required_votes=len(council) + 1,
+            supermajority_threshold=60,
+            status=AmendmentStatus.RATIFIED,  # Genesis is auto-ratified
+            started_at=datetime.utcnow(),
+            ended_at=datetime.utcnow(),
+            votes_for=len(council) + 1,
+            votes_against=0,
+            votes_abstain=0,
+            final_result="passed",
+            agentium_id="AVGEN1"
+        )
+        self.db.add(genesis_voting)
+        self.db.flush()  # Get the genesis_voting.id
+        
+        # Record council votes
         for member in council:
             vote = IndividualVote(
                 voter_agentium_id=member.agentium_id,
                 vote="for",
                 rationale=f"Genesis vote for '{country_name}'",
-                agentium_id=f"V{member.agentium_id}"
+                agentium_id=f"V{member.agentium_id}",
+                amendment_voting_id=genesis_voting.id  # <-- PARENT SET
             )
             self.db.add(vote)
 
-        # Also record Head's vote
+        # Record Head's ratification vote
         head_vote = IndividualVote(
             voter_agentium_id="00001",
             vote="for",
             rationale=f"Head ratifies '{country_name}'",
-            agentium_id="V00001"
+            agentium_id="V00001",
+            amendment_voting_id=genesis_voting.id  # <-- PARENT SET
         )
         self.db.add(head_vote)
-
-        # Store in UserConfig for persistence
-        try:
-            config = UserConfig(
-                user_id="SYSTEM",
-                config_name="country_name",
-                config_value=country_name,
-                is_active=True
-            )
-            self.db.add(config)
-        except Exception:
-            pass  # UserConfig table might not exist in early migrations
 
     async def _load_constitution(
         self,
