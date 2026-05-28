@@ -386,7 +386,7 @@ class InitializationService:
                 voter_agentium_id=member.agentium_id,
                 vote="for",
                 rationale=f"Genesis vote for '{country_name}'",
-                agentium_id=f"V{member.agentium_id}_GENESIS"
+                agentium_id=f"V{member.agentium_id}"
             )
             self.db.add(vote)
 
@@ -395,7 +395,7 @@ class InitializationService:
             voter_agentium_id="00001",
             vote="for",
             rationale=f"Head ratifies '{country_name}'",
-            agentium_id="V00001_GENESIS"
+            agentium_id="V00001"
         )
         self.db.add(head_vote)
 
