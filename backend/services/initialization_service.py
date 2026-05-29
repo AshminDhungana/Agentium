@@ -24,6 +24,7 @@ from backend.models.entities.user import User
 from backend.models.entities.user_config import UserModelConfig as UserConfig
 from backend.models.entities.voting import IndividualVote
 from backend.services.knowledge_service import get_knowledge_service
+from backend.services.capability_registry import CapabilityRegistry, Capability
 
 logger = logging.getLogger(__name__)
 
@@ -525,7 +526,9 @@ class InitializationService:
             self._log("WARNING", f"Vector DB indexing skipped: {e}")
 
     async def _grant_council_privileges(self, council: List[CouncilMember]) -> None:
-        """Grant Council admin rights."""
+        """Grant Council admin rights and spawn capabilities."""
+        head = self.db.query(HeadOfCouncil).filter_by(agentium_id="00001").first()
+
         for member in council:
             if member.ethos:
                 member.ethos.metadata = json.dumps({
@@ -533,6 +536,22 @@ class InitializationService:
                     "can_approve_submissions": True,
                     "granted_at": datetime.utcnow().isoformat()
                 })
+
+            CapabilityRegistry.grant_capability(
+                member,
+                Capability.SPAWN_TASK_AGENT,
+                head,
+                "Granted at genesis — Council Members may spawn Task Agents",
+                self.db
+            )
+            CapabilityRegistry.grant_capability(
+                member,
+                Capability.SPAWN_LEAD,
+                head,
+                "Granted at genesis — Council Members may spawn Lead Agents",
+                self.db
+            )
+
         self.db.flush()
 
     def _create_head_ethos(self, head: HeadOfCouncil) -> Ethos:
