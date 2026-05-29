@@ -95,6 +95,6 @@ def test_client_and_auth(client, auth_headers):
     assert resp.json()["status"] == "healthy"
     
     # Authenticated request
-    resp2 = client.get("/api/v1/auth/me", headers=auth_headers)
+    resp2 = client.get("/api/v1/auth/verify-session", headers=auth_headers)
     assert resp2.status_code == 200
-    assert resp2.json()["username"] == "admin"
+    assert resp2.json()["user"]["username"] == "admin"

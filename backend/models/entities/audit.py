@@ -128,7 +128,7 @@ class AuditLog(BaseEntity):
         # Truncate actor_id defensively so it never exceeds the column width.
         safe_actor_id = str(actor_id)[:100] if actor_id else "unknown"
         entry = cls(
-            agentium_id=f"A{_uuid.uuid4().hex[:19]}",  # exactly 20 chars, always unique
+            agentium_id=f"A{_uuid.uuid4().hex[:9]}",  # exactly 10 chars, fits String(10)
             level=level,
             category=category,
             actor_type=actor_type,

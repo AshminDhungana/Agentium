@@ -285,8 +285,8 @@ def auth_headers(client, seeded_db):
     # Login to get JWT token
     response = client.post(
         "/api/v1/auth/login",
-        data={"username": "admin", "password": "admin"}
+        json={"username": "admin", "password": "admin"}
     )
-    assert response.status_code == 200
+    assert response.status_code == 200, f"Login failed: status={response.status_code}, body={response.text}"
     token = response.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
