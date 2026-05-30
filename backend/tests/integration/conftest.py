@@ -100,6 +100,10 @@ async def seeded_db(db_session: Session) -> Session:
         db_session.add(admin)
         db_session.flush()
 
+    # Pass db_session directly so all genesis writes (including capability grants)
+    # land on the same session identity map that the test will query.
+    # Without this, grant_capability() flushes onto a different session's objects
+    # and custom_capabilities is never visible to the test's parent query.
     init_service = InitializationService(db=db_session)
     if not init_service.is_system_initialized():
         # Temporarily mock the API key check to allow genesis to proceed in tests
@@ -110,7 +114,11 @@ async def seeded_db(db_session: Session) -> Session:
             await init_service.run_genesis_protocol(force=True, country_name="TestNation")
         finally:
             init_service._has_any_active_api_key = original_check
-            
+
+    # Flush so all pending writes (agent rows, custom_capabilities, audit logs)
+    # are visible within this session before the test begins querying.
+    db_session.flush()
+
     return db_session
 
 

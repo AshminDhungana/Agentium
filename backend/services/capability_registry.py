@@ -108,15 +108,20 @@ TIER_CAPABILITIES: Dict[str, Set[Capability]] = {
         Capability.VOTE_ON_AMENDMENT,
         Capability.REVIEW_VIOLATIONS,
         Capability.MANAGE_CHANNELS,
-        # Inherits some Lead capabilities
+        # Inherits all Lead capabilities (Council supersedes Lead)
+        Capability.SPAWN_TASK_AGENT,
+        Capability.DELEGATE_WORK,
+        Capability.LIQUIDATE_TASK_AGENT,
         Capability.REQUEST_RESOURCES,
         Capability.SUBMIT_KNOWLEDGE,
         Capability.ESCALATE_TO_COUNCIL,
         # Inherits Task capabilities
         Capability.EXECUTE_TASK,
         Capability.REPORT_STATUS,
+        Capability.ESCALATE_BLOCKER,
         Capability.QUERY_KNOWLEDGE,
         Capability.USE_TOOLS,
+        Capability.REQUEST_CLARIFICATION,
     },
     
     # LEAD AGENTS (2xxxx) - Middle management
