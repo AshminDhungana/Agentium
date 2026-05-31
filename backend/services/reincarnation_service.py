@@ -104,21 +104,30 @@ class ReincarnationService:
                 logger.debug(f"Advisory lock not available for prefix {prefix}: {e}")
             
             # ═══════════════════════════════════════════════════════════
-            # STEP 2: Get current maximum ID with row-level lock
+            # STEP 2: Get current maximum ID with row-level lock.
+            # PostgreSQL forbids FOR UPDATE with aggregate functions, so
+            # we lock the matching rows first and compute max in Python.
             # ═══════════════════════════════════════════════════════════
-            highest = db.query(func.max(Agent.agentium_id)).filter(
-                Agent.agentium_id.like(f"{prefix}%")
-            ).with_for_update().scalar()
-            
-            if highest:
-                try:
-                    current_num = int(highest)
-                    next_num = current_num + 1
-                except ValueError:
-                    next_num = int(f"{prefix}0001")
+            locked_rows = (
+                db.query(Agent.agentium_id)
+                .filter(Agent.agentium_id.like(f"{prefix}%"))
+                .with_for_update()
+                .all()
+            )
+
+            if locked_rows:
+                max_id = None
+                for (agent_id,) in locked_rows:
+                    try:
+                        num = int(agent_id)
+                        if max_id is None or num > max_id:
+                            max_id = num
+                    except ValueError:
+                        continue
+                next_num = (max_id + 1) if max_id is not None else int(f"{prefix}0001")
             else:
                 next_num = int(f"{prefix}0001")
-            
+
             prefix_max = int(f"{prefix}9999")
             
             # ═══════════════════════════════════════════════════════════
@@ -156,30 +165,38 @@ class ReincarnationService:
             # Triggered when: sequential ID taken, or pool has gaps from deletions
             # ═══════════════════════════════════════════════════════════
             logger.info(f"🔍 Scanning for gaps in prefix {prefix} (sequential ID {next_num} unavailable)")
-            
+
+            # Numeric bounds for this prefix, e.g. prefix "3" → 30001..39999
+            prefix_min_num = int(f"{prefix}0001")
+            prefix_max_num = int(f"{prefix}9999")
+            # Suffix-only bounds used inside the CTE (strip the leading prefix digit)
+            suffix_min = int(str(prefix_min_num)[1:])   # e.g. 1
+            suffix_max = int(str(prefix_max_num)[1:])   # e.g. 9999
+            prefix_len = len(str(prefix))               # always 1 for current ranges
+
             # Use a CTE to find gaps atomically
             try:
                 gap_result = db.execute(
-                    text("""
+                    text(f"""
                         WITH RECURSIVE numbers AS (
                             SELECT :min_num AS n
                             UNION ALL
                             SELECT n + 1 FROM numbers WHERE n < :max_num
                         ),
                         used_ids AS (
-                            SELECT CAST(substring(agentium_id FROM 2) AS INTEGER) as num
-                            FROM agents 
+                            SELECT CAST(substring(agentium_id FROM {prefix_len + 1}) AS INTEGER) AS num
+                            FROM agents
                             WHERE agentium_id LIKE :prefix_pattern
                         )
-                        SELECT LPAD(n::text, 4, '0') as gap_id
+                        SELECT LPAD(n::text, 4, '0') AS gap_id
                         FROM numbers
                         WHERE n NOT IN (SELECT num FROM used_ids)
                         AND n BETWEEN :min_num AND :max_num
                         LIMIT 1
                     """),
                     {
-                        "min_num": 1,
-                        "max_num": 9999,
+                        "min_num": suffix_min,
+                        "max_num": suffix_max,
                         "prefix_pattern": f"{prefix}%"
                     }
                 ).fetchone()
