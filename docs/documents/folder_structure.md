@@ -277,8 +277,8 @@ Agentium/
 │   ├── alembic.ini                  # Alembic config
 │   ├── celery_app.py                # Celery async tasks
 │   ├── Dockerfile                   # Backend container
-│   │   └── Dockerfile.privileged    # Privileged container
-│   │   └── Dockerfile.remote-executor # Remote executor container
+│   ├── Dockerfile.privileged        # Privileged container
+│   └── Dockerfile.remote-executor    # Remote executor container
 │   ├── main.py                      # FastAPI app entry
 │   └── requirements.txt             # Python dependencies
 │   └── pytest.ini                   # Pytest configuration
