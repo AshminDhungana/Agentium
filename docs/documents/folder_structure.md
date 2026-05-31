@@ -10,13 +10,27 @@ Agentium/
 ├── bridges/                          # External service integrations
 │   └── whatsapp/                    # WhatsApp bridge integration
 │       ├── Dockerfile                # WhatsApp bridge container
+│       ├── index.js                  # WhatsApp bridge entry point
 │       ├── package.json              # Node.js dependencies
 │       └── package-lock.json
 ├── voice-bridge/                     # Voice bridge functionality
+│   ├── install.sh                    # Voice bridge installation script
+│   ├── main.py                       # Voice bridge main entry
+│   └── requirements.txt               # Voice bridge dependencies
 ├── scripts/                          # Build and utility scripts
+│   ├── agentium-voice-startup.cmd    # Voice startup script (Windows)
+│   ├── detect-host.ps1               # Host detection script (PowerShell)
+│   ├── detect-host.sh               # Host detection script (Bash)
+│   ├── install-voice-bridge.ps1      # Install voice bridge (PowerShell)
+│   ├── install-voice-bridge.sh       # Install voice bridge (Bash)
+│   ├── setup.ps1                    # Project setup script (PowerShell)
+│   ├── uninstall-voice-bridge.ps1    # Uninstall voice bridge (PowerShell)
+│   ├── uninstall-voice-bridge.sh     # Uninstall voice bridge (Bash)
+│   └── voice-autoinstall.sh         # Automatic voice installation script
 ├── backend/                          # Python FastAPI backend
 │   ├── alembic/                      # Database migrations
 │   │   ├── env.py                   # Alembic environment config
+│   │   ├── script.py.mako           # Alembic template
 │   │   └── versions/                # Migration scripts
 │   │       ├── 001_schema.py        # Initial schema
 │   │       ├── 002_migration.py     # General migration
@@ -34,8 +48,8 @@ Agentium/
 │   │   │   ├── ab_testing.py        # A/B testing
 │   │   │   ├── admin.py             # Admin endpoints
 │   │   │   ├── api_keys.py          # API key management
-│   │   │   ├── audit_routes.py      # Audit endpoints
 │   │   │   ├── audio.py             # Audio processing
+│   │   │   ├── audit_routes.py      # Audit endpoints
 │   │   │   ├── auth.py              # Authentication
 │   │   │   ├── browser.py           # Browser automation
 │   │   │   ├── capability_routes.py # Capabilities API
@@ -47,8 +61,8 @@ Agentium/
 │   │   │   ├── events.py            # Event processing
 │   │   │   ├── federation.py        # Federation management
 │   │   │   ├── files.py             # File operations
-│   │   │   ├── inbox.py             # Unified inbox
 │   │   │   ├── improvements.py      # Self-improvement engine
+│   │   │   ├── inbox.py             # Unified inbox
 │   │   │   ├── knowledge.py         # Knowledge base & citation graph
 │   │   │   ├── lifecycle_routes.py  # Lifecycle management
 │   │   │   ├── mcp_tools.py         # MCP tools
@@ -74,11 +88,9 @@ Agentium/
 │   │   │   └── workflows.py         # Workflow automation
 │   │   ├── schemas/                 # Pydantic schemas
 │   │   │   ├── checkpoint.py
-│   │   │   ├── messages.py
 │   │   │   ├── mcp_schemas.py
 │   │   │   ├── remote_executor.py
 │   │   │   ├── task.py
-│   │   │   ├── tool_creation.py
 │   │   │   └── user_preference.py
 │   │   ├── host_access.py           # Host access API
 │   │   └── sovereign.py             # Sovereign governance API
@@ -107,17 +119,18 @@ Agentium/
 │   │   │   ├── channels.py          # Channel configs
 │   │   │   ├── chat_message.py      # Chat messages
 │   │   │   ├── checkpoint.py        # Execution checkpoints
+│   │   │   ├── citation_edge.py    # Citation edges (RAG)
 │   │   │   ├── constitution.py      # Constitution rules
 │   │   │   ├── critics.py           # Critic agents
 │   │   │   ├── delegation.py        # Delegation management
+│   │   │   ├── event_trigger.py     # Event triggers
 │   │   │   ├── federation.py        # Federation data
 │   │   │   ├── mcp_tool.py          # MCP tools
 │   │   │   ├── mobile.py            # Mobile device records
-│   │   │   ├── model_provider.py    # LLM providers
 │   │   │   ├── monitoring.py        # Monitoring data
 │   │   │   ├── plugin.py            # Plugin definitions
-│   │   │   ├── remote_execution.py  # Remote execution
 │   │   │   ├── reasoning_trace.py   # Reasoning traces
+│   │   │   ├── remote_execution.py  # Remote execution
 │   │   │   ├── scheduled_task.py    # Scheduled tasks
 │   │   │   ├── skill.py             # Skill definitions
 │   │   │   ├── speaker_profile.py   # Speaker profiles
@@ -133,10 +146,9 @@ Agentium/
 │   │   │   ├── user_preference.py   # User preferences
 │   │   │   ├── voting.py            # Voting records
 │   │   │   ├── wait_condition.py    # Wait conditions
-│   │   │   ├── citation_edge.py    # Citation edges (RAG)
 │   │   │   ├── webhook.py           # Webhook entities
 │   │   │   ├── workflow.py          # Workflow definitions
-│   │   │   └── event_trigger.py     # Event triggers
+│   │   │   └── __init__.py
 │   │   └── schemas/                 # Request/response schemas
 │   │       ├── messages.py
 │   │       ├── task.py
@@ -163,25 +175,26 @@ Agentium/
 │   │   │   └── audit_processor.py   # Audit processor
 │   │   ├── audit_service.py        # Audit service
 │   │   ├── auth.py                  # Auth service
-│   │   ├── auto_delegation_service.py # Automatic task delegation
 │   │   ├── autonomous_learning.py  # Autonomous learning
+│   │   ├── auto_delegation_service.py # Automatic task delegation
 │   │   ├── browser_service.py      # Browser automation
 │   │   ├── capability_registry.py  # Agent capabilities
-│   │   ├── channel_manager.py      # Channel orchestration
 │   │   ├── channels/                # Channel integrations
 │   │   │   ├── base.py              # Base channel
 │   │   │   ├── slack.py             # Slack integration
 │   │   │   └── whatsapp_unified.py  # WhatsApp integration
+│   │   ├── channel_manager.py      # Channel orchestration
 │   │   ├── chat_service.py         # Chat handling
 │   │   ├── checkpoint_service.py   # Checkpoint management
+│   │   ├── citation_graph_service.py # Citation graph (RAG)
 │   │   ├── clarification_service.py # Clarification requests
 │   │   ├── config_versioning.py    # Config versioning
 │   │   ├── context_manager.py      # Context handling
 │   │   ├── critic_agents.py        # Critic agent logic
 │   │   ├── db_maintenance.py       # Database maintenance
+│   │   ├── event_processor.py      # Event processing
 │   │   ├── fact_checker.py         # Fact checking
 │   │   ├── federation_service.py   # Federation management
-│   │   ├── event_processor.py      # Event processing
 │   │   ├── file_processor.py       # PDF/image extraction
 │   │   ├── host_access.py          # Host access service
 │   │   ├── idle_governance.py      # Idle management
@@ -190,7 +203,6 @@ Agentium/
 │   │   ├── initialization_service.py # System init
 │   │   ├── knowledge_governance.py # Knowledge policies
 │   │   ├── knowledge_service.py    # Knowledge base
-│   │   ├── citation_graph_service.py # Citation graph (RAG)
 │   │   ├── mcp_client.py           # MCP client
 │   │   ├── mcp_governance.py       # MCP governance
 │   │   ├── mcp_stats_service.py    # MCP statistics
@@ -203,7 +215,6 @@ Agentium/
 │   │   │   └── health_checks.py
 │   │   ├── monitoring_service.py    # System monitoring
 │   │   ├── persistent_council.py    # Persistent council
-│   │   ├── slow_query_service.py    # Slow query logging
 │   │   ├── plugin_marketplace_service.py # Plugin marketplace
 │   │   ├── predictive_scaling.py   # Predictive auto-scaling
 │   │   ├── prompt_template_manager.py # Prompt templates
@@ -220,13 +231,13 @@ Agentium/
 │   │   ├── self_improvement_service.py # Continuous self-improvement
 │   │   ├── skill_manager.py        # Skill management
 │   │   ├── skill_rag.py            # Skill RAG
+│   │   ├── slow_query_service.py    # Slow query logging
 │   │   ├── storage_service.py      # Storage service
-│   │   ├── task_state_machine.py    # Task state logic
-│   │   ├── wait_poll_service.py     # Wait/poll service
 │   │   ├── tasks/                   # Task execution
 │   │   │   ├── __init__.py
 │   │   │   ├── task_executor.py
 │   │   │   └── workflow_tasks.py
+│   │   ├── task_state_machine.py    # Task state logic
 │   │   ├── token_optimizer.py       # Token optimization
 │   │   ├── tool_analytics.py        # Tool analytics
 │   │   ├── tool_creation_service.py # Tool creation
@@ -235,11 +246,17 @@ Agentium/
 │   │   ├── tool_marketplace.py      # Tool marketplace
 │   │   ├── tool_versioning.py       # Tool versioning
 │   │   ├── user_preference_service.py # User preferences
+│   │   ├── wait_poll_service.py     # Wait/poll service
 │   │   ├── webhook_dispatch_service.py # Webhook dispatch
 │   │   ├── workflow_engine.py       # Workflow engine
 │   │   ├── workflow_executor.py     # Workflow execution
 │   │   ├── workflow_planner.py      # Workflow planning
 │   │   └── workflow_tools.py        # Workflow tools
+│   ├── tests/                       # Backend tests
+│   │   └── integration/             # Integration tests
+│   │       ├── conftest.py
+│   │       ├── test_agent_lifecycle.py
+│   │       └── test_fixtures_smoke.py
 │   ├── tools/                       # Built-in tools
 │   │   ├── browser_router.py        # Browser routing
 │   │   ├── browser_tool.py         # Browser automation
@@ -259,115 +276,70 @@ Agentium/
 │   │   └── web_search_tool.py      # Web search
 │   ├── alembic.ini                  # Alembic config
 │   ├── celery_app.py                # Celery async tasks
-│   ├── chroma_data/                 # ChromaDB data (auto-generated)
 │   ├── Dockerfile                   # Backend container
-│   ├── Dockerfile.privileged        # Privileged container
-│   ├── Dockerfile.remote-executor   # Remote executor container
+│   │   └── Dockerfile.privileged    # Privileged container
+│   │   └── Dockerfile.remote-executor # Remote executor container
 │   ├── main.py                      # FastAPI app entry
 │   └── requirements.txt             # Python dependencies
-
+│   └── pytest.ini                   # Pytest configuration
 ├── frontend/                        # React TypeScript frontend
 │   ├── public/                      # Static assets
+│   │   ├── shield.svg
+│   │   └── vite.svg
 │   ├── src/
 │   │   ├── assets/                  # Static assets
+│   │   │   └── earth-dark.jpg
 │   │   ├── components/              # React components
 │   │   │   ├── agents/              # Agent components
-│   │   │   │   ├── AgentCard.tsx
-│   │   │   │   ├── AgentListView.tsx
-│   │   │   │   ├── AgentTree.tsx
-│   │   │   │   ├── BulkLiquidateModal.tsx
-│   │   │   │   ├── CriticStatsPanel.tsx
-│   │   │   │   ├── LifecycleDashboard.tsx
-│   │   │   │   ├── PromoteAgentModal.tsx
-│   │   │   │   ├── SpawnAgentModal.tsx
-│   │   │   │   └── TerminateAgentModal.tsx
 │   │   │   ├── BrowserTaskPanel.tsx # Browser task panel
 │   │   │   ├── BudgetControl.tsx
 │   │   │   ├── channels/            # Channel UI
-│   │   │   │   ├── ChannelMetricsCard.tsx
-│   │   │   │   ├── CircuitBreakerBadge.tsx
-│   │   │   │   └── MessageLogViewer.tsx
 │   │   │   ├── checkpoints/         # Checkpoint UI
-│   │   │   │   ├── BranchDiffView.tsx
-│   │   │   │   ├── CheckpointDiffModal.tsx
-│   │   │   │   ├── CheckpointImportModal.tsx
-│   │   │   │   └── CheckpointTimeline.tsx
-│   │   │   ├── knowledge/           # Knowledge graph UI
-│   │   │   │   └── CitationGraph.tsx
 │   │   │   ├── common/              # Shared components
-│   │   │   │   ├── ErrorBoundary.tsx
-│   │   │   │   └── ProtectedRoute.tsx
 │   │   │   ├── ConnectionStatus.tsx
 │   │   │   ├── council/             # Governance UI
-│   │   │   │   └── VotingInterface.tsx
 │   │   │   ├── dashboard/           # Dashboard components
-│   │   │   │   ├── AgentsList.tsx
-│   │   │   │   ├── ChannelHealthWidget.tsx
-│   │   │   │   ├── DashboardHeader.tsx
-│   │   │   │   ├── FinancialBurnDashboard.tsx
-│   │   │   │   ├── ProviderAnalytics.tsx
-│   │   │   │   ├── QuickActions.tsx
-│   │   │   │   ├── RecentTasks.tsx
-│   │   │   │   ├── StatsGrid.tsx
-│   │   │   │   └── SystemHealth.tsx
 │   │   │   ├── federation/          # Federation UI
-│   │   │   │   ├── AddPeerModal.tsx
-│   │   │   │   ├── DelegateTaskModal.tsx
-│   │   │   │   └── PeerTable.tsx
 │   │   │   ├── FlatMapAuthBackground.tsx
 │   │   │   ├── GlobalWebSocketProvider.tsx
 │   │   │   ├── HealthIndicator.tsx
 │   │   │   ├── layout/              # Layout components
-│   │   │   │   └── MainLayout.tsx
 │   │   │   ├── mcp/                 # MCP tools UI
-│   │   │   │   └── MCPToolRegistry.tsx
 │   │   │   ├── models/              # Model config UI
-│   │   │   │   ├── ModelCard.tsx
-│   │   │   │   ├── ModelCardSkeleton.tsx
-│   │   │   │   └── ModelConfigForm.tsx
 │   │   │   ├── monitoring/          # Monitoring UI
-│   │   │   │   ├── APIKeyHealth.tsx
-│   │   │   │   ├── HealthScore.tsx
-│   │   │   │   └── ViolationCard.tsx
 │   │   │   ├── rbac/               # RBAC UI
-│   │   │   │   └── AuditTrailTab.tsx
 │   │   │   ├── sovereign/           # Sovereign governance UI
-│   │   │   │   ├── SystemTab.tsx
-│   │   │   │   └── EventTriggerManager.tsx
-│   │   │   ├── voting/              # Voting UI
-│   │   │   │   ├── ConstitutionTab.tsx
-│   │   │   │   ├── DetailPanel.tsx
-│   │   │   │   ├── GovernanceTab.tsx
-│   │   │   │   ├── ProposeAmendmentModal.tsx
-│   │   │   │   ├── QuorumBar.tsx
-│   │   │   │   └── VotingCard.tsx
 │   │   │   ├── SovereignRoute.tsx
 │   │   │   ├── tasks/               # Task UI
-│   │   │   │   ├── AutoDelegationPanel.tsx
-│   │   │   │   ├── BrowserSessionsList.tsx
-│   │   │   │   ├── BrowserTaskViewer.tsx
-│   │   │   │   ├── CreateTaskModal.tsx
-│   │   │   │   └── TaskCard.tsx
-│   │   │   ├── UnifiedInbox.tsx
 │   │   │   ├── ui/                  # Shared UI components
-│   │   │   │   ├── button.tsx
-│   │   │   │   ├── card.tsx
-│   │   │   │   ├── DashboardSkeleton.tsx
-│   │   │   │   ├── ErrorState.tsx
-│   │   │   │   ├── StatCard.tsx
-│   │   │   │   ├── Toggle.tsx
-│   │   │   │   └── WidgetErrorFallback.tsx
+│   │   │   ├── UnifiedInbox.tsx
 │   │   │   ├── VoiceIndicator.tsx
 │   │   │   ├── VoiceSettingsModal.tsx # Voice settings
+│   │   │   ├── voting/              # Voting UI
 │   │   │   └── workflows/           # Workflow UI
-│   │   │       ├── WorkflowAutomationPanel.tsx
-│   │   │       └── WorkflowBuilder.tsx
 │   │   ├── constants/               # Constants and config
+│   │   │   ├── agents.ts
+│   │   │   ├── channelTypes.ts
+│   │   │   ├── polling.ts
 │   │   │   └── providerMeta.tsx
 │   │   ├── context/                 # React context providers
 │   │   │   └── DragDropContext.tsx
 │   │   ├── hooks/                   # Custom React hooks
+│   │   │   ├── useChannelMetrics.ts
+│   │   │   ├── useCountdownTick.tsx
+│   │   │   ├── useDashboardData.ts
+│   │   │   ├── useFocusTrap.ts
+│   │   │   ├── useMediaQuery.ts
+│   │   │   ├── useMessageLog.ts
+│   │   │   ├── useModelConfigs.ts
+│   │   │   ├── usePasswordStrength.ts
+│   │   │   ├── useQRPolling.ts
+│   │   │   ├── useSkills.ts
+│   │   │   ├── useSystemTab.ts
+│   │   │   ├── useToast.ts
+│   │   │   ├── useUserManagement.ts
 │   │   │   ├── useVoiceBridge.ts
+│   │   │   ├── useVotingData.ts
 │   │   │   └── useWebSocket.ts
 │   │   ├── pages/                   # Page components
 │   │   │   ├── ABTestingPage.tsx
@@ -394,7 +366,8 @@ Agentium/
 │   │   │   ├── ToolMarketplacePage.tsx
 │   │   │   ├── Usermanagement.tsx
 │   │   │   ├── VotingPage.tsx
-│   │   │   └── WebhookManagementPage.tsx
+│   │   │   ├── WebhookManagementPage.tsx
+│   │   │   └── WorkflowDesignerPage.tsx
 │   │   ├── services/                # API service layers
 │   │   │   ├── abTesting.ts
 │   │   │   ├── admin.ts
@@ -404,9 +377,9 @@ Agentium/
 │   │   │   ├── auth.ts
 │   │   │   ├── audit.ts
 │   │   │   ├── browserApi.ts
-│   │   │   ├── chatApi.ts
 │   │   │   ├── channelMessages.ts
 │   │   │   ├── channelMetrics.ts
+│   │   │   ├── chatApi.ts
 │   │   │   ├── checkpoints.ts
 │   │   │   ├── constitution.ts
 │   │   │   ├── federation.ts
@@ -415,9 +388,9 @@ Agentium/
 │   │   │   ├── inboxApi.ts
 │   │   │   ├── knowledge.ts
 │   │   │   ├── localVoice.ts
+│   │   │   ├── mcpToolsApi.ts
 │   │   │   ├── models.ts
 │   │   │   ├── monitoring.ts
-│   │   │   ├── mcpToolsApi.ts
 │   │   │   ├── plugins.ts
 │   │   │   ├── preferences.ts
 │   │   │   ├── providerAnalyticsApi.ts
@@ -428,16 +401,24 @@ Agentium/
 │   │   │   ├── voiceApi.ts
 │   │   │   ├── voiceBridge.ts
 │   │   │   ├── voting.ts
-│   │   │   └── webhooksService.ts
+│   │   │   └── webhookService.ts
 │   │   ├── store/                   # State management (Zustand)
+│   │   │   ├── agentsStore.ts
 │   │   │   ├── authStore.ts
 │   │   │   ├── backendStore.ts
 │   │   │   ├── chatStore.ts
 │   │   │   └── websocketStore.ts
 │   │   ├── types/                   # TypeScript types
+│   │   │   ├── dashboard.ts
 │   │   │   ├── hostAccess.ts
-│   │   │   └── index.ts
-│   │   ├── utils/                   # Utility functions
+│   │   │   ├── index.ts
+│   │   │   └── toolManagement.ts
+│   │   └── utils/                   # Utility functions
+│   │       ├── agentIds.ts
+│   │       ├── channelHealth.ts
+│   │       ├── errors.ts
+│   │       ├── statusColors.ts
+│   │       └── time.ts
 │   │   ├── App.tsx                  # Root component
 │   │   ├── App.css                  # App styles
 │   │   ├── index.css                # Global styles
@@ -446,6 +427,7 @@ Agentium/
 │   ├── eslint.config.js
 │   ├── index.html
 │   ├── nginx.conf
+│   ├── package-lock.json
 │   ├── package.json
 │   ├── postcss.config.js
 │   ├── tailwind.config.js
@@ -453,44 +435,49 @@ Agentium/
 │   ├── tsconfig.json
 │   ├── tsconfig.node.json
 │   └── vite.config.ts
-
 ├── mobile/                          # Mobile applications
 │   ├── android/                     # Android app
 │   │   └── README.md
 │   └── ios/                         # iOS app
 │       └── README.md
-
 ├── sdk/                             # Agentium SDKs
 │   ├── python/                      # Python SDK
 │   │   ├── agentium_sdk/            # Python SDK package
+│   │   │   ├── client.py
+│   │   │   ├── exceptions.py
+│   │   │   ├── models.py
+│   │   │   └── __init__.py
 │   │   ├── pyproject.toml           # Python SDK config
 │   │   ├── README.md
 │   │   └── tests/                   # Python SDK tests
+│   │       └── test_sdk.py
 │   └── typescript/                  # TypeScript SDK
+│       ├── jest.config.js
+│       ├── package.json
+│       ├── README.md
+│       ├── scripts/                 # Build scripts
+│       │   └── generate-types.ts
 │       ├── src/                     # TypeScript SDK source
 │       │   ├── client.ts
 │       │   ├── errors.ts
 │       │   ├── index.ts
 │       │   └── types.ts
-│       ├── package.json             # TypeScript SDK config
-│       ├── tsconfig.json
-│       ├── jest.config.js
-│       ├── scripts/                 # Build scripts
 │       ├── tests/                   # TypeScript SDK tests
-│       └── README.md
-
+│       │   └── client.test.ts
+│       └── tsconfig.json
 ├── docs/                            # Documentation
 │   ├── architecture/                # Architecture documentation
 │   │   └── scalability_strategy.md  # Scalability strategy
 │   ├── assets/                      # Documentation assets
+│   │   └── animation.svg
 │   ├── constitution/
 │   │   └── core.md                  # Constitution core
-│   ├── documents/
-│   │   ├── agentium_guide.md        # Agentium user guide
-│   │   ├── architectural_breakdown.md # Architecture details
-│   │   ├── folder_structure.md      # This file
-│   │   ├── selfhost.md              # Self-hosting guide
-│   │   └── todo.md                  # TODO list
+│   └── documents/
+│       ├── agentium_guide.md        # Agentium user guide
+│       ├── architectural_breakdown.md # Architecture details
+│       ├── folder_structure.md      # This file
+│       ├── selfhost.md              # Self-hosting guide
+│       └── todo.md                  # TODO list
 │   ├── workflow/                    # Workflow documentation
 │   │   ├── channel_verification.md
 │   │   ├── dev_workflow.md
@@ -499,56 +486,17 @@ Agentium/
 │   │   ├── task_execution.md
 │   │   └── unified_inbox.md
 │   └── phase10_plan.md              # Phase 10 planning
-
-├── scripts/                          # Build and utility scripts
-├── test/                             # Test files
-├── voice-bridge/                     # Voice bridge functionality
+├── test/                             # Root level tests and utilities
+│   ├── compare_endpoints.py
+│   ├── extract_backend_routes.py
+│   ├── extract_frontend_routes.py
+│   ├── filter_endpoints.py
+│   └── verify_frontend_endpoints.py
 ├── .env                              # Environment variables (do not commit)
 ├── .gitignore
 ├── CONTRIBUTING.md                   # Contributing guidelines
 ├── LICENSE
 ├── Makefile                          # Build automation
 ├── README.md
-├── docker-compose.yml                # Main compose file
-├── docker-compose.remote-executor.yml
-├── package-lock.json
-└── package.json                      # Root package (metadata)
-```
-
-## Architecture Overview
-
-### Backend (Python/FastAPI)
-
-- **api/**: REST API endpoints organized by feature
-- **core/**: Core application logic (auth, config, security, vector store)
-- **models/**: Database layer with SQLAlchemy entities
-- **services/**: Business logic microservices
-- **tools/**: Built-in agent tools
-- **tests/**: Unit and integration tests
-
-### Frontend (React/TypeScript)
-
-- **components/**: Reusable UI components
-- **pages/**: Route-level page components
-- **services/**: API communication layer
-- **store/**: State management (Zustand)
-- **hooks/**: Custom React hooks
-- **constants/**: Application constants
-- **context/**: React context providers
-- **utils/**: Utility functions
-
-### Mobile
-
-- **android/**: Android application
-- **ios/**: iOS application
-
-### SDKs
-
-- **python/**: Python SDK for Agentium
-- **typescript/**: TypeScript/JavaScript SDK for Agentium
-
-### Infrastructure
-
-- **bridges/**: External service integrations (WhatsApp)
-- **docker-compose.yml**: Container orchestration
-- **voice-bridge/**: Voice interaction bridge
+└── docker-compose.yml                # Main compose file
+└── docker-compose.remote-executor.yml

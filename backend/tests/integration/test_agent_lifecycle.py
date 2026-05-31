@@ -36,7 +36,7 @@ async def test_agent_lifecycle_full_flow(seeded_db: Session):
 
     # Assert spawn results
     assert task_agent is not None
-    assert task_agent.agent_type == AgentType.TASK
+    assert task_agent.agent_type == AgentType.TASK_AGENT
     assert task_agent.status == AgentStatus.ACTIVE
     assert task_agent.is_active is True
     assert task_agent.ethos_id is not None

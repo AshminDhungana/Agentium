@@ -966,7 +966,7 @@ class Agent(BaseEntity):
         self.status = AgentStatus.TERMINATED
         self.terminated_at = datetime.utcnow()
         self.termination_reason = reason
-        self.is_active = True
+        self.is_active = False
         
         if violation:
             self._log_violation_termination()
@@ -1290,6 +1290,7 @@ class Agent(BaseEntity):
         template = templates[agent.agent_type]
         
         ethos = Ethos(
+            agentium_id=agent.agentium_id,
             agent_type=agent.agent_type.value,
             mission_statement=template['mission'],
             core_values=json.dumps(template['core_values']),

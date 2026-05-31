@@ -348,17 +348,22 @@ class ReincarnationService:
             name=name,
             description=description,
             parent_id=parent.id,
-            agent_type=AgentType.TASK,
+            agent_type=AgentType.TASK_AGENT,
             status=AgentStatus.ACTIVE,
             is_active=True,
             is_persistent=False,
             idle_mode_enabled=False,
-            created_by=parent.agentium_id
+            created_by_agentium_id=parent.agentium_id
         )
         
         db.add(task_agent)
         db.flush()
-        
+
+        # Create and assign default Ethos for the new Task Agent
+        default_ethos = parent._create_default_ethos(task_agent, db)
+        task_agent.ethos_id = default_ethos.id
+        db.flush()
+
         # Grant custom capabilities if specified
         if capabilities:
             parent_for_grant = db.query(Agent).filter_by(agentium_id="00001").first()  # Head grants
@@ -434,16 +439,21 @@ class ReincarnationService:
             name=name,
             description=description,
             parent_id=parent.id,
-            agent_type=AgentType.LEAD,
+            agent_type=AgentType.LEAD_AGENT,
             status=AgentStatus.ACTIVE,
             is_active=True,
             is_persistent=False,
-            created_by=parent.agentium_id
+            created_by_agentium_id=parent.agentium_id
         )
         
         db.add(lead_agent)
         db.flush()
-        
+
+        # Create and assign default Ethos for the new Lead Agent
+        default_ethos = parent._create_default_ethos(lead_agent, db)
+        lead_agent.ethos_id = default_ethos.id
+        db.flush()
+
         # Log the spawn
         audit = AuditLog.log(
             level=AuditLevel.INFO,
@@ -516,11 +526,11 @@ class ReincarnationService:
             name=f"{task_agent.name} (Promoted)",
             description=f"Promoted from {agent_id}. {task_agent.description}",
             parent_id=task_agent.parent_id,
-            agent_type=AgentType.LEAD,
+            agent_type=AgentType.LEAD_AGENT,
             status=AgentStatus.ACTIVE,
             is_active=True,
             is_persistent=task_agent.is_persistent,
-            created_by=promoted_by.agentium_id,
+            created_by_agentium_id=promoted_by.agentium_id,
             constitution_version=task_agent.constitution_version,
             preferred_config_id=task_agent.preferred_config_id,
             ethos_id=task_agent.ethos_id  # Inherit ethos
@@ -1079,7 +1089,13 @@ Provide a concise summary (max 300 words) that the successor agent will inherit.
         agent_type = agent.agent_type
         
         # Generate new ID (same tier as predecessor)
-        tier_map = {"0": "head", "1": "council", "2": "lead", "3": "task"}
+        tier_map = {
+            "0": "head",
+            "1": "council",
+            "2": "lead",
+            "3": "task", "4": "task", "5": "task", "6": "task",
+            "7": "critic", "8": "critic", "9": "critic",
+        }
         tier_name = tier_map.get(agent.agentium_id[0], "task")
         
         new_id = ReincarnationService.generate_id_with_retry(tier_name, db)
@@ -1097,7 +1113,7 @@ Provide a concise summary (max 300 words) that the successor agent will inherit.
             is_active=True,
             is_persistent=agent.is_persistent,
             idle_mode_enabled=agent.idle_mode_enabled,
-            created_by="REINCARNATION_SERVICE"
+            created_by_agentium_id="REINCARNATION_SERVICE"
         )
         
         # Copy key attributes
