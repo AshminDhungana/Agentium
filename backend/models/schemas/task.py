@@ -2,7 +2,7 @@
 Pydantic schemas for Task API.
 Maps to/from backend.models.entities.task (Task entity).
 """
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 from datetime import datetime
 from typing import Optional, List, Any, Dict
 
@@ -27,7 +27,7 @@ class TaskCreate(BaseModel):
     priority: str = Field(default="normal")   # "low"|"normal"|"urgent"|"critical"
     task_type: str = Field(default="execution")  # "execution"|"research"|"creative"
 
-    @validator("priority")
+    @field_validator("priority")
     def validate_priority(cls, v):
         allowed = [p.value for p in TaskPriority]
         # frontend sends "urgent" but entity only has "critical","high","normal","low","idle"
@@ -38,7 +38,7 @@ class TaskCreate(BaseModel):
             raise ValueError(f"priority must be one of {allowed}")
         return v
 
-    @validator("task_type")
+    @field_validator("task_type")
     def validate_task_type(cls, v):
         allowed = [t.value for t in TaskType]
         if v not in allowed:

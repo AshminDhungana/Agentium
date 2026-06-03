@@ -99,6 +99,12 @@ class AuditLog(BaseEntity):
         Index('idx_audit_correlation', 'correlation_id'),
     )
 
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        if not self.agentium_id:
+            import uuid as _uuid
+            self.agentium_id = f"A{_uuid.uuid4().hex[:9]}"
+
     @classmethod
     def log(cls,
             level: AuditLevel,

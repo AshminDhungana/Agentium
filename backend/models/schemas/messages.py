@@ -11,7 +11,7 @@ Section 6.4 – Context Ray Tracing:
 import json
 from datetime import datetime
 from typing import Optional, Dict, Any, List, Literal
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 
 class AgentMessage(BaseModel):
@@ -86,13 +86,13 @@ class AgentMessage(BaseModel):
     processed: bool = False
     error_count: int = 0
     
-    @validator("hop_count")
+    @field_validator("hop_count")
     def check_max_hops(cls, v):
         if v > 5:
             raise ValueError("Message exceeded max hop count - possible routing loop")
         return v
     
-    @validator("sender_id", "recipient_id")
+    @field_validator("sender_id", "recipient_id")
     def validate_agentium_id_format(cls, v):
         """Ensure ID follows 0xxxx – 6xxxx format.
 

@@ -1,6 +1,6 @@
 """Pydantic schemas for remote code execution API."""
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 
 class CodeExecutionRequest(BaseModel):
@@ -27,7 +27,7 @@ class CodeExecutionRequest(BaseModel):
     )
     network_access: bool = Field(default=False, description="Allow network access")
 
-    @validator('code')
+    @field_validator('code')
     def validate_code_not_empty(cls, v):
         if not v or not v.strip():
             raise ValueError('Code cannot be empty')

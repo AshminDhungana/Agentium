@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from backend.models.entities.agents import Agent, AgentStatus, AgentType, CouncilMember, HeadOfCouncil
 from backend.models.entities.constitution import Ethos
-from backend.models.entities.task import Task, TaskStatus, TaskPriority
+from backend.models.entities.task import Task, TaskStatus, TaskPriority, TaskType
 from backend.models.entities.audit import AuditLog, AuditLevel, AuditCategory
 from backend.services.reincarnation_service import reincarnation_service
 from backend.services.idle_governance import idle_governance
@@ -56,7 +56,7 @@ async def test_agent_lifecycle_full_flow(seeded_db: Session):
         agentium_id="TTESTLF99",
         title="Integration Testing Lifecycle Task",
         description="Assigned task for testing the post-task ritual and ethos compression.",
-        task_type="custom",
+        task_type=TaskType.EXECUTION,
         status=TaskStatus.IN_PROGRESS,
         priority=TaskPriority.LOW,
         assigned_task_agent_ids=[task_agent.agentium_id],

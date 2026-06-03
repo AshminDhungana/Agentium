@@ -32,13 +32,7 @@ Agentium/
 │   │   ├── env.py                   # Alembic environment config
 │   │   ├── script.py.mako           # Alembic template
 │   │   └── versions/                # Migration scripts
-│   │       ├── 001_schema.py        # Initial schema
-│   │       ├── 002_migration.py     # General migration
-│   │       ├── 003_consolidated.py  # Consolidated migration (Phases 3-11)
-│   │       ├── 004_event_triggers.py # Event triggers migration
-│   │       ├── 005_speaker_profiles.py # Speaker profiles migration
-│   │       ├── 006_wait_poll.py     # Wait/poll condition migration
-│   │       └── 007_citation_edges.py # Citation edges migration
+│   │       ├── 000_combined_migration.py  # Combined migration
 │   ├── api/                          # API layer
 │   │   ├── dependencies/
 │   │   │   └── auth.py              # Auth dependencies
@@ -500,3 +494,4 @@ Agentium/
 ├── README.md
 └── docker-compose.yml                # Main compose file
 └── docker-compose.remote-executor.yml
+```

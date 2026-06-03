@@ -27,7 +27,7 @@ import logging
 from datetime import datetime, timezone
 from typing import List, Optional, Dict, Any
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import Column, String, DateTime, JSON, Float, Integer, Boolean, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import relationship
 
@@ -114,11 +114,11 @@ class SkillSchema(BaseModel):
         default="sentence-transformers/all-MiniLM-L6-v2"
     )
 
-    @validator("tags")
+    @field_validator("tags")
     def validate_tags(cls, v: List[str]) -> List[str]:
         return [tag.lower().strip() for tag in v]
 
-    @validator("skill_name")
+    @field_validator("skill_name")
     def validate_skill_name(cls, v: str) -> str:
         return v.lower().replace(" ", "_").replace("-", "_")
 

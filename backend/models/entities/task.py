@@ -7,6 +7,7 @@ Updated for Task Execution Architecture: Governance Alignment
 from datetime import datetime
 from typing import List, Dict, Any
 from sqlalchemy import Column, String, Text, DateTime, ForeignKey, Integer, Enum, Boolean, JSON
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship, validates
 from backend.models.entities.base import BaseEntity
 from backend.models.entities.agents import Agent  
@@ -121,7 +122,7 @@ class Task(BaseEntity):
     head_of_council_id = Column(String(36), ForeignKey('agents.id'), nullable=True)
     assigned_council_ids = Column(JSON, default=list)
     lead_agent_id = Column(String(36), ForeignKey('agents.id'), nullable=True)
-    assigned_task_agent_ids = Column(JSON, default=list)
+    assigned_task_agent_ids = Column(JSONB, default=list)
     
     requires_deliberation = Column(Boolean, default=True)
     deliberation_id = Column(

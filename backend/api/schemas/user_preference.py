@@ -3,7 +3,7 @@ Pydantic schemas for User Preference API.
 """
 
 from typing import Optional, Any, Dict, List
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 
 class PreferenceBase(BaseModel):
@@ -18,7 +18,7 @@ class PreferenceCreate(PreferenceBase):
     scope_target_id: Optional[str] = None
     editable_by_agents: bool = True
 
-    @validator('key')
+    @field_validator('key')
     def validate_key_format(cls, v):
         """Ensure key follows hierarchical format."""
         if '.' in v:
