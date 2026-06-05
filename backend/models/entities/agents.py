@@ -515,6 +515,14 @@ class Agent(BaseEntity):
                     raw_text = raw_text[4:]
 
             compressed = json.loads(raw_text.strip())
+            if not isinstance(compressed, dict):
+                logger.warning(
+                    f"[{self.agentium_id}] Ethos LLM compression returned {type(compressed).__name__} "
+                    f"instead of dict. Falling back to Python heuristic."
+                )
+                ethos.prune_obsolete_content(completed_steps=completed_steps)
+                db.flush()
+                return
 
         except Exception as e:
             # LLM unavailable or returned malformed JSON — fall back gracefully

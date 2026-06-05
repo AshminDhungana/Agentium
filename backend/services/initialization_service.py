@@ -2,6 +2,7 @@
 Initialization Service for Agentium.
 Genesis protocol - bootstraps the governance system from scratch.
 """
+from backend.services import self_healing_service
 import os
 import asyncio
 import json
@@ -305,6 +306,25 @@ class InitializationService:
             await self._grant_council_privileges(council)
             results["steps_completed"].append("council_privileges_granted")
 
+            try:
+                from backend.models.entities.user_config import UserModelConfig
+                default_cfg = (
+                    self.db.query(UserModelConfig)
+                    .filter(UserModelConfig.is_default == True)
+                    .filter(UserModelConfig.status == "active")
+                    .first()
+                )
+                if default_cfg:
+                    head = self.db.query(HeadOfCouncil).filter_by(agentium_id="00001").first()
+                    if head and not head.model_config_id:
+                        head.model_config_id = str(default_cfg.id)
+                        self.db.flush()
+                        logger.info(f"✅ Model config assigned to Head 00001 during genesis: {default_cfg.config_name}")
+                else:
+                    logger.warning("⚠️ No active default model config found during genesis")
+            except Exception as e:
+                logger.warning(f"⚠️ Could not assign model config to Head during genesis: {e}")
+                
             if not os.environ.get("TESTING"):
                 self.db.commit()
             else:
@@ -404,7 +424,10 @@ class InitializationService:
             votes_against=0,
             votes_abstain=0,
             final_result="passed",
-            agentium_id="AVGEN1"
+            agentium_id="AVGEN1",
+            proposed_by_agentium_id="00001",
+            proposed_changes=f"Establish country name: {country_name}",
+            rationale="Genesis protocol — founding democratic vote on nation name"
         )
         self.db.add(genesis_voting)
         self.db.flush()

@@ -52,6 +52,8 @@ class AmendmentVoting(BaseEntity):
     status = Column(Enum(AmendmentStatus), default=AmendmentStatus.PROPOSED, nullable=False)
     started_at = Column(DateTime, nullable=True)
     ended_at = Column(DateTime, nullable=True)
+
+    proposed_by_agentium_id = Column(String(10), nullable=False)
     
     # Results
     votes_for = Column(Integer, default=0)
