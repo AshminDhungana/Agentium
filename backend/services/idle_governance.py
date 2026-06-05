@@ -212,46 +212,49 @@ class EnhancedIdleGovernanceEngine:
     async def _idle_loop(self):
         """Main eternal loop with scheduled task execution."""
         while self.is_running:
-            db = None
+            sleep_duration = self.check_interval
             try:
                 with get_db_context() as db:
-                    # Execute scheduled tasks
-                    await self._run_scheduled_tasks(db)
-                    
-                    # Check if there are user tasks pending
-                    user_tasks = self._get_pending_user_tasks(db)
-                    
-                    if user_tasks:
-                        # Pause idle work until user tasks are handled
-                        await self._pause_idle_work(db, reason=f"{len(user_tasks)} user tasks pending")
-                        await asyncio.sleep(5)
-                        continue
-                    
-                    # Get available persistent agents
-                    available_agents = self._get_available_persistent_agents(db)
-                    
-                    if not available_agents:
-                        await asyncio.sleep(self.check_interval)
-                        continue
-                    
-                    # Assign work to each available agent
-                    for agent in available_agents:
-                        await self._assign_idle_work(db, agent)
-                    
-                    # Execute the work
-                    await self._execute_idle_work(db, available_agents)
-                    
-                    # Small delay to prevent CPU spinning
-                    await asyncio.sleep(self.check_interval)
-                    
-            except Exception as e:
-                logger.error(f"❌ Error in idle loop: {e}")
-                if db:
                     try:
-                        db.rollback()
-                    except:
-                        pass
-                await asyncio.sleep(self.check_interval)
+                        # Execute scheduled tasks
+                        await self._run_scheduled_tasks(db)
+                        
+                        # Check if there are user tasks pending
+                        user_tasks = self._get_pending_user_tasks(db)
+                        
+                        if user_tasks:
+                            # Pause idle work until user tasks are handled
+                            await self._pause_idle_work(db, reason=f"{len(user_tasks)} user tasks pending")
+                            sleep_duration = 5
+                        else:
+                            # Get available persistent agents
+                            available_agents = self._get_available_persistent_agents(db)
+                            
+                            if not available_agents:
+                                sleep_duration = self.check_interval
+                            else:
+                                # Assign work to each available agent
+                                for agent in available_agents:
+                                    await self._assign_idle_work(db, agent)
+                                
+                                # Execute the work
+                                await self._execute_idle_work(db, available_agents)
+                                sleep_duration = self.check_interval
+                                
+                    except Exception as e:
+                        logger.error(f"❌ Error in idle loop DB work: {e}")
+                        try:
+                            db.rollback()
+                        except Exception:
+                            pass
+                        sleep_duration = self.check_interval
+                        
+            except Exception as e:
+                logger.error(f"❌ Error in idle loop outer: {e}")
+                sleep_duration = self.check_interval
+            
+            # Sleep happens OUTSIDE the with block — DB connection is released before sleeping
+            await asyncio.sleep(sleep_duration)
     
     # ═══════════════════════════════════════════════════════════
     # SCHEDULED TASKS
@@ -776,7 +779,8 @@ class EnhancedIdleGovernanceEngine:
         
         # Track which system tasks were completed this cycle to avoid duplicates
         system_tasks_completed_this_cycle: set = set()
-        
+        loop = asyncio.get_running_loop()
+
         for agent in agents:
             task_id = self.current_idle_tasks.get(agent.agentium_id)
             if not task_id:
@@ -814,7 +818,11 @@ class EnhancedIdleGovernanceEngine:
                 tokens_saved = 0
                 
                 if task.task_type == TaskType.PREFERENCE_OPTIMIZATION:
-                    result = preference_optimizer_task.execute()
+                    # Run sync task in thread pool so it doesn't block HTTP traffic
+                    result = await asyncio.wait_for(
+                        loop.run_in_executor(None, preference_optimizer_task.execute),
+                        timeout=60
+                    )
                     tokens_saved = result.get('tokens_saved', 0) if isinstance(result, dict) else 0
                     self._last_pref_opt_run[agent.agentium_id] = datetime.utcnow()
                     
@@ -849,10 +857,16 @@ class EnhancedIdleGovernanceEngine:
                     system_tasks_completed_this_cycle.add(task.task_type.value)
                         
                 elif task.task_type in (TaskType.CONSTITUTION_REFINE, TaskType.CONSTITUTION_READ):
-                    agent.read_and_align_constitution(db)
+                    await asyncio.wait_for(
+                        loop.run_in_executor(None, agent.read_and_align_constitution, db),
+                        timeout=120
+                    )
                     
-                elif task.task_type == TaskType.ETHOS_OPTIMIZATION:  # FIXED: was ETHOS_OPTIMIMIZATION
-                    agent.compress_ethos(db)
+                elif task.task_type == TaskType.ETHOS_OPTIMIZATION:
+                    await asyncio.wait_for(
+                        loop.run_in_executor(None, agent.compress_ethos, db),
+                        timeout=120
+                    )
                     
                 elif task.task_type == TaskType.PREDICTIVE_PLANNING:
                     logger.info(f"🔮 Predictive planning cycle by {agent.agentium_id}")
@@ -884,7 +898,17 @@ class EnhancedIdleGovernanceEngine:
                 self.metrics.record_idle_task_completion(tokens_saved)
                 
                 logger.info(f"✅ Idle work completed: {agent.agentium_id} → {task.task_type.value}")
-                
+
+            except asyncio.TimeoutError:
+                logger.error(f"⏱️ Idle task {task.task_type.value} timed out for {agent.agentium_id}")
+                # Force cleanup so the agent isn't stuck forever
+                task.status = TaskStatus.FAILED
+                task.is_active = False
+                self.current_idle_tasks.pop(agent.agentium_id, None)
+                agent.status = AgentStatus.ACTIVE
+                agent.current_task_id = None
+                continue  # Don't let one bad task kill the loop
+
             except Exception as e:
                 logger.warning(f"⚠️ Idle work error for {agent.agentium_id}: {e}")
                 self.current_idle_tasks.pop(agent.agentium_id, None)
