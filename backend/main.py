@@ -38,6 +38,7 @@ from backend.services.initialization_service import InitializationService
 from backend.services.token_optimizer import token_optimizer, idle_budget
 from backend.models.entities.task import TaskType, TaskPriority, TaskStatus
 from backend.models.entities.agents import AgentStatus
+from backend.models.entities.user_config import ConnectionStatus
 
 # Phase 6.7 — MCP Bridge
 from backend.services.mcp_tool_bridge import init_bridge
@@ -249,11 +250,11 @@ async def lifespan(app: FastAPI):
                 default_cfg = (
                     db.query(UserModelConfig)
                     .filter(UserModelConfig.is_default == True)
-                    .filter(UserModelConfig.status == "active")
+                    .filter(UserModelConfig.status == ConnectionStatus.ACTIVE)
                     .first()
                 ) or (
                     db.query(UserModelConfig)
-                    .filter(UserModelConfig.status == "active")
+                    .filter(UserModelConfig.status == ConnectionStatus.ACTIVE)
                     .first()
                 )
                 if default_cfg:

@@ -947,19 +947,16 @@ class Agent(BaseEntity):
         return True
 
     def get_model_config(self, session: Session) -> Optional['UserModelConfig']:
-        """Get the model configuration to use for this agent."""
         if self.preferred_config:
-            if self.preferred_config.status.value == 'active':
+            if self.preferred_config.status == ConnectionStatus.ACTIVE:
                 return self.preferred_config
         
-        # Fallback to user's default config
-        from backend.models.entities.user_config import UserModelConfig
+        from backend.models.entities.user_config import UserModelConfig, ConnectionStatus
         default_config = session.query(UserModelConfig).filter_by(
-            user_id="sovereign",
+            user_id=None,
             is_default=True,
-            status='active'
+            status=ConnectionStatus.ACTIVE
         ).first()
-        
         return default_config
     
     def terminate(self, reason: str, violation: bool = False):

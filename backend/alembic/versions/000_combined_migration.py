@@ -439,7 +439,7 @@ def upgrade() -> None:
             sa.Column('head_of_council_id', sa.String(36), sa.ForeignKey('agents.id'), nullable=True),
             sa.Column('assigned_council_ids', sa.JSON(), server_default='[]'),
             sa.Column('lead_agent_id', sa.String(36), sa.ForeignKey('agents.id'), nullable=True),
-            sa.Column('assigned_task_agent_ids', sa.JSON(), server_default='[]'),
+            sa.Column('assigned_task_agent_ids', postgresql.JSONB(), server_default='[]'),
             sa.Column('requires_deliberation', sa.Boolean(), server_default='true'),
             sa.Column('deliberation_id', sa.String(36), nullable=True),
             sa.Column('approved_by_council', sa.Boolean(), server_default='false'),

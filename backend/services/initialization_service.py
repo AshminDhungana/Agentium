@@ -374,20 +374,20 @@ class InitializationService:
                 default_cfg = (
                     self.db.query(UserModelConfig)
                     .filter(UserModelConfig.is_default == True)
-                    .filter(UserModelConfig.status == "active")
+                    .filter(UserModelConfig.status == ConnectionStatus.ACTIVE)
                     .first()
                 )
                 if default_cfg:
                     head = self.db.query(HeadOfCouncil).filter_by(agentium_id="00001").first()
-                    if head and not head.model_config_id:
-                        head.model_config_id = str(default_cfg.id)
+                    if head and not head.preferred_config_id:
+                        head.preferred_config_id = str(default_cfg.id)
                         self.db.flush()
                         logger.info(f"✅ Model config assigned to Head 00001 during genesis: {default_cfg.config_name}")
                 if not default_cfg:
                     # Fallback: grab any active config if no default is marked yet
                     default_cfg = (
                         self.db.query(UserModelConfig)
-                        .filter(UserModelConfig.status == "active")
+                        .filter(UserModelConfig.status == ConnectionStatus.ACTIVE)
                         .first()
                     )
                     if default_cfg:

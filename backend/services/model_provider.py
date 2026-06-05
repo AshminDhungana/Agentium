@@ -858,19 +858,17 @@ class ModelService:
 
     @staticmethod
     async def get_provider(user_id: str, preferred_config_id: Optional[str] = None) -> Optional[BaseModelProvider]:
-        """Get provider instance for user."""
         with get_db_context() as db:
             if preferred_config_id:
                 config = db.query(UserModelConfig).filter_by(
                     id=preferred_config_id,
-                    user_id=user_id,
-                    status='active'
+                    status=ConnectionStatus.ACTIVE
                 ).first()
             else:
                 config = db.query(UserModelConfig).filter_by(
                     user_id=user_id,
                     is_default=True,
-                    status='active'
+                    status=ConnectionStatus.ACTIVE
                 ).first()
 
             if not config:

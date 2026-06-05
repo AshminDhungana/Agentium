@@ -15,6 +15,7 @@ from backend.services.context_manager import context_manager
 from backend.services.reincarnation_service import reincarnation_service
 from backend.services.clarification_service import clarification_service
 from backend.services.model_provider import ModelService
+from backend.models.entities.user_config import ConnectionStatus
 
 
 logger = logging.getLogger(__name__)
@@ -41,7 +42,7 @@ class ChatService:
                 default_config = (
                     db.query(UserModelConfig)
                     .filter(UserModelConfig.is_default == True)
-                    .filter(UserModelConfig.status == "active")
+                    .filter(UserModelConfig.status == ConnectionStatus.ACTIVE)
                     .first()
                 )
                 if default_config:
