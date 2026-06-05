@@ -138,15 +138,20 @@ class InitializationService:
         try:
             from backend.services.channel_manager import ChannelManager
 
-            # Fire and forget - don't block genesis on external channels
-            asyncio.create_task(
-                ChannelManager.broadcast_to_channels(
-                    user_id=sovereign_user.id,
-                    content=message,
-                    db=self.db,
-                    is_silent=False
-                )
-            )
+            async def _broadcast_with_fresh_session():
+                """Fire-and-forget with its own DB session to avoid
+                InvalidRequestError when genesis commits/rolls back."""
+                from backend.models.database import get_db_context
+                with get_db_context() as fresh_db:
+                    await ChannelManager.broadcast_to_channels(
+                        user_id=sovereign_user.id,
+                        content=message,
+                        db=fresh_db,
+                        is_silent=False,
+                    )
+
+            # Fire and forget — don't block genesis on external channels
+            asyncio.create_task(_broadcast_with_fresh_session())
             self._log("INFO", "Broadcast via external channels initiated")
         except Exception as e:
             self._log("WARNING", f"External channel broadcast failed: {e}")

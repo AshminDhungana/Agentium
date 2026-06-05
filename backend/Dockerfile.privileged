@@ -88,7 +88,7 @@ RUN useradd -m -s /bin/bash -G sudo,docker agentium && \
 WORKDIR /app
 
 # Create necessary directories
-RUN mkdir -p /app/backend /host /host_home
+RUN mkdir -p /app/backend /host /host_home /data/config-repo
 
 RUN mkdir -p /tmp/.X11-unix && chmod 1777 /tmp/.X11-unix
 
@@ -116,7 +116,7 @@ RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTr
 COPY . .
 
 # Set proper ownership
-RUN chown -R agentium:agentium /app
+RUN chown -R agentium:agentium /app /data/config-repo
 
 USER agentium
 
