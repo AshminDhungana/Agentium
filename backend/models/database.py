@@ -45,10 +45,11 @@ db_session = scoped_session(SessionLocal)
 
 
 @event.listens_for(Engine, "connect")
-def set_timezone(dbapi_conn, connection_record):
-    """Set UTC timezone for all connections."""
+def set_connection_params(dbapi_conn, connection_record):
+    """Set UTC timezone and UTF-8 encoding for all connections."""
     cursor = dbapi_conn.cursor()
     cursor.execute("SET timezone TO 'UTC'")
+    cursor.execute("SET CLIENT_ENCODING TO 'UTF8'")
     cursor.close()
 
 

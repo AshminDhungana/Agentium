@@ -9,7 +9,7 @@ services:
       POSTGRES_DB: agentium
       POSTGRES_USER: agentium
       POSTGRES_PASSWORD: agentium
-      POSTGRES_INITDB_ARGS: "--locale=C"
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --locale=C.UTF-8"
       POSTGRES_HOST_AUTH_METHOD: scram-sha-256
     # Phase 16.1: enable pg_stat_statements for slow-query analysis.
     # -c shared_preload_libraries — loads the extension module at server start.
@@ -243,7 +243,8 @@ services:
       - uploads_data:/app/data/uploads
       - config_repo:/data/config-repo
     restart: unless-stopped
-    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000
+    command: >
+      sh -c "mkdir -p /data/config-repo && chmod 777 /data/config-repo && uvicorn backend.main:app --host 0.0.0.0 --port 8000"
     depends_on:
       postgres:
         condition: service_healthy

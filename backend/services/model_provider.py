@@ -233,6 +233,7 @@ class BaseModelProvider(ABC):
                     error_message=error,
                     cost_usd=cost,
                     request_metadata={"agentium_id": agentium_id},
+                    agentium_id=agentium_id,
                 ))
                 db.commit()
         except Exception as exc:
