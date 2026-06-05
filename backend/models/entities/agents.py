@@ -11,6 +11,7 @@ from sqlalchemy.orm import relationship, validates, Session
 from backend.models.entities.base import BaseEntity
 from backend.models.entities.constitution import Ethos
 import enum
+from backend.models.entities.user_config import ConnectionStatus
 
 class AgentType(str, enum.Enum):
     """Agent tiers: 4 governance + 3 critic types."""

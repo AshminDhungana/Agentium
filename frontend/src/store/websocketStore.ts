@@ -325,7 +325,7 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
             const headers: Record<string, string> = {};
             if (token) headers['Authorization'] = `Bearer ${token}`;
             
-            const res = await fetch(`/api/v1/ws/replay?since=${encodeURIComponent(since)}`, { headers });
+            const res = await fetch(`/ws/replay?since=${encodeURIComponent(since)}`, { headers });
             if (!res.ok) return;
             const data = await res.json();
             if (data.events && Array.isArray(data.events)) {

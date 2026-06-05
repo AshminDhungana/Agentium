@@ -546,8 +546,8 @@ app.include_router(workflows_routes.router,          prefix="/api/v1")
 app.include_router(scaling_routes.router,            prefix="/api/v1")  
 app.include_router(improvements_routes.router,       prefix="/api/v1") 
 app.include_router(events_routes.router,             prefix="/api/v1")  
-app.include_router(wait_poll_routes.router,          prefix="/api/v1")  # Phase 16
-app.include_router(knowledge_routes.router,          prefix="/api/v1")  # Phase 16.3
+app.include_router(wait_poll_routes.router,          prefix="/api/v1") 
+app.include_router(knowledge_routes.router,          prefix="/api/v1")  
 
 
 # ══════════════════════════════════════════════════════════════════════════════
