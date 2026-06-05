@@ -685,14 +685,23 @@ class ConstitutionalGuard:
 
             # Also create ConstitutionViolation record for BLOCK / VOTE_REQUIRED
             if decision.verdict != Verdict.ALLOW:
+                severity_to_audit_level = {
+                    ViolationSeverity.LOW: AuditLevel.WARNING,
+                    ViolationSeverity.MEDIUM: AuditLevel.WARNING,
+                    ViolationSeverity.HIGH: AuditLevel.CRITICAL,
+                    ViolationSeverity.CRITICAL: AuditLevel.EMERGENCY,
+                }
                 violation = ConstitutionViolation(
-                    agentium_id=f"CV{agent_id}{datetime.utcnow().strftime('%H%M%S')}",
-                    violator_agentium_id=agent_id,
+                    agentium_id=agent_id,
                     violation_type=action,
-                    severity=decision.severity.value,
-                    description=decision.explanation,
-                    article_violated=", ".join(decision.citations[:3]),
-                    action_taken=decision.verdict.value,
+                    violated_article=", ".join(decision.citations[:3]),
+                    description=decision.explanation or f"Constitutional violation: {action}",
+                    severity=severity_to_audit_level.get(decision.severity, AuditLevel.WARNING),
+                    attempted_action=f"{action} {json.dumps({})}",
+                    detected_by="CONSTITUTIONAL_GUARD",
+                    detection_method="pre_execution_check",
+                    blocked=(decision.verdict == Verdict.BLOCK),
+                    context={"verdict": decision.verdict.value, "citations": decision.citations},
                 )
                 self.db.add(violation)
 
@@ -703,9 +712,10 @@ class ConstitutionalGuard:
                 try:
                     from datetime import timedelta
                     cutoff = datetime.utcnow() - timedelta(hours=24)
+                    # blocked=False identifies VOTE_REQUIRED rows (blocked=True means BLOCK verdict)
                     recent_votes = self.db.query(ConstitutionViolation).filter(
                         ConstitutionViolation.violation_type == action,
-                        ConstitutionViolation.action_taken == Verdict.VOTE_REQUIRED.value,
+                        ConstitutionViolation.blocked == False,
                         ConstitutionViolation.created_at >= cutoff
                     ).count()
                     
