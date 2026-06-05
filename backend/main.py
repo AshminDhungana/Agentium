@@ -245,15 +245,19 @@ async def lifespan(app: FastAPI):
                 HeadOfCouncil.agentium_id == "00001"
             ).first()
 
-            if head and not head.model_config_id:
+            if head and not head.preferred_config_id:
                 default_cfg = (
                     db.query(UserModelConfig)
                     .filter(UserModelConfig.is_default == True)
                     .filter(UserModelConfig.status == "active")
                     .first()
+                ) or (
+                    db.query(UserModelConfig)
+                    .filter(UserModelConfig.status == "active")
+                    .first()
                 )
                 if default_cfg:
-                    head.model_config_id = str(default_cfg.id)
+                    head.preferred_config_id = str(default_cfg.id)
                     db.commit()
                     logger.info(
                         f"✅ Auto-assigned default model config to Head 00001: "

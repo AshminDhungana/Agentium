@@ -3,6 +3,7 @@ Initialization Service for Agentium.
 Genesis protocol - bootstraps the governance system from scratch.
 """
 from backend.services import self_healing_service
+from backend.services import self_healing_service
 import os
 import asyncio
 import json
@@ -23,6 +24,7 @@ from backend.models.entities.agents import (
 from backend.models.entities.constitution import Constitution, Ethos
 from backend.models.entities.user import User
 from backend.models.entities.user_config import UserModelConfig as UserConfig
+from backend.models.entities.user_config import ProviderType, ConnectionStatus
 from backend.models.entities.voting import IndividualVote
 from backend.services.knowledge_service import get_knowledge_service
 from backend.services.capability_registry import CapabilityRegistry, Capability
@@ -114,6 +116,12 @@ class InitializationService:
             self._log("WARNING", "No sovereign user found for broadcast")
             return
 
+        # Extract the plain scalar NOW while the session is still alive.
+        # sovereign_user.id must not be accessed inside the fire-and-forget
+        # task below because by that point the ORM object may be detached from
+        # self.db (after a flush/commit), causing DetachedInstanceError.
+        sovereign_user_id = sovereign_user.id
+
         # 1. Broadcast via WebSocket (real-time dashboard)
         try:
             # Import here to avoid circular imports
@@ -145,7 +153,7 @@ class InitializationService:
                 from backend.models.database import get_db_context
                 with get_db_context() as fresh_db:
                     await ChannelManager.broadcast_to_channels(
-                        user_id=sovereign_user.id,
+                        user_id=sovereign_user_id,  # plain scalar — not an ORM attribute
                         content=message,
                         db=fresh_db,
                         is_silent=False,
@@ -212,6 +220,58 @@ class InitializationService:
             )
 
         await self._broadcast_to_user(message, is_urgent=False)
+
+    async def _ensure_default_model_config(self) -> None:
+        """
+        If no UserModelConfig exists yet, synthesize one from the first
+        active API key so genesis can complete without a manual UI step.
+        """
+        from backend.models.entities.user_config import UserModelConfig
+        from backend.services.api_key_manager import api_key_manager
+
+        existing = (
+            self.db.query(UserModelConfig)
+            .filter(UserModelConfig.status == ConnectionStatus.ACTIVE)
+            .first()
+        )
+        if existing:
+            return  # Already have one — nothing to do
+
+        try:
+            availability = api_key_manager.get_provider_availability(self.db)
+            active_provider = next(
+                (p for p, available in availability.items() if available), None
+            )
+            if not active_provider:
+                return
+
+            # Map lowercase string to ProviderType enum
+            provider_enum = ProviderType(active_provider.upper())
+
+            # Create a minimal default config for the detected provider
+            cfg = UserModelConfig(
+                config_name=f"Default ({active_provider})",
+                provider=provider_enum,
+                default_model=self._default_model_for_provider(active_provider),
+                status=ConnectionStatus.ACTIVE,
+                is_default=True,
+            )
+            self.db.add(cfg)
+            self.db.flush()
+            logger.info(f"✅ Auto-created default UserModelConfig for provider: {active_provider}")
+        except Exception as e:
+            logger.warning(f"⚠️ Could not auto-create model config: {e}")
+
+    def _default_model_for_provider(self, provider: str) -> str:
+        """Return a sensible default model name for a provider."""
+        defaults = {
+            "openai": "gpt-4o",
+            "anthropic": "claude-3-5-sonnet-20241022",
+            "google": "gemini-1.5-pro",
+            "groq": "llama-3.1-70b-versatile",
+            "deepseek": "deepseek-chat",
+        }
+        return defaults.get(provider.lower(), "gpt-4o")
 
     async def run_genesis_protocol(
         self,
@@ -305,7 +365,10 @@ class InitializationService:
             # Step 7: Grant Council admin rights
             await self._grant_council_privileges(council)
             results["steps_completed"].append("council_privileges_granted")
-
+            
+            # Ensure a UserModelConfig row exists for the active API key
+            await self._ensure_default_model_config()
+            
             try:
                 from backend.models.entities.user_config import UserModelConfig
                 default_cfg = (
@@ -318,6 +381,25 @@ class InitializationService:
                     head = self.db.query(HeadOfCouncil).filter_by(agentium_id="00001").first()
                     if head and not head.model_config_id:
                         head.model_config_id = str(default_cfg.id)
+                        self.db.flush()
+                        logger.info(f"✅ Model config assigned to Head 00001 during genesis: {default_cfg.config_name}")
+                if not default_cfg:
+                    # Fallback: grab any active config if no default is marked yet
+                    default_cfg = (
+                        self.db.query(UserModelConfig)
+                        .filter(UserModelConfig.status == "active")
+                        .first()
+                    )
+                    if default_cfg:
+                        # Promote it to default so future lookups succeed
+                        default_cfg.is_default = True
+                        self.db.flush()
+                        logger.info(f"✅ Promoted '{default_cfg.config_name}' as default model config")
+        
+                if default_cfg:
+                    head = self.db.query(HeadOfCouncil).filter_by(agentium_id="00001").first()
+                    if head and not head.preferred_config_id:
+                        head.preferred_config_id = str(default_cfg.id)
                         self.db.flush()
                         logger.info(f"✅ Model config assigned to Head 00001 during genesis: {default_cfg.config_name}")
                 else:
@@ -543,7 +625,15 @@ class InitializationService:
             self.vector_store.initialize()
             self.knowledge_service.embed_constitution(self.db, constitution)
 
-            for member in council:
+            # Re-query members so they are bound to the current session before
+            # accessing the lazy-loaded `ethos` relationship.
+            member_ids = [m.agentium_id for m in council]
+            attached_council = (
+                self.db.query(CouncilMember)
+                .filter(CouncilMember.agentium_id.in_(member_ids))
+                .all()
+            )
+            for member in attached_council:
                 if member.ethos:
                     self.knowledge_service.embed_ethos(member.ethos)
 
@@ -557,7 +647,18 @@ class InitializationService:
         """Grant Council admin rights and spawn capabilities."""
         head = self.db.query(HeadOfCouncil).filter_by(agentium_id="00001").first()
 
-        for member in council:
+        # Re-query members from the current session so that accessing the
+        # lazy-loaded `ethos` relationship does not raise DetachedInstanceError.
+        # The objects in the incoming `council` list may have been created or
+        # flushed in an earlier unit-of-work and can be detached by this point.
+        member_ids = [m.agentium_id for m in council]
+        attached_council = (
+            self.db.query(CouncilMember)
+            .filter(CouncilMember.agentium_id.in_(member_ids))
+            .all()
+        )
+
+        for member in attached_council:
             if member.ethos:
                 member.ethos.metadata = json.dumps({
                     "knowledge_admin": True,

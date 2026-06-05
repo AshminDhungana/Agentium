@@ -264,33 +264,52 @@ class Ethos(BaseEntity):
     
     # Update tracking (agents can update their own ethos)
     last_updated_by_agent = Column(Boolean, default=False)  # True if agent updated itself
-    
     def get_core_values(self) -> List[str]:
         import json
-        try:
-            return json.loads(self.core_values) if self.core_values else []
-        except json.JSONDecodeError:
+        val = self.core_values
+        if not val:
             return []
-    
+        if isinstance(val, list):
+            return val
+        try:
+            return json.loads(val)
+        except (json.JSONDecodeError, TypeError):
+            return []
+
     def get_behavioral_rules(self) -> List[str]:
         import json
-        try:
-            return json.loads(self.behavioral_rules) if self.behavioral_rules else []
-        except json.JSONDecodeError:
+        val = self.behavioral_rules
+        if not val:
             return []
-    
+        if isinstance(val, list):
+            return val
+        try:
+            return json.loads(val)
+        except (json.JSONDecodeError, TypeError):
+            return []
+
     def get_restrictions(self) -> List[str]:
         import json
-        try:
-            return json.loads(self.restrictions) if self.restrictions else []
-        except json.JSONDecodeError:
+        val = self.restrictions
+        if not val:
             return []
-    
+        if isinstance(val, list):
+            return val
+        try:
+            return json.loads(val)
+        except (json.JSONDecodeError, TypeError):
+            return []
+
     def get_capabilities(self) -> List[str]:
         import json
+        val = self.capabilities
+        if not val:
+            return []
+        if isinstance(val, list):
+            return val
         try:
-            return json.loads(self.capabilities) if self.capabilities else []
-        except json.JSONDecodeError:
+            return json.loads(val)
+        except (json.JSONDecodeError, TypeError):
             return []
     
     def verify(self, verifier_agentium_id: str):
@@ -307,11 +326,15 @@ class Ethos(BaseEntity):
     # --- Working Memory Accessors (Workflow §1-§5) ---
     
     def get_active_plan(self) -> Optional[Dict[str, Any]]:
-        """Get the current structured execution plan."""
         import json
+        val = self.active_plan
+        if not val:
+            return None
+        if isinstance(val, dict):
+            return val
         try:
-            return json.loads(self.active_plan) if self.active_plan else None
-        except json.JSONDecodeError:
+            return json.loads(val)
+        except (json.JSONDecodeError, TypeError):
             return None
     
     def set_active_plan(self, plan: Dict[str, Any]):
@@ -321,11 +344,15 @@ class Ethos(BaseEntity):
         self.increment_version()
     
     def get_constitutional_references(self) -> List[Dict[str, Any]]:
-        """Get relevant constitutional section references."""
         import json
+        val = self.constitutional_references
+        if not val:
+            return []
+        if isinstance(val, list):
+            return val
         try:
-            return json.loads(self.constitutional_references) if self.constitutional_references else []
-        except json.JSONDecodeError:
+            return json.loads(val)
+        except (json.JSONDecodeError, TypeError):
             return []
     
     def set_constitutional_references(self, references: List[Dict[str, Any]]):
@@ -334,11 +361,15 @@ class Ethos(BaseEntity):
         self.constitutional_references = json.dumps(references)
     
     def get_task_progress(self) -> Dict[str, Any]:
-        """Get task progress markers."""
         import json
+        val = self.task_progress_markers
+        if not val:
+            return {}
+        if isinstance(val, dict):
+            return val
         try:
-            return json.loads(self.task_progress_markers) if self.task_progress_markers else {}
-        except json.JSONDecodeError:
+            return json.loads(val)
+        except (json.JSONDecodeError, TypeError):
             return {}
     
     def set_task_progress(self, progress: Dict[str, Any]):
@@ -347,19 +378,27 @@ class Ethos(BaseEntity):
         self.task_progress_markers = json.dumps(progress)
     
     def get_reasoning_artifacts(self) -> List[str]:
-        """Get temporary reasoning artifacts."""
         import json
+        val = self.reasoning_artifacts
+        if not val:
+            return []
+        if isinstance(val, list):
+            return val
         try:
-            return json.loads(self.reasoning_artifacts) if self.reasoning_artifacts else []
-        except json.JSONDecodeError:
+            return json.loads(val)
+        except (json.JSONDecodeError, TypeError):
             return []
     
     def get_lessons_learned(self) -> List[Dict[str, Any]]:
-        """Get accumulated lessons learned."""
         import json
+        val = self.lessons_learned
+        if not val:
+            return []
+        if isinstance(val, list):
+            return val
         try:
-            return json.loads(self.lessons_learned) if self.lessons_learned else []
-        except json.JSONDecodeError:
+            return json.loads(val)
+        except (json.JSONDecodeError, TypeError):
             return []
     
     def add_lesson_learned(self, lesson: Dict[str, Any]):
