@@ -122,6 +122,18 @@ class ConnectionManager:
             with get_fresh_db() as db:
                 head = db.query(HeadOfCouncil).filter_by(agentium_id="00001").first()
                 if not head:
+                    # Inform the frontend before closing so it can show a helpful message
+                    # instead of a silent disconnect.  Genesis runs automatically once an
+                    # API key is added via POST /api/v1/models/configs.
+                    await websocket.send_json({
+                        "type":      "system_not_ready",
+                        "content":   (
+                            "System is not yet initialized. "
+                            "Please add an API key on the Models page — "
+                            "genesis will start automatically."
+                        ),
+                        "timestamp": datetime.utcnow().isoformat(),
+                    })
                     await websocket.close(code=1011, reason="System not initialised — no Head of Council")
                     return None
                 head_agent_id    = head.id

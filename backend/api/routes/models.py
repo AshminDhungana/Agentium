@@ -345,6 +345,23 @@ async def create_config(
     except Exception as e:
         logger.error(f"Config versioning failed: {e}")
 
+    # ── TRIGGER GENESIS IF SYSTEM NOT YET INITIALIZED ──────────────────────
+    # This runs after the first API key is saved so the council can actually
+    # call the model.  We fire-and-forget via asyncio.create_task so the HTTP
+    # response returns immediately while genesis runs in the background.
+    try:
+        from backend.services.initialization_service import InitializationService
+        import asyncio
+        init_service = InitializationService(db)
+        if not init_service.is_system_initialized():
+            asyncio.create_task(init_service.run_genesis_protocol())
+            logger.info("🚀 Genesis protocol triggered after first API key configuration")
+        else:
+            logger.info("ℹ️  System already initialized — skipping genesis trigger")
+    except Exception as e:
+        logger.warning(f"Genesis auto-trigger failed (non-fatal): {e}")
+    # ── END GENESIS TRIGGER ────────────────────────────────────────────────
+
     return serialized
 
 
@@ -391,6 +408,20 @@ async def create_universal_config(
         ConfigVersioningService.commit_snapshot("model_config", serialized["id"], user_id, serialized)
     except Exception as e:
         logger.error(f"Config versioning failed: {e}")
+
+    # ── TRIGGER GENESIS IF SYSTEM NOT YET INITIALIZED ──────────────────────
+    try:
+        from backend.services.initialization_service import InitializationService
+        import asyncio
+        init_service = InitializationService(db)
+        if not init_service.is_system_initialized():
+            asyncio.create_task(init_service.run_genesis_protocol())
+            logger.info("🚀 Genesis protocol triggered after first universal API key configuration")
+        else:
+            logger.info("ℹ️  System already initialized — skipping genesis trigger")
+    except Exception as e:
+        logger.warning(f"Genesis auto-trigger failed (non-fatal): {e}")
+    # ── END GENESIS TRIGGER ────────────────────────────────────────────────
 
     return serialized
 

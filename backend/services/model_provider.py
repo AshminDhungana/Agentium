@@ -281,7 +281,7 @@ class OpenAICompatibleProvider(BaseModelProvider):
                 completion_tokens=completion_tokens,
                 latency_ms=latency,
                 success=True,
-                agentium_id=kwargs.get('agentium_id', 'system'),
+                agentium_id=kwargs.get('agentium_id') or 'system',
             )
 
             return {
@@ -306,7 +306,7 @@ class OpenAICompatibleProvider(BaseModelProvider):
                 latency_ms=int((time.time() - start_time) * 1000),
                 success=False,
                 error=str(e),
-                agentium_id=kwargs.get('agentium_id', 'system'),
+                agentium_id=kwargs.get('agentium_id') or 'system',
             )
             raise
 
@@ -465,7 +465,7 @@ class OpenAICompatibleProvider(BaseModelProvider):
                 latency_ms=latency,
                 success=False,
                 error=str(exc),
-                agentium_id=kwargs.get("agentium_id", "system"),
+                agentium_id=kwargs.get("agentium_id") or "system",
             )
             raise
 
@@ -477,7 +477,7 @@ class OpenAICompatibleProvider(BaseModelProvider):
             completion_tokens=total_completion_tokens,
             latency_ms=latency,
             success=True,
-            agentium_id=kwargs.get("agentium_id", "system"),
+            agentium_id=kwargs.get("agentium_id") or "system",
         )
 
         return {
@@ -524,7 +524,7 @@ class AnthropicProvider(BaseModelProvider):
             completion_tokens=completion_tokens,
             latency_ms=latency,
             success=True,
-            agentium_id=kwargs.get('agentium_id', 'system'),
+            agentium_id=kwargs.get('agentium_id') or 'system',
         )
 
         return {
@@ -661,7 +661,7 @@ class AnthropicProvider(BaseModelProvider):
                 latency_ms=latency,
                 success=False,
                 error=str(exc),
-                agentium_id=kwargs.get("agentium_id", "system"),
+                agentium_id=kwargs.get("agentium_id") or "system",
             )
             raise
 
@@ -673,7 +673,7 @@ class AnthropicProvider(BaseModelProvider):
             completion_tokens=total_completion_tokens,
             latency_ms=latency,
             success=True,
-            agentium_id=kwargs.get("agentium_id", "system"),
+            agentium_id=kwargs.get("agentium_id") or "system",
         )
 
         return {
