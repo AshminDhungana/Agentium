@@ -158,6 +158,9 @@ class AmendmentService:
             required_votes=max(1, int(len(eligible_voters) * QUORUM_PERCENTAGE / 100)),
             supermajority_threshold=SUPERMAJORITY_THRESHOLD,
             status=AmendmentStatus.PROPOSED,
+            proposed_by_agentium_id=proposer_id,
+            proposed_changes=diff_markdown,
+            rationale=rationale,
         )
 
         # Store proposal metadata in discussion thread
@@ -191,7 +194,7 @@ class AmendmentService:
             amendment_id=amendment_voting.id,
         )
 
-        self.db.commit()
+        self.db.flush()
 
         return {
             "amendment_id": amendment_voting.id,
@@ -274,7 +277,7 @@ class AmendmentService:
                 amendment_id=amendment_id,
             )
 
-        self.db.commit()
+        self.db.flush()
 
         return {
             "amendment_id": amendment_id,
@@ -315,7 +318,7 @@ class AmendmentService:
             amendment_id=amendment_id,
         )
 
-        self.db.commit()
+        self.db.flush()
 
         return {
             "amendment_id": amendment_id,
@@ -360,7 +363,7 @@ class AmendmentService:
             amendment_id=amendment_id,
         )
 
-        self.db.commit()
+        self.db.flush()
 
         return {
             "amendment_id": amendment_id,
@@ -422,7 +425,7 @@ class AmendmentService:
             amendment_id=amendment_id,
         )
 
-        self.db.commit()
+        self.db.flush()
         return result
 
     # ------------------------------------------------------------------

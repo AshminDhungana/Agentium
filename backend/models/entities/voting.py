@@ -9,6 +9,7 @@ from sqlalchemy import Column, String, Text, DateTime, ForeignKey, Integer, Enum
 from sqlalchemy.orm import relationship, validates
 from backend.models.entities.base import BaseEntity
 import enum
+import uuid
 
 class VoteType(str, enum.Enum):
     """Types of votes a council member can cast."""
@@ -73,7 +74,8 @@ class AmendmentVoting(BaseEntity):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         if not kwargs.get('agentium_id'):
-            self.agentium_id = f"AV{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
+            # "AV" + 8 hex chars = 10 chars, fits VARCHAR(10)
+            self.agentium_id = f"AV{uuid.uuid4().hex[:8]}"
             
     def start_voting(self):
         """Open voting session."""
@@ -229,7 +231,8 @@ class TaskDeliberation(BaseEntity):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         if not kwargs.get('agentium_id'):
-            self.agentium_id = f"D{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
+            # "DL" + 8 hex chars = 10 chars, fits VARCHAR(10)
+            self.agentium_id = f"DL{uuid.uuid4().hex[:8]}"
     
     def start(self):
         """Open voting."""

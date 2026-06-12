@@ -346,18 +346,9 @@ async def create_config(
         logger.error(f"Config versioning failed: {e}")
 
     # ── TRIGGER GENESIS IF SYSTEM NOT YET INITIALIZED ──────────────────────
-    # This runs after the first API key is saved so the council can actually
-    # call the model.  We fire-and-forget via asyncio.create_task so the HTTP
-    # response returns immediately while genesis runs in the background.
     try:
-        from backend.services.initialization_service import InitializationService
-        import asyncio
-        init_service = InitializationService(db)
-        if not init_service.is_system_initialized():
-            asyncio.create_task(init_service.run_genesis_protocol())
-            logger.info("🚀 Genesis protocol triggered after first API key configuration")
-        else:
-            logger.info("ℹ️  System already initialized — skipping genesis trigger")
+        from backend.services.initialization_service import trigger_genesis_if_needed
+        trigger_genesis_if_needed(db)
     except Exception as e:
         logger.warning(f"Genesis auto-trigger failed (non-fatal): {e}")
     # ── END GENESIS TRIGGER ────────────────────────────────────────────────
@@ -411,14 +402,8 @@ async def create_universal_config(
 
     # ── TRIGGER GENESIS IF SYSTEM NOT YET INITIALIZED ──────────────────────
     try:
-        from backend.services.initialization_service import InitializationService
-        import asyncio
-        init_service = InitializationService(db)
-        if not init_service.is_system_initialized():
-            asyncio.create_task(init_service.run_genesis_protocol())
-            logger.info("🚀 Genesis protocol triggered after first universal API key configuration")
-        else:
-            logger.info("ℹ️  System already initialized — skipping genesis trigger")
+        from backend.services.initialization_service import trigger_genesis_if_needed
+        trigger_genesis_if_needed(db)
     except Exception as e:
         logger.warning(f"Genesis auto-trigger failed (non-fatal): {e}")
     # ── END GENESIS TRIGGER ────────────────────────────────────────────────

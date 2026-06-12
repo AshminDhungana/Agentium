@@ -1055,6 +1055,46 @@ class InitializationService:
         return constitution
 
 
+def trigger_genesis_if_needed(db) -> bool:
+    """
+    Check if genesis is needed (using the caller's session) and, if so,
+    schedule it in a background task with its OWN fresh session.
+
+    Returns True if genesis was scheduled, False if already initialized.
+
+    This helper centralises the fire-and-forget genesis trigger so that
+    models.py (create_config, create_universal_config) and api_keys.py
+    (create_api_key) all use the same code path and can't drift.
+
+    Critical: the request-scoped ``db`` is ONLY used for the cheap
+    is_system_initialized() check.  The actual genesis run always opens
+    a brand-new session via get_db_context() so it outlives the HTTP
+    request without hitting a closed/invalid session.
+    """
+    import asyncio
+
+    if InitializationService(db).is_system_initialized():
+        logger.info("ℹ️  System already initialized — skipping genesis trigger")
+        return False
+
+    async def _run_genesis() -> None:
+        from backend.models.database import get_db_context
+        try:
+            with get_db_context() as genesis_db:
+                result = await InitializationService(genesis_db).run_genesis_protocol()
+                logger.info(
+                    "Genesis result: %s — %s",
+                    result.get("status"),
+                    result.get("message"),
+                )
+        except Exception as exc:
+            logger.error("Auto-genesis failed: %s", exc, exc_info=True)
+
+    asyncio.create_task(_run_genesis())
+    logger.info("🚀 Genesis protocol triggered after API key configuration")
+    return True
+
+
 # Convenience function
 async def initialize_agentium(
     db: Optional[Session] = None,

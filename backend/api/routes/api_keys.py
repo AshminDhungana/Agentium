@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from backend.models.database import get_db
-from backend.models.entities.user_config import UserModelConfig, ProviderType
+from backend.models.entities.user_config import UserModelConfig, ProviderType, ConnectionStatus
 from backend.services.api_key_manager import api_key_manager, APIKeyHealthStatus
 from backend.core.auth import get_current_user
 
@@ -132,7 +132,6 @@ class CreateKeyResponse(BaseModel):
 @router.post("/", response_model=CreateKeyResponse, status_code=201)
 async def create_api_key(
     request: CreateKeyRequest,
-    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
@@ -154,7 +153,7 @@ async def create_api_key(
 
     # ── Resolve provider enum ────────────────────────────────────────────────
     try:
-        provider_enum = ProviderType(request.provider.lower())
+        provider_enum = ProviderType(request.provider.upper().strip())
     except ValueError:
         raise HTTPException(
             status_code=400,
@@ -181,49 +180,22 @@ async def create_api_key(
     key = UserModelConfig(
         provider=provider_enum,
         config_name=request.config_name,
-        model_name=request.model_name,
-        api_key=encrypted,
+        default_model=request.model_name,
+        api_key_encrypted=encrypted,
         api_key_masked=masked,
         monthly_budget_usd=request.monthly_budget_usd,
         priority=request.priority,
         is_default=request.is_default,
         is_active=True,
-        status="active",
+        status=ConnectionStatus.ACTIVE,
     )
     db.add(key)
     db.commit()
     db.refresh(key)
 
     # ── Auto-trigger Genesis if not yet initialized ──────────────────────────
-    # Check whether Head 00001 already exists.  If not, fire genesis in the
-    # background so the user doesn't have to navigate to /models and manually
-    # trigger it — adding a key IS the trigger.
-    from backend.models.entities.agents import HeadOfCouncil
-    from backend.services.initialization_service import InitializationService
-
-    genesis_triggered = False
-    head_exists = db.query(HeadOfCouncil).filter_by(
-        agentium_id="00001", is_active=True
-    ).first()
-
-    if not head_exists:
-        genesis_triggered = True
-
-        async def _run_genesis() -> None:
-            # Always open a fresh session — never reuse the request session
-            # inside a background task (it gets closed when the request ends).
-            from backend.models.database import get_db as _get_db
-            with next(_get_db()) as new_db:
-                svc = InitializationService(new_db)
-                try:
-                    await svc.run_genesis_protocol()
-                except Exception as exc:
-                    import logging
-                    logging.getLogger(__name__).error(
-                        "Auto-genesis after key creation failed: %s", exc, exc_info=True
-                    )
-
-        background_tasks.add_task(_run_genesis)
+    from backend.services.initialization_service import trigger_genesis_if_needed
+    genesis_triggered = trigger_genesis_if_needed(db)
 
     return CreateKeyResponse(
         success=True,
