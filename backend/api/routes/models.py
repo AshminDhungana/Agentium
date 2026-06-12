@@ -348,7 +348,8 @@ async def create_config(
     # ── TRIGGER GENESIS IF SYSTEM NOT YET INITIALIZED ──────────────────────
     try:
         from backend.services.initialization_service import trigger_genesis_if_needed
-        trigger_genesis_if_needed(db)
+        genesis_triggered = trigger_genesis_if_needed(db)
+        logger.info(f"🚀 Genesis triggered from models.py: {genesis_triggered}")
     except Exception as e:
         logger.warning(f"Genesis auto-trigger failed (non-fatal): {e}")
     # ── END GENESIS TRIGGER ────────────────────────────────────────────────
@@ -403,7 +404,8 @@ async def create_universal_config(
     # ── TRIGGER GENESIS IF SYSTEM NOT YET INITIALIZED ──────────────────────
     try:
         from backend.services.initialization_service import trigger_genesis_if_needed
-        trigger_genesis_if_needed(db)
+        genesis_triggered = trigger_genesis_if_needed(db)
+        logger.info(f"🚀 Genesis triggered from models.py: {genesis_triggered}")
     except Exception as e:
         logger.warning(f"Genesis auto-trigger failed (non-fatal): {e}")
     # ── END GENESIS TRIGGER ────────────────────────────────────────────────

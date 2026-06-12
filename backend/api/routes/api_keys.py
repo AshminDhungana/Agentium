@@ -195,7 +195,9 @@ async def create_api_key(
 
     # ── Auto-trigger Genesis if not yet initialized ──────────────────────────
     from backend.services.initialization_service import trigger_genesis_if_needed
+    logger.info(f"🔑 API key created successfully: {key.config_name} ({key.provider.value})")
     genesis_triggered = trigger_genesis_if_needed(db)
+    logger.info(f"🚀 Genesis triggered: {genesis_triggered}")
 
     return CreateKeyResponse(
         success=True,

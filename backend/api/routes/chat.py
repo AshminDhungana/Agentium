@@ -306,10 +306,11 @@ async def _stream_response(
         if not config_id:
             try:
                 from backend.models.entities import UserModelConfig
+                from backend.models.entities.user_config import ConnectionStatus
                 _default = (
                     db.query(UserModelConfig)
                     .filter(UserModelConfig.is_default == True)
-                    .filter(UserModelConfig.status == "active")
+                    .filter(UserModelConfig.status == ConnectionStatus.ACTIVE)
                     .first()
                 )
                 if _default:

@@ -74,11 +74,36 @@ class InitializationService:
     def _has_any_active_api_key(self) -> bool:
         """Return True if at least one healthy provider key exists in the DB."""
         from backend.services.api_key_manager import api_key_manager
+        from backend.models.entities.user_config import UserModelConfig, ConnectionStatus
+
+        # First, do a direct query to check if any active API keys exist
+        try:
+            active_keys = self.db.query(UserModelConfig).filter(
+                UserModelConfig.is_active == True,
+                UserModelConfig.status == ConnectionStatus.ACTIVE
+            ).all()
+
+            if active_keys:
+                logger.info(f"✅ Found {len(active_keys)} active API key(s) - genesis can proceed")
+                for key in active_keys:
+                    logger.info(f"   - Provider: {key.provider}, Config: {key.config_name}, Status: {key.status}, ID: {key.id}")
+                return True
+            else:
+                # Log all API keys for debugging
+                all_keys = self.db.query(UserModelConfig).all()
+                logger.warning(f"⚠️ No active API keys found. Total keys in DB: {len(all_keys)}")
+                for key in all_keys:
+                    logger.warning(f"   - Key: {key.id}, Provider: {key.provider}, is_active: {key.is_active}, status: {key.status}")
+        except Exception as e:
+            logger.warning(f"⚠️ Direct API key query failed: {e}", exc_info=True)
+
+        # Fallback to using api_key_manager for provider availability check
         try:
             availability = api_key_manager.get_provider_availability(self.db)
+            logger.info(f"Provider availability: {availability}")
             return any(availability.values())
         except Exception as e:
-            logger.warning(f"Could not check API key availability: {e}")
+            logger.warning(f"Could not check API key availability via manager: {e}")
             return False  # Fail safe — block genesis if we can't verify
 
     def is_system_initialized(self) -> bool:
@@ -295,8 +320,9 @@ class InitializationService:
         # ── API KEY GATE ──────────────────────────────────────────────────────
         # Genesis requires a working AI provider. Without one the agents are
         # created but can never make a single LLM call — a broken half-state.
+        logger.info("🔑 Checking for active API keys before genesis...")
         if not self._has_any_active_api_key():
-            logger.warning("⛔ Genesis blocked: no active API key configured.")
+            logger.error("⛔ Genesis BLOCKED: no active API key configured.")
             return {
                 "status": "no_api_key",
                 "message": (
@@ -305,6 +331,7 @@ class InitializationService:
                 ),
                 "action_required": "configure_api_key",
             }
+        logger.info("✅ API key check passed - proceeding with genesis")
         # ─────────────────────────────────────────────────────────────────────
 
         if force:
@@ -1080,15 +1107,16 @@ def trigger_genesis_if_needed(db) -> bool:
     async def _run_genesis() -> None:
         from backend.models.database import get_db_context
         try:
+            logger.info("🚀 Starting genesis protocol in background task...")
             with get_db_context() as genesis_db:
                 result = await InitializationService(genesis_db).run_genesis_protocol()
                 logger.info(
-                    "Genesis result: %s — %s",
+                    "✅ Genesis completed: status=%s, message=%s",
                     result.get("status"),
                     result.get("message"),
                 )
         except Exception as exc:
-            logger.error("Auto-genesis failed: %s", exc, exc_info=True)
+            logger.error("❌ Auto-genesis failed: %s", exc, exc_info=True)
 
     asyncio.create_task(_run_genesis())
     logger.info("🚀 Genesis protocol triggered after API key configuration")
