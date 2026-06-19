@@ -171,7 +171,31 @@ class UserModelConfig(BaseEntity):
         self.cooldown_until = None
 
     def record_spend(self, cost_usd: float):
-        """Add to current spend and check for monthly reset."""
+        """
+        Add to current spend and check for monthly reset.
+
+        ⚠️ CONCURRENCY WARNING: this mutates Python attributes on an
+        in-memory ORM instance via simple read-modify-write
+        (self.current_spend_usd += cost_usd). It is only safe to call this
+        when you hold exclusive access to this row for the duration of the
+        surrounding transaction (e.g. a single request handler that loaded,
+        updates, and commits this object with no other writer in between).
+
+        Under concurrent requests — e.g. multiple agents hitting the same
+        key/config at once — two sessions can each load this row with
+        current_spend_usd=10.0, each add their own delta in Python, and
+        each commit; whichever commits last overwrites the other's
+        increment, silently losing tracked spend and letting real spend
+        exceed monthly_budget_usd without the ledger ever reflecting it.
+
+        For any code path where multiple processes/requests might record
+        spend against the same config concurrently, use
+        APIKeyManager.record_spend() instead (backend.services.api_key_manager),
+        which performs the increment as a single atomic SQL UPDATE and
+        cannot lose a concurrent write. This method remains here for
+        simple, single-writer contexts (tests, scripts, migrations) where
+        the overhead of a manager call isn't warranted.
+        """
         now = datetime.utcnow()
         if self.last_spend_reset.month != now.month or self.last_spend_reset.year != now.year:
             self.current_spend_usd = 0.0
@@ -185,8 +209,9 @@ class UserModelConfig(BaseEntity):
 
     def get_effective_base_url(self) -> Optional[str]:
         """Get the effective API base URL."""
-        if self.provider == ProviderType.LOCAL and self.local_server_url:
-            return self.local_server_url
+        # Local provider: always resolve to a local URL, never fall through to OpenAI
+        if self.provider == ProviderType.LOCAL:
+            return self.local_server_url or self.api_base_url or "http://localhost:11434/v1"
         if self.provider == ProviderType.OPENAI and not self.api_base_url:
             return "https://api.openai.com/v1"
         if self.provider == ProviderType.ANTHROPIC and not self.api_base_url:
@@ -199,6 +224,8 @@ class UserModelConfig(BaseEntity):
             return "https://api.together.xyz/v1"
         if self.provider == ProviderType.FIREWORKS and not self.api_base_url:
             return "https://api.fireworks.ai/inference/v1"
+        if self.provider == ProviderType.COHERE and not self.api_base_url:
+            return "https://api.cohere.ai/v1"
         if self.provider == ProviderType.MOONSHOT and not self.api_base_url:
             return "https://api.moonshot.cn/v1"
         if self.provider == ProviderType.DEEPSEEK and not self.api_base_url:

@@ -119,6 +119,20 @@ async def seeded_db(db_session: Session) -> Session:
     # are visible within this session before the test begins querying.
     db_session.flush()
 
+    # Ensure there is an Agent with agentium_id="admin" to prevent ForeignKey violations
+    # when voting as "admin" via HTTP endpoints.
+    from backend.models.entities.agents import Agent, AgentType, AgentStatus
+    admin_agent = db_session.query(Agent).filter_by(agentium_id="admin").first()
+    if not admin_agent:
+        admin_agent = Agent(
+            agentium_id="admin",
+            name="Admin User Agent",
+            agent_type=AgentType.COUNCIL_MEMBER,
+            status=AgentStatus.ACTIVE,
+        )
+        db_session.add(admin_agent)
+        db_session.flush()
+
     return db_session
 
 

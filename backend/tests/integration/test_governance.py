@@ -71,11 +71,11 @@ pytestmark = pytest.mark.integration
 
 def _make_amendment_id() -> str:
     """Generate a unique agentium_id for AmendmentVoting rows created in tests."""
-    return f"AV{datetime.utcnow().strftime('%H%M%S')}{uuid.uuid4().hex[:4]}"
+    return f"AV{uuid.uuid4().hex[:8]}"
 
 
 def _make_deliberation_id() -> str:
-    return f"DL{datetime.utcnow().strftime('%H%M%S')}{uuid.uuid4().hex[:4]}"
+    return f"DL{uuid.uuid4().hex[:8]}"
 
 
 # ===========================================================================
@@ -285,6 +285,11 @@ class TestAmendmentLifecycle:
     @pytest.mark.asyncio
     async def test_propose_rejected_for_task_agent(self, seeded_db: Session):
         """Task-tier ID (30001) cannot propose — PermissionError raised, no row written."""
+        # Clear existing seeded amendment voting rows and their referencing votes
+        seeded_db.query(IndividualVote).delete()
+        seeded_db.query(AmendmentVoting).delete()
+        seeded_db.flush()
+
         svc = AmendmentService(seeded_db)
         await svc.initialize()
 
@@ -812,6 +817,11 @@ class TestVotingAPI:
 
     def test_list_amendments_empty(self, client, auth_headers, seeded_db: Session):
         """GET /api/v1/voting/amendments returns empty list when none exist."""
+        # Clear existing seeded amendment voting rows and their referencing votes
+        seeded_db.query(IndividualVote).delete()
+        seeded_db.query(AmendmentVoting).delete()
+        seeded_db.flush()
+
         resp = client.get("/api/v1/voting/amendments", headers=auth_headers)
         assert resp.status_code == 200
         assert resp.json() == []
@@ -820,6 +830,11 @@ class TestVotingAPI:
         self, client, auth_headers, seeded_db: Session
     ):
         """After inserting a row directly, the list endpoint returns it."""
+        # Clear existing seeded amendment voting rows and their referencing votes
+        seeded_db.query(IndividualVote).delete()
+        seeded_db.query(AmendmentVoting).delete()
+        seeded_db.flush()
+
         constitution = seeded_db.query(Constitution).filter_by(is_active=True).first()
         av = AmendmentVoting(
             agentium_id=_make_amendment_id(),
@@ -827,6 +842,9 @@ class TestVotingAPI:
             eligible_voters=["10001", "10002", "00001"],
             required_votes=2,
             status=AmendmentStatus.PROPOSED,
+            proposed_by_agentium_id="10001",
+            proposed_changes="+ Article X",
+            rationale="testing",
             discussion_thread=[{
                 "timestamp": datetime.utcnow().isoformat(),
                 "agent": "10001",
@@ -878,6 +896,9 @@ class TestVotingAPI:
             eligible_voters=["admin"],  # JWT sub value used by route
             required_votes=1,
             status=AmendmentStatus.VOTING,
+            proposed_by_agentium_id="10001",
+            proposed_changes="+ Article X",
+            rationale="testing",
             started_at=datetime.utcnow(),
         )
         seeded_db.add(av)
@@ -904,6 +925,9 @@ class TestVotingAPI:
             eligible_voters=["admin"],
             required_votes=1,
             status=AmendmentStatus.PROPOSED,
+            proposed_by_agentium_id="10001",
+            proposed_changes="+ Article X",
+            rationale="testing",
         )
         seeded_db.add(av)
         seeded_db.flush()
@@ -927,6 +951,9 @@ class TestVotingAPI:
             eligible_voters=["10001"],   # admin is NOT in here
             required_votes=1,
             status=AmendmentStatus.VOTING,
+            proposed_by_agentium_id="10001",
+            proposed_changes="+ Article X",
+            rationale="testing",
             started_at=datetime.utcnow(),
         )
         seeded_db.add(av)
@@ -973,9 +1000,10 @@ class TestVotingAPI:
             agentium_id="TDELIBTEST",
             title="Deliberation test task",
             description="used by deliberation vote test",
-            task_type=TaskType.DECISION,
+            task_type=TaskType.EXECUTION,
             status=TaskStatus.PENDING,
-            priority=TaskPriority.MEDIUM,
+            priority=TaskPriority.NORMAL,
+            created_by="system",
             is_active=True,
         )
         seeded_db.add(task)
@@ -1012,9 +1040,10 @@ class TestVotingAPI:
             agentium_id="TCONCLUDED",
             title="Concluded deliberation task",
             description="used by concluded vote test",
-            task_type=TaskType.DECISION,
+            task_type=TaskType.EXECUTION,
             status=TaskStatus.PENDING,
-            priority=TaskPriority.MEDIUM,
+            priority=TaskPriority.NORMAL,
+            created_by="system",
             is_active=True,
         )
         seeded_db.add(task)
@@ -1051,9 +1080,10 @@ class TestVotingAPI:
             agentium_id="TLISTTEST1",
             title="List deliberation task",
             description="used by list test",
-            task_type=TaskType.DECISION,
+            task_type=TaskType.EXECUTION,
             status=TaskStatus.PENDING,
-            priority=TaskPriority.MEDIUM,
+            priority=TaskPriority.NORMAL,
+            created_by="system",
             is_active=True,
         )
         seeded_db.add(task)

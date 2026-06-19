@@ -746,6 +746,7 @@ class AmendmentService:
         amendment_id: str,
     ):
         """Log amendment-related actions to the audit trail."""
+        import uuid as _uuid
         try:
             audit = AuditLog(
                 level=AuditLevel.NOTICE,
@@ -756,7 +757,7 @@ class AmendmentService:
                 target_type="amendment",
                 target_id=amendment_id,
                 description=description,
-                agentium_id=f"AM{datetime.utcnow().strftime('%H%M%S')}",
+                agentium_id=f"AM{_uuid.uuid4().hex[:8]}",
             )
             self.db.add(audit)
         except Exception as exc:

@@ -35,7 +35,7 @@ class ChatService:
         config_id = config.id if config else None
         model_name = config.default_model if config else "default"
 
-        # ── FALLBACK: Head has no model_config_id — use the global default ──────
+        # ── FALLBACK: Head has no preferred_config_id — use the global default ──
         # This happens on fresh deploys before the agent is assigned a config.
         if not config_id:
             try:
@@ -49,16 +49,16 @@ class ChatService:
                     config_id = str(default_config.id)
                     model_name = default_config.default_model
                     logger.info(
-                        f"Head {head.agentium_id} has no model_config_id — "
+                        f"Head {head.agentium_id} has no preferred_config_id — "
                         f"falling back to default config '{default_config.config_name}' ({config_id})"
                     )
                     # Persist the link so we don't fall back on every request
                     try:
-                        head.model_config_id = config_id
+                        head.preferred_config_id = config_id
                         db.commit()
                         logger.info(f"✅ Persisted default model config to Head {head.agentium_id}")
                     except Exception as persist_err:
-                        logger.warning(f"Could not persist model_config_id to Head: {persist_err}")
+                        logger.warning(f"Could not persist preferred_config_id to Head: {persist_err}")
                         db.rollback()
             except Exception as fallback_err:
                 logger.warning(f"Default config fallback failed for Head {head.agentium_id}: {fallback_err}")

@@ -175,6 +175,22 @@ def _serialize_config(config: UserModelConfig) -> Dict[str, Any]:
     }
 
 
+def _update_head_preferred_config_if_default(db: Session, config: UserModelConfig):
+    """If the config is set as default, update Head of Council's preferred_config_id."""
+    if config.is_default:
+        try:
+            from backend.models.entities.agents import HeadOfCouncil
+            head = db.query(HeadOfCouncil).filter_by(agentium_id="00001").first()
+            if head:
+                head.preferred_config_id = str(config.id)
+                db.commit()
+                logger.info(
+                    f"✅ Assigned default model config '{config.config_name}' ({config.id}) to Head 00001"
+                )
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to update Head preferred model config: {e}")
+
+
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Routes
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -338,6 +354,8 @@ async def create_config(
     db.commit()
     db.refresh(db_config)
 
+    _update_head_preferred_config_if_default(db, db_config)
+
     serialized = _serialize_config(db_config)
     try:
         from backend.services.config_versioning import ConfigVersioningService
@@ -393,6 +411,8 @@ async def create_universal_config(
     db.add(db_config)
     db.commit()
     db.refresh(db_config)
+
+    _update_head_preferred_config_if_default(db, db_config)
 
     serialized = _serialize_config(db_config)
     try:
@@ -473,6 +493,8 @@ async def update_config(
     db.commit()
     db.refresh(config)
 
+    _update_head_preferred_config_if_default(db, config)
+
     serialized = _serialize_config(config)
     try:
         from backend.services.config_versioning import ConfigVersioningService
@@ -498,8 +520,35 @@ async def delete_config(
     if remaining <= 1:
         raise HTTPException(status_code=400, detail="Cannot delete the only configuration")
 
+    # If the config is referenced by Head of Council, we must clear/reassign it first to avoid FK constraint issues
+    try:
+        from backend.models.entities.agents import HeadOfCouncil
+        head = db.query(HeadOfCouncil).filter_by(agentium_id="00001").first()
+        if head and head.preferred_config_id == config_id:
+            head.preferred_config_id = None
+            db.commit()
+    except Exception as e:
+        logger.warning(f"Failed to clear Head preferred model config reference: {e}")
+
+    is_deleted_default = config.is_default
+
     db.delete(config)
     db.commit()
+
+    if is_deleted_default:
+        # Find another active config to mark as default
+        new_default = db.query(UserModelConfig).filter_by(
+            user_id=user_id,
+            status=ConnectionStatus.ACTIVE
+        ).first() or db.query(UserModelConfig).filter_by(
+            user_id=user_id
+        ).first()
+
+        if new_default:
+            new_default.is_default = True
+            db.commit()
+            _update_head_preferred_config_if_default(db, new_default)
+
     return {"message": "Configuration deleted"}
 
 
@@ -619,6 +668,8 @@ async def set_default(
     db.query(UserModelConfig).filter_by(user_id=user_id, is_default=True).update({"is_default": False})
     config.is_default = True
     db.commit()
+
+    _update_head_preferred_config_if_default(db, config)
 
     return {"message": "Configuration set as default", "config_id": config_id}
 

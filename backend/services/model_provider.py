@@ -12,7 +12,7 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 
 from backend.models.database import get_db_context
-from backend.models.entities.user_config import UserModelConfig, ProviderType, ModelUsageLog
+from backend.models.entities.user_config import UserModelConfig, ProviderType, ModelUsageLog, ConnectionStatus
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -899,6 +899,8 @@ class ModelService:
         if not provider:
             raise ValueError("No active model configuration found. Please configure in settings.")
 
+        from backend.services.api_key_manager import api_key_manager
+
         system_prompt = system_prompt_override or (
             agent.ethos.mission_statement if agent.ethos else "You are an AI assistant."
         )
@@ -911,7 +913,17 @@ class ModelService:
             except:
                 pass
 
-        return await provider.generate(system_prompt, user_message)
+        try:
+            result = await provider.generate(system_prompt, user_message, **kwargs)
+            api_key_manager.mark_key_success(provider.config.id)
+            cost = result.get("cost_usd", 0.0)
+            tokens = result.get("tokens_used", 0)
+            api_key_manager.record_spend(provider.config.id, cost, tokens)
+            return result
+        except Exception as e:
+            is_rate_limit = "rate limit" in str(e).lower() or "429" in str(e)
+            api_key_manager.mark_key_failed(provider.config.id, error=str(e), is_rate_limit=is_rate_limit)
+            raise
 
     @staticmethod
     async def generate_with_agent_tools(
@@ -1029,15 +1041,27 @@ class ModelService:
 
         messages = [{"role": "user", "content": user_message}]
 
-        return await provider.generate_with_tools(
-            system_prompt=system_prompt,
-            messages=messages,
-            tools=tools,
-            tool_executor=tool_executor,
-            max_iterations=max_tool_iterations,
-            agentium_id=agent_id,
-            **kwargs,
-        )
+        from backend.services.api_key_manager import api_key_manager
+
+        try:
+            result = await provider.generate_with_tools(
+                system_prompt=system_prompt,
+                messages=messages,
+                tools=tools,
+                tool_executor=tool_executor,
+                max_iterations=max_tool_iterations,
+                agentium_id=agent_id,
+                **kwargs,
+            )
+            api_key_manager.mark_key_success(provider.config.id, db=db)
+            cost = result.get("cost_usd", 0.0)
+            tokens = result.get("tokens_used", 0)
+            api_key_manager.record_spend(provider.config.id, cost, tokens, db=db)
+            return result
+        except Exception as e:
+            is_rate_limit = "rate limit" in str(e).lower() or "429" in str(e)
+            api_key_manager.mark_key_failed(provider.config.id, error=str(e), is_rate_limit=is_rate_limit, db=db)
+            raise
 
     @staticmethod
     async def test_connection(config: UserModelConfig) -> Dict[str, Any]:

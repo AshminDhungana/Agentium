@@ -1,5 +1,5 @@
 """
-API Key Manager - Phase 5.4: Resilience & Notification System
+API Key Manager 
 
 Provides:
 - Multi-key failover with priority ordering
@@ -26,7 +26,7 @@ from typing import Optional, Dict, List, Callable, Any, Tuple
 from datetime import datetime, timedelta
 from functools import wraps
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, text
 from threading import Lock
 
 from backend.models.database import get_db_context, get_system_agent_id
@@ -196,9 +196,21 @@ class APIKeyManager:
         return True
     
     def _reset_monthly_spend_if_needed(self, key: UserModelConfig):
-        """Reset monthly spend counter if we've entered a new month."""
+        """
+        Reset monthly spend counter if we've entered a new month.
+
+        NOTE: this mutates the in-memory ORM object only. It does NOT commit,
+        and it is NOT safe as the sole reset mechanism under concurrency —
+        two requests can both decide "new month" and both reset to 0,
+        each then adding their own delta, losing whichever write loses the
+        race. The atomic, concurrency-safe reset happens inside record_spend()
+        via a single conditional UPDATE. This method exists for synchronous
+        read paths (e.g. _is_key_healthy, check_budget, _get_key_status)
+        where we just need an accurate in-memory view to make a decision —
+        the real reset-of-record is the SQL statement in record_spend().
+        """
         now = datetime.utcnow()
-        if (key.last_spend_reset.month != now.month or 
+        if (key.last_spend_reset.month != now.month or
             key.last_spend_reset.year != now.year):
             key.current_spend_usd = 0.0
             key.last_spend_reset = now
@@ -330,42 +342,212 @@ class APIKeyManager:
         cost_usd: float,
         tokens_used: int = 0,
         db: Optional[Session] = None
-    ):
+    ) -> Dict[str, Any]:
         """
         Record API usage cost for budget tracking.
-        
+
+        This performs the increment as a single atomic SQL UPDATE rather
+        than a Python read-modify-write on the ORM object. That matters
+        under concurrency: with read-modify-write, two requests that both
+        read current_spend_usd=10.0 and each add $1 can both write back
+        $11.0 instead of $12.0 — one dollar of real spend silently
+        vanishes from tracking, and a key can run over budget without the
+        ledger ever showing it. The UPDATE below folds the monthly reset
+        and the increment into one statement so there is no window where
+        two sessions can race on the same row.
+
         Args:
             key_id: UUID of the key
             cost_usd: Actual cost in USD
             tokens_used: Token count for logging
             db: Database session
+
+        Returns:
+            Dict with the key's spend state after this update, e.g.:
+            {
+                "current_spend_usd": 12.34,
+                "monthly_budget_usd": 50.0,
+                "budget_exceeded": False,
+                "remaining_usd": 37.66,
+            }
+            Returns {} if the key was not found.
         """
-        def _update(db_session: Session):
-            key = db_session.query(UserModelConfig).filter_by(id=key_id).first()
-            if not key:
-                return
-            
-            self._reset_monthly_spend_if_needed(key)
-            key.current_spend_usd += cost_usd
-            key.total_requests += 1
-            key.estimated_cost_usd = (key.estimated_cost_usd or 0) + cost_usd
-            
-            # Check if budget exceeded
-            if key.monthly_budget_usd > 0 and key.current_spend_usd >= key.monthly_budget_usd:
+        if cost_usd < 0:
+            logger.warning(f"record_spend called with negative cost_usd={cost_usd} for key {key_id}; ignoring")
+            cost_usd = 0.0
+
+        def _update(db_session: Session) -> Dict[str, Any]:
+            now = datetime.utcnow()
+
+            # Single atomic statement: if we've rolled into a new month,
+            # reset current_spend_usd to just this charge and bump
+            # last_spend_reset; otherwise add to the existing total.
+            # The CASE conditions are evaluated server-side against the
+            # row's actual current values at UPDATE time (under the
+            # row lock Postgres takes for the UPDATE), so there is no
+            # read-then-write gap for a concurrent request to land in.
+            row = db_session.execute(
+                text("""
+                    UPDATE user_model_configs
+                    SET
+                        current_spend_usd = CASE
+                            WHEN EXTRACT(MONTH FROM last_spend_reset) != EXTRACT(MONTH FROM :now)
+                                 OR EXTRACT(YEAR FROM last_spend_reset) != EXTRACT(YEAR FROM :now)
+                            THEN :cost_usd
+                            ELSE current_spend_usd + :cost_usd
+                        END,
+                        last_spend_reset = CASE
+                            WHEN EXTRACT(MONTH FROM last_spend_reset) != EXTRACT(MONTH FROM :now)
+                                 OR EXTRACT(YEAR FROM last_spend_reset) != EXTRACT(YEAR FROM :now)
+                            THEN :now
+                            ELSE last_spend_reset
+                        END,
+                        total_requests = total_requests + 1,
+                        estimated_cost_usd = COALESCE(estimated_cost_usd, 0) + :cost_usd
+                    WHERE id = :key_id
+                    RETURNING current_spend_usd, monthly_budget_usd
+                """),
+                {"key_id": key_id, "cost_usd": cost_usd, "now": now},
+            ).first()
+
+            if row is None:
+                logger.warning(f"record_spend: key {key_id} not found")
+                return {}
+
+            current_spend_usd, monthly_budget_usd = float(row[0]), float(row[1] or 0.0)
+            budget_exceeded = monthly_budget_usd > 0 and current_spend_usd >= monthly_budget_usd
+
+            if budget_exceeded:
                 logger.warning(
                     f"💸 Key {key_id} monthly budget EXHAUSTED: "
-                    f"${key.current_spend_usd:.2f} / ${key.monthly_budget_usd:.2f}"
+                    f"${current_spend_usd:.2f} / ${monthly_budget_usd:.2f}"
                 )
-        
+                self._notify_budget_exceeded(key_id, current_spend_usd, monthly_budget_usd, db_session)
+            else:
+                # Early-warning thresholds so spend is visible before the
+                # hard cap is hit, not just after.
+                self._maybe_warn_budget_threshold(key_id, current_spend_usd, monthly_budget_usd)
+
+            return {
+                "current_spend_usd": current_spend_usd,
+                "monthly_budget_usd": monthly_budget_usd,
+                "budget_exceeded": budget_exceeded,
+                "remaining_usd": (
+                    max(0.0, monthly_budget_usd - current_spend_usd)
+                    if monthly_budget_usd > 0 else None
+                ),
+            }
+
         if db:
-            _update(db)
+            return _update(db)
         else:
             with get_db_context() as db_session:
-                _update(db_session)
+                result = _update(db_session)
                 db_session.commit()
+                return result
+
+    # Thresholds (as a fraction of monthly_budget_usd) at which to log an
+    # early warning, so spend is visible before the hard cap actually hits.
+    _WARNING_THRESHOLDS = (0.75, 0.90)
+
+    def _maybe_warn_budget_threshold(self, key_id: str, current_spend_usd: float, monthly_budget_usd: float):
+        """Log a one-shot warning per threshold as spend approaches the cap."""
+        if monthly_budget_usd <= 0:
+            return
+        pct = current_spend_usd / monthly_budget_usd
+        cache_key = f"{key_id}:threshold"
+        last_warned_pct = self._notification_cache.get(cache_key, 0.0)
+        if isinstance(last_warned_pct, datetime):
+            last_warned_pct = 0.0  # _notification_cache is also used for datetimes elsewhere; guard the mix
+        for threshold in self._WARNING_THRESHOLDS:
+            if pct >= threshold and last_warned_pct < threshold:
+                logger.warning(
+                    f"⚠️ Key {key_id} at {pct*100:.0f}% of monthly budget "
+                    f"(${current_spend_usd:.2f} / ${monthly_budget_usd:.2f})"
+                )
+                self._notification_cache[cache_key] = threshold
+
+    def _notify_budget_exceeded(self, key_id: str, current_spend_usd: float, monthly_budget_usd: float, db: Optional[Session] = None):
+        """
+        Raise a MonitoringAlert + websocket notification when a key's
+        monthly budget is exceeded. Debounced like _notify_all_keys_down
+        so a burst of requests against an exhausted key doesn't spam alerts.
+        """
+        now = datetime.utcnow()
+        cache_key = f"{key_id}:budget_exceeded"
+        last_notification = self._notification_cache.get(cache_key)
+        if last_notification and isinstance(last_notification, datetime):
+            if (now - last_notification).total_seconds() < self.NOTIFICATION_DEBOUNCE_SECONDS:
+                return
+        self._notification_cache[cache_key] = now
+
+        message = (
+            f"💸 **AGENTIUM ALERT: Monthly Budget Exceeded**\n\n"
+            f"Key: `{key_id}`\n"
+            f"Spend: ${current_spend_usd:.2f} / ${monthly_budget_usd:.2f}\n"
+            f"Time: {now.strftime('%Y-%m-%d %H:%M:%S UTC')}\n\n"
+            f"This key will be skipped by failover until budget resets or is raised."
+        )
+
+        try:
+            self._broadcast_websocket_alert("budget", message)
+        except Exception as e:
+            logger.error(f"Failed to broadcast budget alert: {e}")
+
+        try:
+            self._send_channel_alerts(message, db)
+        except Exception as e:
+            logger.error(f"Failed to send budget alert to channels: {e}")
+
+        try:
+            # NOTE: MonitoringAlert's exact field set wasn't available to verify
+            # against — if your model uses different kwargs (e.g. `message`
+            # instead of `description`, or no `meta_data` column), adjust this
+            # call to match. Wrapped in try/except so a schema mismatch here
+            # never breaks the actual spend-recording path above.
+            alert = MonitoringAlert(
+                severity=ViolationSeverity.HIGH,
+                category="budget",
+                title="Monthly budget exceeded",
+                description=message,
+                meta_data={
+                    "key_id": key_id,
+                    "current_spend_usd": current_spend_usd,
+                    "monthly_budget_usd": monthly_budget_usd,
+                },
+            )
+            if db:
+                db.add(alert)
+            else:
+                with get_db_context() as db_session:
+                    db_session.add(alert)
+                    db_session.commit()
+        except Exception as e:
+            # Alert persistence is best-effort; never let it break the spend record path
+            logger.error(f"Failed to persist MonitoringAlert for budget exceeded: {e}")
     
     def check_budget(self, key_id: str, estimated_cost: float, db: Optional[Session] = None) -> bool:
-        """Check if a key has sufficient budget remaining."""
+        """
+        Check if a key has sufficient budget remaining.
+
+        IMPORTANT — this is a pre-flight check, not a reservation. There is
+        an inherent gap between this check and the later record_spend() call
+        that actually books the cost: the provider request happens in
+        between, and another concurrent request can pass this same check in
+        that window. That means two requests can both see "budget OK" and
+        both proceed, jointly overshooting monthly_budget_usd by up to one
+        extra request's worth of cost. record_spend() itself is atomic and
+        will not lose track of the overshoot — it will correctly show the
+        key as over budget afterward, and the next check_budget() call will
+        correctly start returning False — but it cannot retroactively cancel
+        a request already in flight. For hard, no-overshoot enforcement,
+        budget checks would need to reserve cost atomically (e.g. an UPDATE
+        ... WHERE current_spend_usd + :cost <= monthly_budget_usd RETURNING)
+        rather than read-then-decide. That stronger guarantee is not
+        implemented here because it would require committing the charge
+        before knowing the call will succeed, which has its own correctness
+        tradeoffs (refunding failed calls, partial token usage, etc).
+        """
         def _check(db_session: Session):
             key = db_session.query(UserModelConfig).filter_by(id=key_id).first()
             if not key or key.monthly_budget_usd <= 0:

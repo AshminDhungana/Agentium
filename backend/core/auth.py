@@ -87,6 +87,7 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
 
     # Normalize the payload to ensure consistent field names
     normalized_payload = {
+        "sub": payload.get("sub"),
         "user_id": payload.get("user_id"),
         "username": payload.get("sub"),  # "sub" is the standard JWT subject claim
         "is_admin": payload.get("is_admin", False),

@@ -269,9 +269,9 @@ async def lifespan(app: FastAPI):
                         "⚠️ No active default model config found — "
                         "Head 00001 will fall back at chat time"
                     )
-            elif head and head.model_config_id:
+            elif head and head.preferred_config_id:
                 logger.info(
-                    f"✅ Head 00001 already has model config: {head.model_config_id}"
+                    f"✅ Head 00001 already has model config: {head.preferred_config_id}"
                 )
         finally:
             db.close()

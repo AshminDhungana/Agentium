@@ -106,7 +106,7 @@ class AmendmentVoting(BaseEntity):
                 voter_agentium_id=council_member_id,
                 vote=vote,
                 rationale=rationale,
-                agentium_id=f"V{council_member_id}"
+                agentium_id=f"V{uuid.uuid4().hex[:9]}"
             )
             self.individual_votes.append(vote_record)
             
@@ -167,12 +167,12 @@ class AmendmentVoting(BaseEntity):
     def add_discussion_entry(self, agentium_id: str, message: str):
         """Add entry to discussion."""
         thread = self.discussion_thread or []
-        thread.append({
+        new_thread = list(thread) + [{
             'timestamp': datetime.utcnow().isoformat(),
             'agent': agentium_id,
             'message': message
-        })
-        self.discussion_thread = thread
+        }]
+        self.discussion_thread = new_thread
         
     def to_dict(self) -> Dict[str, Any]:
         base = super().to_dict()
@@ -267,7 +267,7 @@ class TaskDeliberation(BaseEntity):
                 voter_agentium_id=council_member_id,
                 vote=vote,
                 rationale=rationale,
-                agentium_id=f"V{council_member_id}"  # Vote ID format
+                agentium_id=f"V{uuid.uuid4().hex[:9]}"  # Vote ID format
             )
             self.individual_votes.append(vote_record)
         
@@ -360,12 +360,12 @@ class TaskDeliberation(BaseEntity):
     def add_discussion_entry(self, agentium_id: str, message: str):
         """Add a message to the deliberation thread."""
         thread = self.discussion_thread or []
-        thread.append({
+        new_thread = list(thread) + [{
             'timestamp': datetime.utcnow().isoformat(),
             'agent': agentium_id,
             'message': message
-        })
-        self.discussion_thread = thread
+        }]
+        self.discussion_thread = new_thread
     
     def get_participation_rate(self) -> float:
         """Calculate what percentage of council members voted."""
