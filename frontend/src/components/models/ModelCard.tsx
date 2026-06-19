@@ -9,7 +9,7 @@
  * This component is intentionally pure: same props → same output.
  */
 
-import React from 'react';
+import React, { useMemo, useRef, useEffect, useState } from 'react';
 import {
     Check,
     RefreshCw,
@@ -52,6 +52,22 @@ export interface ModelCardProps {
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
+    // FIX: previously every card had role="status" unconditionally, so a bulk
+    // refresh that updates 6 cards at once could trigger 6 simultaneous screen
+    // reader announcements. role="status" is now only applied once this badge's
+    // status has actually changed post-mount — the initial render of the grid
+    // stays silent.
+    const isInitialMount = useRef(true);
+    const [announceChange, setAnnounceChange] = useState(false);
+
+    useEffect(() => {
+        if (isInitialMount.current) {
+            isInitialMount.current = false;
+            return;
+        }
+        setAnnounceChange(true);
+    }, [status]);
+
     const map: Record<string, { cls: string; icon: React.ReactNode; label: string }> = {
         active: {
             cls: 'bg-green-100 text-green-700 border-green-200 dark:bg-green-500/10 dark:text-green-400 dark:border-green-500/20',
@@ -77,7 +93,7 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
     return (
         <span
             className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full border ${s.cls}`}
-            role="status"
+            role={announceChange ? 'status' : undefined}
             aria-label={`Status: ${s.label}`}
         >
             {s.icon}
@@ -99,12 +115,24 @@ export const ModelCard: React.FC<ModelCardProps> = React.memo(({
     onSetDefault,
     onPendingDelete,
 }) => {
-    const meta = getProviderMeta(config.provider);
+    // FIX: pure lookup keyed only on config.provider — memoized so it doesn't
+    // recompute (and rebuild any icon JSX) on every render of every card.
+    const meta = useMemo(() => getProviderMeta(config.provider), [config.provider]);
     const isTesting = activeAction === 'testing';
     const isDeleting = activeAction === 'deleting';
     const isFetching = activeAction === 'fetching';
     const isAnyBusy = activeAction !== null;
     const awaitingDeleteConfirm = pendingDeleteId === config.id;
+
+    // FIX: when the Trash button is swapped for Confirm/Cancel, focus stayed
+    // wherever it was — keyboard and screen-reader users got no signal the UI
+    // changed under them. Move focus to Confirm as soon as it appears.
+    const confirmButtonRef = useRef<HTMLButtonElement>(null);
+    useEffect(() => {
+        if (awaitingDeleteConfirm) {
+            confirmButtonRef.current?.focus();
+        }
+    }, [awaitingDeleteConfirm]);
 
     return (
         <div
@@ -161,7 +189,7 @@ export const ModelCard: React.FC<ModelCardProps> = React.memo(({
                                 <Key className="w-3 h-3" aria-hidden="true" />
                                 API Key
                             </span>
-                            <span className="font-mono text-xs text--600 dark:text-gray-500">
+                            <span className="font-mono text-xs text-gray-600 dark:text-gray-500">
                                 {config.api_key_masked}
                             </span>
                         </div>
@@ -190,7 +218,7 @@ export const ModelCard: React.FC<ModelCardProps> = React.memo(({
                                 <span
                                     role="listitem"
                                     aria-label={`${config.available_models.length - 4} more models`}
-                                    className="text-xs text--600 dark:text-gray-500 px-2 py-0.5 bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-[#1e2535] rounded-md"
+                                    className="text-xs text-gray-600 dark:text-gray-500 px-2 py-0.5 bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-[#1e2535] rounded-md"
                                 >
                                     +{config.available_models.length - 4}
                                 </span>
@@ -288,6 +316,7 @@ export const ModelCard: React.FC<ModelCardProps> = React.memo(({
                     {awaitingDeleteConfirm ? (
                         <div className="flex items-center gap-1">
                             <button
+                                ref={confirmButtonRef}
                                 onClick={() => onDelete(config.id)}
                                 disabled={isDeleting}
                                 aria-label={`Confirm delete ${config.config_name}`}

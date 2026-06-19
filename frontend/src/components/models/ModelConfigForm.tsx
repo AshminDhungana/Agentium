@@ -201,13 +201,22 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value, type } = e.target;
+
+        if (type === 'number') {
+            // FIX: parseFloat('') is NaN. Writing NaN into formData silently corrupts
+            // max_tokens/temperature (it then gets sent to the API or fails validation
+            // with no clear cause). If the field is mid-edit (empty or not yet a valid
+            // number, e.g. "0." while typing "0.7"), skip the update and keep the last
+            // valid value instead of storing NaN.
+            const parsed = parseFloat(value);
+            if (value === '' || Number.isNaN(parsed)) return;
+            setFormData(prev => ({ ...prev, [name]: parsed }));
+            return;
+        }
+
         setFormData(prev => ({
             ...prev,
-            [name]: type === 'checkbox'
-                ? (e.target as HTMLInputElement).checked
-                : type === 'number'
-                    ? parseFloat(value)
-                    : value,
+            [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value,
         }));
     };
 
@@ -218,6 +227,13 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
         }
         if (selectedProvider?.requires_api_key && !formData.api_key) {
             setError('API key required to fetch models');
+            return;
+        }
+        // FIX: 'local' doesn't need an API key, but it does need a server URL.
+        // Without this guard, clearing the field and hitting Fetch silently
+        // tries to reach an empty URL.
+        if (formData.provider === 'local' && !formData.local_server_url.trim()) {
+            setError('Local server URL is required to fetch models');
             return;
         }
 
@@ -272,6 +288,11 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
                 api_key: formData.api_key || undefined,
                 max_tokens: formData.max_tokens,
                 temperature: formData.temperature,
+                // FIX: previously omitted — a "successful" test was validating a
+                // config with default top_p/timeout, not the actual values about
+                // to be saved.
+                top_p: formData.top_p,
+                timeout_seconds: formData.timeout,
                 ...(formData.provider === 'local'
                     ? { local_server_url: formData.local_server_url }
                     : formData.api_base_url
@@ -621,7 +642,7 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
                                     autoComplete="new-password"
                                 />
                                 {initialConfig?.api_key_masked && !formData.api_key && (
-                                    <p className="text-xs text--600 dark:text-gray-500 mt-1.5">
+                                    <p className="text-xs text-gray-600 dark:text-gray-500 mt-1.5">
                                         Current: {initialConfig.api_key_masked} (leave empty to keep)
                                     </p>
                                 )}
@@ -664,7 +685,7 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
                                     onChange={handleChange}
                                     className={`${inputCls} font-mono`}
                                 />
-                                <p className="text-xs text--600 dark:text-gray-500 mt-1.5">
+                                <p className="text-xs text-gray-600 dark:text-gray-500 mt-1.5">
                                     Default: Ollama (http://localhost:11434/v1). For LM Studio use http://localhost:1234/v1
                                 </p>
                             </div>
@@ -746,7 +767,7 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
                                     {formData.available_models.length} models available from {formData.provider}
                                 </p>
                             ) : (
-                                <p className="text-xs text--600 dark:text-gray-500 mt-1.5">
+                                <p className="text-xs text-gray-600 dark:text-gray-500 mt-1.5">
                                     {isUniversal
                                         ? 'Enter the exact model name as expected by the API'
                                         : selectedProvider?.requires_api_key && !formData.api_key

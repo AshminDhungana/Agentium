@@ -4,7 +4,7 @@
  * AI Model Configurations page.
  */
 
-import React, { useState, Component } from 'react';
+import React, { useState, useCallback, Component } from 'react';
 import {
     Plus,
     AlertCircle,
@@ -139,16 +139,20 @@ const ModelsPageInner: React.FC = () => {
         setPendingDeleteId,
     } = useModelConfigs();
 
-    const handleEdit = (config: import('@/types').ModelConfig) => {
+    // FIX: previously plain functions recreated on every render. ModelCard is
+    // React.memo'd, but a new function identity passed as a prop on every
+    // parent render defeats that memoization for every card in the grid, not
+    // just the one that changed.
+    const handleEdit = useCallback((config: import('@/types').ModelConfig) => {
         setEditingConfig(config);
         setShowForm(true);
-    };
+    }, []);
 
-    const handleSaveAndClose = async (config: import('@/types').ModelConfig) => {
+    const handleSaveAndClose = useCallback(async (config: import('@/types').ModelConfig) => {
         await handleSave(config);
         setShowForm(false);
         setEditingConfig(null);
-    };
+    }, [handleSave]);
 
     // ── Initial load skeleton (no configs in cache yet) ────────────────────
     if (loading && configs.length === 0) {
@@ -277,7 +281,7 @@ const ModelsPageInner: React.FC = () => {
                     // Empty state
                     <div className="text-center py-20" role="status">
                         <div className="inline-flex items-center justify-center w-20 h-20 bg-white dark:bg-[#161b27] border border-gray-200 dark:border-[#1e2535] rounded-2xl mb-6 shadow-sm dark:shadow-[0_2px_16px_rgba(0,0,0,0.25)]">
-                            <Settings className="w-9 h-9 text--600 dark:text-gray-500" aria-hidden="true" />
+                            <Settings className="w-9 h-9 text-gray-600 dark:text-gray-500" aria-hidden="true" />
                         </div>
                         <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
                             No Configurations Yet
