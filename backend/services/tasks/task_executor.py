@@ -945,9 +945,9 @@ def process_dependency_graph():
                         dep.status = "dispatched"
                         dispatched += 1
 
-                        assigned_agent_id = getattr(child, 'assigned_agent_id', None)
-                        if assigned_agent_id:
-                            execute_task_async.delay(child.agentium_id, assigned_agent_id)
+                        assigned_agent_ids = child.assigned_task_agent_ids or []
+                        if assigned_agent_ids:
+                            execute_task_async.delay(child.agentium_id, assigned_agent_ids[0])
                     except Exception as e:
                         logger.warning(f"Failed to dispatch child task: {e}")
 
