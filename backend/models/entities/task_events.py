@@ -65,7 +65,10 @@ class TaskEvent(BaseEntity):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         if not self.agentium_id:
-            self.agentium_id = f"E{datetime.utcnow().strftime('%Y%m%d%H%M%S%f')}"
+            # Prefix 'E' for Event. Column is VARCHAR(10): 1 (prefix) +
+            # 6 (HHMMSS) + 3 (millisecond-precision suffix) = 10 chars exactly.
+            now = datetime.utcnow()
+            self.agentium_id = f"E{now.strftime('%H%M%S')}{now.strftime('%f')[:3]}"
     
     @classmethod
     def reconstruct_state(cls, task_id: str, db_session) -> Dict[str, Any]:

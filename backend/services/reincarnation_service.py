@@ -1113,7 +1113,7 @@ Provide a concise summary (max 300 words) that the successor agent will inherit.
             is_active=True,
             is_persistent=agent.is_persistent,
             idle_mode_enabled=agent.idle_mode_enabled,
-            created_by_agentium_id="REINCARNATION_SERVICE"
+            created_by_agentium_id=agent.agentium_id
         )
         
         # Copy key attributes

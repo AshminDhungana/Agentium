@@ -3,9 +3,6 @@ Task execution handlers for Celery.
 Includes: task execution, constitution review, idle processing, 
 self-healing execution loop, data retention, and channel message retry.
 
-Phase 17.1 additions:
-- detect_suspicious_patterns: reads Redis 4xx weighted-sum counters, auto-blocks
-  IPs over threshold, writes AuditLog entries for every block decision.
 """
 import logging
 import asyncio
@@ -900,8 +897,16 @@ def check_escalation_timeouts():
 
 
 @celery_app.task(name='backend.services.tasks.task_executor.process_dependency_graph')
-def process_dependency_graph():
-    with get_task_db() as db:
+def process_dependency_graph(db=None):
+    """
+    db: optional injected Session. When omitted (normal Celery execution),
+    a dedicated session is opened via get_task_db() and committed/closed as
+    usual. Tests that need to see/operate on data committed via a separate
+    fixture session should pass that session in directly via db=...
+    """
+    from contextlib import nullcontext
+    db_ctx = nullcontext(db) if db is not None else get_task_db()
+    with db_ctx as db:
         try:
             from backend.models.entities.task import TaskDependency
 

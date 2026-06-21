@@ -180,14 +180,14 @@ class PredictiveScalingService:
                     ReincarnationService.spawn_task_agent(
                         parent=head,
                         name=f"Predictive-Spawn-{datetime.utcnow().strftime('%H%M%S')}-{i}",
+                        description="Pre-spawned by Predictive Auto-Scaler to absorb forecasted load surge.",
                         db=db
                     )
                     spawned += 1
                 except Exception as exc:
                     logger.error(f"PredictiveScaling: spawn failed: {exc}")
                     
-            AuditLog.log(
-                db=db,
+            entry = AuditLog.log(
                 level=AuditLevel.INFO,
                 category=AuditCategory.GOVERNANCE,
                 actor_type="system",
@@ -196,6 +196,9 @@ class PredictiveScalingService:
                 description=f"Predictive scale spawned {spawned} agents.",
                 after_state={"next_1h": next_1h, "spawned": spawned}
             )
+            if isinstance(entry, AuditLog):
+                db.add(entry)
+                db.commit()
             # Emit WebSocket Event
             from backend.api.routes.websocket import manager
             import asyncio
@@ -226,8 +229,7 @@ class PredictiveScalingService:
             db.commit()
             
             if liquidated > 0:
-                AuditLog.log(
-                    db=db,
+                entry = AuditLog.log(
                     level=AuditLevel.INFO,
                     category=AuditCategory.GOVERNANCE,
                     actor_type="system",
@@ -236,6 +238,9 @@ class PredictiveScalingService:
                     description=f"Predictive scale liquidated {liquidated} idle agents.",
                     after_state={"next_6h": next_6h, "liquidated": liquidated}
                 )
+                if isinstance(entry, AuditLog):
+                    db.add(entry)
+                    db.commit()
                 from backend.api.routes.websocket import manager
                 import asyncio
                 try:

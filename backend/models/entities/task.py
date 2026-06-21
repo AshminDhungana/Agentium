@@ -257,10 +257,14 @@ class Task(BaseEntity):
             self.requires_deliberation = False
         return priority
     
-    def set_status(self, new_status: TaskStatus, actor_id: str = "system", note: str = None):
+    def set_status(self, new_status: TaskStatus, actor_id: str = "system", note: str = None, trigger_checkpoint: bool = True):
         """
         Set task status with state machine validation.
         This is the ONLY way to change status - enforces legal transitions.
+
+        trigger_checkpoint: set False to suppress the automated Phase 6.5
+        checkpoint hook — used by CheckpointService.resume_from_checkpoint
+        so that restoring state doesn't itself spawn a new checkpoint.
         """
         from backend.services.task_state_machine import TaskStateMachine
         
@@ -278,7 +282,8 @@ class Task(BaseEntity):
         self._emit_status_event(old_status, new_status, actor_id, note)
         
         # Phase 6.5: Automated Checkpoint hook
-        self._trigger_checkpoint_if_needed(new_status, actor_id)
+        if trigger_checkpoint:
+            self._trigger_checkpoint_if_needed(new_status, actor_id)
         
         return True
         
@@ -303,16 +308,17 @@ class Task(BaseEntity):
             phase = CheckpointPhase.WAIT_ENTERED
             
         if phase:
+            task_id_for_log = self.id  # capture before the session can be poisoned by a failed flush
             try:
                 CheckpointService.create_checkpoint(
                     db=session,
-                    task_id=self.id,
+                    task_id=task_id_for_log,
                     phase=phase,
                     actor_id=actor_id
                 )
             except Exception as e:
                 import logging
-                logging.getLogger(__name__).error(f"Failed to create checkpoint for task {self.id}: {e}")
+                logging.getLogger(__name__).error(f"Failed to create checkpoint for task {task_id_for_log}: {e}")
     
     def _emit_status_event(self, old_status: TaskStatus, new_status: TaskStatus, actor_id: str, note: str = None):
         """Emit event for event sourcing."""

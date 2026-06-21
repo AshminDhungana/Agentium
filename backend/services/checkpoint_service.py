@@ -64,7 +64,7 @@ class CheckpointService:
 
         checkpoint = ExecutionCheckpoint(
             id=str(uuid.uuid4()),
-            session_id=task.session_id,
+            session_id=task.workflow_id or "no-workflow",
             task_id=task.id,
             phase=phase,
             agent_states=agent_states,
@@ -74,7 +74,7 @@ class CheckpointService:
 
         db.add(checkpoint)
         
-        AuditLog.log(
+        audit_entry = AuditLog.log(
             level=AuditLevel.INFO,
             category=AuditCategory.SYSTEM,
             actor_type="system",
@@ -87,6 +87,7 @@ class CheckpointService:
                 f"({len(agent_states)} agents, {len(subtask_snapshots)} subtasks)"
             )
         )
+        db.add(audit_entry)
         
         db.commit()
         db.refresh(checkpoint)
@@ -120,11 +121,14 @@ class CheckpointService:
 
         # ── 1. Restore task core properties ──────────────────────
         if 'status' in snapshot:
-            task.set_status(
-                snapshot['status'],
-                actor_id=actor_id,
-                note=f"Resumed from checkpoint {checkpoint_id}"
-            )
+            restored_status = TaskStatus(snapshot['status'])
+            if task.status != restored_status:
+                task.set_status(
+                    restored_status,
+                    actor_id=actor_id,
+                    note=f"Resumed from checkpoint {checkpoint_id}",
+                    trigger_checkpoint=False,
+                )
             
         if 'result_data' in snapshot:
             task.result_data = snapshot['result_data']
@@ -142,7 +146,7 @@ class CheckpointService:
         subtask_snapshots = snapshot.get("subtask_snapshots", [])
         CheckpointService._restore_subtasks(db, subtask_snapshots, actor_id, checkpoint_id)
 
-        AuditLog.log(
+        audit_entry = AuditLog.log(
             level=AuditLevel.WARNING,
             category=AuditCategory.SYSTEM,
             actor_type="user",
@@ -156,6 +160,7 @@ class CheckpointService:
                 f"{len(subtask_snapshots)} subtasks)"
             )
         )
+        db.add(audit_entry)
 
         db.commit()
         db.refresh(task)
@@ -216,7 +221,7 @@ class CheckpointService:
         )
         db.add(branch_checkpoint)
 
-        AuditLog.log(
+        audit_entry = AuditLog.log(
             level=AuditLevel.INFO,
             category=AuditCategory.TASK,
             actor_type="user",
@@ -226,6 +231,7 @@ class CheckpointService:
             target_id=new_task.id,
             description=f"Branched from checkpoint {checkpoint_id} into new task {new_task.id}"
         )
+        db.add(audit_entry)
 
         db.commit()
         db.refresh(new_task)
@@ -328,7 +334,7 @@ class CheckpointService:
             db.delete(ck)
             
         if count > 0:
-            AuditLog.log(
+            audit_entry = AuditLog.log(
                 level=AuditLevel.INFO,
                 category=AuditCategory.SYSTEM,
                 actor_type="system",
@@ -336,6 +342,7 @@ class CheckpointService:
                 action="checkpoint_cleanup",
                 description=f"Deleted {count} checkpoints older than {max_age_days} days"
             )
+            db.add(audit_entry)
             db.commit()
             
         return count
@@ -367,7 +374,9 @@ class CheckpointService:
                 "agent_type": agent.agent_type.value if agent.agent_type else None,
                 "is_persistent": agent.is_persistent,
                 "ethos_summary": (
-                    agent.ethos.content[:500] if hasattr(agent, 'ethos') and agent.ethos else None
+                    agent.ethos.mission_statement[:500]
+                    if hasattr(agent, 'ethos') and agent.ethos and agent.ethos.mission_statement
+                    else None
                 ),
                 "custom_capabilities": agent.custom_capabilities if hasattr(agent, 'custom_capabilities') else None,
                 "last_idle_action_at": (
@@ -432,13 +441,19 @@ class CheckpointService:
             saved_status = snap.get("status")
             if saved_status:
                 try:
-                    subtask.set_status(
-                        saved_status,
-                        actor_id=actor_id,
-                        note=f"Restored from checkpoint {checkpoint_id}"
+                    restored_status = TaskStatus(saved_status)
+                    if subtask.status != restored_status:
+                        subtask.set_status(
+                            restored_status,
+                            actor_id=actor_id,
+                            note=f"Restored from checkpoint {checkpoint_id}",
+                            trigger_checkpoint=False,
+                        )
+                except (ValueError, Exception) as e:
+                    logger.warning(
+                        f"⚠️ Failed to restore status '{saved_status}' for subtask "
+                        f"{snap.get('id')} during checkpoint restore: {e}"
                     )
-                except Exception:
-                    pass
 
             if "result_data" in snap:
                 subtask.result_data = snap["result_data"]

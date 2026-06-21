@@ -334,7 +334,7 @@ class TestDependencyGraphParallelDispatch:
         with patch(
             "backend.services.tasks.task_executor.execute_task_async.delay"
         ) as mock_delay:
-            result = process_dependency_graph()
+            result = process_dependency_graph(db=seeded_db)
 
         # Both independent branches dispatched in the same pass.
         assert result["dispatched"] == 2
@@ -382,7 +382,7 @@ class TestDependencyGraphParallelDispatch:
         seeded_db.commit()
 
         with patch("backend.services.tasks.task_executor.execute_task_async.delay"):
-            result = process_dependency_graph()
+            result = process_dependency_graph(db=seeded_db)
 
         # Only the order=0 predecessor dispatches this pass.
         assert result["dispatched"] == 1
@@ -430,7 +430,7 @@ class TestDependencyGraphParallelDispatch:
         seeded_db.commit()
 
         with patch("backend.services.tasks.task_executor.execute_task_async.delay"):
-            result = process_dependency_graph()
+            result = process_dependency_graph(db=seeded_db)
 
         assert result["dispatched"] == 1
         seeded_db.refresh(children[1])
@@ -497,7 +497,7 @@ class TestCrashDetectionAndReincarnation:
         agent = _spawn_task_agent(seeded_db, head, "Crash-Recovery-Worker")
 
         task = Task(
-            agentium_id="TCRASHRECOV",
+            agentium_id="TCRASHRC1",
             title="Task interrupted by simulated crash",
             description="Work in progress when the agent crashed",
             task_type=TaskType.EXECUTION,
