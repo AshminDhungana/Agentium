@@ -54,8 +54,23 @@ class WorkflowEngine:
         """Convert JSON definition to WorkflowStep rows."""
         db.query(WorkflowStep).filter(WorkflowStep.workflow_id == workflow.id).delete()
         steps_data = template.get("steps", [])
+
+        # Determine the starting step ID within this session so that
+        # multiple steps created in the same transaction get unique IDs.
+        from sqlalchemy import text
+        result = db.execute(text("""
+            SELECT agentium_id FROM workflow_steps
+            WHERE agentium_id ~ '^WS[0-9]+$'
+            ORDER BY CAST(SUBSTRING(agentium_id FROM 3) AS INTEGER) DESC
+            LIMIT 1
+        """)).scalar()
+        next_num = (int(result[2:]) + 1) if result else 1
+
         for step_data in steps_data:
+            agentium_id = f"WS{next_num:05d}"
+            next_num += 1
             step = WorkflowStep(
+                agentium_id=agentium_id,
                 workflow_id=workflow.id,
                 step_index=step_data.get("step_index"),
                 step_type=WorkflowStepType(step_data.get("type")),
@@ -71,12 +86,14 @@ class WorkflowEngine:
         workflow = db.query(Workflow).filter(Workflow.id == workflow_id).first()
         if not workflow:
             raise ValueError("Workflow not found")
-            
+
+        # Snapshot current version BEFORE updating
+        WorkflowEngine.create_version(db, workflow.id)
+
         workflow.template_json = new_template
         workflow.version += 1
-        
+
         WorkflowEngine._sync_steps_from_template(db, workflow, new_template)
-        WorkflowEngine.create_version(db, workflow.id)
         return workflow
 
     @staticmethod
@@ -84,7 +101,19 @@ class WorkflowEngine:
         """Versioning logic to save a snapshot of the workflow."""
         workflow = db.query(Workflow).filter(Workflow.id == workflow_id).first()
         if workflow:
+            # Determine the next version ID within this session
+            from sqlalchemy import text
+            result = db.execute(text("""
+                SELECT agentium_id FROM workflow_versions
+                WHERE agentium_id ~ '^WV[0-9]+$'
+                ORDER BY CAST(SUBSTRING(agentium_id FROM 3) AS INTEGER) DESC
+                LIMIT 1
+            """)).scalar()
+            next_num = (int(result[2:]) + 1) if result else 1
+            agentium_id = f"WV{next_num:05d}"
+
             version_record = WorkflowVersion(
+                agentium_id=agentium_id,
                 workflow_id=workflow.id,
                 version=workflow.version,
                 template_json=workflow.template_json
@@ -190,7 +219,7 @@ class WorkflowEngine:
             priority=TaskPriority.NORMAL,
             workflow_id=execution.workflow_id,
             context_data=execution.context_data,
-            created_by="workflow_system"
+            created_by="workflow"
         )
         db.add(task)
         db.flush()
