@@ -109,11 +109,14 @@ class APIManager:
             }
             capability = capability_map.get(config.provider, ModelCapability.SIMPLE)
 
+            from backend.services.model_provider import calculate_cost
+            cost_per_1k = calculate_cost(config.default_model, config.provider, 1000, 0)
+
             return ModelConfig(
                 provider=config.provider.value if hasattr(config.provider, 'value') else str(config.provider),
                 model_name=config.default_model,
                 config_id=config.id,
-                cost_per_1k_tokens=0.0,
+                cost_per_1k_tokens=cost_per_1k,
                 max_context_length=config.max_tokens or 4000,
                 rate_limit_per_minute=config.rate_limit or 60,
                 capability=capability,

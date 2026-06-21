@@ -18,12 +18,31 @@ from backend.models.entities.user_config import UserModelConfig, ProviderType, M
 # ─────────────────────────────────────────────────────────────────────────────
 # Per-model pricing table
 # Prices are USD per 1 M tokens (input_rate, output_rate).
-# Source: official provider pricing pages as of early 2026.
+# Source: official provider pricing pages as of June 2026.
+#   Anthropic: https://platform.claude.com/docs/en/about-claude/pricing
+#   OpenAI:    https://openai.com/api/pricing/
+#   Google:    https://ai.google.dev/gemini-api/docs/pricing
+# NOTE: Anthropic model_used values come back from the API as the canonical
+# IDs above (e.g. "claude-sonnet-4-6"). The prefix-match fallback in
+# calculate_cost() also covers dated/snapshot variants if Anthropic adds them.
 # ─────────────────────────────────────────────────────────────────────────────
 
 # fmt: off
 MODEL_PRICES: Dict[str, Tuple[float, float]] = {
     # ── OpenAI ───────────────────────────────────────────────────────────────
+    # Current generation (Jun 2026) — see https://openai.com/api/pricing/
+    "gpt-5.5":                         (5.00,   30.00),
+    "gpt-5.5-pro":                     (30.00, 180.00),
+    "gpt-5.4":                         (2.50,   15.00),
+    "gpt-5.4-mini":                    (0.75,    4.00),
+    "gpt-5.4-nano":                    (0.20,    1.25),
+    "gpt-5.3-codex":                   (1.75,   14.00),
+    "gpt-4.1":                         (2.00,    8.00),
+    "gpt-4.1-mini":                    (0.40,    1.60),
+    "gpt-4.1-nano":                    (0.10,    0.40),
+    "o4-mini":                         (1.10,    4.40),
+
+    # Legacy (kept so historical usage logs still price correctly)
     "gpt-4o":                          (2.50,   10.00),
     "gpt-4o-2024-11-20":               (2.50,   10.00),
     "gpt-4o-2024-08-06":               (2.50,   10.00),
@@ -42,6 +61,23 @@ MODEL_PRICES: Dict[str, Tuple[float, float]] = {
     "o3-mini":                         (1.10,    4.40),
 
     # ── Anthropic ────────────────────────────────────────────────────────────
+    # Current generation (Jun 2026) — see https://platform.claude.com/docs/en/about-claude/pricing
+    "claude-fable-5":                  (10.00,  50.00),
+    "claude-mythos-5":                 (10.00,  50.00),   # limited availability (Project Glasswing)
+    "claude-mythos-preview":           (10.00,  50.00),   # limited availability (Project Glasswing)
+    "claude-opus-4-8":                 (5.00,   25.00),
+    "claude-opus-4-7":                 (5.00,   25.00),
+    "claude-opus-4-6":                 (5.00,   25.00),
+    "claude-opus-4-5":                 (5.00,   25.00),
+    "claude-sonnet-4-6":               (3.00,   15.00),
+    "claude-sonnet-4-5":               (3.00,   15.00),
+    "claude-haiku-4-5":                (1.00,    5.00),
+
+    # Deprecated / retired (kept so historical usage logs still price correctly)
+    "claude-opus-4-1":                 (15.00,  75.00),
+    "claude-opus-4":                   (15.00,  75.00),
+    "claude-sonnet-4":                 (3.00,   15.00),
+    "claude-haiku-3-5":                (0.80,    4.00),
     "claude-3-5-sonnet-20241022":      (3.00,   15.00),
     "claude-3-5-sonnet-20240620":      (3.00,   15.00),
     "claude-3-5-haiku-20241022":       (0.80,    4.00),
@@ -52,6 +88,17 @@ MODEL_PRICES: Dict[str, Tuple[float, float]] = {
     "claude-2.0":                      (8.00,   24.00),
 
     # ── Google Gemini ─────────────────────────────────────────────────────────
+    # Current generation (Jun 2026), standard ≤200K-token rate — see https://ai.google.dev/gemini-api/docs/pricing
+    "gemini-3.1-pro":                  (2.00,   12.00),
+    "gemini-3.1-pro-preview":          (2.00,   12.00),
+    "gemini-3.5-flash":                (1.50,    9.00),
+    "gemini-3-flash-preview":          (0.50,    3.00),
+    "gemini-3.1-flash-lite":           (0.25,    1.50),
+    "gemini-2.5-pro":                  (1.25,   10.00),
+    "gemini-2.5-flash":                (0.30,    2.50),
+    "gemini-2.5-flash-lite":           (0.10,    0.40),
+
+    # Legacy (kept so historical usage logs still price correctly)
     "gemini-1.5-pro":                  (1.25,    5.00),
     "gemini-1.5-pro-002":              (1.25,    5.00),
     "gemini-1.5-flash":                (0.075,   0.30),
@@ -76,11 +123,11 @@ MODEL_PRICES: Dict[str, Tuple[float, float]] = {
     "codestral-latest":                (0.20,    0.60),
 
     # ── Together AI ───────────────────────────────────────────────────────────
-    "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo":  (0.88,  0.88),
-    "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo":   (0.18,  0.18),
-    "meta-llama/Meta-Llama-3.1-405B-Instruct-Turbo": (3.50,  3.50),
-    "mistralai/Mixtral-8x7B-Instruct-v0.1":          (0.60,  0.60),
-    "Qwen/Qwen2.5-72B-Instruct-Turbo":               (1.20,  1.20),
+    "meta-llama/meta-llama-3.1-70b-instruct-turbo":  (0.88,  0.88),
+    "meta-llama/meta-llama-3.1-8b-instruct-turbo":   (0.18,  0.18),
+    "meta-llama/meta-llama-3.1-405b-instruct-turbo": (3.50,  3.50),
+    "mistralai/mixtral-8x7b-instruct-v0.1":          (0.60,  0.60),
+    "qwen/qwen2.5-72b-instruct-turbo":               (1.20,  1.20),
 
     # ── DeepSeek ──────────────────────────────────────────────────────────────
     "deepseek-chat":                   (0.27,    1.10),
@@ -141,15 +188,27 @@ def calculate_cost(
     # Normalise: some APIs return versioned suffixes or capitalisation variants
     normalised = model_name.lower().strip()
 
-    # 1. Exact match
-    prices = MODEL_PRICES.get(model_name) or MODEL_PRICES.get(normalised)
+    # Try dynamic pricing registry first
+    from backend.services.pricing_sync_service import PricingSyncService
+    prices = PricingSyncService.get_price(normalised)
 
-    # 2. Prefix match — handles "gpt-4o-2024-xx-xx" → "gpt-4o" etc.
     if prices is None:
+        # 1. Exact match in hardcoded MODEL_PRICES
+        prices = MODEL_PRICES.get(normalised)
+
+    # 2. Prefix match — handles dated/snapshot suffixes, e.g.
+    #    "claude-opus-4-8-20260615" → "claude-opus-4-8", "gpt-4o-2024-xx-xx" → "gpt-4o".
+    #    Picks the LONGEST matching key (most specific) rather than the first
+    #    one found, since dict order can't be relied on to put more specific
+    #    prefixes (e.g. "claude-opus-4-8") ahead of shorter ones that are also
+    #    real model IDs (e.g. "claude-opus-4").
+    if prices is None:
+        best_key = ""
         for key, val in MODEL_PRICES.items():
-            if normalised.startswith(key.lower()):
+            key_lower = key.lower()
+            if normalised.startswith(key_lower) and len(key_lower) > len(best_key):
+                best_key = key_lower
                 prices = val
-                break
 
     if prices is not None:
         input_rate, output_rate = prices
@@ -173,6 +232,20 @@ class BaseModelProvider(ABC):
         self.config = config
         self.api_key = self._get_api_key() if config.requires_api_key() else None
         self.base_url = config.get_effective_base_url()
+
+        # Safety net: get_effective_base_url() now returns a real default for
+        # every provider EXCEPT AI21 / AZURE_OPENAI / CUSTOM / OPENAI_COMPATIBLE,
+        # which require the user to supply api_base_url explicitly. Without this
+        # check, base_url=None gets passed straight to openai.AsyncOpenAI(),
+        # which silently defaults to https://api.openai.com/v1 — i.e. the exact
+        # "everything calls OpenAI" bug this is guarding against.
+        if self.base_url is None and config.provider != ProviderType.ANTHROPIC:
+            raise ValueError(
+                f"No base URL configured for provider '{config.provider.value}' "
+                f"(config_id={getattr(config, 'id', '?')}). This provider requires "
+                f"an explicit api_base_url (or azure_endpoint for Azure) to be set "
+                f"on the model config — refusing to fall back to a default endpoint."
+            )
 
     def _get_api_key(self) -> Optional[str]:
         """Decrypt API key."""
@@ -692,83 +765,6 @@ class AnthropicProvider(BaseModelProvider):
         }
 
 
-class GeminiProvider(BaseModelProvider):
-    """Google Gemini API (via OpenAI compatibility layer)."""
-
-    async def generate(self, system_prompt: str, user_message: str, **kwargs) -> Dict[str, Any]:
-        import openai
-
-        client = openai.AsyncOpenAI(
-            api_key=self.api_key,
-            base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
-            timeout=self.config.timeout_seconds
-        )
-
-        start_time = time.time()
-        response = await client.chat.completions.create(
-            model=kwargs.get('model', self.config.default_model),
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_message}
-            ],
-            max_tokens=kwargs.get('max_tokens', self.config.max_tokens),
-        )
-
-        latency = int((time.time() - start_time) * 1000)
-
-        return {
-            "content": response.choices[0].message.content,
-            "tokens_used": response.usage.total_tokens if response.usage else 0,
-            "latency_ms": latency,
-            "model": response.model
-        }
-
-    async def stream_generate(self, system_prompt: str, user_message: str, **kwargs):
-        import openai
-
-        client = openai.AsyncOpenAI(
-            api_key=self.api_key,
-            base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
-        )
-
-        stream = await client.chat.completions.create(
-            model=kwargs.get('model', self.config.default_model),
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_message}
-            ],
-            stream=True,
-            max_tokens=kwargs.get('max_tokens', self.config.max_tokens),
-        )
-
-        async for chunk in stream:
-            if chunk.choices[0].delta.content:
-                yield chunk.choices[0].delta.content
-
-    # generate_with_tools() is inherited from OpenAICompatibleProvider
-    # once base_url is set to the Gemini OpenAI-compat endpoint.
-    # Override here so the correct base_url is used.
-    async def generate_with_tools(
-        self,
-        system_prompt: str,
-        messages: List[Dict[str, Any]],
-        tools: List[Dict[str, Any]],
-        tool_executor: Callable,
-        max_iterations: int = 10,
-        **kwargs,
-    ) -> Dict[str, Any]:
-        # Temporarily set base_url to Gemini endpoint, then delegate to the
-        # OpenAI-compatible implementation.
-        original_base_url = self.base_url
-        self.base_url = "https://generativelanguage.googleapis.com/v1beta/openai/"
-        try:
-            return await OpenAICompatibleProvider.generate_with_tools(
-                self, system_prompt, messages, tools, tool_executor, max_iterations, **kwargs
-            )
-        finally:
-            self.base_url = original_base_url
-
-
 class LocalProvider(OpenAICompatibleProvider):
     """Local models via Ollama, llama.cpp, LM Studio, etc."""
 
@@ -821,7 +817,7 @@ class LocalProvider(OpenAICompatibleProvider):
                 data = await response.json()
                 return {
                     "content": data.get('response', ''),
-                    "tokens_used": data.get('eval_count', 0),
+                    "tokens_used": data.get('eval_count', 0) + data.get('prompt_eval_count', 0),
                     "latency_ms": 0,
                     "model": self.config.default_model
                 }
@@ -833,7 +829,7 @@ class LocalProvider(OpenAICompatibleProvider):
 # Provider factory — UNIVERSAL mapping
 PROVIDERS = {
     ProviderType.ANTHROPIC:       AnthropicProvider,
-    ProviderType.GEMINI:          GeminiProvider,
+    ProviderType.GEMINI:          OpenAICompatibleProvider,
     ProviderType.OPENAI:          OpenAICompatibleProvider,
     ProviderType.GROQ:            OpenAICompatibleProvider,
     ProviderType.MISTRAL:         OpenAICompatibleProvider,
@@ -1122,17 +1118,21 @@ class ModelService:
                 ])
 
             # ── ANTHROPIC ────────────────────────────────────────────────────────
-            # Anthropic has no public ListModels REST endpoint — return curated list
+            # Anthropic now exposes a public GET /v1/models endpoint (added after
+            # this integration was first written) — fetch live instead of
+            # hardcoding a list that goes stale every time a new Claude ships.
             elif provider == ProviderType.ANTHROPIC:
-                return [
-                    "claude-opus-4-5",
-                    "claude-sonnet-4-5",
-                    "claude-haiku-4-5",
-                    "claude-3-5-sonnet-20241022",
-                    "claude-3-5-haiku-20241022",
-                    "claude-3-opus-20240229",
-                    "claude-3-haiku-20240307",
-                ]
+                if not api_key:
+                    return ModelService._get_default_models(provider)
+                import anthropic
+                client = anthropic.AsyncAnthropic(api_key=api_key)
+                try:
+                    models = await client.models.list()
+                    model_ids = sorted([m.id for m in models.data])
+                    return model_ids if model_ids else ModelService._get_default_models(provider)
+                except Exception as e:
+                    print(f"Anthropic list_models error: {e}")
+                    return ModelService._get_default_models(provider)
 
             # ── GEMINI ────────────────────────────────────────────────────────────
             # Uses Google Discovery REST API (v1beta/models) — NOT the old native SDK
@@ -1342,18 +1342,17 @@ class ModelService:
         """Get current curated defaults when live API fetch fails."""
         defaults = {
             ProviderType.OPENAI: [
-                "gpt-4o", "gpt-4o-mini", "o3-mini", "o1", "o1-mini",
-                "gpt-4-turbo", "gpt-3.5-turbo",
+                "gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.4-nano",
+                "gpt-5.3-codex", "o4-mini", "gpt-4.1", "gpt-4o",
             ],
             ProviderType.ANTHROPIC: [
-                "claude-opus-4-5", "claude-sonnet-4-5", "claude-haiku-4-5",
-                "claude-3-5-sonnet-20241022", "claude-3-5-haiku-20241022",
-                "claude-3-opus-20240229", "claude-3-haiku-20240307",
+                "claude-opus-4-8", "claude-sonnet-4-6", "claude-haiku-4-5",
+                "claude-opus-4-7", "claude-opus-4-5", "claude-sonnet-4-5",
             ],
             ProviderType.GEMINI: [
-                "gemini-2.0-flash", "gemini-2.0-flash-lite",
-                "gemini-2.5-pro-preview-03-25",
-                "gemini-1.5-pro", "gemini-1.5-flash", "gemini-1.5-flash-8b",
+                "gemini-3.1-pro", "gemini-3.5-flash", "gemini-3.1-flash-lite",
+                "gemini-3-flash-preview", "gemini-2.5-pro", "gemini-2.5-flash",
+                "gemini-2.5-flash-lite",
             ],
             ProviderType.GROQ: [
                 "llama-3.3-70b-versatile", "llama-3.1-8b-instant",

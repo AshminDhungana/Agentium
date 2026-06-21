@@ -177,6 +177,22 @@ async def lifespan(app: FastAPI):
             admin_created = create_default_admin(db)
             if admin_created:
                 logger.info("✅ Default admin user created")
+            
+            # Pre-load model pricing cache
+            from backend.services.pricing_sync_service import PricingSyncService
+            PricingSyncService.load_cache_from_db(db)
+            
+            # Synchronize model prices in the background to avoid blocking server startup
+            async def run_background_sync():
+                try:
+                    from backend.models.database import get_db_context
+                    with get_db_context() as bg_db:
+                        await PricingSyncService.sync_prices(bg_db)
+                except Exception as sync_err:
+                    logger.warning(f"⚠️ Background pricing synchronization failed (non-fatal): {sync_err}")
+            
+            import asyncio
+            asyncio.create_task(run_background_sync())
         finally:
             db.close()
     except Exception as e:

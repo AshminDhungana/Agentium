@@ -162,11 +162,14 @@ from backend.models.entities.speaker_profile import SpeakerProfile
 # Phase 16.3 — Cross-Document Citation Graph
 from backend.models.entities.citation_edge import CitationEdge
 
+from backend.models.entities.model_pricing import ModelPricing
+
 # All models for Alembic/database creation
 __all__ = [
     # Base
     'Base',
     'BaseEntity',
+    'ModelPricing',
     
     # User Configuration (Frontend-managed models)
     'User',

@@ -845,3 +845,47 @@ async def unblock_ip(
         )
 
     # 204 No Content — no response body needed
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# POST /api/v1/admin/pricing/sync
+# ──────────────────────────────────────────────────────────────────────────────
+
+@router.post(
+    "/admin/pricing/sync",
+    summary="Phase 16.3 — Synchronize model pricing",
+    description="Synchronize model pricing details from LiteLLM's public repository registry.",
+)
+async def sync_model_pricing(
+    admin: dict = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    from backend.services.pricing_sync_service import PricingSyncService
+    
+    result = await PricingSyncService.sync_prices(db)
+    if not result.get("success"):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=result.get("error", "Failed to synchronize pricing data.")
+        )
+        
+    # Write Audit Log
+    try:
+        audit_entry = AuditLog.log(
+            level=AuditLevel.INFO,
+            category=AuditCategory.SYSTEM,
+            actor_type="admin",
+            actor_id=admin.get("username", "unknown"),
+            action="model_pricing_synced",
+            target_type="system",
+            target_id="pricing_registry",
+            description=f"Admin triggered manual model pricing synchronization. Added: {result.get('added', 0)}, Updated: {result.get('updated', 0)}",
+            meta_data=result,
+        )
+        db.add(audit_entry)
+        db.commit()
+    except Exception as audit_exc:
+        import logging as _log
+        _log.getLogger(__name__).warning("sync_model_pricing: audit log write failed (non-fatal): %s", audit_exc)
+        
+    return result

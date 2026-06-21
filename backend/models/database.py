@@ -349,6 +349,9 @@ def init_db():
 
     # ── Phase 16.3: Citation Graph ───────────────────────────────────────────
     from backend.models.entities.citation_edge import CitationEdge  # noqa: F401
+    
+    # ── Dynamic Model Pricing ────────────────────────────────────────────────
+    from backend.models.entities.model_pricing import ModelPricing  # noqa: F401
 
     # Create all tables that don't exist yet
     Base.metadata.create_all(bind=engine)

@@ -3,19 +3,6 @@
 Revision ID: 000_combined_migration
 Revises: (none — this is the root migration)
 Create Date: 2026-05-31
-
-Consolidates ALL migrations in dependency order:
-  001_schema          — Complete base schema (users, agents, tasks, constitutions,
-                        channels, tools, scheduled tasks, checkpoints, etc.)
-  002_migration       — A/B testing, skill system, schema fixes, maintenance config
-  003_consolidated    — Reasoning traces, RBAC, federation, plugins, webhooks,
-                        workflows, skills page, task delegation, self-healing
-  004_event_triggers  — event_triggers & event_logs tables
-  005_speaker_profiles — speaker_profiles table
-  006_wait_poll       — wait_conditions table (waitstrategy / waitconditionstatus enums)
-  007_citation_edges  — citation_edges table
-
-All sections are idempotent (existence-checked before CREATE / ALTER).
 """
 
 import json

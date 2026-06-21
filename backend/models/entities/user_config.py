@@ -207,30 +207,64 @@ class UserModelConfig(BaseEntity):
         """Store masked version for display."""
         return value
 
+    # Default OpenAI-compatible base URLs, keyed by provider.
+    # IMPORTANT: every provider that goes through OpenAICompatibleProvider
+    # (see backend/services/model_provider.py PROVIDERS map) MUST have an
+    # entry here, or get_effective_base_url() falls through to `None` —
+    # and the `openai` SDK silently treats base_url=None as "not provided"
+    # and defaults to https://api.openai.com/v1. That was the root cause
+    # of every non-OpenAI provider quietly calling OpenAI's API.
+    _DEFAULT_BASE_URLS = {
+        ProviderType.OPENAI:      "https://api.openai.com/v1",
+        ProviderType.ANTHROPIC:   "https://api.anthropic.com/v1",
+        ProviderType.GEMINI:      "https://generativelanguage.googleapis.com/v1beta/openai/",
+        ProviderType.GROQ:        "https://api.groq.com/openai/v1",
+        ProviderType.MISTRAL:     "https://api.mistral.ai/v1",
+        ProviderType.TOGETHER:    "https://api.together.xyz/v1",
+        ProviderType.FIREWORKS:   "https://api.fireworks.ai/inference/v1",
+        # Cohere's native /v1 REST API does NOT speak OpenAI's chat-completions
+        # schema. The OpenAI-SDK-compatible path is /compatibility/v1.
+        ProviderType.COHERE:      "https://api.cohere.ai/compatibility/v1",
+        ProviderType.PERPLEXITY:  "https://api.perplexity.ai",
+        # api.moonshot.cn is the China-mainland platform. International
+        # accounts (platform.moonshot.ai) use a separate key + endpoint —
+        # if your users sign up internationally, override api_base_url to
+        # "https://api.moonshot.ai/v1" per-config.
+        ProviderType.MOONSHOT:    "https://api.moonshot.cn/v1",
+        ProviderType.DEEPSEEK:    "https://api.deepseek.com/v1",
+        # Singapore/international DashScope endpoint. China-mainland accounts
+        # should override api_base_url to "https://dashscope.aliyuncs.com/compatible-mode/v1".
+        # API keys are NOT interchangeable across DashScope regions.
+        ProviderType.QIANWEN:     "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+        ProviderType.ZHIPU:       "https://open.bigmodel.cn/api/paas/v4",
+    }
+
+    # Providers with no safe universal default: each user's endpoint is
+    # account-specific (Azure resource, AI21 has no confirmed OpenAI-compat
+    # endpoint, CUSTOM/OPENAI_COMPATIBLE are explicitly user-supplied).
+    # These MUST come from api_base_url (or azure_endpoint) — silently
+    # falling back to OpenAI here would be worse than just erroring,
+    # since it could send an enterprise key/payload to the wrong vendor.
+    _REQUIRES_EXPLICIT_BASE_URL = {
+        ProviderType.AI21,
+        ProviderType.AZURE_OPENAI,
+        ProviderType.CUSTOM,
+        ProviderType.OPENAI_COMPATIBLE,
+    }
+
     def get_effective_base_url(self) -> Optional[str]:
         """Get the effective API base URL."""
         # Local provider: always resolve to a local URL, never fall through to OpenAI
         if self.provider == ProviderType.LOCAL:
             return self.local_server_url or self.api_base_url or "http://localhost:11434/v1"
-        if self.provider == ProviderType.OPENAI and not self.api_base_url:
-            return "https://api.openai.com/v1"
-        if self.provider == ProviderType.ANTHROPIC and not self.api_base_url:
-            return "https://api.anthropic.com/v1"
-        if self.provider == ProviderType.GROQ and not self.api_base_url:
-            return "https://api.groq.com/openai/v1"
-        if self.provider == ProviderType.MISTRAL and not self.api_base_url:
-            return "https://api.mistral.ai/v1"
-        if self.provider == ProviderType.TOGETHER and not self.api_base_url:
-            return "https://api.together.xyz/v1"
-        if self.provider == ProviderType.FIREWORKS and not self.api_base_url:
-            return "https://api.fireworks.ai/inference/v1"
-        if self.provider == ProviderType.COHERE and not self.api_base_url:
-            return "https://api.cohere.ai/v1"
-        if self.provider == ProviderType.MOONSHOT and not self.api_base_url:
-            return "https://api.moonshot.cn/v1"
-        if self.provider == ProviderType.DEEPSEEK and not self.api_base_url:
-            return "https://api.deepseek.com/v1"
-        return self.api_base_url
+
+        if self.api_base_url:
+            return self.api_base_url
+
+        if self.provider in self._REQUIRES_EXPLICIT_BASE_URL:
+            return None
+
+        return self._DEFAULT_BASE_URLS.get(self.provider)
 
     def requires_api_key(self) -> bool:
         """Check if this provider requires an API key."""
