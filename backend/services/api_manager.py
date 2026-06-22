@@ -293,14 +293,14 @@ def init_api_manager(db: Session) -> APIManager:
         config_count = db.query(UserModelConfig).filter_by(is_active=True).count()
 
         if config_count == 0:
-            logger.info("No model configs found — creating default LOCAL config")
+            logger.info("No model configs found — creating fallback LOCAL config (not set as default)")
             default_config = UserModelConfig(
                 user_id=None,
                 config_name="Default Local Model",
                 provider=ProviderType.LOCAL,
                 provider_name="Local",
                 default_model="kimi-2.5",
-                is_default=True,
+                is_default=False,     # Don't auto-mark as default — real configs should take precedence
                 is_active=True,
                 status=ConnectionStatus.ACTIVE,
                 rate_limit=60,

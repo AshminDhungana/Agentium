@@ -134,7 +134,7 @@ class ConnectionManager:
                         ),
                         "timestamp": datetime.utcnow().isoformat(),
                     })
-                    await websocket.close(code=1011, reason="System not initialised — no Head of Council")
+                    await websocket.close(code=1013, reason="Genesis in progress — Head of Council not yet created")
                     return None
                 head_agent_id    = head.id
                 head_agentium_id = head.agentium_id

@@ -214,6 +214,16 @@ export function useWebSocketChat(onMessage: (msg: WebSocketMessage) => void): Us
                         return;
                     }
 
+                    // Genesis hasn't finished creating the Head of Council yet.
+                    // The server closes with code 1013 right after this message —
+                    // surface a friendly status instead of the generic error path,
+                    // and let onclose's 1013 branch handle the short fixed retry.
+                    if ((data as any).type === 'system_not_ready') {
+                        console.info('[WebSocket] System not ready yet (Genesis in progress):', data.content);
+                        setError('Setting up your system… this only happens once.');
+                        return;
+                    }
+
                     if ((data as any).type === 'auth_required') {
                         console.warn('[WebSocket] Received auth_required — resending auth token');
                         const token = localStorage.getItem('access_token');
@@ -252,6 +262,17 @@ export function useWebSocketChat(onMessage: (msg: WebSocketMessage) => void): Us
                     case 4001:
                         setError('Authentication failed - please login again');
                         logout();
+                        return;
+                    case 1013:
+                        // Server is mid-Genesis (Head of Council not created yet).
+                        // This is expected and transient — retry on a short fixed
+                        // delay instead of falling into the exponential backoff
+                        // below, which previously made the "Reconnecting…" state
+                        // drag on far longer than Genesis itself actually took.
+                        setError('Setting up your system… this only happens once.');
+                        reconnectTimeoutRef.current = setTimeout(() => {
+                            connect();
+                        }, 1500);
                         return;
                     case 1011:
                         setError('Server error - please try again later');

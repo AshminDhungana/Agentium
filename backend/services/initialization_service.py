@@ -248,32 +248,46 @@ class InitializationService:
 
     async def _ensure_default_model_config(self) -> None:
         """
-        If no UserModelConfig exists yet, synthesize one from the first
-        active API key so genesis can complete without a manual UI step.
+        Ensure the best available model config is marked as default.
+        Prefers real (non-LOCAL) providers; promotes an active config if needed.
         """
-        from backend.models.entities.user_config import UserModelConfig
+        from backend.models.entities.user_config import UserModelConfig, ProviderType
         from backend.services.api_key_manager import api_key_manager
 
-        existing = (
+        active_configs = (
             self.db.query(UserModelConfig)
             .filter(UserModelConfig.status == ConnectionStatus.ACTIVE)
-            .first()
+            .all()
         )
-        if existing:
-            return  # Already have one — nothing to do
+
+        # ── Priority 1: a usable default already exists ──
+        current_default = next((c for c in active_configs if c.is_default), None)
+        if current_default:
+            if current_default.provider != ProviderType.LOCAL or current_default.api_base_url:
+                return  # Usable default already in place
+
+        # ── Priority 2: promote the best available active config to default ──
+        usable = [c for c in active_configs if c.provider != ProviderType.LOCAL or c.api_base_url]
+        best = next((c for c in usable if c.provider != ProviderType.LOCAL), None) or (usable[0] if usable else None)
+
+        if best:
+            for cfg in active_configs:
+                cfg.is_default = False
+            best.is_default = True
+            self.db.flush()
+            logger.info(f"✅ Promoted '{best.config_name}' (provider={best.provider.value}) to default model config")
+            return
+
+        # ── Priority 3: no usable configs — create one from API keys ──
+        availability = api_key_manager.get_provider_availability(self.db)
+        active_provider = next(
+            (p for p, available in availability.items() if available), None
+        )
+        if not active_provider:
+            return
 
         try:
-            availability = api_key_manager.get_provider_availability(self.db)
-            active_provider = next(
-                (p for p, available in availability.items() if available), None
-            )
-            if not active_provider:
-                return
-
-            # Map lowercase string to ProviderType enum
             provider_enum = ProviderType(active_provider.upper())
-
-            # Create a minimal default config for the detected provider
             cfg = UserModelConfig(
                 config_name=f"Default ({active_provider})",
                 provider=provider_enum,
@@ -397,40 +411,47 @@ class InitializationService:
             await self._ensure_default_model_config()
             
             try:
-                from backend.models.entities.user_config import UserModelConfig
-                default_cfg = (
+                from backend.models.entities.user_config import UserModelConfig, ProviderType
+
+                # ── Pick the best working model config: prefer non-LOCAL active configs ──
+                all_active = (
                     self.db.query(UserModelConfig)
-                    .filter(UserModelConfig.is_default == True)
                     .filter(UserModelConfig.status == ConnectionStatus.ACTIVE)
-                    .first()
+                    .all()
                 )
-                if default_cfg:
-                    head = self.db.query(HeadOfCouncil).filter_by(agentium_id="00001").first()
-                    if head and not head.preferred_config_id:
-                        head.preferred_config_id = str(default_cfg.id)
-                        self.db.flush()
-                        logger.info(f"✅ Model config assigned to Head 00001 during genesis: {default_cfg.config_name}")
+
+                # Prefer non-LOCAL providers (they're real cloud-based endpoints).
+                # For LOCAL, only use it if it actually has a configured base_url.
+                def _is_usable(cfg: UserModelConfig) -> bool:
+                    if cfg.provider != ProviderType.LOCAL:
+                        return True
+                    # LOCAL must have an explicit base_url to be usable
+                    return bool(cfg.api_base_url)
+
+                usable_configs = [c for c in all_active if _is_usable(c)]
+
+                # Priority 1: the one marked is_default that is usable
+                default_cfg = next((c for c in usable_configs if c.is_default), None)
+
+                # Priority 2: any usable config (prefer non-LOCAL)
                 if not default_cfg:
-                    # Fallback: grab any active config if no default is marked yet
-                    default_cfg = (
-                        self.db.query(UserModelConfig)
-                        .filter(UserModelConfig.status == ConnectionStatus.ACTIVE)
-                        .first()
-                    )
-                    if default_cfg:
-                        # Promote it to default so future lookups succeed
-                        default_cfg.is_default = True
-                        self.db.flush()
-                        logger.info(f"✅ Promoted '{default_cfg.config_name}' as default model config")
-        
+                    default_cfg = next((c for c in usable_configs if c.provider != ProviderType.LOCAL), None)
+
+                # Priority 3: any usable config at all
+                if not default_cfg:
+                    default_cfg = usable_configs[0] if usable_configs else None
+
+                # ── Assign to Head ──────────────────────────────────────────────────
                 if default_cfg:
                     head = self.db.query(HeadOfCouncil).filter_by(agentium_id="00001").first()
                     if head and not head.preferred_config_id:
                         head.preferred_config_id = str(default_cfg.id)
                         self.db.flush()
-                        logger.info(f"✅ Model config assigned to Head 00001 during genesis: {default_cfg.config_name}")
+                        logger.info(f"✅ Model config assigned to Head 00001 during genesis: {default_cfg.config_name} (provider={default_cfg.provider.value})")
                 else:
                     logger.warning("⚠️ No active default model config found during genesis")
+            except Exception as e:
+                logger.warning(f"⚠️ Could not assign model config to Head during genesis: {e}")
             except Exception as e:
                 logger.warning(f"⚠️ Could not assign model config to Head during genesis: {e}")
                 

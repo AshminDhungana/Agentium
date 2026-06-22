@@ -715,7 +715,7 @@ Build a self-governing AI ecosystem where agents operate under constitutional la
 - [x] **Workflow Engine Suite** (`test_workflow_engine.py`) — 5-step workflow with `task → condition → parallel → human_approval → task`; cron trigger via `schedule_cron`; version increment on update; rollback to prior version; ETA estimation within 20% of actual
 - [x] **RAG Pipeline Suite** (`test_rag.py`) — store → query → deduplication (cosine ≥ 0.95 skips); decay score applied at query time; citation graph BFS to depth 2 returns correct `{ nodes, edges }`; retrieved context is injected into agent prompt
 - [x] **Multi-Channel Suite** (`test_channels.py`) — mock inbound message per channel type (Telegram, Discord, Slack, WhatsApp); verify loop prevention; assert `speaker_id` is attached to `ExternalMessage` after speaker identification
-- [ ] **Security Suite** (`test_security.py`) — expired JWT returns 401; observer role cannot mutate agents or tasks (403); rate limit returns 429 after threshold; HMAC-SHA256 webhook validation rejects tampered payload; XSS payload in task `description` is sanitized before storage
+- [x] **Security Suite** (`test_security.py`) — expired JWT returns 401; observer role cannot mutate agents or tasks (403); rate limit returns 429 after threshold; HMAC-SHA256 webhook validation rejects tampered payload; XSS payload in task `description` is sanitized before storage
 
 #### CI Integration
 
