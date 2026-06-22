@@ -1240,7 +1240,7 @@ class ChannelManager:
             description="".join(description_parts),
             task_type=TaskType.EXECUTION,
             priority=TaskPriority.HIGH if channel.require_approval else TaskPriority.NORMAL,
-            created_by=f"channel:{channel.id}",
+            created_by=channel.agentium_id,
             head_of_council_id=(
                 assigned_agent.id
                 if assigned_agent.agent_type.value == "head_of_council"

@@ -8,6 +8,7 @@ from sqlalchemy import Column, String, Text, Integer, DateTime, ForeignKey, Enum
 from sqlalchemy.orm import relationship
 from backend.models.entities.base import BaseEntity
 import enum
+import uuid as _uuid
 
 
 class ChannelType(str, enum.Enum):
@@ -113,6 +114,11 @@ class ExternalMessage(BaseEntity):
     """
 
     __tablename__ = 'external_messages'
+
+    def __init__(self, **kwargs):
+        if not kwargs.get('agentium_id'):
+            kwargs['agentium_id'] = f"EM{_uuid.uuid4().hex[:8].upper()}"
+        super().__init__(**kwargs)
 
     # Source
     channel_id       = Column(String(36), ForeignKey('external_channels.id'), nullable=False, index=True)

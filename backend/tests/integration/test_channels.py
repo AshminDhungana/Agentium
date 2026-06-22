@@ -29,7 +29,7 @@ pytestmark = pytest.mark.integration
 
 
 def _make_channel(
-    db: Session, channel_type: ChannelType, name: str = None
+    db: Session, channel_type: ChannelType, name: str = None, auto_create_tasks: bool = False
 ) -> ExternalChannel:
     """Create an active ExternalChannel for testing."""
     if name is None:
@@ -41,6 +41,7 @@ def _make_channel(
         status=ChannelStatus.ACTIVE,
         webhook_path=uuid.uuid4().hex,
         config={"provider": "test"},
+        auto_create_tasks=auto_create_tasks,
     )
     db.add(ch)
     db.commit()
