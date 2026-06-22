@@ -4,7 +4,7 @@
  * Connects to the local bridge process running on the host at ws://127.0.0.1:9999.
  * Emits VoiceInteractionEvents so ChatPage can append voice exchanges to chat history.
  *
- * All errors are caught internally; the rest of the app is never affected.
+ *
  */
 
 import { showToast } from '@/hooks/useToast';
@@ -25,7 +25,16 @@ type InteractionHandler = (event: VoiceInteractionEvent) => void;
 
 const WS_URL       = 'ws://127.0.0.1:9999';
 const MAX_RETRIES  = 5;
-const RETRY_DELAYS = [1000, 2000, 4000, 8000, 15000]; // ms, per attempt
+const RETRY_DELAYS = [1000, 2000, 4000, 8000, 15000]; // ms, base delay per attempt (before jitter)
+
+/**
+ * R4: apply ±20% jitter to a base delay so multiple tabs reconnecting after
+ * the same bridge restart don't all retry at exactly the same instant.
+ */
+function withJitter(baseDelayMs: number): number {
+  const jitterFactor = 0.8 + Math.random() * 0.4; // 0.8x .. 1.2x
+  return Math.round(baseDelayMs * jitterFactor);
+}
 
 // ── VoiceBridgeService ────────────────────────────────────────────────────────
 
@@ -113,25 +122,22 @@ class VoiceBridgeService {
     return data.voice_token as string;
   }
 
+  /**
+   * B3: reads the JWT from the single key the rest of the app actually uses.
+   * Confirmed against auth.ts (authService.login/logout/getToken/initAuth)
+   * and api.ts's request interceptor — both read/write 'access_token'
+   * directly. There is no 'auth-storage' Zustand-persist key anywhere in
+   * this app; the previous fallback parse of that key was dead code that
+   * could only ever return ''.
+   */
   private _getSessionToken(): string {
-    // Reads from localStorage where authStore persists the JWT
     try {
-      // First try the direct access_token key used by auth.ts
-      const directToken = localStorage.getItem('access_token');
-      if (directToken) {
-        return directToken;
-      }
-      
-      // Fallback to auth-storage (Zustand persist format)
-      const raw = localStorage.getItem('auth-storage');
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        return parsed?.state?.token ?? '';
-      }
+      return localStorage.getItem('access_token') ?? '';
     } catch {
-      // ignore
+      // localStorage unavailable (e.g. private browsing edge cases) — treat
+      // as no token rather than throwing.
+      return '';
     }
-    return '';
   }
 
   private _openSocket(token: string): void {
@@ -177,7 +183,10 @@ class VoiceBridgeService {
       if (this.status === 'offline') return; // intentional disconnect
 
       if (this.retryCount < MAX_RETRIES) {
-        const delay = RETRY_DELAYS[this.retryCount] ?? 15000;
+        // R4: jitter applied so multiple tabs don't reconnect in lockstep
+        // after the host bridge restarts.
+        const baseDelay = RETRY_DELAYS[this.retryCount] ?? 15000;
+        const delay = withJitter(baseDelay);
         this.retryCount++;
         console.info(`[voiceBridge] Reconnecting in ${delay}ms (attempt ${this.retryCount}/${MAX_RETRIES})`);
         this._setStatus('connecting');

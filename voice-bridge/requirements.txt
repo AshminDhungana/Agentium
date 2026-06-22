@@ -9,7 +9,12 @@ websockets==16.0
 SpeechRecognition==3.14.5
 PyAudio==0.2.14          # mic hardware access
 
-# Offline STT fallback (optional — skip if no model downloaded)
+# Offline STT fallback — used automatically by main.py when Google's free
+# Web Speech API returns a RequestError (it is rate-limited and not intended
+# for commercial/production use). Download a model and set VOSK_MODEL_PATH
+# in env.conf to enable; if no model is found the bridge logs once and
+# continues with Google as the sole engine (no behavior change without a
+# model present).
 vosk==0.3.45
 
 # TTS

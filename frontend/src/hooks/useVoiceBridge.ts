@@ -30,6 +30,23 @@ export function useVoiceBridge(
   const onInteractionRef = useRef(onInteraction);
   useEffect(() => { onInteractionRef.current = onInteraction; }, [onInteraction]);
 
+  // B6: tracks the previous isAuthenticated value across renders so we can
+  // detect a true → false transition specifically (logout), as opposed to
+  // a component remount that still has isAuthenticated === true (navigation).
+  const wasAuthenticatedRef = useRef(isAuthenticated);
+
+  useEffect(() => {
+    const wasAuthenticated = wasAuthenticatedRef.current;
+    wasAuthenticatedRef.current = isAuthenticated;
+
+    if (wasAuthenticated && !isAuthenticated) {
+      // Logout detected — close the bridge connection now rather than
+      // leaving a stale-token socket open until the next remount.
+      console.info('[useVoiceBridge] Logout detected — disconnecting voice bridge');
+      voiceBridgeService.disconnect();
+    }
+  }, [isAuthenticated]);
+
   useEffect(() => {
     if (!isAuthenticated) return;
 
@@ -53,7 +70,8 @@ export function useVoiceBridge(
     return () => {
       unsubStatus();
       unsubInteraction();
-      // Do NOT disconnect on unmount — the singleton stays alive across page changes
+      // Do NOT disconnect on unmount — the singleton stays alive across page
+      // changes. Logout is handled by the dedicated effect above instead.
     };
   }, [isAuthenticated]);
 

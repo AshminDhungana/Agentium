@@ -38,6 +38,7 @@ Timing constants (all configurable via env.conf or environment variables):
   WAKE_WORD_LISTEN_TIMEOUT     = 8s   — how long each passive listen call
                                           blocks before looping back; keep ≤10s
                                           so KeyboardInterrupt stays responsive.
+
 """
 from __future__ import annotations
 
@@ -50,7 +51,7 @@ import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Tuple
 
 # ── Logging ────────────────────────────────────────────────────────────────────
 
@@ -101,6 +102,20 @@ SESSION_NO_SPEECH_TIMEOUT: float = float(_conf.get("SESSION_NO_SPEECH_TIMEOUT", 
 SESSION_MAX_DURATION:      float = float(_conf.get("SESSION_MAX_DURATION",      os.getenv("SESSION_MAX_DURATION",      "120.0")))
 WAKE_WORD_LISTEN_TIMEOUT:  float = float(_conf.get("WAKE_WORD_LISTEN_TIMEOUT",  os.getenv("WAKE_WORD_LISTEN_TIMEOUT",  "8.0")))
 
+# ── Vosk offline-fallback config (B1/B2) ───────────────────────────────────────
+# Only used when recognize_google() fails with a RequestError (network/quota/
+# 5xx from Google) AND a model directory is present. If no model is found,
+# the bridge logs once and continues with Google as the sole engine — exactly
+# today's behavior. This is additive, not a replacement.
+VOSK_MODEL_PATH: str = _conf.get("VOSK_MODEL_PATH", os.getenv("VOSK_MODEL_PATH", str(Path.home() / ".agentium" / "vosk-model")))
+
+# ── Backend call resilience config (B4/R1) ─────────────────────────────────────
+BACKEND_QUERY_RETRIES:    int   = int(_conf.get("BACKEND_QUERY_RETRIES",    os.getenv("BACKEND_QUERY_RETRIES",    "2")))
+BACKEND_QUERY_RETRY_WAIT: float = float(_conf.get("BACKEND_QUERY_RETRY_WAIT", os.getenv("BACKEND_QUERY_RETRY_WAIT", "1.5")))
+
+# ── Subsystem supervisor config (B5) ────────────────────────────────────────────
+SUPERVISOR_RESTART_DELAY: float = float(_conf.get("SUPERVISOR_RESTART_DELAY", os.getenv("SUPERVISOR_RESTART_DELAY", "3.0")))
+
 logger.info(
     "[bridge] BACKEND_URL=%s  WS_PORT=%d  WAKE_WORD='%s'  REQUIRE_WAKE_WORD=%s",
     BACKEND_URL, WS_PORT, WAKE_WORD, REQUIRE_WAKE_WORD,
@@ -115,6 +130,7 @@ logger.info(
 SR_AVAILABLE     = False
 TTS_AVAILABLE    = False
 WS_LIB_AVAILABLE = False
+VOSK_AVAILABLE   = False
 
 try:
     import speech_recognition as sr
@@ -137,8 +153,90 @@ try:
 except ImportError:
     logger.warning("[WARN] websockets not installed — browser sync disabled")
 
+try:
+    import vosk  # noqa: F401  (presence check only — model load happens lazily below)
+    VOSK_AVAILABLE = True
+    logger.info("[bridge] vosk library available")
+except ImportError:
+    logger.info("[bridge] vosk not installed — offline STT fallback disabled (Google-only)")
+
 import urllib.request
 import urllib.error
+
+# ── Vosk lazy model loader (B1/B2) ─────────────────────────────────────────────
+
+_vosk_model = None
+_vosk_model_load_attempted = False
+
+
+def _get_vosk_model():
+    """
+    Lazily load the Vosk model exactly once. Returns None (and logs once) if
+    the model directory doesn't exist or fails to load — callers must treat
+    None as "fallback unavailable, keep going with Google only."
+    """
+    global _vosk_model, _vosk_model_load_attempted
+    if not VOSK_AVAILABLE:
+        return None
+    if _vosk_model_load_attempted:
+        return _vosk_model
+    _vosk_model_load_attempted = True
+
+    model_dir = Path(VOSK_MODEL_PATH)
+    if not model_dir.is_dir():
+        logger.info(
+            "[bridge] No Vosk model found at %s — offline STT fallback disabled "
+            "(download a model and set VOSK_MODEL_PATH to enable it)",
+            model_dir,
+        )
+        return None
+
+    try:
+        import vosk
+        vosk.SetLogLevel(-1)  # suppress Vosk's own noisy stdout logging
+        _vosk_model = vosk.Model(str(model_dir))
+        logger.info("[bridge] Vosk offline STT model loaded from %s", model_dir)
+    except Exception as exc:
+        logger.warning("[WARN] Vosk model failed to load from %s: %s — fallback disabled", model_dir, exc)
+        _vosk_model = None
+    return _vosk_model
+
+
+# Vosk's published models (vosk-model-small-en-us, vosk-model-en-us, etc.) are
+# all trained at 16 kHz, 16-bit mono — feeding them anything else silently
+# degrades accuracy. speech_recognition's AudioData.get_raw_data() can
+# resample for us via convert_rate/convert_width, so we always normalize to
+# this rate/width regardless of what the microphone itself captured at.
+VOSK_SAMPLE_RATE = 16000
+VOSK_SAMPLE_WIDTH = 2  # bytes (16-bit PCM)
+
+
+def _recognize_with_vosk(audio: "sr.AudioData") -> Optional[str]:
+    """
+    Transcribe an already-captured AudioData object using the local Vosk
+    model. Returns None on any failure (model missing, decode error, no
+    speech recognized) so the caller can fall back to "no speech detected"
+    semantics identical to a Google STT miss.
+    """
+    model = _get_vosk_model()
+    if model is None:
+        return None
+
+    try:
+        import vosk
+        rec = vosk.KaldiRecognizer(model, VOSK_SAMPLE_RATE)
+        rec.SetWords(False)
+        # Resample to 16kHz/16-bit regardless of the mic's native capture
+        # rate — Vosk's bundled models expect this specific format.
+        raw = audio.get_raw_data(convert_rate=VOSK_SAMPLE_RATE, convert_width=VOSK_SAMPLE_WIDTH)
+        rec.AcceptWaveform(raw)
+        result = json.loads(rec.FinalResult())
+        text = (result.get("text") or "").strip()
+        return text or None
+    except Exception as exc:
+        logger.warning("[WARN] Vosk transcription failed: %s", exc)
+        return None
+
 
 # ── TTS ────────────────────────────────────────────────────────────────────────
 
@@ -179,6 +277,13 @@ async def speak(text: str) -> None:
 
 # ── STT ────────────────────────────────────────────────────────────────────────
 
+# R2: tracks whether the last listen attempt failed due to missing/unusable
+# microphone hardware, so the passive wake-word loop can back off instead of
+# hot-looping at full WAKE_WORD_LISTEN_TIMEOUT cadence forever.
+_last_mic_error_at: Optional[float] = None
+MIC_ERROR_BACKOFF_SECONDS = 30.0
+
+
 def _listen_sync(
     timeout: float = 8.0,
     phrase_time_limit: float = 15.0,
@@ -203,7 +308,15 @@ def _listen_sync(
 
     Returns the transcribed string or None on timeout / unrecognised audio.
     """
+    global _last_mic_error_at
+
     if not SR_AVAILABLE:
+        return None
+
+    # R2: if the microphone was unusable very recently, don't hammer the OS
+    # audio layer at full speed — back off so logs/CPU don't spin uselessly
+    # for a user who simply has no mic attached.
+    if _last_mic_error_at is not None and (time.monotonic() - _last_mic_error_at) < MIC_ERROR_BACKOFF_SECONDS:
         return None
 
     recognizer = sr.Recognizer()
@@ -220,7 +333,16 @@ def _listen_sync(
             )
             audio = recognizer.listen(source, timeout=timeout, phrase_time_limit=phrase_time_limit)
     except OSError as exc:
-        logger.warning("[WARN] Microphone error: %s", exc)
+        # R2: distinct from STT-API failures — this means no microphone
+        # hardware is available at all. Log once distinctly and start the
+        # backoff window so the passive loop doesn't retry at full speed.
+        if _last_mic_error_at is None:
+            logger.error(
+                "[ERROR] No usable microphone detected (%s). Voice input will stay "
+                "disabled for %.0fs before retrying — check hardware/permissions.",
+                exc, MIC_ERROR_BACKOFF_SECONDS,
+            )
+        _last_mic_error_at = time.monotonic()
         return None
     except sr.WaitTimeoutError:
         logger.debug("[bridge] Listen timeout — no speech detected")
@@ -229,17 +351,29 @@ def _listen_sync(
         logger.warning("[WARN] Unexpected mic error: %s", exc)
         return None
 
+    # Microphone worked this time — clear any prior backoff state.
+    _last_mic_error_at = None
+
     logger.debug("[bridge] Audio captured, sending to STT…")
 
     try:
         text = recognizer.recognize_google(audio)
-        logger.info("[bridge] STT result: '%s'", text)
+        logger.info("[bridge] STT result (Google): '%s'", text)
         return text
     except sr.UnknownValueError:
         logger.debug("[bridge] STT: could not understand audio")
         return None
     except sr.RequestError as exc:
-        logger.warning("[WARN] Google STT request failed: %s", exc)
+        # B1/B2: Google's free Web Speech API is unauthenticated, rate-limited,
+        # and not intended for commercial/production use — it WILL throttle or
+        # error intermittently. Try the local Vosk model (if available) before
+        # giving up on this utterance entirely.
+        logger.warning("[WARN] Google STT request failed: %s — trying offline fallback", exc)
+        fallback_text = _recognize_with_vosk(audio)
+        if fallback_text:
+            logger.info("[bridge] STT result (Vosk fallback): '%s'", fallback_text)
+            return fallback_text
+        logger.warning("[WARN] Offline fallback unavailable or produced no result for this utterance")
         return None
 
 
@@ -269,50 +403,73 @@ def _auth_headers() -> dict:
     return headers
 
 
+# B4/R1: The backend only ever exposes ONE real chat endpoint —
+# POST /api/v1/chat/send, with request body {"message": "...", "stream": false}
+# and response body {"response": "...", "agent_id": "...", ...} — confirmed
+# against backend/api/routes/chat.py. The previous implementation guessed at
+# 4 candidate URLs (3 of which can never exist given how main.py registers
+# routers) and re-probed all 4 on every single voice turn. This resolves the
+# endpoint once per process and reuses it, with a small bounded retry for
+# transient failures instead of silently giving up after one attempt.
+_RESOLVED_CHAT_ENDPOINT = f"{BACKEND_URL}/api/v1/chat/send"
+
+
+def _post_chat_message(text: str) -> Optional[str]:
+    """
+    Single POST attempt against the resolved chat endpoint.
+    Returns the reply text on success, or None on any failure.
+    """
+    payload = json.dumps({"message": text, "stream": False}).encode()
+    try:
+        req = urllib.request.Request(
+            _RESOLVED_CHAT_ENDPOINT, data=payload, headers=_auth_headers(), method="POST"
+        )
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            body = json.loads(resp.read().decode())
+            reply = (
+                body.get("response")
+                or body.get("content")
+                or body.get("message")
+                or body.get("reply")
+                or body.get("text")
+                or ""
+            )
+            if reply:
+                return reply
+            logger.warning("[WARN] Backend returned empty reply: %s", body)
+            return None
+    except urllib.error.HTTPError as exc:
+        logger.warning("[WARN] HTTP %s from %s: %s", exc.code, _RESOLVED_CHAT_ENDPOINT, exc.reason)
+        return None
+    except urllib.error.URLError as exc:
+        logger.warning("[WARN] Cannot reach %s: %s", _RESOLVED_CHAT_ENDPOINT, exc.reason)
+        return None
+    except Exception as exc:
+        logger.warning("[WARN] Unexpected error querying %s: %s", _RESOLVED_CHAT_ENDPOINT, exc)
+        return None
+
+
 def _query_backend_sync(text: str) -> Optional[str]:
     """
-    Blocking HTTP POST to backend — runs in thread executor.
-    Tries multiple endpoint paths to find whichever the backend exposes.
+    Blocking HTTP POST to the resolved backend chat endpoint — runs in a
+    thread executor. Retries up to BACKEND_QUERY_RETRIES times with a short
+    fixed wait, since a transient failure (e.g. backend mid-restart) shouldn't
+    silently fail an entire voice turn after a single attempt.
     """
-    endpoints = [
-        f"{BACKEND_URL}/api/v1/chat/message",
-        f"{BACKEND_URL}/api/v1/chat",
-        f"{BACKEND_URL}/api/chat/message",
-        f"{BACKEND_URL}/api/chat",
-    ]
+    logger.debug("[bridge] POST %s", _RESOLVED_CHAT_ENDPOINT)
 
-    payload = json.dumps({"content": text, "source": "voice"}).encode()
+    for attempt in range(1, BACKEND_QUERY_RETRIES + 1):
+        reply = _post_chat_message(text)
+        if reply:
+            logger.info("[bridge] Backend reply (attempt %d): %s", attempt, reply[:120])
+            return reply
+        if attempt < BACKEND_QUERY_RETRIES:
+            logger.debug("[bridge] Retrying backend query in %.1fs (attempt %d/%d)…",
+                         BACKEND_QUERY_RETRY_WAIT, attempt + 1, BACKEND_QUERY_RETRIES)
+            time.sleep(BACKEND_QUERY_RETRY_WAIT)
 
-    for url in endpoints:
-        try:
-            logger.debug("[bridge] POST %s", url)
-            req = urllib.request.Request(url, data=payload, headers=_auth_headers(), method="POST")
-            with urllib.request.urlopen(req, timeout=30) as resp:
-                body = json.loads(resp.read().decode())
-                reply = (
-                    body.get("response")
-                    or body.get("content")
-                    or body.get("message")
-                    or body.get("reply")
-                    or body.get("text")
-                    or ""
-                )
-                if reply:
-                    logger.info("[bridge] Backend reply (%s): %s", url, reply[:120])
-                    return reply
-                else:
-                    logger.warning("[WARN] Backend returned empty reply from %s: %s", url, body)
-        except urllib.error.HTTPError as exc:
-            logger.warning("[WARN] HTTP %s from %s: %s", exc.code, url, exc.reason)
-            continue
-        except urllib.error.URLError as exc:
-            logger.warning("[WARN] Cannot reach %s: %s", url, exc.reason)
-            break
-        except Exception as exc:
-            logger.warning("[WARN] Unexpected error querying %s: %s", url, exc)
-            continue
-
-    logger.warning("[WARN] All backend endpoints failed for text: '%s'", text)
+    logger.warning("[WARN] Backend query failed after %d attempt(s) for text: '%s'",
+                    BACKEND_QUERY_RETRIES, text)
     return None
 
 
@@ -359,22 +516,25 @@ async def _broadcast(event: dict) -> None:
     logger.debug("[bridge] Broadcast sent to %d browser(s)", len(_connected_browsers) - len(dead))
 
 
-async def _start_ws_server() -> None:
+async def _run_ws_server_once() -> None:
+    """
+    Single attempt at starting the WS server and serving forever.
+    Raises on failure (e.g. port already in use) — the supervisor wrapping
+    this function decides whether/how to retry. Kept separate from the old
+    _start_ws_server() name so the supervisor (B5) has a single-attempt unit
+    to wrap with restart logic.
+    """
     if not WS_LIB_AVAILABLE:
         logger.warning("[WARN] websockets not available — browser WS server skipped")
+        # Block forever without raising — there's nothing to retry here, this
+        # is a missing-dependency condition, not a transient failure.
+        await asyncio.Future()
         return
-    try:
-        import websockets
-        async with websockets.serve(_ws_handler, "127.0.0.1", WS_PORT):
-            logger.info("[bridge] WS server listening on ws://127.0.0.1:%d", WS_PORT)
-            await asyncio.Future()
-    except OSError as exc:
-        if "address already in use" in str(exc).lower():
-            logger.error(
-                "[ERROR] Port %d already in use — kill the other process or change WS_PORT in env.conf",
-                WS_PORT,
-            )
-        raise
+
+    import websockets
+    async with websockets.serve(_ws_handler, "127.0.0.1", WS_PORT):
+        logger.info("[bridge] WS server listening on ws://127.0.0.1:%d", WS_PORT)
+        await asyncio.Future()
 
 
 # ── Session mode ───────────────────────────────────────────────────────────────
@@ -461,7 +621,14 @@ async def _run_session() -> None:
 
 # ── Main voice loop ────────────────────────────────────────────────────────────
 
-async def _voice_loop() -> None:
+async def _run_voice_loop_once() -> None:
+    """
+    Single pass of the voice loop's outer try/except wrapper, extracted from
+    the old _voice_loop() so the supervisor (B5) can wrap it with independent
+    restart logic. Behavior identical to before except that an unhandled
+    exception now propagates to the supervisor instead of being swallowed by
+    an inner `except Exception: sleep(1)` that masked recurring failures.
+    """
     logger.info("[bridge] Voice loop started")
 
     if not SR_AVAILABLE:
@@ -475,53 +642,75 @@ async def _voice_loop() -> None:
         logger.info("[bridge] Wake word mode OFF — speaking directly starts a session")
 
     while True:
-        try:
-            # ── Passive scan: listen for the wake word ─────────────────────────
-            # Use a tighter pause_threshold (0.8s) here — we only need to catch
-            # the two-word trigger, not a full sentence.
-            raw = await listen_once(
-                timeout=WAKE_WORD_LISTEN_TIMEOUT,
-                phrase_time_limit=5.0,
-                pause_threshold=0.8,
-            )
+        # ── Passive scan: listen for the wake word ─────────────────────────
+        # Use a tighter pause_threshold (0.8s) here — we only need to catch
+        # the two-word trigger, not a full sentence.
+        raw = await listen_once(
+            timeout=WAKE_WORD_LISTEN_TIMEOUT,
+            phrase_time_limit=5.0,
+            pause_threshold=0.8,
+        )
 
-            if not raw:
+        if not raw:
+            continue
+
+        logger.info("[bridge] Heard: '%s'", raw)
+
+        if REQUIRE_WAKE_WORD:
+            if WAKE_WORD not in raw.lower():
+                logger.debug("[bridge] No wake word in '%s' — ignoring", raw)
                 continue
 
-            logger.info("[bridge] Heard: '%s'", raw)
+            logger.info("[bridge] Wake word detected — starting session")
+            await speak("Yes, how can I help?")
+        else:
+            # No wake word required — anything heard kicks off a session
+            # with the first utterance already captured.
+            logger.info("[bridge] Direct mode — processing immediately")
+            reply = await query_backend(raw)
+            if not reply:
+                reply = "I'm having trouble reaching the backend right now."
+            await speak(reply)
+            await _broadcast({
+                "type":  "voice_interaction",
+                "user":  raw,
+                "reply": reply,
+                "ts":    time.time(),
+            })
 
-            if REQUIRE_WAKE_WORD:
-                if WAKE_WORD not in raw.lower():
-                    logger.debug("[bridge] No wake word in '%s' — ignoring", raw)
-                    continue
+        # ── Enter session mode ─────────────────────────────────────────────
+        if REQUIRE_WAKE_WORD:
+            await _run_session()
 
-                logger.info("[bridge] Wake word detected — starting session")
-                await speak("Yes, how can I help?")
-            else:
-                # No wake word required — anything heard kicks off a session
-                # with the first utterance already captured.
-                logger.info("[bridge] Direct mode — processing immediately")
-                reply = await query_backend(raw)
-                if not reply:
-                    reply = "I'm having trouble reaching the backend right now."
-                await speak(reply)
-                await _broadcast({
-                    "type":  "voice_interaction",
-                    "user":  raw,
-                    "reply": reply,
-                    "ts":    time.time(),
-                })
 
-            # ── Enter session mode ─────────────────────────────────────────────
-            if REQUIRE_WAKE_WORD:
-                await _run_session()
+# ── Subsystem supervisor (B5) ───────────────────────────────────────────────────
+#
+# Previously both the WS server and the voice loop ran under a single
+# asyncio.gather(), so an unexpected failure in either one tore down the
+# entire process — including the subsystem that was working fine. Each
+# subsystem is now supervised independently: on an unhandled exception it
+# logs, waits SUPERVISOR_RESTART_DELAY, and restarts itself. A clean
+# CancelledError (from process shutdown) still propagates immediately so
+# Ctrl+C / SIGTERM continue to work exactly as before.
 
+async def _supervise(name: str, coro_factory) -> None:
+    """Run coro_factory() forever, restarting it with a delay on failure."""
+    while True:
+        try:
+            await coro_factory()
+            # A subsystem returning normally (rather than running forever)
+            # is unexpected for these two coroutines — treat it the same as
+            # a failure so we don't silently stop supervising.
+            logger.warning("[bridge][supervisor:%s] Subsystem exited unexpectedly — restarting", name)
         except asyncio.CancelledError:
-            logger.info("[bridge] Voice loop cancelled")
-            break
+            logger.info("[bridge][supervisor:%s] Cancelled — shutting down", name)
+            raise
         except Exception as exc:
-            logger.warning("[WARN] Unhandled error in voice loop: %s", exc, exc_info=True)
-            await asyncio.sleep(1)
+            logger.error(
+                "[ERROR][supervisor:%s] Subsystem crashed: %s — restarting in %.1fs",
+                name, exc, SUPERVISOR_RESTART_DELAY, exc_info=True,
+            )
+        await asyncio.sleep(SUPERVISOR_RESTART_DELAY)
 
 
 # ── Entry point ────────────────────────────────────────────────────────────────
@@ -530,18 +719,22 @@ async def _main() -> None:
     logger.info("=" * 60)
     logger.info("  Agentium SecureVoiceBridge starting")
     logger.info("  Backend   : %s", BACKEND_URL)
+    logger.info("  Chat API  : %s", _RESOLVED_CHAT_ENDPOINT)
     logger.info("  WS port   : %d", WS_PORT)
     logger.info("  Wake word : '%s' (required=%s)", WAKE_WORD, REQUIRE_WAKE_WORD)
     logger.info("  STT       : %s", "SpeechRecognition+Google" if SR_AVAILABLE else "DISABLED")
+    logger.info("  STT fallback (offline): %s", "vosk (model path configured)" if VOSK_AVAILABLE else "unavailable")
     logger.info("  TTS       : %s", "pyttsx3" if TTS_AVAILABLE else "DISABLED")
     logger.info("  Platform  : %s", platform.system())
     logger.info("  Session   : no_speech=%.1fs  max=%.0fs  pause=%.1fs",
                 SESSION_NO_SPEECH_TIMEOUT, SESSION_MAX_DURATION, SESSION_PAUSE_THRESHOLD)
     logger.info("=" * 60)
 
+    # B5: each subsystem is supervised independently now instead of sharing
+    # a single asyncio.gather() that dies as one unit.
     await asyncio.gather(
-        _start_ws_server(),
-        _voice_loop(),
+        _supervise("ws-server", _run_ws_server_once),
+        _supervise("voice-loop", _run_voice_loop_once),
     )
 
 
