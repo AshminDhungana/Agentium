@@ -1,28 +1,6 @@
 /**
  * websocketStore.ts
  *
- * Bug fixes applied:
- *
- * BUG 1 — Pong timeout called connect() directly, bypassing backoff.
- *   The old code did: get().disconnect(false); get().connect();
- *   This created an immediate reconnect on every pong timeout with no delay,
- *   producing the rapid 499 loop visible in nginx logs.
- *   Fix: pong timeout now increments _reconnectAttempts and schedules connect()
- *   with the same exponential backoff as the onclose path.
- *
- * BUG 2 — _reconnectAttempts was reset to 0 on every `system` message.
- *   This caused the backoff counter to restart from scratch on every reconnect
- *   cycle (2s → 2s → 2s…) instead of growing (2s → 4s → 8s…).
- *   Fix: _reconnectAttempts is now only reset after the FIRST successful
- *   ping→pong round-trip (_handlePong), confirming a genuinely stable
- *   connection, not just a successful auth handshake.
- *
- * BUG 3 — connect() had no minimum-time guard between calls.
- *   When _ws is briefly null (between a close and its reconnect timer), two
- *   simultaneous callers (e.g. reconnect timer + GlobalWebSocketProvider
- *   effect) could both slip through the readyState guards and open two sockets.
- *   Fix: _lastConnectTime tracks the timestamp of each connect() call; any
- *   call within 1 s of the previous one is ignored.
  */
 
 import { create } from 'zustand';
@@ -114,6 +92,13 @@ interface WebSocketState {
      */
     _lastConnectTime: number;
     /**
+     * True when the server returned system_not_ready with genesis_triggered=false
+     * (i.e. no API key saved yet). While this is true the store stays completely
+     * silent — no banner, no retry loop. It is cleared as soon as the user calls
+     * notifyApiKeyAdded(), which immediately re-attempts connection.
+     */
+    _genesisWaitingForApiKey: boolean;
+    /**
      * BUG 2 FIX: true after the first successful ping→pong round-trip,
      * which is when we consider the connection genuinely stable and safe to
      * reset _reconnectAttempts. Using the system handshake alone was too
@@ -131,6 +116,12 @@ interface WebSocketState {
     markAsRead: () => void;
     addMessageToHistory: (message: WebSocketMessage) => void;
     clearError: () => void;
+    /**
+     * Call this after the user saves their first API key on the Models page.
+     * It kicks the WebSocket out of the silent "no API key yet" state and
+     * immediately attempts to reconnect — so chat activates without a page reload.
+     */
+    notifyApiKeyAdded: () => void;
 
     // Internal actions
     _setConnected: (connected: boolean) => void;
@@ -195,6 +186,7 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
     _processedIds:       new Set<string>(),
     _activeToastId:      null,
     _lastConnectTime:    0,       // BUG 3 FIX
+    _genesisWaitingForApiKey: false,
     _connectionStable:   false,   // BUG 2 FIX
     _lastMessageTimestamp: null,
 
@@ -207,6 +199,16 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
     _incrementUnread: ()          => set(s => ({ unreadCount: s.unreadCount + 1 })),
     markAsRead:      ()           => set({ unreadCount: 0 }),
     clearError:      ()           => set({ error: null }),
+
+    notifyApiKeyAdded: () => {
+        // Clear the "waiting for API key" flag and immediately try to connect.
+        // This is called by the Models page after a successful API key save,
+        // which ensures chat becomes active without requiring a page reload.
+        console.log('[WebSocket] API key added — re-attempting connection');
+        set({ _genesisWaitingForApiKey: false });
+        get().disconnect(true);
+        setTimeout(() => get().connect(), 100);
+    },
 
     /** Keep the dedup set bounded to MAX_PROCESSED_IDS */
     _trackProcessedId: (id: string) => {
@@ -355,6 +357,15 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
             return;
         }
 
+        // If the server told us there is no API key yet, stay silent until the
+        // user saves one and calls notifyApiKeyAdded(). Without this guard the
+        // reconnect timer / effect re-runs would keep re-connecting and the
+        // "System Initializing" banner would flash on every attempt.
+        if (get()._genesisWaitingForApiKey) {
+            console.debug('[WebSocket] connect() suppressed — waiting for API key');
+            return;
+        }
+
         const s = get();
         if (s._ws?.readyState === WebSocket.CONNECTING) return;
         if (s._ws?.readyState === WebSocket.OPEN)       return;
@@ -441,6 +452,42 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
                         return;
                     }
 
+                    // genesis_triggered=false  → no API key saved yet, stay silent.
+                    // genesis_triggered=true   → API key exists, genesis is running,
+                    //                            show banner and poll every 10 s.
+                    if (data.type === 'system_not_ready') {
+                        const triggered = data.genesis_triggered as boolean | undefined;
+                        // Always clear the connecting/connected flags regardless of
+                        // which sub-case we're in — we are definitively not connected.
+                        get()._setConnecting(false);
+                        get()._setConnected(false);
+
+                        if (triggered) {
+                            // API key saved, genesis running — surface status and
+                            // poll gently every 10 s without burning the backoff counter.
+                            console.warn('[WebSocket] system_not_ready — genesis in progress, will retry in 10s');
+                            set({ _genesisWaitingForApiKey: false });
+                            get()._setError(
+                                (data.content as string | undefined) ??
+                                'Genesis in progress. Retrying…'
+                            );
+                            const t = setTimeout(() => {
+                                get()._setError(null);
+                                get().connect();
+                            }, 10_000);
+                            set({ _reconnectTimeout: t });
+                        } else {
+                            // No API key yet — user hasn't triggered genesis.
+                            // Set the waiting flag so connect() is a no-op until
+                            // notifyApiKeyAdded() is called. Clear any error so
+                            // no banner appears and no retry loop starts.
+                            console.warn('[WebSocket] system_not_ready — no API key configured yet, staying silent');
+                            set({ _genesisWaitingForApiKey: true });
+                            get()._setError(null);
+                        }
+                        return;
+                    }
+
                     if (data.timestamp) {
                         set({ _lastMessageTimestamp: data.timestamp });
                     }
@@ -479,12 +526,19 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
                     case 4001: errorMsg = 'Authentication failed — please log in again'; break;
                     case 1000: break; // clean close
                     case 1006: errorMsg = 'Connection lost unexpectedly'; break;
+                    case 1013:
+                        // Server sent system_not_ready then closed with 1013.
+                        // The onmessage handler already set the error string and
+                        // scheduled a 10-second polling retry — do NOT call
+                        // _scheduleReconnect() here or we'll double-schedule and
+                        // burn through the backoff counter unnecessarily.
+                        break;
                     default:   errorMsg = `Connection closed (${event.code})`; break;
                 }
                 if (errorMsg) get()._setError(errorMsg);
 
                 const isManual = get()._isManualDisconnect;
-                if (!isManual && event.code !== 4001) {
+                if (!isManual && event.code !== 4001 && event.code !== 1013) {
                     // BUG 1 FIX: use the shared _scheduleReconnect() which
                     // applies exponential backoff. Previously this path had
                     // its own inline backoff while the pong timeout bypassed

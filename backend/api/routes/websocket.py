@@ -122,18 +122,44 @@ class ConnectionManager:
             with get_fresh_db() as db:
                 head = db.query(HeadOfCouncil).filter_by(agentium_id="00001").first()
                 if not head:
-                    # Inform the frontend before closing so it can show a helpful message
-                    # instead of a silent disconnect.  Genesis runs automatically once an
-                    # API key is added via POST /api/v1/models/configs.
-                    await websocket.send_json({
-                        "type":      "system_not_ready",
-                        "content":   (
-                            "System is not yet initialized. "
-                            "Please add an API key on the Models page — "
-                            "genesis will start automatically."
-                        ),
-                        "timestamp": datetime.utcnow().isoformat(),
-                    })
+                    # Head of Council not yet created.  Two sub-cases:
+                    #
+                    # 1. genesis_triggered=False — no API key has been saved yet.
+                    #    The frontend should stay silent; showing a banner here
+                    #    would be premature (the user hasn't done anything yet).
+                    #
+                    # 2. genesis_triggered=True — an API key exists so genesis
+                    #    has been kicked off and is still running.  The frontend
+                    #    shows a "System Initializing…" banner and polls every 10 s.
+                    #
+                    # We determine this by checking whether any UserModelConfig row
+                    # exists, which is created when the user saves their first API
+                    # key on the Models page (POST /api/v1/models/configs).
+                    genesis_triggered = False
+                    try:
+                        from backend.models.entities import UserModelConfig
+                        genesis_triggered = db.query(UserModelConfig).limit(1).first() is not None
+                    except Exception:
+                        pass  # if the table doesn't exist yet, treat as not triggered
+
+                    try:
+                        await websocket.send_json({
+                            "type":              "system_not_ready",
+                            # genesis_triggered tells the frontend whether to show
+                            # the initializing banner (True) or stay silent (False).
+                            "genesis_triggered": genesis_triggered,
+                            "content":           (
+                                "System is initializing — genesis is running. "
+                                "This usually takes under a minute."
+                            ) if genesis_triggered else (
+                                "System is not yet initialized. "
+                                "Please add an API key on the Models page — "
+                                "genesis will start automatically."
+                            ),
+                            "timestamp":         datetime.utcnow().isoformat(),
+                        })
+                    except Exception:
+                        pass  # socket may already be closing
                     await websocket.close(code=1013, reason="Genesis in progress — Head of Council not yet created")
                     return None
                 head_agent_id    = head.id

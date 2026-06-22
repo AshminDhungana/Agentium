@@ -22,6 +22,7 @@ import { ModelCardSkeleton } from '@/components/models/ModelCardSkeleton';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { useModelConfigs } from '@/hooks/useModelConfigs';
 import { formatTokenCount } from '@/utils/time';
+import { useWebSocketStore } from '@/store/websocketStore';
 
 // ─── Error Boundary ───────────────────────────────────────────────────────────
 //
@@ -139,6 +140,11 @@ const ModelsPageInner: React.FC = () => {
         setPendingDeleteId,
     } = useModelConfigs();
 
+    // Notify the WebSocket store when an API key is saved for the first time so
+    // it can exit the silent "no API key yet" state and reconnect immediately —
+    // no page reload needed (Bug 2 fix, called after every successful save).
+    const notifyApiKeyAdded = useWebSocketStore(s => s.notifyApiKeyAdded);
+
     // FIX: previously plain functions recreated on every render. ModelCard is
     // React.memo'd, but a new function identity passed as a prop on every
     // parent render defeats that memoization for every card in the grid, not
@@ -150,9 +156,14 @@ const ModelsPageInner: React.FC = () => {
 
     const handleSaveAndClose = useCallback(async (config: import('@/types').ModelConfig) => {
         await handleSave(config);
+        // Wake the WebSocket out of the "waiting for API key" silent state.
+        // notifyApiKeyAdded() is idempotent — it is safe to call on every save,
+        // not only on the very first one (subsequent calls are a no-op because
+        // _genesisWaitingForApiKey is already false after the initial connect).
+        notifyApiKeyAdded();
         setShowForm(false);
         setEditingConfig(null);
-    }, [handleSave]);
+    }, [handleSave, notifyApiKeyAdded]);
 
     // ── Initial load skeleton (no configs in cache yet) ────────────────────
     if (loading && configs.length === 0) {
