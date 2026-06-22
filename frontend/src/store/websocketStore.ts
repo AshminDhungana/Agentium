@@ -457,9 +457,9 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
                     //                            show banner and poll every 10 s.
                     if (data.type === 'system_not_ready') {
                         const triggered = data.genesis_triggered as boolean | undefined;
-                        // Always clear the connecting/connected flags regardless of
-                        // which sub-case we're in — we are definitively not connected.
-                        get()._setConnecting(false);
+                        // We are definitively not connected, but keep isConnecting true
+                        // so the reconnect / initialization banner stays visible while
+                        // the client polls for genesis completion.
                         get()._setConnected(false);
 
                         if (triggered) {
@@ -518,22 +518,47 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
             ws.onclose = (event) => {
                 get()._clearAllTimers();
                 get()._setConnected(false);
-                get()._setConnecting(false);
                 set({ _ws: null, _connectionStable: false });
 
                 let errorMsg: string | null = null;
                 switch (event.code) {
-                    case 4001: errorMsg = 'Authentication failed — please log in again'; break;
-                    case 1000: break; // clean close
-                    case 1006: errorMsg = 'Connection lost unexpectedly'; break;
-                    case 1013:
-                        // Server sent system_not_ready then closed with 1013.
-                        // The onmessage handler already set the error string and
-                        // scheduled a 10-second polling retry — do NOT call
-                        // _scheduleReconnect() here or we'll double-schedule and
-                        // burn through the backoff counter unnecessarily.
+                    case 4001:
+                        errorMsg = 'Authentication failed — please log in again';
+                        get()._setConnecting(false);
                         break;
-                    default:   errorMsg = `Connection closed (${event.code})`; break;
+                    case 1000:
+                        get()._setConnecting(false);
+                        break; // clean close
+                    case 1006:
+                        errorMsg = 'Connection lost unexpectedly';
+                        get()._setConnecting(false);
+                        break;
+                    case 1013:
+                        // onmessage may have scheduled a reconnect timeout, but
+                        // _clearAllTimers() above already cancelled it. If onmessage
+                        // never ran (message lost before delivery) the client would
+                        // be stuck forever. Recreate the retry here. Skip entirely
+                        // when the server already told us no API key is saved yet
+                        // so we remain silent in that silent-waiting state.
+                        if (!get()._genesisWaitingForApiKey) {
+                            if (!get().error) {
+                                get()._setError('Genesis in progress. Retrying…');
+                            }
+                            {
+                                const t = setTimeout(() => {
+                                    get()._setError(null);
+                                    get().connect();
+                                }, 10_000);
+                                set({ _reconnectTimeout: t });
+                            }
+                        }
+                        // Keep isConnecting true so the reconnect/init banner
+                        // stays visible while we poll every 10s.
+                        break;
+                    default:
+                        errorMsg = `Connection closed (${event.code})`;
+                        get()._setConnecting(false);
+                        break;
                 }
                 if (errorMsg) get()._setError(errorMsg);
 
