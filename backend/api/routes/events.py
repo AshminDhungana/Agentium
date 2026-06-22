@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 
-from backend.models.database import get_db_context
+from backend.models.database import get_db
 from backend.models.entities.event_trigger import (
     EventLog,
     EventLogStatus,
@@ -20,13 +20,6 @@ from backend.models.entities.event_trigger import (
 from backend.services.event_processor import EventProcessorService
 
 router = APIRouter(prefix="/events", tags=["Events"])
-
-
-# ── Dependency ────────────────────────────────────────────────────────────────
-
-def get_db():
-    with get_db_context() as db:
-        yield db
 
 
 # ── Trigger CRUD ──────────────────────────────────────────────────────────────
