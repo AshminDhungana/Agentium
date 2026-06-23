@@ -1,0 +1,61 @@
+name: Integration Tests
+
+on:
+  push:
+    branches: [ "main", "master", "develop" ]
+  pull_request:
+    branches: [ "main", "master", "develop" ]
+
+jobs:
+  integration-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Start test services
+        run: |
+          docker compose -f docker-compose.test.yml up -d
+
+      - name: Wait for services to be healthy
+        run: |
+          for i in {1..60}; do
+            sleep 2
+            docker compose -f docker-compose.test.yml ps | grep -i healthy && break
+          done
+          docker compose -f docker-compose.test.yml ps
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        working-directory: ./backend
+        run: |
+          pip install --upgrade pip setuptools wheel
+          pip install --no-cache-dir -r requirements.txt
+
+      - name: Run integration tests with coverage
+        working-directory: ./backend
+        run: pytest --cov=backend/services --cov-report=term-missing --cov-report=html --cov-fail-under=80
+        env:
+          DATABASE_URL: postgresql://agentium:agentium@localhost:5432/agentium_test
+          REDIS_URL: redis://localhost:6379/1
+          CHROMA_HOST: localhost
+          CHROMA_PORT: 8001
+          CELERY_TASK_ALWAYS_EAGER: true
+          TESTING: true
+          PYTHONPATH: .
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: backend/htmlcov/
+
+      - name: Stop test services
+        if: always()
+        run: docker compose -f docker-compose.test.yml down

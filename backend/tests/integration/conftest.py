@@ -7,12 +7,14 @@ import os
 import json
 import pytest
 import pytest_asyncio
-from typing import Generator, AsyncGenerator
+from typing import Generator
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, Session
 import redis.asyncio as redis
 import redis as sync_redis
+import httpx
+from httpx import ASGITransport
 
 # Set environment variables for the test session
 # This ensures that imported modules pick up the test configuration
@@ -297,6 +299,25 @@ def client(db_session, redis_client, vector_store, celery_eager):
         yield test_client
         
     # Restore override
+    backend.core.vector_store.get_vector_store = original_get_vector_store
+    app.dependency_overrides.clear()
+
+
+@pytest_asyncio.fixture(scope="function")
+async def async_client(db_session, redis_client, vector_store, celery_eager):
+    """Async httpx client with ASGI transport for testing async FastAPI routes."""
+    def override_get_db():
+        yield db_session
+
+    app.dependency_overrides[get_db] = override_get_db
+    import backend.core.vector_store
+    original_get_vector_store = backend.core.vector_store.get_vector_store
+    backend.core.vector_store.get_vector_store = lambda: vector_store
+
+    transport = ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
+        yield ac
+
     backend.core.vector_store.get_vector_store = original_get_vector_store
     app.dependency_overrides.clear()
 

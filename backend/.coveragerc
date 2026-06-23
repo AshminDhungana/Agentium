@@ -1,0 +1,10 @@
+[run]
+source = backend/services
+branch = True
+
+[report]
+show_missing = True
+skip_covered = False
+
+[html]
+directory = htmlcov

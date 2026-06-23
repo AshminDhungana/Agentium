@@ -1,0 +1,52 @@
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Ephemeral Test Infrastructure
+# PostgreSQL + Redis + ChromaDB — no persistent volumes
+# Used by CI (GitHub Actions) and local integration test runs.
+# ── Services ─────────────────────────────────
+#   postgres :5432  ─  test DB (agentium_test)
+#   redis    :6379  ─  Celery broker / cache
+#   chromadb :8001  ─  vector store (host:container = 8001:8000)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: agentium-test-postgres
+    environment:
+      POSTGRES_DB: agentium_test
+      POSTGRES_USER: agentium
+      POSTGRES_PASSWORD: agentium
+      POSTGRES_HOST_AUTH_METHOD: scram-sha-256
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agentium"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    # No volumes — ephemeral
+
+  redis:
+    image: redis:7.2.1-alpine
+    container_name: agentium-test-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    # No volumes — ephemeral
+
+  chromadb:
+    image: chromadb/chroma:1.5.1
+    container_name: agentium-test-chroma
+    ports:
+      - "8001:8000"
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo > /dev/tcp/localhost/8000"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    # No volumes — ephemeral
