@@ -42,7 +42,7 @@ class GitTool:
     
     def __init__(self):
         self.base_path = Path("/host_home/agentium-git")
-        self.base_path.mkdir(exist_ok=True)
+        self.base_path.mkdir(parents=True, exist_ok=True)
     
     async def execute(
         self,
