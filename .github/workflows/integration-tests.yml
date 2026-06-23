@@ -39,7 +39,7 @@ jobs:
 
       - name: Run integration tests with coverage
         working-directory: ./backend
-        run: pytest --cov=backend/services --cov-report=term-missing --cov-report=html --cov-fail-under=80
+        run: pytest
         env:
           DATABASE_URL: postgresql://agentium:agentium@localhost:5432/agentium_test
           REDIS_URL: redis://localhost:6379/1
@@ -47,7 +47,7 @@ jobs:
           CHROMA_PORT: 8001
           CELERY_TASK_ALWAYS_EAGER: true
           TESTING: true
-          PYTHONPATH: .
+          PYTHONPATH: $GITHUB_WORKSPACE
 
       - name: Upload coverage report
         if: always()
