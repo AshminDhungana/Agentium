@@ -42,13 +42,21 @@ logger = logging.getLogger(__name__)
 # ── Optional dependency guards ─────────────────────────────────────────────────
 
 try:
+    # pyautogui's own dependency, mouseinfo, does `Display(os.environ['DISPLAY'])`
+    # at *import time* with no .get()/try-except of its own. On headless hosts
+    # (CI runners, servers with no X server) this raises KeyError — not
+    # ImportError — so we must catch both or the import escapes this guard
+    # and crashes every module that imports desktop_tool (e.g. tool_registry).
     import pyautogui
     pyautogui.FAILSAFE = True   # Move mouse to top-left corner to abort
     pyautogui.PAUSE = 0.05      # Small delay between actions for stability
     PYAUTOGUI_AVAILABLE = True
-except ImportError:
+except (ImportError, KeyError) as _pyautogui_import_error:
     PYAUTOGUI_AVAILABLE = False
-    logger.warning("pyautogui not installed — mouse/keyboard control unavailable")
+    logger.warning(
+        "pyautogui unavailable — mouse/keyboard control disabled (%s)",
+        _pyautogui_import_error,
+    )
 
 try:
     from PIL import Image
