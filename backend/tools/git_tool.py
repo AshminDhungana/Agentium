@@ -42,6 +42,8 @@ class GitTool:
     
     def __init__(self):
         self.base_path = Path("/host_home/agentium-git")
+
+    def _ensure_base_path(self):
         self.base_path.mkdir(parents=True, exist_ok=True)
     
     async def execute(
@@ -88,6 +90,7 @@ class GitTool:
     
     async def _clone(self, repo_url: str, path: Optional[str] = None, **kwargs) -> Dict[str, Any]:
         """Clone repository."""
+        self._ensure_base_path()
         target = self.base_path / (path or self._repo_name_from_url(repo_url))
         
         result = subprocess.run(
