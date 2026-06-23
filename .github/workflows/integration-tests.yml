@@ -47,7 +47,7 @@ jobs:
           CHROMA_PORT: 8001
           CELERY_TASK_ALWAYS_EAGER: true
           TESTING: true
-          PYTHONPATH: $GITHUB_WORKSPACE
+          PYTHONPATH: ${{ github.workspace }}
 
       - name: Upload coverage report
         if: always()
