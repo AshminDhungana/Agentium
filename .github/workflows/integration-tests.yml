@@ -2,9 +2,9 @@ name: Integration Tests
 
 on:
   push:
-    branches: [ "main", "master", "develop" ]
+    branches: ["main", "master", "develop"]
   pull_request:
-    branches: [ "main", "master", "develop" ]
+    branches: ["main", "master", "develop"]
 
 jobs:
   integration-tests:
@@ -22,14 +22,19 @@ jobs:
         run: |
           for i in {1..60}; do
             sleep 2
-            docker compose -f docker-compose.test.yml ps | grep -i healthy && break
+            healthy_count=$(docker compose -f docker-compose.test.yml ps | grep -ci healthy || true)
+            if [ "$healthy_count" -eq 3 ]; then
+              echo "All services healthy."
+              break
+            fi
+            echo "Waiting for services to become healthy ($healthy_count/3)..."
           done
           docker compose -f docker-compose.test.yml ps
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
       - name: Install dependencies
         working-directory: ./backend
