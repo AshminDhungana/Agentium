@@ -774,11 +774,19 @@ _vector_store: Optional[VectorStore] = None
 
 
 def get_vector_store() -> VectorStore:
-    """Return the initialised singleton VectorStore."""
+    """
+    Return the singleton VectorStore.
+
+    Does NOT eagerly connect to ChromaDB. Construction only sets up the
+    instance; the actual connection is deferred to ``VectorStore.client``
+    (or ``initialize()`` called directly), which run on first real use.
+    This keeps module-import time (e.g. ``skill_manager.py``'s module-level
+    ``skill_manager = SkillManager()``) free of network calls, so importing
+    the app doesn't hard-fail just because Chroma isn't reachable yet.
+    """
     global _vector_store  # noqa: PLW0603
     if _vector_store is None:
         _vector_store = VectorStore()
-        _vector_store.initialize()
     return _vector_store
 
 
