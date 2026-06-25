@@ -246,8 +246,17 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
         setError(null);
         setTestResult(null);
         try {
+            // FIX: custom/universal providers set formData.provider = 'custom', but the
+            // backend's fetch-models-direct endpoint routes by ProviderType and has no
+            // handler for 'custom' — it either throws or returns [], which triggers a 404
+            // that crashes the error boundary and blanks the page.
+            // Custom providers are always OpenAI-compatible, so send provider='openai'
+            // with the custom api_base_url; the backend will call GET /models against
+            // that URL exactly as it would for a real OpenAI endpoint.
+            const fetchProvider = isUniversal ? 'openai' : formData.provider;
+
             const result = await modelsApi.fetchModelsDirectly({
-                provider: formData.provider,
+                provider: fetchProvider as typeof formData.provider,
                 api_key: formData.api_key || undefined,
                 api_base_url: formData.api_base_url || undefined,
                 local_server_url: formData.local_server_url || undefined,
@@ -262,7 +271,9 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
             }));
             setTestResult({
                 success: true,
-                message: `✓ Found ${result.count} available models from ${result.provider}`,
+                // FIX: String() coerce — result.provider comes from the API and could be
+                // a non-string on unexpected responses, which would cause React error #31.
+                message: `✓ Found ${result.count} available models from ${String(result.provider)}`,
             });
         } catch (err: unknown) {
             // FIX: extractErrorMessage always returns a string — never an object
