@@ -17,13 +17,16 @@ import httpx
 from httpx import ASGITransport
 
 # Set environment variables for the test session
-# This ensures that imported modules pick up the test configuration
-os.environ["DATABASE_URL"] = "postgresql://agentium:agentium@postgres:5432/agentium_test"
-os.environ["REDIS_URL"] = "redis://redis:6379/1"
-os.environ["CHROMA_HOST"] = "chromadb"
-os.environ["CHROMA_PORT"] = "8000"
-os.environ["CELERY_TASK_ALWAYS_EAGER"] = "true"
-os.environ["TESTING"] = "true"
+# This ensures that imported modules pick up the test configuration.
+# Only set defaults when not already provided — CI (GitHub Actions)
+# sets these to localhost because tests run on the runner host, not
+# inside the Docker network where "postgres"/"redis"/"chromadb" resolve.
+os.environ.setdefault("DATABASE_URL", "postgresql://agentium:agentium@postgres:5432/agentium_test")
+os.environ.setdefault("REDIS_URL", "redis://redis:6379/1")
+os.environ.setdefault("CHROMA_HOST", "chromadb")
+os.environ.setdefault("CHROMA_PORT", "8000")
+os.environ.setdefault("CELERY_TASK_ALWAYS_EAGER", "true")
+os.environ.setdefault("TESTING", "true")
 
 
 from backend.main import app
@@ -35,8 +38,10 @@ from backend.models.entities.user import User
 
 # Engine for the test database
 # Use the default postgres db just to create the test db if it doesn't exist
-DEFAULT_URL = "postgresql://agentium:agentium@postgres:5432/agentium"
 TEST_DB_URL = os.environ["DATABASE_URL"]
+# Derive the default-db URL from the test-db URL so it works with whatever
+# host the env is configured for (localhost in CI, postgres in Docker).
+DEFAULT_URL = TEST_DB_URL.rsplit("/", 1)[0] + "/agentium"
 
 
 @pytest.fixture(scope="session")

@@ -20,16 +20,22 @@ jobs:
 
       - name: Wait for services to be healthy
         run: |
+          echo "=== Service startup logs ==="
+          docker compose -f docker-compose.test.yml logs
+          echo "=== Waiting for healthy services ==="
           for i in {1..60}; do
             sleep 2
-            healthy_count=$(docker compose -f docker-compose.test.yml ps | grep -ci healthy || true)
+            healthy_count=$(docker compose -f docker-compose.test.yml ps | grep -ci "healthy" || true)
             if [ "$healthy_count" -eq 3 ]; then
-              echo "All services healthy."
+              echo "All 3 services healthy."
               break
             fi
-            echo "Waiting for services to become healthy ($healthy_count/3)..."
+            echo "Waiting for services ($healthy_count/3 healthy) — attempt $i/60"
           done
+          echo "=== Final service status ==="
           docker compose -f docker-compose.test.yml ps
+          # Verify PostgreSQL is accepting connections from the host
+          pg_isready -h localhost -p 5432 -U agentium -d agentium_test || echo "WARNING: pg_isready failed"
 
       - name: Set up Python
         uses: actions/setup-python@v5
