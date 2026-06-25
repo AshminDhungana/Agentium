@@ -56,13 +56,16 @@ jobs:
           # Create databases idempotently (fail the build if this breaks)
           for db in agentium agentium_test; do
             echo "Ensuring database exists: $db"
-            docker compose -f docker-compose.test.yml exec -T postgres psql -U "$PSQL_USER" -c "SELECT 1 FROM pg_database WHERE datname='$db'" | grep -q 1 || \
-              docker compose -f docker-compose.test.yml exec -T postgres psql -U "$PSQL_USER" -c "CREATE DATABASE $db"
+            docker compose -f docker-compose.test.yml exec -T postgres \
+              psql -U "$PSQL_USER" -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='$db'" | grep -q 1 || \
+              docker compose -f docker-compose.test.yml exec -T postgres \
+                psql -U "$PSQL_USER" -d postgres -c "CREATE DATABASE $db"
           done
 
           # Verify databases exist
           echo "=== Verifying databases ==="
-          docker compose -f docker-compose.test.yml exec -T postgres psql -U "$PSQL_USER" -c "\l" | grep -E "agentium|agentium_test"
+          docker compose -f docker-compose.test.yml exec -T postgres \
+            psql -U "$PSQL_USER" -d postgres -c "\l" | grep -E "agentium|agentium_test"
         shell: bash
 
       - name: Set up Python
