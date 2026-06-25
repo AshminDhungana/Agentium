@@ -41,7 +41,10 @@ from backend.models.entities.user import User
 TEST_DB_URL = os.environ["DATABASE_URL"]
 # Derive the default-db URL from the test-db URL so it works with whatever
 # host the env is configured for (localhost in CI, postgres in Docker).
-DEFAULT_URL = TEST_DB_URL.rsplit("/", 1)[0] + "/agentium"
+# We connect to the 'postgres' system database (guaranteed to exist) for
+# admin operations like CREATE DATABASE, rather than assuming a custom
+# 'agentium' database exists in all environments.
+DEFAULT_URL = TEST_DB_URL.rsplit("/", 1)[0] + "/postgres"
 
 
 @pytest.fixture(scope="session")

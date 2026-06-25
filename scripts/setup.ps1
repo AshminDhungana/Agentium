@@ -1,17 +1,12 @@
 # setup.ps1 - Windows entry point for Agentium Voice Bridge
 # Usage: powershell -ExecutionPolicy Bypass -File scripts\setup.ps1
 # Automatically requests UAC elevation if needed.
-
-$ErrorActionPreference = "Stop"
-
-# ---------------------------------------------------------------------------
-# IMPORTANT: param() MUST be the first statement in a script.
-# We declare -RepoRoot here so both the non-admin first run AND the elevated
-# re-launch can receive it cleanly.
-# ---------------------------------------------------------------------------
+# NOTE: param() MUST be the first executable statement — only comments above it.
 param(
     [string]$RepoRoot = ""
 )
+
+$ErrorActionPreference = "Stop"
 
 # Resolve repo root from PSScriptRoot when not passed in
 if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
@@ -131,7 +126,7 @@ while ($elapsed -le $maxWait) {
 }
 
 if ($bridgeUp) {
-    Write-Host "  Bridge is UP and listening on port 9999 ✓" -ForegroundColor Green
+    Write-Host "  Bridge is UP and listening on port 9999 [OK]" -ForegroundColor Green
 } else {
     Write-Host "  Bridge did NOT start within $maxWait`s -- check log below" -ForegroundColor Red
 

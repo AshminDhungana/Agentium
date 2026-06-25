@@ -236,6 +236,11 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
             setError('Local server URL is required to fetch models');
             return;
         }
+        // Custom providers need a base URL to know where to call /models.
+        if (isUniversal && !formData.api_base_url.trim()) {
+            setError('API Base URL is required to fetch models from a custom provider');
+            return;
+        }
 
         setFetchingModels(true);
         setError(null);
@@ -726,30 +731,31 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
                                     />
                                 )}
 
-                                {/* Fetch Models button */}
-                                {(!isUniversal && formData.provider !== 'local') && (
+                                {/* Fetch Models button — shown for all known providers, local,
+                                    and custom providers that have a base URL configured */}
+                                {(formData.provider === 'local' || !isUniversal || formData.api_base_url.trim()) && (
                                     <button
                                         type="button"
                                         onClick={fetchAvailableModels}
-                                        disabled={fetchingModels || (!formData.api_key && selectedProvider?.requires_api_key === true)}
-                                        aria-label="Fetch available models from provider"
-                                        title={!formData.api_key && selectedProvider?.requires_api_key ? 'Enter API key first' : 'Fetch available models from provider'}
-                                        className="px-3 py-2.5 bg-blue-600 hover:bg-blue-700 dark:hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors duration-150 flex items-center gap-1.5 whitespace-nowrap shadow-sm"
-                                    >
-                                        {fetchingModels
-                                            ? <LoadingSpinner size="sm" />
-                                            : <Download className="w-4 h-4" aria-hidden="true" />
+                                        disabled={
+                                            fetchingModels
+                                            || (!formData.api_key && selectedProvider?.requires_api_key === true)
+                                            || (isUniversal && !formData.api_base_url.trim())
                                         }
-                                        {fetchingModels ? 'Fetching…' : 'Fetch'}
-                                    </button>
-                                )}
-                                {formData.provider === 'local' && (
-                                    <button
-                                        type="button"
-                                        onClick={fetchAvailableModels}
-                                        disabled={fetchingModels}
-                                        aria-label="Fetch installed models from local server"
-                                        title="Fetch installed models from local server"
+                                        aria-label={
+                                            formData.provider === 'local'
+                                                ? 'Fetch installed models from local server'
+                                                : 'Fetch available models from provider'
+                                        }
+                                        title={
+                                            isUniversal && !formData.api_base_url.trim()
+                                                ? 'Enter API Base URL first'
+                                                : !formData.api_key && selectedProvider?.requires_api_key
+                                                    ? 'Enter API key first'
+                                                    : formData.provider === 'local'
+                                                        ? 'Fetch installed models from local server'
+                                                        : 'Fetch available models from provider'
+                                        }
                                         className="px-3 py-2.5 bg-blue-600 hover:bg-blue-700 dark:hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors duration-150 flex items-center gap-1.5 whitespace-nowrap shadow-sm"
                                     >
                                         {fetchingModels
@@ -769,7 +775,9 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
                             ) : (
                                 <p className="text-xs text-gray-600 dark:text-gray-500 mt-1.5">
                                     {isUniversal
-                                        ? 'Enter the exact model name as expected by the API'
+                                        ? formData.api_base_url.trim()
+                                            ? "Click 'Fetch' to discover available models, or type a model name manually"
+                                            : 'Enter the API Base URL above, then click Fetch — or type the exact model name'
                                         : selectedProvider?.requires_api_key && !formData.api_key
                                             ? "Enter your API key and click 'Fetch' to see available options"
                                             : "Click 'Fetch' to see available options, or type a model name manually"

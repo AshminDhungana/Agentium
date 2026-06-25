@@ -285,7 +285,9 @@ export const ModelCard: React.FC<ModelCardProps> = React.memo(({
                         {isTesting ? 'Testing…' : 'Test'}
                     </button>
 
-                    {/* Fetch Models */}
+                    {/* Fetch Models — hidden only for custom providers that have no base URL stored,
+                        since there is no endpoint to call without one. */}
+                    {(config.provider !== 'custom' || !!config.api_base_url) && (
                     <button
                         onClick={() => onFetchModels(config.id)}
                         disabled={isAnyBusy}
@@ -300,6 +302,7 @@ export const ModelCard: React.FC<ModelCardProps> = React.memo(({
                         )}
                         {isFetching ? 'Fetching…' : 'Fetch'}
                     </button>
+                    )}
 
                     {/* Edit */}
                     <button
