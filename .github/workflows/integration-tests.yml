@@ -39,13 +39,26 @@ jobs:
 
       - name: Initialize test databases
         run: |
-          # Create the application database if it doesn't exist (docker-compose.test.yml only creates agentium_test)
-          docker compose -f docker-compose.test.yml exec -T postgres bash -lc \
-            "psql -U postgres -tc \\"SELECT 1 FROM pg_database WHERE datname='agentium'\\" | grep -q 1 || psql -U postgres -c \\"CREATE DATABASE agentium\\""
+          # Use the container's actual POSTGRES_USER (fallback to agentium)
+          PSQL_USER="$(docker compose -f docker-compose.test.yml exec -T postgres bash -lc 'echo "${POSTGRES_USER:-agentium}"' | tr -d '\r')"
+          echo "Using DB user: $PSQL_USER"
 
-          # Ensure the test database also exists (idempotent)
-          docker compose -f docker-compose.test.yml exec -T postgres bash -lc \
-            "psql -U postgres -tc \\"SELECT 1 FROM pg_database WHERE datname='agentium_test'\\" | grep -q 1 || psql -U postgres -c \\"CREATE DATABASE agentium_test\\""
+          # Wait until Postgres is accepting connections
+          for i in {1..30}; do
+            if docker compose -f docker-compose.test.yml exec -T postgres bash -lc "pg_isready -U \"$PSQL_USER\"" >/dev/null 2>&1; then
+              echo "Postgres is ready."
+              break
+            fi
+            echo "Waiting for Postgres to be ready ($i/30)..."
+            sleep 1
+          done
+
+          # Create databases idempotently
+          for db in agentium agentium_test; do
+            docker compose -f docker-compose.test.yml exec -T postgres bash -lc \
+              "psql -U \"$PSQL_USER\" -tc \\"SELECT 1 FROM pg_database WHERE datname='$db'\\" | grep -q 1 || psql -U \"$PSQL_USER\" -c \\"CREATE DATABASE $db\\"" \
+              || echo "WARNING: Could not verify/create database $db"
+          done
         shell: bash
 
       - name: Set up Python

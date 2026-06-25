@@ -24,7 +24,7 @@ from httpx import ASGITransport
 os.environ.setdefault("DATABASE_URL", "postgresql://agentium:agentium@postgres:5432/agentium_test")
 os.environ.setdefault("REDIS_URL", "redis://redis:6379/1")
 os.environ.setdefault("CHROMA_HOST", "chromadb")
-os.environ.setdefault("CHROMA_PORT", "8000")
+os.environ.setdefault("CHROMA_PORT", "8001")
 os.environ.setdefault("CELERY_TASK_ALWAYS_EAGER", "true")
 os.environ.setdefault("TESTING", "true")
 
