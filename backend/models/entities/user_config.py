@@ -3,7 +3,7 @@ User model configuration for Agentium.
 Supports ANY API provider (OpenAI, Anthropic, Groq, Mistral, Gemini, local, etc.)
 """
 import enum
-import random
+import uuid
 from datetime import datetime
 from typing import Optional, List
 from sqlalchemy import Column, String, Integer, Float, Boolean, DateTime, Enum, JSON, Text, ForeignKey
@@ -141,7 +141,15 @@ class UserModelConfig(BaseEntity):
         super().__init__(**kwargs)
         if not self.agentium_id:
             date_part = datetime.utcnow().strftime('%y%m%d')
-            random_part = f"{random.randint(0, 999):03d}"
+            # Was random.randint(0, 999) — only 1,000 values shared by every
+            # config created that day. With db_session function-scoped and
+            # genesis re-run per test, a CI suite easily generates hundreds
+            # of these on the same day; by the birthday paradox that pool
+            # collides with high probability (e.g. ~78% chance of at least
+            # one collision after just 50 draws from a 1,000-value space),
+            # producing intermittent unique-constraint failures in unrelated
+            # tests. uuid4()'s 8 hex chars give ~4.3 billion values instead.
+            random_part = uuid.uuid4().hex[:8]
             self.agentium_id = f"C{date_part}{random_part}"
 
     def is_key_healthy(self) -> bool:

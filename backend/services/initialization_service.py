@@ -288,6 +288,22 @@ class InitializationService:
 
         try:
             provider_enum = ProviderType(active_provider.upper())
+
+            # Idempotency: avoid inserting a second "Default (provider)" row
+            # if one already exists for this provider (e.g. genesis re-run
+            # with force=True in tests, or a retry after a partial failure).
+            existing_config = self.db.query(UserModelConfig).filter(
+                UserModelConfig.provider == provider_enum,
+                UserModelConfig.config_name == f"Default ({active_provider})",
+            ).first()
+
+            if existing_config:
+                if not existing_config.is_default:
+                    existing_config.is_default = True
+                    self.db.flush()
+                logger.info(f"✅ Using existing UserModelConfig for provider: {active_provider}")
+                return
+
             cfg = UserModelConfig(
                 config_name=f"Default ({active_provider})",
                 provider=provider_enum,
@@ -450,8 +466,6 @@ class InitializationService:
                         logger.info(f"✅ Model config assigned to Head 00001 during genesis: {default_cfg.config_name} (provider={default_cfg.provider.value})")
                 else:
                     logger.warning("⚠️ No active default model config found during genesis")
-            except Exception as e:
-                logger.warning(f"⚠️ Could not assign model config to Head during genesis: {e}")
             except Exception as e:
                 logger.warning(f"⚠️ Could not assign model config to Head during genesis: {e}")
                 

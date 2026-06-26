@@ -5,6 +5,7 @@ Connects to the running docker-compose stack on localhost.
 
 import os
 import json
+import logging
 import pytest
 import pytest_asyncio
 from typing import Generator
@@ -35,6 +36,8 @@ from backend.core.vector_store import get_vector_store, VectorStore
 from backend.services.initialization_service import InitializationService
 from backend.celery_app import celery_app
 from backend.models.entities.user import User
+
+logger = logging.getLogger(__name__)
 
 # Engine for the test database
 # Use the default postgres db just to create the test db if it doesn't exist
@@ -96,52 +99,64 @@ def db_session(db_engine) -> Generator[Session, None, None]:
 @pytest_asyncio.fixture(scope="function")
 async def seeded_db(db_session: Session) -> Session:
     """Provide a database session fully seeded via the genesis protocol."""
-    # Ensure default admin exists
-    admin = db_session.query(User).filter(User.username == "admin").first()
-    if not admin:
-        admin = User(
-            username="admin",
-            email="admin@agentium.local",
-            hashed_password=User.hash_password("admin"),
-            is_active=True,
-            is_pending=False,
-            is_admin=True
-        )
-        db_session.add(admin)
+    try:
+        # Ensure default admin exists
+        admin = db_session.query(User).filter(User.username == "admin").first()
+        if not admin:
+            admin = User(
+                username="admin",
+                email="admin@agentium.local",
+                hashed_password=User.hash_password("admin"),
+                is_active=True,
+                is_pending=False,
+                is_admin=True
+            )
+            db_session.add(admin)
+            db_session.flush()
+
+        # Pass db_session directly so all genesis writes (including capability grants)
+        # land on the same session identity map that the test will query.
+        # Without this, grant_capability() flushes onto a different session's objects
+        # and custom_capabilities is never visible to the test's parent query.
+        init_service = InitializationService(db=db_session)
+        if not init_service.is_system_initialized():
+            # Temporarily mock the API key check to allow genesis to proceed in tests
+            original_check = init_service._has_any_active_api_key
+            init_service._has_any_active_api_key = lambda: True
+
+            try:
+                await init_service.run_genesis_protocol(force=True, country_name="TestNation")
+            finally:
+                init_service._has_any_active_api_key = original_check
+
+        # Flush so all pending writes (agent rows, custom_capabilities, audit logs)
+        # are visible within this session before the test begins querying.
         db_session.flush()
 
-    # Pass db_session directly so all genesis writes (including capability grants)
-    # land on the same session identity map that the test will query.
-    # Without this, grant_capability() flushes onto a different session's objects
-    # and custom_capabilities is never visible to the test's parent query.
-    init_service = InitializationService(db=db_session)
-    if not init_service.is_system_initialized():
-        # Temporarily mock the API key check to allow genesis to proceed in tests
-        original_check = init_service._has_any_active_api_key
-        init_service._has_any_active_api_key = lambda: True
-        
-        try:
-            await init_service.run_genesis_protocol(force=True, country_name="TestNation")
-        finally:
-            init_service._has_any_active_api_key = original_check
+        # Ensure there is an Agent with agentium_id="admin" to prevent ForeignKey violations
+        # when voting as "admin" via HTTP endpoints.
+        from backend.models.entities.agents import Agent, AgentType, AgentStatus
+        admin_agent = db_session.query(Agent).filter_by(agentium_id="admin").first()
+        if not admin_agent:
+            admin_agent = Agent(
+                agentium_id="admin",
+                name="Admin User Agent",
+                agent_type=AgentType.COUNCIL_MEMBER,
+                status=AgentStatus.ACTIVE,
+            )
+            db_session.add(admin_agent)
+            db_session.flush()
 
-    # Flush so all pending writes (agent rows, custom_capabilities, audit logs)
-    # are visible within this session before the test begins querying.
-    db_session.flush()
-
-    # Ensure there is an Agent with agentium_id="admin" to prevent ForeignKey violations
-    # when voting as "admin" via HTTP endpoints.
-    from backend.models.entities.agents import Agent, AgentType, AgentStatus
-    admin_agent = db_session.query(Agent).filter_by(agentium_id="admin").first()
-    if not admin_agent:
-        admin_agent = Agent(
-            agentium_id="admin",
-            name="Admin User Agent",
-            agent_type=AgentType.COUNCIL_MEMBER,
-            status=AgentStatus.ACTIVE,
-        )
-        db_session.add(admin_agent)
-        db_session.flush()
+    except Exception as e:
+        # A flush-time failure (e.g. a constraint violation during genesis)
+        # leaves the underlying Postgres transaction aborted — every query
+        # after that point in this fixture (and in the test body, if the
+        # exception were swallowed) would fail with a confusing secondary
+        # "current transaction is aborted" error instead of the real one.
+        # Roll back explicitly so the original exception is what surfaces.
+        db_session.rollback()
+        logger.error(f"seeded_db fixture failed: {e}")
+        raise
 
     return db_session
 
