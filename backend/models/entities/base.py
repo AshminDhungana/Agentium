@@ -21,7 +21,7 @@ class BaseEntity(Base):
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     
     # Identification number based on entity type (0xxxx, 1xxxx, 2xxxx, 3xxxx)
-    agentium_id = Column(String(10), unique=True, nullable=False, index=True)
+    agentium_id = Column(String(20), unique=True, nullable=False, index=True)
     
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
