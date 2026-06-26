@@ -172,29 +172,36 @@ async def lifespan(app: FastAPI):
         init_db()
         logger.info("✅ Database initialized")
 
-        db = next(get_db())
-        try:
-            admin_created = create_default_admin(db)
-            if admin_created:
-                logger.info("✅ Default admin user created")
-            
-            # Pre-load model pricing cache
-            from backend.services.pricing_sync_service import PricingSyncService
-            PricingSyncService.load_cache_from_db(db)
-            
-            # Synchronize model prices in the background to avoid blocking server startup
-            async def run_background_sync():
-                try:
-                    from backend.models.database import get_db_context
-                    with get_db_context() as bg_db:
-                        await PricingSyncService.sync_prices(bg_db)
-                except Exception as sync_err:
-                    logger.warning(f"⚠️ Background pricing synchronization failed (non-fatal): {sync_err}")
-            
-            import asyncio
-            asyncio.create_task(run_background_sync())
-        finally:
-            db.close()
+        if os.environ.get("TESTING") == "true":
+            logger.info("⏭️ TESTING mode — skipping admin bootstrap and pricing cache load")
+        else:
+            db = next(get_db())
+            try:
+                # In tests, seeded_db fixture creates admin inside the savepoint
+                # transaction.  Calling create_default_admin here would open a
+                # separate session and commit outside that savepoint, causing
+                # cross-session lock contention on the users table.
+                admin_created = create_default_admin(db)
+                if admin_created:
+                    logger.info("✅ Default admin user created")
+
+                # Pre-load model pricing cache
+                from backend.services.pricing_sync_service import PricingSyncService
+                PricingSyncService.load_cache_from_db(db)
+
+                # Synchronize model prices in the background to avoid blocking server startup
+                async def run_background_sync():
+                    try:
+                        from backend.models.database import get_db_context
+                        with get_db_context() as bg_db:
+                            await PricingSyncService.sync_prices(bg_db)
+                    except Exception as sync_err:
+                        logger.warning(f"⚠️ Background pricing synchronization failed (non-fatal): {sync_err}")
+
+                import asyncio
+                asyncio.create_task(run_background_sync())
+            finally:
+                db.close()
     except Exception as e:
         logger.error(f"❌ Database initialization failed: {e}")
         raise
@@ -202,140 +209,161 @@ async def lifespan(app: FastAPI):
     # ─────────────────────────────────────────────────────────────
     # 1b. Seed fallback Constitution (API-key independent)
     # ─────────────────────────────────────────────────────────────
-    try:
-        db = next(get_db())
+    if os.environ.get("TESTING") == "true":
+        logger.info("⏭️ TESTING mode — skipping Constitution seed (seeded_db fixture handles this)")
+    else:
         try:
-            existing = db.query(Constitution).filter_by(is_active=True).first()
-            if not existing:
-                fallback = InitializationService.create_default_constitution(db)
-                logger.info(f"✅ Fallback constitution seeded: {fallback.version}")
-            else:
-                logger.info(f"✅ Constitution already present: {existing.version}")
-        finally:
-            db.close()
-    except Exception as e:
-        logger.error(f"❌ Constitution seed failed (non-fatal): {e}")
+            db = next(get_db())
+            try:
+                existing = db.query(Constitution).filter_by(is_active=True).first()
+                if not existing:
+                    fallback = InitializationService.create_default_constitution(db)
+                    logger.info(f"✅ Fallback constitution seeded: {fallback.version}")
+                else:
+                    logger.info(f"✅ Constitution already present: {existing.version}")
+            finally:
+                db.close()
+        except Exception as e:
+            logger.error(f"❌ Constitution seed failed (non-fatal): {e}")
 
     # ─────────────────────────────────────────────────────────────
     # 2. Persistent Council — status check only (read-only)
     # ─────────────────────────────────────────────────────────────
-    try:
-        db = next(get_db())
+    if os.environ.get("TESTING") == "true":
+        logger.info("⏭️ TESTING mode — skipping Persistent Council status check")
+    else:
         try:
-            from backend.models.entities.agents import HeadOfCouncil
-            head = db.query(HeadOfCouncil).filter_by(
-                agentium_id="00001", is_active=True
-            ).first()
-            if head:
-                logger.info("✅ Persistent Council already initialized (Head 00001 present)")
-            else:
-                logger.info("⏳ Persistent Council not yet initialized")
-                logger.info("   Add an API key on the Models page — genesis triggers automatically")
-        finally:
-            db.close()
-    except Exception as e:
-        logger.warning(f"⚠️ Persistent Council status check failed (non-fatal): {e}")
+            db = next(get_db())
+            try:
+                from backend.models.entities.agents import HeadOfCouncil
+                head = db.query(HeadOfCouncil).filter_by(
+                    agentium_id="00001", is_active=True
+                ).first()
+                if head:
+                    logger.info("✅ Persistent Council already initialized (Head 00001 present)")
+                else:
+                    logger.info("⏳ Persistent Council not yet initialized")
+                    logger.info("   Add an API key on the Models page — genesis triggers automatically")
+            finally:
+                db.close()
+        except Exception as e:
+            logger.warning(f"⚠️ Persistent Council status check failed (non-fatal): {e}")
 
     # ─────────────────────────────────────────────────────────────
     # 3. Initialize API Manager (Universal Provider Support)
     # ─────────────────────────────────────────────────────────────
-    try:
-        db = next(get_db())
+    if os.environ.get("TESTING") == "true":
+        logger.info("⏭️ TESTING mode — skipping API Manager initialization")
+    else:
         try:
-            init_api_manager(db)
-            logger.info("✅ API Manager initialized with universal provider support")
-        finally:
-            db.close()
-    except Exception as e:
-        logger.error(f"❌ API Manager initialization failed: {e}")
+            db = next(get_db())
+            try:
+                init_api_manager(db)
+                logger.info("✅ API Manager initialized with universal provider support")
+            finally:
+                db.close()
+        except Exception as e:
+            logger.error(f"❌ API Manager initialization failed: {e}")
 
     # ─────────────────────────────────────────────────────────────
     # 3b. Auto-assign default model config to Head agent if missing
     # ─────────────────────────────────────────────────────────────
-    try:
-        db = next(get_db())
+    if os.environ.get("TESTING") == "true":
+        logger.info("⏭️ TESTING mode — skipping Head agent model config auto-assign")
+    else:
         try:
-            from backend.models.entities import UserModelConfig
-            from backend.models.entities.agents import HeadOfCouncil
+            db = next(get_db())
+            try:
+                from backend.models.entities import UserModelConfig
+                from backend.models.entities.agents import HeadOfCouncil
 
-            head = db.query(HeadOfCouncil).filter(
-                HeadOfCouncil.agentium_id == "00001"
-            ).first()
+                head = db.query(HeadOfCouncil).filter(
+                    HeadOfCouncil.agentium_id == "00001"
+                ).first()
 
-            if head and not head.preferred_config_id:
-                default_cfg = (
-                    db.query(UserModelConfig)
-                    .filter(UserModelConfig.is_default == True)
-                    .filter(UserModelConfig.status == ConnectionStatus.ACTIVE)
-                    .first()
-                ) or (
-                    db.query(UserModelConfig)
-                    .filter(UserModelConfig.status == ConnectionStatus.ACTIVE)
-                    .first()
-                )
-                if default_cfg:
-                    head.preferred_config_id = str(default_cfg.id)
-                    db.commit()
+                if head and not head.preferred_config_id:
+                    default_cfg = (
+                        db.query(UserModelConfig)
+                        .filter(UserModelConfig.is_default == True)
+                        .filter(UserModelConfig.status == ConnectionStatus.ACTIVE)
+                        .first()
+                    ) or (
+                        db.query(UserModelConfig)
+                        .filter(UserModelConfig.status == ConnectionStatus.ACTIVE)
+                        .first()
+                    )
+                    if default_cfg:
+                        head.preferred_config_id = str(default_cfg.id)
+                        db.commit()
+                        logger.info(
+                            f"✅ Auto-assigned default model config to Head 00001: "
+                            f"'{default_cfg.config_name}' ({default_cfg.id})"
+                        )
+                    else:
+                        logger.warning(
+                            "⚠️ No active default model config found — "
+                            "Head 00001 will fall back at chat time"
+                        )
+                elif head and head.preferred_config_id:
                     logger.info(
-                        f"✅ Auto-assigned default model config to Head 00001: "
-                        f"'{default_cfg.config_name}' ({default_cfg.id})"
+                        f"✅ Head 00001 already has model config: {head.preferred_config_id}"
                     )
-                else:
-                    logger.warning(
-                        "⚠️ No active default model config found — "
-                        "Head 00001 will fall back at chat time"
-                    )
-            elif head and head.preferred_config_id:
-                logger.info(
-                    f"✅ Head 00001 already has model config: {head.preferred_config_id}"
-                )
-        finally:
-            db.close()
-    except Exception as e:
-        logger.warning(
-            f"⚠️ Auto-assign model config to Head skipped (non-fatal): {e}"
-        )
+            finally:
+                db.close()
+        except Exception as e:
+            logger.warning(
+                f"⚠️ Auto-assign model config to Head skipped (non-fatal): {e}"
+            )
 
     # ─────────────────────────────────────────────────────────────
     # 4. Initialize Model Allocator
     # ─────────────────────────────────────────────────────────────
-    try:
-        db = next(get_db())
+    if os.environ.get("TESTING") == "true":
+        logger.info("⏭️ TESTING mode — skipping Model Allocator initialization")
+    else:
         try:
-            init_model_allocator(db)
-            logger.info("✅ Model Allocator initialized")
-        finally:
-            db.close()
-    except Exception as e:
-        logger.error(f"❌ Model Allocator initialization failed: {e}")
+            db = next(get_db())
+            try:
+                init_model_allocator(db)
+                logger.info("✅ Model Allocator initialized")
+            finally:
+                db.close()
+        except Exception as e:
+            logger.error(f"❌ Model Allocator initialization failed: {e}")
 
     # ─────────────────────────────────────────────────────────────
     # 5. Initialize Token Optimizer with Idle Budget
     # ─────────────────────────────────────────────────────────────
-    try:
-        db = next(get_db())
+    if os.environ.get("TESTING") == "true":
+        logger.info("⏭️ TESTING mode — skipping Token Optimizer initialization")
+    else:
         try:
-            persistent_agents = persistent_council.get_persistent_agents(db)
-            agent_list = list(persistent_agents.values())
-            init_token_optimizer(db, agent_list)
+            db = next(get_db())
+            try:
+                persistent_agents = persistent_council.get_persistent_agents(db)
+                agent_list = list(persistent_agents.values())
+                init_token_optimizer(db, agent_list)
 
-            logger.info("✅ Token Optimizer initialized")
-            logger.info(f"   - Idle Budget: ${idle_budget.daily_idle_budget_usd:.2f}/day")
-            logger.info(f"   - Active Mode Budget: ${token_optimizer.active_budget.daily_cost_limit_usd:.2f}/day")
-        finally:
-            db.close()
-    except Exception as e:
-        logger.error(f"❌ Token Optimizer initialization failed: {e}")
+                logger.info("✅ Token Optimizer initialized")
+                logger.info(f"   - Idle Budget: ${idle_budget.daily_idle_budget_usd:.2f}/day")
+                logger.info(f"   - Active Mode Budget: ${token_optimizer.active_budget.daily_cost_limit_usd:.2f}/day")
+            finally:
+                db.close()
+        except Exception as e:
+            logger.error(f"❌ Token Optimizer initialization failed: {e}")
 
     # ─────────────────────────────────────────────────────────────
     # Initialize API Key Manager
     # ─────────────────────────────────────────────────────────────
-    db = next(get_db())
-    try:
-        init_api_key_manager(db)
-        logger.info("✅ API Key Manager initialized with resilience")
-    finally:
-        db.close()
+    if os.environ.get("TESTING") == "true":
+        logger.info("⏭️ TESTING mode — skipping API Key Manager initialization")
+    else:
+        db = next(get_db())
+        try:
+            init_api_key_manager(db)
+            logger.info("✅ API Key Manager initialized with resilience")
+        finally:
+            db.close()
 
     # ─────────────────────────────────────────────────────────────
     # 6. Start Idle Governance Engine & Background Monitors
@@ -371,19 +399,22 @@ async def lifespan(app: FastAPI):
     # ─────────────────────────────────────────────────────────────
     # 8. Initialize MCP Tool Bridge 
     # ─────────────────────────────────────────────────────────────
-    try:
-        db = next(get_db())
+    if os.environ.get("TESTING") == "true":
+        logger.info("⏭️ TESTING mode — skipping MCP Tool Bridge initialization")
+    else:
         try:
-            bridge = init_bridge(tool_registry, SessionLocal)
-            count = bridge.sync_all(db)
-            logger.info(f"✅ MCP Tool Bridge initialized — {count} approved tool(s) loaded")
-            logger.info("   Agents can now discover MCP tools via GET /tools/")
-            logger.info("   MCP tools also visible at GET /tools/mcp")
-        finally:
-            db.close()
-    except Exception as e:
-        logger.error(f"⚠️ MCP Tool Bridge initialization failed: {e}")
-        logger.error("   System will continue — MCP tools can be synced manually via approve endpoint")
+            db = next(get_db())
+            try:
+                bridge = init_bridge(tool_registry, SessionLocal)
+                count = bridge.sync_all(db)
+                logger.info(f"✅ MCP Tool Bridge initialized — {count} approved tool(s) loaded")
+                logger.info("   Agents can now discover MCP tools via GET /tools/")
+                logger.info("   MCP tools also visible at GET /tools/mcp")
+            finally:
+                db.close()
+        except Exception as e:
+            logger.error(f"⚠️ MCP Tool Bridge initialization failed: {e}")
+            logger.error("   System will continue — MCP tools can be synced manually via approve endpoint")
 
     # ─────────────────────────────────────────────────────────────
     # 9. Bootstrap Vector Knowledge Base 

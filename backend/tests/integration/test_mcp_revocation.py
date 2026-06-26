@@ -7,21 +7,29 @@ Verifies that revoking an MCP tool via POST /api/v1/mcp-tools/{id}/revoke
 propagates to Redis in under one second and that subsequent invocations are
 blocked without needing a PostgreSQL query.
 
-Uses existing fixtures: client, redis_client, auth_headers, seeded_db.
+Uses existing fixtures: client, redis_client, db_session.
 """
 
 import pytest
 import time
+
+from backend.models.entities.user import User
 
 
 @pytest.mark.integration
 class TestMCPSubSecondRevocation:
     """End-to-end tests for the Redis-based sub-second revocation path."""
 
-    # ---- Helpers ----------------------------------------------------------------
+    # ---- Fixtures ---------------------------------------------------------------
 
-    @staticmethod
-    def _propose_tool(client, auth_headers, name: str, server_url: str) -> str:
+    # No class-local auth_headers needed — the global fixture from conftest.py
+    # (which depends on seeded_db) is used instead.  Relying on seeded_db ensures
+    # the admin user is created through the proper genesis path, avoiding stale
+    # data and duplicate-key issues.
+
+    # ---- Helpers -----------------------------------------------------------------
+
+    def _propose_tool(self, client, auth_headers, name: str, server_url: str) -> str:
         """Propose a new MCP tool and return its id."""
         r = client.post(
             "/api/v1/mcp-tools",
@@ -37,8 +45,7 @@ class TestMCPSubSecondRevocation:
         assert r.status_code == 201, f"Propose failed: {r.text}"
         return r.json()["id"]
 
-    @staticmethod
-    def _approve_tool(client, auth_headers, tool_id: str):
+    def _approve_tool(self, client, auth_headers, tool_id: str):
         r = client.post(
             f"/api/v1/mcp-tools/{tool_id}/approve",
             json={"approved_by": "admin"},
@@ -46,8 +53,7 @@ class TestMCPSubSecondRevocation:
         )
         assert r.status_code == 200, f"Approve failed: {r.text}"
 
-    @staticmethod
-    def _revoke_tool(client, auth_headers, tool_id: str):
+    def _revoke_tool(self, client, auth_headers, tool_id: str):
         r = client.post(
             f"/api/v1/mcp-tools/{tool_id}/revoke",
             json={"revoked_by": "admin", "reason": f"Revocation test for {tool_id}"},
@@ -56,14 +62,14 @@ class TestMCPSubSecondRevocation:
         assert r.status_code == 200, f"Revoke failed: {r.text}"
         return r
 
-    # ---- Task 1: Sub-Second Redis Propagation ----------------------------------
+    # ---- Task 1: Sub-Second Redis Propagation -----------------------------------
 
-    def test_revoke_endpoint_adds_tool_to_redis_set(self, client, redis_client, auth_headers, seeded_db):
+    def test_revoke_endpoint_adds_tool_to_redis_set(self, client, redis_client, db_session, auth_headers):
         """
         After POST /api/v1/mcp-tools/{id}/revoke, the tool_id must appear
         in the Redis SET 'agentium:mcp:revoked' within one second.
         """
-        tool_id = self._propose_tool(client, auth_headers, "test-revoke-1", "http://localhost:9999/test-mcp")
+        tool_id = self._propose_tool(client, auth_headers, "test-revoke-1", "http://localhost:9999/test-mcp-1")
         self._approve_tool(client, auth_headers, tool_id)
 
         start = time.monotonic()
@@ -75,28 +81,21 @@ class TestMCPSubSecondRevocation:
             "Tool should have been added to Redis revocation SET instantly"
         )
 
-    # ---- Task 2: Execution Blocked After Revocation ----------------------------
-
-    def test_execution_blocked_after_revocation(self, client, redis_client, auth_headers, seeded_db):
+    # ---- Task 2: Execution Blocked After Revocation -----------------------------
+    def test_execution_blocked_after_revocation(self, client, redis_client, db_session, auth_headers):
         """
         Invoking a revoked tool via POST /api/v1/mcp-tools/{id}/execute must
-        return success=False with a revocation/block message before any actual
-        MCP client connection is attempted.
+        return success=False with a revocation/block message.
         """
         tool_id = self._propose_tool(client, auth_headers, "test-revoke-2", "http://localhost:9999/test-mcp-2")
         self._approve_tool(client, auth_headers, tool_id)
         self._revoke_tool(client, auth_headers, tool_id)
 
-        # Verify it is in Redis
         assert redis_client.sismember("agentium:mcp:revoked", tool_id)
 
         r = client.post(
             f"/api/v1/mcp-tools/{tool_id}/execute",
-            json={
-                "agent_id": "admin",
-                "agent_tier": "3xxxx",
-                "params": {},
-            },
+            json={"agent_id": "admin", "agent_tier": "3xxxx", "params": {}},
             headers=auth_headers,
         )
         assert r.status_code == 200
@@ -108,21 +107,16 @@ class TestMCPSubSecondRevocation:
         )
 
     # ---- Task 3: Re-Approval Clears Redis Revocation ---------------------------
-
-    def test_re_approval_clears_redis_revocation(self, client, redis_client, auth_headers, seeded_db):
+    def test_re_approval_clears_redis_revocation(self, client, redis_client, db_session, auth_headers):
         """
         When approve_mcp_server is called it internally calls
-        mcp_stats_service.remove_from_revoked, so the tool is removed
-        from the Redis SET.  We seed the SET directly before approval,
-        prove the tool is present, approve, then assert it is gone.
+        mcp_stats_service.remove_from_revoked, clearing the Redis SET.
         """
         tool_id = self._propose_tool(client, auth_headers, "test-revoke-3", "http://localhost:9999/test-mcp-3")
 
-        # Seed Redis revocation SET directly (simulating a prior revocation)
         redis_client.sadd("agentium:mcp:revoked", tool_id)
         assert redis_client.sismember("agentium:mcp:revoked", tool_id)
 
-        # Normal approval should clean up the stale Redis entry
         self._approve_tool(client, auth_headers, tool_id)
 
         assert not redis_client.sismember("agentium:mcp:revoked", tool_id), (
@@ -130,12 +124,8 @@ class TestMCPSubSecondRevocation:
         )
 
     # ---- Task 4: Revoked Tools Endpoint -----------------------------------------
-
-    def test_revoked_tools_endpoint(self, client, redis_client, auth_headers, seeded_db):
-        """
-        GET /api/v1/mcp-tools/revoked must list all tool IDs currently in the
-        Redis revocation SET.
-        """
+    def test_revoked_tools_endpoint(self, client, redis_client, db_session, auth_headers):
+        """GET /api/v1/mcp-tools/revoked must list all tool IDs in the Redis SET."""
         tool_id = self._propose_tool(client, auth_headers, "test-revoke-4", "http://localhost:9999/test-mcp-4")
         self._approve_tool(client, auth_headers, tool_id)
         self._revoke_tool(client, auth_headers, tool_id)

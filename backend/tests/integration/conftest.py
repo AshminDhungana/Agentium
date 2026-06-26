@@ -52,30 +52,36 @@ DEFAULT_URL = TEST_DB_URL.rsplit("/", 1)[0] + "/postgres"
 
 @pytest.fixture(scope="session")
 def db_engine():
-    """Create the test database and all tables, drop at the end."""
-    # Create test database if it doesn't exist
+    """Create the test database and all tables, tear down at the end."""
     engine_default = create_engine(DEFAULT_URL, isolation_level="AUTOCOMMIT")
     with engine_default.connect() as conn:
-        result = conn.execute(text("SELECT 1 FROM pg_database WHERE datname='agentium_test'")).fetchone()
-        if not result:
-            conn.execute(text("CREATE DATABASE agentium_test ENCODING 'UTF8' TEMPLATE template0"))
+        # Always start with a clean test database to avoid stale data
+        # from a previous run whose tear-down failed (e.g. missing
+        # named constraints in metadata vs. actual DB).
+        conn.execute(text("DROP DATABASE IF EXISTS agentium_test"))
+        conn.execute(text("CREATE DATABASE agentium_test ENCODING 'UTF8' TEMPLATE template0"))
     engine_default.dispose()
 
     # Create all tables in the test database
     engine_test = create_engine(TEST_DB_URL)
-    
+
     # Import all models to ensure they are registered with Base
     import backend.models.entities
-    
+
     Base.metadata.create_all(bind=engine_test)
-    
-    # Run any initial setup (e.g. creating default records if needed, though genesis handles most)
-    
+
     yield engine_test
-    
-    # Drop all tables after the test session
-    Base.metadata.drop_all(bind=engine_test)
-    engine_test.dispose()
+
+    # Best-effort tear down: named constraints created with use_alter=True
+    # may have a different name in the DB than in the model (migrations,
+    # circular dependencies, etc).  If drop_all fails, we still dispose so a
+    # subsequent run can recreate the DB from scratch.
+    try:
+        Base.metadata.drop_all(bind=engine_test)
+    except Exception:
+        pass
+    finally:
+        engine_test.dispose()
 
 
 @pytest.fixture(scope="function")
