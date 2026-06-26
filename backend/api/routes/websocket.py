@@ -607,6 +607,37 @@ async def websocket_chat_endpoint(
             pass
 
 
+@router.get("/genesis-status")
+async def genesis_status(current_user=Depends(get_current_user)):
+    """
+    Lightweight HTTP status check for the genesis bootstrap process.
+
+    The chat WebSocket connection is gated on Head 00001 existing, but a
+    client that hits that gate is closed before it's ever added to
+    ConnectionManager — so it cannot receive a WebSocket broadcast telling
+    it genesis has finished. This endpoint gives the frontend something
+    cheap to poll instead of repeatedly retrying the full WS handshake.
+
+    Returns one of:
+      - "not_started": no API key configured yet, genesis hasn't been triggered
+      - "running":      API key exists, genesis is in progress
+      - "complete":     Head 00001 exists, chat is ready to connect
+    """
+    with get_fresh_db() as db:
+        head = db.query(HeadOfCouncil).filter_by(agentium_id="00001").first()
+        if head:
+            return {"status": "complete"}
+
+        genesis_triggered = False
+        try:
+            from backend.models.entities import UserModelConfig
+            genesis_triggered = db.query(UserModelConfig).limit(1).first() is not None
+        except Exception:
+            pass
+
+        return {"status": "running" if genesis_triggered else "not_started"}
+
+
 @router.get("/replay")
 async def replay_events(since: str, current_user=Depends(get_current_user)):
     """Fetch buffered broadcast events for reconnection replay."""

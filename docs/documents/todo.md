@@ -719,10 +719,10 @@ Build a self-governing AI ecosystem where agents operate under constitutional la
 
 #### CI Integration
 
-- [ ] Add `pytest-cov` to `requirements-dev.txt`; enforce minimum 80% line coverage on `backend/services/`; fail CI build below threshold
-- [ ] Add `pytest-asyncio` for all async FastAPI route tests using `httpx.AsyncClient` with `ASGITransport`
-- [ ] GitHub Actions job `integration-tests`: spin up `docker-compose -f docker-compose.test.yml up -d` (PostgreSQL + Redis + ChromaDB); run full suite; upload HTML coverage report as CI artifact
-- [ ] Create `docker-compose.test.yml` — ephemeral containers with no persistent volumes; `TESTING=true` env var disables external AI provider calls and activates mock responses
+- [x] Add `pytest-cov` to `requirements-dev.txt`; enforce minimum 80% line coverage on `backend/services/`; fail CI build below threshold
+- [x] Add `pytest-asyncio` for all async FastAPI route tests using `httpx.AsyncClient` with `ASGITransport`
+- [x] GitHub Actions job `integration-tests`: spin up `docker-compose -f docker-compose.test.yml up -d` (PostgreSQL + Redis + ChromaDB); run full suite; upload HTML coverage report as CI artifact
+- [x] Create `docker-compose.test.yml` — ephemeral containers with no persistent volumes; `TESTING=true` env var disables external AI provider calls and activates mock responses
 
 ---
 

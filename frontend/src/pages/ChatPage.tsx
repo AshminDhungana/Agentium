@@ -65,7 +65,7 @@ const MAX_PROCESSED_IDS = 500;
  * and will purge in production builds (Issue 10).
  */
 const TAB_ACTIVE_STYLES: Record<ActiveTab, string> = {
-    ai:    'text-blue-600 dark:text-blue-400',
+    ai: 'text-blue-600 dark:text-blue-400',
     inbox: 'text-emerald-600 dark:text-emerald-400',
     files: 'text-violet-600 dark:text-violet-400',
 };
@@ -73,16 +73,16 @@ const TAB_ACTIVE_STYLES: Record<ActiveTab, string> = {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function formatFileSize(bytes: number): string {
-    if (bytes < 1024)         return `${bytes} B`;
-    if (bytes < 1024 * 1024)  return `${(bytes / 1024).toFixed(1)} KB`;
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function getFileIcon(type: string) {
-    if (type.startsWith('image/'))  return <ImageIcon className="w-5 h-5" />;
-    if (type.startsWith('video/'))  return <Video className="w-5 h-5" />;
-    if (type.startsWith('audio/'))  return <Music className="w-5 h-5" />;
-    if (type.includes('pdf'))       return <FileText className="w-5 h-5" />;
+    if (type.startsWith('image/')) return <ImageIcon className="w-5 h-5" />;
+    if (type.startsWith('video/')) return <Video className="w-5 h-5" />;
+    if (type.startsWith('audio/')) return <Music className="w-5 h-5" />;
+    if (type.includes('pdf')) return <FileText className="w-5 h-5" />;
     if (type.includes('zip') || type.includes('tar')) return <Archive className="w-5 h-5" />;
     if (type.includes('javascript') || type.includes('python') || type.includes('json'))
         return <Code className="w-5 h-5" />;
@@ -90,7 +90,7 @@ function getFileIcon(type: string) {
 }
 
 function formatTimestamp(date: Date): string {
-    if (isToday(date))     return format(date, 'HH:mm');
+    if (isToday(date)) return format(date, 'HH:mm');
     if (isYesterday(date)) return `Yesterday ${format(date, 'HH:mm')}`;
     return format(date, 'MMM d, HH:mm');
 }
@@ -102,38 +102,38 @@ export function ChatPage() {
     const [activeTab, setActiveTab] = useState<ActiveTab>('ai');
 
     // ── AI Chat ───────────────────────────────────────────────────────────────
-    const [input,          setInput]         = useState('');
+    const [input, setInput] = useState('');
     // ── messages live in the Zustand store so they survive navigation ─────────
     const { messages, setMessages } = useChatStore(
         useShallow((s) => ({ messages: s.messages, setMessages: s.setMessages }))
     );
-    const [uploadedFiles,  setUploadedFiles] = useState<UploadedFile[]>([]);
-    const [isRecording,    setIsRecording]   = useState(false);
+    const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+    const [isRecording, setIsRecording] = useState(false);
     // isPaused was declared here but never consumed — removed (Issue 12)
-    const [recordingTime,  setRecordingTime] = useState(0);
-    const [showFileMenu,   setShowFileMenu]  = useState(false);
-    const [imagePreview,   setImagePreview]  = useState<{ url: string; name: string } | null>(null);
+    const [recordingTime, setRecordingTime] = useState(0);
+    const [showFileMenu, setShowFileMenu] = useState(false);
+    const [imagePreview, setImagePreview] = useState<{ url: string; name: string } | null>(null);
     const [voiceAvailable, setVoiceAvailable] = useState<boolean | null>(null);
     const [showVoiceTooltip, setShowVoiceTooltip] = useState(false);
-    const [isLocalMode,    setIsLocalMode]   = useState(false);
+    const [isLocalMode, setIsLocalMode] = useState(false);
     const [interimTranscript, setInterimTranscript] = useState('');
     const [showVoiceSettings, setShowVoiceSettings] = useState(false);
     // Issue 1: initialise to '' so that the API-provided default voice can be applied
-    const [selectedVoice,  setSelectedVoice]  = useState('');
+    const [selectedVoice, setSelectedVoice] = useState('');
     const [selectedLanguage, setSelectedLanguage] = useState('');
-    const [availableVoices,  setAvailableVoices]  = useState<{ id: string; name: string; description: string }[]>([]);
+    const [availableVoices, setAvailableVoices] = useState<{ id: string; name: string; description: string }[]>([]);
     const [availableLanguages, setAvailableLanguages] = useState<{ code: string; name: string }[]>([]);
-    const [isSpeaking, setIsSpeaking]  = useState<string | null>(null);
+    const [isSpeaking, setIsSpeaking] = useState<string | null>(null);
     // Upload progress: maps local UploadedFile id → 0-100 percent
     const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
 
-    const audioPlayerRef      = useRef<HTMLAudioElement | null>(null);
-    const messagesEndRef      = useRef<HTMLDivElement>(null);
-    const fileInputRef        = useRef<HTMLInputElement>(null);
-    const textareaRef         = useRef<HTMLTextAreaElement>(null);
+    const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
+    const messagesEndRef = useRef<HTMLDivElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
     const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
-    const mediaRecorderRef    = useRef<MediaRecorder | null>(null);
-    const audioStreamRef      = useRef<MediaStream | null>(null);
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+    const audioStreamRef = useRef<MediaStream | null>(null);
 
     /**
      * Dedup set lives in a ref (not React state) — no re-renders,
@@ -167,25 +167,25 @@ export function ChatPage() {
     const wsSubscribed = useRef(false);
 
     // ── Inbox ─────────────────────────────────────────────────────────────────
-    const [conversations,  setConversations] = useState<UnifiedConversation[]>([]);
-    const [selectedId,     setSelectedId]    = useState<string | null>(null);
-    const [inboxLoading,   setInboxLoading]  = useState(false);
-    const [replyContent,   setReplyContent]  = useState('');
-    const [isSending,      setIsSending]     = useState(false);
+    const [conversations, setConversations] = useState<UnifiedConversation[]>([]);
+    const [selectedId, setSelectedId] = useState<string | null>(null);
+    const [inboxLoading, setInboxLoading] = useState(false);
+    const [replyContent, setReplyContent] = useState('');
+    const [isSending, setIsSending] = useState(false);
     const inboxMessagesEndRef = useRef<HTMLDivElement>(null);
 
     // ── File Browser ──────────────────────────────────────────────────────────
-    const [browserFiles,    setBrowserFiles]   = useState<BrowserFile[]>([]);
-    const [browserLoading,  setBrowserLoading] = useState(false);
-    const [browserSearch,   setBrowserSearch]  = useState('');
+    const [browserFiles, setBrowserFiles] = useState<BrowserFile[]>([]);
+    const [browserLoading, setBrowserLoading] = useState(false);
+    const [browserSearch, setBrowserSearch] = useState('');
     const [browserCategory, setBrowserCategory] = useState('all');
-    const [browserStats,    setBrowserStats]   = useState<{
+    const [browserStats, setBrowserStats] = useState<{
         total_files: number; total_size_bytes: number;
         storage_limit_bytes: number; storage_used_percent: number;
     } | null>(null);
-    const [filePreview,    setFilePreview]   = useState<{ url: string; name: string; type: string } | null>(null);
+    const [filePreview, setFilePreview] = useState<{ url: string; name: string; type: string } | null>(null);
     const [isDraggingOver, setIsDraggingOver] = useState(false);
-    const [deletingFile,   setDeletingFile]  = useState<string | null>(null);
+    const [deletingFile, setDeletingFile] = useState<string | null>(null);
     const browserUploadRef = useRef<HTMLInputElement>(null);
 
     // ── Auth & WS ─────────────────────────────────────────────────────────────
@@ -200,18 +200,23 @@ export function ChatPage() {
         reconnect, connectionStats,
         unreadCount, markAsRead,
         messageHistory, lastMessage,
+        genesisInProgress,
     } = useWebSocketStore(
         useShallow((s) => ({
-            isConnected:     s.isConnected,
-            isConnecting:    s.isConnecting,
-            error:           s.error,
-            sendMessage:     s.sendMessage,
-            reconnect:       s.reconnect,
+            isConnected: s.isConnected,
+            isConnecting: s.isConnecting,
+            error: s.error,
+            sendMessage: s.sendMessage,
+            reconnect: s.reconnect,
             connectionStats: s.connectionStats,
-            unreadCount:     s.unreadCount,
-            markAsRead:      s.markAsRead,
-            messageHistory:  s.messageHistory,
-            lastMessage:     s.lastMessage,
+            unreadCount: s.unreadCount,
+            markAsRead: s.markAsRead,
+            messageHistory: s.messageHistory,
+            lastMessage: s.lastMessage,
+            // True while polling GET /ws/genesis-status — lets the header show
+            // "Initializing…" instead of a generic "Connecting…" so it's clear
+            // this isn't a dropped-connection retry.
+            genesisInProgress: s._genesisPollActive,
         }))
     );
 
@@ -219,14 +224,14 @@ export function ChatPage() {
     const handleVoiceInteraction = useCallback((event: VoiceInteractionEvent) => {
         try {
             const ts = new Date(event.ts * 1000);
-            const voiceUserId  = `voice-user-${event.ts}`;
+            const voiceUserId = `voice-user-${event.ts}`;
             const voiceReplyId = `voice-reply-${event.ts}`;
             if (processedMessageIds.current.has(voiceUserId)) return;
             trackId(voiceUserId);
             trackId(voiceReplyId);
             setMessages((prev) => [
                 ...prev,
-                { id: voiceUserId,  role: 'sovereign'       as const, content: event.user,  timestamp: ts, metadata: { source: 'voice' } },
+                { id: voiceUserId, role: 'sovereign' as const, content: event.user, timestamp: ts, metadata: { source: 'voice' } },
                 { id: voiceReplyId, role: 'head_of_council' as const, content: event.reply, timestamp: ts, metadata: { source: 'voice' } },
             ]);
         } catch (err) {
@@ -268,11 +273,11 @@ export function ChatPage() {
                 trackId(messageId);
 
                 const newMessage: Message = {
-                    id:        messageId,
-                    role:      (msg.role as Message['role']) || 'head_of_council',
-                    content:   msg.content as string,
+                    id: messageId,
+                    role: (msg.role as Message['role']) || 'head_of_council',
+                    content: msg.content as string,
                     timestamp: new Date(),
-                    metadata:  msg.metadata as MessageMetadata | undefined,
+                    metadata: msg.metadata as MessageMetadata | undefined,
                 };
                 // Note: isHistoryLoad.current is NOT reset here to avoid racing
                 // with loadChatHistory. It is consumed and reset in the scroll
@@ -392,11 +397,11 @@ export function ChatPage() {
             if (!history.messages.length) return;
 
             const formattedMessages: Message[] = history.messages.map((msg) => ({
-                id:          msg.id,
-                role:        msg.role,
-                content:     msg.content,
-                timestamp:   new Date(msg.created_at),
-                metadata:    msg.metadata as MessageMetadata | undefined,
+                id: msg.id,
+                role: msg.role,
+                content: msg.content,
+                timestamp: new Date(msg.created_at),
+                metadata: msg.metadata as MessageMetadata | undefined,
                 attachments: msg.attachments,
             }));
             // Seed dedup set BEFORE setting state so the WS subscriber ignores these
@@ -427,11 +432,11 @@ export function ChatPage() {
         const attachments = uploadedFiles
             .filter((f) => f.apiFile && !f.uploadError)
             .map((f) => ({
-                name:           f.apiFile!.original_name,
-                type:           f.apiFile!.type,
-                size:           f.apiFile!.size,
-                url:            f.apiFile!.url,
-                category:       f.apiFile!.category,
+                name: f.apiFile!.original_name,
+                type: f.apiFile!.type,
+                size: f.apiFile!.size,
+                url: f.apiFile!.url,
+                category: f.apiFile!.category,
                 // Forward extracted_text so the backend can inject file content
                 // into the AI prompt without a second round-trip to storage.
                 extracted_text: f.apiFile!.extracted_text ?? null,
@@ -441,10 +446,10 @@ export function ChatPage() {
         const userMsgId = crypto.randomUUID();
         trackId(userMsgId);
         const userMessage: Message = {
-            id:          userMsgId,
-            role:        'sovereign',
-            content:     input.trim() || '(file attachment)',
-            timestamp:   new Date(),
+            id: userMsgId,
+            role: 'sovereign',
+            content: input.trim() || '(file attachment)',
+            timestamp: new Date(),
             attachments: attachments.length > 0 ? attachments : undefined,
         };
         isHistoryLoad.current = false;
@@ -643,8 +648,8 @@ export function ChatPage() {
                 // Issue 8: use the authenticated api service so protected file URLs
                 // get the correct Authorization header and 401s are handled globally.
                 const response = await api.get(attachment.url, { responseType: 'blob' });
-                const url      = window.URL.createObjectURL(response.data);
-                const a        = document.createElement('a');
+                const url = window.URL.createObjectURL(response.data);
+                const a = document.createElement('a');
                 a.href = url; a.download = attachment.name;
                 document.body.appendChild(a); a.click(); document.body.removeChild(a);
                 window.URL.revokeObjectURL(url);
@@ -786,9 +791,8 @@ export function ChatPage() {
             );
         }
         return (
-            <div key={attachment.name} className={`mt-2 flex items-center gap-3 p-3 rounded-xl border ${
-                isUser ? 'bg-white/10 border-white/20' : 'bg-gray-50 dark:bg-[#1e2535] border-gray-200 dark:border-[#2a3347]'
-            }`}>
+            <div key={attachment.name} className={`mt-2 flex items-center gap-3 p-3 rounded-xl border ${isUser ? 'bg-white/10 border-white/20' : 'bg-gray-50 dark:bg-[#1e2535] border-gray-200 dark:border-[#2a3347]'
+                }`}>
                 <div className={isUser ? 'text-white/70' : 'text-gray-600 dark:text-gray-400'}>
                     {getFileIcon(attachment.type || '')}
                 </div>
@@ -824,9 +828,9 @@ export function ChatPage() {
     }
 
     const showUnreadBadge = unreadCount > 0;
-    const selectedConv    = conversations.find((c) => c.id === selectedId);
-    const filteredFiles   = browserFiles.filter((f) => {
-        const matchesSearch   = !browserSearch || f.filename.toLowerCase().includes(browserSearch.toLowerCase());
+    const selectedConv = conversations.find((c) => c.id === selectedId);
+    const filteredFiles = browserFiles.filter((f) => {
+        const matchesSearch = !browserSearch || f.filename.toLowerCase().includes(browserSearch.toLowerCase());
         const matchesCategory = browserCategory === 'all' || f.category === browserCategory;
         return matchesSearch && matchesCategory;
     });
@@ -844,19 +848,17 @@ export function ChatPage() {
                             {/* Left: avatar + title */}
                             <div className="flex items-center gap-4">
                                 <div className="relative">
-                                    <div className={`w-11 h-11 rounded-2xl flex items-center justify-center shadow-lg ${
-                                        activeTab === 'ai'    ? 'bg-gradient-to-br from-blue-500 to-blue-600 shadow-blue-500/25 dark:shadow-blue-900/40'
-                                      : activeTab === 'inbox' ? 'bg-gradient-to-br from-emerald-500 to-teal-600 shadow-emerald-500/25 dark:shadow-emerald-900/40'
-                                      :                         'bg-gradient-to-br from-violet-500 to-purple-600 shadow-violet-500/25 dark:shadow-violet-900/40'
-                                    }`}>
-                                        {activeTab === 'ai'    ? <Crown    className="w-5 h-5 text-white" />
-                                       : activeTab === 'inbox' ? <Inbox    className="w-5 h-5 text-white" />
-                                       :                         <FolderOpen className="w-5 h-5 text-white" />}
+                                    <div className={`w-11 h-11 rounded-2xl flex items-center justify-center shadow-lg ${activeTab === 'ai' ? 'bg-gradient-to-br from-blue-500 to-blue-600 shadow-blue-500/25 dark:shadow-blue-900/40'
+                                            : activeTab === 'inbox' ? 'bg-gradient-to-br from-emerald-500 to-teal-600 shadow-emerald-500/25 dark:shadow-emerald-900/40'
+                                                : 'bg-gradient-to-br from-violet-500 to-purple-600 shadow-violet-500/25 dark:shadow-violet-900/40'
+                                        }`}>
+                                        {activeTab === 'ai' ? <Crown className="w-5 h-5 text-white" />
+                                            : activeTab === 'inbox' ? <Inbox className="w-5 h-5 text-white" />
+                                                : <FolderOpen className="w-5 h-5 text-white" />}
                                     </div>
                                     {activeTab === 'ai' && (
-                                        <div className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white dark:border-[#161b27] transition-colors duration-300 ${
-                                            isConnected ? 'bg-green-500' : 'bg-gray-400 dark:bg-gray-600'
-                                        }`} />
+                                        <div className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white dark:border-[#161b27] transition-colors duration-300 ${isConnected ? 'bg-green-500' : 'bg-gray-400 dark:bg-gray-600'
+                                            }`} />
                                     )}
                                     {showUnreadBadge && activeTab === 'ai' && (
                                         <div className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
@@ -872,7 +874,7 @@ export function ChatPage() {
                                         {activeTab === 'ai' ? (
                                             isConnected ? (
                                                 <span className="text-green-600 dark:text-green-400 font-medium">Active now</span>
-                                            ) : isConnecting ? 'Connecting…' : (
+                                            ) : genesisInProgress ? 'Initializing…' : isConnecting ? 'Connecting…' : (
                                                 <span className="text--600 dark:text-gray-500">Offline</span>
                                             )
                                         ) : activeTab === 'inbox' ? (
@@ -912,16 +914,15 @@ export function ChatPage() {
 
                                 {/* Voice Bridge status pill */}
                                 {activeTab === 'ai' && (
-                                    <div className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border ${
-                                        bridgeStatus === 'connected'
+                                    <div className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border ${bridgeStatus === 'connected'
                                             ? 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-500/10 border-green-200 dark:border-green-500/20'
                                             : bridgeStatus === 'connecting'
-                                            ? 'text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-500/10 border-yellow-200 dark:border-yellow-500/20'
-                                            : 'text--600 dark:text-gray-500 bg-gray-50 dark:bg-[#1e2535] border-gray-200 dark:border-[#1e2535]'
-                                    }`} title={`Voice bridge: ${bridgeStatus}`}>
+                                                ? 'text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-500/10 border-yellow-200 dark:border-yellow-500/20'
+                                                : 'text--600 dark:text-gray-500 bg-gray-50 dark:bg-[#1e2535] border-gray-200 dark:border-[#1e2535]'
+                                        }`} title={`Voice bridge: ${bridgeStatus}`}>
                                         {bridgeStatus === 'connecting' ? <LoadingSpinner size="xs" />
-                                         : bridgeStatus === 'connected' ? <Mic className="w-3 h-3" />
-                                         : <MicOff className="w-3 h-3" />}
+                                            : bridgeStatus === 'connected' ? <Mic className="w-3 h-3" />
+                                                : <MicOff className="w-3 h-3" />}
                                         <span className="capitalize">{bridgeStatus === 'connected' ? 'Voice' : bridgeStatus}</span>
                                     </div>
                                 )}
@@ -929,18 +930,17 @@ export function ChatPage() {
                                 {/* Tab switcher */}
                                 <div className="flex items-center bg-gray-100 dark:bg-[#0f1117] rounded-xl p-1 border border-gray-200 dark:border-[#1e2535]">
                                     {([
-                                        { key: 'ai'    as const, icon: Crown,      label: 'AI Chat' },
-                                        { key: 'inbox' as const, icon: Inbox,      label: 'Inbox'   },
-                                        { key: 'files' as const, icon: FolderOpen, label: 'Files'   },
+                                        { key: 'ai' as const, icon: Crown, label: 'AI Chat' },
+                                        { key: 'inbox' as const, icon: Inbox, label: 'Inbox' },
+                                        { key: 'files' as const, icon: FolderOpen, label: 'Files' },
                                     ] as const).map(({ key, icon: Icon, label }) => (
                                         <button key={key} onClick={() => setActiveTab(key)}
-                                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
-                                                activeTab === key
+                                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${activeTab === key
                                                     // Issue 10: static class map — dynamic text-${color}-* strings
                                                     // are not detected by Tailwind JIT and get purged in production
                                                     ? `bg-white dark:bg-[#161b27] ${TAB_ACTIVE_STYLES[key]} shadow-sm`
                                                     : 'text-gray-600 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
-                                            }`}>
+                                                }`}>
                                             <Icon className="w-3.5 h-3.5" />
                                             {label}
                                             {key === 'inbox' && conversations.length > 0 && activeTab !== 'inbox' && (
@@ -978,25 +978,23 @@ export function ChatPage() {
                                 )}
 
                                 {messages.map((message) => {
-                                    const isUser  = message.role === 'sovereign';
+                                    const isUser = message.role === 'sovereign';
                                     const isError = message.metadata?.error === true;
                                     return (
                                         <div key={message.id} className={`flex gap-3 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
                                             {/* Avatar */}
-                                            <div className={`flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center text-white text-xs font-semibold ${
-                                                isUser ? 'bg-gradient-to-br from-blue-500 to-blue-600'
-                                                       : isError ? 'bg-orange-500' : 'bg-gradient-to-br from-gray-700 to-gray-800'
-                                            }`}>
+                                            <div className={`flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center text-white text-xs font-semibold ${isUser ? 'bg-gradient-to-br from-blue-500 to-blue-600'
+                                                    : isError ? 'bg-orange-500' : 'bg-gradient-to-br from-gray-700 to-gray-800'
+                                                }`}>
                                                 {isUser ? (user?.username?.[0]?.toUpperCase() ?? 'S') : <Bot className="w-4 h-4" />}
                                             </div>
 
                                             <div className={`flex flex-col max-w-[75%] ${isUser ? 'items-end' : 'items-start'}`}>
-                                                <div className={`px-4 py-3 rounded-2xl ${
-                                                    isUser  ? 'bg-gradient-to-br from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/20 dark:shadow-blue-900/40'
-                                                    : isError ? 'bg-orange-50 dark:bg-orange-500/10 border border-orange-200 dark:border-orange-500/20 text-orange-900 dark:text-orange-300'
-                                                    : message.role === 'system' ? 'bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-900 dark:text-red-300'
-                                                    : 'bg-white dark:bg-[#161b27] border border-gray-200 dark:border-[#1e2535] text-gray-900 dark:text-gray-100 shadow-sm dark:shadow-[0_2px_12px_rgba(0,0,0,0.2)]'
-                                                }`}>
+                                                <div className={`px-4 py-3 rounded-2xl ${isUser ? 'bg-gradient-to-br from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/20 dark:shadow-blue-900/40'
+                                                        : isError ? 'bg-orange-50 dark:bg-orange-500/10 border border-orange-200 dark:border-orange-500/20 text-orange-900 dark:text-orange-300'
+                                                            : message.role === 'system' ? 'bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-900 dark:text-red-300'
+                                                                : 'bg-white dark:bg-[#161b27] border border-gray-200 dark:border-[#1e2535] text-gray-900 dark:text-gray-100 shadow-sm dark:shadow-[0_2px_12px_rgba(0,0,0,0.2)]'
+                                                    }`}>
                                                     <p className="text-[15px] leading-relaxed whitespace-pre-wrap">{message.content}</p>
                                                     {message.attachments?.map((att, i) => (
                                                         <div key={i}>{renderAttachment(att, isUser)}</div>
@@ -1099,11 +1097,10 @@ export function ChatPage() {
                                                 {voiceAvailable && (
                                                     <>
                                                         <button type="button" onClick={handleVoiceButtonClick}
-                                                            className={`p-1.5 rounded-lg transition-colors ${
-                                                                isRecording
+                                                            className={`p-1.5 rounded-lg transition-colors ${isRecording
                                                                     ? 'bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400'
                                                                     : 'hover:bg-gray-200 dark:hover:bg-[#1e2535] text--600 dark:text-gray-500'
-                                                            }`} title={isRecording ? 'Stop recording' : 'Start voice input'}>
+                                                                }`} title={isRecording ? 'Stop recording' : 'Start voice input'}>
                                                             {isRecording ? <Pause className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
                                                         </button>
                                                         <button type="button" onClick={() => setShowVoiceSettings(true)}
@@ -1157,20 +1154,19 @@ export function ChatPage() {
                                         />
                                     </div>
                                 ) : conversations.map((conv) => {
-                                    const latestMsg   = conv.messages?.at(-1);
+                                    const latestMsg = conv.messages?.at(-1);
                                     const channelType = conv.messages?.find((m: any) => m.sender_channel)?.sender_channel;
                                     return (
                                         <button key={conv.id} onClick={() => setSelectedId(conv.id)}
-                                            className={`w-full text-left px-4 py-3.5 flex items-center gap-3 transition-colors duration-150 ${
-                                                selectedId === conv.id
+                                            className={`w-full text-left px-4 py-3.5 flex items-center gap-3 transition-colors duration-150 ${selectedId === conv.id
                                                     ? 'bg-emerald-50 dark:bg-emerald-500/10'
                                                     : 'hover:bg-gray-50 dark:hover:bg-[#1e2535]'
-                                            }`}>
+                                                }`}>
                                             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white text-xs font-semibold flex-shrink-0">
                                                 {channelType === 'whatsapp' ? <Smartphone className="w-4 h-4" />
-                                                 : channelType === 'slack'  ? <Slack        className="w-4 h-4" />
-                                                 : channelType === 'email'  ? <Mail          className="w-4 h-4" />
-                                                 : <MessageCircle className="w-4 h-4" />}
+                                                    : channelType === 'slack' ? <Slack className="w-4 h-4" />
+                                                        : channelType === 'email' ? <Mail className="w-4 h-4" />
+                                                            : <MessageCircle className="w-4 h-4" />}
                                             </div>
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center justify-between">
@@ -1200,11 +1196,10 @@ export function ChatPage() {
                                     <div className="flex-1 overflow-y-auto p-4 space-y-3">
                                         {selectedConv.messages?.map((msg: any) => (
                                             <div key={msg.id} className={`flex ${msg.role === 'system' ? 'justify-start' : 'justify-end'}`}>
-                                                <div className={`max-w-[70%] px-4 py-2.5 rounded-2xl text-sm ${
-                                                    msg.role === 'system'
+                                                <div className={`max-w-[70%] px-4 py-2.5 rounded-2xl text-sm ${msg.role === 'system'
                                                         ? 'bg-white dark:bg-[#161b27] border border-gray-200 dark:border-[#1e2535] text-gray-900 dark:text-gray-100'
                                                         : 'bg-emerald-600 text-white'
-                                                }`}>
+                                                    }`}>
                                                     {msg.sender_channel && (
                                                         <span className="text-[10px] font-medium uppercase tracking-wide opacity-60 block mb-1">
                                                             via {msg.sender_channel}

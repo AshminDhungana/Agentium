@@ -1136,8 +1136,32 @@ def trigger_genesis_if_needed(db) -> bool:
                     result.get("status"),
                     result.get("message"),
                 )
+            # Note: this broadcast only reaches clients that are already
+            # authenticated on the WebSocket (e.g. another tab/admin view).
+            # A client stuck on the genesis gate isn't in
+            # ConnectionManager.active_connections yet — it's closed before
+            # being added — so it relies on polling GET /ws/genesis-status
+            # instead. See websocket.py:genesis_status.
+            try:
+                from backend.api.routes.websocket import manager as ws_manager
+                await ws_manager.broadcast({
+                    "type":      "genesis_complete",
+                    "status":    result.get("status"),
+                    "timestamp": datetime.utcnow().isoformat(),
+                })
+            except Exception as bexc:
+                logger.warning(f"genesis_complete broadcast failed: {bexc}")
         except Exception as exc:
             logger.error("❌ Auto-genesis failed: %s", exc, exc_info=True)
+            try:
+                from backend.api.routes.websocket import manager as ws_manager
+                await ws_manager.broadcast({
+                    "type":      "genesis_failed",
+                    "error":     str(exc),
+                    "timestamp": datetime.utcnow().isoformat(),
+                })
+            except Exception as bexc:
+                logger.warning(f"genesis_failed broadcast failed: {bexc}")
 
     asyncio.create_task(_run_genesis())
     logger.info("🚀 Genesis protocol triggered after API key configuration")
