@@ -127,10 +127,9 @@ class IdleBudgetManager:
     """
 
     def __init__(self):
-        # Load persisted limits (or use hardcoded defaults on first run)
-        cfg = SystemBudgetConfig.load()
-        self.daily_token_limit: int = cfg["daily_token_limit"]
-        self.daily_cost_limit: float = cfg["daily_cost_limit"]
+        # Lazy load config
+        self._daily_token_limit: Optional[int] = None
+        self._daily_cost_limit: Optional[float] = None
 
         # Cost multiplier for idle vs active (local models are free)
         self.idle_cost_multiplier = 0.0
@@ -138,6 +137,30 @@ class IdleBudgetManager:
         # Compatibility properties expected by main.py / token_optimizer
         self._total_tokens_saved = 0
         self._total_cost_saved = 0.0
+
+    def _ensure_loaded(self):
+        if self._daily_token_limit is None or self._daily_cost_limit is None:
+            cfg = SystemBudgetConfig.load()
+            self._daily_token_limit = cfg["daily_token_limit"]
+            self._daily_cost_limit = cfg["daily_cost_limit"]
+
+    @property
+    def daily_token_limit(self) -> int:
+        self._ensure_loaded()
+        return self._daily_token_limit
+
+    @daily_token_limit.setter
+    def daily_token_limit(self, value: int):
+        self._daily_token_limit = value
+
+    @property
+    def daily_cost_limit(self) -> float:
+        self._ensure_loaded()
+        return self._daily_cost_limit
+
+    @daily_cost_limit.setter
+    def daily_cost_limit(self, value: float):
+        self._daily_cost_limit = value
 
     # ------------------------------------------------------------------
     # Compat properties

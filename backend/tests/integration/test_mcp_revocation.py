@@ -95,7 +95,7 @@ class TestMCPSubSecondRevocation:
 
         r = client.post(
             f"/api/v1/mcp-tools/{tool_id}/execute",
-            json={"agent_id": "admin", "agent_tier": "3xxxx", "params": {}},
+            json={"agent_id": "30001", "agent_tier": "3xxxx", "params": {}},
             headers=auth_headers,
         )
         assert r.status_code == 200

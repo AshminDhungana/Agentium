@@ -27,7 +27,7 @@ os.environ.setdefault("REDIS_URL", "redis://redis:6379/1")
 os.environ.setdefault("CHROMA_HOST", "chromadb")
 os.environ.setdefault("CHROMA_PORT", "8001")
 os.environ.setdefault("CELERY_TASK_ALWAYS_EAGER", "true")
-os.environ.setdefault("TESTING", "true")
+os.environ["TESTING"] = "true"
 
 
 from backend.main import app
@@ -58,6 +58,13 @@ def db_engine():
         # Always start with a clean test database to avoid stale data
         # from a previous run whose tear-down failed (e.g. missing
         # named constraints in metadata vs. actual DB).
+        # Force-terminate any lingering sessions before dropping,
+        # otherwise DROP DATABASE hangs waiting for an exclusive lock.
+        conn.execute(text(
+            "SELECT pg_terminate_backend(pid) "
+            "FROM pg_stat_activity WHERE datname = 'agentium_test' "
+            "AND pid <> pg_backend_pid()"
+        ))
         conn.execute(text("DROP DATABASE IF EXISTS agentium_test"))
         conn.execute(text("CREATE DATABASE agentium_test ENCODING 'UTF8' TEMPLATE template0"))
     engine_default.dispose()
@@ -139,13 +146,13 @@ async def seeded_db(db_session: Session) -> Session:
         # are visible within this session before the test begins querying.
         db_session.flush()
 
-        # Ensure there is an Agent with agentium_id="admin" to prevent ForeignKey violations
-        # when voting as "admin" via HTTP endpoints.
+        # Ensure there is an Agent with a valid agentium_id for test runs.
+        # (IDs must start with a digit after recent validation changes.)
         from backend.models.entities.agents import Agent, AgentType, AgentStatus
-        admin_agent = db_session.query(Agent).filter_by(agentium_id="admin").first()
+        admin_agent = db_session.query(Agent).filter_by(agentium_id="30001").first()
         if not admin_agent:
             admin_agent = Agent(
-                agentium_id="admin",
+                agentium_id="30001",
                 name="Admin User Agent",
                 agent_type=AgentType.COUNCIL_MEMBER,
                 status=AgentStatus.ACTIVE,
