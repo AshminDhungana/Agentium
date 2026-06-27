@@ -114,6 +114,20 @@ export interface ImportResult {
     validation?: ValidationResult;
 }
 
+// ─── Phase 18: Unified Diff Types ───────────────────────────────────────────
+
+export interface CheckpointDiffResult {
+    left_checkpoint_id: string;
+    right_checkpoint_id: string;
+    left_branch?: string;
+    right_branch?: string;
+    left_agentium_id?: string;
+    right_agentium_id?: string;
+    unified_diff: string;
+    left_json: string;
+    right_json: string;
+}
+
 // ============================================================================
 // Checkpoints Service
 // ============================================================================
@@ -182,6 +196,21 @@ export const checkpointsService = {
         if (taskId) params.append('task_id', taskId);
         const response = await api.get<BranchCompareResult>(
             `/api/v1/checkpoints/compare?${params.toString()}`
+        );
+        return response.data;
+    },
+
+    /**
+     * Get a unified diff between two individual checkpoints.
+     * Returns JSON snapshots and unified diff for Monaco diff viewer.
+     */
+    getCheckpointDiff: async (
+        checkpointId: string,
+        compareToId: string
+    ): Promise<CheckpointDiffResult> => {
+        const response = await api.get<CheckpointDiffResult>(
+            `/api/v1/checkpoints/${checkpointId}/diff`,
+            { params: { compare_to: compareToId } }
         );
         return response.data;
     },

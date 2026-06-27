@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { checkpointsService, Checkpoint, CheckpointPhase } from '../../services/checkpoints';
 import { CheckpointDiffModal } from './CheckpointDiffModal';
+import { CheckpointDiffViewer } from './CheckpointDiffViewer';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 // ─── Phase metadata ──────────────────────────────────────────────────────────
@@ -397,6 +398,8 @@ export const CheckpointTimeline: React.FC<CheckpointTimelineProps> = ({
     const [compareLeft, setCompareLeft] = useState<string>('');
     const [compareRight, setCompareRight] = useState<string>('');
     const [showDiff, setShowDiff] = useState(false);
+    const [diffMode, setDiffMode] = useState<'structured' | 'raw'>('structured');
+    const [rawDiffIds, setRawDiffIds] = useState<{ leftId: string; rightId: string } | null>(null);
 
     const load = useCallback(async (silent = false) => {
         if (silent) setIsRefreshing(true);
@@ -452,7 +455,29 @@ export const CheckpointTimeline: React.FC<CheckpointTimelineProps> = ({
         }
         setCompareLeft(availableBranches[0]);
         setCompareRight(availableBranches[1]);
+        setDiffMode('structured');
         setIsCompareModalOpen(true);
+    };
+
+    const handleViewDiff = async () => {
+        if (diffMode === 'structured') {
+            setShowDiff(true);
+            setIsCompareModalOpen(false);
+        } else {
+            // Raw mode: fetch compare result to get checkpoint IDs, then open raw diff
+            try {
+                const result = await checkpointsService.compareBranches(compareLeft, compareRight, taskId);
+                setRawDiffIds({ leftId: result.left_checkpoint_id, rightId: result.right_checkpoint_id });
+                setIsCompareModalOpen(false);
+            } catch (err: any) {
+                const msg = err?.response?.data?.detail || 'Failed to load checkpoint IDs for raw diff';
+                showToast.error(msg);
+            }
+        }
+    };
+
+    const handleCloseRawDiff = () => {
+        setRawDiffIds(null);
     };
 
     // ── Loading state ─────────────────────────────────────────────────────────
@@ -592,7 +617,7 @@ export const CheckpointTimeline: React.FC<CheckpointTimelineProps> = ({
 
                             <div>
                                 <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Right Branch</label>
-                                <select 
+                                <select
                                     className="w-full px-3 py-2 text-sm rounded bg-slate-50 border border-slate-200 dark:bg-[#0f1117] dark:border-[#1e2535] dark:text-white"
                                     value={compareRight}
                                     onChange={(e) => setCompareRight(e.target.value)}
@@ -602,17 +627,44 @@ export const CheckpointTimeline: React.FC<CheckpointTimelineProps> = ({
                                     ))}
                                 </select>
                             </div>
+
+                            {/* Diff mode toggle */}
+                            <div>
+                                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">View Mode</label>
+                                <div className="flex rounded-lg border border-slate-200 dark:border-[#1e2535] overflow-hidden">
+                                    <button
+                                        onClick={() => setDiffMode('structured')}
+                                        className={`flex-1 py-1.5 text-xs font-medium transition-colors ${
+                                            diffMode === 'structured'
+                                                ? 'bg-violet-600 text-white'
+                                                : 'bg-slate-50 dark:bg-[#0f1117] text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#1a2030]'
+                                        }`}
+                                    >
+                                        Structured
+                                    </button>
+                                    <button
+                                        onClick={() => setDiffMode('raw')}
+                                        className={`flex-1 py-1.5 text-xs font-medium transition-colors ${
+                                            diffMode === 'raw'
+                                                ? 'bg-violet-600 text-white'
+                                                : 'bg-slate-50 dark:bg-[#0f1117] text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#1a2030]'
+                                        }`}
+                                    >
+                                        Raw Diff
+                                    </button>
+                                </div>
+                            </div>
                         </div>
 
                         <div className="mt-6 flex gap-2">
-                            <button 
-                                onClick={() => setIsCompareModalOpen(false)}
+                            <button
+                                onClick={() => { setIsCompareModalOpen(false); setRawDiffIds(null); }}
                                 className="flex-1 px-4 py-2 text-sm border border-slate-200 dark:border-[#1e2535] rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1e2535] transition-colors"
                             >
                                 Cancel
                             </button>
-                            <button 
-                                onClick={() => setShowDiff(true)}
+                            <button
+                                onClick={handleViewDiff}
                                 disabled={compareLeft === compareRight}
                                 className="flex-1 px-4 py-2 text-sm bg-violet-600 text-white rounded-lg hover:bg-violet-700 disabled:opacity-50 transition-colors"
                             >
@@ -623,7 +675,7 @@ export const CheckpointTimeline: React.FC<CheckpointTimelineProps> = ({
                 </div>
             )}
 
-            {/* Diff Modal */}
+            {/* Diff Modal (Structured View) */}
             {showDiff && (
                 <CheckpointDiffModal
                     taskId={taskId}
@@ -633,6 +685,15 @@ export const CheckpointTimeline: React.FC<CheckpointTimelineProps> = ({
                         setShowDiff(false);
                         setIsCompareModalOpen(false);
                     }}
+                />
+            )}
+
+            {/* Raw Diff Viewer (Monaco) */}
+            {rawDiffIds && (
+                <CheckpointDiffViewer
+                    checkpointId={rawDiffIds.leftId}
+                    compareToId={rawDiffIds.rightId}
+                    onClose={handleCloseRawDiff}
                 />
             )}
         </div>
