@@ -508,8 +508,31 @@ export const AgentsPage: React.FC = () => {
             showToast.success(`${agent.name} moved under ${newParent.name}`);
             await loadAgents(true);
         } catch (err: unknown) {
-            const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-            showToast.error(detail || 'Reassignment failed');
+            const axiosErr = err as {
+                response?: {
+                    status?: number;
+                    data?: {
+                        detail?: { code?: string; verdict?: string; explanation?: string };
+                        error?: string;
+                    };
+                };
+                message?: string;
+            };
+
+            if (axiosErr.response?.status === 403) {
+                const blockDetail = axiosErr.response.data?.detail;
+                if (blockDetail?.verdict === 'BLOCK') {
+                    showToast.error(`Constitutional Block: ${blockDetail.explanation || 'Reassignment blocked by Constitution'}`);
+                } else {
+                    showToast.error('Reassignment blocked by constitutional guard');
+                }
+            } else {
+                const detail = axiosErr.response?.data?.detail;
+                const msg = (typeof detail === 'string' && detail)
+                    ? detail
+                    : axiosErr.message || 'Reassignment failed';
+                showToast.error(msg);
+            }
             await loadAgents(true);
         }
     };

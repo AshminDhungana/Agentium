@@ -544,9 +544,10 @@ app.add_middleware(InputSanitizationMiddleware)
 app.add_middleware(ObserverReadOnlyMiddleware)
 
 
-from backend.api.routes import scaling as scaling_routes                      
-from backend.api.routes import improvements as improvements_routes            
-from backend.api.routes import events as events_routes                         
+from backend.api.routes import scaling as scaling_routes
+from backend.api.routes import improvements as improvements_routes
+from backend.api.routes import events as events_routes
+from backend.api.routes import reassign_routes
 
 # ═══════════════════════════════════════════════════════════
 # REGISTER ROUTERS
@@ -568,6 +569,7 @@ app.include_router(files_routes.router,             prefix="/api/v1")
 app.include_router(voice_routes.router,             prefix="/api/v1")
 app.include_router(capability_routes.router)
 app.include_router(lifecycle_routes.router)
+app.include_router(reassign_routes.router)
 app.include_router(audit_routes_router.router,      prefix="/api/v1")
 app.include_router(monitoring_router.router,        prefix="/api/v1")
 app.include_router(api_keys_routes.router,          prefix="/api/v1")

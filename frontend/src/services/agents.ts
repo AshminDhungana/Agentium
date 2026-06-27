@@ -148,8 +148,8 @@ export const agentsService = {
     },
 
     reassignAgent: async (agentId: string, data: ReassignAgentRequest): Promise<Agent> => {
-        const response = await api.post<{ agent: Agent }>(
-            `/api/v1/agents/lifecycle/${agentId}/reassign`,
+        const response = await api.patch<{ agent: Agent }>(
+            `/api/v1/agents/${agentId}/parent`,
             data,
         );
         return response.data.agent;

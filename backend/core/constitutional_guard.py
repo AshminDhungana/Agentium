@@ -88,15 +88,16 @@ TIER_CAPABILITIES: Dict[str, List[str]] = {
         "veto", "amendment", "liquidate_any", "admin_vector_db",
         "broadcast", "spawn_any", "override_vote", "modify_constitution",
         "execute_command", "read_file", "write_file", "browser_control",
+        "reassign_agent",
     ],
     "1": [  # Council Members
         "propose_amendment", "allocate_resources", "audit",
         "moderate_knowledge", "spawn_lead", "vote", "escalate",
-        "read_file",
+        "read_file", "reassign_agent",
     ],
     "2": [  # Lead Agents
         "spawn_task_agent", "delegate_work", "request_resources",
-        "submit_knowledge", "report_status",
+        "submit_knowledge", "report_status", "reassign_agent",
     ],
     "3": [  # Task Agents
         "execute_task", "report_status", "escalate_blocker",

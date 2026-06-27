@@ -733,7 +733,7 @@ Build a self-governing AI ecosystem where agents operate under constitutional la
 #### Outstanding Items from Prior Phases
 
 - [x] **Phase 6 — MCP Revocation Sub-Second** — revoke a tool via `DELETE /mcp-tools/{id}/approve`; invoke the same tool within 1 second; confirm `403 Tool revoked` response sourced from Redis SET (`agentium:mcp:revoked`), not a DB query; assert no `SELECT` issued to PostgreSQL during revocation check
-- [ ] **Phase 7 — Drag-and-Drop Agent Reassignment** — implement in `AgentTree.tsx` via `react-dnd`; on drop, call `PATCH /agents/{id}/parent` with `new_parent_id`; run constitutional guard check before persisting; display validation toast on BLOCK verdict
+- [x] **Phase 7 — Drag-and-Drop Agent Reassignment** — implement in `AgentTree.tsx` via `react-dnd`; on drop, call `PATCH /agents/{id}/parent` with `new_parent_id`; run constitutional guard check before persisting; display validation toast on BLOCK verdict
 - [ ] **Phase 7 — Checkpoint Diff View** — implement `CheckpointDiffViewer.tsx` using Monaco Editor diff API (`createDiffEditor`); add `GET /checkpoints/{id}/diff?compare_to={id2}` backend route returning a unified diff of `context_window_snapshot` JSON; wire "Compare Branches" button in `CheckpointTimeline.tsx`
 - [ ] **Phase 13 — Success Criteria Walkthrough** — execute all 8 listed success criteria from §Phase 13 manually in staging; document pass/fail result per criterion; open a tracked GitHub Issue for any failure before marking Phase 18 complete
 
