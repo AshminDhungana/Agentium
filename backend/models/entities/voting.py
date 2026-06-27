@@ -6,7 +6,7 @@ Handles democratic decision-making for tasks and constitutional amendments.
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 from sqlalchemy import Column, String, Text, DateTime, ForeignKey, Integer, Enum, Boolean, JSON, CheckConstraint, Index
-from sqlalchemy.orm import relationship, validates
+from sqlalchemy.orm import relationship, validates, foreign
 from backend.models.entities.base import BaseEntity
 import enum
 import uuid
@@ -411,7 +411,7 @@ class IndividualVote(BaseEntity):
     amendment_voting_id = Column(String(36), ForeignKey('amendment_votings.id'), nullable=True)
     
     # Vote details
-    voter_agentium_id = Column(String(10), ForeignKey('agents.agentium_id'), nullable=False)
+    voter_agentium_id = Column(String(10), nullable=False)
     vote = Column(Enum(VoteType), nullable=False)
     rationale = Column(Text, nullable=True)  # Why they voted this way
     
@@ -423,7 +423,11 @@ class IndividualVote(BaseEntity):
     # Relations
     task_deliberation = relationship("TaskDeliberation", back_populates="individual_votes")
     amendment_voting = relationship("AmendmentVoting", back_populates="individual_votes")
-    council_member = relationship("Agent", foreign_keys=[voter_agentium_id])
+    council_member = relationship(
+        "Agent",
+        primaryjoin="foreign(IndividualVote.voter_agentium_id) == Agent.agentium_id",
+        back_populates="votes_cast"
+    )
     
     __table_args__ = (
         CheckConstraint(

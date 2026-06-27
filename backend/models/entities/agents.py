@@ -7,7 +7,7 @@ Includes IDLE GOVERNANCE support for persistent agents.
 from datetime import datetime
 from typing import Optional, List, Dict, Any, Type, Union
 from sqlalchemy import Column, String, Text, DateTime, ForeignKey, Integer, Enum, Boolean, event, select, Index
-from sqlalchemy.orm import relationship, validates, Session
+from sqlalchemy.orm import relationship, validates, Session, foreign
 from backend.models.entities.base import BaseEntity
 from backend.models.entities.constitution import Ethos
 import enum
@@ -106,6 +106,12 @@ class Agent(BaseEntity):
     ethos = relationship("Ethos", foreign_keys=[ethos_id])
     preferred_config = relationship("UserModelConfig", foreign_keys=[preferred_config_id])
     remote_executions = relationship("RemoteExecutionRecord", back_populates="agent", lazy="dynamic")
+    votes_cast = relationship(
+        "IndividualVote",
+        primaryjoin="Agent.agentium_id == foreign(IndividualVote.voter_agentium_id)",
+        back_populates="council_member",
+        lazy="dynamic"
+    )
     __mapper_args__ = {
         'polymorphic_on': agent_type,
         'polymorphic_identity': None
@@ -1428,7 +1434,6 @@ class CouncilMember(Agent):
     votes_participated = Column(Integer, default=0)
     votes_abstained = Column(Integer, default=0)
     
-    votes_cast = relationship("IndividualVote", back_populates="council_member", lazy="dynamic")
     
     __mapper_args__ = {
         'polymorphic_identity': AgentType.COUNCIL_MEMBER

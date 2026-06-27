@@ -149,10 +149,10 @@ async def seeded_db(db_session: Session) -> Session:
         # Ensure there is an Agent with a valid agentium_id for test runs.
         # (IDs must start with a digit after recent validation changes.)
         from backend.models.entities.agents import Agent, AgentType, AgentStatus
-        admin_agent = db_session.query(Agent).filter_by(agentium_id="30001").first()
+        admin_agent = db_session.query(Agent).filter_by(agentium_id="10003").first()
         if not admin_agent:
             admin_agent = Agent(
-                agentium_id="30001",
+                agentium_id="10003",
                 name="Admin User Agent",
                 agent_type=AgentType.COUNCIL_MEMBER,
                 status=AgentStatus.ACTIVE,
