@@ -3,6 +3,7 @@ MCP Governance Service
 ================================================
 """
 import logging
+import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 from sqlalchemy.orm import Session
@@ -94,6 +95,7 @@ class MCPGovernanceService:
             usage_count=0,
             health_status="unknown",
             is_active=True,
+            agentium_id=f"mcp-{uuid.uuid4().hex[:12]}",
         )
         self.db.add(tool)
         self.db.commit()
