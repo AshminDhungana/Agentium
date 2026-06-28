@@ -739,9 +739,9 @@ Build a self-governing AI ecosystem where agents operate under constitutional la
 
 #### Performance Regression Gate
 
-- [ ] Run `locust` load test at 1,000 concurrent users for 5 minutes against staging; assert: constitutional check p95 < 50 ms, task routing p95 < 100 ms, API p95 < 500 ms — matching Phase 8 targets
-- [ ] Celery throughput: assert ≥ 1,000 tasks/hour under the `locust` task-submission scenario; compare against Phase 8 baseline
-- [ ] ChromaDB `query_similar()` with 10,000 seeded documents: assert p95 < 200 ms; measure with `pytest-benchmark` and commit baseline to `benchmarks/`
+- [x] Run `locust` load test at 1,000 concurrent users for 5 minutes against staging; assert: constitutional check p95 < 50 ms, task routing p95 < 100 ms, API p95 < 500 ms — matching Phase 8 targets
+- [x] Celery throughput: assert ≥ 1,000 tasks/hour under the `locust` task-submission scenario; compare against Phase 8 baseline
+- [x] ChromaDB `query_similar()` with 10,000 seeded documents: assert p95 < 200 ms; measure with `pytest-benchmark` and commit baseline to `benchmarks/`
 
 ---
 
@@ -876,6 +876,47 @@ OpenAI TTS — Text-to-Speech
 When the system needs structured input from a user inside the **chat window**, it renders an inline multi-select checkbox card directly in the message thread. The user can select multiple options at once and confirm with a single click, keeping the conversation compact.
 
 This interaction is **exclusive to the chat window**. When the user is on an external channel such as WhatsApp, SMS, or email, the system falls back to a plain text message listing numbered options and asks for a comma-separated reply.
+
+### 19.1.1 Multi-Question Elicitation Card (Chat-Window Only)
+
+An extension of the multi-select checkbox card that lets the Head of Council (or any agent) ask **a small batch of questions in a single turn**, instead of one question per card. This reduces back-and-forth when the agent needs a few related pieces of information to proceed (e.g. destination, budget, dates) — without recreating the cognitive overload of a long form.
+
+**Batching rule (informed by form-UX research):**
+
+- **Maximum 2–3 questions per card.** Cognitive load research shows people process small chunks (2–3 items) far more reliably than longer batches; beyond that, completion and accuracy drop.
+- If the agent has **4 or more** pieces of information to collect, it must **split them across two or more sequential cards** rather than cramming them into one. Each card still follows the 2–3 question cap.
+- Within a card, questions are ordered **easiest → hardest** (the "foot-in-the-door" pattern) — quick/low-effort picks first, anything requiring thought or sensitive input last.
+
+**Behavior:**
+
+- The card renders **inline** in the chat thread, with each question as its own block in a single-column layout — no side-by-side fields.
+- Each question independently has its own option set (single-select or multi-select, configurable per question).
+- Every question's **last option is "Other / Type your own"**, styled identically to the rest (not a visually separate fallback) — selecting it reveals an inline text field scoped to that question.
+- A small **"x of y answered"** counter sits at the top of the card, giving lightweight progress visibility without a full step-by-step progress bar (since all questions are visible at once, not paged).
+- A single **Confirm** button at the bottom submits all answers (selected options + typed text) together as one structured response.
+- Confirm stays disabled until every **required** question has an answer; optional questions can be left blank or explicitly skipped.
+- If the user types a free-text message in the main chat box instead of using the card, the entire card auto-dismisses and the message is processed as a normal reply.
+- Only one active multi-question card may exist at a time; a new request replaces any unanswered one.
+- Once confirmed, the card collapses into a read-only summary bubble listing each question with its chosen/typed answer.
+- If a second card immediately follows the first (because the agent split a longer batch), it appears as a new inline card directly below the now-collapsed summary, continuing the conversation rhythm rather than feeling like a fresh interruption.
+
+**Visual Design:**
+
+- Same Tailwind dark-mode system as the single-question card: rounded container, subtle border, indigo accents for selected states.
+- Questions are separated by light divider lines within the same card, not individual bordered boxes — keeps it feeling like one compact form, not stacked cards.
+- Labels sit above their input (not beside it), left-aligned — reduces visual scanning effort.
+- The inline "type your own" field appears directly beneath its question when selected, with a thin indigo outline matching the selected-state style.
+
+**Data Payload:**
+
+The backend triggers the card with a structured payload containing an array of questions (**hard cap: 3**). Each question includes: question text, input type (`single_select` / `multi_select`), a required flag, and an array of options (id, label, value) — with an implicit final "Other" option mapping to a free-text value rather than a fixed id. An optional shared expiration timer can apply to the whole card. If the agent's planning layer generates more than 3 questions, it must chunk them into multiple sequential payloads rather than exceeding the cap.
+
+**External channels (WhatsApp, SMS, email):**
+
+- Falls back to a single plain-text message listing all questions numbered sequentially, with lettered options under each (e.g. `1. Where to? a) Tokyo b) Paris c) Other (type your answer)`), asking for one reply line per question.
+- The 2–3 question cap and easy→hard ordering still apply, since these channels have even less room for cognitive overhead than the in-app card.
+
+---
 
 ### 19.2 Single-Use Agent Timer (Execution Wait)
 

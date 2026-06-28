@@ -26,14 +26,15 @@ from typing import Optional, Dict, List, Callable, Any, Tuple
 from datetime import datetime, timedelta
 from functools import wraps
 from sqlalchemy.orm import Session
-from sqlalchemy import func, text
+from sqlalchemy import text
 from threading import Lock
 
-from backend.models.database import get_db_context, get_system_agent_id
+from backend.models.database import get_system_agent_id
 from backend.models.entities.user_config import UserModelConfig, ConnectionStatus, ProviderType
 from backend.models.entities.channels import ExternalChannel, ChannelType
 from backend.models.entities.monitoring import MonitoringAlert, ViolationSeverity
 from backend.core.security import decrypt_api_key
+from backend.core.dependencies import with_db_session
 
 logger = logging.getLogger(__name__)
 
@@ -90,6 +91,7 @@ class APIKeyManager:
     # Core Failover Logic
     # =====================================================================
     
+    @with_db_session
     def get_active_key(
         self, 
         provider: str, 
@@ -108,31 +110,23 @@ class APIKeyManager:
             
         Returns:
             UserModelConfig with healthy key, or None if no keys available
-            
+
         Performance: <50ms database query
         """
-        def _query(db_session: Session):
-            # Get all active keys for provider, ordered by priority
-            keys = db_session.query(UserModelConfig).filter_by(
-                provider=provider,
-                is_active=True
-            ).filter(
-                UserModelConfig.priority >= min_priority
-            ).order_by(
-                UserModelConfig.priority.asc()
-            ).all()
-            
-            for key in keys:
-                if self._is_key_healthy(key, estimated_cost):
-                    return key
-            
-            return None
-        
-        if db:
-            return _query(db)
-        else:
-            with get_db_context() as db_session:
-                return _query(db_session)
+        keys = db.query(UserModelConfig).filter_by(
+            provider=provider,
+            is_active=True
+        ).filter(
+            UserModelConfig.priority >= min_priority
+        ).order_by(
+            UserModelConfig.priority.asc()
+        ).all()
+
+        for key in keys:
+            if self._is_key_healthy(key, estimated_cost):
+                return key
+
+        return None
     
     def get_active_key_with_fallback(
         self,
@@ -219,6 +213,7 @@ class APIKeyManager:
     # Failure Handling & Recovery
     # =====================================================================
     
+    @with_db_session
     def mark_key_failed(
         self, 
         key_id: str, 
@@ -238,66 +233,50 @@ class APIKeyManager:
         Returns:
             Dict with status: 'cooldown', 'error', or 'disabled'
         """
-        def _update(db_session: Session):
-            key = db_session.query(UserModelConfig).filter_by(id=key_id).first()
-            if not key:
-                logger.error(f"Key {key_id} not found for failure marking")
-                return {"status": "not_found"}
-            
-            key.failure_count += 1
-            key.last_failure_at = datetime.utcnow()
-            
-            cooldown_minutes = 15 if is_rate_limit else self.DEFAULT_COOLDOWN_MINUTES
-            
-            if key.failure_count >= self.MAX_FAILURES_BEFORE_COOLDOWN:
-                key.cooldown_until = datetime.utcnow() + timedelta(minutes=cooldown_minutes)
-                key.status = ConnectionStatus.ERROR
-                
-                logger.warning(
-                    f"🔒 Key {key_id} ({key.provider.value}) entered cooldown "
-                    f"for {cooldown_minutes}min after {key.failure_count} failures"
-                )
-                
-                return {
-                    "status": "cooldown",
-                    "cooldown_until": key.cooldown_until.isoformat(),
-                    "failure_count": key.failure_count
-                }
-            else:
-                logger.info(
-                    f"⚠️ Key {key_id} failure #{key.failure_count}: {error or 'Unknown error'}"
-                )
-                return {
-                    "status": "error",
-                    "failure_count": key.failure_count,
-                    "remaining_attempts": self.MAX_FAILURES_BEFORE_COOLDOWN - key.failure_count
-                }
-        
-        if db:
-            return _update(db)
+        key = db.query(UserModelConfig).filter_by(id=key_id).first()
+        if not key:
+            logger.error(f"Key {key_id} not found for failure marking")
+            return {"status": "not_found"}
+
+        key.failure_count += 1
+        key.last_failure_at = datetime.utcnow()
+
+        cooldown_minutes = 15 if is_rate_limit else self.DEFAULT_COOLDOWN_MINUTES
+
+        if key.failure_count >= self.MAX_FAILURES_BEFORE_COOLDOWN:
+            key.cooldown_until = datetime.utcnow() + timedelta(minutes=cooldown_minutes)
+            key.status = ConnectionStatus.ERROR
+
+            logger.warning(
+                f"🔒 Key {key_id} ({key.provider.value}) entered cooldown "
+                f"for {cooldown_minutes}min after {key.failure_count} failures"
+            )
+
+            return {
+                "status": "cooldown",
+                "cooldown_until": key.cooldown_until.isoformat(),
+                "failure_count": key.failure_count
+            }
         else:
-            with get_db_context() as db_session:
-                result = _update(db_session)
-                db_session.commit()
-                return result
+            logger.info(
+                f"⚠️ Key {key_id} failure #{key.failure_count}: {error or 'Unknown error'}"
+            )
+            return {
+                "status": "error",
+                "failure_count": key.failure_count,
+                "remaining_attempts": self.MAX_FAILURES_BEFORE_COOLDOWN - key.failure_count
+            }
     
+    @with_db_session
     def mark_key_success(self, key_id: str, db: Optional[Session] = None):
         """Reset failure count on successful API call."""
-        def _update(db_session: Session):
-            key = db_session.query(UserModelConfig).filter_by(id=key_id).first()
-            if key and key.failure_count > 0:
-                key.failure_count = 0
-                key.last_failure_at = None
-                key.cooldown_until = None
-                if key.status == ConnectionStatus.ERROR:
-                    key.status = ConnectionStatus.ACTIVE
-        
-        if db:
-            _update(db)
-        else:
-            with get_db_context() as db_session:
-                _update(db_session)
-                db_session.commit()
+        key = db.query(UserModelConfig).filter_by(id=key_id).first()
+        if key and key.failure_count > 0:
+            key.failure_count = 0
+            key.last_failure_at = None
+            key.cooldown_until = None
+            if key.status == ConnectionStatus.ERROR:
+                key.status = ConnectionStatus.ACTIVE
     
     def _auto_recover_key(self, key: UserModelConfig):
         """Automatically recover a key from cooldown."""
@@ -305,40 +284,33 @@ class APIKeyManager:
         key.failure_count = max(0, key.failure_count - 1)  # Decay failures
         logger.info(f"🔓 Key {key.id} auto-recovered from cooldown")
     
+    @with_db_session
     def recover_key(self, key_id: str, db: Optional[Session] = None) -> bool:
         """
         Manually recover a key from cooldown/error state.
-        
+
         Returns True if key was found and recovered.
         """
-        def _update(db_session: Session):
-            key = db_session.query(UserModelConfig).filter_by(id=key_id).first()
-            if not key:
-                return False
-            
-            key.status = ConnectionStatus.ACTIVE
-            key.failure_count = 0
-            key.cooldown_until = None
-            key.last_failure_at = None
-            
-            logger.info(f"🔓 Key {key_id} manually recovered")
-            return True
-        
-        if db:
-            return _update(db)
-        else:
-            with get_db_context() as db_session:
-                result = _update(db_session)
-                db_session.commit()
-                return result
+        key = db.query(UserModelConfig).filter_by(id=key_id).first()
+        if not key:
+            return False
+
+        key.status = ConnectionStatus.ACTIVE
+        key.failure_count = 0
+        key.cooldown_until = None
+        key.last_failure_at = None
+
+        logger.info(f"🔓 Key {key_id} manually recovered")
+        return True
     
     # =====================================================================
     # Budget Management
     # =====================================================================
     
+    @with_db_session
     def record_spend(
-        self, 
-        key_id: str, 
+        self,
+        key_id: str,
         cost_usd: float,
         tokens_used: int = 0,
         db: Optional[Session] = None
@@ -376,75 +348,66 @@ class APIKeyManager:
             logger.warning(f"record_spend called with negative cost_usd={cost_usd} for key {key_id}; ignoring")
             cost_usd = 0.0
 
-        def _update(db_session: Session) -> Dict[str, Any]:
-            now = datetime.utcnow()
+        now = datetime.utcnow()
 
-            # Single atomic statement: if we've rolled into a new month,
-            # reset current_spend_usd to just this charge and bump
-            # last_spend_reset; otherwise add to the existing total.
-            # The CASE conditions are evaluated server-side against the
-            # row's actual current values at UPDATE time (under the
-            # row lock Postgres takes for the UPDATE), so there is no
-            # read-then-write gap for a concurrent request to land in.
-            row = db_session.execute(
-                text("""
-                    UPDATE user_model_configs
-                    SET
-                        current_spend_usd = CASE
-                            WHEN EXTRACT(MONTH FROM last_spend_reset) != EXTRACT(MONTH FROM :now)
-                                 OR EXTRACT(YEAR FROM last_spend_reset) != EXTRACT(YEAR FROM :now)
-                            THEN :cost_usd
-                            ELSE current_spend_usd + :cost_usd
-                        END,
-                        last_spend_reset = CASE
-                            WHEN EXTRACT(MONTH FROM last_spend_reset) != EXTRACT(MONTH FROM :now)
-                                 OR EXTRACT(YEAR FROM last_spend_reset) != EXTRACT(YEAR FROM :now)
-                            THEN :now
-                            ELSE last_spend_reset
-                        END,
-                        total_requests = total_requests + 1,
-                        estimated_cost_usd = COALESCE(estimated_cost_usd, 0) + :cost_usd
-                    WHERE id = :key_id
-                    RETURNING current_spend_usd, monthly_budget_usd
-                """),
-                {"key_id": key_id, "cost_usd": cost_usd, "now": now},
-            ).first()
+        # Single atomic statement: if we've rolled into a new month,
+        # reset current_spend_usd to just this charge and bump
+        # last_spend_reset; otherwise add to the existing total.
+        # The CASE conditions are evaluated server-side against the
+        # row's actual current values at UPDATE time (under the
+        # row lock Postgres takes for the UPDATE), so there is no
+        # read-then-write gap for a concurrent request to land in.
+        row = db.execute(
+            text("""
+                UPDATE user_model_configs
+                SET
+                    current_spend_usd = CASE
+                        WHEN EXTRACT(MONTH FROM last_spend_reset) != EXTRACT(MONTH FROM :now)
+                             OR EXTRACT(YEAR FROM last_spend_reset) != EXTRACT(YEAR FROM :now)
+                        THEN :cost_usd
+                        ELSE current_spend_usd + :cost_usd
+                    END,
+                    last_spend_reset = CASE
+                        WHEN EXTRACT(MONTH FROM last_spend_reset) != EXTRACT(MONTH FROM :now)
+                             OR EXTRACT(YEAR FROM last_spend_reset) != EXTRACT(YEAR FROM :now)
+                        THEN :now
+                        ELSE last_spend_reset
+                    END,
+                    total_requests = total_requests + 1,
+                    estimated_cost_usd = COALESCE(estimated_cost_usd, 0) + :cost_usd
+                WHERE id = :key_id
+                RETURNING current_spend_usd, monthly_budget_usd
+            """),
+            {"key_id": key_id, "cost_usd": cost_usd, "now": now},
+        ).first()
 
-            if row is None:
-                logger.warning(f"record_spend: key {key_id} not found")
-                return {}
+        if row is None:
+            logger.warning(f"record_spend: key {key_id} not found")
+            return {}
 
-            current_spend_usd, monthly_budget_usd = float(row[0]), float(row[1] or 0.0)
-            budget_exceeded = monthly_budget_usd > 0 and current_spend_usd >= monthly_budget_usd
+        current_spend_usd, monthly_budget_usd = float(row[0]), float(row[1] or 0.0)
+        budget_exceeded = monthly_budget_usd > 0 and current_spend_usd >= monthly_budget_usd
 
-            if budget_exceeded:
-                logger.warning(
-                    f"💸 Key {key_id} monthly budget EXHAUSTED: "
-                    f"${current_spend_usd:.2f} / ${monthly_budget_usd:.2f}"
-                )
-                self._notify_budget_exceeded(key_id, current_spend_usd, monthly_budget_usd, db_session)
-            else:
-                # Early-warning thresholds so spend is visible before the
-                # hard cap is hit, not just after.
-                self._maybe_warn_budget_threshold(key_id, current_spend_usd, monthly_budget_usd)
-
-            return {
-                "current_spend_usd": current_spend_usd,
-                "monthly_budget_usd": monthly_budget_usd,
-                "budget_exceeded": budget_exceeded,
-                "remaining_usd": (
-                    max(0.0, monthly_budget_usd - current_spend_usd)
-                    if monthly_budget_usd > 0 else None
-                ),
-            }
-
-        if db:
-            return _update(db)
+        if budget_exceeded:
+            logger.warning(
+                f"💸 Key {key_id} monthly budget EXHAUSTED: "
+                f"${current_spend_usd:.2f} / ${monthly_budget_usd:.2f}"
+            )
+            self._notify_budget_exceeded(key_id, current_spend_usd, monthly_budget_usd, db)
         else:
-            with get_db_context() as db_session:
-                result = _update(db_session)
-                db_session.commit()
-                return result
+            # Early-warning thresholds so spend is visible before the
+            # hard cap is hit, not just after.
+            self._maybe_warn_budget_threshold(key_id, current_spend_usd, monthly_budget_usd)
+
+        return {
+            "current_spend_usd": current_spend_usd,
+            "monthly_budget_usd": monthly_budget_usd,
+            "budget_exceeded": budget_exceeded,
+            "remaining_usd": (
+                max(0.0, monthly_budget_usd - current_spend_usd)
+                if monthly_budget_usd > 0 else None
+            ),
+        }
 
     # Thresholds (as a fraction of monthly_budget_usd) at which to log an
     # early warning, so spend is visible before the hard cap actually hits.
@@ -467,6 +430,7 @@ class APIKeyManager:
                 )
                 self._notification_cache[cache_key] = threshold
 
+    @with_db_session
     def _notify_budget_exceeded(self, key_id: str, current_spend_usd: float, monthly_budget_usd: float, db: Optional[Session] = None):
         """
         Raise a MonitoringAlert + websocket notification when a key's
@@ -516,16 +480,12 @@ class APIKeyManager:
                     "monthly_budget_usd": monthly_budget_usd,
                 },
             )
-            if db:
-                db.add(alert)
-            else:
-                with get_db_context() as db_session:
-                    db_session.add(alert)
-                    db_session.commit()
+            db.add(alert)
         except Exception as e:
             # Alert persistence is best-effort; never let it break the spend record path
             logger.error(f"Failed to persist MonitoringAlert for budget exceeded: {e}")
     
+    @with_db_session
     def check_budget(self, key_id: str, estimated_cost: float, db: Optional[Session] = None) -> bool:
         """
         Check if a key has sufficient budget remaining.
@@ -548,21 +508,15 @@ class APIKeyManager:
         before knowing the call will succeed, which has its own correctness
         tradeoffs (refunding failed calls, partial token usage, etc).
         """
-        def _check(db_session: Session):
-            key = db_session.query(UserModelConfig).filter_by(id=key_id).first()
-            if not key or key.monthly_budget_usd <= 0:
-                return True  # No budget limit
-            
-            self._reset_monthly_spend_if_needed(key)
-            remaining = key.monthly_budget_usd - key.current_spend_usd
-            return remaining >= estimated_cost
-        
-        if db:
-            return _check(db)
-        else:
-            with get_db_context() as db_session:
-                return _check(db_session)
+        key = db.query(UserModelConfig).filter_by(id=key_id).first()
+        if not key or key.monthly_budget_usd <= 0:
+            return True  # No budget limit
+
+        self._reset_monthly_spend_if_needed(key)
+        remaining = key.monthly_budget_usd - key.current_spend_usd
+        return remaining >= estimated_cost
     
+    @with_db_session
     def update_budget(
         self,
         key_id: str,
@@ -570,26 +524,18 @@ class APIKeyManager:
         db: Optional[Session] = None
     ) -> bool:
         """Update monthly budget limit for a key."""
-        def _update(db_session: Session):
-            key = db_session.query(UserModelConfig).filter_by(id=key_id).first()
-            if not key:
-                return False
-            
-            key.monthly_budget_usd = monthly_budget_usd
-            return True
-        
-        if db:
-            return _update(db)
-        else:
-            with get_db_context() as db_session:
-                result = _update(db_session)
-                db_session.commit()
-                return result
+        key = db.query(UserModelConfig).filter_by(id=key_id).first()
+        if not key:
+            return False
+
+        key.monthly_budget_usd = monthly_budget_usd
+        return True
     
     # =====================================================================
     # Key Rotation
     # =====================================================================
     
+    @with_db_session
     def rotate_key(
         self,
         old_key_id: str,
@@ -609,68 +555,62 @@ class APIKeyManager:
         
         Returns the new key config.
         """
-        def _rotate(db_session: Session):
-            old_key = db_session.query(UserModelConfig).filter_by(id=old_key_id).first()
-            if not old_key:
-                return None
-            
-            # Create new key with temporary lower priority
-            new_key = UserModelConfig(
-                user_id=old_key.user_id,
-                provider=old_key.provider,
-                provider_name=old_key.provider_name,
-                config_name=f"{old_key.config_name} (Rotated)",
-                api_key_encrypted=new_key_encrypted,
-                api_key_masked=new_key_masked or "...****",
-                api_base_url=old_key.api_base_url,
-                local_server_url=old_key.local_server_url,
-                default_model=old_key.default_model,
-                available_models=old_key.available_models,
-                priority=old_key.priority + 1,  # Temporary lower priority
-                is_default=False,
-                max_tokens=old_key.max_tokens,
-                temperature=old_key.temperature,
-                top_p=old_key.top_p,
-                timeout_seconds=old_key.timeout_seconds,
-                status=ConnectionStatus.TESTING,
-                monthly_budget_usd=old_key.monthly_budget_usd
-            )
-            
-            db_session.add(new_key)
-            db_session.flush()
-            
-            # Test new key
-            from backend.services.model_provider import ModelService
-            test_result = ModelService.test_connection(new_key)
-            
-            if not test_result.get("success"):
-                db_session.rollback()
-                logger.error(f"❌ Key rotation failed: new key test failed")
-                return None
-            
-            # Swap priorities - new key becomes primary
-            old_priority = old_key.priority
-            old_key.priority = 999  # Demote old key
-            old_key.config_name = f"{old_key.config_name} (Deprecated)"
-            old_key.cooldown_until = datetime.utcnow() + timedelta(hours=1)  # 1 hour grace
-            new_key.priority = old_priority
-            new_key.status = ConnectionStatus.ACTIVE
-            
-            db_session.commit()
-            logger.info(f"🔄 Key rotated: {old_key_id} → {new_key.id}")
-            
-            return new_key
-        
-        if db:
-            return _rotate(db)
-        else:
-            with get_db_context() as db_session:
-                return _rotate(db_session)
+        old_key = db.query(UserModelConfig).filter_by(id=old_key_id).first()
+        if not old_key:
+            return None
+
+        # Create new key with temporary lower priority
+        new_key = UserModelConfig(
+            user_id=old_key.user_id,
+            provider=old_key.provider,
+            provider_name=old_key.provider_name,
+            config_name=f"{old_key.config_name} (Rotated)",
+            api_key_encrypted=new_key_encrypted,
+            api_key_masked=new_key_masked or "...****",
+            api_base_url=old_key.api_base_url,
+            local_server_url=old_key.local_server_url,
+            default_model=old_key.default_model,
+            available_models=old_key.available_models,
+            priority=old_key.priority + 1,  # Temporary lower priority
+            is_default=False,
+            max_tokens=old_key.max_tokens,
+            temperature=old_key.temperature,
+            top_p=old_key.top_p,
+            timeout_seconds=old_key.timeout_seconds,
+            status=ConnectionStatus.TESTING,
+            monthly_budget_usd=old_key.monthly_budget_usd
+        )
+
+        db.add(new_key)
+        db.flush()
+
+        # Test new key
+        from backend.services.model_provider import ModelService
+        test_result = ModelService.test_connection(new_key)
+
+        if not test_result.get("success"):
+            db.rollback()
+            logger.error(f"❌ Key rotation failed: new key test failed")
+            return None
+
+        # Swap priorities - new key becomes primary
+        old_priority = old_key.priority
+        old_key.priority = 999  # Demote old key
+        old_key.config_name = f"{old_key.config_name} (Deprecated)"
+        old_key.cooldown_until = datetime.utcnow() + timedelta(hours=1)  # 1 hour grace
+        new_key.priority = old_priority
+        new_key.status = ConnectionStatus.ACTIVE
+
+        db.commit()
+        logger.info(f"🔄 Key rotated: {old_key_id} → {new_key.id}")
+
+        return new_key
     
     # =====================================================================
     # Health Reporting
     # =====================================================================
     
+    @with_db_session
     def get_key_health_report(
         self,
         provider: Optional[str] = None,
@@ -697,94 +637,87 @@ class APIKeyManager:
                 "budget_exhausted": 1
             }
         """
-        def _query(db_session: Session):
-            query = db_session.query(UserModelConfig).filter_by(is_active=True)
-            if provider:
-                query = query.filter_by(provider=provider)
-            
-            keys = query.all()
-            
-            # Group by provider
-            provider_stats: Dict[str, Dict] = {}
-            overall = {
-                "total_keys": 0,
-                "healthy_keys": 0,
-                "keys_in_cooldown": 0,
-                "budget_exhausted": 0,
-                "total_monthly_spend": 0.0
-            }
-            
-            for key in keys:
-                prov = key.provider.value if hasattr(key.provider, 'value') else str(key.provider)
-                
-                if prov not in provider_stats:
-                    provider_stats[prov] = {
-                        "total_keys": 0,
-                        "healthy": 0,
-                        "cooldown": 0,
-                        "rate_limited": 0,
-                        "exhausted": 0,
-                        "error": 0,
-                        "keys": []
-                    }
-                
-                status = self._get_key_status(key)
-                stats = provider_stats[prov]
-                stats["total_keys"] += 1
-                overall["total_keys"] += 1
-                
-                if status == APIKeyHealthStatus.HEALTHY:
-                    stats["healthy"] += 1
-                    overall["healthy_keys"] += 1
-                elif status == APIKeyHealthStatus.COOLDOWN:
-                    stats["cooldown"] += 1
-                    overall["keys_in_cooldown"] += 1
-                elif status == APIKeyHealthStatus.EXHAUSTED:
-                    stats["exhausted"] += 1
-                    overall["budget_exhausted"] += 1
-                elif status == APIKeyHealthStatus.RATE_LIMITED:
-                    stats["rate_limited"] += 1
-                else:
-                    stats["error"] += 1
-                
-                self._reset_monthly_spend_if_needed(key)
-                overall["total_monthly_spend"] += key.current_spend_usd
-                
-                # Add key details (mask sensitive data)
-                key_info = {
-                    "id": str(key.id),
-                    "priority": key.priority,
-                    "status": status,
-                    "failure_count": key.failure_count,
-                    "cooldown_until": key.cooldown_until.isoformat() if key.cooldown_until else None,
-                    "monthly_budget_usd": key.monthly_budget_usd,
-                    "current_spend_usd": round(key.current_spend_usd, 4),
-                    "budget_remaining_pct": round(
-                        ((key.monthly_budget_usd - key.current_spend_usd) / key.monthly_budget_usd * 100), 2
-                    ) if key.monthly_budget_usd > 0 else 100
+        query = db.query(UserModelConfig).filter_by(is_active=True)
+        if provider:
+            query = query.filter_by(provider=provider)
+
+        keys = query.all()
+
+        # Group by provider
+        provider_stats: Dict[str, Dict] = {}
+        overall = {
+            "total_keys": 0,
+            "healthy_keys": 0,
+            "keys_in_cooldown": 0,
+            "budget_exhausted": 0,
+            "total_monthly_spend": 0.0
+        }
+
+        for key in keys:
+            prov = key.provider.value if hasattr(key.provider, 'value') else str(key.provider)
+
+            if prov not in provider_stats:
+                provider_stats[prov] = {
+                    "total_keys": 0,
+                    "healthy": 0,
+                    "cooldown": 0,
+                    "rate_limited": 0,
+                    "exhausted": 0,
+                    "error": 0,
+                    "keys": []
                 }
-                stats["keys"].append(key_info)
-            
-            # Determine overall status
-            if overall["healthy_keys"] == overall["total_keys"]:
-                overall_status = "healthy"
-            elif overall["healthy_keys"] >= overall["total_keys"] // 2:
-                overall_status = "degraded"
+
+            status = self._get_key_status(key)
+            stats = provider_stats[prov]
+            stats["total_keys"] += 1
+            overall["total_keys"] += 1
+
+            if status == APIKeyHealthStatus.HEALTHY:
+                stats["healthy"] += 1
+                overall["healthy_keys"] += 1
+            elif status == APIKeyHealthStatus.COOLDOWN:
+                stats["cooldown"] += 1
+                overall["keys_in_cooldown"] += 1
+            elif status == APIKeyHealthStatus.EXHAUSTED:
+                stats["exhausted"] += 1
+                overall["budget_exhausted"] += 1
+            elif status == APIKeyHealthStatus.RATE_LIMITED:
+                stats["rate_limited"] += 1
             else:
-                overall_status = "critical"
-            
-            return {
-                "overall_status": overall_status,
-                "providers": provider_stats,
-                "summary": overall,
-                "generated_at": datetime.utcnow().isoformat()
+                stats["error"] += 1
+
+            self._reset_monthly_spend_if_needed(key)
+            overall["total_monthly_spend"] += key.current_spend_usd
+
+            # Add key details (mask sensitive data)
+            key_info = {
+                "id": str(key.id),
+                "priority": key.priority,
+                "status": status,
+                "failure_count": key.failure_count,
+                "cooldown_until": key.cooldown_until.isoformat() if key.cooldown_until else None,
+                "monthly_budget_usd": key.monthly_budget_usd,
+                "current_spend_usd": round(key.current_spend_usd, 4),
+                "budget_remaining_pct": round(
+                    ((key.monthly_budget_usd - key.current_spend_usd) / key.monthly_budget_usd * 100), 2
+                ) if key.monthly_budget_usd > 0 else 100
             }
-        
-        if db:
-            return _query(db)
+            stats["keys"].append(key_info)
+
+        # Determine overall status
+        if overall["healthy_keys"] == overall["total_keys"]:
+            overall_status = "healthy"
+        elif overall["healthy_keys"] >= overall["total_keys"] // 2:
+            overall_status = "degraded"
         else:
-            with get_db_context() as db_session:
-                return _query(db_session)
+            overall_status = "critical"
+
+        return {
+            "overall_status": overall_status,
+            "providers": provider_stats,
+            "summary": overall,
+            "generated_at": datetime.utcnow().isoformat()
+        }
     
     def _get_key_status(self, key: UserModelConfig) -> str:
         """Determine health status string for a key."""
@@ -805,27 +738,21 @@ class APIKeyManager:
         
         return APIKeyHealthStatus.HEALTHY
     
+    @with_db_session
     def get_provider_availability(self, db: Optional[Session] = None) -> Dict[str, bool]:
         """
         Quick check: which providers have at least one healthy key?
-        
+
         Returns: {"openai": True, "anthropic": False, ...}
         """
-        def _query(db_session: Session):
-            result = {}
-            all_providers = [p.value for p in ProviderType]
-            
-            for prov in all_providers:
-                healthy_key = self.get_active_key(prov, db=db_session)
-                result[prov] = healthy_key is not None
-            
-            return result
-        
-        if db:
-            return _query(db)
-        else:
-            with get_db_context() as db_session:
-                return _query(db_session)
+        result = {}
+        all_providers = [p.value for p in ProviderType]
+
+        for prov in all_providers:
+            healthy_key = self.get_active_key(prov, db=db)
+            result[prov] = healthy_key is not None
+
+        return result
     
     # =====================================================================
     # Notification System
@@ -878,48 +805,42 @@ class APIKeyManager:
         except Exception as e:
             logger.error(f"Failed to broadcast WebSocket alert: {e}")
     
+    @with_db_session
     def _send_channel_alerts(self, message: str, db: Optional[Session] = None):
         """Send alerts to all configured external channels."""
-        def _send(db_session: Session):
-            try:
-                from backend.services.channel_manager import ChannelManager
-                channel_manager = ChannelManager()
-                
-                # Get all active channels
-                channels = db_session.query(ExternalChannel).filter_by(
-                    status='active',
-                    is_active=True
-                ).all()
-                
-                for channel in channels:
-                    try:
-                        if channel.channel_type == ChannelType.TELEGRAM:
-                            asyncio.create_task(
-                                channel_manager.send_telegram(channel.channel_id, message)
-                            )
-                        elif channel.channel_type == ChannelType.DISCORD:
-                            asyncio.create_task(
-                                channel_manager.send_discord(channel.channel_id, message)
-                            )
-                        elif channel.channel_type == ChannelType.SLACK:
-                            asyncio.create_task(
-                                channel_manager.send_slack(channel.channel_id, message)
-                            )
-                        elif channel.channel_type == ChannelType.WHATSAPP:
-                            asyncio.create_task(
-                                channel_manager.send_whatsapp(channel.channel_id, message)
-                            )
-                    except Exception as e:
-                        logger.error(f"Failed to send to {channel.channel_type}: {e}")
-                        
-            except Exception as e:
-                logger.error(f"Channel alert system error: {e}")
-        
-        if db:
-            _send(db)
-        else:
-            with get_db_context() as db_session:
-                _send(db_session)
+        try:
+            from backend.services.channel_manager import ChannelManager
+            channel_manager = ChannelManager()
+
+            # Get all active channels
+            channels = db.query(ExternalChannel).filter_by(
+                status='active',
+                is_active=True
+            ).all()
+
+            for channel in channels:
+                try:
+                    if channel.channel_type == ChannelType.TELEGRAM:
+                        asyncio.create_task(
+                            channel_manager.send_telegram(channel.channel_id, message)
+                        )
+                    elif channel.channel_type == ChannelType.DISCORD:
+                        asyncio.create_task(
+                            channel_manager.send_discord(channel.channel_id, message)
+                        )
+                    elif channel.channel_type == ChannelType.SLACK:
+                        asyncio.create_task(
+                            channel_manager.send_slack(channel.channel_id, message)
+                        )
+                    elif channel.channel_type == ChannelType.WHATSAPP:
+                        asyncio.create_task(
+                            channel_manager.send_whatsapp(channel.channel_id, message)
+                        )
+                except Exception as e:
+                    logger.error(f"Failed to send to {channel.channel_type}: {e}")
+
+        except Exception as e:
+            logger.error(f"Channel alert system error: {e}")
     
     # =====================================================================
     # Decorator for Automatic Failover
@@ -986,9 +907,8 @@ class APIKeyManager:
     # Phase 9.5: API Key Resilience Enhancements
     # =====================================================================
 
-    async def notify_all_keys_down(
-        self, db: Optional[Session] = None
-    ):
+    @with_db_session
+    async def notify_all_keys_down(self, db: Optional[Session] = None):
         """
         Dispatch a formal MonitoringAlert via AlertManager when no healthy keys
         remain across ALL configured providers.
@@ -996,31 +916,25 @@ class APIKeyManager:
         """
         from backend.services.alert_manager import AlertManager, ALERT_TYPE_ALL_KEYS_DOWN
 
-        def _dispatch(db_session: Session):
-            alert_manager = AlertManager(db_session)
-            alert = MonitoringAlert(
-                alert_type=ALERT_TYPE_ALL_KEYS_DOWN,
-                severity=ViolationSeverity.CRITICAL,
-                detected_by_agent_id=get_system_agent_id(db_session),
-                affected_agent_id=None,
-                message=(
-                    "All API keys are down across every configured provider. "
-                    "AI services are completely unavailable."
-                ),
-            )
-            db_session.add(alert)
-            db_session.commit()
-            asyncio.create_task(alert_manager.dispatch_alert(alert))
-            logger.critical(
-                "🔑❌ All API keys are down — formal alert dispatched."
-            )
+        alert_manager = AlertManager(db)
+        alert = MonitoringAlert(
+            alert_type=ALERT_TYPE_ALL_KEYS_DOWN,
+            severity=ViolationSeverity.CRITICAL,
+            detected_by_agent_id=get_system_agent_id(db),
+            affected_agent_id=None,
+            message=(
+                "All API keys are down across every configured provider. "
+                "AI services are completely unavailable."
+            ),
+        )
+        db.add(alert)
+        db.commit()
+        asyncio.create_task(alert_manager.dispatch_alert(alert))
+        logger.critical(
+            "🔑❌ All API keys are down — formal alert dispatched."
+        )
 
-        if db:
-            _dispatch(db)
-        else:
-            with get_db_context() as db_session:
-                _dispatch(db_session)
-
+    @with_db_session
     def verify_multi_key_support(
         self, provider: str, db: Optional[Session] = None
     ) -> Dict[str, Any]:
@@ -1030,37 +944,30 @@ class APIKeyManager:
         and which one would be selected via failover.
         Phase 9.5 requirement.
         """
-        def _verify(db_session: Session) -> Dict[str, Any]:
-            keys = (
-                db_session.query(UserModelConfig)
-                .filter_by(provider=provider, is_active=True)
-                .order_by(UserModelConfig.priority.asc())
-                .all()
-            )
-            selected = self.get_active_key(provider, db=db_session)
+        keys = (
+            db.query(UserModelConfig)
+            .filter_by(provider=provider, is_active=True)
+            .order_by(UserModelConfig.priority.asc())
+            .all()
+        )
+        selected = self.get_active_key(provider, db=db)
 
-            return {
-                "provider": provider,
-                "total_keys": len(keys),
-                "keys": [
-                    {
-                        "id": str(k.id),
-                        "priority": k.priority,
-                        "status": self._get_key_status(k),
-                        "failure_count": k.failure_count,
-                    }
-                    for k in keys
-                ],
-                "selected_key_id": str(selected.id) if selected else None,
-                "multi_key_operational": len(keys) > 1
-                and selected is not None,
-            }
-
-        if db:
-            return _verify(db)
-        else:
-            with get_db_context() as db_session:
-                return _verify(db_session)
+        return {
+            "provider": provider,
+            "total_keys": len(keys),
+            "keys": [
+                {
+                    "id": str(k.id),
+                    "priority": k.priority,
+                    "status": self._get_key_status(k),
+                    "failure_count": k.failure_count,
+                }
+                for k in keys
+            ],
+            "selected_key_id": str(selected.id) if selected else None,
+            "multi_key_operational": len(keys) > 1
+            and selected is not None,
+        }
 
 
 api_key_manager = APIKeyManager()
