@@ -83,7 +83,7 @@ jobs:
         working-directory: ./backend
         run: |
           pip install --upgrade pip setuptools wheel
-          pip install --no-cache-dir -r requirements.txt
+          pip install --no-cache-dir -r requirements.txt -r requirements-dev.txt
 
       - name: Run integration tests with coverage
         working-directory: ./backend
@@ -128,7 +128,7 @@ jobs:
         working-directory: ./backend
         run: |
           pip install --upgrade pip setuptools wheel
-          pip install --no-cache-dir -r requirements.txt
+          pip install --no-cache-dir -r requirements.txt -r requirements-dev.txt
 
       - name: Install performance testing tools
         run: |
