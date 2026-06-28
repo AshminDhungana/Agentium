@@ -21,11 +21,16 @@ from __future__ import annotations
 
 import os
 import logging
+import threading
+import time
 
 from locust import HttpUser, task, between, events
 from locust.runners import MasterRunner
 
 logger = logging.getLogger(__name__)
+
+_token_lock = threading.Lock()
+_shared_token: str | None = None
 
 # -- Load-test settings (over-rideable via environment) --
 DEFAULT_USERS = 1000
@@ -51,23 +56,46 @@ class LocustAuthenticatedUser(HttpUser):
     abstract = True
 
     def on_start(self):
+        global _shared_token
         self.client.headers.pop("Authorization", None)
-        self._authenticate()
+        with _token_lock:
+            if _shared_token:
+                self.client.headers["Authorization"] = f"Bearer {_shared_token}"
+                return
 
-    def _authenticate(self):
-        try:
-            resp = self.client.post(
-                "/api/v1/auth/login",
-                json={"username": _TEST_USER, "password": _TEST_PASS}
-            )
-            if resp.status_code == 200:
-                token = resp.json().get("access_token", "")
-                self.client.headers["Authorization"] = f"Bearer {token}"
-                logger.info("Authenticated virtual user")
-            else:
-                logger.error("Auth failed: HTTP %s", resp.status_code)
-        except Exception as exc:
-            logger.error("Auth exception: %s", exc)
+        self._authenticate_with_retry()
+
+    def _authenticate_with_retry(self, max_retries=5):
+        global _shared_token
+        for attempt in range(max_retries):
+            with _token_lock:
+                if _shared_token:
+                    self.client.headers["Authorization"] = f"Bearer {_shared_token}"
+                    return
+            try:
+                resp = self.client.post(
+                    "/api/v1/auth/login",
+                    json={"username": _TEST_USER, "password": _TEST_PASS}
+                )
+                if resp.status_code == 200:
+                    token = resp.json().get("access_token", "")
+                    with _token_lock:
+                        _shared_token = token
+                    self.client.headers["Authorization"] = f"Bearer {token}"
+                    logger.info("Authenticated virtual user")
+                    return
+                elif resp.status_code == 429:
+                    backoff = 2 ** attempt
+                    logger.warning("Auth rate-limited (429), retry %d/%d in %ds",
+                                   attempt + 1, max_retries, backoff)
+                    time.sleep(backoff)
+                else:
+                    logger.error("Auth failed: HTTP %s", resp.status_code)
+                    return
+            except Exception as exc:
+                logger.error("Auth exception: %s", exc)
+                return
+        logger.error("Auth exhausted all %d retries", max_retries)
 
 
 class ConstitutionalCheckUser(LocustAuthenticatedUser):
@@ -82,7 +110,11 @@ class ConstitutionalCheckUser(LocustAuthenticatedUser):
     def on_start(self):
         super().on_start()
         try:
-            resp = self.client.get("/api/v1/agents", headers=self.client.headers)
+            resp = self.client.get(
+                "/api/v1/agents",
+                headers=self.client.headers,
+                name="/api/v1/agents (seed)"
+            )
             if resp.status_code == 200:
                 agents = resp.json().get("agents", [])
                 self._agent_ids = [
@@ -94,7 +126,7 @@ class ConstitutionalCheckUser(LocustAuthenticatedUser):
     @task(3)
     def list_agents(self):
         with self.client.get(
-            "/api/v1/agents", catch_response=True, name="GET /api/v1/agents"
+            "/api/v1/agents", catch_response=True, name="/api/v1/agents"
         ) as resp:
             if resp.status_code != 200:
                 resp.failure(f"Unexpected status: {resp.status_code}")
@@ -109,7 +141,7 @@ class ConstitutionalCheckUser(LocustAuthenticatedUser):
             f"/api/v1/agents/{agent_id}/parent",
             json={"new_parent_id": new_parent_id, "reason": "Load-test"},
             catch_response=True,
-            name="PATCH /api/v1/agents/{id}/parent",
+            name="/api/v1/agents/{id}/parent",
         ) as resp:
             if resp.status_code not in (200, 403):
                 resp.failure(f"Unexpected status: {resp.status_code}")
@@ -131,7 +163,7 @@ class TaskRoutingUser(LocustAuthenticatedUser):
                 "task_type": "execution",
             },
             catch_response=True,
-            name="POST /api/v1/tasks",
+            name="/api/v1/tasks",
         ) as resp:
             if resp.status_code != 201:
                 resp.failure(f"Unexpected status: {resp.status_code}")
@@ -141,7 +173,7 @@ class TaskRoutingUser(LocustAuthenticatedUser):
         with self.client.get(
             "/api/v1/tasks",
             catch_response=True,
-            name="GET /api/v1/tasks",
+            name="/api/v1/tasks",
         ) as resp:
             if resp.status_code != 200:
                 resp.failure(f"Unexpected status: {resp.status_code}")
@@ -157,7 +189,7 @@ class GeneralAPIUser(LocustAuthenticatedUser):
         with self.client.get(
             "/api/v1/monitoring/stats",
             catch_response=True,
-            name="GET /api/v1/monitoring/stats",
+            name="/api/v1/monitoring/stats",
         ) as resp:
             if resp.status_code != 200:
                 resp.failure(f"Unexpected status: {resp.status_code}")
@@ -167,7 +199,7 @@ class GeneralAPIUser(LocustAuthenticatedUser):
         with self.client.get(
             "/api/v1/agents",
             catch_response=True,
-            name="GET /api/v1/agents (health read)",
+            name="/api/v1/agents (health read)",
         ) as resp:
             if resp.status_code != 200:
                 resp.failure(f"Unexpected status: {resp.status_code}")
@@ -177,7 +209,7 @@ class GeneralAPIUser(LocustAuthenticatedUser):
         with self.client.get(
             "/api/health",
             catch_response=True,
-            name="GET /api/health",
+            name="/api/health",
         ) as resp:
             if resp.status_code != 200:
                 resp.failure(f"Unexpected status: {resp.status_code}")
