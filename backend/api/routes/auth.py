@@ -14,7 +14,6 @@ from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.orm import Session
 from typing import Optional
 
-from backend.core.rate_limit import limiter
 
 from backend.models.database import get_db
 from backend.core.auth import (
@@ -107,7 +106,6 @@ class ChangePasswordRequest(BaseModel):
 # ── Routes ────────────────────────────────────────────────────────────────────
 
 @router.post("/signup", response_model=SignupResponse)
-@limiter.limit("5/minute", error_message="Too many signup attempts. Please wait 60 s.")
 async def signup(
     request: Request,
     payload: SignupRequest,
@@ -163,7 +161,6 @@ async def signup(
 
 
 @router.post("/login", response_model=LoginResponse)
-@limiter.limit("5/minute", error_message="Too many login attempts. Please wait 60 s.")
 async def login(
     request: Request,
     payload: LoginRequest,
@@ -263,7 +260,6 @@ async def login(
 
 
 @router.post("/refresh", response_model=LoginResponse)
-@limiter.limit("5/minute", error_message="Too many token refresh attempts. Please wait.")
 async def refresh_token_endpoint(
     request: Request,
     payload: RefreshRequest,
@@ -358,7 +354,6 @@ async def verify_token_endpoint(
 
 
 @router.post("/change-password")
-@limiter.limit("5/minute", error_message="Too many password change attempts. Please wait.")
 async def change_password(
     request: Request,
     payload: ChangePasswordRequest,

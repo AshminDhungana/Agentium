@@ -95,15 +95,13 @@ from backend.api.routes import wait_poll as wait_poll_routes                   #
 from backend.api.routes import knowledge as knowledge_routes                   # Phase 16.3
 
 from backend.core.security_middleware import (
-    # Phase 9.4
-    RateLimitMiddleware,
     SessionLimitMiddleware,
     InputSanitizationMiddleware,
-    # Phase 17.1
     IPBlocklistMiddleware,
     PayloadSizeLimitMiddleware,
     ErrorCounterMiddleware,
 )
+from backend.core.middleware import RateLimitMiddleware
 from backend.core.observer_middleware import ObserverReadOnlyMiddleware
 from backend.core.timing_middleware import TimingMiddleware
 
@@ -535,8 +533,15 @@ except Exception as _mw_exc:
     )
     app.add_middleware(PayloadSizeLimitMiddleware)
 
-# Phase 9.4 middleware (unchanged)
-app.add_middleware(RateLimitMiddleware)
+# Unified Redis-backed rate limiting (replaces slowapi + old in-memory)
+try:
+    from backend.core.redis import get_redis_client as _get_redis_for_ratelimit
+    _redis_rl = _get_redis_for_ratelimit()
+    app.add_middleware(RateLimitMiddleware, redis=_redis_rl)
+    logger.info("Unified RateLimitMiddleware registered (Redis-backed)")
+except Exception as exc:
+    logger.error("Failed to register RateLimitMiddleware: %s", exc)
+
 app.add_middleware(SessionLimitMiddleware)
 app.add_middleware(InputSanitizationMiddleware)
 
@@ -620,8 +625,8 @@ async def health_check_api():
     }
 
 
-# The slowapi per-endpoint limits are applied directly in the respective routes
-# (e.g., auth_routes.py and tasks_routes.py) using the @limiter.limit decorator.
+# Rate limiting is now handled by the unified RateLimitMiddleware in
+# backend/core/middleware.py (per-path tier: auth → task → general).
 
 
 # ── Agent Management ──────────────────────────────────────────────────────────

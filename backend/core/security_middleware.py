@@ -216,59 +216,8 @@ class ErrorCounterMiddleware(BaseHTTPMiddleware):
 # ══════════════════════════════════════════════════════════════════════════════
 # Phase 9.4 — EXISTING MIDDLEWARE (unchanged)
 # ══════════════════════════════════════════════════════════════════════════════
-
-class RateLimitMiddleware(BaseHTTPMiddleware):
-    """
-    Per-IP rate limiting using an in-memory sliding window.
-    Phase 9.4: Security Hardening.
-
-    Note: Phase 17.1 adds Redis-backed slowapi limits on top of this for
-    distributed correctness across multiple Uvicorn workers. This in-memory
-    middleware remains as a fast local guard for single-worker deployments and
-    as a fallback when Redis is unavailable.
-    """
-
-    def __init__(self, app, max_requests: Optional[int] = None):
-        super().__init__(app)
-        self.max_requests = max_requests or settings.API_RATE_LIMIT_PER_MINUTE
-        self._window: dict = {}  # ip -> list[timestamp]
-
-    async def dispatch(self, request: Request, call_next):
-        # Skip rate limiting for health check
-        if request.url.path in ("/api/health", "/health", "/docs", "/openapi.json"):
-            return await call_next(request)
-
-        client_ip = request.client.host if request.client else "unknown"
-        now = time.time()
-        window_start = now - 60  # 1-minute window
-
-        # Clean expired entries and append current
-        timestamps = self._window.get(client_ip, [])
-        timestamps = [t for t in timestamps if t > window_start]
-        timestamps.append(now)
-        self._window[client_ip] = timestamps
-
-        if len(timestamps) > self.max_requests:
-            logger.warning(
-                f"Rate limit exceeded for {client_ip}: "
-                f"{len(timestamps)} requests in 60s (limit: {self.max_requests})"
-            )
-            return JSONResponse(
-                status_code=429,
-                content={
-                    "detail": "Rate limit exceeded. Please try again later.",
-                    "retry_after_seconds": 60,
-                },
-            )
-
-        response = await call_next(request)
-        response.headers["X-RateLimit-Limit"] = str(self.max_requests)
-        response.headers["X-RateLimit-Remaining"] = str(
-            max(0, self.max_requests - len(timestamps))
-        )
-        return response
-
-
+# NOTE: RateLimitMiddleware removed — functionality consolidated into
+#       backend/core/middleware.py (RateLimitMiddleware with Redis Lua scripts).
 class SessionLimitMiddleware(BaseHTTPMiddleware):
     """
     Limits concurrent active sessions per user.
