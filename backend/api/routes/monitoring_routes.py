@@ -729,7 +729,7 @@ async def get_active_anomalies(
     Returns currently open anomaly violation reports.
     """
     try:
-        from backend.models.entities.agents import ViolationReport
+        from backend.models.entities.monitoring import ViolationReport
         from datetime import datetime, timedelta
         
         day_ago = datetime.utcnow() - timedelta(hours=24)

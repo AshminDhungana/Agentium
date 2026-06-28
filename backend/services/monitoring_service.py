@@ -907,9 +907,12 @@ class MonitoringService:
                 EventLog.status == EventLogStatus.DEAD_LETTER,
                 EventLog.created_at >= day_ago,
             ).count()
-            event_health_pct = round(
-                ((events_total - events_dead) / max(events_total, 1)) * 100, 1,
-            )
+            if events_total == 0:
+                event_health_pct = 100.0
+            else:
+                event_health_pct = round(
+                    ((events_total - events_dead) / events_total) * 100, 1,
+                )
         except Exception:
             db.rollback()
             event_health_pct = 100.0

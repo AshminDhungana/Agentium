@@ -40,3 +40,18 @@ class CheckpointBranchRequest(BaseModel):
     """Payload for branching from a checkpoint."""
     branch_name: str
     new_supervisor_id: Optional[str] = None
+
+
+# ─── Phase 18: Unified Diff ──────────────────────────────────────────────
+
+class UnifiedDiffResponse(BaseModel):
+    """Unified diff of two checkpoint snapshot JSONs."""
+    left_checkpoint_id: str
+    right_checkpoint_id: str
+    left_branch: Optional[str] = None
+    right_branch: Optional[str] = None
+    left_agentium_id: Optional[str] = None
+    right_agentium_id: Optional[str] = None
+    unified_diff: str
+    left_json: str
+    right_json: str

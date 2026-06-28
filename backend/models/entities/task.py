@@ -97,8 +97,8 @@ class Task(BaseEntity):
     
     title = Column(String(200), nullable=True)  # nullable to support idle tasks created without title
     description = Column(Text, nullable=False)
-    task_type = Column(Enum(TaskType), default=TaskType.EXECUTION, nullable=False)
-    priority = Column(Enum(TaskPriority), default=TaskPriority.NORMAL, nullable=False)
+    task_type = Column(Enum(TaskType, values_callable=lambda obj: [e.value for e in obj], create_constraint=True), default=TaskType.EXECUTION, nullable=False)
+    priority = Column(Enum(TaskPriority, values_callable=lambda obj: [e.value for e in obj], create_constraint=True), default=TaskPriority.NORMAL, nullable=False)
     
     # NEW: Constitutional governance fields
     constitutional_basis = Column(Text, nullable=True)  # Reason task is constitutionally valid

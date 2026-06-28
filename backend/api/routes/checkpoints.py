@@ -4,6 +4,7 @@ Phase 6.5 implementation.
 """
 import hashlib
 import json
+import difflib
 from datetime import datetime
 from fastapi import File, UploadFile, Form
 from io import BytesIO
@@ -17,7 +18,8 @@ from backend.services.checkpoint_service import CheckpointService
 from backend.api.schemas.checkpoint import (
     CheckpointCreate,
     CheckpointResponse,
-    CheckpointBranchRequest
+    CheckpointBranchRequest,
+    UnifiedDiffResponse,
 )
 from backend.api.schemas.task import TaskResponse
 from pydantic import BaseModel
@@ -394,6 +396,63 @@ def compare_branches(
         agent_state_diffs=agent_diffs,
         artifact_diffs=artifact_diffs,
         summary=summary,
+    )
+
+
+@router.get("/{checkpoint_id}/diff", response_model=UnifiedDiffResponse)
+def compare_two_checkpoints(
+    checkpoint_id: str,
+    compare_to: str = Query(..., description="ID of the other checkpoint to compare against"),
+    db: Session = Depends(get_db),
+):
+    """
+    Return a unified diff of the `task_state_snapshot` JSON between two
+    individual checkpoints, identified by primary key.
+
+    Useful for the Monaco Editor diff view in the frontend.
+    """
+    if checkpoint_id == compare_to:
+        raise HTTPException(status_code=400, detail="Cannot compare a checkpoint to itself")
+
+    left = (
+        db.query(ExecutionCheckpoint)
+        .filter(ExecutionCheckpoint.id == checkpoint_id)
+        .first()
+    )
+    right = (
+        db.query(ExecutionCheckpoint)
+        .filter(ExecutionCheckpoint.id == compare_to)
+        .first()
+    )
+
+    if not left:
+        raise HTTPException(status_code=404, detail=f"Checkpoint {checkpoint_id} not found")
+    if not right:
+        raise HTTPException(status_code=404, detail=f"Checkpoint {compare_to} not found")
+
+    left_state: Dict[str, Any] = left.task_state_snapshot or {}
+    right_state: Dict[str, Any] = right.task_state_snapshot or {}
+
+    left_json = json.dumps(left_state, indent=2, sort_keys=True, ensure_ascii=False)
+    right_json = json.dumps(right_state, indent=2, sort_keys=True, ensure_ascii=False)
+
+    unified = difflib.unified_diff(
+        left_json.splitlines(keepends=True),
+        right_json.splitlines(keepends=True),
+        fromfile=f"{left.branch_name or 'checkpoint'}-{left.agentium_id}",
+        tofile=f"{right.branch_name or 'checkpoint'}-{right.agentium_id}",
+    )
+
+    return UnifiedDiffResponse(
+        left_checkpoint_id=checkpoint_id,
+        right_checkpoint_id=compare_to,
+        left_branch=left.branch_name,
+        right_branch=right.branch_name,
+        left_agentium_id=left.agentium_id,
+        right_agentium_id=right.agentium_id,
+        unified_diff="".join(unified),
+        left_json=left_json,
+        right_json=right_json,
     )
 
 @router.post("/validate", response_model=ValidationResult)
