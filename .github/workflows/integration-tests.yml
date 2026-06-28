@@ -165,7 +165,7 @@ jobs:
           CHROMA_PORT=8001 \
           TESTING=true \
           PYTHONPATH=${{ github.workspace }} \
-          pytest tests/benchmarks/test_chroma_query.py -m benchmark --benchmark-only --benchmark-save=baseline
+          pytest tests/benchmarks/test_chroma_query.py -m benchmark --benchmark-only --benchmark-save=baseline -o "addopts="
 
       - name: Upload benchmark baseline
         if: always()
