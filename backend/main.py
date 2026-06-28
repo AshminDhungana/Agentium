@@ -104,8 +104,8 @@ from backend.core.security_middleware import (
     PayloadSizeLimitMiddleware,
     ErrorCounterMiddleware,
 )
-
 from backend.core.observer_middleware import ObserverReadOnlyMiddleware
+from backend.core.timing_middleware import TimingMiddleware
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -542,6 +542,10 @@ app.add_middleware(InputSanitizationMiddleware)
 
 # Phase 11.1: Observer Enforcement
 app.add_middleware(ObserverReadOnlyMiddleware)
+
+# Phase 18.2 — Performance Regression Gate: timing middleware
+# Register LAST so it wraps everything and measures full request lifecycle.
+app.add_middleware(TimingMiddleware)
 
 
 from backend.api.routes import scaling as scaling_routes

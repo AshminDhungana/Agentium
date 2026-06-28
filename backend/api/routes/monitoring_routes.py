@@ -17,6 +17,7 @@ from backend.models.entities.monitoring import (
     ViolationSeverity
 )
 from backend.core.auth import get_current_active_user
+from backend.core.timing_middleware import get_timing_stats
 from backend.services.reasoning_trace_service import reasoning_trace_service
 
 router = APIRouter(prefix="/monitoring", tags=["Monitoring"])
@@ -372,6 +373,33 @@ async def get_monitoring_stats(
             "total_reports": total_reports
         },
         "generated_at": datetime.utcnow().isoformat()
+    }
+
+
+@router.get("/metrics")
+async def get_timing_metrics(
+    current_user: dict = Depends(get_current_active_user)
+):
+    """
+    Returns endpoint-level timing statistics collected by TimingMiddleware.
+
+    Useful for:
+      - Performance regression gates (Phase 18.2)
+      - Locust / load-test assertion checks
+      - Manual debugging of slow endpoints
+
+    Fields per endpoint:
+      - ``count``      – total requests seen
+      - ``buffered``   – how many samples are in the ring buffer
+      - ``avg_ms``     – mean latency
+      - ``p95_ms``     – 95ᵗʰ percentile
+      - ``p99_ms``     – 99ᵗʰ percentile
+      - ``min_ms`` / ``max_ms`` – fastest / slowest ever observed
+    """
+    stats = get_timing_stats()
+    return {
+        "endpoints": stats,
+        "generated_at": datetime.utcnow().isoformat(),
     }
 
 

@@ -5,6 +5,12 @@ on:
     branches: ["main", "master", "develop"]
   pull_request:
     branches: ["main", "master", "develop"]
+  workflow_dispatch:
+    inputs:
+      staging_url:
+        description: 'Staging URL for full load test'
+        required: false
+        default: 'http://localhost:8000'
 
 jobs:
   integration-tests:
@@ -99,5 +105,77 @@ jobs:
           path: backend/htmlcov/
 
       - name: Stop test services
+        if: always()
+        run: docker compose -f docker-compose.test.yml down
+
+  # ───────────────────────────────────────────────────────────────
+  # Phase 18.2 - Performance Regression Gate
+  # ───────────────────────────────────────────────────────────────
+  performance-tests:
+    needs: integration-tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        working-directory: ./backend
+        run: |
+          pip install --upgrade pip setuptools wheel
+          pip install --no-cache-dir -r requirements.txt
+
+      - name: Install performance testing tools
+        run: |
+          pip install locust>=2.29 pytest-benchmark>=4.0 py-cpuinfo>=9.0
+
+      - name: Start test infrastructure
+        run: docker compose -f docker-compose.test.yml up -d
+
+      - name: Run ChromaDB benchmark
+        working-directory: ./backend
+        run: |
+          DATABASE_URL=postgresql://agentium:agentium@localhost:5432/agentium_test \
+          REDIS_URL=redis://localhost:6379/1 \
+          CHROMA_HOST=localhost \
+          CHROMA_PORT=8001 \
+          TESTING=true \
+          PYTHONPATH=${{ github.workspace }} \
+          pytest tests/benchmarks/test_chroma_query.py -m benchmark --benchmark-only --benchmark-save=baseline
+
+      - name: Upload benchmark baseline
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-baseline
+          path: backend/benchmarks/baseline/
+
+      - name: Run load test (scaled-down for CI)
+        working-directory: ./backend
+        run: |
+          cd tests/load && \
+          locust \
+            --host ${{ github.event.inputs.staging_url || 'http://localhost:8000' }} \
+            --users 100 \
+            --spawn-rate 10 \
+            --run-time 2m \
+            --headless \
+            --html locust_report.html
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+
+      - name: Upload Locust report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: locust-report
+          path: backend/tests/load/locust_report.html
+
+      - name: Tear down test infrastructure
         if: always()
         run: docker compose -f docker-compose.test.yml down
