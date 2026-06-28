@@ -11,3 +11,9 @@ faker==33.3.0
 locust>=2.29
 pytest-benchmark>=4.0
 py-cpuinfo>=9.0
+
+# --- Redis test double (Phase 18.1 Security Suite) ---
+# [lua] extra is required: RateLimitMiddleware uses script_load/evalsha,
+# and without lupa installed fakeredis can't execute the Lua sliding-window
+# script, silently degrading every test to the native-pipeline fallback path.
+fakeredis[lua]>=2.26

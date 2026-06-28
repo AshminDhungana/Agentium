@@ -14,13 +14,17 @@ import pytest
 import hmac
 import hashlib
 import json
+import time
 import uuid
 from datetime import timedelta, timezone
 from fastapi.testclient import TestClient
 from fastapi import FastAPI
 
+import fakeredis.aioredis
+
 from backend.core.auth import create_access_token
-from backend.core.security_middleware import RateLimitMiddleware
+from backend.core.middleware import RateLimitMiddleware
+from backend.core import middleware as rate_limit_module
 from backend.models.entities.user import User, ROLE_OBSERVER
 from backend.models.entities.event_trigger import EventTrigger, TriggerType
 from backend.models.database import get_db_context
@@ -120,13 +124,31 @@ class TestObserverRole:
 # ── Group 3 — Rate Limiting ────────────────────────────────────────────
 
 class TestRateLimiting:
-    """Per-IP rate limit enforcement via RateLimitMiddleware."""
+    """Per-IP rate limit enforcement via RateLimitMiddleware.
 
-    def test_rate_limit_returns_429_after_threshold(self):
-        """After max_requests have been consumed, the next request returns 429."""
+    Phase 17.1 consolidated rate limiting into backend.core.middleware.
+    RateLimitMiddleware no longer accepts a `max_requests` kwarg — limits
+    are fixed per RateLimitTier (AUTH / TASK / GENERAL) in `_RULES`, and
+    enforcement runs against Redis (sliding-window sorted sets via a Lua
+    script, with a native-pipeline fallback if scripting is unavailable).
+
+    We use fakeredis (with the [lua] extra) as a real-enough Redis stand-in
+    so the test exercises the actual evalsha path rather than a hand-rolled
+    approximation of it, and monkeypatch the GENERAL tier's limit down so
+    the test stays fast and deterministic.
+    """
+
+    def test_rate_limit_returns_429_after_threshold(self, monkeypatch):
+        # Shrink the GENERAL tier limit (the route below isn't under
+        # /api/v1/auth or /api/v1/tasks, so it maps to GENERAL).
+        monkeypatch.setitem(
+            rate_limit_module._RULES,
+            rate_limit_module.RateLimitTier.GENERAL,
+            rate_limit_module.RateLimitRule(requests=2, window=60, key_suffix="general"),
+        )
+
         app = FastAPI()
-        # Use a very low limit so the test is fast
-        app.add_middleware(RateLimitMiddleware, max_requests=2)
+        app.add_middleware(RateLimitMiddleware, redis=fakeredis.aioredis.FakeRedis())
 
         @app.get("/test")
         def read():
@@ -142,6 +164,42 @@ class TestRateLimiting:
         response = test_client.get("/test")
         assert response.status_code == 429
         assert "Rate limit exceeded" in response.json()["detail"]
+
+    def test_rate_limit_resets_after_window(self, monkeypatch):
+        """Once the sliding window has elapsed, requests are allowed again."""
+        monkeypatch.setitem(
+            rate_limit_module._RULES,
+            rate_limit_module.RateLimitTier.GENERAL,
+            rate_limit_module.RateLimitRule(requests=1, window=1, key_suffix="general"),
+        )
+
+        app = FastAPI()
+        app.add_middleware(RateLimitMiddleware, redis=fakeredis.aioredis.FakeRedis())
+
+        @app.get("/test")
+        def read():
+            return {"status": "ok"}
+
+        test_client = TestClient(app)
+
+        assert test_client.get("/test").status_code == 200
+        assert test_client.get("/test").status_code == 429
+
+        time.sleep(1.1)
+        assert test_client.get("/test").status_code == 200
+
+    def test_rate_limit_fails_open_when_redis_unavailable(self):
+        """If Redis is None, the middleware must allow traffic through (fail open)."""
+        app = FastAPI()
+        app.add_middleware(RateLimitMiddleware, redis=None)
+
+        @app.get("/test")
+        def read():
+            return {"status": "ok"}
+
+        test_client = TestClient(app)
+        for _ in range(10):
+            assert test_client.get("/test").status_code == 200
 
 
 # ── Group 4 — Webhook HMAC Integrity ───────────────────────────────────

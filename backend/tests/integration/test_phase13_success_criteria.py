@@ -630,7 +630,6 @@ class TestCriterion07HealthRings:
 
     def test_five_health_rings_all_green(self, client, seeded_db: Session, auth_headers):
         """Under clean conditions, all 5 health rings should be green (>= 90)."""
-        # Ensure a一问能健康状态: create some healthy agents and tasks
         head = _get_head_of_council(seeded_db)
         _spawn_task_agent(seeded_db, head, "Healthy-Agent-1")
         _spawn_task_agent(seeded_db, head, "Healthy-Agent-2")
