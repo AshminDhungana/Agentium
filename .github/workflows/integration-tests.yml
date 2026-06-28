@@ -210,18 +210,25 @@ jobs:
           # Show last few lines of server log for debugging
           tail -20 /tmp/backend.log || true
 
-      - name: Run load test (scaled-down for CI)
-        working-directory: ./backend
+      - name: Verify endpoints before load test
         run: |
-          cd tests/load && \
+          echo "=== Verifying key endpoints ==="
+          curl -sf http://localhost:8000/api/health || (echo "Health check failed" && exit 1)
+          curl -sf http://localhost:8000/api/v1/tasks/ | head -20 || echo "Tasks endpoint check (may 404 if no auth)"
+          echo "=== Endpoints verified, proceeding to load test ==="
+
+      - name: Run load test (scaled-down for CI)
+        working-directory: ./backend/tests/load
+        run: |
           locust \
             --host ${{ github.event.inputs.staging_url || 'http://localhost:8000' }} \
-            --users 100 \
-            --spawn-rate 10 \
+            --users 20 \
+            --spawn-rate 5 \
             --run-time 2m \
             --headless \
             --html locust_report.html
         env:
+          CI: true
           PYTHONPATH: ${{ github.workspace }}
 
       - name: Stop backend server

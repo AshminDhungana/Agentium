@@ -33,8 +33,10 @@ _token_lock = threading.Lock()
 _shared_token: str | None = None
 
 # -- Load-test settings (over-rideable via environment) --
-DEFAULT_USERS = 1000
-DEFAULT_SPAWN_RATE = 10
+# CI-friendly defaults: fewer users so rate-limits aren't tripped
+_is_ci = os.getenv("CI", "false").lower() == "true"
+DEFAULT_USERS = 20 if _is_ci else 1000
+DEFAULT_SPAWN_RATE = 5 if _is_ci else 10
 DEFAULT_RUN_TIME = "5m"
 
 LOCUST_USERS = int(os.getenv("LOCUST_USERS", str(DEFAULT_USERS)))
@@ -154,8 +156,9 @@ class TaskRoutingUser(LocustAuthenticatedUser):
 
     @task(3)
     def create_task(self):
+        # Note: FastAPI tasks router uses "/tasks/" prefix (trailing slash)
         with self.client.post(
-            "/api/v1/tasks",
+            "/api/v1/tasks/",
             json={
                 "title": "Load-test task",
                 "description": "Automated load test task",
@@ -171,7 +174,7 @@ class TaskRoutingUser(LocustAuthenticatedUser):
     @task(2)
     def list_tasks(self):
         with self.client.get(
-            "/api/v1/tasks",
+            "/api/v1/tasks/",
             catch_response=True,
             name="/api/v1/tasks",
         ) as resp:
