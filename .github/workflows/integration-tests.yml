@@ -91,6 +91,8 @@ jobs:
         env:
           DATABASE_URL: postgresql://agentium:agentium@localhost:5432/agentium_test
           REDIS_URL: redis://localhost:6379/1
+          CELERY_BROKER_URL: redis://localhost:6379/1
+          CELERY_RESULT_BACKEND: redis://localhost:6379/1
           CHROMA_HOST: localhost
           CHROMA_PORT: 8001
           CELERY_TASK_ALWAYS_EAGER: true
@@ -136,6 +138,23 @@ jobs:
 
       - name: Start test infrastructure
         run: docker compose -f docker-compose.test.yml up -d
+
+      - name: Wait for services to be healthy
+        run: |
+          echo "=== Service startup logs ==="
+          docker compose -f docker-compose.test.yml logs
+          echo "=== Waiting for healthy services ==="
+          for i in {1..60}; do
+            sleep 2
+            healthy_count=$(docker compose -f docker-compose.test.yml ps | grep -ci "healthy" || true)
+            if [ "$healthy_count" -eq 3 ]; then
+              echo "All 3 services healthy."
+              break
+            fi
+            echo "Waiting for services ($healthy_count/3 healthy) — attempt $i/60"
+          done
+          echo "=== Final service status ==="
+          docker compose -f docker-compose.test.yml ps
 
       - name: Run ChromaDB benchmark
         working-directory: ./backend

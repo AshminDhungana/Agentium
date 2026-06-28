@@ -1480,3 +1480,13 @@ def detect_suspicious_patterns(self):
             r.close()
         except Exception:
             pass
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Celery Throughput Performance Gate No-op Task
+# ──────────────────────────────────────────────────────────────────────────────
+
+@celery_app.task(name="agentium.tasks.task_executor.execute_task_async")
+def execute_task_async_noop(*args, **kwargs):
+    """No-op task for Celery throughput performance benchmark."""
+    return {"noop": True}

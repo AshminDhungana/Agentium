@@ -854,7 +854,10 @@ class MonitoringService:
         ).scalar()
         avg_agent_health = round(float(avg_health_row), 1) if avg_health_row else 100.0
 
-        agent_health_pct = round((agents_active / max(total_agents, 1)) * 100, 1)
+        if total_agents == 0:
+            agent_health_pct = 100.0
+        else:
+            agent_health_pct = round((agents_active / total_agents) * 100, 1)
 
         # ── Task Health ───────────────────────────────────────────────────
 
@@ -876,9 +879,11 @@ class MonitoringService:
             Task.is_active == True,
         ).count()
 
-        task_health_pct = round(
-            (tasks_completed / max(tasks_completed + tasks_failed, 1)) * 100, 1,
-        )
+        total_completed_failed = tasks_completed + tasks_failed
+        if total_completed_failed == 0:
+            task_health_pct = 100.0
+        else:
+            task_health_pct = round((tasks_completed / total_completed_failed) * 100, 1)
 
         # ── Workflow Health ───────────────────────────────────────────────
         try:
@@ -890,9 +895,10 @@ class MonitoringService:
                 WorkflowExecution.status == "completed",
                 WorkflowExecution.started_at >= day_ago,
             ).count()
-            workflow_health_pct = round(
-                (wf_completed / max(wf_total, 1)) * 100, 1,
-            )
+            if wf_total == 0:
+                workflow_health_pct = 100.0
+            else:
+                workflow_health_pct = round((wf_completed / wf_total) * 100, 1)
         except Exception:
             db.rollback()
             workflow_health_pct = 100.0

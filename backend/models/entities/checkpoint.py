@@ -48,10 +48,11 @@ class ExecutionCheckpoint(BaseEntity):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         if not kwargs.get('agentium_id'):
-            # Prefix 'C' for Checkpoint. Column is VARCHAR(10): 1 (prefix) +
-            # 3 (session slice) + 6 (HHMMSS) = 10 chars exactly.
+            # Prefix 'C' for Checkpoint. Column is VARCHAR(20) in schema.
+            # 1 (prefix) + 3 (session slice) + 6 (HHMMSS) + 4 (random hex) = 14 chars exactly.
             session = (kwargs.get('session_id') or 'unk')[:3]
-            self.agentium_id = f"C{session}{datetime.utcnow().strftime('%H%M%S')}"
+            import uuid
+            self.agentium_id = f"C{session}{datetime.utcnow().strftime('%H%M%S')}{uuid.uuid4().hex[:4].upper()}"
 
     def to_dict(self) -> Dict[str, Any]:
         base = super().to_dict()
