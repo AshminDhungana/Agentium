@@ -751,7 +751,7 @@ Build a self-governing AI ecosystem where agents operate under constitutional la
 
 #### Backend
 
-- [ ] **Service Layer DB Session Audit** — scan all `backend/services/` files for duplicated session-handling boilerplate; extract into a single `@with_db_session` decorator in `backend/core/dependencies.py` and apply uniformly
+- [x] **Service Layer DB Session Audit** — scan all `backend/services/` files for duplicated session-handling boilerplate; extract into a single `@with_db_session` decorator in `backend/core/dependencies.py` and apply uniformly
 - [ ] **Rate Limiting Consolidation** — merge Phase 17.1 `slowapi` endpoint limits, Phase 2 constitutional cache TTL logic, and Phase 4 per-channel rate limits into a unified `RateLimitMiddleware` class in `backend/core/middleware.py`; remove all redundant per-route rate limit decorators
 - [ ] **LLM Client Abstraction** — extract duplicated provider retry and failover logic from `agent_orchestrator.py`, `auto_delegation_service.py`, and `reincarnation_service.py` into a shared `LLMClient` class at `backend/core/llm_client.py`; wire circuit breaker integration and token tracking inside the client
 - [ ] **Celery Task Naming Convention** — audit all Celery task definitions for consistent `agentium.{module}.{task_name}` naming; update `celery_app.py` beat schedule entries to match; fix any autodiscovery gaps causing tasks to run under incorrect names

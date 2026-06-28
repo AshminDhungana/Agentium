@@ -99,7 +99,7 @@ def with_db_session(
                 bound = sig.bind_partial(*args, **kwargs)
                 db_arg: Any = bound.arguments.get(_param_name, _NOT_SET)
 
-                if _param_name in bound.arguments and _is_session(db_arg):
+                if _param_name in bound.arguments and db_arg is not None:
                     # Caller already provided a session – pass through untouched.
                     return await _func(*args, **kwargs)  # type: ignore[arg-type]
 
@@ -122,7 +122,7 @@ def with_db_session(
                 bound = sig.bind_partial(*args, **kwargs)
                 db_arg: Any = bound.arguments.get(_param_name, _NOT_SET)
 
-                if _param_name in bound.arguments and _is_session(db_arg):
+                if _param_name in bound.arguments and db_arg is not None:
                     return _func(*args, **kwargs)
 
                 with get_db_context() as db:
