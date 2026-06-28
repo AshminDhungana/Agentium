@@ -49,8 +49,8 @@ def _seed_collection(vector_store):
             for i in range(batch_start, batch_end)
         ]
         ids = [f"bench-{i}" for i in range(batch_start, batch_end)]
-        vector_store.add_documents(
-            collection_key=collection_key,
+        collection = vector_store.get_collection(collection_key)
+        collection.add(
             documents=texts,
             metadatas=metadatas,
             ids=ids,
