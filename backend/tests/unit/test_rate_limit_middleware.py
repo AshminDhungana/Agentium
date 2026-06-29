@@ -18,6 +18,7 @@ from backend.core.middleware import (
     RateLimitTier,
     RateLimitRule,
 )
+import backend.core.middleware as _mw_module
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -36,6 +37,14 @@ def _make_scope(path: str = "/api/v1/some/endpoint", method: str = "GET") -> dic
 
 def _make_request(path: str = "/api/v1/test", method: str = "GET") -> Request:
     return Request(_make_scope(path, method), receive=MagicMock())
+
+
+# ── Disable rate-limit bypass in CI ──────────────────────────────────────────
+
+@pytest.fixture(autouse=True)
+def disable_skip_rate_limit(monkeypatch):
+    """Override the CI/TESTING env bypass so tests actually exercise rate limiting."""
+    monkeypatch.setattr(_mw_module, "_skip_rate_limit", lambda: False)
 
 
 # ── Fixtures ─────────────────────────────────────────────────────────────────

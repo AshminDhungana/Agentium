@@ -146,6 +146,8 @@ class TestRateLimiting:
             rate_limit_module.RateLimitTier.GENERAL,
             rate_limit_module.RateLimitRule(requests=2, window=60, key_suffix="general"),
         )
+        # Disable the CI/TESTING env bypass so we actually exercise the limiter
+        monkeypatch.setattr(rate_limit_module, "_skip_rate_limit", lambda: False)
 
         app = FastAPI()
         app.add_middleware(RateLimitMiddleware, redis=fakeredis.aioredis.FakeRedis())
@@ -172,6 +174,8 @@ class TestRateLimiting:
             rate_limit_module.RateLimitTier.GENERAL,
             rate_limit_module.RateLimitRule(requests=1, window=1, key_suffix="general"),
         )
+        # Disable the CI/TESTING env bypass so we actually exercise the limiter
+        monkeypatch.setattr(rate_limit_module, "_skip_rate_limit", lambda: False)
 
         app = FastAPI()
         app.add_middleware(RateLimitMiddleware, redis=fakeredis.aioredis.FakeRedis())

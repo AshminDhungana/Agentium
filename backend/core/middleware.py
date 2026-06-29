@@ -78,6 +78,11 @@ _EXEMPT_PATHS: set[str] = {
 # In CI environments, skip rate limiting entirely to avoid false failures
 _SKIP_RATE_LIMIT = os.getenv("CI", "false").lower() == "true" or os.getenv("TESTING", "false").lower() == "true"
 
+
+# Use a function for the skip flag so that tests can monkeypatch it reliably.
+def _skip_rate_limit() -> bool:
+    return _SKIP_RATE_LIMIT
+
 # Atomic Lua script for sliding-window admission + cleanup
 # KEYS[1]: sorted-set key, ARGV[1]: now (float), ARGV[2]: window (int)
 # ARGV[3]: max requests (int), ARGV[4]: expire_seconds (int)
@@ -184,7 +189,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next):
         # ── CI / test bypass ──────────────────────────────────────────────────
-        if _SKIP_RATE_LIMIT:
+        if _skip_rate_limit():
             return await call_next(request)
 
         # ── Exempt paths ──────────────────────────────────────────────────────
