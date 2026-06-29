@@ -23,6 +23,7 @@ from backend.models.entities.task import (
 )
 from backend.models.entities.agents import Agent, AgentStatus
 from backend.models.entities.audit import AuditLog, AuditLevel, AuditCategory
+from backend.core.llm_client import LLMClient
 
 logger = logging.getLogger(__name__)
 
@@ -200,9 +201,9 @@ class SubTaskBreaker:
             List of created child Task objects.
         """
         try:
-            from backend.services.model_provider import ModelService
+            from backend.core.llm_client import LLMClient
         except ImportError:
-            logger.warning("SubTaskBreaker: ModelService not available, skipping decomposition")
+            logger.warning("SubTaskBreaker: LLMClient not available, skipping decomposition")
             return []
 
         prompt = (
@@ -220,7 +221,8 @@ class SubTaskBreaker:
                 logger.warning("SubTaskBreaker: Head agent not found, skipping")
                 return []
 
-            result = await ModelService.generate_with_agent(
+            llm_client = LLMClient(db=db)
+            result = await llm_client.generate(
                 agent=head,
                 user_message=prompt,
                 db=db,

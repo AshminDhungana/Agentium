@@ -15,7 +15,7 @@ from backend.models.entities.constitution import Ethos
 from backend.models.entities.task import Task, TaskStatus, TaskAuditLog
 from backend.models.entities.audit import AuditLog, AuditLevel, AuditCategory
 from backend.services.context_manager import context_manager
-from backend.services.model_provider import ModelService
+from backend.core.llm_client import LLMClient
 from backend.services.capability_registry import CapabilityRegistry, Capability
 import logging 
 
@@ -1010,16 +1010,14 @@ Extract the KEY LESSONS and WISDOM from this agent's life. Focus on:
 Provide a concise summary (max 300 words) that the successor agent will inherit."""
 
         try:
-            response = await ModelService.generate_text(
+            llm_client = LLMClient(db=db)
+            response = await llm_client.generate(
                 agent=agent,
-                prompt=prompt,
-                max_tokens=500,
-                temperature=0.3,
-                db=db
+                user_message=prompt,
+                db=db,
+                system_prompt_override="You are a summarization assistant. Be concise."
             )
-            
             return response.get("content", "No wisdom extracted")
-            
         except Exception as e:
             print(f"⚠️ Failed to summarize context: {e}")
             return f"[Incarnation {incarnation}] Context limit reached. Manual summary unavailable."

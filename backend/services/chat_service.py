@@ -15,6 +15,7 @@ from backend.services.context_manager import context_manager
 from backend.services.reincarnation_service import reincarnation_service
 from backend.services.clarification_service import clarification_service
 from backend.services.model_provider import ModelService
+from backend.core.llm_client import LLMClient
 from backend.models.entities.user_config import ConnectionStatus
 
 
@@ -146,7 +147,8 @@ Address the Sovereign respectfully. If they issue a command that requires execut
         # completely unaffected.
         # FIX: Handle model generation failures with try/except
         try:
-            result = await ModelService.generate_with_agent_tools(
+            llm_client = LLMClient(db=db)
+            result = await llm_client.generate_with_tools(
                 agent=head,
                 user_message=message,
                 db=db,
