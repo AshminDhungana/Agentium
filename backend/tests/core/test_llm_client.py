@@ -11,6 +11,15 @@ class MockAgent:
     preferred_config_id = "test-config-id"
 
 
+@pytest.fixture(autouse=True)
+def reset_circuit_breakers():
+    """Reset shared circuit breaker state between tests."""
+    from backend.core.llm_client import LLMClient
+    LLMClient._circuit_breakers.clear()
+    yield
+    LLMClient._circuit_breakers.clear()
+
+
 class TestProviderCircuitBreaker:
     def test_initial_state_closed(self):
         cb = ProviderCircuitBreaker()
@@ -45,7 +54,8 @@ class TestProviderCircuitBreaker:
         cb.record_success()
         cb.record_failure()
         m = cb.get_metrics()
-        assert m["state"] == "open"
+        # 1 failure is below threshold; state remains closed
+        assert m["state"] == "closed"
         assert m["consecutive_failures"] == 1
         assert m["total_success"] == 1
         assert m["total_failure"] == 1
@@ -116,8 +126,7 @@ class TestLLMClientGenerate:
     @pytest.mark.asyncio
     async def test_token_tracking_called(self, llm_client):
         with patch("backend.core.llm_client.ModelService.generate_with_agent", new_callable=AsyncMock) as mock_generate, \
-             patch("backend.core.llm_client.api_key_manager") as mock_akm, \
-             patch("backend.core.llm_client.token_optimizer") as mock_topt:
+             patch("backend.core.llm_client.api_key_manager") as mock_akm:
             mock_generate.return_value = {
                 "content": "tracked",
                 "tokens_used": 42,
