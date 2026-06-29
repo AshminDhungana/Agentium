@@ -23,7 +23,7 @@ from backend.core.constitutional_guard import ConstitutionalGuard, Verdict, Viol
 from backend.services.tool_creation_service import ToolCreationService
 from backend.services.critic_agents import critic_service, CriticType
 from backend.services.api_manager import api_manager
-from backend.services.model_provider import ModelService
+from backend.core.llm_client import LLMClient
 from backend.models.schemas.tool_creation import ToolCreationRequest
 
 # Tool execution imports
@@ -201,7 +201,8 @@ class AgentOrchestrator:
         # Falls back gracefully to plain generation when no tools are available
         # for the tier (tools list is empty → provider ignores the parameter).
         tier_str = f"{agent.agentium_id[0]}xxxx"
-        result = await ModelService.generate_with_agent_tools(
+        llm_client = LLMClient(db=db)
+        result = await llm_client.generate_with_tools(
             agent=agent,
             user_message=task.description,
             db=db,
@@ -213,12 +214,6 @@ class AgentOrchestrator:
             # Forward prompt-template kwargs so providers honour them
             max_tokens_multiplier=max_tokens_multiplier,
             chain_of_thought=requires_cot,
-        )
-
-        # Record usage
-        token_optimizer.update_token_count(
-            agent_id=agent.agentium_id,
-            tokens_used=result.get("tokens_used", 0)
         )
 
         # Compress ethos after sub-step execution to prevent cognitive bloat
