@@ -142,7 +142,7 @@ class TestRateLimiting:
         # Shrink the GENERAL tier limit (the route below isn't under
         # /api/v1/auth or /api/v1/tasks, so it maps to GENERAL).
         monkeypatch.setitem(
-            rate_limit_module._RULES,
+            rate_limit_module._IP_RULES,
             rate_limit_module.RateLimitTier.GENERAL,
             rate_limit_module.RateLimitRule(requests=2, window=60, key_suffix="general"),
         )
@@ -170,7 +170,7 @@ class TestRateLimiting:
     def test_rate_limit_resets_after_window(self, monkeypatch):
         """Once the sliding window has elapsed, requests are allowed again."""
         monkeypatch.setitem(
-            rate_limit_module._RULES,
+            rate_limit_module._IP_RULES,
             rate_limit_module.RateLimitTier.GENERAL,
             rate_limit_module.RateLimitRule(requests=1, window=1, key_suffix="general"),
         )
