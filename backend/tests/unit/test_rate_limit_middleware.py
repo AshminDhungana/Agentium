@@ -296,3 +296,104 @@ class TestRateLimitHeaders:
         assert response.headers["X-RateLimit-Limit"] == "200"
         assert int(response.headers["X-RateLimit-Remaining"]) >= 0
         assert response.headers["X-RateLimit-Tier"] == "general"
+
+
+# ── Test Channel Tier ────────────────────────────────────────────────────────
+
+class TestChannelTier:
+    """Channel / webhook paths should map to the CHANNEL tier."""
+
+    @pytest.mark.asyncio
+    async def test_channels_tier(self):
+        """Paths under /api/v1/channels/* map to CHANNEL."""
+        redis = AsyncMock()
+        mw = RateLimitMiddleware(MagicMock(), redis)
+        for path in ("/api/v1/channels/whatsapp", "/api/v1/channels/"):
+            req = _make_request(path)
+            assert await mw._tier_for_request(req) is RateLimitTier.CHANNEL
+
+    @pytest.mark.asyncio
+    async def test_webhooks_tier(self):
+        """Paths under /webhooks/* map to CHANNEL."""
+        redis = AsyncMock()
+        mw = RateLimitMiddleware(MagicMock(), redis)
+        for path in ("/webhooks/telegram", "/webhooks/"):
+            req = _make_request(path)
+            assert await mw._tier_for_request(req) is RateLimitTier.CHANNEL
+
+    @pytest.mark.asyncio
+    async def test_channel_platform_key_contains_platform(self):
+        """Channel limit key includes the detected platform name."""
+        redis = AsyncMock()
+        redis.evalsha = AsyncMock(return_value=[1, 1])
+
+        app = AsyncMock(return_value=Response("ok"))
+        mw = RateLimitMiddleware(app, redis)
+
+        req = _make_request("/api/v1/channels/whatsapp/inbox")
+        await mw.dispatch(req, app)
+
+        key = redis.evalsha.await_args.args[2]
+        assert "channel:whatsapp" in key
+
+
+# ── Test Per-User Rate Limiting ──────────────────────────────────────────────
+
+class TestPerUserRateLimit:
+    """Per-user limits are stricter and checked before per-IP."""
+
+    @pytest.mark.asyncio
+    async def test_per_user_blocked_returns_429(self, monkeypatch):
+        """When per-user limit exceeded, return 429 with user: tier."""
+        redis = AsyncMock()
+        redis.evalsha = AsyncMock(return_value=[0, 50])
+
+        app = AsyncMock(return_value=Response("ok"))
+        mw = RateLimitMiddleware(app, redis)
+
+        monkeypatch.setattr(
+            _mw_module, "_extract_user_id", lambda req: "user-123"
+        )
+
+        req = _make_request("/api/v1/agents")
+        response = await mw.dispatch(req, app)
+
+        assert response.status_code == 429
+        assert response.headers["X-RateLimit-Tier"] == "user:general"
+        assert response.headers["X-RateLimit-Limit"] == "100"
+
+    @pytest.mark.asyncio
+    async def test_per_user_allowed_sets_headers(self, monkeypatch):
+        """Per-user under limit proceeds, headers show per-IP limits."""
+        redis = AsyncMock()
+        redis.evalsha = AsyncMock(return_value=[1, 5])
+
+        target = AsyncMock(return_value=Response("done", headers={}))
+        mw = RateLimitMiddleware(target, redis)
+
+        monkeypatch.setattr(
+            _mw_module, "_extract_user_id", lambda req: "user-123"
+        )
+
+        req = _make_request("/api/v1/agents")
+        response = await mw.dispatch(req, target)
+
+        assert response.status_code == 200
+        assert response.headers["X-RateLimit-Limit"] == "200"
+        assert int(response.headers["X-RateLimit-Remaining"]) >= 0
+        assert response.headers["X-RateLimit-Tier"] == "general"
+
+
+# ── Test Per-User Key Construction ──────────────────────────────────────────
+
+class TestPerUserKey:
+    """Redis keys for per-user limits include the user id."""
+
+    @pytest.mark.asyncio
+    async def test_per_user_key_format(self):
+        mw = RateLimitMiddleware(MagicMock(), AsyncMock())
+        key = await mw._rate_limit_key(
+            _make_request("/api/v1/agents"), RateLimitTier.GENERAL, user_id="user-123"
+        )
+        assert key == "agentium:ratelimit:general:user:user-123"
+

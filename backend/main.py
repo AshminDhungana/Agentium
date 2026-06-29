@@ -44,11 +44,6 @@ from backend.models.entities.user_config import ConnectionStatus
 from backend.services.mcp_tool_bridge import init_bridge
 from backend.core.tool_registry import tool_registry
 
-# Phase 17.1 — Rate limiting
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.errors import RateLimitExceeded
-from slowapi.util import get_remote_address
-
 # API Routes
 from backend.api.routes import chat as chat_routes
 from backend.api.routes import channels as channels_routes
@@ -110,7 +105,6 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 celery = celery_app
 
-from backend.core.rate_limit import limiter
 
 
 class ConstitutionUpdateRequest(BaseModel):
@@ -438,7 +432,7 @@ async def lifespan(app: FastAPI):
             logger.error("❌ Knowledge base bootstrap failed: %s", e)
 
     logger.info("🎉 Agentium startup complete!")
-    logger.info("   Phase 17.1: DDoS hardening active — slowapi + blocklist + payload limits")
+    logger.info("   Phase 17.1: DDoS hardening active — unified RateLimitMiddleware + blocklist + payload limits")
 
     yield  # ── Application runs here ──────────────────────────────
 
@@ -481,10 +475,6 @@ app = FastAPI(
     lifespan=lifespan,
     redirect_slashes=False,
 )
-
-# ── Phase 17.1: attach slowapi limiter to app state ──────────────────────────
-app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 origins = os.getenv("ALLOWED_ORIGINS")
 

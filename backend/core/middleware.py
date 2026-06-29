@@ -11,6 +11,7 @@ Consolidates:
 from __future__ import annotations
 import os
 import time
+import asyncio
 import logging
 from dataclasses import dataclass
 from enum import Enum
@@ -29,7 +30,6 @@ logger = logging.getLogger(__name__)
 
 class RateLimitTier(Enum):
     """Named rate-limit tiers."""
-    IP = "ip"              # Generic per-IP
     AUTH = "auth"         # Auth endpoints (stricter)
     TASK = "task"         # Task endpoints
     GENERAL = "general"   # Everything else
@@ -44,12 +44,20 @@ class RateLimitRule:
     key_suffix: str    # Redis key fragment
 
 
-# Rules — exact same limits as before consolidation
-_RULES: dict[RateLimitTier, RateLimitRule] = {
-    RateLimitTier.IP:      RateLimitRule(requests=settings.API_RATE_LIMIT_PER_MINUTE, window=60, key_suffix="ip"),
+# Per-IP rules — exact same limits as before consolidation
+_IP_RULES: dict[RateLimitTier, RateLimitRule] = {
     RateLimitTier.AUTH:    RateLimitRule(requests=5,   window=60, key_suffix="auth"),
     RateLimitTier.TASK:    RateLimitRule(requests=30,  window=60, key_suffix="task"),
     RateLimitTier.GENERAL: RateLimitRule(requests=200, window=60, key_suffix="general"),
+    RateLimitTier.CHANNEL: RateLimitRule(requests=80,  window=60, key_suffix="channel"),
+}
+
+# Per-user rules (stricter, when request is authenticated)
+_USER_RULES: dict[RateLimitTier, RateLimitRule] = {
+    RateLimitTier.AUTH:    RateLimitRule(requests=3,   window=60, key_suffix="user_auth"),
+    RateLimitTier.TASK:    RateLimitRule(requests=20,  window=60, key_suffix="user_task"),
+    RateLimitTier.GENERAL: RateLimitRule(requests=100, window=60, key_suffix="user_general"),
+    RateLimitTier.CHANNEL: RateLimitRule(requests=50,  window=60, key_suffix="user_channel"),
 }
 
 # Per-channel platform limits (Phase 4 — unchanged values)
@@ -83,6 +91,24 @@ _SKIP_RATE_LIMIT = os.getenv("CI", "false").lower() == "true" or os.getenv("TEST
 def _skip_rate_limit() -> bool:
     return _SKIP_RATE_LIMIT
 
+
+# ── User extraction helper ────────────────────────────────────────────────────
+
+def _extract_user_id(request: Request) -> Optional[str]:
+    """Extract user_id from Authorization header (JWT Bearer token)."""
+    auth_header = request.headers.get("authorization", "")
+    if not auth_header.startswith("Bearer "):
+        return None
+    token = auth_header[7:]
+    try:
+        from jose import jwt as jose_jwt
+
+        payload = jose_jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+        return payload.get("user_id") or payload.get("sub")
+    except Exception:
+        return None
+
+
 # Atomic Lua script for sliding-window admission + cleanup
 # KEYS[1]: sorted-set key, ARGV[1]: now (float), ARGV[2]: window (int)
 # ARGV[3]: max requests (int), ARGV[4]: expire_seconds (int)
@@ -112,25 +138,29 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
     Unified Redis-backed rate-limiting middleware.
 
     Execution order per request:
-      1. Determine tier (auth → task → general)
-      2. Build Redis key:  agentium:ratelimit:{tier}:{ip}
-      3. Run atomic Lua sliding-window check
-      4. If allowed, attach X-RateLimit headers and proceed
-      5. If blocked, return 429 with Retry-After header
+      1. Determine tier (auth → task → general → channel)
+      2. Extract user ID from JWT (if authenticated)
+      3. Build Redis key(s): agentium:ratelimit:{tier}:{ip} and optionally user variant
+      4. Run per-user check (stricter, skip if not authenticated)
+      5. Run per-IP check with atomic Lua sliding-window
+      6. If allowed, attach X-RateLimit headers and proceed
+      7. If blocked, return 429 with Retry-After header
     """
 
     def __init__(self, app, redis):
         super().__init__(app)
         self.redis = redis
         self._sha: Optional[str] = None
+        self._sha_lock = asyncio.Lock()
 
     async def _get_sha(self) -> str:
-        if self._sha is None and self.redis is not None:
-            try:
-                self._sha = await self.redis.script_load(_LUA_ADMIT)
-            except Exception as exc:
-                logger.debug("RateLimitMiddleware: Lua script load failed (non-fatal): %s", exc)
-        return self._sha
+        async with self._sha_lock:
+            if self._sha is None and self.redis is not None:
+                try:
+                    self._sha = await self.redis.script_load(_LUA_ADMIT)
+                except Exception as exc:
+                    logger.debug("RateLimitMiddleware: Lua script load failed (non-fatal): %s", exc)
+            return self._sha
 
     async def _tier_for_request(self, request: Request) -> RateLimitTier:
         """Map request path to the correct limit tier."""
@@ -139,6 +169,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             return RateLimitTier.AUTH
         if path.startswith("/api/v1/tasks"):
             return RateLimitTier.TASK
+        if path.startswith("/api/v1/channels") or path.startswith("/webhooks"):
+            return RateLimitTier.CHANNEL
         return RateLimitTier.GENERAL
 
     async def _check(self, key: str, rule: RateLimitRule) -> tuple[bool, int]:
@@ -182,10 +214,35 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             logger.warning("RateLimitMiddleware: Redis check failed (allowing): %s", exc)
             return True, -1
 
-    async def _rate_limit_key(self, request: Request, tier: RateLimitTier) -> str:
+    async def _rate_limit_key(self, request: Request, tier: RateLimitTier, user_id: Optional[str] = None) -> str:
         """Build the Redis key for a given tier."""
         ip = request.client.host if request.client else "unknown"
+        if user_id:
+            return f"agentium:ratelimit:{tier.value}:user:{user_id}"
         return f"agentium:ratelimit:{tier.value}:{ip}"
+
+    async def _check_platform_limit(self, request: Request) -> tuple[bool, int, str]:
+        """
+        Check platform-specific rate limits for channel/webhook requests.
+        Returns (allowed, remaining, platform_name).
+        """
+        path = request.url.path
+        platform = None
+        # Try to extract platform from path segments
+        for known in PLATFORM_RATE_LIMITS:
+            if known in path.lower():
+                platform = known
+                break
+
+        if not platform:
+            platform = "unknown"
+
+        limits = PLATFORM_RATE_LIMITS.get(platform, {"minute": 80})
+        # Use per-minute limit; per-hour could be added similarly
+        rule = RateLimitRule(requests=limits.get("minute", 80), window=60, key_suffix=f"channel:{platform}")
+        key = f"agentium:ratelimit:channel:{platform}:{request.client.host if request.client else 'unknown'}"
+        allowed, remaining = await self._check(key, rule)
+        return allowed, remaining, platform
 
     async def dispatch(self, request: Request, call_next):
         # ── CI / test bypass ──────────────────────────────────────────────────
@@ -198,14 +255,42 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
         # ── Determine tier ────────────────────────────────────────────────────
         tier = await self._tier_for_request(request)
-        rule = _RULES[tier]
 
-        # ── Check Redis ───────────────────────────────────────────────────────
-        key = await self._rate_limit_key(request, tier)
-        allowed, remaining = await self._check(key, rule)
+        # ── Per-user check (stricter, if authenticated) ───────────────────────
+        user_id = _extract_user_id(request)
+        if user_id:
+            user_rule = _USER_RULES[tier]
+            user_key = await self._rate_limit_key(request, tier, user_id=user_id)
+            user_allowed, user_remaining = await self._check(user_key, user_rule)
+            if not user_allowed:
+                retry_after = user_rule.window
+                return JSONResponse(
+                    {
+                        "detail": "Rate limit exceeded. Please try again later.",
+                        "code": "RATE_LIMIT_EXCEEDED",
+                        "tier": f"user:{tier.value}",
+                        "retry_after_seconds": retry_after,
+                    },
+                    status_code=429,
+                    headers={
+                        "Retry-After": str(retry_after),
+                        "X-RateLimit-Limit": str(user_rule.requests),
+                        "X-RateLimit-Remaining": "0",
+                        "X-RateLimit-Tier": f"user:{tier.value}",
+                    },
+                )
+
+        # ── Per-IP check ──────────────────────────────────────────────────────
+        if tier == RateLimitTier.CHANNEL:
+            allowed, remaining, platform = await self._check_platform_limit(request)
+        else:
+            rule = _IP_RULES[tier]
+            key = await self._rate_limit_key(request, tier)
+            allowed, remaining = await self._check(key, rule)
 
         if not allowed:
-            retry_after = rule.window  # simple: retry after full window
+            rule = _IP_RULES[tier]  # Get rule for retry_after calculation
+            retry_after = rule.window
             return JSONResponse(
                 {
                     "detail": "Rate limit exceeded. Please try again later.",
@@ -224,6 +309,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
         # ── Proceed ───────────────────────────────────────────────────────────
         response = await call_next(request)
+        rule = _IP_RULES[tier]
         response.headers["X-RateLimit-Limit"] = str(rule.requests)
         response.headers["X-RateLimit-Remaining"] = str(remaining)
         response.headers["X-RateLimit-Tier"] = tier.value
