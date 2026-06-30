@@ -6,6 +6,8 @@ import sys
 from pathlib import Path
 from urllib.parse import urlparse, urlunparse
 
+from sqlalchemy import create_engine, text
+
 
 BACKEND_DIR = Path(__file__).parent.parent.parent.resolve()
 ALEMBIC_INI = BACKEND_DIR / "alembic.ini"
@@ -79,15 +81,13 @@ def drop_and_recreate_test_db():
     # Get the DB name from the original URL
     db_name = Path(parsed.path).name or "agentium_test"
 
-    cmd = [
-        "psql", admin_url, "-c",
-        f"DROP DATABASE IF EXISTS {db_name}; CREATE DATABASE {db_name};"
-    ]
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    if result.returncode != 0:
-        raise RuntimeError(
-            f"Failed to recreate test DB:\n{result.stdout}\n{result.stderr}"
-        )
+    # Use SQLAlchemy with autocommit so DROP/CREATE DATABASE are not wrapped
+    # in a transaction (PostgreSQL does not allow DROP DATABASE in a txn).
+    admin_engine = create_engine(admin_url, isolation_level="AUTOCOMMIT")
+    with admin_engine.connect() as conn:
+        conn.execute(text(f"DROP DATABASE IF EXISTS {db_name}"))
+        conn.execute(text(f"CREATE DATABASE {db_name}"))
+    admin_engine.dispose()
     print(f"Dropped and recreated {db_name}")
 
 

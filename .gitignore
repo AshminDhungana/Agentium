@@ -9,7 +9,7 @@ logs.txt
 # IDE
 .vscode/
 .idea/
-.superpowers/
+./.superpowers/
 ./docs/superpowers/
 
 # Node

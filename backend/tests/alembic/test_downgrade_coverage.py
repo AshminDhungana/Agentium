@@ -60,11 +60,15 @@ class AlembicRunner:
 
 def _drop_and_create_test_db(engine: Engine) -> None:
     """Drop and recreate the test database."""
-    # Connect to the default 'postgres' maintenance DB
+    # Close all pooled connections to the target DB so PostgreSQL allows
+    # us to drop it (avoids "database is being accessed by other users").
+    engine.dispose()
+
+    # Connect to the default 'postgres' maintenance DB with autocommit so
+    # DROP/CREATE DATABASE are not wrapped in a transaction block.
     admin_url = DATABASE_URL.rsplit("/", 1)[0] + "/postgres"
-    admin_engine = create_engine(admin_url)
+    admin_engine = create_engine(admin_url, isolation_level="AUTOCOMMIT")
     with admin_engine.connect() as conn:
-        conn.execution_options(isolation_level="AUTOCOMMIT")
         conn.execute(text("DROP DATABASE IF EXISTS agentium_test"))
         conn.execute(text("CREATE DATABASE agentium_test"))
     admin_engine.dispose()
