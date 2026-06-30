@@ -99,7 +99,9 @@ def _get_tables_and_enums(engine: Engine) -> tuple[set[str], set[str]]:
 
 @pytest.fixture(scope="module")
 def engine() -> Engine:
-    return create_engine(DATABASE_URL)
+    e = create_engine(DATABASE_URL)
+    yield e
+    e.dispose()
 
 
 @pytest.fixture
@@ -149,8 +151,12 @@ def test_roundtrip_each_migration_individually(engine: Engine, fresh_database):
         # For the last one, downgrade back to previous before continuing
         runner.downgrade("-1")
 
+    # After fully round-tripping each migration, database should be back at base
+    tables, enums = _get_tables_and_enums(engine)
+    assert len(tables) == 0, f"Tables left after full roundtrip: {tables}"
+    assert not enums, f"Leftover custom enum types after roundtrip: {enums}"
+
     # Re-apply all to return to head
     runner.upgrade("head")
-    tables, enums = _get_tables_and_enums(engine)
+    tables, _ = _get_tables_and_enums(engine)
     assert len(tables) > 0, "No tables after restoring to head"
-    assert not enums, f"Leftover custom enum types after roundtrip: {enums}"

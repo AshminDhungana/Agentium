@@ -85,6 +85,16 @@ def drop_and_recreate_test_db():
     # in a transaction (PostgreSQL does not allow DROP DATABASE in a txn).
     admin_engine = create_engine(admin_url, isolation_level="AUTOCOMMIT")
     with admin_engine.connect() as conn:
+        # Force terminate any lingering sessions on the target DB so DROP
+        # DATABASE does not fail with "database is being accessed by other users".
+        try:
+            conn.execute(text(
+                f"SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
+                f"WHERE datname = '{db_name}' AND pid <> pg_backend_pid()"
+            ))
+        except Exception:
+            pass  # Best-effort; not all users have this privilege
+
         conn.execute(text(f"DROP DATABASE IF EXISTS {db_name}"))
         conn.execute(text(f"CREATE DATABASE {db_name}"))
     admin_engine.dispose()
