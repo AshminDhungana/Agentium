@@ -9,6 +9,8 @@ logs.txt
 # IDE
 .vscode/
 .idea/
+.superpowers/
+./docs/superpowers/
 
 # Node
 node_modules/

@@ -416,7 +416,7 @@ class WorkflowEngine:
         return doc
 
 
-@shared_task
+@shared_task(name="agentium.services.workflow_engine.workflow_step_runner")
 def workflow_step_runner(execution_id: str):
     """Celery worker task to resume workflow asynchronous steps."""
     with get_db_context() as db:

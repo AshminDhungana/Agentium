@@ -6,7 +6,7 @@ from backend.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
 
-@celery_app.task
+@celery_app.task(name="agentium.monitoring.health_checks.run_health_check")
 def run_health_check():
     """Run system health check."""
     logger.info("Running health check")

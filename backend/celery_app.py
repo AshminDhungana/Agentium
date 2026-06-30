@@ -22,6 +22,9 @@ celery_app = Celery(
     include=[
         'backend.services.tasks.task_executor',
         'backend.services.tasks.workflow_tasks',
+        'backend.services.audit.audit_processor',
+        'backend.services.monitoring.health_checks',
+        'backend.services.workflow_engine',
     ]
 )
 
@@ -45,168 +48,168 @@ celery_app.conf.update(
 celery_app.conf.beat_schedule = {
     # ── Channel health ────────────────────────────────────────────────────────
     'health-check-every-5-minutes': {
-        'task': 'backend.services.tasks.task_executor.check_channel_health',
+        'task': 'agentium.tasks.task_executor.check_channel_health',
         'schedule': 300.0,
     },
     'cleanup-old-messages-daily': {
-        'task': 'backend.services.tasks.task_executor.cleanup_old_channel_messages',
+        'task': 'agentium.tasks.task_executor.cleanup_old_channel_messages',
         'schedule': 86400.0,
         'kwargs': {'days': 30},
     },
     'imap-receiver-check': {
-        'task': 'backend.services.tasks.task_executor.start_imap_receivers',
+        'task': 'agentium.tasks.task_executor.start_imap_receivers',
         'schedule': 60.0,
     },
     'channel-heartbeat': {
-        'task': 'backend.services.tasks.task_executor.send_channel_heartbeat',
+        'task': 'agentium.tasks.task_executor.send_channel_heartbeat',
         'schedule': 300.0,
     },
 
     # ── Constitution & governance ─────────────────────────────────────────────
     'constitution-daily-review': {
-        'task': 'backend.services.tasks.task_executor.daily_constitution_review',
+        'task': 'agentium.tasks.task_executor.daily_constitution_review',
         'schedule': 86400.0,
     },
     'idle-task-processor': {
-        'task': 'backend.services.tasks.task_executor.process_idle_tasks',
+        'task': 'agentium.tasks.task_executor.process_idle_tasks',
         'schedule': 60.0,
     },
 
     # ── Task execution ────────────────────────────────────────────────────────
     'handle-task-escalation': {
-        'task': 'backend.services.tasks.task_executor.handle_task_escalation',
+        'task': 'agentium.tasks.task_executor.handle_task_escalation',
         'schedule': 300.0,
     },
     'sovereign-data-retention': {
-        'task': 'backend.services.tasks.task_executor.sovereign_data_retention',
+        'task': 'agentium.tasks.task_executor.sovereign_data_retention',
         'schedule': 86400.0,
     },
     'auto-scale-check': {
-        'task': 'backend.services.tasks.task_executor.auto_scale_check',
+        'task': 'agentium.tasks.task_executor.auto_scale_check',
         'schedule': 600.0,
     },
 
     # ── Reasoning recovery watchdog ───────────────────────────────────────────
     'reasoning-watchdog': {
-        'task': 'backend.services.tasks.task_executor.check_stalled_reasoning',
+        'task': 'agentium.tasks.task_executor.check_stalled_reasoning',
         'schedule': 60.0,
     },
 
     # ── Federation (Phase 11.2) ───────────────────────────────────────────────
     'federation-heartbeat': {
-        'task': 'backend.celery_app.federation_heartbeat',
+        'task': 'agentium.celery_app.federation_heartbeat',
         'schedule': 300.0,
     },
     'federation-cleanup-stale': {
-        'task': 'backend.celery_app.federation_cleanup_stale',
+        'task': 'agentium.celery_app.federation_cleanup_stale',
         'schedule': 3600.0,
     },
 
     # ── Phase 13.1: Auto-Delegation Engine ────────────────────────────────────
     'auto-escalation-timer': {
-        'task': 'backend.services.tasks.task_executor.check_escalation_timeouts',
+        'task': 'agentium.tasks.task_executor.check_escalation_timeouts',
         'schedule': 60.0,
     },
     'dependency-graph-processor': {
-        'task': 'backend.services.tasks.task_executor.process_dependency_graph',
+        'task': 'agentium.tasks.task_executor.process_dependency_graph',
         'schedule': 30.0,
     },
 
     # ── Phase 13.2: Self-Healing & Auto-Recovery ──────────────────────────────
     'agent-heartbeat': {
-        'task': 'backend.services.tasks.task_executor.agent_heartbeat',
+        'task': 'agentium.tasks.task_executor.agent_heartbeat',
         'schedule': 60.0,
     },
     'crash-detection': {
-        'task': 'backend.services.tasks.task_executor.detect_crashed_agents',
+        'task': 'agentium.tasks.task_executor.detect_crashed_agents',
         'schedule': 30.0,
     },
     'self-diagnostic-daily': {
-        'task': 'backend.services.tasks.task_executor.self_diagnostic_daily',
+        'task': 'agentium.tasks.task_executor.self_diagnostic_daily',
         'schedule': 86400.0,
     },
     'critical-path-guardian': {
-        'task': 'backend.services.tasks.task_executor.critical_path_guardian',
+        'task': 'agentium.tasks.task_executor.critical_path_guardian',
         'schedule': 120.0,
     },
 
     # ── Phase 13.3: Predictive Auto-Scaling ───────────────────────────────────
     'load-metrics-snapshot': {
-        'task': 'backend.services.tasks.task_executor.metrics_snapshot',
+        'task': 'agentium.tasks.task_executor.metrics_snapshot',
         'schedule': 300.0,
     },
     'predictive-scaling-check': {
-        'task': 'backend.services.tasks.task_executor.predictive_scale',
+        'task': 'agentium.tasks.task_executor.predictive_scale',
         'schedule': 300.0,
     },
 
     # ── Phase 13.4: Continuous Self-Improvement Engine ────────────────────────
     'knowledge-consolidation-weekly': {
-        'task': 'backend.services.tasks.task_executor.knowledge_consolidation',
+        'task': 'agentium.tasks.task_executor.knowledge_consolidation',
         'schedule': 604800.0,
     },
     'performance-optimization-weekly': {
-        'task': 'backend.services.tasks.task_executor.performance_optimization',
+        'task': 'agentium.tasks.task_executor.performance_optimization',
         'schedule': 604800.0,
     },
 
     # ── Phase 13.6: Intelligent Event Processing ──────────────────────────────
     'threshold-event-check': {
-        'task': 'backend.services.tasks.task_executor.threshold_event_check',
+        'task': 'agentium.tasks.task_executor.threshold_event_check',
         'schedule': 60.0,
     },
     'external-api-poll': {
-        'task': 'backend.services.tasks.task_executor.external_api_poll',
+        'task': 'agentium.tasks.task_executor.external_api_poll',
         'schedule': 60.0,
     },
 
     # ── Phase 13.7: Zero-Touch Operations Dashboard ───────────────────────────
     'anomaly-detection': {
-        'task': 'backend.services.tasks.task_executor.anomaly_detection',
+        'task': 'agentium.tasks.task_executor.anomaly_detection',
         'schedule': 300.0,
     },
     'sla-monitor': {
-        'task': 'backend.services.tasks.task_executor.sla_monitor',
+        'task': 'agentium.tasks.task_executor.sla_monitor',
         'schedule': 60.0,
     },
 
     # ── Phase 15.2: MCP Real-Time Stats Broadcast ─────────────────────────────
     'mcp-stats-broadcast': {
-        'task': 'backend.celery_app.broadcast_mcp_stats',
+        'task': 'agentium.celery_app.broadcast_mcp_stats',
         'schedule': 30.0,   # every 30 seconds
     },
 
     # ── Phase 16: Wait & Poll ─────────────────────────────────────────────
     'poll-wait-conditions': {
-        'task': 'backend.services.tasks.task_executor.poll_wait_conditions',
+        'task': 'agentium.tasks.task_executor.poll_wait_conditions',
         'schedule': 30.0,   # every 30 seconds — matches default poll_interval_seconds
     },
 
     # ── Phase 16.1: Database Connection Pool Tuning & Slow Query Logging ──────
     'log-slow-query-summary-daily': {
-        'task': 'backend.services.tasks.task_executor.log_slow_query_summary_daily',
+        'task': 'agentium.tasks.task_executor.log_slow_query_summary_daily',
         'schedule': 86400.0,
     },
 
     # ── Phase 16.2: Learning Decay for Outdated Knowledge Patterns ────────────
     'decay-learnings': {
-        'task': 'backend.services.tasks.task_executor.decay_learnings',
+        'task': 'agentium.tasks.task_executor.decay_learnings',
         'schedule': 604800.0,  # Weekly
     },
 
     # ── Phase 16.3: Cross-Document Citation Graph ─────────────────────────────
     'update-citation-boosts': {
-        'task': 'backend.services.tasks.task_executor.update_citation_boosts',
+        'task': 'agentium.tasks.task_executor.update_citation_boosts',
         'schedule': 21600.0,  # Every 6 hours
     },
     'cleanup-citation-edges-weekly': {
-        'task': 'backend.services.tasks.task_executor.cleanup_citation_edges',
+        'task': 'agentium.tasks.task_executor.cleanup_citation_edges',
         'schedule': 604800.0,  # Weekly
     },
 
     # ── Phase 15.3: Channel Health Broadcast ──────────────────────────────────
     'channel-health-broadcast': {
-        'task': 'backend.celery_app.broadcast_channel_health',
+        'task': 'agentium.celery_app.broadcast_channel_health',
         'schedule': 300.0,  # every 5 minutes — aligns with health-check-every-5-minutes
     },
 
@@ -216,7 +219,7 @@ celery_app.conf.beat_schedule = {
     # sliding window are auto-added to the blocklist with a 1-hour TTL and their
     # block decision is written to AuditLog for traceability.
     'suspicious-pattern-detection': {
-        'task': 'backend.services.tasks.task_executor.detect_suspicious_patterns',
+        'task': 'agentium.tasks.task_executor.detect_suspicious_patterns',
         'schedule': 300.0,   # every 5 minutes
         'options': {
             'queue': 'monitoring',   # isolate from business-logic queues
@@ -230,7 +233,7 @@ celery_app.conf.beat_schedule = {
 # Phase 15.2 — MCP Real-Time Stats Broadcast Task
 # ──────────────────────────────────────────────────────────────────────────────
 
-@celery_app.task(name="backend.celery_app.broadcast_mcp_stats", ignore_result=True)
+@celery_app.task(name="agentium.celery_app.broadcast_mcp_stats", ignore_result=True)
 def broadcast_mcp_stats():
     """
     Phase 15.2: Read live MCP invocation stats from Redis and push to all
@@ -290,7 +293,7 @@ def broadcast_mcp_stats():
 # Phase 15.3 — Channel Health Broadcast Task
 # ──────────────────────────────────────────────────────────────────────────────
 
-@celery_app.task(name="backend.celery_app.broadcast_channel_health", ignore_result=True)
+@celery_app.task(name="agentium.celery_app.broadcast_channel_health", ignore_result=True)
 def broadcast_channel_health():
     """
     Phase 15.3: Fetch health summary for all active channels and push a
@@ -394,7 +397,7 @@ def _signed_headers(peer_url: str, signing_key: str, body_bytes: bytes) -> dict:
     }
 
 
-@celery_app.task(bind=True, max_retries=5, default_retry_delay=30)
+@celery_app.task(name="agentium.celery_app.deliver_federated_task", bind=True, max_retries=5, default_retry_delay=30)
 def deliver_federated_task(
     self,
     fed_task_id: str,
@@ -458,7 +461,7 @@ def deliver_federated_task(
         raise self.retry(exc=exc, countdown=countdown)
 
 
-@celery_app.task
+@celery_app.task(name="agentium.celery_app.federation_heartbeat")
 def federation_heartbeat():
     """Active heartbeat probe — ping all active peers every 5 minutes."""
     if not os.getenv("FEDERATION_ENABLED", "false").lower() == "true":
@@ -525,7 +528,7 @@ def federation_heartbeat():
     return results
 
 
-@celery_app.task
+@celery_app.task(name="agentium.celery_app.federation_cleanup_stale")
 def federation_cleanup_stale():
     """Supplementary stale-peer check — runs hourly."""
     if not os.getenv("FEDERATION_ENABLED", "false").lower() == "true":
@@ -549,7 +552,7 @@ def federation_cleanup_stale():
         db.close()
 
 
-@celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
+@celery_app.task(name="agentium.celery_app.send_federation_result", bind=True, max_retries=3, default_retry_delay=60)
 def send_federation_result(
     self,
     callback_url: str,

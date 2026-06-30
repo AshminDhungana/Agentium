@@ -93,7 +93,7 @@ def get_task_db():
 # Core Task Execution
 # ═══════════════════════════════════════════════════════════
 
-@celery_app.task(bind=True, max_retries=3)
+@celery_app.task(name="agentium.tasks.task_executor.execute_task_async", bind=True, max_retries=3)
 def execute_task_async(self, task_id: str, agent_id: str):
     """
     Execute task with skill-augmented RAG.
@@ -223,14 +223,14 @@ def execute_task_async(self, task_id: str, agent_id: str):
             raise self.retry(exc=exc, countdown=countdown)
 
 
-@celery_app.task
+@celery_app.task(name="agentium.tasks.task_executor.daily_constitution_review")
 def daily_constitution_review():
     """Daily review of constitution by persistent council."""
     logger.info("Running daily constitution review")
     return {"status": "completed"}
 
 
-@celery_app.task
+@celery_app.task(name="agentium.tasks.task_executor.process_idle_tasks")
 def process_idle_tasks():
     """Process tasks when system is idle."""
     logger.info("Processing idle tasks")
@@ -241,7 +241,7 @@ def process_idle_tasks():
 # Self-Healing Execution Loop
 # ═══════════════════════════════════════════════════════════
 
-@celery_app.task
+@celery_app.task(name="agentium.tasks.task_executor.handle_task_escalation")
 def handle_task_escalation():
     """
     Handle tasks that have been escalated to Council after max retries.
@@ -345,7 +345,7 @@ def _simulate_council_decision(task: Task) -> str:
 # Data Retention & Sovereign Optimization
 # ═══════════════════════════════════════════════════════════
 
-@celery_app.task
+@celery_app.task(name="agentium.tasks.task_executor.sovereign_data_retention")
 def sovereign_data_retention():
     """Daily data retention and cleanup task."""
     with get_task_db() as db:
@@ -443,7 +443,7 @@ def sovereign_data_retention():
 # Auto-Scaling Governance
 # ═══════════════════════════════════════════════════════════
 
-@celery_app.task
+@celery_app.task(name="agentium.tasks.task_executor.auto_scale_check")
 def auto_scale_check():
     """Monitor queue depth and trigger auto-scaling if needed."""
     with get_task_db() as db:
@@ -521,7 +521,7 @@ def auto_scale_check():
 # Reasoning Recovery Watchdog
 # ═══════════════════════════════════════════════════════════
 
-@celery_app.task
+@celery_app.task(name="agentium.tasks.task_executor.check_stalled_reasoning")
 def check_stalled_reasoning():
     """Watchdog: detect stalled reasoning traces and re-queue their tasks."""
     with get_task_db() as db:
@@ -579,7 +579,7 @@ def check_stalled_reasoning():
 # Channel Message Retry & Recovery
 # ═══════════════════════════════════════════════════════════
 
-@celery_app.task(bind=True, max_retries=3)
+@celery_app.task(name="agentium.tasks.task_executor.retry_channel_message", bind=True, max_retries=3)
 def retry_channel_message(self, message_id: str, agent_id: str, content: str, rich_media_dict: Dict[str, Any] = None):
     """Retry sending a failed channel message."""
     with get_task_db() as db:
@@ -650,7 +650,7 @@ def retry_channel_message(self, message_id: str, agent_id: str, content: str, ri
             }
 
 
-@celery_app.task
+@celery_app.task(name="agentium.tasks.task_executor.cleanup_old_channel_messages")
 def cleanup_old_channel_messages(days: int = 30):
     """Archive old channel messages."""
     cutoff = datetime.utcnow() - timedelta(days=days)
@@ -670,7 +670,7 @@ def cleanup_old_channel_messages(days: int = 30):
         return {"archived": count, "cutoff_days": days}
 
 
-@celery_app.task
+@celery_app.task(name="agentium.tasks.task_executor.check_channel_health")
 def check_channel_health():
     """Periodic health check for all channels."""
     from backend.services.channel_manager import ChannelManager, CircuitState
@@ -718,7 +718,7 @@ def check_channel_health():
         }
 
 
-@celery_app.task
+@celery_app.task(name="agentium.tasks.task_executor.start_imap_receivers")
 def start_imap_receivers():
     """Ensure IMAP receivers are running for all email channels."""
     from backend.services.channel_manager import imap_receiver
@@ -765,7 +765,7 @@ def start_imap_receivers():
         }
 
 
-@celery_app.task
+@celery_app.task(name="agentium.tasks.task_executor.send_channel_heartbeat")
 def send_channel_heartbeat():
     """Send periodic heartbeat to all active channels."""
     with get_task_db() as db:
@@ -794,7 +794,7 @@ def send_channel_heartbeat():
 # Bulk Operations
 # ═══════════════════════════════════════════════════════════
 
-@celery_app.task
+@celery_app.task(name="agentium.tasks.task_executor.broadcast_to_channels")
 def broadcast_to_channels(channel_ids: list, message: str, agent_id: str):
     """Broadcast a message to multiple channels."""
     from backend.services.channel_manager import ChannelManager
@@ -848,7 +848,7 @@ def broadcast_to_channels(channel_ids: list, message: str, agent_id: str):
 # Phase 13.1 — Auto-Delegation Engine Tasks
 # ═══════════════════════════════════════════════════════════
 
-@celery_app.task(name='backend.services.tasks.task_executor.check_escalation_timeouts')
+@celery_app.task(name='agentium.tasks.task_executor.check_escalation_timeouts')
 def check_escalation_timeouts():
     with get_task_db() as db:
         try:
@@ -896,7 +896,7 @@ def check_escalation_timeouts():
             return {"error": str(e)}
 
 
-@celery_app.task(name='backend.services.tasks.task_executor.process_dependency_graph')
+@celery_app.task(name='agentium.tasks.task_executor.process_dependency_graph')
 def process_dependency_graph(db=None):
     """
     db: optional injected Session. When omitted (normal Celery execution),
@@ -970,7 +970,7 @@ def process_dependency_graph(db=None):
 # Phase 13.2 — Self-Healing & Auto-Recovery Tasks
 # ═══════════════════════════════════════════════════════════
 
-@celery_app.task(name='backend.services.tasks.task_executor.agent_heartbeat')
+@celery_app.task(name='agentium.tasks.task_executor.agent_heartbeat')
 def agent_heartbeat():
     with get_task_db() as db:
         try:
@@ -983,7 +983,7 @@ def agent_heartbeat():
             return {"error": str(e)}
 
 
-@celery_app.task(name='backend.services.tasks.task_executor.detect_crashed_agents')
+@celery_app.task(name='agentium.tasks.task_executor.detect_crashed_agents')
 def detect_crashed_agents():
     with get_task_db() as db:
         try:
@@ -1001,7 +1001,7 @@ def detect_crashed_agents():
             return {"error": str(e)}
 
 
-@celery_app.task(name='backend.services.tasks.task_executor.self_diagnostic_daily')
+@celery_app.task(name='agentium.tasks.task_executor.self_diagnostic_daily')
 def self_diagnostic_daily():
     with get_task_db() as db:
         try:
@@ -1016,7 +1016,7 @@ def self_diagnostic_daily():
             return {"error": str(e)}
 
 
-@celery_app.task(name='backend.services.tasks.task_executor.critical_path_guardian')
+@celery_app.task(name='agentium.tasks.task_executor.critical_path_guardian')
 def critical_path_guardian():
     with get_task_db() as db:
         try:
@@ -1037,7 +1037,7 @@ def critical_path_guardian():
 # Phase 13.4 — Continuous Self-Improvement Engine
 # ═══════════════════════════════════════════════════════════
 
-@celery_app.task(name='backend.services.tasks.task_executor.knowledge_consolidation')
+@celery_app.task(name='agentium.tasks.task_executor.knowledge_consolidation')
 def knowledge_consolidation():
     with get_task_db() as db:
         try:
@@ -1048,7 +1048,7 @@ def knowledge_consolidation():
             return {"error": str(e)}
 
 
-@celery_app.task(name='backend.services.tasks.task_executor.performance_optimization')
+@celery_app.task(name='agentium.tasks.task_executor.performance_optimization')
 def performance_optimization():
     with get_task_db() as db:
         try:
@@ -1063,7 +1063,7 @@ def performance_optimization():
 # Phase 13.3 — Predictive Auto-Scaling Tasks
 # ═══════════════════════════════════════════════════════════
 
-@celery_app.task(name='backend.services.tasks.task_executor.metrics_snapshot')
+@celery_app.task(name='agentium.tasks.task_executor.metrics_snapshot')
 def metrics_snapshot():
     with get_task_db() as db:
         try:
@@ -1075,7 +1075,7 @@ def metrics_snapshot():
             return {"error": str(e)}
 
 
-@celery_app.task(name='backend.services.tasks.task_executor.predictive_scale')
+@celery_app.task(name='agentium.tasks.task_executor.predictive_scale')
 def predictive_scale():
     with get_task_db() as db:
         try:
@@ -1093,7 +1093,7 @@ def predictive_scale():
 # Phase 13.6 — Intelligent Event Processing Tasks
 # ═══════════════════════════════════════════════════════════
 
-@celery_app.task(name='backend.services.tasks.task_executor.threshold_event_check')
+@celery_app.task(name='agentium.tasks.task_executor.threshold_event_check')
 def threshold_event_check():
     with get_task_db() as db:
         try:
@@ -1110,7 +1110,7 @@ def threshold_event_check():
             return {"error": str(e)}
 
 
-@celery_app.task(name='backend.services.tasks.task_executor.external_api_poll')
+@celery_app.task(name='agentium.tasks.task_executor.external_api_poll')
 def external_api_poll():
     with get_task_db() as db:
         try:
@@ -1131,7 +1131,7 @@ def external_api_poll():
 # Phase 13.7 — Zero-Touch Operations Dashboard Tasks
 # ═══════════════════════════════════════════════════════════
 
-@celery_app.task(name='backend.services.tasks.task_executor.anomaly_detection')
+@celery_app.task(name='agentium.tasks.task_executor.anomaly_detection')
 def anomaly_detection():
     with get_task_db() as db:
         try:
@@ -1155,7 +1155,7 @@ def anomaly_detection():
             return {"error": str(e)}
 
 
-@celery_app.task(name='backend.services.tasks.task_executor.sla_monitor')
+@celery_app.task(name='agentium.tasks.task_executor.sla_monitor')
 def sla_monitor():
     with get_task_db() as db:
         try:
@@ -1177,7 +1177,7 @@ def sla_monitor():
 # Phase 16 — Wait & Poll
 # ══════════════════════════════════════════════════════════════════════════════
 
-@celery_app.task(name='backend.services.tasks.task_executor.poll_wait_conditions')
+@celery_app.task(name='agentium.tasks.task_executor.poll_wait_conditions')
 def poll_wait_conditions():
     with get_task_db() as db:
         try:
@@ -1195,7 +1195,7 @@ def poll_wait_conditions():
 # Phase 16.1 — Slow Query Logging
 # ══════════════════════════════════════════════════════════════════════════════
 
-@celery_app.task(name='backend.services.tasks.task_executor.log_slow_query_summary_daily')
+@celery_app.task(name='agentium.tasks.task_executor.log_slow_query_summary_daily')
 def log_slow_query_summary_daily():
     with get_task_db() as db:
         try:
@@ -1233,7 +1233,7 @@ def log_slow_query_summary_daily():
 # Phase 16.2 — Learning Decay
 # ══════════════════════════════════════════════════════════════════════════════
 
-@celery_app.task(name='backend.services.tasks.task_executor.decay_learnings')
+@celery_app.task(name='agentium.tasks.task_executor.decay_learnings')
 def decay_learnings():
     with get_task_db() as db:
         try:
@@ -1268,7 +1268,7 @@ def decay_learnings():
 # Phase 16.3 — Cross-Document Citation Graph
 # ══════════════════════════════════════════════════════════════════════════════
 
-@celery_app.task(name='backend.services.tasks.task_executor.update_citation_boosts')
+@celery_app.task(name='agentium.tasks.task_executor.update_citation_boosts')
 def update_citation_boosts():
     with get_task_db() as db:
         try:
@@ -1319,7 +1319,7 @@ def update_citation_boosts():
             return {"error": str(e)}
 
 
-@celery_app.task(name='backend.services.tasks.task_executor.cleanup_citation_edges')
+@celery_app.task(name='agentium.tasks.task_executor.cleanup_citation_edges')
 def cleanup_citation_edges():
     with get_task_db() as db:
         try:
@@ -1351,7 +1351,7 @@ _BLOCK_TTL_SECONDS = int(os.getenv("DDOS_BLOCK_TTL_SECONDS", "3600"))
 
 
 @celery_app.task(
-    name="backend.services.tasks.task_executor.detect_suspicious_patterns",
+    name="agentium.tasks.task_executor.detect_suspicious_patterns",
     bind=True,
     max_retries=2,
     default_retry_delay=30,

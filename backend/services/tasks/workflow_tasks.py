@@ -40,7 +40,7 @@ def _make_session():
     bind=True,
     max_retries=3,
     default_retry_delay=60,
-    name="workflow.fire_reminder",
+    name="agentium.tasks.workflow_tasks.fire_reminder",
 )
 def fire_reminder(self, message: str, workflow_id: str = None):
     """
@@ -98,7 +98,7 @@ def fire_reminder(self, message: str, workflow_id: str = None):
     bind=True,
     max_retries=3,
     default_retry_delay=120,
-    name="workflow.execute_deferred_subtask",
+    name="agentium.tasks.workflow_tasks.execute_deferred_subtask",
 )
 def execute_deferred_subtask(
     self, workflow_id: str, intent: str, params: dict
