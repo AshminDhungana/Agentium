@@ -2589,6 +2589,18 @@ def downgrade() -> None:
         op.execute(f"DROP TYPE IF EXISTS {enum_type} CASCADE")
 
     # ── [001] Base schema ─────────────────────────────────────────────────────
+    # tasks <-> task_deliberations is a circular FK relationship:
+    #   tasks.deliberation_id       -> task_deliberations.id  (tasks_deliberation_id_fkey)
+    #   task_deliberations.task_id  -> tasks.id
+    # Neither table can be dropped first while both constraints are in place,
+    # so break the cycle by dropping the tasks-side FK before any table drops.
+    inspector = Inspector.from_engine(conn)
+    existing_tables = set(inspector.get_table_names())
+    if 'tasks' in existing_tables:
+        task_fks = {fk.get('name') for fk in inspector.get_foreign_keys('tasks')}
+        if 'tasks_deliberation_id_fkey' in task_fks:
+            op.drop_constraint('tasks_deliberation_id_fkey', 'tasks', type_='foreignkey')
+
     tables_to_drop = [
         'user_preference_history', 'user_preferences',
         'mcp_tools',
@@ -2605,8 +2617,11 @@ def downgrade() -> None:
         'audit_logs',
         'individual_votes', 'voting_records',
         'amendment_votings',
-        'task_audit_logs', 'task_events', 'task_deliberations',
-        'subtasks', 'tasks',
+        # task_deliberations references tasks.id, and individual_votes references
+        # task_deliberations.id, so it must drop after individual_votes/voting_records
+        # but before tasks (the FK cycle was already broken above).
+        'task_deliberations',
+        'task_audit_logs', 'task_events', 'subtasks', 'tasks',
         'constitutions',
         'critic_agents', 'task_agents', 'lead_agents', 'council_members', 'head_of_council',
         'agents', 'ethos', 'user_model_configs', 'users',
