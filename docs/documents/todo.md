@@ -757,7 +757,7 @@ Build a self-governing AI ecosystem where agents operate under constitutional la
 - [x] **Celery Task Naming Convention** — audit all Celery task definitions for consistent `agentium.{module}.{task_name}` naming; update `celery_app.py` beat schedule entries to match; fix any autodiscovery gaps causing tasks to run under incorrect names
 - [x] **Alembic Downgrade Coverage** — run `alembic check` against the live database; write missing `downgrade()` functions for any migration that only implements `upgrade()`; verify full round-trip `downgrade base → upgrade head` on a clean DB
 - [x] **Pydantic v2 Migration** — replace deprecated `@validator` decorators with `@field_validator` and `.dict()` calls with `.model_dump()` across all `backend/schemas/` files; resolve all `PydanticDeprecatedSince20` warnings
-- [ ] **Error Response Standardization** — define typed exception classes in `backend/core/exceptions.py` mapped to HTTP status codes; replace all bare `raise HTTPException(...)` calls throughout routes with typed exceptions; enforce uniform response shape `{ "error": str, "code": str, "detail": dict | None }`
+- [x] **Error Response Standardization** — define typed exception classes in `backend/core/exceptions.py` mapped to HTTP status codes; replace all bare `raise HTTPException(...)` calls throughout routes with typed exceptions; enforce uniform response shape `{ "error": str, "code": str, "detail": dict | None }`
 
 #### Frontend
 
