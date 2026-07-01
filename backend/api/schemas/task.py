@@ -3,7 +3,7 @@ Pydantic schemas for Task API.
 Maps to/from backend.models.entities.task (Task entity).
 Updated: Phase 6.3 — Pre-Declared Acceptance Criteria
 """
-from pydantic import BaseModel, Field, validator as pydantic_validator
+from pydantic import BaseModel, Field, field_validator
 from datetime import datetime
 from typing import Optional, List, Any, Dict
 
@@ -27,7 +27,7 @@ class AcceptanceCriterionSchema(BaseModel):
     is_mandatory: bool = True
     description: str = ""
 
-    @pydantic_validator("validator")
+    @field_validator("validator")
     def validate_validator(cls, v: str) -> str:
         allowed = {"code", "output", "plan"}
         if v not in allowed:
@@ -64,7 +64,7 @@ class TaskCreate(BaseModel):
         description="Trigger auto-delegation engine on task creation"
     )
 
-    @pydantic_validator("priority")
+    @field_validator("priority")
     def validate_priority(cls, v):
         allowed = [p.value for p in TaskPriority]
         mapping = {"urgent": "high"}
@@ -73,14 +73,14 @@ class TaskCreate(BaseModel):
             raise ValueError(f"priority must be one of {allowed}")
         return v
 
-    @pydantic_validator("task_type")
+    @field_validator("task_type")
     def validate_task_type(cls, v):
         allowed = [t.value for t in TaskType]
         if v not in allowed:
             return "execution"
         return v
 
-    @pydantic_validator("veto_authority")
+    @field_validator("veto_authority")
     def validate_veto_authority(cls, v):
         if v is None:
             return v
@@ -88,7 +88,7 @@ class TaskCreate(BaseModel):
             raise ValueError("veto_authority must be one of: code, output, plan")
         return v
 
-    @pydantic_validator("acceptance_criteria", each_item=False)
+    @field_validator("acceptance_criteria")
     def validate_unique_metrics(cls, v):
         if not v:
             return v
@@ -101,7 +101,7 @@ class TaskCreate(BaseModel):
     def acceptance_criteria_as_dicts(self) -> Optional[List[Dict[str, Any]]]:
         if not self.acceptance_criteria:
             return None
-        return [c.dict() for c in self.acceptance_criteria]
+        return [c.model_dump() for c in self.acceptance_criteria]
 
 
 class TaskResponse(BaseModel):
@@ -136,7 +136,7 @@ class TaskUpdate(BaseModel):
     # Phase 13.1
     escalation_timeout_seconds: Optional[int] = None
 
-    @pydantic_validator("veto_authority")
+    @field_validator("veto_authority")
     def validate_veto_authority(cls, v):
         if v is None:
             return v

@@ -331,7 +331,7 @@ async def get_skill_full(
     if skill.verification_status != "verified" and not auth_context["is_privileged"]:
         raise HTTPException(403, "Skill pending verification")
 
-    skill_dict = skill.dict()
+    skill_dict = skill.model_dump()
 
     skill_db = db.query(SkillDB).filter_by(skill_id=skill_id).first()
 
@@ -425,7 +425,7 @@ async def get_skill(
     if skill.verification_status != "verified" and not auth_context["is_privileged"]:
         raise HTTPException(403, "Skill pending verification")
 
-    return skill.dict()
+    return skill.model_dump()
 
 
 @router.post("/{skill_id}/deprecate")

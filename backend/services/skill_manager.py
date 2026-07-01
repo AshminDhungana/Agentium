@@ -198,7 +198,7 @@ class SkillManager:
             submission_id=f"sub_{skill.skill_id}",
             skill_id=skill.skill_id,
             submitted_by=submitter.agentium_id,
-            skill_data=skill.dict()
+            skill_data=skill.model_dump()
         )
         db.add(submission)
         db.commit()
@@ -357,7 +357,7 @@ class SkillManager:
         major, minor, patch = current.version.split(".")
         new_version = f"{major}.{minor}.{int(patch) + 1}"
 
-        updated_data = current.dict()
+        updated_data = current.model_dump()
         updated_data.update(updates)
         updated_data["version"] = new_version
         updated_data["updated_at"] = datetime.utcnow()

@@ -89,7 +89,7 @@ class {tool_file_name.title()}Tool:
         return {{
             "tool_name": self.tool_name,
             "description": "{request.description}",
-            "parameters": {json.dumps([p.dict() for p in request.parameters])},
+            "parameters": {json.dumps([p.model_dump() for p in request.parameters])},
             "created_by": self.created_by,
             "authorized_tiers": {request.authorized_tiers}
         }}

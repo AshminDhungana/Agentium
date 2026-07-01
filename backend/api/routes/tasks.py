@@ -293,7 +293,7 @@ async def update_task(
     # Phase 6.3: Update acceptance_criteria and veto_authority
     if task_data.acceptance_criteria is not None:
         try:
-            raw = [c.dict() for c in task_data.acceptance_criteria]
+            raw = [c.model_dump() for c in task_data.acceptance_criteria]
             parsed = AcceptanceCriteriaService.parse_and_validate(raw)
             task.acceptance_criteria = AcceptanceCriteriaService.to_json(parsed)
         except ValueError as exc:

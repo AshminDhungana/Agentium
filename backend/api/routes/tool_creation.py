@@ -18,7 +18,7 @@ Fixes (This Update):
 """
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any, Literal
 
 from backend.models.database import get_db
