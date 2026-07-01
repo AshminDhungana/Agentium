@@ -2,7 +2,8 @@
 A/B Model Testing API Routes
 """
 
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Query
+from fastapi import APIRouter, Depends, BackgroundTasks, Query
+from backend.core.exceptions import BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, TooLargeError, RateLimitError, InternalServerError, ServiceUnavailableError
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func, case
 from typing import List, Optional
@@ -27,7 +28,7 @@ async def require_admin(current_user: dict = Depends(get_current_user)) -> dict:
     """Require the caller to be an admin / sovereign user."""
     is_admin = current_user.get("is_admin", False) or current_user.get("isSovereign", False)
     if not is_admin:
-        raise HTTPException(status_code=403, detail="Admin access required for A/B Testing")
+        raise ForbiddenError(error="Admin access required for A/B Testing", code="ADMIN_ACCESS_REQUIRED_FOR_AB")
     return current_user
 
 
@@ -292,7 +293,7 @@ async def list_experiments(
             status_enum = ExperimentStatus(status)
             query = query.filter(Experiment.status == status_enum)
         except ValueError:
-            raise HTTPException(400, f"Invalid status: {status}")
+            raise BadRequestError(error=f"Invalid status: {status}", code="INVALID_STATUS")
 
     total = query.count()
     experiments = (
@@ -325,7 +326,7 @@ async def get_experiment(
         .first()
     )
     if not experiment:
-        raise HTTPException(404, "Experiment not found")
+        raise NotFoundError(error="Experiment not found", code="EXPERIMENT_NOT_FOUND")
 
     return _serialize_experiment_detail(experiment)
 
@@ -339,11 +340,11 @@ async def cancel_experiment(
     """Cancel a running or pending experiment."""
     experiment = db.query(Experiment).filter(Experiment.id == experiment_id).first()
     if not experiment:
-        raise HTTPException(404, "Experiment not found")
+        raise NotFoundError(error="Experiment not found", code="EXPERIMENT_NOT_FOUND")
 
     cancellable = {ExperimentStatus.RUNNING, ExperimentStatus.PENDING, ExperimentStatus.DRAFT}
     if experiment.status not in cancellable:
-        raise HTTPException(400, f"Cannot cancel experiment with status: {experiment.status.value}")
+        raise BadRequestError(error=f"Cannot cancel experiment with status: {experiment.status.value}", code="CANNOT_CANCEL_EXPERIMENT_WITH_STATUS")
 
     experiment.status = ExperimentStatus.CANCELLED
     experiment.completed_at = datetime.utcnow()
@@ -366,15 +367,12 @@ async def delete_experiment(
     """Delete an experiment and all its runs/results."""
     experiment = db.query(Experiment).filter(Experiment.id == experiment_id).first()
     if not experiment:
-        raise HTTPException(404, "Experiment not found")
+        raise NotFoundError(error="Experiment not found", code="EXPERIMENT_NOT_FOUND")
 
     # Block deletion of active experiments — background task may still be writing to them
     non_deletable = {ExperimentStatus.RUNNING, ExperimentStatus.PENDING}
     if experiment.status in non_deletable:
-        raise HTTPException(
-            400,
-            f"Cannot delete experiment with status '{experiment.status.value}'. Cancel it first.",
-        )
+        raise BadRequestError(error=f"Cannot delete experiment with status '{experiment.status.value}'. Cancel it first.", code="CANNOT_DELETE_EXPERIMENT_WITH_STATUS")
 
     name = experiment.name
     db.delete(experiment)

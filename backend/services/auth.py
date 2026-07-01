@@ -3,7 +3,8 @@ Authentication Service.
 Provides logic for retrieving authenticated agents and verifying hierarchy permissions.
 Used by host_access.py and other secure endpoints.
 """
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, status
+from backend.core.exceptions import BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, TooLargeError, RateLimitError, InternalServerError, ServiceUnavailableError
 from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from typing import Optional
@@ -41,10 +42,7 @@ async def get_current_agent(
         
     # Check if active
     if agent.status == 'terminated':
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Agent has been terminated"
-        )
+        raise ForbiddenError(error="Agent has been terminated", code="AGENT_HAS_BEEN_TERMINATED")
         
     return agent
 

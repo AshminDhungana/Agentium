@@ -8,6 +8,7 @@ import logging
 from typing import List, Optional, Dict, Any
 
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
+from backend.core.exceptions import BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, TooLargeError, RateLimitError, InternalServerError, ServiceUnavailableError
 from pydantic import BaseModel, SecretStr, Field, field_validator
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
@@ -452,7 +453,7 @@ async def get_config(
     """Get specific configuration."""
     config = db.query(UserModelConfig).filter_by(id=config_id, user_id=user_id).first()
     if not config:
-        raise HTTPException(status_code=404, detail="Configuration not found")
+        raise NotFoundError(error="Configuration not found", code="CONFIGURATION_NOT_FOUND")
 
     return _serialize_config(config)
 
@@ -467,7 +468,7 @@ async def update_config(
     """Update configuration."""
     config = db.query(UserModelConfig).filter_by(id=config_id, user_id=user_id).first()
     if not config:
-        raise HTTPException(status_code=404, detail="Configuration not found")
+        raise NotFoundError(error="Configuration not found", code="CONFIGURATION_NOT_FOUND")
 
     if updates.is_default and not config.is_default:
         db.query(UserModelConfig).filter_by(user_id=user_id, is_default=True).update({"is_default": False})
@@ -484,7 +485,7 @@ async def update_config(
     for field, value in update_data.items():
         if field in ('api_base_url', 'local_server_url') and value:
             if not value.startswith(('http://', 'https://')):
-                raise HTTPException(status_code=400, detail=f"Invalid URL: {value}")
+                raise BadRequestError(error=f"Invalid URL: {value}", code="INVALID_URL")
         setattr(config, field, value)
 
     if "api_key_encrypted" in update_data:
@@ -514,11 +515,11 @@ async def delete_config(
     """Delete configuration."""
     config = db.query(UserModelConfig).filter_by(id=config_id, user_id=user_id).first()
     if not config:
-        raise HTTPException(status_code=404, detail="Configuration not found")
+        raise NotFoundError(error="Configuration not found", code="CONFIGURATION_NOT_FOUND")
 
     remaining = db.query(UserModelConfig).filter_by(user_id=user_id).count()
     if remaining <= 1:
-        raise HTTPException(status_code=400, detail="Cannot delete the only configuration")
+        raise BadRequestError(error="Cannot delete the only configuration", code="CANNOT_DELETE_THE_ONLY_CONFIGURATION")
 
     # If the config is referenced by Head of Council, we must clear/reassign it first to avoid FK constraint issues
     try:
@@ -561,7 +562,7 @@ async def test_config(
     """Test specific configuration."""
     config = db.query(UserModelConfig).filter_by(id=config_id, user_id=user_id).first()
     if not config:
-        raise HTTPException(status_code=404, detail="Configuration not found")
+        raise NotFoundError(error="Configuration not found", code="CONFIGURATION_NOT_FOUND")
 
     result = await ModelService.test_connection(config)
     return TestResult(
@@ -583,7 +584,7 @@ async def fetch_models(
     """Dynamically fetch available models from provider API."""
     config = db.query(UserModelConfig).filter_by(id=config_id, user_id=user_id).first()
     if not config:
-        raise HTTPException(status_code=404, detail="Configuration not found")
+        raise NotFoundError(error="Configuration not found", code="CONFIGURATION_NOT_FOUND")
 
     api_key: Optional[str] = None
     if config.api_key_encrypted:
@@ -597,10 +598,7 @@ async def fetch_models(
         )
     except Exception as exc:
         logger.error("fetch_models failed for config %s: %s", config_id, exc, exc_info=True)
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to fetch models: {exc}",
-        ) from exc
+        raise InternalServerError(error=f"Failed to fetch models: {exc}", code="FAILED_TO_FETCH_MODELS") from exc
 
     config.available_models = models
     flag_modified(config, "available_models")  # Required: SQLAlchemy won't detect JSON column reassignment
@@ -635,16 +633,10 @@ async def fetch_provider_models_direct(request: FetchModelsRequest):
             exc,
             exc_info=True,
         )
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to fetch models from {request.provider.value}: {exc}",
-        ) from exc
+        raise InternalServerError(error=f"Failed to fetch models from {request.provider.value}: {exc}", code="FAILED_TO_FETCH_MODELS_FROM") from exc
 
     if not models:
-        raise HTTPException(
-            status_code=404,
-            detail=f"No models found for provider {request.provider.value}",
-        )
+        raise NotFoundError(error=f"No models found for provider {request.provider.value}", code="NO_MODELS_FOUND_FOR_PROVIDER")
 
     return FetchModelsResponse(
         provider             = request.provider.value,
@@ -663,7 +655,7 @@ async def set_default(
     """Set a configuration as the default."""
     config = db.query(UserModelConfig).filter_by(id=config_id, user_id=user_id).first()
     if not config:
-        raise HTTPException(status_code=404, detail="Configuration not found")
+        raise NotFoundError(error="Configuration not found", code="CONFIGURATION_NOT_FOUND")
 
     db.query(UserModelConfig).filter_by(user_id=user_id, is_default=True).update({"is_default": False})
     config.is_default = True
@@ -684,7 +676,7 @@ async def get_usage(
     """Get usage statistics for a configuration."""
     config = db.query(UserModelConfig).filter_by(id=config_id, user_id=user_id).first()
     if not config:
-        raise HTTPException(status_code=404, detail="Configuration not found")
+        raise NotFoundError(error="Configuration not found", code="CONFIGURATION_NOT_FOUND")
 
     from datetime import datetime, timedelta
 

@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
+from backend.core.exceptions import BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, TooLargeError, RateLimitError, InternalServerError, ServiceUnavailableError
 from sqlalchemy.orm import Session
 from datetime import datetime
 from typing import Dict, Any
@@ -19,7 +20,7 @@ async def get_load_predictions():
         predictions = predictive_scaling_service.get_predictions()
         return predictions
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise InternalServerError(error=str(e), code="STRE")
 
 @router.get("/scaling/history")
 async def get_scaling_history(db: Session = Depends(get_db)):
@@ -47,7 +48,7 @@ async def manual_scaling_override(
     Admin only (or sovereign).
     """
     if current_user.get("role") not in ["primary_sovereign", "admin"]:
-        raise HTTPException(status_code=403, detail="Admin permissions required.")
+        raise ForbiddenError(error="Admin permissions required.", code="ADMIN_PERMISSIONS_REQUIRED")
         
     action = payload.get("action")
     count = payload.get("count", 1)
@@ -56,7 +57,7 @@ async def manual_scaling_override(
     if action == "spawn":
         head = db.query(HeadOfCouncil).filter_by(agentium_id="00001").first()
         if not head:
-            raise HTTPException(status_code=500, detail="Head of Council not found")
+            raise InternalServerError(error="Head of Council not found", code="HEAD_OF_COUNCIL_NOT_FOUND")
             
         spawned = 0
         for i in range(count):
@@ -110,4 +111,4 @@ async def manual_scaling_override(
         )
         return {"status": "success", "liquidated": liquidated}
     else:
-        raise HTTPException(status_code=400, detail="Invalid action")
+        raise BadRequestError(error="Invalid action", code="INVALID_ACTION")

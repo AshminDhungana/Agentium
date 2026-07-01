@@ -5,7 +5,8 @@ Endpoints for plugin developers and administrators to manage the ecosystem.
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
+from backend.core.exceptions import BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, TooLargeError, RateLimitError, InternalServerError, ServiceUnavailableError
 from sqlalchemy.orm import Session
 
 from backend.models.database import get_db
@@ -111,7 +112,7 @@ def submit_review(
 ):
     """Submit a star rating and optional review text for an installed plugin."""
     if not (1 <= request.rating <= 5):
-        raise HTTPException(status_code=422, detail="Rating must be between 1 and 5.")
+        raise BadRequestError(error="Rating must be between 1 and 5.", code="RATING_MUST_BE_BETWEEN_1")
     review = PluginMarketplaceService.submit_review(
         db, plugin_id, current_user, request.rating, request.review_text
     )
@@ -128,7 +129,7 @@ def verify_plugin(
 ):
     """Admin: Mark a submitted plugin as security-verified."""
     if not current_user.is_admin:
-        raise HTTPException(status_code=403, detail="Only admins can verify plugins.")
+        raise ForbiddenError(error="Only admins can verify plugins.", code="ONLY_ADMINS_CAN_VERIFY_PLUGINS")
     plugin = PluginMarketplaceService.verify_plugin(db, plugin_id, current_user)
     return {"id": plugin.id, "status": plugin.status}
 
@@ -141,7 +142,7 @@ def publish_plugin(
 ):
     """Admin: Publish a verified plugin to the public marketplace."""
     if not current_user.is_admin:
-        raise HTTPException(status_code=403, detail="Only admins can publish plugins.")
+        raise ForbiddenError(error="Only admins can publish plugins.", code="ONLY_ADMINS_CAN_PUBLISH_PLUGINS")
     plugin = PluginMarketplaceService.publish_plugin(db, plugin_id, current_user)
     return {"id": plugin.id, "status": plugin.status}
 
@@ -171,7 +172,7 @@ async def execute_plugin(
     """Execute a plugin within a secure sandbox."""
     # Ensure the user has the right to execute (e.g. they installed it)
     if not current_user.is_sovereign:
-        raise HTTPException(status_code=403, detail="Only Sovereign can execute plugins manually.")
+        raise ForbiddenError(error="Only Sovereign can execute plugins manually.", code="ONLY_SOVEREIGN_CAN_EXECUTE_PLUGINS")
         
     result = await PluginMarketplaceService.execute_plugin_sandboxed(
         db=db, 
@@ -195,7 +196,7 @@ def record_plugin_revenue(
 ):
     """Record a revenue transaction for a plugin on the ledger."""
     if not current_user.is_sovereign:
-        raise HTTPException(status_code=403, detail="Only Sovereign can record revenue for plugins.")
+        raise ForbiddenError(error="Only Sovereign can record revenue for plugins.", code="ONLY_SOVEREIGN_CAN_RECORD_REVENUE")
         
     ledger = PluginMarketplaceService.record_revenue(
         db=db,

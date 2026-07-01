@@ -4,7 +4,8 @@ REST endpoints for frontend to manage preferences.
 """
 
 from typing import Optional, Any, Dict
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
+from backend.core.exceptions import BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, TooLargeError, RateLimitError, InternalServerError, ServiceUnavailableError
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 
@@ -90,7 +91,7 @@ async def get_my_preference(
     value = service.get_value(key, user_id=current_user["user_id"], default=default)
 
     if value is None and default is None:
-        raise HTTPException(status_code=404, detail=f"Preference '{key}' not found")
+        raise NotFoundError(error=f"Preference '{key}' not found", code="PREFERENCE_NOT_FOUND")
 
     return {
         "key": key,
@@ -139,7 +140,7 @@ async def update_preference(
     # Check if exists
     existing = service.get_preference(key, user_id=current_user["user_id"])
     if not existing:
-        raise HTTPException(status_code=404, detail=f"Preference '{key}' not found")
+        raise NotFoundError(error=f"Preference '{key}' not found", code="PREFERENCE_NOT_FOUND")
 
     pref = service.set_preference(
         key=key,
@@ -165,7 +166,7 @@ async def delete_preference(
 
     success = service.delete_preference(key, user_id=current_user["user_id"])
     if not success:
-        raise HTTPException(status_code=404, detail=f"Preference '{key}' not found")
+        raise NotFoundError(error=f"Preference '{key}' not found", code="PREFERENCE_NOT_FOUND")
 
     return {
         "status": "deleted",
@@ -271,7 +272,7 @@ async def agent_list_preferences(
     )
 
     if result["status"] == "error":
-        raise HTTPException(status_code=403, detail=result["error"])
+        raise ForbiddenError(error=result["error"], code="RESULTERROR")
 
     return result
 
@@ -297,7 +298,7 @@ async def agent_get_preference(
     )
 
     if result["status"] == "error":
-        raise HTTPException(status_code=403, detail=result["error"])
+        raise ForbiddenError(error=result["error"], code="RESULTERROR")
 
     return result
 
@@ -325,7 +326,7 @@ async def agent_set_preference(
     )
 
     if result["status"] == "error":
-        raise HTTPException(status_code=403, detail=result["error"])
+        raise ForbiddenError(error=result["error"], code="RESULTERROR")
 
     return result
 
@@ -344,7 +345,7 @@ async def optimize_preferences(
     Admin only.
     """
     if not current_user.get("is_admin"):
-        raise HTTPException(status_code=403, detail="Admin access required")
+        raise ForbiddenError(error="Admin access required", code="ADMIN_ACCESS_REQUIRED")
 
     service = UserPreferenceService(db)
     results = service.optimize_preferences()
@@ -362,7 +363,7 @@ async def get_optimization_recommendations(
 ):
     """Get optimization recommendations. Admin only."""
     if not current_user.get("is_admin"):
-        raise HTTPException(status_code=403, detail="Admin access required")
+        raise ForbiddenError(error="Admin access required", code="ADMIN_ACCESS_REQUIRED")
 
     service = UserPreferenceService(db)
     recommendations = service.get_optimization_recommendations()
@@ -382,7 +383,7 @@ async def get_preference_history(
 ):
     """Get change history for a preference. Admin only."""
     if not current_user.get("is_admin"):
-        raise HTTPException(status_code=403, detail="Admin access required")
+        raise ForbiddenError(error="Admin access required", code="ADMIN_ACCESS_REQUIRED")
 
     from backend.models.entities.user_preference import UserPreferenceHistory
 

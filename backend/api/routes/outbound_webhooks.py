@@ -8,7 +8,8 @@ import secrets
 import uuid
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
+from backend.core.exceptions import BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, TooLargeError, RateLimitError, InternalServerError, ServiceUnavailableError
 from pydantic import BaseModel, Field, HttpUrl
 from sqlalchemy.orm import Session
 
@@ -73,11 +74,8 @@ async def create_subscription(
     # Validate event types
     invalid = set(request.events) - SUPPORTED_EVENTS
     if invalid:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid event types: {', '.join(invalid)}. "
-                   f"Supported: {', '.join(sorted(SUPPORTED_EVENTS))}",
-        )
+        raise BadRequestError(error=f"Invalid event types: {', '.join(invalid)}. "
+                   f"Supported: {', '.join(sorted(SUPPORTED_EVENTS))}", code="INVALID_EVENT_TYPES_FSUPPORTED")
 
     secret = request.secret or secrets.token_hex(32)
 
@@ -141,10 +139,7 @@ async def update_subscription(
     if request.events is not None:
         invalid = set(request.events) - SUPPORTED_EVENTS
         if invalid:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid event types: {', '.join(invalid)}",
-            )
+            raise BadRequestError(error=f"Invalid event types: {', '.join(invalid)}", code="INVALID_EVENT_TYPES")
         sub.events = request.events
 
     if request.url is not None:
@@ -272,5 +267,5 @@ def _get_user_subscription(
         .first()
     )
     if not sub:
-        raise HTTPException(status_code=404, detail="Webhook subscription not found")
+        raise NotFoundError(error="Webhook subscription not found", code="WEBHOOK_SUBSCRIPTION_NOT_FOUND")
     return sub

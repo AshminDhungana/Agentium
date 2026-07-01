@@ -23,7 +23,8 @@ import os
 from datetime import datetime, timedelta
 from typing import Optional, List, Any, Dict
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status, Query, BackgroundTasks
+from fastapi import APIRouter, Depends, Request, status, Query, BackgroundTasks
+from backend.core.exceptions import BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, TooLargeError, RateLimitError, InternalServerError, ServiceUnavailableError
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 from sqlalchemy import func
@@ -100,7 +101,7 @@ class ChannelSettingsRequest(BaseModel):
 def _get_channel_or_404(channel_id: str, db: Session) -> ExternalChannel:
     channel = db.query(ExternalChannel).filter_by(id=channel_id).first()
     if not channel:
-        raise HTTPException(status_code=404, detail=f"Channel {channel_id} not found")
+        raise NotFoundError(error=f"Channel {channel_id} not found", code="CHANNEL_NOT_FOUND")
     return channel
 
 
@@ -163,10 +164,7 @@ def create_channel(
     try:
         ctype = ChannelType(request.type)
     except ValueError:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid channel type '{request.type}'. Valid: {[t.value for t in ChannelType]}"
-        )
+        raise BadRequestError(error=f"Invalid channel type '{request.type}'. Valid: {[t.value for t in ChannelType]}", code="INVALID_CHANNEL_TYPE_VALID")
 
     # Generate secure webhook path
     webhook_path = secrets.token_urlsafe(24)
@@ -367,7 +365,7 @@ def update_channel(
                 circuit_breaker._metrics[channel_id].consecutive_failures = 0
             channel.status = new_status
         except ValueError:
-            raise HTTPException(status_code=400, detail=f"Invalid status: {request.status}")
+            raise BadRequestError(error=f"Invalid status: {request.status}", code="INVALID_STATUS")
 
     db.commit()
     db.refresh(channel)
@@ -668,7 +666,7 @@ async def send_test_message(
     channel = await run_in_threadpool(_get_channel_or_404, channel_id, db)
     
     if channel.status != ChannelStatus.ACTIVE:
-        raise HTTPException(status_code=400, detail="Channel is not active")
+        raise BadRequestError(error="Channel is not active", code="CHANNEL_IS_NOT_ACTIVE")
     
     try:
         rich_media = None
@@ -694,10 +692,10 @@ async def send_test_message(
             await run_in_threadpool(_commit_msg)
             return {"success": True, "message": "Test message sent successfully"}
         else:
-            raise HTTPException(status_code=500, detail="Failed to send message")
+            raise InternalServerError(error="Failed to send message", code="FAILED_TO_SEND_MESSAGE")
             
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise InternalServerError(error=str(e), code="STRE")
 
 
 # ═══════════════════════════════════════════════════════════
@@ -722,7 +720,7 @@ async def get_channel_qr(
     channel = await run_in_threadpool(_get_channel_or_404, channel_id, db)
 
     if channel.channel_type != ChannelType.WHATSAPP:
-        raise HTTPException(status_code=400, detail="QR polling only applies to WhatsApp channels")
+        raise BadRequestError(error="QR polling only applies to WhatsApp channels", code="QR_POLLING_ONLY_APPLIES_TO")
 
     if channel.status == ChannelStatus.ACTIVE:
         return {"status": "active", "qr_code": None, "connected": True}
@@ -768,7 +766,7 @@ async def get_whatsapp_detailed_status(
     channel = await run_in_threadpool(_get_channel_or_404, channel_id, db)
 
     if channel.channel_type != ChannelType.WHATSAPP:
-        raise HTTPException(status_code=400, detail="Not a WhatsApp channel")
+        raise BadRequestError(error="Not a WhatsApp channel", code="NOT_A_WHATSAPP_CHANNEL")
 
     adapter = UnifiedWhatsAppAdapter(channel)
     provider_status = await adapter.get_status()
@@ -806,13 +804,10 @@ async def switch_whatsapp_provider(
     channel = await run_in_threadpool(_get_channel_or_404, channel_id, db)
 
     if channel.channel_type != ChannelType.WHATSAPP:
-        raise HTTPException(status_code=400, detail="Not a WhatsApp channel")
+        raise BadRequestError(error="Not a WhatsApp channel", code="NOT_A_WHATSAPP_CHANNEL")
 
     if new_provider not in ("cloud_api", "web_bridge"):
-        raise HTTPException(
-            status_code=400,
-            detail="provider must be 'cloud_api' or 'web_bridge'",
-        )
+        raise BadRequestError(error="provider must be 'cloud_api' or 'web_bridge'", code="PROVIDER_MUST_BE_CLOUDAPI_OR")
 
     old_provider = (channel.config or {}).get("provider", "cloud_api")
 
@@ -1243,17 +1238,14 @@ async def replay_message(
     """
     message = db.query(ExternalMessage).filter_by(id=message_id).first()
     if not message:
-        raise HTTPException(status_code=404, detail=f"Message {message_id} not found")
+        raise NotFoundError(error=f"Message {message_id} not found", code="MESSAGE_NOT_FOUND")
 
     channel = db.query(ExternalChannel).filter_by(id=message.channel_id).first()
     if not channel:
-        raise HTTPException(status_code=404, detail="Parent channel not found")
+        raise NotFoundError(error="Parent channel not found", code="PARENT_CHANNEL_NOT_FOUND")
 
     if channel.status != ChannelStatus.ACTIVE:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Cannot replay: channel is {channel.status.value}. Activate the channel first."
-        )
+        raise BadRequestError(error=f"Cannot replay: channel is {channel.status.value}. Activate the channel first.", code="CANNOT_REPLAY_CHANNEL_IS_ACTIVATE")
 
     # Reset message error state
     message.status = "received"
@@ -1277,7 +1269,7 @@ async def replay_message(
         message.last_error = str(e)
         message.status = "failed"
         db.commit()
-        raise HTTPException(status_code=500, detail=f"Replay failed: {str(e)}")
+        raise InternalServerError(error=f"Replay failed: {str(e)}", code="REPLAY_FAILED")
 
 
 # ═══════════════════════════════════════════════════════════

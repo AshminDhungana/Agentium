@@ -2,7 +2,8 @@
 Tasks API routes for Agentium.
 Updated for Task Execution Architecture: Governance Alignment
 """
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
+from fastapi import APIRouter, Depends, status, Query, Request
+from backend.core.exceptions import BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, TooLargeError, RateLimitError, InternalServerError, ServiceUnavailableError
 from sqlalchemy.orm import Session, noload
 from typing import List, Optional
 
@@ -115,15 +116,12 @@ async def create_task(
             )
             task.acceptance_criteria = AcceptanceCriteriaService.to_json(parsed_criteria)
         except ValueError as exc:
-            raise HTTPException(status_code=422, detail=str(exc))
+            raise BadRequestError(error=str(exc), code="STREXC")
 
     if task_data.veto_authority:
         valid_veto = {"code", "output", "plan"}
         if task_data.veto_authority not in valid_veto:
-            raise HTTPException(
-                status_code=422,
-                detail=f"veto_authority must be one of: {sorted(valid_veto)}"
-            )
+            raise BadRequestError(error=f"veto_authority must be one of: {sorted(valid_veto)}", code="VETOAUTHORITY_MUST_BE_ONE_OF")
         task.veto_authority = task_data.veto_authority
 
     db.add(task)
@@ -175,10 +173,7 @@ async def list_tasks(
             task_status = TaskStatus(status.lower())
             query = query.filter(Task.status == task_status)
         except ValueError:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid status '{status}'. Valid: {[s.value for s in TaskStatus]}"
-            )
+            raise BadRequestError(error=f"Invalid status '{status}'. Valid: {[s.value for s in TaskStatus]}", code="INVALID_STATUS_VALID")
 
     if agent_id:
         query = query.filter(
@@ -228,7 +223,7 @@ async def get_task(
     ).filter(Task.id == task_id).first()
 
     if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
+        raise NotFoundError(error="Task not found", code="TASK_NOT_FOUND")
     
     result = _serialize(task)
     
@@ -254,20 +249,20 @@ async def update_task(
     """Update task. Status changes go through state machine validation."""
     task = db.query(Task).filter(Task.id == task_id).first()
     if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
+        raise NotFoundError(error="Task not found", code="TASK_NOT_FOUND")
 
     # Handle status change with state machine validation
     if task_data.status is not None:
         try:
             new_status = TaskStatus(task_data.status)
         except ValueError:
-            raise HTTPException(status_code=400, detail=f"Invalid status: {task_data.status}")
+            raise BadRequestError(error=f"Invalid status: {task_data.status}", code="INVALID_STATUS")
         
         try:
             # Use task's set_status method which includes state machine validation
             task.set_status(new_status, str(current_user.get("sub", "user")), task_data.status_note)
         except IllegalStateTransition as e:
-            raise HTTPException(status_code=400, detail=str(e))
+            raise BadRequestError(error=str(e), code="STRE")
     
     # Update other fields
     if task_data.title is not None:
@@ -278,7 +273,7 @@ async def update_task(
         try:
             task.priority = TaskPriority(task_data.priority)
         except ValueError:
-            raise HTTPException(status_code=400, detail=f"Invalid priority: {task_data.priority}")
+            raise BadRequestError(error=f"Invalid priority: {task_data.priority}", code="INVALID_PRIORITY")
     
     # NEW: Update governance fields
     if task_data.constitutional_basis is not None:
@@ -297,7 +292,7 @@ async def update_task(
             parsed = AcceptanceCriteriaService.parse_and_validate(raw)
             task.acceptance_criteria = AcceptanceCriteriaService.to_json(parsed)
         except ValueError as exc:
-            raise HTTPException(status_code=422, detail=str(exc))
+            raise BadRequestError(error=str(exc), code="STREXC")
     if task_data.veto_authority is not None:
         task.veto_authority = task_data.veto_authority
 
@@ -316,7 +311,7 @@ async def execute_task(
     """Execute a task by assigning it to an agent."""
     task = db.query(Task).filter(Task.id == task_id).first()
     if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
+        raise NotFoundError(error="Task not found", code="TASK_NOT_FOUND")
 
     agents = task.assigned_task_agent_ids or []
     if not isinstance(agents, list):
@@ -328,7 +323,7 @@ async def execute_task(
     try:
         task.set_status(TaskStatus.IN_PROGRESS, agent_id)
     except IllegalStateTransition as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise BadRequestError(error=str(e), code="STRE")
     
     db.commit()
     db.refresh(task)
@@ -353,16 +348,16 @@ async def escalate_task(
     """
     task = db.query(Task).filter(Task.id == task_id).first()
     if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
+        raise NotFoundError(error="Task not found", code="TASK_NOT_FOUND")
     
     try:
         task.escalate_to_council(reason, str(current_user.get("sub", "user")))
         db.commit()
         db.refresh(task)
     except IllegalStateTransition as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise BadRequestError(error=str(e), code="STRE")
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise BadRequestError(error=str(e), code="STRE")
     
     return {
         "status": "success",
@@ -380,7 +375,7 @@ async def get_subtasks(
     """Get all subtasks (child tasks) for a parent task."""
     task = db.query(Task).filter(Task.id == task_id).first()
     if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
+        raise NotFoundError(error="Task not found", code="TASK_NOT_FOUND")
     
     # Get child tasks
     children = db.query(Task).filter(Task.parent_task_id == task_id).all()
@@ -411,7 +406,7 @@ async def get_task_events(
     """
     task = db.query(Task).filter(Task.id == task_id).first()
     if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
+        raise NotFoundError(error="Task not found", code="TASK_NOT_FOUND")
     
     query = db.query(TaskEvent).filter(TaskEvent.task_id == task_id)
     
@@ -420,10 +415,7 @@ async def get_task_events(
             et = TaskEventType(event_type)
             query = query.filter(TaskEvent.event_type == et)
         except ValueError:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid event type. Valid: {[e.value for e in TaskEventType]}"
-            )
+            raise BadRequestError(error=f"Invalid event type. Valid: {[e.value for e in TaskEventType]}", code="INVALID_EVENT_TYPE_VALID")
     
     events = query.order_by(TaskEvent.created_at.desc()).offset(skip).limit(limit).all()
     
@@ -447,13 +439,10 @@ async def retry_task(
     """
     task = db.query(Task).filter(Task.id == task_id).first()
     if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
+        raise NotFoundError(error="Task not found", code="TASK_NOT_FOUND")
     
     if task.status not in [TaskStatus.FAILED, TaskStatus.ESCALATED, TaskStatus.STOPPED]:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Cannot retry task in status {task.status.value}. Must be failed, escalated, or stopped."
-        )
+        raise BadRequestError(error=f"Cannot retry task in status {task.status.value}. Must be failed, escalated, or stopped.", code="CANNOT_RETRY_TASK_IN_STATUS")
     
     # Reset counters
     task.retry_count = 0
@@ -464,7 +453,7 @@ async def retry_task(
         db.commit()
         db.refresh(task)
     except IllegalStateTransition as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise BadRequestError(error=str(e), code="STRE")
     
     return {
         "status": "success",
@@ -482,7 +471,7 @@ async def get_allowed_transitions(
     """Get list of allowed status transitions for a task."""
     task = db.query(Task).filter(Task.id == task_id).first()
     if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
+        raise NotFoundError(error="Task not found", code="TASK_NOT_FOUND")
     
     allowed = TaskStateMachine.get_allowed_transitions(task.status)
     
@@ -507,7 +496,7 @@ async def auto_delegate_task(
     """Force (re-)delegation of a task through the auto-delegation engine."""
     task = db.query(Task).filter(Task.id == task_id).first()
     if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
+        raise NotFoundError(error="Task not found", code="TASK_NOT_FOUND")
 
     try:
         from backend.services.auto_delegation_service import DelegationEngine
@@ -521,7 +510,7 @@ async def auto_delegate_task(
         }
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
+        raise BadRequestError(error=str(e), code="STRE")
 
 
 @router.get("/{task_id}/delegation-log")
@@ -533,7 +522,7 @@ async def get_delegation_log(
     """Retrieve the delegation decision trail for a task."""
     task = db.query(Task).filter(Task.id == task_id).first()
     if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
+        raise NotFoundError(error="Task not found", code="TASK_NOT_FOUND")
 
     return {
         "task_id": task_id,
@@ -554,7 +543,7 @@ async def get_dependency_graph(
 
     task = db.query(Task).filter(Task.id == task_id).first()
     if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
+        raise NotFoundError(error="Task not found", code="TASK_NOT_FOUND")
 
     deps = db.query(TaskDependency).filter(
         TaskDependency.parent_task_id == task_id,

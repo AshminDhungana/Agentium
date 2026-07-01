@@ -22,6 +22,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from backend.core.config import settings
+from backend.core.error_responses import make_error_response
 
 logger = logging.getLogger(__name__)
 
@@ -118,9 +119,10 @@ class IPBlocklistMiddleware(BaseHTTPMiddleware):
             blocked = await self.redis.exists(f"agentium:blocked:ips:{ip}")
             if blocked:
                 logger.warning("Phase 17.1 blocklist: rejected %s", ip)
-                return JSONResponse(
-                    {"detail": "Access temporarily restricted.", "code": "IP_BLOCKED"},
+                return make_error_response(
                     status_code=403,
+                    error="Access temporarily restricted.",
+                    code="IP_BLOCKED",
                     headers={"Retry-After": "3600"},
                 )
         except Exception as exc:
@@ -159,9 +161,11 @@ class PayloadSizeLimitMiddleware(BaseHTTPMiddleware):
             try:
                 if int(cl_header) > limit:
                     mb = limit // (1024 * 1024)
-                    return JSONResponse(
-                        {"detail": f"Payload too large. Limit for this endpoint: {mb} MB."},
+                    return make_error_response(
                         status_code=413,
+                        error="Payload too large.",
+                        code="PAYLOAD_TOO_LARGE",
+                        detail={"limit_mb": mb},
                     )
             except ValueError:
                 pass  # malformed Content-Length — let the route handler deal with it
@@ -265,14 +269,14 @@ class SessionLimitMiddleware(BaseHTTPMiddleware):
                 f"Session limit exceeded for user {user_id}: "
                 f"{len(active)} sessions (limit: {self.max_sessions})"
             )
-            return JSONResponse(
+            return make_error_response(
                 status_code=429,
-                content={
-                    "detail": (
-                        f"Maximum {self.max_sessions} concurrent sessions "
-                        f"allowed. Please log out from other devices."
-                    ),
-                },
+                error=(
+                    f"Maximum {self.max_sessions} concurrent sessions "
+                    f"allowed. Please log out from other devices."
+                ),
+                code="SESSION_LIMIT_EXCEEDED",
+                detail={"max_sessions": self.max_sessions},
             )
 
         return await call_next(request)

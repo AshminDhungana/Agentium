@@ -18,6 +18,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 from typing import List, Optional
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, status
+from backend.core.exceptions import BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, TooLargeError, RateLimitError, InternalServerError, ServiceUnavailableError
 from fastapi.responses import FileResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
@@ -116,13 +117,10 @@ async def _read_file_chunked(file: UploadFile, max_size: int) -> bytes:
             break
         total += len(chunk)
         if total > max_size:
-            raise HTTPException(
-                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                detail=(
+            raise TooLargeError(error=(
                     f"File '{file.filename}' exceeds the "
                     f"{max_size // (1024 * 1024)}MB size limit"
-                ),
-            )
+                ), code="FFILE_EXCEEDS_THE_FMB_SIZE")
         chunks.append(chunk)
 
     return b"".join(chunks)
@@ -146,10 +144,7 @@ async def upload_files(
     )
 
     if not files:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No files provided"
-        )
+        raise BadRequestError(error="No files provided", code="NO_FILES_PROVIDED")
 
     uploaded_files = []
     errors = []
@@ -282,10 +277,7 @@ async def upload_files(
 
     # If all files failed, return error
     if not uploaded_files and errors:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"errors": errors}
-        )
+        raise BadRequestError(error={"errors": errors}, code="ERROR")
 
     return {
         "success": True,
@@ -395,10 +387,7 @@ async def download_file(
     _cur_uid = current_user.get("user_id") or current_user.get("id")
     _cur_admin = current_user.get("is_admin", False)
     if str(_cur_uid) != user_id and not _cur_admin:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied"
-        )
+        raise ForbiddenError(error="Access denied", code="ACCESS_DENIED")
 
     object_name = f"files/{user_id}/{filename}"
 
@@ -408,10 +397,7 @@ async def download_file(
         local_root = _os.getenv("STORAGE_LOCAL_PATH", "./data/uploads")
         local_path = Path(local_root).resolve() / object_name
         if not local_path.exists():
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="File not found"
-            )
+            raise NotFoundError(error="File not found", code="FILE_NOT_FOUND")
         media_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
         return FileResponse(
             path=str(local_path),
@@ -422,10 +408,7 @@ async def download_file(
     # ── S3/MinIO backend: redirect to presigned URL ───────────────────────────
     url = storage_service.generate_presigned_url(object_name, expiration=3600)
     if not url:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="File not found or failed to generate URL"
-        )
+        raise NotFoundError(error="File not found or failed to generate URL", code="FILE_NOT_FOUND_OR_FAILED")
     return RedirectResponse(url=url)
 
 
@@ -444,10 +427,7 @@ async def delete_file(
     success = storage_service.delete_file(object_name)
 
     if not success:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to delete file"
-        )
+        raise InternalServerError(error=f"Failed to delete file", code="FAILED_TO_DELETE_FILE")
         
     return {
         "success": True,
@@ -470,19 +450,13 @@ async def preview_file(
     _cur_uid = current_user.get("user_id") or current_user.get("id")
     _cur_admin = current_user.get("is_admin", False)
     if str(_cur_uid) != user_id and not _cur_admin:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied"
-        )
+        raise ForbiddenError(error="Access denied", code="ACCESS_DENIED")
 
     media_type = mimetypes.guess_type(filename)[0] or 'application/octet-stream'
 
     # Only allow preview for safe types
     if not (media_type.startswith('image/') or media_type.startswith('video/') or media_type == 'application/pdf'):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="File type not supported for preview"
-        )
+        raise BadRequestError(error="File type not supported for preview", code="FILE_TYPE_NOT_SUPPORTED_FOR")
 
     object_name = f"files/{user_id}/{filename}"
 
@@ -492,10 +466,7 @@ async def preview_file(
         local_root = _os.getenv("STORAGE_LOCAL_PATH", "./data/uploads")
         local_path = Path(local_root).resolve() / object_name
         if not local_path.exists():
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="File not found"
-            )
+            raise NotFoundError(error="File not found", code="FILE_NOT_FOUND")
         return FileResponse(
             path=str(local_path),
             media_type=media_type,
@@ -506,9 +477,6 @@ async def preview_file(
     url = storage_service.generate_presigned_url(object_name, expiration=3600)
     
     if not url:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="File not found or failed to generate URL"
-        )
+        raise NotFoundError(error="File not found or failed to generate URL", code="FILE_NOT_FOUND_OR_FAILED")
 
     return RedirectResponse(url=url)

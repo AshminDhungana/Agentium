@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, BackgroundTasks
+from backend.core.exceptions import BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, TooLargeError, RateLimitError, InternalServerError, ServiceUnavailableError
 from typing import List, Dict, Any
 from sqlalchemy.orm import Session
 from datetime import datetime
@@ -23,7 +24,7 @@ def create_workflow(payload: Dict[str, Any], db: Session = Depends(get_db)):
     cron = payload.get("schedule_cron")
     
     if not name or not template:
-        raise HTTPException(status_code=400, detail="name and template_json required")
+        raise BadRequestError(error="name and template_json required", code="NAME_AND_TEMPLATEJSON_REQUIRED")
         
     wf = WorkflowEngine.create_workflow(db, name, template, agent_id, cron)
     db.commit()
@@ -40,7 +41,7 @@ def get_workflow(workflow_id: str, db: Session = Depends(get_db)):
     """Get workflow definition."""
     wf = db.query(Workflow).filter(Workflow.id == workflow_id).first()
     if not wf:
-        raise HTTPException(status_code=404, detail="Workflow not found")
+        raise NotFoundError(error="Workflow not found", code="WORKFLOW_NOT_FOUND")
     return wf.to_dict()
 
 @router.put("/{workflow_id}", response_model=Dict[str, Any])
@@ -48,13 +49,13 @@ def update_workflow(workflow_id: str, payload: Dict[str, Any], db: Session = Dep
     """Update workflow template."""
     template = payload.get("template_json")
     if not template:
-        raise HTTPException(status_code=400, detail="template_json required")
+        raise BadRequestError(error="template_json required", code="TEMPLATEJSON_REQUIRED")
     try:
         wf = WorkflowEngine.update_workflow(db, workflow_id, template)
         db.commit()
         return wf.to_dict()
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise BadRequestError(error=str(e), code="STRE")
 
 @router.post("/{workflow_id}/execute", response_model=Dict[str, Any])
 def execute_workflow(workflow_id: str, payload: Dict[str, Any], db: Session = Depends(get_db)):
@@ -64,14 +65,14 @@ def execute_workflow(workflow_id: str, payload: Dict[str, Any], db: Session = De
         execution = WorkflowEngine.trigger_execution(db, workflow_id, trigger="api", context=context)
         return execution.to_dict()
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise NotFoundError(error=str(e), code="STRE")
 
 @router.get("/executions/{execution_id}", response_model=Dict[str, Any])
 def get_execution_status(execution_id: str, db: Session = Depends(get_db)):
     """Get status of an execution."""
     execution = db.query(WorkflowExecution).filter(WorkflowExecution.id == execution_id).first()
     if not execution:
-        raise HTTPException(status_code=404, detail="Execution not found")
+        raise NotFoundError(error="Execution not found", code="EXECUTION_NOT_FOUND")
     return execution.to_dict()
 
 @router.get("/{workflow_id}/eta", response_model=Dict[str, Any])
@@ -84,5 +85,5 @@ def get_workflow_docs(workflow_id: str, db: Session = Depends(get_db)):
     """Auto-generate documentation for a workflow."""
     doc = WorkflowEngine.auto_document(db, workflow_id)
     if not doc:
-        raise HTTPException(status_code=404, detail="Workflow not found")
+        raise NotFoundError(error="Workflow not found", code="WORKFLOW_NOT_FOUND")
     return {"documentation": doc}

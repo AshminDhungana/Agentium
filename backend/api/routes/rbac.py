@@ -7,6 +7,7 @@ from datetime import datetime
 from pydantic import BaseModel
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from backend.core.exceptions import BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, TooLargeError, RateLimitError, InternalServerError, ServiceUnavailableError
 from sqlalchemy.orm import Session
 
 from backend.models.database import get_db
@@ -49,18 +50,12 @@ def get_current_user_from_token(
 
     payload = verify_token(token)
     if not payload:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authentication credentials",
-        )
+        raise UnauthorizedError(error="Invalid authentication credentials", code="INVALID_AUTHENTICATION_CREDENTIALS")
 
     user_id = payload.get("user_id")
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found",
-        )
+        raise UnauthorizedError(error="User not found", code="USER_NOT_FOUND")
     return user
 
 
@@ -75,7 +70,7 @@ def list_users_with_roles(
     # Use is_sovereign property so role-expiry is respected, with is_admin
     # as a backward-compat fallback for users that pre-date the RBAC system.
     if not (current_user.is_sovereign or current_user.is_admin):
-        raise HTTPException(status_code=403, detail="Insufficient permissions.")
+        raise ForbiddenError(error="Insufficient permissions.", code="INSUFFICIENT_PERMISSIONS")
 
     users = db.query(User).all()
     # Include delegation details for sovereign/admin callers
@@ -109,7 +104,7 @@ def list_capabilities(
     than maintaining its own hardcoded list.
     """
     if not (current_user.is_sovereign or current_user.is_admin):
-        raise HTTPException(status_code=403, detail="Insufficient permissions.")
+        raise ForbiddenError(error="Insufficient permissions.", code="INSUFFICIENT_PERMISSIONS")
     return sorted(VALID_CAPABILITIES)
 
 
@@ -122,7 +117,7 @@ def delegate_capability(
     """Delegate capabilities to another user. Only Primary Sovereign."""
     # Use is_sovereign (property, respects role expiry) for consistent guard
     if not current_user.is_sovereign:
-        raise HTTPException(status_code=403, detail="Only Sovereign can delegate capabilities.")
+        raise ForbiddenError(error="Only Sovereign can delegate capabilities.", code="ONLY_SOVEREIGN_CAN_DELEGATE_CAPABILITIES")
     try:
         delegation = RBACService.delegate_capabilities(
             db=db,
@@ -136,7 +131,7 @@ def delegate_capability(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise BadRequestError(error=str(e), code="STRE")
 
 
 @router.delete("/delegate/{delegation_id}")
@@ -152,7 +147,7 @@ def revoke_delegation(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise BadRequestError(error=str(e), code="STRE")
 
 
 @router.post("/emergency-transfer")
@@ -163,7 +158,7 @@ def emergency_override_transfer(
 ):
     """Emergency transfer of Primary Sovereign role."""
     if not current_user.is_sovereign:
-        raise HTTPException(status_code=403, detail="Only Sovereign can initiate emergency transfer.")
+        raise ForbiddenError(error="Only Sovereign can initiate emergency transfer.", code="ONLY_SOVEREIGN_CAN_INITIATE_EMERGENCY")
     try:
         delegation = RBACService.transfer_emergency_override(
             db=db,
@@ -179,7 +174,7 @@ def emergency_override_transfer(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise BadRequestError(error=str(e), code="STRE")
 
 
 @router.get("/permissions/me")

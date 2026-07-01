@@ -9,7 +9,8 @@ Changes vs previous version:
 """
 
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
+from backend.core.exceptions import BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, TooLargeError, RateLimitError, InternalServerError, ServiceUnavailableError
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -127,18 +128,12 @@ async def check_capability(
     agent = db.query(Agent).filter_by(agentium_id=request.agentium_id).first()
 
     if not agent:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Agent {request.agentium_id} not found"
-        )
+        raise NotFoundError(error=f"Agent {request.agentium_id} not found", code="AGENT_NOT_FOUND")
 
     try:
         capability = Capability(request.capability)
     except ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid capability: {request.capability}"
-        )
+        raise BadRequestError(error=f"Invalid capability: {request.capability}", code="INVALID_CAPABILITY")
 
     has_capability = CapabilityRegistry.can_agent(agent, capability, db)
     tier           = CapabilityRegistry.get_agent_tier(agent.agentium_id)
@@ -165,10 +160,7 @@ async def get_agent_capabilities(
     agent = db.query(Agent).filter_by(agentium_id=agentium_id).first()
 
     if not agent:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Agent {agentium_id} not found"
-        )
+        raise NotFoundError(error=f"Agent {agentium_id} not found", code="AGENT_NOT_FOUND")
 
     profile = CapabilityRegistry.get_agent_capabilities(agent)
     return CapabilityProfileResponse(**profile)
@@ -272,26 +264,17 @@ async def grant_capability(
     target_agent = db.query(Agent).filter_by(agentium_id=request.target_agentium_id).first()
 
     if not target_agent:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Target agent {request.target_agentium_id} not found"
-        )
+        raise NotFoundError(error=f"Target agent {request.target_agentium_id} not found", code="TARGET_AGENT_NOT_FOUND")
 
     granter = db.query(Agent).filter_by(agentium_id="00001").first()
 
     if not granter:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Head of Council not found (required to grant capabilities)"
-        )
+        raise NotFoundError(error="Head of Council not found (required to grant capabilities)", code="HEAD_OF_COUNCIL_NOT_FOUND")
 
     try:
         capability = Capability(request.capability)
     except ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid capability: {request.capability}"
-        )
+        raise BadRequestError(error=f"Invalid capability: {request.capability}", code="INVALID_CAPABILITY")
 
     try:
         CapabilityRegistry.grant_capability(
@@ -309,13 +292,10 @@ async def grant_capability(
         }
 
     except PermissionError as e:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+        raise ForbiddenError(error=str(e), code="STRE")
     except Exception as e:
         db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to grant capability: {str(e)}"
-        )
+        raise InternalServerError(error=f"Failed to grant capability: {str(e)}", code="FAILED_TO_GRANT_CAPABILITY")
 
 
 @router.post("/revoke")
@@ -328,26 +308,17 @@ async def revoke_capability(
     target_agent = db.query(Agent).filter_by(agentium_id=request.target_agentium_id).first()
 
     if not target_agent:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Target agent {request.target_agentium_id} not found"
-        )
+        raise NotFoundError(error=f"Target agent {request.target_agentium_id} not found", code="TARGET_AGENT_NOT_FOUND")
 
     revoker = db.query(Agent).filter_by(agentium_id="00001").first()
 
     if not revoker:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Head of Council not found (required to revoke capabilities)"
-        )
+        raise NotFoundError(error="Head of Council not found (required to revoke capabilities)", code="HEAD_OF_COUNCIL_NOT_FOUND")
 
     try:
         capability = Capability(request.capability)
     except ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid capability: {request.capability}"
-        )
+        raise BadRequestError(error=f"Invalid capability: {request.capability}", code="INVALID_CAPABILITY")
 
     try:
         CapabilityRegistry.revoke_capability(
@@ -365,13 +336,10 @@ async def revoke_capability(
         }
 
     except PermissionError as e:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+        raise ForbiddenError(error=str(e), code="STRE")
     except Exception as e:
         db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to revoke capability: {str(e)}"
-        )
+        raise InternalServerError(error=f"Failed to revoke capability: {str(e)}", code="FAILED_TO_REVOKE_CAPABILITY")
 
 
 @router.get("/audit", response_model=CapabilityAuditResponse)
@@ -381,10 +349,7 @@ async def capability_audit(
 ):
     """Generate system-wide capability audit report. Admin/Council only."""
     if not current_user.get("is_admin") and current_user.get("role") != "sovereign":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin or Sovereign privileges required"
-        )
+        raise ForbiddenError(error="Admin or Sovereign privileges required", code="ADMIN_OR_SOVEREIGN_PRIVILEGES_REQUIRED")
 
     report = CapabilityRegistry.capability_audit_report(db)
     return CapabilityAuditResponse(**report)
@@ -399,24 +364,15 @@ async def revoke_all_capabilities(
 ):
     """Revoke ALL capabilities from an agent. Emergency use only. Requires admin/sovereign."""
     if not current_user.get("is_admin") and current_user.get("role") != "sovereign":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin or Sovereign privileges required"
-        )
+        raise ForbiddenError(error="Admin or Sovereign privileges required", code="ADMIN_OR_SOVEREIGN_PRIVILEGES_REQUIRED")
 
     agent = db.query(Agent).filter_by(agentium_id=agentium_id).first()
 
     if not agent:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Agent {agentium_id} not found"
-        )
+        raise NotFoundError(error=f"Agent {agentium_id} not found", code="AGENT_NOT_FOUND")
 
     if agentium_id == "00001":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Cannot revoke all capabilities from Head of Council"
-        )
+        raise ForbiddenError(error="Cannot revoke all capabilities from Head of Council", code="CANNOT_REVOKE_ALL_CAPABILITIES_FROM")
 
     try:
         CapabilityRegistry.revoke_all_capabilities(agent, reason, db)
@@ -431,7 +387,4 @@ async def revoke_all_capabilities(
 
     except Exception as e:
         db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to revoke capabilities: {str(e)}"
-        )
+        raise InternalServerError(error=f"Failed to revoke capabilities: {str(e)}", code="FAILED_TO_REVOKE_CAPABILITIES")

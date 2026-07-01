@@ -7,7 +7,8 @@ Supports both User (Sovereign) and Agent authentication.
 from typing import Optional
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
+from backend.core.exceptions import BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, TooLargeError, RateLimitError, InternalServerError, ServiceUnavailableError
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -49,11 +50,7 @@ async def get_current_user_or_agent(
     or an Agent JWT.  Returns a normalised auth-context dict.
     """
     if not credentials:
-        raise HTTPException(
-            status_code=401,
-            detail="Not authenticated",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        raise UnauthorizedError(error="Not authenticated", code="NOT_AUTHENTICATED", headers={"WWW-Authenticate": "Bearer"})
 
     token = credentials.credentials
 
@@ -103,11 +100,7 @@ async def get_current_user_or_agent(
     except Exception:
         pass
 
-    raise HTTPException(
-        status_code=401,
-        detail="Invalid token — not a valid User or Agent token",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
+    raise UnauthorizedError(error="Invalid token — not a valid User or Agent token", code="INVALID_TOKEN_NOT_A_VALID", headers={"WWW-Authenticate": "Bearer"})
 
 
 # ---------------------------------------------------------------------------
@@ -202,7 +195,7 @@ async def get_pending_submissions(
 ):
     """Get skill submissions pending Council review (privileged only)."""
     if not auth_context["is_privileged"]:
-        raise HTTPException(403, "Council/Head/Sovereign only")
+        raise ForbiddenError(error="Council/Head/Sovereign only", code="COUNCILHEADSOVEREIGN_ONLY")
 
     submissions = db.query(SkillSubmission).filter_by(status="pending").all()
     return {
@@ -229,17 +222,17 @@ async def review_submission(
 ):
     """Review a skill submission — approve or reject (privileged only)."""
     if not auth_context["is_privileged"]:
-        raise HTTPException(403, "Council/Head/Sovereign only")
+        raise ForbiddenError(error="Council/Head/Sovereign only", code="COUNCILHEADSOVEREIGN_ONLY")
 
     submission = db.query(SkillSubmission).filter_by(
         submission_id=submission_id
     ).first()
     if not submission:
-        raise HTTPException(404, "Submission not found")
+        raise NotFoundError(error="Submission not found", code="SUBMISSION_NOT_FOUND")
 
     skill_db = db.query(SkillDB).filter_by(skill_id=submission.skill_id).first()
     if not skill_db:
-        raise HTTPException(404, "Skill not found")
+        raise NotFoundError(error="Skill not found", code="SKILL_NOT_FOUND")
 
     reviewer_id = (
         auth_context.get("agentium_id")
@@ -282,14 +275,14 @@ async def create_skill(
     Requires Council/Head review unless auto_verify=true (privileged only).
     """
     if auto_verify and not auth_context["is_privileged"]:
-        raise HTTPException(403, "Only Council/Head/Sovereign can auto-verify")
+        raise ForbiddenError(error="Only Council/Head/Sovereign can auto-verify", code="ONLY_COUNCILHEADSOVEREIGN_CAN_AUTOVERIFY")
 
     creator = auth_context.get("agent")
     if not creator and auth_context["type"] == "user":
         creator = db.query(Agent).filter(Agent.agentium_id == "00001").first()
 
     if not creator:
-        raise HTTPException(400, "Cannot determine skill creator")
+        raise BadRequestError(error="Cannot determine skill creator", code="CANNOT_DETERMINE_SKILL_CREATOR")
 
     try:
         skill = skill_manager.create_skill(
@@ -304,7 +297,7 @@ async def create_skill(
             "status": skill.verification_status,
         }
     except Exception as exc:
-        raise HTTPException(400, str(exc))
+        raise BadRequestError(error=str(exc), code="STREXC")
 
 
 # ===========================================================================
@@ -326,10 +319,10 @@ async def get_skill_full(
     """
     skill = skill_manager.get_skill_by_id(skill_id, db)
     if not skill:
-        raise HTTPException(404, "Skill not found")
+        raise NotFoundError(error="Skill not found", code="SKILL_NOT_FOUND")
 
     if skill.verification_status != "verified" and not auth_context["is_privileged"]:
-        raise HTTPException(403, "Skill pending verification")
+        raise ForbiddenError(error="Skill pending verification", code="SKILL_PENDING_VERIFICATION")
 
     skill_dict = skill.model_dump()
 
@@ -420,10 +413,10 @@ async def get_skill(
     """Get skill details by ID."""
     skill = skill_manager.get_skill_by_id(skill_id, db)
     if not skill:
-        raise HTTPException(404, "Skill not found")
+        raise NotFoundError(error="Skill not found", code="SKILL_NOT_FOUND")
 
     if skill.verification_status != "verified" and not auth_context["is_privileged"]:
-        raise HTTPException(403, "Skill pending verification")
+        raise ForbiddenError(error="Skill pending verification", code="SKILL_PENDING_VERIFICATION")
 
     return skill.model_dump()
 
@@ -441,14 +434,11 @@ async def deprecate_skill(
     """
     skill_db = db.query(SkillDB).filter_by(skill_id=skill_id).first()
     if not skill_db:
-        raise HTTPException(404, "Skill not found")
+        raise NotFoundError(error="Skill not found", code="SKILL_NOT_FOUND")
 
     is_creator = str(skill_db.creator_id) == str(auth_context.get("id", ""))
     if not is_creator and not auth_context["is_privileged"]:
-        raise HTTPException(
-            403,
-            "Only the skill creator or privileged users may deprecate this skill",
-        )
+        raise ForbiddenError(error="Only the skill creator or privileged users may deprecate this skill", code="ONLY_THE_SKILL_CREATOR_OR")
 
     skill_db.verification_status = "deprecated"
     skill_db.rejection_reason = body.reason
@@ -486,9 +476,9 @@ async def update_skill(
             "new_version": skill.version,
         }
     except PermissionError as exc:
-        raise HTTPException(403, str(exc))
+        raise ForbiddenError(error=str(exc), code="STREXC")
     except ValueError as exc:
-        raise HTTPException(404, str(exc))
+        raise NotFoundError(error=str(exc), code="STREXC")
 
 
 @router.post("/{skill_id}/execute")
@@ -501,17 +491,17 @@ async def execute_with_skill(
     """Execute a task using a specific verified skill."""
     skill = skill_manager.get_skill_by_id(skill_id, db)
     if not skill:
-        raise HTTPException(404, "Skill not found")
+        raise NotFoundError(error="Skill not found", code="SKILL_NOT_FOUND")
 
     if skill.verification_status != "verified":
-        raise HTTPException(403, "Skill not verified")
+        raise ForbiddenError(error="Skill not verified", code="SKILL_NOT_VERIFIED")
 
     agent = auth_context.get("agent")
     if not agent and auth_context["type"] == "user":
         agent = db.query(Agent).filter(Agent.agentium_id == "00001").first()
 
     if not agent:
-        raise HTTPException(403, "Execution requires agent context")
+        raise ForbiddenError(error="Execution requires agent context", code="EXECUTION_REQUIRES_AGENT_CONTEXT")
 
     result = await skill_rag.execute_with_skills(
         task_description=task_input,

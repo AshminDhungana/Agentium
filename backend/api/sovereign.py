@@ -3,7 +3,7 @@ Sovereign API Endpoints - Human override control for Head of Council operations.
 This gives YOU (the human) visibility and control over the AI agent system.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, WebSocket, WebSocketDisconnect, Query
+from fastapi import APIRouter, Depends, BackgroundTasks, WebSocket, WebSocketDisconnect, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime
@@ -20,6 +20,7 @@ from backend.models.entities.audit import AuditLog, AuditLevel, AuditCategory
 from backend.models.entities.user import User  # Your user model
 from pydantic import BaseModel
 
+from backend.core.exceptions import ForbiddenError, BadRequestError
 
 router = APIRouter(prefix="/sovereign", tags=["sovereign"])
 
@@ -54,9 +55,9 @@ async def get_current_sovereign_user(
 ):
     """Verify that the current user is the Sovereign (admin)."""
     if not current_user or not current_user.is_admin:
-        raise HTTPException(
-            status_code=403,
-            detail="Only the Sovereign can access this endpoint"
+        raise ForbiddenError(
+            error="Only the Sovereign can access this endpoint",
+            code="SOVEREIGN_ONLY",
         )
     return current_user
 
@@ -185,7 +186,10 @@ async def manage_container(
 ):
     """Start, stop, restart, or remove agent containers."""
     if action not in ['start', 'stop', 'restart', 'remove']:
-        raise HTTPException(status_code=400, detail="Invalid action")
+        raise BadRequestError(
+            error="Invalid action",
+            code="INVALID_CONTAINER_ACTION",
+        )
 
     # C10: reuse cached service
     head = _get_head_service()
@@ -209,7 +213,11 @@ async def manage_container(
 
     result = head.manage_container(action, container_id)
     if not result.get("success"):
-        raise HTTPException(status_code=400, detail=result.get("error"))
+        raise BadRequestError(
+            error=result.get("error", "Container action failed"),
+            code="CONTAINER_ACTION_FAILED",
+            detail={"error": result.get("error")},
+        )
     return result
 
 # ── Commands ──────────────────────────────────────────────────────────────────
@@ -258,7 +266,10 @@ async def execute_sovereign_command(
             command_req.params.get("content", "")
         )
     else:
-        raise HTTPException(status_code=400, detail="Unknown command type")
+        raise BadRequestError(
+            error="Unknown command type",
+            code="UNKNOWN_COMMAND",
+        )
 
     return {
         "id": f"sov_{datetime.utcnow().timestamp()}",

@@ -14,7 +14,8 @@ import logging
 import json
 
 from sqlalchemy.orm import Session
-from fastapi import HTTPException, status
+from fastapi import status
+from backend.core.exceptions import BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, TooLargeError, RateLimitError, InternalServerError, ServiceUnavailableError
 
 from backend.models.entities.mobile import DeviceToken, NotificationPreference
 from backend.models.entities.user import User
@@ -33,7 +34,7 @@ class PushNotificationService:
     ) -> DeviceToken:
         """Register a new device token for a user."""
         if platform not in ["ios", "android"]:
-            raise HTTPException(status_code=400, detail="Invalid platform. Must be 'ios' or 'android'.")
+            raise BadRequestError(error="Invalid platform. Must be 'ios' or 'android'.", code="INVALID_PLATFORM_MUST_BE_IOS")
 
         device = db.query(DeviceToken).filter(DeviceToken.token == token).first()
 
@@ -65,7 +66,7 @@ class PushNotificationService:
         ).first()
 
         if not device:
-            raise HTTPException(status_code=404, detail="Device token not found.")
+            raise NotFoundError(error="Device token not found.", code="DEVICE_TOKEN_NOT_FOUND")
 
         device.is_active = False
         db.commit()

@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
+from backend.core.exceptions import BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, TooLargeError, RateLimitError, InternalServerError, ServiceUnavailableError
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 from typing import Optional
@@ -64,7 +65,7 @@ async def get_unified_conversation(
     ).first()
     
     if not conversation:
-        raise HTTPException(status_code=404, detail="Conversation not found")
+        raise NotFoundError(error="Conversation not found", code="CONVERSATION_NOT_FOUND")
         
     return conversation.to_dict(include_messages=True)
 
@@ -83,7 +84,7 @@ async def reply_to_conversation(
     ).first()
     
     if not conversation:
-        raise HTTPException(status_code=404, detail="Conversation not found")
+        raise NotFoundError(error="Conversation not found", code="CONVERSATION_NOT_FOUND")
         
     # We need to find the external channel ID to send the reply.
     # We can inspect the messages in this conversation to find one that came from an external channel.
@@ -93,17 +94,17 @@ async def reply_to_conversation(
     ).order_by(desc(ChatMessage.created_at)).first()
     
     if not latest_external_msg:
-        raise HTTPException(status_code=400, detail="This conversation has no external channel messages to reply to.")
+        raise BadRequestError(error="This conversation has no external channel messages to reply to.", code="THIS_CONVERSATION_HAS_NO_EXTERNAL")
         
     from backend.models.entities.channels import ExternalMessage
     orig_msg = db.query(ExternalMessage).filter_by(id=latest_external_msg.external_message_id).first()
     
     if not orig_msg:
-        raise HTTPException(status_code=404, detail="Original external message not found")
+        raise NotFoundError(error="Original external message not found", code="ORIGINAL_EXTERNAL_MESSAGE_NOT_FOUND")
         
     channel = db.query(ExternalChannel).filter_by(id=orig_msg.channel_id).first()
     if not channel:
-        raise HTTPException(status_code=404, detail="External channel not found")
+        raise NotFoundError(error="External channel not found", code="EXTERNAL_CHANNEL_NOT_FOUND")
 
     # Use ChannelManager to send the message back to the sender
     success = await ChannelManager.send_response(
@@ -115,7 +116,7 @@ async def reply_to_conversation(
     )
     
     if not success:
-        raise HTTPException(status_code=500, detail="Failed to send reply to external channel")
+        raise InternalServerError(error="Failed to send reply to external channel", code="FAILED_TO_SEND_REPLY_TO")
         
     # If successful, record the reply as a ChatMessage in the conversation
     sys_msg = ChatMessage.create_system_message(

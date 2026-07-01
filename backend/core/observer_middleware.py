@@ -5,10 +5,10 @@ Enforces that any user whose effective role is `observer` can only use safe HTTP
 """
 import logging
 from fastapi import Request, status
-from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from backend.core.auth import verify_token
+from backend.core.error_responses import make_error_response
 from backend.models.database import SessionLocal
 from backend.models.entities.user import User
 
@@ -52,11 +52,11 @@ class ObserverReadOnlyMiddleware(BaseHTTPMiddleware):
                     logger.warning(
                         f"Blocked {request.method} {path} for observer user {user.username}"
                     )
-                    return JSONResponse(
+                    return make_error_response(
                         status_code=status.HTTP_403_FORBIDDEN,
-                        content={
-                            "detail": "Observer role is read-only. Cannot execute state-changing requests."
-                        }
+                        error="Observer role is read-only. Cannot execute state-changing requests.",
+                        code="OBSERVER_READ_ONLY",
+                        detail={"effective_role": "observer"},
                     )
                     
         except Exception as e:

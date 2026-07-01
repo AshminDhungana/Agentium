@@ -10,7 +10,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from fastapi import Depends, HTTPException, status, Request
+from fastapi import Depends, status, Request
+from backend.core.exceptions import BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, TooLargeError, RateLimitError, InternalServerError, ServiceUnavailableError
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import hmac
 import hashlib
@@ -71,19 +72,11 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     Used for protected API routes.
     """
     if not credentials:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Not authenticated",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        raise UnauthorizedError(error="Not authenticated", code="NOT_AUTHENTICATED", headers={"WWW-Authenticate": "Bearer"})
 
     payload = verify_token(credentials.credentials)
     if payload is None or payload.get("type", "access") != "access":
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired access token",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        raise UnauthorizedError(error="Invalid or expired access token", code="INVALID_OR_EXPIRED_ACCESS_TOKEN", headers={"WWW-Authenticate": "Bearer"})
 
     # Normalize the payload to ensure consistent field names
     normalized_payload = {
@@ -104,10 +97,7 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
 async def get_current_active_user(current_user: Dict[str, Any] = Depends(get_current_user)):
     """Verify user is active."""
     if not current_user.get("is_active"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Inactive user",
-        )
+        raise BadRequestError(error="Inactive user", code="INACTIVE_USER")
     return current_user
 
 

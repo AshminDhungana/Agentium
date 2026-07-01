@@ -8,7 +8,8 @@ import logging
 from typing import List, Dict, Any, Optional
 
 from pydantic import BaseModel
-from fastapi import APIRouter, Depends, HTTPException, Header, Request, status
+from fastapi import APIRouter, Depends, Header, Request, status
+from backend.core.exceptions import BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, TooLargeError, RateLimitError, InternalServerError, ServiceUnavailableError
 from sqlalchemy.orm import Session
 
 from backend.models.database import get_db
@@ -75,14 +76,14 @@ async def authenticate_peer(
     2. Legacy secret:    X-Agentium-Secret  (will be removed in a future version)
     """
     if not x_agentium_peer_url:
-        raise HTTPException(status_code=401, detail="Missing X-Agentium-Peer-Url header.")
+        raise UnauthorizedError(error="Missing X-Agentium-Peer-Url header.", code="MISSING_XAGENTIUMPEERURL_HEADER")
 
     # Preferred: HMAC path
     if x_agentium_signature and x_agentium_timestamp:
         try:
             ts = int(x_agentium_timestamp)
         except ValueError:
-            raise HTTPException(status_code=400, detail="X-Agentium-Timestamp must be a unix integer.")
+            raise BadRequestError(error="X-Agentium-Timestamp must be a unix integer.", code="XAGENTIUMTIMESTAMP_MUST_BE_A_UNIX")
         raw_body = await request.body()
         return FederationService.authenticate_peer_hmac(
             db=db,
@@ -105,10 +106,7 @@ async def authenticate_peer(
             secret=x_agentium_secret,
         )
 
-    raise HTTPException(
-        status_code=401,
-        detail="Provide either (X-Agentium-Signature + X-Agentium-Timestamp) or X-Agentium-Secret.",
-    )
+    raise UnauthorizedError(error="Provide either (X-Agentium-Signature + X-Agentium-Timestamp) or X-Agentium-Secret.", code="PROVIDE_EITHER_XAGENTIUMSIGNATURE_XAGENTIUMTIMESTAMP_OR")
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -123,7 +121,7 @@ def register_peer(
 ):
     """Register a new peer Agentium instance. Requires admin (Sovereign) privileges."""
     if not current_user.is_admin:
-        raise HTTPException(status_code=403, detail="Only Sovereign (admin) can register peers.")
+        raise ForbiddenError(error="Only Sovereign (admin) can register peers.", code="ONLY_SOVEREIGN_ADMIN_CAN_REGISTER")
 
     peer = FederationService.register_peer(
         db=db,
@@ -184,7 +182,7 @@ def delete_peer(
 ):
     """Remove a peer instance. Requires admin privileges."""
     if not current_user.is_admin:
-        raise HTTPException(status_code=403, detail="Only Sovereign (admin) can remove peers.")
+        raise ForbiddenError(error="Only Sovereign (admin) can remove peers.", code="ONLY_SOVEREIGN_ADMIN_CAN_REMOVE")
     FederationService.delete_peer(db, peer_id)
 
 
@@ -197,7 +195,7 @@ def update_peer_trust(
 ):
     """Update the trust level of a registered peer."""
     if not current_user.is_admin:
-        raise HTTPException(status_code=403, detail="Only Sovereign (admin) can update peer trust.")
+        raise ForbiddenError(error="Only Sovereign (admin) can update peer trust.", code="ONLY_SOVEREIGN_ADMIN_CAN_UPDATE")
     peer = FederationService.update_peer_trust(db, peer_id, request.trust_level)
     return {"id": peer.id, "trust_level": peer.trust_level}
 
@@ -272,7 +270,7 @@ async def receive_delegated_task(
     try:
         data = json.loads(body)
     except json.JSONDecodeError:
-        raise HTTPException(status_code=400, detail="Invalid JSON body.")
+        raise BadRequestError(error="Invalid JSON body.", code="INVALID_JSON_BODY")
 
     req = TaskReceiveRequest(**data)
     fed_task = FederationService.receive_delegated_task(
@@ -298,7 +296,7 @@ async def receive_task_result(
     try:
         data = json.loads(body)
     except json.JSONDecodeError:
-        raise HTTPException(status_code=400, detail="Invalid JSON body.")
+        raise BadRequestError(error="Invalid JSON body.", code="INVALID_JSON_BODY")
 
     req = TaskResultRequest(**data)
     fed_task = FederationService.receive_task_result(
@@ -339,7 +337,7 @@ def sync_knowledge_from_peer(
 ):
     """Manually trigger a pull of domain knowledge (constitution) from a peer."""
     if not current_user.is_admin:
-        raise HTTPException(status_code=403, detail="Only Sovereign can sync knowledge.")
+        raise ForbiddenError(error="Only Sovereign can sync knowledge.", code="ONLY_SOVEREIGN_CAN_SYNC_KNOWLEDGE")
         
     my_url = settings.FEDERATION_INSTANCE_URL
     my_secret = getattr(settings, "FEDERATION_SHARED_SECRET", "")
@@ -353,7 +351,7 @@ def sync_knowledge_from_peer(
     )
     
     if not success:
-        raise HTTPException(status_code=500, detail="Failed to sync knowledge from peer.")
+        raise InternalServerError(error="Failed to sync knowledge from peer.", code="FAILED_TO_SYNC_KNOWLEDGE_FROM")
         
     return {"status": "success", "message": "Knowledge synced to vector store."}
 
@@ -371,7 +369,7 @@ def create_federated_vote(
 ):
     """Creates a federated vote spanning multiple instances."""
     if not current_user.is_admin:
-        raise HTTPException(status_code=403, detail="Only Sovereign can create federated votes.")
+        raise ForbiddenError(error="Only Sovereign can create federated votes.", code="ONLY_SOVEREIGN_CAN_CREATE_FEDERATED")
         
     vote = FederationService.create_federated_vote(
         db=db,
@@ -404,7 +402,7 @@ async def webhook_cast_federated_vote(
     try:
         data = json.loads(body)
     except json.JSONDecodeError:
-        raise HTTPException(status_code=400, detail="Invalid JSON body.")
+        raise BadRequestError(error="Invalid JSON body.", code="INVALID_JSON_BODY")
 
     req = CastVoteRequest(**data)
     
@@ -449,4 +447,4 @@ async def receive_federated_knowledge(
         return {"acknowledged": True, "items_shared": len(request.documents)}
     except Exception as e:
         logger.error(f"failed to receive federated knowledge: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise InternalServerError(error=str(e), code="STRE")

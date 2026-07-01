@@ -7,6 +7,7 @@ import json
 import difflib
 from datetime import datetime
 from fastapi import File, UploadFile, Form
+from backend.core.exceptions import BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, TooLargeError, RateLimitError, InternalServerError, ServiceUnavailableError
 from io import BytesIO
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -189,9 +190,9 @@ def create_checkpoint(
         )
         return checkpoint
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise NotFoundError(error=str(e), code="STRE")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise InternalServerError(error=str(e), code="STRE")
 
 
 @router.get("", response_model=List[CheckpointResponse])
@@ -217,7 +218,7 @@ def get_checkpoint(checkpoint_id: str, db: Session = Depends(get_db)):
     """Get single checkpoint details."""
     checkpoint = db.query(ExecutionCheckpoint).filter(ExecutionCheckpoint.id == checkpoint_id).first()
     if not checkpoint:
-        raise HTTPException(status_code=404, detail="Checkpoint not found")
+        raise NotFoundError(error="Checkpoint not found", code="CHECKPOINT_NOT_FOUND")
     return checkpoint
 
 
@@ -237,9 +238,9 @@ def resume_from_checkpoint(
         )
         return restored_task
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise NotFoundError(error=str(e), code="STRE")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise InternalServerError(error=str(e), code="STRE")
 
 
 @router.post("/{checkpoint_id}/branch", response_model=TaskResponse)
@@ -262,9 +263,9 @@ def branch_from_checkpoint(
         )
         return new_task
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise NotFoundError(error=str(e), code="STRE")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise InternalServerError(error=str(e), code="STRE")
 
 
 # ─── NEW: Branch diff ─────────────────────────────────────────────────────────
@@ -297,11 +298,8 @@ def compare_branches(
             q = q.filter(ExecutionCheckpoint.task_id == task_id)
         cp = q.order_by(ExecutionCheckpoint.created_at.desc()).first()
         if cp is None:
-            raise HTTPException(
-                status_code=404,
-                detail=f"No active checkpoint found for branch '{branch}'"
-                + (f" and task '{task_id}'" if task_id else ""),
-            )
+            raise NotFoundError(error=f"No active checkpoint found for branch '{branch}'"
+                + (f" and task '{task_id}'" if task_id else ""), code="NO_ACTIVE_CHECKPOINT_FOUND_FOR")
         return cp
 
     left_cp = _latest_for_branch(left_branch)
@@ -412,7 +410,7 @@ def compare_two_checkpoints(
     Useful for the Monaco Editor diff view in the frontend.
     """
     if checkpoint_id == compare_to:
-        raise HTTPException(status_code=400, detail="Cannot compare a checkpoint to itself")
+        raise BadRequestError(error="Cannot compare a checkpoint to itself", code="CANNOT_COMPARE_A_CHECKPOINT_TO")
 
     left = (
         db.query(ExecutionCheckpoint)
@@ -426,9 +424,9 @@ def compare_two_checkpoints(
     )
 
     if not left:
-        raise HTTPException(status_code=404, detail=f"Checkpoint {checkpoint_id} not found")
+        raise NotFoundError(error=f"Checkpoint {checkpoint_id} not found", code="CHECKPOINT_NOT_FOUND")
     if not right:
-        raise HTTPException(status_code=404, detail=f"Checkpoint {compare_to} not found")
+        raise NotFoundError(error=f"Checkpoint {compare_to} not found", code="CHECKPOINT_NOT_FOUND")
 
     left_state: Dict[str, Any] = left.task_state_snapshot or {}
     right_state: Dict[str, Any] = right.task_state_snapshot or {}
@@ -582,7 +580,7 @@ async def import_checkpoint(
         )
         
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise BadRequestError(error=str(e), code="STRE")
 
 
 @router.get("/{checkpoint_id}/integrity")
@@ -598,7 +596,7 @@ def get_checkpoint_integrity(
     ).first()
     
     if not checkpoint:
-        raise HTTPException(status_code=404, detail="Checkpoint not found")
+        raise NotFoundError(error="Checkpoint not found", code="CHECKPOINT_NOT_FOUND")
     
     # Verify internal consistency
     issues = []
@@ -645,7 +643,7 @@ def verify_checkpoint_integrity(
     ).first()
     
     if not checkpoint:
-        raise HTTPException(status_code=404, detail="Checkpoint not found")
+        raise NotFoundError(error="Checkpoint not found", code="CHECKPOINT_NOT_FOUND")
     
     issues = []
     
@@ -697,7 +695,7 @@ def export_checkpoint(
     ).first()
     
     if not checkpoint:
-        raise HTTPException(status_code=404, detail="Checkpoint not found")
+        raise NotFoundError(error="Checkpoint not found", code="CHECKPOINT_NOT_FOUND")
     
     # Build export data
     export_data = {

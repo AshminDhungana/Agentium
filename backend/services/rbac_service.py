@@ -6,7 +6,8 @@ from typing import List, Optional, Set
 from datetime import datetime
 
 from sqlalchemy.orm import Session
-from fastapi import HTTPException, status
+from fastapi import status
+from backend.core.exceptions import BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, TooLargeError, RateLimitError, InternalServerError, ServiceUnavailableError
 
 from backend.models.entities.user import (
     User,
@@ -72,25 +73,16 @@ class RBACService:
     ) -> Delegation:
         """Create a new delegation of capabilities."""
         if not grantor.is_sovereign:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only the Primary Sovereign can delegate capabilities."
-            )
+            raise ForbiddenError(error="Only the Primary Sovereign can delegate capabilities.", code="ONLY_THE_PRIMARY_SOVEREIGN_CAN")
 
         grantee = db.query(User).filter(User.id == grantee_id).first()
         if not grantee:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Grantee user not found."
-            )
+            raise NotFoundError(error="Grantee user not found.", code="GRANTEE_USER_NOT_FOUND")
 
         # Validate capabilities against the canonical set
         invalid_caps = set(capabilities) - VALID_CAPABILITIES
         if invalid_caps:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Invalid capabilities: {sorted(invalid_caps)}"
-            )
+            raise BadRequestError(error=f"Invalid capabilities: {sorted(invalid_caps)}", code="INVALID_CAPABILITIES")
 
         delegation = Delegation(
             grantor_id=grantor.id,
@@ -127,17 +119,11 @@ class RBACService:
         """Revoke an active delegation."""
         delegation = db.query(Delegation).filter(Delegation.id == delegation_id).first()
         if not delegation:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Delegation not found."
-            )
+            raise NotFoundError(error="Delegation not found.", code="DELEGATION_NOT_FOUND")
 
         # Only Sovereign or the original grantor can revoke
         if not actor.is_sovereign and actor.id != delegation.grantor_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Not authorized to revoke this delegation."
-            )
+            raise ForbiddenError(error="Not authorized to revoke this delegation.", code="NOT_AUTHORIZED_TO_REVOKE_THIS")
 
         delegation.revoke()
         
@@ -168,17 +154,11 @@ class RBACService:
     ) -> Delegation:
         """Transfer primary sovereign role in an emergency."""
         if not current_sovereign.is_sovereign:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only the Primary Sovereign can transfer authority."
-            )
+            raise ForbiddenError(error="Only the Primary Sovereign can transfer authority.", code="ONLY_THE_PRIMARY_SOVEREIGN_CAN")
 
         new_sovereign = db.query(User).filter(User.id == new_sovereign_id).first()
         if not new_sovereign:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Target user not found."
-            )
+            raise NotFoundError(error="Target user not found.", code="TARGET_USER_NOT_FOUND")
 
         # Record the emergency delegation (full capabilities)
         delegation = Delegation(

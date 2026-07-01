@@ -16,7 +16,8 @@ Fixes (This Update):
 - FinalizeImportRequest now includes listing_id field (was missing)
 - finalize_import route now passes listing_id to service
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
+from backend.core.exceptions import BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, TooLargeError, RateLimitError, InternalServerError, ServiceUnavailableError
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any, Literal
@@ -38,18 +39,12 @@ router = APIRouter(prefix="/tool-management", tags=["Tool Creation - Phase 6.8"]
 def _require_head_or_council(agent_tier: str):
     """Raise 403 if agent is not Head (0xxxx) or Council (1xxxx)."""
     if not (agent_tier.startswith("0") or agent_tier.startswith("1")):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Agent tier '{agent_tier}' is not authorized. Head or Council required."
-        )
+        raise ForbiddenError(error=f"Agent tier '{agent_tier}' is not authorized. Head or Council required.", code="AGENT_TIER_IS_NOT_AUTHORIZED")
 
 def _require_not_task_agent(agent_tier: str):
     """Raise 403 if agent is a Task agent (3xxxx) — they cannot create or manage tools."""
     if agent_tier.startswith("3"):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Task agents (3xxxx) cannot create or manage tools."
-        )
+        raise ForbiddenError(error="Task agents (3xxxx) cannot create or manage tools.", code="TASK_AGENTS_3XXXX_CANNOT_CREATE")
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -143,7 +138,7 @@ async def propose_tool(
     service = ToolCreationService(db)
     result  = service.propose_tool(request)
     if not result.get("proposed") and "error" in result:
-        raise HTTPException(status_code=400, detail=result["error"])
+        raise BadRequestError(error=result["error"], code="RESULTERROR")
     return result
 
 
@@ -240,10 +235,7 @@ async def get_agent_tool_usage(
     Agents can only view their own usage. Head/Council can view any agent.
     """
     if agent_tier.startswith("3") and agentium_id != agent_id:
-        raise HTTPException(
-            status_code=403,
-            detail="Task agents can only view their own tool usage."
-        )
+        raise ForbiddenError(error="Task agents can only view their own tool usage.", code="TASK_AGENTS_CAN_ONLY_VIEW")
     service = ToolAnalyticsService(db)
     return service.get_agent_tool_usage(agentium_id=agentium_id, days=days)
 
@@ -271,7 +263,7 @@ async def publish_tool(
         published_by=agent_id,   # from JWT, not request body
     )
     if not result.get("published"):
-        raise HTTPException(status_code=400, detail=result.get("error"))
+        raise BadRequestError(error=result.get("error"), code="RESULTGETERROR")
     return result
 
 
@@ -312,7 +304,7 @@ async def import_tool(
     service = ToolMarketplaceService(db)
     result  = service.import_tool(listing_id=listing_id, requested_by=agent_id)
     if not result.get("staged"):
-        raise HTTPException(status_code=400, detail=result.get("error"))
+        raise BadRequestError(error=result.get("error"), code="RESULTGETERROR")
     return result
 
 
@@ -333,7 +325,7 @@ async def finalize_import(
         staging_id=body.staging_id,
     )
     if not result.get("finalized"):
-        raise HTTPException(status_code=400, detail=result.get("error"))
+        raise BadRequestError(error=result.get("error"), code="RESULTGETERROR")
     return result
 
 
@@ -353,7 +345,7 @@ async def rate_tool(
         rating=body.rating,
     )
     if not result.get("rated"):
-        raise HTTPException(status_code=400, detail=result.get("error"))
+        raise BadRequestError(error=result.get("error"), code="RESULTGETERROR")
     return result
 
 
@@ -375,7 +367,7 @@ async def yank_listing(
         reason=body.reason,
     )
     if not result.get("yanked"):
-        raise HTTPException(status_code=400, detail=result.get("error"))
+        raise BadRequestError(error=result.get("error"), code="RESULTGETERROR")
     return result
 
 
@@ -392,7 +384,7 @@ async def update_listing(
     service = ToolMarketplaceService(db)
     result  = service.update_listing(tool_name=tool_name, updated_by=agent_id)
     if not result.get("updated"):
-        raise HTTPException(status_code=400, detail=result.get("error"))
+        raise BadRequestError(error=result.get("error"), code="RESULTGETERROR")
     return result
 
 
@@ -411,14 +403,11 @@ async def vote_on_tool(
 ):
     """Council member casts a vote on a pending tool proposal. Council only."""
     if not agent_tier.startswith("1"):
-        raise HTTPException(
-            status_code=403,
-            detail="Only Council members (1xxxx) can vote on tool proposals."
-        )
+        raise ForbiddenError(error="Only Council members (1xxxx) can vote on tool proposals.", code="ONLY_COUNCIL_MEMBERS_1XXXX_CAN")
     service = ToolCreationService(db)
     result  = service.vote_on_tool(tool_name, agent_id, body.vote)
     if not result.get("voted"):
-        raise HTTPException(status_code=400, detail=result.get("error"))
+        raise BadRequestError(error=result.get("error"), code="RESULTGETERROR")
     return result
 
 
@@ -483,7 +472,7 @@ async def deprecate_tool(
         sunset_days=body.sunset_days,
     )
     if not result.get("deprecated"):
-        raise HTTPException(status_code=400, detail=result.get("error"))
+        raise BadRequestError(error=result.get("error"), code="RESULTGETERROR")
     return result
 
 
@@ -505,7 +494,7 @@ async def schedule_sunset(
         sunset_days=body.sunset_days,
     )
     if not result.get("scheduled"):
-        raise HTTPException(status_code=400, detail=result.get("error"))
+        raise BadRequestError(error=result.get("error"), code="RESULTGETERROR")
     return result
 
 
@@ -524,7 +513,7 @@ async def execute_sunset(
     forced   = agent_id if body.force and agent_tier.startswith("0") else None
     result   = service.execute_sunset(tool_name=tool_name, forced_by=forced)
     if not result.get("executed"):
-        raise HTTPException(status_code=400, detail=result.get("error"))
+        raise BadRequestError(error=result.get("error"), code="RESULTGETERROR")
     return result
 
 
@@ -546,7 +535,7 @@ async def restore_tool(
         reason=body.reason,
     )
     if not result.get("restored"):
-        raise HTTPException(status_code=400, detail=result.get("error"))
+        raise BadRequestError(error=result.get("error"), code="RESULTGETERROR")
     return result
 
 
@@ -569,7 +558,7 @@ async def propose_tool_update(
         proposed_by=agent_id,
     )
     if not result.get("proposed"):
-        raise HTTPException(status_code=400, detail=result.get("error"))
+        raise BadRequestError(error=result.get("error"), code="RESULTGETERROR")
     return result
 
 
@@ -590,7 +579,7 @@ async def approve_tool_update(
         approved_by_voting_id=body.approved_by_voting_id,
     )
     if not result.get("approved"):
-        raise HTTPException(status_code=400, detail=result.get("error"))
+        raise BadRequestError(error=result.get("error"), code="RESULTGETERROR")
     return result
 
 
@@ -613,7 +602,7 @@ async def rollback_tool(
         reason=body.reason,
     )
     if not result.get("rolled_back"):
-        raise HTTPException(status_code=400, detail=result.get("error"))
+        raise BadRequestError(error=result.get("error"), code="RESULTGETERROR")
     return result
 
 
@@ -642,5 +631,5 @@ async def get_version_diff(
     service = ToolVersioningService(db)
     result  = service.get_diff(tool_name, version_a, version_b)
     if "error" in result:
-        raise HTTPException(status_code=404, detail=result["error"])
+        raise NotFoundError(error=result["error"], code="RESULTERROR")
     return result

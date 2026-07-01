@@ -25,6 +25,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from backend.core.exceptions import BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, TooLargeError, RateLimitError, InternalServerError, ServiceUnavailableError
 from pydantic import BaseModel, Field
 from sqlalchemy import func, or_, text
 from sqlalchemy.orm import Session
@@ -44,10 +45,7 @@ router = APIRouter()
 def require_admin(current_user: dict = Depends(get_current_active_user)):
     """Dependency: requires admin flag on the JWT payload."""
     if not current_user.get("is_admin"):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin privileges required"
-        )
+                raise ForbiddenError(error="Admin privileges required", code="ADMIN_PRIVILEGES_REQUIRED")
     return current_user
 
 
@@ -159,7 +157,7 @@ def _persist_budget_limits(db: Session, daily_token_limit: int, daily_cost_limit
 def _get_user_or_404(db: Session, user_id: str) -> User:
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise NotFoundError(error="User not found", code="USER_NOT_FOUND")
     return user
 
 
@@ -240,10 +238,7 @@ async def update_budget(
     db: Session = Depends(get_db),
 ):
     if not _can_modify_budget(current_user):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only administrators or sovereign can modify budget settings."
-        )
+                raise ForbiddenError(error="Only administrators or sovereign can modify budget settings.", code="ONLY_ADMINISTRATORS_OR_SOVEREIGN_CAN")
 
     from backend.services.token_optimizer import idle_budget
 
@@ -326,10 +321,7 @@ async def get_budget_history(
         }
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to fetch budget history: {str(e)}"
-        )
+                raise InternalServerError(error=f"Failed to fetch budget history: {str(e)}", code="FAILED_TO_FETCH_BUDGET_HISTORY")
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -388,7 +380,7 @@ async def approve_user(
     """Approve a pending user registration."""
     user = _get_user_or_404(db, user_id)
     if not user.is_pending:
-        raise HTTPException(status_code=400, detail="User is not pending approval")
+        raise BadRequestError(error="User is not pending approval", code="USER_IS_NOT_PENDING_APPROVAL")
 
     user.is_pending = False
     user.is_active = True
@@ -419,7 +411,7 @@ async def reject_user(
     """Reject and permanently remove a pending user."""
     user = _get_user_or_404(db, user_id)
     if not user.is_pending:
-        raise HTTPException(status_code=400, detail="Can only reject pending users")
+        raise BadRequestError(error="Can only reject pending users", code="CAN_ONLY_REJECT_PENDING_USERS")
 
     username = user.username
     rejected_id = str(user.id)
@@ -451,7 +443,7 @@ async def delete_user(
 ):
     """Delete a user account. Cannot delete your own account."""
     if user_id == admin.get("user_id"):
-        raise HTTPException(status_code=400, detail="Cannot delete your own account")
+        raise BadRequestError(error="Cannot delete your own account", code="CANNOT_DELETE_YOUR_OWN_ACCOUNT")
 
     user = _get_user_or_404(db, user_id)
     username = user.username
@@ -513,16 +505,10 @@ async def change_user_role(
     db: Session = Depends(get_db),
 ):
     if request.new_role not in VALID_ROLES:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid role '{request.new_role}'. Must be one of: {', '.join(sorted(VALID_ROLES))}",
-        )
+                raise BadRequestError(error=f"Invalid role '{request.new_role}'. Must be one of: {', '.join(sorted(VALID_ROLES))}", code="INVALID_ROLE_MUST_BE_ONE")
 
     if user_id == admin.get("user_id"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Administrators cannot change their own role.",
-        )
+                raise BadRequestError(error="Administrators cannot change their own role.", code="ADMINISTRATORS_CANNOT_CHANGE_THEIR_OWN")
 
     user = _get_user_or_404(db, user_id)
     old_role = user.effective_role
@@ -581,10 +567,7 @@ async def get_slow_queries(
             "slow_queries": [dataclasses.asdict(q) for q in queries] 
         }
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to fetch slow queries: {str(e)}"
-        )
+                raise InternalServerError(error=f"Failed to fetch slow queries: {str(e)}", code="FAILED_TO_FETCH_SLOW_QUERIES")
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -614,13 +597,13 @@ async def restore_config_snapshot(
     try:
         snapshot = ConfigVersioningService.restore_snapshot(entity_type, entity_id, commit)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+                raise BadRequestError(error=str(e), code="STRE")
         
     if entity_type == "channel":
         from backend.models.entities.channels import ExternalChannel
         channel = db.query(ExternalChannel).filter(ExternalChannel.id == entity_id).first()
         if not channel:
-            raise HTTPException(status_code=404, detail="Channel not found")
+            raise NotFoundError(error="Channel not found", code="CHANNEL_NOT_FOUND")
         for key in ["name", "config", "default_agent_id", "auto_create_tasks", "require_approval", "status"]:
             if key in snapshot:
                 setattr(channel, key, snapshot[key])
@@ -629,7 +612,7 @@ async def restore_config_snapshot(
         from backend.models.entities.user_config import UserModelConfig
         config = db.query(UserModelConfig).filter(UserModelConfig.id == entity_id).first()
         if not config:
-            raise HTTPException(status_code=404, detail="Model config not found")
+            raise NotFoundError(error="Model config not found", code="MODEL_CONFIG_NOT_FOUND")
         for key in ["provider_name", "config_name", "api_base_url", "local_server_url", "default_model", "available_models", "is_default", "max_tokens", "temperature", "top_p", "timeout_seconds", "status"]:
             if key in snapshot:
                 setattr(config, key, snapshot[key])
@@ -647,7 +630,7 @@ async def restore_config_snapshot(
         from backend.models.entities.plugin import PluginInstallation
         inst = db.query(PluginInstallation).filter(PluginInstallation.id == entity_id).first()
         if not inst:
-            raise HTTPException(status_code=404, detail="Plugin installation not found")
+            raise NotFoundError(error="Plugin installation not found", code="PLUGIN_INSTALLATION_NOT_FOUND")
         if "config" in snapshot:
             inst.config = snapshot["config"]
         
@@ -655,18 +638,18 @@ async def restore_config_snapshot(
         from backend.models.entities.constitution import ConstitutionArticle
         article = db.query(ConstitutionArticle).filter(ConstitutionArticle.id == entity_id).first()
         if not article:
-            raise HTTPException(status_code=404, detail="Constitution Article not found")
+            raise NotFoundError(error="Constitution Article not found", code="CONSTITUTION_ARTICLE_NOT_FOUND")
         for key in ["text", "commentary", "tier"]:
             if key in snapshot:
                 setattr(article, key, snapshot[key])
     else:
-        raise HTTPException(status_code=400, detail=f"Unsupported entity type for restore: {entity_type}")
+        raise BadRequestError(error=f"Unsupported entity type for restore: {entity_type}", code="UNSUPPORTED_ENTITY_TYPE_FOR_RESTORE")
         
     try:
         db.commit()
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Database update failed: {str(e)}")
+        raise InternalServerError(error=f"Database update failed: {str(e)}", code="DATABASE_UPDATE_FAILED")
         
     return {
         "success": True,
@@ -719,10 +702,7 @@ async def list_blocked_ips(
     try:
         r = _get_redis_sync()
     except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Redis unavailable: {exc}",
-        )
+                raise ServiceUnavailableError(error=f"Redis unavailable: {exc}", code="REDIS_UNAVAILABLE")
 
     results: list[BlockedIPResponse] = []
     cursor = 0
@@ -747,10 +727,7 @@ async def list_blocked_ips(
                 break
 
     except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to scan blocked IPs: {exc}",
-        )
+                raise InternalServerError(error=f"Failed to scan blocked IPs: {exc}", code="FAILED_TO_SCAN_BLOCKED_IPS")
     finally:
         try:
             r.close()
@@ -788,20 +765,14 @@ async def unblock_ip(
     try:
         r = _get_redis_sync()
     except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Redis unavailable: {exc}",
-        )
+                raise ServiceUnavailableError(error=f"Redis unavailable: {exc}", code="REDIS_UNAVAILABLE")
 
     try:
         block_key = f"agentium:blocked:ips:{ip}"
         deleted = r.delete(block_key)
 
         if not deleted:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"IP {ip} is not currently in the blocklist.",
-            )
+                        raise NotFoundError(error=f"IP {ip} is not currently in the blocklist.", code="IP_IS_NOT_CURRENTLY_IN")
 
         # Clear 4xx counters so Celery won't immediately re-block this IP
         r.delete(f"agentium:4xx:{ip}", f"agentium:4xx:{ip}:wsum")
@@ -809,10 +780,7 @@ async def unblock_ip(
     except HTTPException:
         raise
     except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to unblock IP: {exc}",
-        )
+                raise InternalServerError(error=f"Failed to unblock IP: {exc}", code="FAILED_TO_UNBLOCK_IP")
     finally:
         try:
             r.close()
@@ -864,10 +832,7 @@ async def sync_model_pricing(
     
     result = await PricingSyncService.sync_prices(db)
     if not result.get("success"):
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=result.get("error", "Failed to synchronize pricing data.")
-        )
+                raise InternalServerError(error=result.get("error", "Failed to synchronize pricing data."), code="RESULTGETERROR_FAILED_TO_SYNCHRONIZE_PRICING")
         
     # Write Audit Log
     try:

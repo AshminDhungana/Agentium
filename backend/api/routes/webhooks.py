@@ -3,7 +3,8 @@ Secure webhook endpoints with signature verification, rate limiting,
 circuit breaker awareness, and comprehensive error handling.
 """
 
-from fastapi import APIRouter, Request, HTTPException, BackgroundTasks, Depends, status
+from fastapi import APIRouter, Request, BackgroundTasks, Depends, status
+from backend.core.exceptions import BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, TooLargeError, RateLimitError, InternalServerError, ServiceUnavailableError
 from sqlalchemy.orm import Session
 import json
 import hmac
@@ -41,14 +42,11 @@ def get_channel_by_path(
     ).first()
     
     if not channel:
-        raise HTTPException(status_code=404, detail="Channel not found or inactive")
+        raise NotFoundError(error="Channel not found or inactive", code="CHANNEL_NOT_FOUND_OR_INACTIVE")
     
     # Check circuit breaker
     if not circuit_breaker.can_execute(channel.id):
-        raise HTTPException(
-            status_code=503, 
-            detail="Service temporarily unavailable - circuit breaker open"
-        )
+        raise ServiceUnavailableError(error="Service temporarily unavailable - circuit breaker open", code="SERVICE_TEMPORARILY_UNAVAILABLE_CIRCUIT_BREAKER")
     
     return channel
 
@@ -95,7 +93,7 @@ def whatsapp_verify(
     ).first()
     
     if not channel:
-        raise HTTPException(status_code=404, detail="Channel not found")
+        raise NotFoundError(error="Channel not found", code="CHANNEL_NOT_FOUND")
     
     # Check if Cloud API (has verify_token) or Bridge
     is_cloud = 'verify_token' in (channel.config or {})
@@ -114,7 +112,7 @@ def whatsapp_verify(
                 db.commit()
             return int(hub_challenge) if hub_challenge else "OK"
         
-        raise HTTPException(status_code=403, detail="Verification failed")
+        raise ForbiddenError(error="Verification failed", code="VERIFICATION_FAILED")
     else:
         # Web Bridge - just return OK
         return {"status": "webhook_active", "provider": "web_bridge"}
@@ -148,7 +146,7 @@ async def whatsapp_webhook(
                 channel.config['app_secret'], body, signature
             ):
                 circuit_breaker.record_failure(channel.id)
-                raise HTTPException(status_code=401, detail="Invalid signature")
+                raise UnauthorizedError(error="Invalid signature", code="INVALID_SIGNATURE")
         
         # Parse Cloud API payload
         try:
@@ -158,7 +156,7 @@ async def whatsapp_webhook(
             parsed = UnifiedWhatsAppAdapter.parse_cloud_webhook(payload)
             
         except (json.JSONDecodeError, ValueError) as e:
-            raise HTTPException(status_code=400, detail=f"Invalid payload: {e}")
+            raise BadRequestError(error=f"Invalid payload: {e}", code="INVALID_PAYLOAD")
             
     else:
         # Web Bridge: Plain JSON, no signature
@@ -178,7 +176,7 @@ async def whatsapp_webhook(
             }
             
         except json.JSONDecodeError:
-            raise HTTPException(status_code=400, detail="Invalid JSON")
+            raise BadRequestError(error="Invalid JSON", code="INVALID_JSON")
     
     # Skip if no content
     if not parsed.get('content') and not parsed.get('media_url'):
@@ -205,7 +203,7 @@ async def whatsapp_webhook(
         
     except Exception as e:
         circuit_breaker.record_failure(channel.id)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise InternalServerError(error=str(e), code="STRE")
 
 
 # ═══════════════════════════════════════════════════════════
@@ -234,7 +232,7 @@ async def slack_webhook(
         import time
         current_time = int(time.time())
         if abs(current_time - int(timestamp)) > 300:  # 5 minute tolerance
-            raise HTTPException(status_code=403, detail="Request too old")
+            raise ForbiddenError(error="Request too old", code="REQUEST_TOO_OLD")
         
         base = f"v0:{timestamp}:{body.decode()}"
         expected = "v0=" + hmac.new(
@@ -245,7 +243,7 @@ async def slack_webhook(
         
         if not hmac.compare_digest(expected, signature):
             circuit_breaker.record_failure(channel.id)
-            raise HTTPException(status_code=401, detail="Invalid signature")
+            raise UnauthorizedError(error="Invalid signature", code="INVALID_SIGNATURE")
     
     try:
         if 'application/json' in content_type:
@@ -308,7 +306,7 @@ async def slack_webhook(
         
     except Exception as e:
         circuit_breaker.record_failure(channel.id)
-        raise HTTPException(status_code=400, detail=str(e))
+        raise BadRequestError(error=str(e), code="STRE")
 
 
 # ═══════════════════════════════════════════════════════════
@@ -371,7 +369,7 @@ async def telegram_webhook(
         
     except Exception as e:
         circuit_breaker.record_failure(channel.id)
-        raise HTTPException(status_code=400, detail=str(e))
+        raise BadRequestError(error=str(e), code="STRE")
 
 
 # ═══════════════════════════════════════════════════════════
@@ -457,7 +455,7 @@ async def discord_webhook(
 
     except Exception as e:
         circuit_breaker.record_failure(channel.id)
-        raise HTTPException(status_code=400, detail=str(e))
+        raise BadRequestError(error=str(e), code="STRE")
 
 
 # ═══════════════════════════════════════════════════════════
@@ -506,7 +504,7 @@ async def signal_webhook(
         return {"status": "ignored", "reason": str(e)}
     except Exception as e:
         circuit_breaker.record_failure(channel.id)
-        raise HTTPException(status_code=400, detail=str(e))
+        raise BadRequestError(error=str(e), code="STRE")
 
 
 # ═══════════════════════════════════════════════════════════
@@ -558,7 +556,7 @@ async def google_chat_webhook(
 
     except Exception as e:
         circuit_breaker.record_failure(channel.id)
-        raise HTTPException(status_code=400, detail=str(e))
+        raise BadRequestError(error=str(e), code="STRE")
 
 
 # ═══════════════════════════════════════════════════════════
@@ -608,7 +606,7 @@ async def teams_webhook(
 
     except Exception as e:
         circuit_breaker.record_failure(channel.id)
-        raise HTTPException(status_code=400, detail=str(e))
+        raise BadRequestError(error=str(e), code="STRE")
 
 
 # ═══════════════════════════════════════════════════════════
@@ -708,7 +706,7 @@ async def matrix_webhook(
 
     except Exception as e:
         circuit_breaker.record_failure(channel.id)
-        raise HTTPException(status_code=400, detail=str(e))
+        raise BadRequestError(error=str(e), code="STRE")
 
 
 # ═══════════════════════════════════════════════════════════
@@ -754,7 +752,7 @@ async def imessage_webhook(
         return {"status": "ignored", "reason": "self_sent"}
     except Exception as e:
         circuit_breaker.record_failure(channel.id)
-        raise HTTPException(status_code=400, detail=str(e))
+        raise BadRequestError(error=str(e), code="STRE")
 
 
 # ═══════════════════════════════════════════════════════════
@@ -817,7 +815,7 @@ async def email_webhook(
 
     except Exception as e:
         circuit_breaker.record_failure(channel.id)
-        raise HTTPException(status_code=400, detail=str(e))
+        raise BadRequestError(error=str(e), code="STRE")
 
 
 # ═══════════════════════════════════════════════════════════
@@ -832,7 +830,7 @@ async def webhook_health(
     """Get webhook health status for a channel."""
     channel = db.query(ExternalChannel).filter_by(id=channel_id).first()
     if not channel:
-        raise HTTPException(status_code=404, detail="Channel not found")
+        raise NotFoundError(error="Channel not found", code="CHANNEL_NOT_FOUND")
     
     health = ChannelManager.get_channel_health(channel_id)
     

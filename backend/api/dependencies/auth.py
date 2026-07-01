@@ -2,7 +2,7 @@
 Authentication dependencies for API routes.
 """
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from typing import Optional
@@ -10,6 +10,7 @@ from typing import Optional
 from backend.models.database import get_db
 from backend.core.auth import verify_token
 from backend.models.entities.user import User
+from backend.core.exceptions import UnauthorizedError, ForbiddenError
 
 security = HTTPBearer(auto_error=False)
 
@@ -23,32 +24,32 @@ async def get_current_user(
     """
     if not credentials:
         return None
-    
+
     token = credentials.credentials
     payload = verify_token(token)
-    
+
     if not payload:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authentication token",
+        raise UnauthorizedError(
+            error="Invalid authentication token",
+            code="INVALID_TOKEN",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
     # Verify user exists in database
     user = db.query(User).filter(User.username == payload.get("sub")).first()
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found",
+        raise UnauthorizedError(
+            error="User not found",
+            code="USER_NOT_FOUND",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
     if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="User account is not active",
+        raise ForbiddenError(
+            error="User account is not active",
+            code="ACCOUNT_INACTIVE",
         )
-    
+
     return {
         "id": user.id,
         "username": user.username,
@@ -63,9 +64,9 @@ async def get_current_active_user(
 ) -> dict:
     """Ensure user is authenticated and active."""
     if not current_user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Not authenticated",
+        raise UnauthorizedError(
+            error="Not authenticated",
+            code="NOT_AUTHENTICATED",
             headers={"WWW-Authenticate": "Bearer"},
         )
     return current_user
@@ -75,8 +76,8 @@ async def get_current_admin_user(
 ) -> dict:
     """Ensure user is an admin."""
     if not current_user.get("is_admin"):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin privileges required",
+        raise ForbiddenError(
+            error="Admin privileges required",
+            code="ADMIN_ONLY",
         )
     return current_user

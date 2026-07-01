@@ -13,7 +13,8 @@ import logging
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Literal, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
+from backend.core.exceptions import BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, TooLargeError, RateLimitError, InternalServerError, ServiceUnavailableError
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -407,7 +408,7 @@ async def voice_command(
     agent orchestrator, and returns the textual response.
     """
     if not request.transcribed_text.strip():
-        raise HTTPException(status_code=400, detail="Transcribed text cannot be empty.")
+        raise BadRequestError(error="Transcribed text cannot be empty.", code="TRANSCRIBED_TEXT_CANNOT_BE_EMPTY")
 
     try:
         from backend.services.agent_orchestrator import AgentOrchestrator

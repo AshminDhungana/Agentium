@@ -6,6 +6,7 @@ Provides endpoints for agent monitoring, health checks, and violation reports.
 from datetime import datetime, timedelta
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
+from backend.core.exceptions import BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, TooLargeError, RateLimitError, InternalServerError, ServiceUnavailableError
 from sqlalchemy.orm import Session
 from sqlalchemy import func, text
 
@@ -125,7 +126,7 @@ async def get_agent_health(
     agent = db.query(Agent).filter(Agent.agentium_id == agent_id).first()
     
     if not agent:
-        raise HTTPException(status_code=404, detail="Agent not found")
+        raise NotFoundError(error="Agent not found", code="AGENT_NOT_FOUND")
     
     # Get health reports for this agent
     reports = db.query(AgentHealthReport).filter(
@@ -185,18 +186,15 @@ async def report_violation(
     violator = db.query(Agent).filter(Agent.agentium_id == violator_id).first()
     
     if not reporter:
-        raise HTTPException(status_code=404, detail="Reporter agent not found")
+        raise NotFoundError(error="Reporter agent not found", code="REPORTER_AGENT_NOT_FOUND")
     if not violator:
-        raise HTTPException(status_code=404, detail="Violator agent not found")
+        raise NotFoundError(error="Violator agent not found", code="VIOLATOR_AGENT_NOT_FOUND")
     
     # Validate severity
     try:
         severity_enum = ViolationSeverity(severity.lower())
     except ValueError:
-        raise HTTPException(
-            status_code=400, 
-            detail=f"Invalid severity. Must be one of: minor, moderate, major, critical"
-        )
+        raise BadRequestError(error=f"Invalid severity. Must be one of: minor, moderate, major, critical", code="INVALID_SEVERITY_MUST_BE_ONE")
     
     # Create violation report
     violation = ViolationReport(
@@ -299,10 +297,10 @@ async def resolve_violation(
     violation = db.query(ViolationReport).filter(ViolationReport.id == violation_id).first()
     
     if not violation:
-        raise HTTPException(status_code=404, detail="Violation not found")
+        raise NotFoundError(error="Violation not found", code="VIOLATION_NOT_FOUND")
     
     if violation.status == 'resolved':
-        raise HTTPException(status_code=400, detail="Violation already resolved")
+        raise BadRequestError(error="Violation already resolved", code="VIOLATION_ALREADY_RESOLVED")
     
     violation.status = 'resolved'
     violation.resolution = resolution_notes  # actual column is 'resolution'
@@ -503,7 +501,7 @@ async def get_agent_reasoning_traces(
     """
     agent = db.query(Agent).filter(Agent.agentium_id == agent_id).first()
     if not agent:
-        raise HTTPException(status_code=404, detail="Agent not found")
+        raise NotFoundError(error="Agent not found", code="AGENT_NOT_FOUND")
 
     start_date = datetime.utcnow() - timedelta(days=days)
 
@@ -708,10 +706,7 @@ async def rollback_from_checkpoint(
         }
     except Exception as e:
         db.rollback()
-        raise HTTPException(
-            status_code=400,
-            detail=f"Rollback failed: {str(e)}"
-        )
+        raise BadRequestError(error=f"Rollback failed: {str(e)}", code="ROLLBACK_FAILED")
 
 # -----------------------------------------------------------------------------
 # Phase 13.7 — Zero-Touch Operations Dashboard Routes
@@ -730,7 +725,7 @@ async def get_aggregated_dashboard_metrics(
         from backend.services.monitoring_service import MonitoringService
         return MonitoringService.get_aggregated_metrics(db)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch aggregated metrics: {str(e)}")
+        raise InternalServerError(error=f"Failed to fetch aggregated metrics: {str(e)}", code="FAILED_TO_FETCH_AGGREGATED_METRICS")
 
 
 @router.get("/sla")
@@ -745,7 +740,7 @@ async def get_sla_compliance_metrics(
         from backend.services.monitoring_service import MonitoringService
         return MonitoringService.get_sla_metrics(db)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch SLA metrics: {str(e)}")
+        raise InternalServerError(error=f"Failed to fetch SLA metrics: {str(e)}", code="FAILED_TO_FETCH_SLA_METRICS")
 
 
 @router.get("/anomalies")
@@ -769,7 +764,7 @@ async def get_active_anomalies(
         
         return [a.to_dict() for a in anomalies]
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch anomalies: {str(e)}")
+        raise InternalServerError(error=f"Failed to fetch anomalies: {str(e)}", code="FAILED_TO_FETCH_ANOMALIES")
 
 
 @router.get("/incidents")
@@ -785,7 +780,7 @@ async def get_incident_log(
         from backend.services.monitoring_service import MonitoringService
         return MonitoringService.get_incident_log(db, limit)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch incident log: {str(e)}")
+        raise InternalServerError(error=f"Failed to fetch incident log: {str(e)}", code="FAILED_TO_FETCH_INCIDENT_LOG")
 
 
 @router.post("/chaos-test")
@@ -799,22 +794,22 @@ async def inject_chaos_test(
     Requires admin privileges.
     """
     if not current_user.get("is_admin", False):
-        raise HTTPException(status_code=403, detail="Admin privileges required for chaos testing")
+        raise ForbiddenError(error="Admin privileges required for chaos testing", code="ADMIN_PRIVILEGES_REQUIRED_FOR_CHAOS")
         
     test_type = payload.get("test_type")
     if not test_type:
-        raise HTTPException(status_code=400, detail="Missing test_type in payload")
+        raise BadRequestError(error="Missing test_type in payload", code="MISSING_TESTTYPE_IN_PAYLOAD")
         
     try:
         from backend.services.monitoring_service import MonitoringService
         result = MonitoringService.inject_chaos_test(test_type, db)
         if not result.get("success"):
-            raise HTTPException(status_code=400, detail=result.get("details", {}).get("error", "Chaos test failed"))
+            raise BadRequestError(error=result.get("details", {}).get("error", "Chaos test failed"), code="RESULTGETDETAILS_GETERROR_CHAOS_TEST_FAILED")
         return result
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to inject chaos test: {str(e)}")
+        raise InternalServerError(error=f"Failed to inject chaos test: {str(e)}", code="FAILED_TO_INJECT_CHAOS_TEST")
 
 
 @router.post("/admin/rollback-audit/{audit_id}")
@@ -828,13 +823,13 @@ async def rollback_from_audit(
     (This is a placeholder implementation; actual reversal logic depends on the specific action).
     """
     if not current_user.get("is_admin", False):
-        raise HTTPException(status_code=403, detail="Admin privileges required for rollback")
+        raise ForbiddenError(error="Admin privileges required for rollback", code="ADMIN_PRIVILEGES_REQUIRED_FOR_ROLLBACK")
         
     try:
         from backend.models.entities.audit import AuditLog
         audit = db.query(AuditLog).filter_by(id=audit_id).first()
         if not audit:
-            raise HTTPException(status_code=404, detail="Audit log entry not found")
+            raise NotFoundError(error="Audit log entry not found", code="AUDIT_LOG_ENTRY_NOT_FOUND")
             
         # In a real system, we would parse audit.after_state and apply inverse operations
         # For now, we just mark it as rolled back in the log.
@@ -850,7 +845,7 @@ async def rollback_from_audit(
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=400, detail=f"Audit rollback failed: {str(e)}")
+        raise BadRequestError(error=f"Audit rollback failed: {str(e)}", code="AUDIT_ROLLBACK_FAILED")
 
 
 from pydantic import BaseModel
@@ -894,4 +889,4 @@ async def report_frontend_error(
     )
     db.add(log_entry)
     db.commit()
-    return {"status": "recorded"}
+    return {"status": "recorded"}

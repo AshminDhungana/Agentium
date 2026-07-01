@@ -10,7 +10,8 @@ import logging
 import uvicorn
 from backend.api import host_access
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, HTTPException, Request
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, Request
+from backend.core.exceptions import BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, TooLargeError, RateLimitError, InternalServerError, ServiceUnavailableError
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from backend.celery_app import celery_app
@@ -476,6 +477,10 @@ app = FastAPI(
     redirect_slashes=False,
 )
 
+# Register typed exception handlers before middleware so they catch errors first
+from backend.core.error_responses import register_error_handlers
+register_error_handlers(app)
+
 origins = os.getenv("ALLOWED_ORIGINS")
 
 # CORS middleware
@@ -631,11 +636,11 @@ async def create_agent(
 ):
     """Create a new agent with governance compliance."""
     if tier not in [0, 1, 2, 3]:
-        raise HTTPException(status_code=400, detail="Tier must be 0 (Head), 1 (Council), 2 (Lead), or 3 (Task)")
+        raise BadRequestError(error="Tier must be 0 (Head), 1 (Council), 2 (Lead), or 3 (Task)", code="TIER_MUST_BE_0_HEAD")
 
     constitution = db.query(Constitution).filter_by(is_active=True).order_by(Constitution.effective_date.desc()).first()
     if not constitution:
-        raise HTTPException(status_code=500, detail="No active constitution found")
+        raise InternalServerError(error="No active constitution found", code="NO_ACTIVE_CONSTITUTION_FOUND")
 
     agent = Agent(
         role=role,
@@ -680,7 +685,7 @@ async def list_agents(
             status_enum = AgentStatus(status.lower())
             query = query.filter(Agent.status == status_enum)
         except ValueError:
-            raise HTTPException(status_code=400, detail=f"Invalid status: {status}")
+            raise BadRequestError(error=f"Invalid status: {status}", code="INVALID_STATUS")
 
     agents = query.all()
     return {"agents": [agent.to_dict() for agent in agents]}
@@ -694,7 +699,7 @@ async def get_agent(
     """Get specific agent by Agentium ID."""
     agent = db.query(Agent).filter_by(agentium_id=agentium_id).first()
     if not agent:
-        raise HTTPException(status_code=404, detail=f"Agent {agentium_id} not found")
+        raise NotFoundError(error=f"Agent {agentium_id} not found", code="AGENT_NOT_FOUND")
     return agent.to_dict()
 
 
@@ -711,7 +716,7 @@ async def get_constitution(
     ).order_by(Constitution.effective_date.desc()).first()
 
     if not constitution:
-        raise HTTPException(status_code=404, detail="No active constitution found")
+        raise NotFoundError(error="No active constitution found", code="NO_ACTIVE_CONSTITUTION_FOUND")
 
     return constitution.to_dict()
 
@@ -727,7 +732,7 @@ async def update_constitution(
 
     current = db.query(Constitution).filter_by(is_active=True).first()
     if not current:
-        raise HTTPException(status_code=404, detail="No active constitution found")
+        raise NotFoundError(error="No active constitution found", code="NO_ACTIVE_CONSTITUTION_FOUND")
 
     def _to_json_str(value, fallback_str):
         if value is None:

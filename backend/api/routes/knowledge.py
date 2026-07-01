@@ -6,7 +6,8 @@ Exposes the citation graph for BFS traversal and statistics.
 
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
+from backend.core.exceptions import BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, TooLargeError, RateLimitError, InternalServerError, ServiceUnavailableError
 from sqlalchemy.orm import Session
 
 from backend.models.database import get_db
@@ -32,7 +33,7 @@ def get_citation_graph(
     try:
         result = svc.get_citation_graph(db, root_doc_id=root, depth=depth)
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise InternalServerError(error=str(exc), code="STREXC")
 
     return result
 
@@ -50,7 +51,7 @@ def get_citation_stats(
     try:
         top_cited = svc.get_top_cited(db, limit=limit)
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise InternalServerError(error=str(exc), code="STREXC")
 
     return {
         "top_cited": top_cited,

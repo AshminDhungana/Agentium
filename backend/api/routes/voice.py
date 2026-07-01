@@ -10,7 +10,8 @@ from pathlib import Path
 from typing import Optional
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, status, Form
+from fastapi import APIRouter, UploadFile, File, Depends, status, Form
+from backend.core.exceptions import BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, TooLargeError, RateLimitError, InternalServerError, ServiceUnavailableError
 from fastapi.responses import FileResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
@@ -166,53 +167,35 @@ async def transcribe_audio(
     # Check voice availability first
     voice_status = check_voice_available(db, user_id)
     if not voice_status["available"]:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail={
+        raise ServiceUnavailableError(error={
                 "message": voice_status["message"],
                 "action_required": voice_status.get("action_required"),
                 "needs_provider": True
-            }
-        )
+            }, code="ERROR")
     
     # Validate file type
     if audio.content_type not in ALLOWED_AUDIO_TYPES:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Audio type '{audio.content_type}' not supported. Allowed: {', '.join(ALLOWED_AUDIO_TYPES)}"
-        )
+        raise BadRequestError(error=f"Audio type '{audio.content_type}' not supported. Allowed: {', '.join(ALLOWED_AUDIO_TYPES)}", code="AUDIO_TYPE_NOT_SUPPORTED_ALLOWED")
     
     # Read audio content
     try:
         content = await audio.read()
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Failed to read audio: {str(e)}"
-        )
+        raise BadRequestError(error=f"Failed to read audio: {str(e)}", code="FAILED_TO_READ_AUDIO")
     
     # Check size
     if len(content) > MAX_AUDIO_SIZE:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=f"Audio file exceeds 25MB limit ({len(content) / (1024*1024):.1f}MB)"
-        )
+        raise TooLargeError(error=f"Audio file exceeds 25MB limit ({len(content) / (1024*1024):.1f}MB)", code="AUDIO_FILE_EXCEEDS_25MB_LIMIT")
     
     # Get API key
     api_key = get_openai_api_key(db, user_id)
     if not api_key:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="OpenAI API key not available. Please configure OpenAI provider in Models page."
-        )
+        raise ServiceUnavailableError(error="OpenAI API key not available. Please configure OpenAI provider in Models page.", code="OPENAI_API_KEY_NOT_AVAILABLE")
     
     # Get Whisper client
     client = get_whisper_client(api_key)
     if not client:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Voice service temporarily unavailable."
-        )
+        raise ServiceUnavailableError(error="Voice service temporarily unavailable.", code="VOICE_SERVICE_TEMPORARILY_UNAVAILABLE")
     
     # Save to temp file
     file_ext = os.path.splitext(audio.filename or '.webm')[1] or '.webm'
@@ -245,10 +228,7 @@ async def transcribe_audio(
         }
         
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Transcription failed: {str(e)}"
-        )
+        raise InternalServerError(error=f"Transcription failed: {str(e)}", code="TRANSCRIPTION_FAILED")
     finally:
         # Cleanup temp file
         if temp_path and os.path.exists(temp_path):
@@ -275,27 +255,18 @@ async def text_to_speech(
     # Check voice availability first
     voice_status = check_voice_available(db, user_id)
     if not voice_status["available"]:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail={
+        raise ServiceUnavailableError(error={
                 "message": voice_status["message"],
                 "action_required": voice_status.get("action_required"),
                 "needs_provider": True
-            }
-        )
+            }, code="ERROR")
     
     # Validate input
     if not text.strip():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Text cannot be empty"
-        )
+        raise BadRequestError(error="Text cannot be empty", code="TEXT_CANNOT_BE_EMPTY")
     
     if len(text) > 4096:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Text exceeds 4096 character limit"
-        )
+        raise BadRequestError(error="Text exceeds 4096 character limit", code="TEXT_EXCEEDS_4096_CHARACTER_LIMIT")
     
     # Validate voice
     allowed_voices = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer']
@@ -305,18 +276,12 @@ async def text_to_speech(
     # Get API key
     api_key = get_openai_api_key(db, user_id)
     if not api_key:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="OpenAI API key not available. Please configure OpenAI provider in Models page."
-        )
+        raise ServiceUnavailableError(error="OpenAI API key not available. Please configure OpenAI provider in Models page.", code="OPENAI_API_KEY_NOT_AVAILABLE")
     
     # Get client
     client = get_whisper_client(api_key)
     if not client:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Voice service temporarily unavailable."
-        )
+        raise ServiceUnavailableError(error="Voice service temporarily unavailable.", code="VOICE_SERVICE_TEMPORARILY_UNAVAILABLE")
     
     try:
         # Generate speech
@@ -362,10 +327,7 @@ async def text_to_speech(
         }
         
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Speech synthesis failed: {str(e)}"
-        )
+        raise InternalServerError(error=f"Speech synthesis failed: {str(e)}", code="SPEECH_SYNTHESIS_FAILED")
 
 
 @router.get("/audio/{user_id}/{filename}")
@@ -380,19 +342,13 @@ async def get_audio_file(
     """
     # Security check
     if str(current_user.id) != user_id and not current_user.is_admin:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied"
-        )
+        raise ForbiddenError(error="Access denied", code="ACCESS_DENIED")
     
     object_name = f"voice/{user_id}/{filename}"
     url = storage_service.generate_presigned_url(object_name, expiration=3600)
     
     if not url:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Audio file not found or failed to generate URL"
-        )
+        raise NotFoundError(error="Audio file not found or failed to generate URL", code="AUDIO_FILE_NOT_FOUND_OR")
     
     return RedirectResponse(url=url)
 
@@ -453,14 +409,11 @@ async def twilio_voice_webhook(
     """
     twilio_sid = os.getenv("TWILIO_ACCOUNT_SID")
     if not twilio_sid:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail={
+        raise ServiceUnavailableError(error={
                 "message": "Twilio voice not configured",
                 "action_required": "Set TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN",
                 "configured": False,
-            }
-        )
+            }, code="ERROR")
 
     # Return a TwiML-compatible response stub
     return {

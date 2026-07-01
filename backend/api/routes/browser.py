@@ -9,7 +9,8 @@ import logging
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
+from backend.core.exceptions import BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, TooLargeError, RateLimitError, InternalServerError, ServiceUnavailableError
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -69,7 +70,7 @@ async def navigate(
     svc = get_browser_service()
     result = await svc.navigate(req.url, agent_id=req.agent_id, timeout_ms=req.timeout_ms)
     if not result.success:
-        raise HTTPException(status_code=400, detail=result.error)
+        raise BadRequestError(error=result.error, code="RESULTERROR")
     return {
         "url": result.url,
         "title": result.title,
@@ -87,7 +88,7 @@ async def scrape(
     svc = get_browser_service()
     result = await svc.scrape(req.url, selector=req.selector, agent_id=req.agent_id)
     if not result.success:
-        raise HTTPException(status_code=400, detail=result.error)
+        raise BadRequestError(error=result.error, code="RESULTERROR")
     return {
         "url": result.url,
         "text": result.text,
@@ -106,7 +107,7 @@ async def screenshot(
     svc = get_browser_service()
     result = await svc.screenshot(req.url, agent_id=req.agent_id, db=db)
     if not result.success:
-        raise HTTPException(status_code=400, detail=result.error)
+        raise BadRequestError(error=result.error, code="RESULTERROR")
     return {
         "url": result.url,
         "image_base64": result.image_base64,
@@ -125,7 +126,7 @@ async def search(
     svc = get_browser_service()
     result = await svc.search(req.query, agent_id=req.agent_id, max_results=req.max_results)
     if not result.success:
-        raise HTTPException(status_code=400, detail=result.error)
+        raise BadRequestError(error=result.error, code="RESULTERROR")
     return {
         "query": result.query,
         "results": [
@@ -181,7 +182,7 @@ async def get_session_stream(
     svc = get_browser_service()
     session = svc.get_session(task_id)
     if not session:
-        raise HTTPException(status_code=404, detail="Browser session not found")
+        raise NotFoundError(error="Browser session not found", code="BROWSER_SESSION_NOT_FOUND")
         
     return {
         "task_id": session.session_id,
@@ -204,7 +205,7 @@ async def configure_session(
     svc = get_browser_service()
     session = svc.get_session(task_id)
     if not session:
-        raise HTTPException(status_code=404, detail="Browser session not found")
+        raise NotFoundError(error="Browser session not found", code="BROWSER_SESSION_NOT_FOUND")
         
     if req.fps is not None:
         session.fps = req.fps

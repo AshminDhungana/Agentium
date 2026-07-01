@@ -9,7 +9,8 @@ from datetime import datetime
 from typing import List, Optional, Dict, Any
 
 from sqlalchemy.orm import Session
-from fastapi import HTTPException, status
+from fastapi import status
+from backend.core.exceptions import BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, TooLargeError, RateLimitError, InternalServerError, ServiceUnavailableError
 import logging
 
 from backend.models.entities.plugin import Plugin, PluginInstallation, PluginReview
@@ -34,7 +35,7 @@ class PluginMarketplaceService:
     ) -> Plugin:
         """Submit a new plugin for review."""
         if db.query(Plugin).filter(Plugin.name == name).first():
-            raise HTTPException(status_code=400, detail="Plugin with this name already exists.")
+            raise BadRequestError(error="Plugin with this name already exists.", code="PLUGIN_WITH_THIS_NAME_ALREADY")
 
         plugin = Plugin(
             name=name,
@@ -57,14 +58,14 @@ class PluginMarketplaceService:
     def verify_plugin(db: Session, plugin_id: str, admin_user: User) -> Plugin:
         """Mark a submitted plugin as verified (Admin only)."""
         if not admin_user.is_sovereign:
-            raise HTTPException(status_code=403, detail="Only Sovereign can verify plugins.")
+            raise ForbiddenError(error="Only Sovereign can verify plugins.", code="ONLY_SOVEREIGN_CAN_VERIFY_PLUGINS")
 
         plugin = db.query(Plugin).filter(Plugin.id == plugin_id).first()
         if not plugin:
-            raise HTTPException(status_code=404, detail="Plugin not found.")
+            raise NotFoundError(error="Plugin not found.", code="PLUGIN_NOT_FOUND")
 
         if plugin.status == "published":
-            raise HTTPException(status_code=400, detail="Plugin is already published.")
+            raise BadRequestError(error="Plugin is already published.", code="PLUGIN_IS_ALREADY_PUBLISHED")
 
         plugin.is_verified = True
         plugin.verification_date = datetime.utcnow()
@@ -80,10 +81,10 @@ class PluginMarketplaceService:
         """
         plugin = db.query(Plugin).filter(Plugin.id == plugin_id).first()
         if not plugin:
-            raise HTTPException(status_code=404, detail="Plugin not found.")
+            raise NotFoundError(error="Plugin not found.", code="PLUGIN_NOT_FOUND")
 
         if plugin.status != "submitted":
-            raise HTTPException(status_code=400, detail="Only 'submitted' plugins can be sent for approval.")
+            raise BadRequestError(error="Only 'submitted' plugins can be sent for approval.", code="ONLY_SUBMITTED_PLUGINS_CAN_BE")
 
         # In a full implementation, we would create a VotingProposal record here
         # For now, we simulate the proposal creation and return a mock proposal ID
@@ -96,14 +97,14 @@ class PluginMarketplaceService:
     def publish_plugin(db: Session, plugin_id: str, admin_user: User) -> Plugin:
         """Publish a verified plugin to the marketplace (Admin only)."""
         if not admin_user.is_sovereign:
-            raise HTTPException(status_code=403, detail="Only Sovereign can publish plugins.")
+            raise ForbiddenError(error="Only Sovereign can publish plugins.", code="ONLY_SOVEREIGN_CAN_PUBLISH_PLUGINS")
 
         plugin = db.query(Plugin).filter(Plugin.id == plugin_id).first()
         if not plugin:
-            raise HTTPException(status_code=404, detail="Plugin not found.")
+            raise NotFoundError(error="Plugin not found.", code="PLUGIN_NOT_FOUND")
 
         if plugin.status != "verified":
-            raise HTTPException(status_code=400, detail=f"Plugin must be verified before publishing. Current status: {plugin.status}")
+            raise BadRequestError(error=f"Plugin must be verified before publishing. Current status: {plugin.status}", code="PLUGIN_MUST_BE_VERIFIED_BEFORE")
 
         plugin.status = "published"
         plugin.published_at = datetime.utcnow()
@@ -117,14 +118,14 @@ class PluginMarketplaceService:
     ) -> PluginInstallation:
         """Install a plugin onto the local instance."""
         if not user.is_sovereign: # Can be delegated in the future
-            raise HTTPException(status_code=403, detail="Only Sovereign can install plugins.")
+            raise ForbiddenError(error="Only Sovereign can install plugins.", code="ONLY_SOVEREIGN_CAN_INSTALL_PLUGINS")
 
         plugin = db.query(Plugin).filter(Plugin.id == plugin_id).first()
         if not plugin:
-            raise HTTPException(status_code=404, detail="Plugin not found.")
+            raise NotFoundError(error="Plugin not found.", code="PLUGIN_NOT_FOUND")
 
         if plugin.status != "published":
-            raise HTTPException(status_code=400, detail=f"Cannot install {plugin.status} plugin.")
+            raise BadRequestError(error=f"Cannot install {plugin.status} plugin.", code="CANNOT_INSTALL_PLUGIN")
 
         # Check existing installation
         existing = db.query(PluginInstallation).filter(
@@ -133,14 +134,14 @@ class PluginMarketplaceService:
         ).first()
 
         if existing:
-            raise HTTPException(status_code=400, detail="Plugin is already installed.")
+            raise BadRequestError(error="Plugin is already installed.", code="PLUGIN_IS_ALREADY_INSTALLED")
 
         # Validate config against schema
         if plugin.config_schema:
             required_keys = plugin.config_schema.get("required", [])
             for key in required_keys:
                 if key not in config:
-                    raise HTTPException(status_code=400, detail=f"Missing required config key: {key}")
+                    raise BadRequestError(error=f"Missing required config key: {key}", code="MISSING_REQUIRED_CONFIG_KEY")
 
         installation = PluginInstallation(
             plugin_id=plugin.id,
@@ -172,11 +173,11 @@ class PluginMarketplaceService:
         db: Session, installation_id: str, user: User
     ) -> PluginInstallation:
         if not user.is_sovereign:
-            raise HTTPException(status_code=403, detail="Only Sovereign can uninstall plugins.")
+            raise ForbiddenError(error="Only Sovereign can uninstall plugins.", code="ONLY_SOVEREIGN_CAN_UNINSTALL_PLUGINS")
             
         installation = db.query(PluginInstallation).filter(PluginInstallation.id == installation_id).first()
         if not installation:
-            raise HTTPException(status_code=404, detail="Installation not found.")
+            raise NotFoundError(error="Installation not found.", code="INSTALLATION_NOT_FOUND")
             
         installation.is_active = False
         db.commit()
@@ -190,16 +191,16 @@ class PluginMarketplaceService:
         """
         installation = db.query(PluginInstallation).filter(PluginInstallation.id == installation_id).first()
         if not installation or not installation.is_active:
-            raise HTTPException(status_code=404, detail="Active plugin installation not found.")
+            raise NotFoundError(error="Active plugin installation not found.", code="ACTIVE_PLUGIN_INSTALLATION_NOT_FOUND")
             
         plugin = db.query(Plugin).filter(Plugin.id == installation.plugin_id).first()
         if not plugin:
-            raise HTTPException(status_code=404, detail="Plugin not found.")
+            raise NotFoundError(error="Plugin not found.", code="PLUGIN_NOT_FOUND")
             
         # Ensure remote executor is enabled in config
         from backend.core.config import settings
         if not settings.REMOTE_EXECUTOR_ENABLED:
-            raise HTTPException(status_code=503, detail="Sandboxed execution is disabled on this instance.")
+            raise ServiceUnavailableError(error="Sandboxed execution is disabled on this instance.", code="SANDBOXED_EXECUTION_IS_DISABLED_ON")
             
         logger.info(f"Plugin Marketplace: Dispatching {plugin.name} to sandbox with timeout {settings.SANDBOX_TIMEOUT_SECONDS}s")
         
@@ -224,7 +225,7 @@ class PluginMarketplaceService:
         """
         plugin = db.query(Plugin).filter(Plugin.id == plugin_id).first()
         if not plugin:
-            raise HTTPException(status_code=404, detail="Plugin not found.")
+            raise NotFoundError(error="Plugin not found.", code="PLUGIN_NOT_FOUND")
             
         from backend.models.entities.plugin import PluginRevenueLedger
         
@@ -249,11 +250,11 @@ class PluginMarketplaceService:
     ) -> PluginReview:
         """Submit a rating and review for a plugin."""
         if not (1 <= rating <= 5):
-            raise HTTPException(status_code=400, detail="Rating must be between 1 and 5.")
+            raise BadRequestError(error="Rating must be between 1 and 5.", code="RATING_MUST_BE_BETWEEN_1")
 
         plugin = db.query(Plugin).filter(Plugin.id == plugin_id).first()
         if not plugin:
-            raise HTTPException(status_code=404, detail="Plugin not found.")
+            raise NotFoundError(error="Plugin not found.", code="PLUGIN_NOT_FOUND")
 
         # Check existing review
         existing_review = db.query(PluginReview).filter(

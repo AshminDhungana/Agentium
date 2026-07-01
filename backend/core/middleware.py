@@ -22,6 +22,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from backend.core.config import settings
+from backend.core.error_responses import make_error_response
 
 logger = logging.getLogger(__name__)
 
@@ -264,14 +265,15 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             user_allowed, user_remaining = await self._check(user_key, user_rule)
             if not user_allowed:
                 retry_after = user_rule.window
-                return JSONResponse(
-                    {
-                        "detail": "Rate limit exceeded. Please try again later.",
-                        "code": "RATE_LIMIT_EXCEEDED",
+                return make_error_response(
+                    status_code=429,
+                    error="Rate limit exceeded. Please try again later.",
+                    code="RATE_LIMIT_EXCEEDED",
+                    detail={
                         "tier": f"user:{tier.value}",
                         "retry_after_seconds": retry_after,
+                        "rate_limit": user_rule.requests,
                     },
-                    status_code=429,
                     headers={
                         "Retry-After": str(retry_after),
                         "X-RateLimit-Limit": str(user_rule.requests),
@@ -291,14 +293,15 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         if not allowed:
             rule = _IP_RULES[tier]  # Get rule for retry_after calculation
             retry_after = rule.window
-            return JSONResponse(
-                {
-                    "detail": "Rate limit exceeded. Please try again later.",
-                    "code": "RATE_LIMIT_EXCEEDED",
+            return make_error_response(
+                status_code=429,
+                error="Rate limit exceeded. Please try again later.",
+                code="RATE_LIMIT_EXCEEDED",
+                detail={
                     "tier": tier.value,
                     "retry_after_seconds": retry_after,
+                    "rate_limit": rule.requests,
                 },
-                status_code=429,
                 headers={
                     "Retry-After": str(retry_after),
                     "X-RateLimit-Limit": str(rule.requests),

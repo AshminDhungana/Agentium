@@ -3,7 +3,8 @@ Voting API routes for Agentium.
 Handles constitutional amendment voting and task deliberations.
 
 """
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, status, Query
+from backend.core.exceptions import BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, TooLargeError, RateLimitError, InternalServerError, ServiceUnavailableError
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from pydantic import BaseModel, Field
@@ -174,11 +175,11 @@ async def propose_amendment(
         )
         return result
     except PermissionError as e:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+        raise ForbiddenError(error=str(e), code="STRE")
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise BadRequestError(error=str(e), code="STRE")
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        raise InternalServerError(error=str(e), code="STRE")
 
 
 @router.get("/amendments/{amendment_id}", response_model=dict)
@@ -193,7 +194,7 @@ async def get_amendment_details(
 
     detail = await service.get_amendment_detail(amendment_id)
     if not detail:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Amendment not found")
+        raise NotFoundError(error="Amendment not found", code="AMENDMENT_NOT_FOUND")
 
     return detail
 
@@ -211,20 +212,17 @@ async def cast_amendment_vote(
     try:
         vote_enum = VoteType(vote_data.vote)
     except ValueError:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid vote type")
+        raise BadRequestError(error="Invalid vote type", code="INVALID_VOTE_TYPE")
 
     amendment = db.query(AmendmentVoting).filter_by(id=amendment_id).first()
     if not amendment:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Amendment not found")
+        raise NotFoundError(error="Amendment not found", code="AMENDMENT_NOT_FOUND")
 
     if amendment.status != AmendmentStatus.VOTING:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Amendment is not currently in VOTING status (current: {amendment.status.value})"
-        )
+        raise BadRequestError(error=f"Amendment is not currently in VOTING status (current: {amendment.status.value})", code="AMENDMENT_IS_NOT_CURRENTLY_IN")
 
     if user_id not in (amendment.eligible_voters or []):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You are not eligible to vote")
+        raise ForbiddenError(error="You are not eligible to vote", code="YOU_ARE_NOT_ELIGIBLE_TO")
 
     try:
         vote_record = amendment.cast_vote(user_id, vote_enum, vote_data.rationale)
@@ -241,10 +239,10 @@ async def cast_amendment_vote(
             },
         )
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise BadRequestError(error=str(e), code="STRE")
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        raise InternalServerError(error=str(e), code="STRE")
 
 
 @router.post("/amendments/{amendment_id}/sponsor")
@@ -261,9 +259,9 @@ async def sponsor_amendment(
         result = await service.sponsor_amendment(amendment_id, user_id)
         return result
     except PermissionError as e:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+        raise ForbiddenError(error=str(e), code="STRE")
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise BadRequestError(error=str(e), code="STRE")
 
 
 @router.post("/amendments/{amendment_id}/start-voting")
@@ -278,7 +276,7 @@ async def start_amendment_voting(
         result = await service.start_voting(amendment_id)
         return result
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise BadRequestError(error=str(e), code="STRE")
 
 
 @router.post("/amendments/{amendment_id}/conclude")
@@ -293,7 +291,7 @@ async def conclude_amendment_voting(
         result = await service.conclude_voting(amendment_id)
         return result
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise BadRequestError(error=str(e), code="STRE")
 
 
 # ============================================================================
@@ -350,7 +348,7 @@ async def get_deliberation_details(
     """Get detailed information about a deliberation."""
     deliberation = db.query(TaskDeliberation).filter_by(id=deliberation_id).first()
     if not deliberation:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Deliberation not found")
+        raise NotFoundError(error="Deliberation not found", code="DELIBERATION_NOT_FOUND")
 
     # Get individual votes
     votes = deliberation.individual_votes.all()
@@ -404,11 +402,11 @@ async def cast_deliberation_vote(
     try:
         vote_enum = VoteType(vote_data.vote)
     except ValueError:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid vote type")
+        raise BadRequestError(error="Invalid vote type", code="INVALID_VOTE_TYPE")
 
     deliberation = db.query(TaskDeliberation).filter_by(id=deliberation_id).first()
     if not deliberation:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Deliberation not found")
+        raise NotFoundError(error="Deliberation not found", code="DELIBERATION_NOT_FOUND")
 
     # FIX: Accept votes in both ACTIVE and QUORUM_REACHED states.
     # The TaskDeliberation.cast_vote() model method handles both statuses correctly.
@@ -416,17 +414,14 @@ async def cast_deliberation_vote(
         DeliberationStatus.ACTIVE,
         DeliberationStatus.QUORUM_REACHED,
     ):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
+        raise BadRequestError(error=(
                 f"Deliberation is not currently accepting votes "
                 f"(current status: {deliberation.status.value}). "
                 f"Voting is only open when status is 'active' or 'quorum'."
-            ),
-        )
+            ), code="FDELIBERATION_IS_NOT_CURRENTLY_ACCEPTING")
 
     if user_id not in (deliberation.participating_members or []):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You are not part of this deliberation")
+        raise ForbiddenError(error="You are not part of this deliberation", code="YOU_ARE_NOT_PART_OF")
 
     try:
         vote_record = deliberation.cast_vote(user_id, vote_enum, vote_data.rationale)
@@ -443,10 +438,10 @@ async def cast_deliberation_vote(
             },
         )
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise BadRequestError(error=str(e), code="STRE")
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        raise InternalServerError(error=str(e), code="STRE")
 
 
 @router.post("/deliberations/{deliberation_id}/start")
@@ -458,13 +453,10 @@ async def start_deliberation(
     """Start a deliberation (transition from PENDING to ACTIVE)."""
     deliberation = db.query(TaskDeliberation).filter_by(id=deliberation_id).first()
     if not deliberation:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Deliberation not found")
+        raise NotFoundError(error="Deliberation not found", code="DELIBERATION_NOT_FOUND")
 
     if deliberation.status != DeliberationStatus.PENDING:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Deliberation must be in PENDING status (current: {deliberation.status.value})"
-        )
+        raise BadRequestError(error=f"Deliberation must be in PENDING status (current: {deliberation.status.value})", code="DELIBERATION_MUST_BE_IN_PENDING")
 
     deliberation.start()
     db.commit()
@@ -481,13 +473,10 @@ async def conclude_deliberation(
     """Conclude a deliberation and calculate the result."""
     deliberation = db.query(TaskDeliberation).filter_by(id=deliberation_id).first()
     if not deliberation:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Deliberation not found")
+        raise NotFoundError(error="Deliberation not found", code="DELIBERATION_NOT_FOUND")
 
     if deliberation.status not in [DeliberationStatus.ACTIVE, DeliberationStatus.QUORUM_REACHED]:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Deliberation must be ACTIVE or QUORUM_REACHED (current: {deliberation.status.value})"
-        )
+        raise BadRequestError(error=f"Deliberation must be ACTIVE or QUORUM_REACHED (current: {deliberation.status.value})", code="DELIBERATION_MUST_BE_ACTIVE_OR")
 
     try:
         result = deliberation.conclude()
@@ -502,4 +491,4 @@ async def conclude_deliberation(
         }
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        raise InternalServerError(error=str(e), code="STRE")

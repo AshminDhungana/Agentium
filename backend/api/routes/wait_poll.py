@@ -16,7 +16,8 @@ import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
+from backend.core.exceptions import BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, TooLargeError, RateLimitError, InternalServerError, ServiceUnavailableError
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -54,7 +55,7 @@ class ResolveWaitConditionRequest(BaseModel):
 def _get_condition_or_404(db: Session, condition_id: str) -> WaitCondition:
     condition = db.query(WaitCondition).filter(WaitCondition.id == condition_id).first()
     if not condition:
-        raise HTTPException(status_code=404, detail="WaitCondition not found")
+        raise NotFoundError(error="WaitCondition not found", code="WAITCONDITION_NOT_FOUND")
     return condition
 
 
@@ -73,13 +74,10 @@ def create_wait_condition(
     # Validate task exists
     task = db.query(Task).filter(Task.id == body.task_id).first()
     if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
+        raise NotFoundError(error="Task not found", code="TASK_NOT_FOUND")
 
     if task.status == TaskStatus.WAITING:
-        raise HTTPException(
-            status_code=409,
-            detail="Task is already in WAITING state",
-        )
+        raise ConflictError(error="Task is already in WAITING state", code="TASK_IS_ALREADY_IN_WAITING")
 
     # Create condition
     condition = WaitPollService.create_condition(
@@ -101,10 +99,7 @@ def create_wait_condition(
         )
     except Exception as exc:
         db.rollback()
-        raise HTTPException(
-            status_code=422,
-            detail=f"Could not transition task to WAITING: {exc}",
-        )
+        raise BadRequestError(error=f"Could not transition task to WAITING: {exc}", code="COULD_NOT_TRANSITION_TASK_TO")
 
     db.commit()
     db.refresh(condition)
@@ -154,14 +149,11 @@ def resolve_wait_condition(
     condition = _get_condition_or_404(db, condition_id)
 
     if condition.status != WaitConditionStatus.ACTIVE:
-        raise HTTPException(
-            status_code=409,
-            detail=f"WaitCondition is not ACTIVE (current status: {condition.status.value})",
-        )
+        raise ConflictError(error=f"WaitCondition is not ACTIVE (current status: {condition.status.value})", code="WAITCONDITION_IS_NOT_ACTIVE_CURRENT")
 
     success = WaitPollService.resolve_condition(db, condition_id, data=body.data)
     if not success:
-        raise HTTPException(status_code=500, detail="Resolution failed")
+        raise InternalServerError(error="Resolution failed", code="RESOLUTION_FAILED")
 
     db.refresh(condition)
     return condition.to_dict()
@@ -179,10 +171,7 @@ def cancel_wait_condition(
     condition = _get_condition_or_404(db, condition_id)
 
     if condition.status not in (WaitConditionStatus.ACTIVE, WaitConditionStatus.PENDING):
-        raise HTTPException(
-            status_code=409,
-            detail=f"Cannot cancel a condition in state: {condition.status.value}",
-        )
+        raise ConflictError(error=f"Cannot cancel a condition in state: {condition.status.value}", code="CANNOT_CANCEL_A_CONDITION_IN")
 
     condition.cancel()
 

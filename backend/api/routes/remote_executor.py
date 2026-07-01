@@ -5,7 +5,8 @@ Phase 6.6: Brains vs Hands — separates reasoning from execution.
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, BackgroundTasks
+from backend.core.exceptions import BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, TooLargeError, RateLimitError, InternalServerError, ServiceUnavailableError
 from sqlalchemy.orm import Session
 
 from backend.models.database import get_db
@@ -71,10 +72,7 @@ async def create_sandbox(
 ):
     """Create a persistent sandbox for multiple executions. Requires admin."""
     if not current_user.get("is_admin"):
-        raise HTTPException(
-            status_code=403,
-            detail="Admin privileges required to create persistent sandboxes",
-        )
+        raise ForbiddenError(error="Admin privileges required to create persistent sandboxes", code="ADMIN_PRIVILEGES_REQUIRED_TO_CREATE")
 
     agent_id = "00001"
     service = RemoteExecutorService(db)
@@ -115,10 +113,7 @@ async def destroy_sandbox(
 ):
     """Destroy a sandbox and clean up resources."""
     if not current_user.get("is_admin"):
-        raise HTTPException(
-            status_code=403,
-            detail="Admin privileges required to destroy sandboxes",
-        )
+        raise ForbiddenError(error="Admin privileges required to destroy sandboxes", code="ADMIN_PRIVILEGES_REQUIRED_TO_DESTROY")
 
     service = RemoteExecutorService(db)
     success = await service.sandbox_manager.destroy_sandbox(sandbox_id, "api_request")
@@ -166,7 +161,7 @@ async def get_execution(
     )
 
     if not record:
-        raise HTTPException(status_code=404, detail="Execution not found")
+        raise NotFoundError(error="Execution not found", code="EXECUTION_NOT_FOUND")
 
     return ExecutionSummaryResponse(
         execution_id=record.execution_id,

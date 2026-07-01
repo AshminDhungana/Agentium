@@ -8,7 +8,8 @@ from datetime import datetime, timezone
 from threading import Lock
 from time import time
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, status, Request
+from backend.core.exceptions import BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, TooLargeError, RateLimitError, InternalServerError, ServiceUnavailableError
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.orm import Session
@@ -52,14 +53,10 @@ def _check_rate_limit(identifier: str) -> None:
             if now - t < _LOGIN_WINDOW_SECONDS
         ]
         if len(_login_attempts[identifier]) >= _MAX_LOGIN_ATTEMPTS:
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail=(
+            raise RateLimitError(error=(
                     f"Too many failed login attempts. "
                     f"Please wait {_LOGIN_WINDOW_SECONDS // 60} minutes before trying again."
-                ),
-                headers={"Retry-After": str(_LOGIN_WINDOW_SECONDS)},
-            )
+                ), code="FTOO_MANY_FAILED_LOGIN_ATTEMPTS", headers={"Retry-After": str(_LOGIN_WINDOW_SECONDS)})
         _login_attempts[identifier].append(now)
 
 
@@ -121,10 +118,7 @@ async def signup(
     ).first()
 
     if existing_user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Username or email already registered",
-        )
+        raise BadRequestError(error="Username or email already registered", code="USERNAME_OR_EMAIL_ALREADY_REGISTERED")
 
     user = User.create_user(
         db=db,
@@ -192,10 +186,7 @@ async def login(
         db.add(audit_entry)
         db.commit()
 
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid credentials or account not approved",
-        )
+        raise UnauthorizedError(error="Invalid credentials or account not approved", code="INVALID_CREDENTIALS_OR_ACCOUNT_NOT")
 
     # Check if user is active and approved
     if not user.is_active or user.is_pending:
@@ -217,10 +208,7 @@ async def login(
         db.add(audit_entry)
         db.commit()
 
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Account pending approval or deactivated",
-        )
+        raise ForbiddenError(error="Account pending approval or deactivated", code="ACCOUNT_PENDING_APPROVAL_OR_DEACTIVATED")
 
     # Successful DB login — clear rate-limit counter for this username
     _clear_rate_limit(payload.username)
@@ -269,18 +257,11 @@ async def refresh_token_endpoint(
     token_payload = verify_token(payload.refresh_token)
 
     if not token_payload or token_payload.get("type") != "refresh":
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired refresh token",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        raise UnauthorizedError(error="Invalid or expired refresh token", code="INVALID_OR_EXPIRED_REFRESH_TOKEN", headers={"WWW-Authenticate": "Bearer"})
 
     username = token_payload.get("sub")
     if not username:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token payload",
-        )
+        raise UnauthorizedError(error="Invalid token payload", code="INVALID_TOKEN_PAYLOAD")
 
     token_data = {
         "sub": username,
@@ -362,24 +343,15 @@ async def change_password(
 ):
     """Change own password."""
     if current_user.get("user_id") is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Emergency sovereign users cannot change password. Please use database admin account.",
-        )
+        raise BadRequestError(error="Emergency sovereign users cannot change password. Please use database admin account.", code="EMERGENCY_SOVEREIGN_USERS_CANNOT_CHANGE")
 
     user_id = current_user.get("user_id")
     if not user_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User ID not found in token",
-        )
+        raise BadRequestError(error="User ID not found in token", code="USER_ID_NOT_FOUND_IN")
 
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found",
-        )
+        raise NotFoundError(error="User not found", code="USER_NOT_FOUND")
 
     if not User.verify_password(payload.old_password, user.hashed_password):
         # C1: persist failed audit, then raise
@@ -395,10 +367,7 @@ async def change_password(
         db.add(audit_entry)
         db.commit()
 
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Current password is incorrect",
-        )
+        raise BadRequestError(error="Current password is incorrect", code="CURRENT_PASSWORD_IS_INCORRECT")
 
     user.hashed_password = User.hash_password(payload.new_password)
     user.updated_at = datetime.now(timezone.utc)
@@ -441,10 +410,7 @@ async def get_voice_token(
             user_id=current_user.get("user_id"),
         )
     except RuntimeError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=str(exc),
-        )
+        raise ServiceUnavailableError(error=str(exc), code="STREXC")
 
     duration = int(os.getenv("VOICE_TOKEN_DURATION_MINUTES", "30"))
 

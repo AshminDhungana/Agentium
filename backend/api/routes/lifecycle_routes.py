@@ -6,7 +6,8 @@ Provides endpoints for spawning, promoting, and liquidating agents.
 
 from datetime import datetime
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
+from fastapi import APIRouter, Depends, status, BackgroundTasks
+from backend.core.exceptions import BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, TooLargeError, RateLimitError, InternalServerError, ServiceUnavailableError
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -124,16 +125,10 @@ async def spawn_task_agent(
     parent = db.query(Agent).filter_by(agentium_id=request.parent_agentium_id).first()
 
     if not parent:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Parent agent {request.parent_agentium_id} not found"
-        )
+        raise NotFoundError(error=f"Parent agent {request.parent_agentium_id} not found", code="PARENT_AGENT_NOT_FOUND")
 
     if not request.parent_agentium_id.startswith(('1', '2')):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Parent must be a Lead Agent (2xxxx) or Council Member (1xxxx)"
-        )
+        raise BadRequestError(error="Parent must be a Lead Agent (2xxxx) or Council Member (1xxxx)", code="PARENT_MUST_BE_A_LEAD")
 
     try:
         task_agent = reincarnation_service.spawn_task_agent(
@@ -171,15 +166,12 @@ async def spawn_task_agent(
         )
 
     except PermissionError as e:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+        raise ForbiddenError(error=str(e), code="STRE")
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise BadRequestError(error=str(e), code="STRE")
     except Exception as e:
         db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to spawn Task Agent: {str(e)}"
-        )
+        raise InternalServerError(error=f"Failed to spawn Task Agent: {str(e)}", code="FAILED_TO_SPAWN_TASK_AGENT")
 
 
 @router.post("/spawn/lead", response_model=AgentSpawnResponse)
@@ -197,16 +189,10 @@ async def spawn_lead_agent(
     parent = db.query(Agent).filter_by(agentium_id=request.parent_agentium_id).first()
 
     if not parent:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Parent agent {request.parent_agentium_id} not found"
-        )
+        raise NotFoundError(error=f"Parent agent {request.parent_agentium_id} not found", code="PARENT_AGENT_NOT_FOUND")
 
     if not request.parent_agentium_id.startswith(('0', '1')):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Parent must be a Council Member (1xxxx) or Head of Council (0xxxx)"
-        )
+        raise BadRequestError(error="Parent must be a Council Member (1xxxx) or Head of Council (0xxxx)", code="PARENT_MUST_BE_A_COUNCIL")
 
     try:
         lead_agent = reincarnation_service.spawn_lead_agent(
@@ -243,15 +229,12 @@ async def spawn_lead_agent(
         )
 
     except PermissionError as e:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+        raise ForbiddenError(error=str(e), code="STRE")
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise BadRequestError(error=str(e), code="STRE")
     except Exception as e:
         db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to spawn Lead Agent: {str(e)}"
-        )
+        raise InternalServerError(error=f"Failed to spawn Lead Agent: {str(e)}", code="FAILED_TO_SPAWN_LEAD_AGENT")
 
 
 # ═══════════════════════════════════════════════════════════
@@ -273,16 +256,10 @@ async def promote_task_to_lead(
     promoter = db.query(Agent).filter_by(agentium_id=request.promoted_by_agentium_id).first()
 
     if not promoter:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Promoter agent {request.promoted_by_agentium_id} not found"
-        )
+        raise NotFoundError(error=f"Promoter agent {request.promoted_by_agentium_id} not found", code="PROMOTER_AGENT_NOT_FOUND")
 
     if not request.task_agentium_id.startswith('3'):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Only Task Agents (3xxxx) can be promoted to Lead"
-        )
+        raise BadRequestError(error="Only Task Agents (3xxxx) can be promoted to Lead", code="ONLY_TASK_AGENTS_3XXXX_CAN")
 
     try:
         lead_agent = reincarnation_service.promote_to_lead(
@@ -325,15 +302,12 @@ async def promote_task_to_lead(
         )
 
     except PermissionError as e:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+        raise ForbiddenError(error=str(e), code="STRE")
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise BadRequestError(error=str(e), code="STRE")
     except Exception as e:
         db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to promote agent: {str(e)}"
-        )
+        raise InternalServerError(error=f"Failed to promote agent: {str(e)}", code="FAILED_TO_PROMOTE_AGENT")
 
 
 # ═══════════════════════════════════════════════════════════
@@ -355,16 +329,10 @@ async def liquidate_agent(
     liquidator = db.query(Agent).filter_by(agentium_id=request.liquidated_by_agentium_id).first()
 
     if not liquidator:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Liquidator agent {request.liquidated_by_agentium_id} not found"
-        )
+        raise NotFoundError(error=f"Liquidator agent {request.liquidated_by_agentium_id} not found", code="LIQUIDATOR_AGENT_NOT_FOUND")
 
     if request.target_agentium_id == "00001" and not request.force:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Cannot liquidate Head of Council (00001)"
-        )
+        raise ForbiddenError(error="Cannot liquidate Head of Council (00001)", code="CANNOT_LIQUIDATE_HEAD_OF_COUNCIL")
 
     # Capture agent name before liquidation for WS event
     target_agent = db.query(Agent).filter_by(agentium_id=request.target_agentium_id).first()
@@ -404,15 +372,12 @@ async def liquidate_agent(
         )
 
     except PermissionError as e:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+        raise ForbiddenError(error=str(e), code="STRE")
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise BadRequestError(error=str(e), code="STRE")
     except Exception as e:
         db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to liquidate agent: {str(e)}"
-        )
+        raise InternalServerError(error=f"Failed to liquidate agent: {str(e)}", code="FAILED_TO_LIQUIDATE_AGENT")
 
 
 # ═══════════════════════════════════════════════════════════
@@ -462,10 +427,7 @@ async def bulk_liquidate_idle_agents(
     Set dry_run=false to actually execute. Admin/Sovereign only.
     """
     if not current_user.get("is_admin") and current_user.get("role") != "sovereign":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin or Sovereign privileges required"
-        )
+        raise ForbiddenError(error="Admin or Sovereign privileges required", code="ADMIN_OR_SOVEREIGN_PRIVILEGES_REQUIRED")
 
     # Body takes precedence over query params
     effective_threshold = body.idle_days_threshold if body else idle_days_threshold

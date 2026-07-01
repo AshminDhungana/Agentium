@@ -3,7 +3,8 @@ Critic API routes for Agentium.
 Endpoints for submitting task outputs for critic review and querying review history.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, status, Query
+from backend.core.exceptions import BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, TooLargeError, RateLimitError, InternalServerError, ServiceUnavailableError
 from sqlalchemy.orm import Session
 from typing import Optional
 from pydantic import BaseModel, Field
@@ -45,10 +46,7 @@ async def submit_review(
     try:
         critic_type = CriticType(request.critic_type.lower())
     except ValueError:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid critic_type '{request.critic_type}'. Valid: {[ct.value for ct in CriticType]}",
-        )
+        raise BadRequestError(error=f"Invalid critic_type '{request.critic_type}'. Valid: {[ct.value for ct in CriticType]}", code="INVALID_CRITICTYPE_VALID")
     
     result = await critic_service.review_task_output(
         db=db,

@@ -16,6 +16,7 @@ from typing import List, Optional, Dict, Any
 import httpx
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
+from backend.core.exceptions import BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, TooLargeError, RateLimitError, InternalServerError, ServiceUnavailableError
 
 from backend.models.entities.federation import FederatedInstance, FederatedTask, FederatedVote
 from backend.models.entities.task import Task, TaskStatus, TaskPriority, TaskType
@@ -98,12 +99,12 @@ class FederationService:
     ) -> FederatedInstance:
         """Register a new peer instance. Stores hashed secret + derived signing key."""
         if not settings.FEDERATION_ENABLED:
-            raise HTTPException(status_code=400, detail="Federation is not enabled on this instance.")
+            raise BadRequestError(error="Federation is not enabled on this instance.", code="FEDERATION_IS_NOT_ENABLED_ON")
 
         base_url = base_url.rstrip("/")
         existing = db.query(FederatedInstance).filter(FederatedInstance.base_url == base_url).first()
         if existing:
-            raise HTTPException(status_code=400, detail="Peer with this base URL already registered.")
+            raise BadRequestError(error="Peer with this base URL already registered.", code="PEER_WITH_THIS_BASE_URL")
 
         peer = FederatedInstance(
             name=name,
@@ -127,7 +128,7 @@ class FederationService:
     def get_peer(db: Session, peer_id: str) -> FederatedInstance:
         peer = db.query(FederatedInstance).filter(FederatedInstance.id == peer_id).first()
         if not peer:
-            raise HTTPException(status_code=404, detail="Peer not found.")
+            raise NotFoundError(error="Peer not found.", code="PEER_NOT_FOUND")
         return peer
 
     @staticmethod
@@ -170,22 +171,22 @@ class FederationService:
           X-Agentium-Signature : sha256=<hex>
         """
         if not settings.FEDERATION_ENABLED:
-            raise HTTPException(status_code=403, detail="Federation disabled.")
+            raise ForbiddenError(error="Federation disabled.", code="FEDERATION_DISABLED")
 
         peer_url = peer_url.rstrip("/")
         peer = db.query(FederatedInstance).filter(FederatedInstance.base_url == peer_url).first()
         if not peer:
-            raise HTTPException(status_code=401, detail="Peer not registered.")
+            raise UnauthorizedError(error="Peer not registered.", code="PEER_NOT_REGISTERED")
 
         if peer.status != "active":
-            raise HTTPException(status_code=403, detail=f"Peer status is '{peer.status}'.")
+            raise ForbiddenError(error=f"Peer status is '{peer.status}'.", code="PEER_STATUS_IS")
 
         # Strip "sha256=" prefix if present
         clean_sig = signature.replace("sha256=", "")
         signing_key = getattr(peer, "signing_key", peer.shared_secret_hash)
 
         if not _verify_signature(signing_key, raw_body, clean_sig, timestamp):
-            raise HTTPException(status_code=401, detail="Invalid or expired signature.")
+            raise UnauthorizedError(error="Invalid or expired signature.", code="INVALID_OR_EXPIRED_SIGNATURE")
 
         peer.last_heartbeat_at = datetime.utcnow()
         db.commit()
@@ -202,16 +203,16 @@ class FederationService:
         New deployments should use authenticate_peer_hmac instead.
         """
         if not settings.FEDERATION_ENABLED:
-            raise HTTPException(status_code=403, detail="Federation disabled.")
+            raise ForbiddenError(error="Federation disabled.", code="FEDERATION_DISABLED")
 
         base_url = base_url.rstrip("/")
         peer = db.query(FederatedInstance).filter(FederatedInstance.base_url == base_url).first()
         if not peer:
-            raise HTTPException(status_code=401, detail="Peer not registered.")
+            raise UnauthorizedError(error="Peer not registered.", code="PEER_NOT_REGISTERED")
         if not FederationService._verify_secret(secret, peer.shared_secret_hash):
-            raise HTTPException(status_code=401, detail="Invalid shared secret.")
+            raise UnauthorizedError(error="Invalid shared secret.", code="INVALID_SHARED_SECRET")
         if peer.status != "active":
-            raise HTTPException(status_code=403, detail=f"Peer status is '{peer.status}'.")
+            raise ForbiddenError(error=f"Peer status is '{peer.status}'.", code="PEER_STATUS_IS")
 
         peer.last_heartbeat_at = datetime.utcnow()
         db.commit()
@@ -239,7 +240,7 @@ class FederationService:
         """
         peer = cls.get_peer(db, target_peer_id)
         if peer.status != "active":
-            raise HTTPException(status_code=400, detail="Target peer is not active.")
+            raise BadRequestError(error="Target peer is not active.", code="TARGET_PEER_IS_NOT_ACTIVE")
 
         fed_task = FederatedTask(
             target_instance_id=peer.id,
@@ -285,7 +286,7 @@ class FederationService:
         so Agentium agents on this instance actually pick it up and execute it.
         """
         if source_peer.trust_level == "read_only":
-            raise HTTPException(status_code=403, detail="Peer only has read_only access.")
+            raise ForbiddenError(error="Peer only has read_only access.", code="PEER_ONLY_HAS_READONLY_ACCESS")
 
         # ── Create a real Task record ─────────────────────────────────────────
         new_task = Task(
@@ -349,7 +350,7 @@ class FederationService:
             .first()
         )
         if not fed_task:
-            raise HTTPException(status_code=404, detail="Federated task record not found.")
+            raise NotFoundError(error="Federated task record not found.", code="FEDERATED_TASK_RECORD_NOT_FOUND")
 
         fed_task.status = status  # "completed" | "failed"
         fed_task.completed_at = datetime.utcnow() if status == "completed" else None
@@ -447,7 +448,7 @@ class FederationService:
     def delete_peer(db: Session, peer_id: str) -> None:
         peer = db.query(FederatedInstance).filter(FederatedInstance.id == peer_id).first()
         if not peer:
-            raise HTTPException(status_code=404, detail="Peer not found.")
+            raise NotFoundError(error="Peer not found.", code="PEER_NOT_FOUND")
         db.delete(peer)
         db.commit()
 
@@ -455,7 +456,7 @@ class FederationService:
     def update_peer_trust(db: Session, peer_id: str, trust_level: str) -> FederatedInstance:
         allowed = {"full", "limited", "read_only"}
         if trust_level not in allowed:
-            raise HTTPException(status_code=400, detail=f"trust_level must be one of {allowed}")
+            raise BadRequestError(error=f"trust_level must be one of {allowed}", code="TRUSTLEVEL_MUST_BE_ONE_OF")
         peer = FederationService.get_peer(db, peer_id)
         peer.trust_level = trust_level
         db.commit()
@@ -472,7 +473,7 @@ class FederationService:
         """
         peer = cls.get_peer(db, target_peer_id)
         if peer.status != "active":
-            raise HTTPException(status_code=400, detail="Target peer is not active.")
+            raise BadRequestError(error="Target peer is not active.", code="TARGET_PEER_IS_NOT_ACTIVE")
 
         try:
             body = b""
@@ -546,7 +547,7 @@ class FederationService:
                 valid_peers.append(peer.id)
                 
         if not valid_peers:
-            raise HTTPException(status_code=400, detail="No active peers provided for federated vote.")
+            raise BadRequestError(error="No active peers provided for federated vote.", code="NO_ACTIVE_PEERS_PROVIDED_FOR")
             
         vote = FederatedVote(
             proposal_id=proposal_id,
@@ -569,15 +570,15 @@ class FederationService:
         vote = db.query(FederatedVote).filter(FederatedVote.proposal_id == proposal_id).first()
         
         if not vote:
-            raise HTTPException(status_code=404, detail="Federated vote not found.")
+            raise NotFoundError(error="Federated vote not found.", code="FEDERATED_VOTE_NOT_FOUND")
             
         if vote.status != "open" or datetime.utcnow() > vote.closes_at:
             vote.status = "closed"
             db.commit()
-            raise HTTPException(status_code=400, detail="Federated vote is closed.")
+            raise BadRequestError(error="Federated vote is closed.", code="FEDERATED_VOTE_IS_CLOSED")
             
         if peer_id not in vote.participating_instances:
-            raise HTTPException(status_code=403, detail="Peer is not a participant in this vote.")
+            raise ForbiddenError(error="Peer is not a participant in this vote.", code="PEER_IS_NOT_A_PARTICIPANT")
             
         # Copy the JSON dict before modifying (SQLAlchemy JSON tracking)
         current_votes = vote.votes.copy() if vote.votes else {}

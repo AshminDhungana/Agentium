@@ -9,9 +9,11 @@ import logging
 from typing import Optional
 
 from fastapi import (
-    APIRouter, Depends, File, Form, HTTPException,
+    APIRouter, Depends, File, Form,
     UploadFile, WebSocket, WebSocketDisconnect,
 )
+
+from backend.core.exceptions import BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, TooLargeError, RateLimitError, InternalServerError, ServiceUnavailableError
 from sqlalchemy.orm import Session
 
 from backend.api.routes.auth import get_current_active_user
@@ -66,10 +68,10 @@ async def transcribe_audio(
             "speaker_confidence": speaker_info.get("confidence")
         }
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise BadRequestError(error=str(exc), code="STREXC")
     except Exception as exc:
         logger.error("Transcription failed: %s", exc)
-        raise HTTPException(status_code=500, detail="Transcription failed")
+        raise InternalServerError(error="Transcription failed", code="TRANSCRIPTION_FAILED")
 
 
 @router.post("/synthesize")
@@ -94,10 +96,10 @@ async def synthesize_speech(
             headers={"Content-Disposition": "attachment; filename=speech.mp3"},
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise BadRequestError(error=str(exc), code="STREXC")
     except Exception as exc:
         logger.error("Synthesis failed: %s", exc)
-        raise HTTPException(status_code=500, detail="Speech synthesis failed")
+        raise InternalServerError(error="Speech synthesis failed", code="SPEECH_SYNTHESIS_FAILED")
 
 # ── Speaker Identification Endpoints ────────────────────────────────────────────
 
@@ -114,11 +116,11 @@ async def register_speaker(
         audio_bytes = await audio.read()
         profile = identifier.enroll(db, str(current_user.id), name, audio_bytes)
         if not profile:
-            raise HTTPException(status_code=400, detail="Failed to extract embedding from audio sample.")
+            raise BadRequestError(error="Failed to extract embedding from audio sample.", code="FAILED_TO_EXTRACT_EMBEDDING_FROM")
         return profile.to_dict()
     except Exception as exc:
         logger.error("Speaker registration failed: %s", exc)
-        raise HTTPException(status_code=500, detail="Speaker registration failed")
+        raise InternalServerError(error="Speaker registration failed", code="SPEAKER_REGISTRATION_FAILED")
 
 @router.get("/speakers")
 async def get_speakers(
@@ -138,7 +140,7 @@ async def delete_speaker(
     """Soft delete a speaker profile."""
     profile = db.query(SpeakerProfile).filter(SpeakerProfile.id == speaker_id, SpeakerProfile.is_deleted == False).first()
     if not profile:
-        raise HTTPException(status_code=404, detail="Speaker profile not found")
+        raise NotFoundError(error="Speaker profile not found", code="SPEAKER_PROFILE_NOT_FOUND")
     profile.is_deleted = True
     db.commit()
     return {"status": "success", "message": "Speaker profile deleted"}

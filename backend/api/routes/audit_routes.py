@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
+from backend.core.exceptions import BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, TooLargeError, RateLimitError, InternalServerError, ServiceUnavailableError
 from sqlalchemy.orm import Session
 from typing import List, Optional
 
@@ -21,7 +22,7 @@ async def get_escalations(
     Only accessible by users with admin privileges.
     """
     if not current_user.get("is_admin"):
-        raise HTTPException(status_code=403, detail="Not authorized to view audit logs")
+        raise ForbiddenError(error="Not authorized to view audit logs", code="NOT_AUTHORIZED_TO_VIEW_AUDIT")
 
     logs, total = AuditService.get_escalations(db, skip=skip, limit=limit, search=search)
     

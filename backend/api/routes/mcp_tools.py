@@ -3,7 +3,8 @@ MCP Tools API Routes
 """
 from typing import Optional, List, Any, Dict
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query, status
+from backend.core.exceptions import BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, TooLargeError, RateLimitError, InternalServerError, ServiceUnavailableError
 from sqlalchemy.orm import Session
 
 from backend.models.database import get_db
@@ -77,7 +78,7 @@ async def propose_mcp_server(
         )
         return MCPToolResponse(**tool.to_dict())
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+        raise BadRequestError(error=str(exc), code="STREXC")
 
 
 # ── Phase 15.2: Stats routes (placed BEFORE /{tool_id} to avoid routing conflicts) ──
@@ -124,13 +125,13 @@ async def get_revoked_tools(
     Admin / Sovereign only.
     """
     if not current_user.get("is_admin") and current_user.get("role") != "sovereign":
-        raise HTTPException(status_code=403, detail="Admin or Sovereign privileges required.")
+        raise ForbiddenError(error="Admin or Sovereign privileges required.", code="ADMIN_OR_SOVEREIGN_PRIVILEGES_REQUIRED")
     try:
         from backend.services import mcp_stats_service
         revoked = mcp_stats_service.get_revoked_ids()
         return {"revoked_tool_ids": revoked, "count": len(revoked)}
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise InternalServerError(error=str(exc), code="STREXC")
 
 
 # ── Existing /{tool_id} routes (unchanged) ─────────────────────────────────────
@@ -144,7 +145,7 @@ async def get_mcp_tool(
     from backend.models.entities.mcp_tool import MCPTool
     tool = db.query(MCPTool).filter(MCPTool.id == tool_id).first()
     if not tool:
-        raise HTTPException(status_code=404, detail=f"MCP tool '{tool_id}' not found.")
+        raise NotFoundError(error=f"MCP tool '{tool_id}' not found.", code="MCP_TOOL_NOT_FOUND")
     return MCPToolResponse(**tool.to_dict())
 
 
@@ -162,7 +163,7 @@ async def get_tool_stats(
     from backend.models.entities.mcp_tool import MCPTool
     tool = db.query(MCPTool).filter(MCPTool.id == tool_id).first()
     if not tool:
-        raise HTTPException(status_code=404, detail=f"MCP tool '{tool_id}' not found.")
+        raise NotFoundError(error=f"MCP tool '{tool_id}' not found.", code="MCP_TOOL_NOT_FOUND")
 
     try:
         from backend.services import mcp_stats_service
@@ -180,7 +181,7 @@ async def get_tool_stats(
             }
         return {**stats, "tool_name": tool.name}
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise InternalServerError(error=str(exc), code="STREXC")
 
 
 @router.post("/{tool_id}/approve", response_model=MCPToolResponse)
@@ -196,13 +197,13 @@ async def approve_mcp_tool(
     Phase 15.2: also removes tool from the Redis revocation SET if present.
     """
     if not current_user.get("is_admin") and current_user.get("role") != "sovereign":
-        raise HTTPException(status_code=403, detail="Admin or Sovereign privileges required.")
+        raise ForbiddenError(error="Admin or Sovereign privileges required.", code="ADMIN_OR_SOVEREIGN_PRIVILEGES_REQUIRED")
 
     svc = _governance(db)
     try:
         tool = svc.approve_mcp_server(tool_id, approved_by=req.approved_by, vote_id=req.vote_id)
     except (ValueError, PermissionError) as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise BadRequestError(error=str(exc), code="STREXC")
 
     bridge = _bridge()
     if bridge:
@@ -224,13 +225,13 @@ async def revoke_mcp_tool(
     Agents attempting to use a revoked tool receive 404/block immediately.
     """
     if not current_user.get("is_admin") and current_user.get("role") != "sovereign":
-        raise HTTPException(status_code=403, detail="Admin or Sovereign privileges required.")
+        raise ForbiddenError(error="Admin or Sovereign privileges required.", code="ADMIN_OR_SOVEREIGN_PRIVILEGES_REQUIRED")
 
     svc = _governance(db)
     try:
         tool = svc.revoke_mcp_tool(tool_id, revoked_by=req.revoked_by, reason=req.reason)
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise NotFoundError(error=str(exc), code="STREXC")
 
     bridge = _bridge()
     if bridge:
@@ -259,9 +260,9 @@ async def execute_mcp_tool(
         )
         return MCPExecutionResponse(**result)
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise NotFoundError(error=str(exc), code="STREXC")
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise InternalServerError(error=str(exc), code="STREXC")
 
 
 @router.get("/{tool_id}/health", response_model=MCPHealthResponse)
@@ -275,7 +276,7 @@ async def check_tool_health(
         health = await svc.get_tool_health(tool_id)
         return MCPHealthResponse(**health)
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise NotFoundError(error=str(exc), code="STREXC")
 
 
 @router.get("/{tool_id}/audit", response_model=MCPAuditResponse)
@@ -286,7 +287,7 @@ async def get_tool_audit_log(
     current_user: dict = Depends(get_current_active_user),
 ):
     if not current_user.get("is_admin") and current_user.get("role") != "sovereign":
-        raise HTTPException(status_code=403, detail="Admin or Sovereign privileges required.")
+        raise ForbiddenError(error="Admin or Sovereign privileges required.", code="ADMIN_OR_SOVEREIGN_PRIVILEGES_REQUIRED")
 
     svc = _governance(db)
     try:
@@ -300,4 +301,4 @@ async def get_tool_audit_log(
             total_entries=len(tool.audit_log or []) if tool else 0,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise NotFoundError(error=str(exc), code="STREXC")

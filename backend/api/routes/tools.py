@@ -12,7 +12,8 @@ Changes vs original:
 """
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
+from backend.core.exceptions import BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, TooLargeError, RateLimitError, InternalServerError, ServiceUnavailableError
 from pydantic import BaseModel
 
 from backend.core.tool_registry import tool_registry
@@ -69,13 +70,10 @@ async def execute_tool(
     tool = tool_registry.get_tool(request.tool_name)
 
     if not tool:
-        raise HTTPException(status_code=404, detail=f"Tool '{request.tool_name}' not found")
+        raise NotFoundError(error=f"Tool '{request.tool_name}' not found", code="TOOL_NOT_FOUND")
 
     if agent_tier not in tool["authorized_tiers"]:
-        raise HTTPException(
-            status_code=403,
-            detail=f"Agent tier '{agent_tier}' is not authorised to use '{request.tool_name}'",
-        )
+        raise ForbiddenError(error=f"Agent tier '{agent_tier}' is not authorised to use '{request.tool_name}'", code="AGENT_TIER_IS_NOT_AUTHORISED")
 
     # ── MCP tool path ──────────────────────────────────────────────────────────
     if tool.get("is_mcp"):

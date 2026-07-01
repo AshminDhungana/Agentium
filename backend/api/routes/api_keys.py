@@ -11,7 +11,8 @@ Provides REST endpoints for:
 
 from typing import Optional, List
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Query
+from fastapi import APIRouter, Depends, BackgroundTasks, Query
+from backend.core.exceptions import BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, TooLargeError, RateLimitError, InternalServerError, ServiceUnavailableError
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -155,17 +156,14 @@ async def create_api_key(
     try:
         provider_enum = ProviderType(request.provider.upper().strip())
     except ValueError:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unknown provider '{request.provider}'. "
-                   f"Valid values: {[p.value for p in ProviderType]}",
-        )
+        raise BadRequestError(error=f"Unknown provider '{request.provider}'. "
+                   f"Valid values: {[p.value for p in ProviderType]}", code="UNKNOWN_PROVIDER_FVALID_VALUES")
 
     # ── Encrypt key ──────────────────────────────────────────────────────────
     try:
         encrypted = encrypt_api_key(request.api_key)
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Key encryption failed: {exc}")
+        raise InternalServerError(error=f"Key encryption failed: {exc}", code="KEY_ENCRYPTION_FAILED")
 
     masked = f"...{request.api_key[-4:]}"
 
@@ -241,7 +239,7 @@ async def get_provider_health(
     report = api_key_manager.get_key_health_report(provider, db)
     
     if provider not in report["providers"]:
-        raise HTTPException(status_code=404, detail=f"No keys found for provider: {provider}")
+        raise NotFoundError(error=f"No keys found for provider: {provider}", code="NO_KEYS_FOUND_FOR_PROVIDER")
     
     return report["providers"][provider]
 
@@ -335,7 +333,7 @@ async def get_key_status(
     """
     key = db.query(UserModelConfig).filter_by(id=key_id, is_active=True).first()
     if not key:
-        raise HTTPException(status_code=404, detail="Key not found")
+        raise NotFoundError(error="Key not found", code="KEY_NOT_FOUND")
     
     # Calculate status
     status = api_key_manager._get_key_status(key)
@@ -374,20 +372,17 @@ async def recover_key(
     """
     key = db.query(UserModelConfig).filter_by(id=key_id).first()
     if not key:
-        raise HTTPException(status_code=404, detail="Key not found")
+        raise NotFoundError(error="Key not found", code="KEY_NOT_FOUND")
     
     # Check if in cooldown
     if key.cooldown_until and datetime.utcnow() < key.cooldown_until and not request.force:
         remaining = (key.cooldown_until - datetime.utcnow()).total_seconds()
-        raise HTTPException(
-            status_code=400,
-            detail=f"Key still in cooldown for {remaining:.0f} seconds. Use force=true to override."
-        )
+        raise BadRequestError(error=f"Key still in cooldown for {remaining:.0f} seconds. Use force=true to override.", code="KEY_STILL_IN_COOLDOWN_FOR")
     
     success = api_key_manager.recover_key(key_id, db)
     
     if not success:
-        raise HTTPException(status_code=500, detail="Failed to recover key")
+        raise InternalServerError(error="Failed to recover key", code="FAILED_TO_RECOVER_KEY")
     
     return {
         "success": True,
@@ -411,12 +406,12 @@ async def update_key_budget(
     """
     key = db.query(UserModelConfig).filter_by(id=key_id).first()
     if not key:
-        raise HTTPException(status_code=404, detail="Key not found")
+        raise NotFoundError(error="Key not found", code="KEY_NOT_FOUND")
     
     success = api_key_manager.update_budget(key_id, request.monthly_budget_usd, db)
     
     if not success:
-        raise HTTPException(status_code=500, detail="Failed to update budget")
+        raise InternalServerError(error="Failed to update budget", code="FAILED_TO_UPDATE_BUDGET")
     
     # Refresh to get updated values
     db.refresh(key)
@@ -450,7 +445,7 @@ async def rotate_api_key(
     
     key = db.query(UserModelConfig).filter_by(id=key_id).first()
     if not key:
-        raise HTTPException(status_code=404, detail="Key not found")
+        raise NotFoundError(error="Key not found", code="KEY_NOT_FOUND")
     
     # Encrypt the new key
     encrypted_key = encrypt_api_key(request.new_api_key)
@@ -460,7 +455,7 @@ async def rotate_api_key(
     new_key = api_key_manager.rotate_key(key_id, encrypted_key, masked, db)
     
     if not new_key:
-        raise HTTPException(status_code=400, detail="Key rotation failed. New key may be invalid.")
+        raise BadRequestError(error="Key rotation failed. New key may be invalid.", code="KEY_ROTATION_FAILED_NEW_KEY")
     
     return {
         "success": True,
@@ -488,19 +483,16 @@ async def delete_key(
     """
     key = db.query(UserModelConfig).filter_by(id=key_id).first()
     if not key:
-        raise HTTPException(status_code=404, detail="Key not found")
+        raise NotFoundError(error="Key not found", code="KEY_NOT_FOUND")
     
     # Check if safe to delete
     if not force:
         status = api_key_manager._get_key_status(key)
         if status == APIKeyHealthStatus.HEALTHY:
-            raise HTTPException(
-                status_code=400,
-                detail=(
+            raise BadRequestError(error=(
                     f"Key is healthy. Use force=true to force deletion, "
                     f"or mark it as failed first."
-                )
-            )
+                ), code="FKEY_IS_HEALTHY_USE_FORCETRUE")
         
         # Check if it's the only key for this provider
         other_keys = db.query(UserModelConfig).filter(
@@ -510,10 +502,7 @@ async def delete_key(
         ).count()
         
         if other_keys == 0:
-            raise HTTPException(
-                status_code=400,
-                detail="Cannot delete the only key for this provider. Add another key first."
-            )
+            raise BadRequestError(error="Cannot delete the only key for this provider. Add another key first.", code="CANNOT_DELETE_THE_ONLY_KEY")
     
     # Soft delete
     key.is_active = False
@@ -541,7 +530,7 @@ async def get_spend_history(
     
     key = db.query(UserModelConfig).filter_by(id=key_id).first()
     if not key:
-        raise HTTPException(status_code=404, detail="Key not found")
+        raise NotFoundError(error="Key not found", code="KEY_NOT_FOUND")
     
     since = datetime.utcnow() - timedelta(days=days)
     

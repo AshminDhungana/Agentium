@@ -11,7 +11,8 @@ Changes vs original:
 import json
 import uuid
 from typing import AsyncGenerator, List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
+from backend.core.exceptions import BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, TooLargeError, RateLimitError, InternalServerError, ServiceUnavailableError
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -136,7 +137,7 @@ async def get_conversation(
     ).first()
 
     if not conversation:
-        raise HTTPException(status_code=404, detail="Conversation not found")
+        raise NotFoundError(error="Conversation not found", code="CONVERSATION_NOT_FOUND")
 
     return conversation.to_dict(include_messages=include_messages)
 
@@ -156,7 +157,7 @@ async def archive_conversation(
     ).first()
 
     if not conversation:
-        raise HTTPException(status_code=404, detail="Conversation not found")
+        raise NotFoundError(error="Conversation not found", code="CONVERSATION_NOT_FOUND")
 
     conversation.is_archived = "Y"
     db.commit()
@@ -178,7 +179,7 @@ async def delete_conversation(
     ).first()
 
     if not conversation:
-        raise HTTPException(status_code=404, detail="Conversation not found")
+        raise NotFoundError(error="Conversation not found", code="CONVERSATION_NOT_FOUND")
 
     conversation.is_deleted = "Y"
     db.commit()
@@ -237,16 +238,10 @@ async def send_message(
     head = db.query(HeadOfCouncil).filter_by(agentium_id="00001").first()
 
     if not head:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Head of Council not initialized",
-        )
+        raise ServiceUnavailableError(error="Head of Council not initialized", code="HEAD_OF_COUNCIL_NOT_INITIALIZED")
 
     if head.status.value != "active":
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Head of Council is {head.status.value}",
-        )
+        raise ServiceUnavailableError(error=f"Head of Council is {head.status.value}", code="HEAD_OF_COUNCIL_IS")
 
     if chat_msg.stream:
         return StreamingResponse(
@@ -481,10 +476,7 @@ async def get_chat_history(
     except ImportError as exc:
         logger = __import__("logging").getLogger(__name__)
         logger.exception("Failed to import ChatMessage model: %s", exc)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Chat history unavailable — model import error",
-        )
+        raise InternalServerError(error="Chat history unavailable — model import error", code="CHAT_HISTORY_UNAVAILABLE_MODEL_IMPORT")
 
     try:
         messages = (
@@ -500,10 +492,7 @@ async def get_chat_history(
     except Exception as exc:
         logger = __import__("logging").getLogger(__name__)
         logger.exception("get_chat_history query failed for user %s: %s", current_user.get("user_id"), exc)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retrieve chat history",
-        )
+        raise InternalServerError(error="Failed to retrieve chat history", code="FAILED_TO_RETRIEVE_CHAT_HISTORY")
 
     # Return in chronological order
     messages = list(reversed(messages))

@@ -3,7 +3,7 @@ Host System Access API Endpoints for Agentium.
 Provides root-level system control through Head of Council (0xxxx).
 All operations are authenticated, authorized, and audited.
 """
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
+from fastapi import APIRouter, Depends, BackgroundTasks
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any, Optional
@@ -14,6 +14,7 @@ import asyncio
 from backend.models.database import get_db
 from backend.services.host_access import HostAccessService, RestrictedHostAccess
 from backend.services.auth import get_current_agent, verify_agent_hierarchy
+from backend.core.exceptions import UnauthorizedError, ForbiddenError, ServiceUnavailableError
 from backend.models.entities.agents import Agent
 from backend.models.entities.audit import AuditLog, AuditLevel, AuditCategory
 
@@ -148,38 +149,38 @@ async def get_host_access_service(
     agent = await get_current_agent(credentials.credentials, db)
     
     if not agent:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authentication credentials"
+        raise UnauthorizedError(
+            error="Invalid authentication credentials",
+            code="INVALID_AUTH",
         )
-    
+
     # Check if agent is active
     if agent.status != 'active':
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Agent {agent.agentium_id} is not active (status: {agent.status})"
+        raise ForbiddenError(
+            error=f"Agent {agent.agentium_id} is not active (status: {agent.status})",
+            code="AGENT_INACTIVE",
         )
-    
+
     # Initialize host access based on agent type
     agentium_id = agent.agentium_id
-    
+
     if agentium_id.startswith('0'):  # Head of Council - FULL ACCESS
         return HostAccessService(agentium_id)
-    
+
     elif agentium_id.startswith('1'):  # Council Members - RESTRICTED
         # Council members need Head approval for sensitive operations
         head_service = HostAccessService('00001')
         return RestrictedHostAccess(agentium_id, head_service)
-    
+
     elif agentium_id.startswith('2'):  # Lead Agents - SUPERVISED
         # Lead agents have limited access, must route through Head
         head_service = HostAccessService('00001')
         return RestrictedHostAccess(agentium_id, head_service)
-    
+
     else:  # Task Agents (3xxxx) and others - NO ACCESS
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Agent type {agent.agent_type} ({agentium_id}) is not authorized for host access"
+        raise ForbiddenError(
+            error=f"Agent type {agent.agent_type} ({agentium_id}) is not authorized for host access",
+            code="AGENT_TYPE_UNAUTHORIZED",
         )
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -294,9 +295,9 @@ async def write_file(
     **Head of Council only** - Council Members cannot write files directly.
     """
     if not host_access.is_authorized:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="File write requires Head of Council privileges"
+        raise ForbiddenError(
+            error="File write requires Head of Council privileges",
+            code="HEAD_OF_COUNCIL_ONLY",
         )
     
     # Create backup if requested
@@ -387,9 +388,9 @@ async def list_containers(
     List all Docker containers on host system.
     """
     if not host_access.docker_client:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Docker client not available"
+        raise ServiceUnavailableError(
+            error="Docker client not available",
+            code="DOCKER_UNAVAILABLE",
         )
     
     containers = host_access.list_containers()
@@ -410,9 +411,9 @@ async def container_action(
     # Authorization check for non-Head agents
     if not host_access.is_authorized:
         if not request.container_name.startswith('agentium-'):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Can only manage Agentium containers"
+            raise ForbiddenError(
+                error="Can only manage Agentium containers",
+                code="AGENTIUM_CONTAINERS_ONLY",
             )
     
     result = host_access.manage_container(request.action, request.container_name)
@@ -446,9 +447,9 @@ async def execute_in_container(
     Execute command inside a specific container.
     """
     if not host_access.docker_client:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Docker client not available"
+        raise ServiceUnavailableError(
+            error="Docker client not available",
+            code="DOCKER_UNAVAILABLE",
         )
     
     result = host_access.execute_in_container(
@@ -480,9 +481,9 @@ async def spawn_agent_container(
     **Head of Council only**
     """
     if not host_access.is_authorized:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only Head of Council can spawn new agents"
+        raise ForbiddenError(
+            error="Only Head of Council can spawn new agents",
+            code="SPAWN_AGENT_FORBIDDEN",
         )
     
     start_time = datetime.utcnow()

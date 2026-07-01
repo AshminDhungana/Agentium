@@ -7,7 +7,8 @@ and dead-letter queue management.
 import uuid
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, Query, Request
+from backend.core.exceptions import BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, TooLargeError, RateLimitError, InternalServerError, ServiceUnavailableError
 from sqlalchemy.orm import Session
 
 from backend.models.database import get_db
@@ -41,15 +42,12 @@ def create_trigger(payload: Dict[str, Any], db: Session = Depends(get_db)):
     target_agent_id = payload.get("target_agent_id")
 
     if not name or not trigger_type:
-        raise HTTPException(status_code=400, detail="name and trigger_type are required")
+        raise BadRequestError(error="name and trigger_type are required", code="NAME_AND_TRIGGERTYPE_ARE_REQUIRED")
 
     try:
         tt = TriggerType(trigger_type)
     except ValueError:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid trigger_type. Must be one of: {[t.value for t in TriggerType]}",
-        )
+        raise BadRequestError(error=f"Invalid trigger_type. Must be one of: {[t.value for t in TriggerType]}", code="INVALID_TRIGGERTYPE_MUST_BE_ONE")
 
     # For webhook triggers, auto-generate an HMAC secret if not provided
     if tt == TriggerType.WEBHOOK and not config.get("hmac_secret"):
@@ -79,7 +77,7 @@ def update_trigger(
     """Update an existing event trigger."""
     trigger = db.query(EventTrigger).filter(EventTrigger.id == trigger_id).first()
     if not trigger:
-        raise HTTPException(status_code=404, detail="Trigger not found")
+        raise NotFoundError(error="Trigger not found", code="TRIGGER_NOT_FOUND")
 
     for field in (
         "name", "config", "target_workflow_id", "target_agent_id",
@@ -103,7 +101,7 @@ def delete_trigger(trigger_id: str, db: Session = Depends(get_db)):
     """Deactivate (soft-delete) a trigger."""
     trigger = db.query(EventTrigger).filter(EventTrigger.id == trigger_id).first()
     if not trigger:
-        raise HTTPException(status_code=404, detail="Trigger not found")
+        raise NotFoundError(error="Trigger not found", code="TRIGGER_NOT_FOUND")
 
     trigger.deactivate()
     db.commit()
@@ -131,7 +129,7 @@ async def receive_webhook(trigger_id: str, request: Request, db: Session = Depen
     )
 
     if result.get("status") == "error":
-        raise HTTPException(status_code=400, detail=result.get("detail", "Processing error"))
+        raise BadRequestError(error=result.get("detail", "Processing error"), code="RESULTGETDETAIL_PROCESSING_ERROR")
 
     return result
 
@@ -156,7 +154,7 @@ def list_event_logs(
             st = EventLogStatus(status)
             query = query.filter(EventLog.status == st)
         except ValueError:
-            raise HTTPException(status_code=400, detail=f"Invalid status: {status}")
+            raise BadRequestError(error=f"Invalid status: {status}", code="INVALID_STATUS")
 
     logs = query.offset(offset).limit(limit).all()
     return [l.to_dict() for l in logs]
@@ -179,5 +177,5 @@ def retry_dead_letter(log_id: str, db: Session = Depends(get_db)):
     """Manually retry a dead-lettered event."""
     result = EventProcessorService.retry_dead_letter(db, log_id)
     if result.get("status") == "error":
-        raise HTTPException(status_code=400, detail=result.get("detail", "Retry failed"))
+        raise BadRequestError(error=result.get("detail", "Retry failed"), code="RESULTGETDETAIL_RETRY_FAILED")
     return result

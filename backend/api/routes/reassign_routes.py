@@ -1,6 +1,7 @@
 """API routes for Agent Reassignment."""
 
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
+from fastapi import APIRouter, Depends, status, BackgroundTasks
+from backend.core.exceptions import BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, TooLargeError, RateLimitError, InternalServerError, ServiceUnavailableError
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -57,23 +58,14 @@ async def reassign_agent(
     # ------------------------------------------------------------------
     agent = db.query(Agent).filter_by(agentium_id=agentium_id).first()
     if not agent:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Agent {agentium_id} not found",
-        )
+        raise NotFoundError(error=f"Agent {agentium_id} not found", code="AGENT_NOT_FOUND")
 
     new_parent = db.query(Agent).filter_by(agentium_id=request.new_parent_id).first()
     if not new_parent:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"New parent {request.new_parent_id} not found",
-        )
+        raise NotFoundError(error=f"New parent {request.new_parent_id} not found", code="NEW_PARENT_NOT_FOUND")
 
     if new_parent.status in ('terminated', 'terminating'):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot reassign to a terminated agent",
-        )
+        raise BadRequestError(error="Cannot reassign to a terminated agent", code="CANNOT_REASSIGN_TO_A_TERMINATED")
 
     old_parent_id = agent.parent.agentium_id if agent.parent else None
 
@@ -116,9 +108,7 @@ async def reassign_agent(
         db.add(audit)
         db.commit()
 
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={
+        raise ForbiddenError(error={
                 "error": "Constitutional Block",
                 "code": "CONSTITUTIONAL_BLOCK",
                 "detail": {
@@ -127,8 +117,7 @@ async def reassign_agent(
                     "citations": decision.citations,
                     "severity": decision.severity.value,
                 },
-            },
-        )
+            }, code="ERROR")
 
     # ------------------------------------------------------------------
     # 4. Handle VOTE_REQUIRED
@@ -168,10 +157,7 @@ async def reassign_agent(
         db.commit()
     except Exception as exc:
         db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to persist reassignment: {str(exc)}",
-        ) from exc
+        raise InternalServerError(error=f"Failed to persist reassignment: {str(exc)}", code="FAILED_TO_PERSIST_REASSIGNMENT") from exc
 
     # ------------------------------------------------------------------
     # 6. Audit log for ALLOW
