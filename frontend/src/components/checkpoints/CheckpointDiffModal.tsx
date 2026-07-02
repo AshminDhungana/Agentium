@@ -3,7 +3,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { AlertCircle, X, ChevronRight, ChevronDown, Plus, Minus, FileText } from 'lucide-react';
 import { checkpointsService, BranchCompareResult, FieldDiff, AgentStateDiff, ArtifactDiff } from '../../services/checkpoints';
-import { toast } from 'react-hot-toast';
 
 interface CheckpointDiffModalProps {
     taskId?: string;

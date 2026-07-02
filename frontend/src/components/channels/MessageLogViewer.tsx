@@ -17,6 +17,7 @@ import { useQuery } from '@tanstack/react-query';
 import { channelMessagesApi } from '@/services/channelMessages';
 import { format } from 'date-fns';
 import { CheckCircle, XCircle, Clock, AlertTriangle } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 export interface MessageLogViewerProps {
     channelId: string;
@@ -41,7 +42,7 @@ export function MessageLogViewer({ channelId, limit = 50 }: MessageLogViewerProp
     });
 
     if (isLoading) {
-        return <div className="text-sm text-gray-600">Loading logs...</div>;
+        return <LoadingSpinner size="sm" label="Loading logs…" />;
     }
 
     const messages = data?.messages ?? [];

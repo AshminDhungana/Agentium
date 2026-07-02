@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useWebSocketStore } from '../../store/websocketStore';
 import { browserApi, BrowserFrameResponse } from '../../services/browserApi';
 import { Monitor, RefreshCw, AlertCircle, X, Maximize2, Minimize2, Video, Pause, Play } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 export interface BrowserTaskViewerProps {
     taskId: string;
@@ -158,7 +159,7 @@ export const BrowserTaskViewer: React.FC<BrowserTaskViewerProps> = ({ taskId, on
                     <div className="flex-1 bg-black overflow-hidden relative flex items-center justify-center">
                         {status === 'connecting' && !latestFrame?.frame ? (
                              <div className="flex flex-col items-center gap-3">
-                                <RefreshCw className="w-6 h-6 animate-spin text-gray-600" />
+                                <LoadingSpinner size="md" />
                                 <span className="text-xs text-gray-600">Connecting to browser stream...</span>
                              </div>
                         ) : latestFrame?.frame ? (

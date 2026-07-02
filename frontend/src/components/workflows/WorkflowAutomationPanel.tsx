@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { api } from '@/services/api';
 import { WorkflowBuilder } from './WorkflowBuilder';
 import { Button } from "@/components/ui/button";
@@ -204,7 +205,7 @@ export const WorkflowAutomationPanel: React.FC = () => {
       </div>
 
       {loading ? (
-        <div className="text-gray-600 animate-pulse">Loading…</div>
+        <LoadingSpinner size="sm" label="Loading…" />
       ) : workflows.length === 0 ? (
         <div className="bg-white dark:bg-[#161b27] border border-gray-200 dark:border-[#1e2535] rounded-xl">
           <EmptyState

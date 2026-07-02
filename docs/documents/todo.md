@@ -765,7 +765,7 @@ Build a self-governing AI ecosystem where agents operate under constitutional la
 - [x] **Hook Deduplication** — merge overlapping `useWebSocket`, `usePolling`, and `useAutoRefresh` hooks into a single `useRealtimeData<T>(endpoint, wsEvent, pollIntervalMs)` hook in `frontend/src/hooks/`
 - [x] **Dark Mode — Phase 13–15 New Pages** — audit `WorkflowDesigner.tsx`, `WorkflowExecutionMonitor.tsx`, `EventTriggerManager.tsx`, `ScalingDashboard.tsx`, and `LearningImpactDashboard.tsx` for hardcoded `bg-white` / `text-black` / `border-gray-*` without `dark:` variants; apply Phase 17.2 semantic token system
 - [ ] **Mobile Responsiveness — Phase 13–15 New Pages** — apply Phase 17.3 breakpoint patterns to `WorkflowsPage`, `WorkflowDesigner`, `ScalingDashboard`, and `EventTriggerManager`; collapse complex layouts below `md:`; test on 375px viewport
-- [ ] **Shared Component Enforcement** — replace all remaining ad-hoc `Loader2` spinner usages with `<LoadingSpinner>`; replace ad-hoc toast calls with `useToast()`; verify no page introduced after Phase 17 bypasses these shared components
+- [x] **Shared Component Enforcement** — replace all remaining ad-hoc `Loader2` spinner usages with `<LoadingSpinner>`; replace ad-hoc toast calls with `useToast()`; verify no page introduced after Phase 17 bypasses these shared components
 
 ---
 
