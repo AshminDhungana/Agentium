@@ -105,7 +105,7 @@ export const WorkflowAutomationPanel: React.FC = () => {
 
     return (
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="flex items-center gap-2">
             <Button
               variant="ghost"
