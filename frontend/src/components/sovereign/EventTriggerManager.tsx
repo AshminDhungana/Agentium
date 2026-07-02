@@ -498,7 +498,7 @@ export const EventTriggerManager: React.FC = () => {
                                                         setFormType(key as any);
                                                         setFormConfig({});
                                                     }}
-                                                    className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border transition-all duration-150 ${
+                                                    className={`flex items-center gap-1.5 px-2 sm:px-3 py-2 rounded-lg text-xs sm:text-sm font-medium border transition-all duration-150 ${
                                                         isSelected
                                                             ? `${meta.bgColor} ${meta.color} ${meta.borderColor} ring-2 ring-offset-1 ring-offset-transparent`
                                                             : 'bg-gray-100 dark:bg-[#1e2535] text-gray-600 dark:text-gray-400 border-gray-200 dark:border-[#2a3347] hover:bg-gray-200 dark:hover:bg-[#2a3347]'
