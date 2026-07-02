@@ -126,7 +126,6 @@ export const ScalingDashboard: React.FC = () => {
                         <AlertCircle className="w-4 h-4" />
                         System Recommendation: {predictions.recommendation.toUpperCase()}
                     </div>
-                    </>
                 )}
             </div>
 
