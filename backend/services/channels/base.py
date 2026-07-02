@@ -1,3 +1,5 @@
+"""<module>."""
+
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional
 from backend.models.entities.channels import ExternalChannel, ExternalMessage
@@ -8,6 +10,8 @@ class BaseChannelAdapter(ABC):
     """
     
     def __init__(self, channel: ExternalChannel):
+        """Init."""
+
         self.channel = channel
         self.config = channel.config or {}
 

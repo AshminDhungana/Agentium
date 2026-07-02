@@ -81,6 +81,7 @@ def _build_invoke_fn(tool_id: str, tool_name: str, db_factory):
         tool_name_override: Optional[str] = None,
         **_extra,
     ) -> Dict[str, Any]:
+        """Invoke the governed MCP tool using the provided agent context and parameters."""
         db: Session = db_factory()
         try:
             svc = MCPGovernanceService(db)

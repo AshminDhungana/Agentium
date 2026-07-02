@@ -127,6 +127,7 @@ class IdleBudgetManager:
     """
 
     def __init__(self):
+        """Initialize budget manager with lazy-loaded DB-backed limits."""
         # Lazy load config
         self._daily_token_limit: Optional[int] = None
         self._daily_cost_limit: Optional[float] = None
@@ -139,6 +140,8 @@ class IdleBudgetManager:
         self._total_cost_saved = 0.0
 
     def _ensure_loaded(self):
+        """Ensure loaded."""
+
         if self._daily_token_limit is None or self._daily_cost_limit is None:
             cfg = SystemBudgetConfig.load()
             self._daily_token_limit = cfg["daily_token_limit"]
@@ -146,20 +149,24 @@ class IdleBudgetManager:
 
     @property
     def daily_token_limit(self) -> int:
+        """Return the daily token limit (lazy-loaded from DB if needed)."""
         self._ensure_loaded()
         return self._daily_token_limit
 
     @daily_token_limit.setter
     def daily_token_limit(self, value: int):
+        """Set the daily token limit."""
         self._daily_token_limit = value
 
     @property
     def daily_cost_limit(self) -> float:
+        """Return the daily cost limit in USD (lazy-loaded from DB if needed)."""
         self._ensure_loaded()
         return self._daily_cost_limit
 
     @daily_cost_limit.setter
     def daily_cost_limit(self, value: float):
+        """Set the daily cost limit in USD."""
         self._daily_cost_limit = value
 
     # ------------------------------------------------------------------
@@ -168,18 +175,22 @@ class IdleBudgetManager:
 
     @property
     def daily_idle_budget_usd(self):
+        """Return the daily idle budget in USD."""
         return self.daily_cost_limit
 
     @property
     def daily_cost_limit_usd(self):
+        """Return the daily cost limit in USD."""
         return self.daily_cost_limit
 
     @property
     def total_tokens_saved(self):
+        """Return the total number of tokens saved."""
         return self._total_tokens_saved
 
     @property
     def total_cost_saved_usd(self):
+        """Return the total cost saved in USD."""
         return self._total_cost_saved
 
     # ------------------------------------------------------------------
@@ -295,6 +306,7 @@ class TokenOptimizer:
     """
 
     def __init__(self):
+        """Initialize the token optimizer with default idle settings."""
         self.idle_mode_active = False
         self.last_activity_at = datetime.utcnow()
         self.idle_threshold_seconds = 60
@@ -340,15 +352,19 @@ class TokenOptimizer:
             from backend.models.database import get_db_context
 
             async def _wake():
+                """Wake."""
                 with get_db_context() as db:
                     await self.wake_from_idle(db)
 
             asyncio.create_task(_wake())
 
     def get_idle_duration_seconds(self) -> float:
+        """Return the number of seconds since the last recorded activity."""
         return (datetime.utcnow() - self.last_activity_at).total_seconds()
 
     def calculate_token_savings(self, task_type: str, duration_seconds: int) -> int:
+        """Calculate token savings."""
+
         tokens_per_minute = {
             "audit_archival": 50,
             "storage_dedupe": 100,
@@ -367,6 +383,8 @@ class TokenOptimizer:
         return max(0, int(active_tokens - idle_tokens))
 
     async def check_idle_transition(self, db: Session) -> str:
+        """Check idle transition."""
+
         idle_duration = self.get_idle_duration_seconds()
         should_be_idle = idle_duration > self.idle_threshold_seconds
 
@@ -380,6 +398,8 @@ class TokenOptimizer:
         return "no_change"
 
     async def enter_idle_mode(self, db: Session):
+        """Enter idle mode."""
+
         print("🌙 ENTERING IDLE MODE - Switching to local models")
         self.idle_mode_active = True
 
@@ -416,6 +436,8 @@ class TokenOptimizer:
         print(f"✅ {len(agents)} agents switched to {local_model.model_name}")
 
     async def wake_from_idle(self, db: Session):
+        """Wake from idle."""
+
         print("☀️ WAKING FROM IDLE MODE - Restoring optimized models")
         self.idle_mode_active = False
         self.last_activity_at = datetime.utcnow()
@@ -450,6 +472,7 @@ class TokenOptimizer:
         print("✅ All agents restored to optimized models")
 
     async def allocate_model_for_agent(self, agent: Agent, task: Task, db: Session) -> str:
+        """Allocate an optimal model for the given agent and task."""
         if not self.initialized:
             self.initialize(db)
 
@@ -462,6 +485,7 @@ class TokenOptimizer:
         return config_id
 
     def estimate_task_tokens(self, task: Task) -> int:
+        """Estimate the number of tokens needed for the given task."""
         base_tokens = {
             "code": 2000,
             "analysis": 1500,
@@ -482,6 +506,8 @@ class TokenOptimizer:
         self._check_daily_reset()
 
     def _check_daily_reset(self):
+        """Check daily reset."""
+
         now = datetime.utcnow()
         if now.date() > self.last_budget_reset.date():
             self.tokens_used_by_agent.clear()
@@ -489,6 +515,7 @@ class TokenOptimizer:
             self.last_budget_reset = now
 
     def get_cost_report(self, db: Session) -> Dict[str, Any]:
+        """Return a comprehensive cost report for the current session."""
         return {
             "timestamp": datetime.utcnow().isoformat(),
             "idle_mode": self.idle_mode_active,
@@ -500,6 +527,8 @@ class TokenOptimizer:
         }
 
     def _calculate_hourly_cost(self, db: Session) -> float:
+        """Calculate hourly cost."""
+
         agents = db.query(Agent).filter_by(is_active=True).all()
         hourly_cost = 0.0
         for agent in agents:
@@ -512,6 +541,8 @@ class TokenOptimizer:
         return hourly_cost
 
     async def _broadcast_idle_status(self, event: str, data: Dict):
+        """Broadcast idle status."""
+
         try:
             from backend.main import manager
             await manager.broadcast({
@@ -524,6 +555,8 @@ class TokenOptimizer:
             print("⚠️ WebSocket manager not available")
 
     def get_status(self) -> Dict[str, Any]:
+        """Get status."""
+
         idle_duration = self.get_idle_duration_seconds()
         return {
             "idle_mode_active": self.idle_mode_active,

@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 
 
 class PushNotificationService:
+    """PushNotificationService."""
 
     # ── Device Token Management ────────────────────────────────────────────
 

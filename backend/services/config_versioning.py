@@ -1,3 +1,9 @@
+"""
+Git-backed configuration versioning service.
+
+Persist JSON snapshots of system entities to a Git repository, with
+full history tracking, diff detection, and point-in-time restore.
+"""
 import os
 import json
 import logging
@@ -23,9 +29,11 @@ _GIT_EMAIL = "agentium@agentium.system"
 
 
 class ConfigVersioningService:
+    """Provides Git-backed snapshotting, history, and snapshot restore."""
 
     @classmethod
     def _get_repo(cls) -> git.Repo:
+        """Return an initialised git.Repo; create and seed one if the path is not a repo."""
         os.makedirs(REPO_PATH, exist_ok=True)
         try:
             repo = git.Repo(REPO_PATH)
@@ -130,6 +138,7 @@ class ConfigVersioningService:
     def get_config_history(
         cls, entity_type: str, entity_id: str
     ) -> List[Dict[str, Any]]:
+        """Return a list of dicts describing every commit that touched entity_type/entity_id."""
         with _repo_lock:
             try:
                 repo = cls._get_repo()

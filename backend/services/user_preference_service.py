@@ -45,6 +45,8 @@ class UserPreferenceService:
     }
 
     def __init__(self, db: Session):
+        """Init."""
+
         self.db = db
 
     # ═══════════════════════════════════════════════════════════

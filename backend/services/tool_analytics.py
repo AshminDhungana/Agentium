@@ -32,15 +32,21 @@ class _RecordingContext:
     """Context object passed into the `with analytics.record(...)` block."""
 
     def __init__(self):
+        """Init."""
+
         self.success: bool = True
         self.error_message: Optional[str] = None
         self.output_size_bytes: Optional[int] = None
 
     def set_error(self, msg: str):
+        """Set error."""
+
         self.success = False
         self.error_message = msg
 
     def set_output_size(self, size: int):
+        """Set output size."""
+
         self.output_size_bytes = size
 
 
@@ -51,6 +57,8 @@ class ToolAnalyticsService:
     """
 
     def __init__(self, db: Session):
+        """Init."""
+
         self.db = db
 
     # ──────────────────────────────────────────────────────────────
@@ -277,6 +285,8 @@ class ToolAnalyticsService:
     # ──────────────────────────────────────────────────────────────
 
     def _write_log(self, **kwargs):
+        """Write log."""
+
         log = ToolUsageLog(**kwargs, invoked_at=datetime.utcnow())
         self.db.add(log)
         try:
@@ -285,6 +295,8 @@ class ToolAnalyticsService:
             self.db.rollback()  # Never let analytics writes break the main flow
 
     def _hash_input(self, kwargs: dict) -> str:
+        """Hash input."""
+
         try:
             serialized = json.dumps(kwargs, sort_keys=True, default=str)
             return hashlib.sha256(serialized.encode()).hexdigest()
@@ -292,6 +304,8 @@ class ToolAnalyticsService:
             return "hash_error"
 
     def _latency_stats(self, latencies: List[float]) -> Dict[str, Any]:
+        """Latency stats."""
+
         if not latencies:
             return {}
         sorted_l = sorted(latencies)
@@ -306,6 +320,8 @@ class ToolAnalyticsService:
         }
 
     def _top_callers(self, rows: List[ToolUsageLog], top_n: int = 5) -> List[Dict]:
+        """Top callers."""
+
         counts: Dict[str, int] = {}
         for r in rows:
             counts[r.called_by_agentium_id] = counts.get(r.called_by_agentium_id, 0) + 1
@@ -315,6 +331,8 @@ class ToolAnalyticsService:
         ]
 
     def _errors_breakdown(self, errors: List[ToolUsageLog]) -> Dict[str, int]:
+        """Errors breakdown."""
+
         breakdown: Dict[str, int] = {}
         for e in errors:
             key = (e.error_message or "unknown")[:80]

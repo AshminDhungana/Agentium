@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 
 
 class WorkflowExecutor:
+    """Execute a WorkflowPlan as a DAG with concurrent sub-tasks and deferred scheduling."""
 
     async def execute(
         self, plan: WorkflowPlan, created_by: str = None
@@ -178,6 +179,7 @@ class WorkflowExecutor:
         result: dict = None,
         error: str = None,
     ):
+        """Update a single WorkflowSubTask row in the database."""
         with get_db_context() as db:
             sub = db.query(WorkflowSubTask).filter_by(
                 workflow_id=workflow_id, intent=intent
@@ -236,6 +238,7 @@ class WorkflowExecutor:
         status: str,
         context: dict,
     ):
+        """Write the final workflow status and merged context to the database."""
         with get_db_context() as db:
             wf = db.query(WorkflowExecution).filter_by(
                 workflow_id=workflow_id

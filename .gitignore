@@ -11,6 +11,8 @@ logs.txt
 .idea/
 .superpowers/
 docs/superpowers/
+.superpowers/*
+.claude
 
 # Node
 node_modules/
@@ -23,6 +25,28 @@ __pycache__/
 *$py.class
 venv/
 .venv/
+
+# Python build artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
+*.egg
+
+# Coverage / testing
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+.pytest_cache/
+.mypy_cache/
+.hypothesis/
+.tox/
+.nox/
+
+# Profiling
+*.prof
+*.lprof
 
 # Legacy
 CLAUDE.md

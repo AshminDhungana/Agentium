@@ -43,6 +43,8 @@ class AlertManager:
     """Central service for managing and dispatching system alerts."""
 
     def __init__(self, db: Session):
+        """Init."""
+
         self.db = db
         self.channel_manager = ChannelManager()
 
@@ -293,4 +295,6 @@ class AlertManager:
 
 
 def get_alert_manager(db: Session) -> AlertManager:
+    """Get alert manager."""
+
     return AlertManager(db)

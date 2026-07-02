@@ -22,6 +22,8 @@ class PreferenceOptimizerIdleTask:
     """
 
     def __init__(self):
+        """Init."""
+
         self.name = "preference_optimizer"
         self.description = "Optimize user preferences: deduplicate, archive old history, generate recommendations"
         self.category = "maintenance"

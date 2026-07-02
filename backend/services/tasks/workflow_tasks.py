@@ -24,6 +24,8 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 def _make_session():
+    """Make session."""
+
     url = os.getenv(
         "DATABASE_URL",
         "postgresql://agentium:agentium@postgres:5432/agentium",

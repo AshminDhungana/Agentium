@@ -37,6 +37,8 @@ class SkillRAG:
     """
 
     def __init__(self):
+        """Init."""
+
         self.skill_manager = skill_manager
 
     # ═══════════════════════════════════════════════════════════

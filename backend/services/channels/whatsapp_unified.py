@@ -19,6 +19,7 @@ from backend.models.entities.channels import ExternalMessage, ExternalChannel, C
 
 
 class WhatsAppProvider(Enum):
+    """WhatsAppProvider."""
     CLOUD_API = "cloud_api"      # Official Meta Graph API
     WEB_BRIDGE = "web_bridge"    # Baileys/WebSocket bridge
 
@@ -52,6 +53,8 @@ class UnifiedWhatsAppAdapter(BaseChannelAdapter):
     _bridge_tasks: Dict[str, asyncio.Task] = {}
     
     def __init__(self, channel: ExternalChannel):
+        """Init."""
+
         super().__init__(channel)
         self.provider = WhatsAppProvider(self.config.get("provider", "cloud_api"))
         self._cloud_client: Optional[httpx.AsyncClient] = None

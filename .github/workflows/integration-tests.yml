@@ -85,6 +85,10 @@ jobs:
           pip install --upgrade pip setuptools wheel
           pip install --no-cache-dir -r requirements.txt -r requirements-dev.txt
 
+      - name: Check docstring coverage (interrogate)
+        working-directory: ./backend
+        run: python -m interrogate services/ --fail-under=90
+
       - name: Run integration tests with coverage
         working-directory: ./backend
         run: pytest

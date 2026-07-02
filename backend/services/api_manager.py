@@ -52,6 +52,8 @@ class ModelConfig:
     current_load: int = 0
 
     def to_dict(self) -> Dict[str, Any]:
+        """To dict."""
+
         return {
             "provider": self.provider,
             "model_name": self.model_name,
@@ -71,6 +73,8 @@ class APIManager:
     """
 
     def __init__(self, db: Session):
+        """Init."""
+
         self.db = db
         self.models: Dict[str, ModelConfig] = {}
         self._load_configs()
@@ -190,6 +194,7 @@ class APIManager:
             raise ValueError("No available models in APIManager")
 
         def _best_of(candidates: List[ModelConfig]) -> Optional[ModelConfig]:
+            """Best of."""
             if not candidates:
                 return None
             return sorted(candidates, key=lambda m: m.current_load)[0]

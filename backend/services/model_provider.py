@@ -229,6 +229,8 @@ class BaseModelProvider(ABC):
     """Abstract base for all model providers."""
 
     def __init__(self, config: UserModelConfig):
+        """Init."""
+
         self.config = config
         self.api_key = self._get_api_key() if config.requires_api_key() else None
         self.base_url = config.get_effective_base_url()
@@ -259,10 +261,14 @@ class BaseModelProvider(ABC):
 
     @abstractmethod
     async def generate(self, system_prompt: str, user_message: str, **kwargs) -> Dict[str, Any]:
+        """Generate."""
+
         pass
 
     @abstractmethod
     async def stream_generate(self, system_prompt: str, user_message: str, **kwargs) -> AsyncGenerator[str, None]:
+        """Stream generate."""
+
         pass
 
     async def _log_usage(
@@ -322,6 +328,8 @@ class OpenAICompatibleProvider(BaseModelProvider):
     """
 
     async def generate(self, system_prompt: str, user_message: str, **kwargs) -> Dict[str, Any]:
+        """Generate."""
+
         import openai
 
         client = openai.AsyncOpenAI(
@@ -385,6 +393,8 @@ class OpenAICompatibleProvider(BaseModelProvider):
             raise
 
     async def stream_generate(self, system_prompt: str, user_message: str, **kwargs):
+        """Stream generate."""
+
         import openai
 
         client = openai.AsyncOpenAI(
@@ -573,6 +583,8 @@ class AnthropicProvider(BaseModelProvider):
     """Anthropic Claude API."""
 
     async def generate(self, system_prompt: str, user_message: str, **kwargs) -> Dict[str, Any]:
+        """Generate."""
+
         import anthropic
 
         client = anthropic.AsyncAnthropic(api_key=self.api_key)
@@ -615,6 +627,8 @@ class AnthropicProvider(BaseModelProvider):
         }
 
     async def stream_generate(self, system_prompt: str, user_message: str, **kwargs):
+        """Stream generate."""
+
         import anthropic
 
         client = anthropic.AsyncAnthropic(api_key=self.api_key)
@@ -769,6 +783,8 @@ class LocalProvider(OpenAICompatibleProvider):
     """Local models via Ollama, llama.cpp, LM Studio, etc."""
 
     async def generate(self, system_prompt: str, user_message: str, **kwargs) -> Dict[str, Any]:
+        """Generate."""
+
         combined_prompt = f"{system_prompt}\n\nUser: {user_message}"
 
         import openai
@@ -854,6 +870,8 @@ class ModelService:
 
     @staticmethod
     async def get_provider(user_id: str, preferred_config_id: Optional[str] = None) -> Optional[BaseModelProvider]:
+        """Get provider."""
+
         with get_db_context() as db:
             if preferred_config_id:
                 config = db.query(UserModelConfig).filter_by(
@@ -997,6 +1015,7 @@ class ModelService:
         agent_id = getattr(agent, "agentium_id", "system")
 
         async def tool_executor(name: str, args: Dict[str, Any]) -> str:
+            """Tool executor."""
             # execute_tool is synchronous; run in thread pool to avoid blocking
             # the event loop during heavy tool calls.
             loop = asyncio.get_event_loop()

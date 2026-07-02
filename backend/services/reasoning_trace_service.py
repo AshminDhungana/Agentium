@@ -44,6 +44,8 @@ logger = logging.getLogger(__name__)
 # ─────────────────────────────────────────────────────────────────────────────
 
 class TracePhase(str, Enum):
+    """Phases of a reasoning trace lifecycle."""
+
     GOAL_INTERPRETATION = "goal_interpretation"
     CONTEXT_RETRIEVAL   = "context_retrieval"
     PLAN_GENERATION     = "plan_generation"
@@ -54,6 +56,8 @@ class TracePhase(str, Enum):
 
 
 class StepOutcome(str, Enum):
+    """Possible outcomes for a reasoning step."""
+
     PENDING   = "pending"
     SUCCESS   = "success"
     SKIPPED   = "skipped"
@@ -81,6 +85,7 @@ class ReasoningStep:
 
     def complete(self, outcome: StepOutcome, outputs: Dict[str, Any] = None,
                  error: str = None, tokens: int = 0):
+        """Mark this step as completed with an outcome."""
         self.outcome      = outcome
         self.outputs      = outputs or {}
         self.error        = error
@@ -88,6 +93,7 @@ class ReasoningStep:
         self.completed_at = datetime.utcnow().isoformat()
 
     def to_dict(self) -> Dict[str, Any]:
+        """Return a dictionary representation of this step."""
         d = asdict(self)
         d["phase"]   = self.phase.value
         d["outcome"] = self.outcome.value
@@ -128,6 +134,7 @@ class ReasoningTrace:
         alternatives: List[str] = None,
         inputs: Dict[str, Any] = None,
     ) -> ReasoningStep:
+        """Add a new reasoning step to this trace."""
         step = ReasoningStep(
             step_id=f"{self.trace_id}_s{len(self.steps) + 1:03d}",
             phase=phase,
@@ -142,9 +149,11 @@ class ReasoningTrace:
         return step
 
     def latest_step(self) -> Optional[ReasoningStep]:
+        """Return the most recent step, or None if there are no steps."""
         return self.steps[-1] if self.steps else None
 
     def seal(self, success: bool, reason: str = ""):
+        """Finalize the trace with a success or failure status."""
         self.final_outcome  = "success" if success else "failure"
         self.failure_reason = reason if not success else None
         self.current_phase  = TracePhase.COMPLETED if success else TracePhase.FAILED
@@ -152,6 +161,7 @@ class ReasoningTrace:
         self.total_tokens   = sum(s.tokens_used for s in self.steps)
 
     def to_dict(self) -> Dict[str, Any]:
+        """Return a dictionary representation of this trace."""
         d = asdict(self)
         d["current_phase"] = self.current_phase.value
         d["steps"] = [s.to_dict() for s in self.steps]
@@ -513,6 +523,7 @@ class ReasoningTraceService:
     # ── Query / retrieval ─────────────────────────────────────────────────────
 
     def get_active_trace(self, trace_id: str) -> Optional[ReasoningTrace]:
+        """Return an active trace by its ID, or None if not found."""
         return self._active_traces.get(trace_id)
 
     def check_stalled_traces(

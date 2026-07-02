@@ -44,6 +44,7 @@ ROLE_CAPABILITIES: dict = {
 
 
 class RBACService:
+    """RBACService."""
     @staticmethod
     def get_effective_permissions(user: User) -> Set[str]:
         """Combine base role permissions with active delegations."""

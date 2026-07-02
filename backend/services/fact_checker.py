@@ -57,13 +57,19 @@ class FactCheckResult:
 
     @property
     def is_supported(self) -> bool:
+        """Is supported."""
+
         return self.confidence >= 0.7
 
     @property
     def has_contradictions(self) -> bool:
+        """Has contradictions."""
+
         return len(self.contradictions) > 0
 
     def to_dict(self) -> Dict[str, Any]:
+        """To dict."""
+
         return {
             "claim": self.claim,
             "confidence": round(self.confidence, 3),
@@ -112,6 +118,8 @@ class FactChecker:
     CONTRADICTION_THRESHOLD = 0.5    # Close but semantically opposed
 
     def __init__(self, vector_store: Optional[VectorStore] = None):
+        """Init."""
+
         self._vs: VectorStore = vector_store or get_vector_store()
 
     # ── Core API ──────────────────────────────────────────────────────────
@@ -492,19 +500,27 @@ class CitationGraph:
     """
 
     def __init__(self):
+        """Init."""
+
         self._nodes: Dict[str, CitationGraphNode] = {}
         self._edges: List[CitationGraphEdge] = []
 
     def add_node(self, doc_id: str, metadata: Optional[Dict[str, Any]] = None):
+        """Add node."""
+
         self._nodes[doc_id] = CitationGraphNode(doc_id=doc_id, metadata=metadata or {})
 
     def add_edge(self, source_id: str, target_id: str, relationship: str = "supports", similarity: float = 0.0):
+        """Add edge."""
+
         for edge in self._edges:
             if edge.source_id == source_id and edge.target_id == target_id:
                 return
         self._edges.append(CitationGraphEdge(source_id=source_id, target_id=target_id, relationship=relationship, similarity=similarity))
 
     def get_related(self, doc_id: str) -> List[Dict[str, Any]]:
+        """Get related."""
+
         related = []
         for edge in self._edges:
             if edge.source_id == doc_id:
@@ -515,13 +531,19 @@ class CitationGraph:
 
     @property
     def node_count(self) -> int:
+        """Node count."""
+
         return len(self._nodes)
 
     @property
     def edge_count(self) -> int:
+        """Edge count."""
+
         return len(self._edges)
 
     def to_dict(self) -> Dict[str, Any]:
+        """To dict."""
+
         return {
             "nodes": [{"id": n.doc_id, "metadata": n.metadata} for n in self._nodes.values()],
             "edges": [{"source": e.source_id, "target": e.target_id, "relationship": e.relationship, "similarity": round(e.similarity, 3)} for e in self._edges],

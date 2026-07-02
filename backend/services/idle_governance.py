@@ -30,6 +30,8 @@ class IdleGovernanceMetrics:
     """
     
     def __init__(self):
+        """Init."""
+
         self.session_start = None
         self.total_idle_tasks_completed = 0
         self.total_tokens_saved = 0
@@ -117,6 +119,8 @@ class EnhancedIdleGovernanceEngine:
     """
     
     def __init__(self):
+        """Init."""
+
         self.is_running = False
         self.idle_loop_task: Optional[asyncio.Task] = None
         self.check_interval = 10  # Check for work every 10 seconds

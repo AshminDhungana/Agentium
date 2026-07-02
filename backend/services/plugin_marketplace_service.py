@@ -18,7 +18,9 @@ from backend.models.entities.user import User
 
 logger = logging.getLogger(__name__)
 
+
 class PluginMarketplaceService:
+    """Manage the plugin marketplace lifecycle: submit, verify, install, and uninstall."""
 
     @staticmethod
     def submit_plugin(
@@ -172,6 +174,7 @@ class PluginMarketplaceService:
     def uninstall_plugin(
         db: Session, installation_id: str, user: User
     ) -> PluginInstallation:
+        """Deactivate a plugin installation (Sovereign only)."""
         if not user.is_sovereign:
             raise ForbiddenError(error="Only Sovereign can uninstall plugins.", code="ONLY_SOVEREIGN_CAN_UNINSTALL_PLUGINS")
             

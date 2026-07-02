@@ -31,6 +31,7 @@ STATUS_DISABLED = "disabled"
 # ── Verdict enum ───────────────────────────────────────────────────────────────
 
 class MCPVerdict:
+    """MCPVerdict."""
     ALLOW         = "allow"
     BLOCK         = "block"
     VOTE_REQUIRED = "vote_required"
@@ -50,6 +51,8 @@ class MCPGovernanceService:
     """
 
     def __init__(self, db: Session):
+        """Init."""
+
         self.db = db
 
     # ══════════════════════════════════════════════════════════════════════════
@@ -272,6 +275,7 @@ class MCPGovernanceService:
             _name       = tool.name
 
             async def _background_mcp_execution():
+                """Background mcp execution."""
                 result_payload = {}
                 t_start = _time.monotonic()
                 success = False
@@ -483,6 +487,8 @@ class MCPGovernanceService:
     # ══════════════════════════════════════════════════════════════════════════
 
     def _get_tool_or_404(self, tool_id: str) -> MCPTool:
+        """Get tool or 404."""
+
         tool = self.db.query(MCPTool).filter(MCPTool.id == tool_id).first()
         if not tool:
             raise ValueError(f"MCP tool '{tool_id}' not found.")
@@ -512,6 +518,8 @@ class MCPGovernanceService:
         tool.audit_log = current_log[-1000:]
 
     def _record_failure(self, tool: MCPTool) -> None:
+        """Record failure."""
+
         tool.failure_count        = (tool.failure_count or 0) + 1
         tool.consecutive_failures = (tool.consecutive_failures or 0) + 1
         tool.health_status        = "degraded" if tool.consecutive_failures < AUTO_DISABLE_THRESHOLD else "down"
@@ -519,6 +527,8 @@ class MCPGovernanceService:
 
     @staticmethod
     def _blocked_response(tool_name: str, reason: str) -> Dict[str, Any]:
+        """Blocked response."""
+
         return {
             "success":   False,
             "tool":      tool_name,

@@ -1,3 +1,5 @@
+"""<module>."""
+
 import json
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
@@ -206,6 +208,8 @@ class WorkflowEngine:
 
     @staticmethod
     def _advance_step(db: Session, execution: WorkflowExecution, next_idx: int):
+        """Advance step."""
+
         execution.current_step_index = next_idx
         db.commit()
 

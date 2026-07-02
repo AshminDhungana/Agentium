@@ -38,13 +38,14 @@ class KnowledgeCategory(str, Enum):
 class KnowledgeSubmission:
     """Represents a knowledge submission awaiting approval."""
     
-    def __init__(self, 
+    def __init__(self,
                  content: str,
                  submitter_agentium_id: str,
                  category: KnowledgeCategory,
                  title: str = None,
                  description: str = None,
                  metadata: Dict[str, Any] = None):
+        """Create a new knowledge submission with generated ID and review deadline."""
         self.id = f"K{datetime.utcnow().strftime('%Y%m%d%H%M%S%f')}"
         self.content = content
         self.submitter_agentium_id = submitter_agentium_id
@@ -78,8 +79,9 @@ class KnowledgeGovernanceService:
     # Class-level registry so submissions survive across per-request instantiations.
     # In production this should be replaced with a Redis/DB-backed store.
     _staged_submissions: Dict[str, "KnowledgeSubmission"] = {}
-    
+
     def __init__(self, db: Session):
+        """Open a DB session and wire in vector store and knowledge service."""
         self.db = db
         self.vector_store = get_vector_store()
         self.knowledge_service = get_knowledge_service()

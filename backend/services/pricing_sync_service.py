@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 class PricingSyncService:
+    """PricingSyncService."""
     # Class-level cache (model_id_lower -> (input_rate_per_1m, output_rate_per_1m))
     _cache: Dict[str, Tuple[float, float]] = {}
     _initialized = False

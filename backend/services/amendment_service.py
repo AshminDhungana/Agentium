@@ -74,6 +74,8 @@ class AmendmentService:
     """
 
     def __init__(self, db: Session):
+        """Init."""
+
         self.db = db
         self._message_bus = None
         self._vector_store = None

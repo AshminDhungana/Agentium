@@ -46,6 +46,8 @@ class ContextWindowManager:
     }
     
     def __init__(self):
+        """Init."""
+
         self.agent_contexts: Dict[str, Dict] = {}
     
     def register_agent(self, agent_id: str, model_name: str, initial_tokens: int = 0):

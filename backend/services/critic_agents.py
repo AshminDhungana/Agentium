@@ -523,6 +523,7 @@ class CriticService:
         output_content: str,
         critic_type: CriticType,
     ) -> tuple:
+        """Run preflight check followed by AI review with rule-based fallback."""
         task = db.query(Task).filter_by(id=task_id).first()
         preflight_verdict, preflight_reason, preflight_suggestions = self._preflight_check(
             output_content, critic_type, task
@@ -546,6 +547,7 @@ class CriticService:
         output_content: str,
         critic_type: CriticType,
     ) -> tuple:
+        """Call the AI model to review the output and return the parsed verdict."""
         from backend.services.model_provider import ModelService
 
         model_key = critic.preferred_review_model or self.CRITIC_DEFAULT_MODEL
@@ -562,6 +564,7 @@ class CriticService:
         return self._parse_ai_verdict(raw_response)
 
     def _build_critic_system_prompt(self, critic_type: CriticType) -> str:
+        """Return the system prompt string for the given critic type."""
         role_descriptions = {
             CriticType.CODE: (
                 "You are a senior code reviewer with a security and correctness focus. "
@@ -591,6 +594,7 @@ Respond ONLY with a JSON object — no markdown, no preamble:
         task: Optional[Task],
         output_content: str,
     ) -> str:
+        """Return the user prompt string for the given critic type, task, and output."""
         task_context = (
             f"TASK DESCRIPTION:\n{task.description}\n\n"
             if task and task.description
@@ -617,6 +621,7 @@ Respond ONLY with a JSON object — no markdown, no preamble:
         )
 
     def _parse_ai_verdict(self, raw_response: str) -> tuple:
+        """Parse the AI response and return a tuple of (verdict, reason, suggestions)."""
         import json, re
 
         cleaned = re.sub(r"```(?:json)?|```", "", raw_response).strip()
@@ -633,6 +638,7 @@ Respond ONLY with a JSON object — no markdown, no preamble:
         return (verdict, reason, suggestions)
 
     def _preflight_check(self, content: str, critic_type: CriticType, task: Optional[Task]) -> tuple:
+        """Dispatch to the appropriate rule-based review based on critic type."""
         if critic_type == CriticType.CODE:
             return self._review_code(content, task)
         elif critic_type == CriticType.OUTPUT:
@@ -642,9 +648,11 @@ Respond ONLY with a JSON object — no markdown, no preamble:
         return (CriticVerdict.PASS, None, None)
 
     def _rule_based_review(self, content: str, critic_type: CriticType, task: Optional[Task]) -> tuple:
+        """Run a rule-based review as a fallback when AI review fails."""
         return self._preflight_check(content, critic_type, task)
 
     def _review_code(self, content: str, task: Optional[Task]) -> tuple:
+        """Check code output for dangerous patterns and obvious issues."""
         issues, suggestions = [], []
         dangerous_patterns = [
             "eval(", "exec(", "__import__", "os.system(", "subprocess.Popen(",
@@ -664,6 +672,7 @@ Respond ONLY with a JSON object — no markdown, no preamble:
         return (CriticVerdict.PASS, None, None)
 
     def _review_output(self, content: str, task: Optional[Task]) -> tuple:
+        """Check output for emptiness, error traces, and task relevance."""
         issues, suggestions = [], []
         if not content.strip():
             issues.append("Output is empty — does not fulfill any user intent")
@@ -684,6 +693,7 @@ Respond ONLY with a JSON object — no markdown, no preamble:
         return (CriticVerdict.PASS, None, None)
 
     def _review_plan(self, content: str, task: Optional[Task]) -> tuple:
+        """Check execution plan for completeness, duplicates, and length."""
         issues, suggestions = [], []
         if not content.strip():
             issues.append("Execution plan is empty")
@@ -716,6 +726,7 @@ Respond ONLY with a JSON object — no markdown, no preamble:
         critic_type: CriticType,
         reason: str,
     ) -> Dict[str, Any]:
+        """Escalate a rejected task to the Council for deliberation."""
         audit = AuditLog(
             level=AuditLevel.WARNING,
             category=AuditCategory.GOVERNANCE,
@@ -751,6 +762,7 @@ Respond ONLY with a JSON object — no markdown, no preamble:
         verdict: CriticVerdict,
         reason: Optional[str],
     ):
+        """Write an audit log entry for a critic review."""
         level = AuditLevel.INFO if verdict == CriticVerdict.PASS else AuditLevel.WARNING
         audit = AuditLog(
             level=level,
@@ -774,6 +786,7 @@ Respond ONLY with a JSON object — no markdown, no preamble:
     # -------------------------------------------------------------------------
 
     def get_reviews_for_task(self, db: Session, task_id: str) -> List[Dict[str, Any]]:
+        """Return all active reviews associated with a task."""
         reviews = (
             db.query(CritiqueReview)
             .filter(CritiqueReview.task_id == task_id, CritiqueReview.is_active == True)

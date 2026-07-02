@@ -44,6 +44,8 @@ class MCPClient:
     """
 
     def __init__(self, server_url: str, timeout_seconds: int = 30):
+        """Init."""
+
         self.server_url = server_url
         self.timeout_seconds = timeout_seconds
         self._session: Optional[Any] = None
@@ -51,10 +53,14 @@ class MCPClient:
     # ── Context manager ────────────────────────────────────────────────────────
 
     async def __aenter__(self) -> "MCPClient":
+        """Aenter."""
+
         await self.connect()
         return self
 
     async def __aexit__(self, *_) -> None:
+        """Aexit."""
+
         await self.disconnect()
 
     # ── Connection lifecycle ───────────────────────────────────────────────────
@@ -192,6 +198,8 @@ class MCPClient:
     # ── Mock helpers (used when mcp package is absent) ─────────────────────────
 
     def _mock_list_tools(self) -> List[Dict[str, Any]]:
+        """Mock list tools."""
+
         return [
             {
                 "name": "mock_search",
@@ -201,6 +209,8 @@ class MCPClient:
         ]
 
     def _mock_call_tool(self, tool_name: str, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Mock call tool."""
+
         return {
             "success": True,
             "tool": tool_name,

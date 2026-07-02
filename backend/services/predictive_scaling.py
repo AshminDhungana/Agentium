@@ -1,3 +1,5 @@
+"""<module>."""
+
 import os
 import time
 import json
@@ -25,6 +27,7 @@ SCALING_WS_EVENT = "scaling_event"
 
 
 class PredictiveScalingService:
+    """PredictiveScalingService."""
     @staticmethod
     def snapshot_metrics(db: Session):
         """

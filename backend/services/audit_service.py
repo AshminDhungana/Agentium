@@ -1,9 +1,12 @@
+"""<module>."""
+
 from typing import List, Optional, Tuple
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 from backend.models.entities.audit import AuditLog, AuditCategory, AuditLevel
 
 class AuditService:
+    """AuditService."""
     @staticmethod
     def get_escalations(
         db: Session,

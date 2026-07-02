@@ -17,3 +17,8 @@ py-cpuinfo>=9.0
 # and without lupa installed fakeredis can't execute the Lua sliding-window
 # script, silently degrading every test to the native-pipeline fallback path.
 fakeredis[lua]>=2.26
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 📖 DOCSTRING COVERAGE
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+interrogate>=1.7.0

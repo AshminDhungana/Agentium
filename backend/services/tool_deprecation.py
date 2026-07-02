@@ -30,6 +30,8 @@ class ToolDeprecationService:
     """
 
     def __init__(self, db: Session):
+        """Init."""
+
         self.db = db
 
     # ──────────────────────────────────────────────────────────────
@@ -328,6 +330,8 @@ class ToolDeprecationService:
     # ──────────────────────────────────────────────────────────────
 
     def _audit(self, action: str, tool_name: str, actor: str, details: dict):
+        """Audit."""
+
         audit = AuditLog(
             level=AuditLevel.INFO,
             category=AuditCategory.SYSTEM,

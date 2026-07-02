@@ -39,6 +39,8 @@ class ToolCreationService:
     """
 
     def __init__(self, db: Session):
+        """Init."""
+
         self.db = db
         self.factory = ToolFactory()
         self.versioning = ToolVersioningService(db)
@@ -389,6 +391,8 @@ class ToolCreationService:
     # ──────────────────────────────────────────────────────────────
 
     def _log_tool_activation(self, agentium_id: str, tool_name: str):
+        """Log tool activation."""
+
         audit = AuditLog(
             level=AuditLevel.INFO,
             category=AuditCategory.SYSTEM,

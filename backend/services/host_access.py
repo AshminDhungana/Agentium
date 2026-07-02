@@ -16,6 +16,8 @@ class HostAccessService:
     """
     
     def __init__(self, agentium_id: str):
+        """Init."""
+
         self.agentium_id = agentium_id
         self.is_authorized = agentium_id.startswith('0')  # Only Head of Council (0xxxx)
         self.host_root = os.getenv('HOST_FS_MOUNT', '/host')
@@ -323,6 +325,8 @@ class RestrictedHostAccess:
     """
     
     def __init__(self, agentium_id: str, head_council_proxy: HostAccessService):
+        """Init."""
+
         self.agentium_id = agentium_id
         self.head_proxy = head_council_proxy  # Routes through Head of Council
         self.approval_required = True

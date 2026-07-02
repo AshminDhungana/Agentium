@@ -66,6 +66,8 @@ class AgentOrchestrator:
     """
 
     def __init__(self, db: Session, message_bus: Optional[MessageBus] = None):
+        """Init."""
+
         self.db = db
         self.message_bus = message_bus
         self.vector_store: Optional[VectorStore] = None
@@ -975,6 +977,8 @@ class AgentOrchestrator:
     # ------------------------------------------------------------------
 
     def _get_or_create_cb(self, agent_id: str) -> Dict[str, Any]:
+        """Get or create cb."""
+
         if agent_id not in self._circuit_breakers:
             self._circuit_breakers[agent_id] = {
                 "state":     CB_CLOSED,
@@ -984,6 +988,8 @@ class AgentOrchestrator:
         return self._circuit_breakers[agent_id]
 
     def _check_circuit_breaker(self, agent_id: str) -> Optional[RouteResult]:
+        """Check circuit breaker."""
+
         cb = self._get_or_create_cb(agent_id)
 
         if cb["state"] == CB_CLOSED:
@@ -1007,6 +1013,8 @@ class AgentOrchestrator:
         return None  # HALF_OPEN — allow probe
 
     def _update_circuit_breaker(self, agent_id: str, success: bool):
+        """Update circuit breaker."""
+
         cb = self._get_or_create_cb(agent_id)
 
         if success:
@@ -1045,12 +1053,18 @@ class AgentOrchestrator:
     # ------------------------------------------------------------------
 
     def check_permission(self, from_id: str, to_id: str) -> bool:
+        """Check permission."""
+
         return HierarchyValidator.can_route(from_id, to_id, self._get_direction(from_id, to_id))
 
     def _get_agent(self, agent_id: str) -> Optional[Agent]:
+        """Get agent."""
+
         return self.db.query(Agent).filter_by(agentium_id=agent_id, is_active=True).first()
 
     def _get_parent_id(self, agent_id: str) -> str:
+        """Get parent id."""
+
         agent = self._get_agent(agent_id)
         if agent and agent.parent:
             return agent.parent.agentium_id
@@ -1059,6 +1073,8 @@ class AgentOrchestrator:
         return parents.get(tier, "00001")
 
     def _get_direction(self, from_id: str, to_id: str) -> str:
+        """Get direction."""
+
         from_tier = HierarchyValidator.get_tier(from_id)
         to_tier   = HierarchyValidator.get_tier(to_id)
 
@@ -1082,9 +1098,13 @@ class AgentOrchestrator:
         return f"{tier_num}xxxx"
 
     def _get_type(self, agent_id: str) -> str:
+        """Get type."""
+
         return {'0': 'head', '1': 'council', '2': 'lead', '3': 'task'}.get(agent_id[0], 'task')
 
     async def _find_available_task(self, lead_id: str) -> Optional[str]:
+        """Find available task."""
+
         lead = self._get_agent(lead_id)
         if not lead:
             return None
@@ -1103,6 +1123,8 @@ class AgentOrchestrator:
         return None
 
     async def _log(self, actor: str, action: str, desc: str, level=AuditLevel.INFO, target=None):
+        """Log."""
+
         audit = AuditLog(
             level=level,
             category=AuditCategory.GOVERNANCE,

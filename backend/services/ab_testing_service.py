@@ -36,6 +36,8 @@ class CriticService:
     """Lightweight critic service for evaluating A/B test outputs."""
 
     def __init__(self, db: Session):
+        """Init."""
+
         self.db = db
 
     async def evaluate_output(
@@ -116,6 +118,8 @@ class ABTestingService:
     """Service for running A/B tests between AI models."""
 
     def __init__(self, db: Session):
+        """Init."""
+
         self.db = db
         self.critic_service = CriticService(db)
 
@@ -317,6 +321,8 @@ class ABTestingService:
     # ── Quality score ─────────────────────────────────────────────────────────
 
     def _calculate_quality_score(self, critic_results: Dict) -> float:
+        """Calculate quality score."""
+
         weights = {"plan_score": 0.25, "code_score": 0.35, "output_score": 0.40}
         total = sum(critic_results.get(k, 0) * w for k, w in weights.items())
         return round(total, 2)
@@ -324,6 +330,8 @@ class ABTestingService:
     # ── Cost estimate ─────────────────────────────────────────────────────────
 
     def _estimate_cost(self, config_id: str, tokens: int) -> float:
+        """Estimate cost."""
+
         try:
             config = self.db.query(UserModelConfig).filter(
                 UserModelConfig.id == config_id

@@ -284,6 +284,8 @@ class MessageBus:
     """
     
     def __init__(self):
+        """Init."""
+
         self._redis: Optional[redis.Redis] = None
         self._pubsub: Optional[redis.client.PubSub] = None
         self._subscribers: Dict[str, Set[Callable]] = {}

@@ -268,6 +268,8 @@ class SpeakerIdentifier:
     IDENTIFICATION_THRESHOLD = 0.70
 
     def __init__(self):
+        """Init."""
+
         self._classifier = None
 
     def _get_classifier(self):

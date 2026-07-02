@@ -38,6 +38,8 @@ class ToolMarketplaceService:
     """
 
     def __init__(self, db: Session):
+        """Init."""
+
         self.db = db
         self.factory = ToolFactory()
 
@@ -423,6 +425,8 @@ class ToolMarketplaceService:
     # ──────────────────────────────────────────────────────────────
 
     def _audit(self, action: str, tool_name: str, actor: str, details: dict):
+        """Audit."""
+
         audit = AuditLog(
             level=AuditLevel.INFO,
             category=AuditCategory.SYSTEM,

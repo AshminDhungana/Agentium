@@ -30,6 +30,8 @@ class ToolVersioningService:
     """
 
     def __init__(self, db: Session):
+        """Init."""
+
         self.db = db
         self.factory = ToolFactory()
 
@@ -409,6 +411,8 @@ class ToolVersioningService:
     # ──────────────────────────────────────────────────────────────
 
     def _get_latest_version(self, tool_name: str) -> Optional[ToolVersion]:
+        """Get latest version."""
+
         return (
             self.db.query(ToolVersion)
             .filter(ToolVersion.tool_name == tool_name)
@@ -417,6 +421,8 @@ class ToolVersioningService:
         )
 
     def _audit(self, action: str, tool_name: str, actor: str, details: dict):
+        """Audit."""
+
         audit = AuditLog(
             level=AuditLevel.INFO,
             category=AuditCategory.SYSTEM,

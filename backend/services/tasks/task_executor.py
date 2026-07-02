@@ -206,6 +206,7 @@ def execute_task_async(self, task_id: str, agent_id: str):
                                 redis_url = os.getenv("REDIS_URL", "redis://redis:6379/0")
 
                                 async def inc_ap():
+                                    """Inc ap."""
                                     r = await aioredis.from_url(redis_url, decode_responses=True)
                                     await r.hincrby("agentium:learning:impact", "anti_patterns_warned", 1)
                                     await r.close()
@@ -333,6 +334,8 @@ def handle_task_escalation():
 
 
 def _simulate_council_decision(task: Task) -> str:
+    """Simulate council decision."""
+
     if task.retry_count >= task.max_retries:
         if task.priority in [TaskPriority.CRITICAL, TaskPriority.SOVEREIGN]:
             return "allocate_resources"
@@ -850,6 +853,8 @@ def broadcast_to_channels(channel_ids: list, message: str, agent_id: str):
 
 @celery_app.task(name='agentium.tasks.task_executor.check_escalation_timeouts')
 def check_escalation_timeouts():
+    """Check escalation timeouts."""
+
     with get_task_db() as db:
         try:
             now = datetime.utcnow()
@@ -972,6 +977,8 @@ def process_dependency_graph(db=None):
 
 @celery_app.task(name='agentium.tasks.task_executor.agent_heartbeat')
 def agent_heartbeat():
+    """Agent heartbeat."""
+
     with get_task_db() as db:
         try:
             from backend.services.self_healing_service import SelfHealingService
@@ -985,6 +992,8 @@ def agent_heartbeat():
 
 @celery_app.task(name='agentium.tasks.task_executor.detect_crashed_agents')
 def detect_crashed_agents():
+    """Detect crashed agents."""
+
     with get_task_db() as db:
         try:
             from backend.services.self_healing_service import SelfHealingService
@@ -1003,6 +1012,8 @@ def detect_crashed_agents():
 
 @celery_app.task(name='agentium.tasks.task_executor.self_diagnostic_daily')
 def self_diagnostic_daily():
+    """Self diagnostic daily."""
+
     with get_task_db() as db:
         try:
             from backend.services.self_healing_service import SelfHealingService
@@ -1018,6 +1029,8 @@ def self_diagnostic_daily():
 
 @celery_app.task(name='agentium.tasks.task_executor.critical_path_guardian')
 def critical_path_guardian():
+    """Critical path guardian."""
+
     with get_task_db() as db:
         try:
             from backend.services.self_healing_service import SelfHealingService
@@ -1039,6 +1052,8 @@ def critical_path_guardian():
 
 @celery_app.task(name='agentium.tasks.task_executor.knowledge_consolidation')
 def knowledge_consolidation():
+    """Knowledge consolidation."""
+
     with get_task_db() as db:
         try:
             from backend.services.autonomous_learning import get_learning_engine
@@ -1050,6 +1065,8 @@ def knowledge_consolidation():
 
 @celery_app.task(name='agentium.tasks.task_executor.performance_optimization')
 def performance_optimization():
+    """Performance optimization."""
+
     with get_task_db() as db:
         try:
             from backend.services.self_improvement_service import self_improvement_service
@@ -1065,6 +1082,8 @@ def performance_optimization():
 
 @celery_app.task(name='agentium.tasks.task_executor.metrics_snapshot')
 def metrics_snapshot():
+    """Metrics snapshot."""
+
     with get_task_db() as db:
         try:
             from backend.services.predictive_scaling import predictive_scaling_service
@@ -1077,6 +1096,8 @@ def metrics_snapshot():
 
 @celery_app.task(name='agentium.tasks.task_executor.predictive_scale')
 def predictive_scale():
+    """Predictive scale."""
+
     with get_task_db() as db:
         try:
             from backend.services.predictive_scaling import predictive_scaling_service
@@ -1095,6 +1116,8 @@ def predictive_scale():
 
 @celery_app.task(name='agentium.tasks.task_executor.threshold_event_check')
 def threshold_event_check():
+    """Threshold event check."""
+
     with get_task_db() as db:
         try:
             from backend.services.event_processor import EventProcessorService
@@ -1112,6 +1135,8 @@ def threshold_event_check():
 
 @celery_app.task(name='agentium.tasks.task_executor.external_api_poll')
 def external_api_poll():
+    """External api poll."""
+
     with get_task_db() as db:
         try:
             from backend.services.event_processor import EventProcessorService
@@ -1133,6 +1158,8 @@ def external_api_poll():
 
 @celery_app.task(name='agentium.tasks.task_executor.anomaly_detection')
 def anomaly_detection():
+    """Anomaly detection."""
+
     with get_task_db() as db:
         try:
             from backend.services.monitoring_service import MonitoringService
@@ -1157,6 +1184,8 @@ def anomaly_detection():
 
 @celery_app.task(name='agentium.tasks.task_executor.sla_monitor')
 def sla_monitor():
+    """Sla monitor."""
+
     with get_task_db() as db:
         try:
             from backend.services.monitoring_service import MonitoringService
@@ -1179,6 +1208,8 @@ def sla_monitor():
 
 @celery_app.task(name='agentium.tasks.task_executor.poll_wait_conditions')
 def poll_wait_conditions():
+    """Poll wait conditions."""
+
     with get_task_db() as db:
         try:
             from backend.services.wait_poll_service import WaitPollService
@@ -1197,6 +1228,8 @@ def poll_wait_conditions():
 
 @celery_app.task(name='agentium.tasks.task_executor.log_slow_query_summary_daily')
 def log_slow_query_summary_daily():
+    """Log slow query summary daily."""
+
     with get_task_db() as db:
         try:
             from backend.services.slow_query_service import get_slow_queries, get_summary
@@ -1235,6 +1268,8 @@ def log_slow_query_summary_daily():
 
 @celery_app.task(name='agentium.tasks.task_executor.decay_learnings')
 def decay_learnings():
+    """Decay learnings."""
+
     with get_task_db() as db:
         try:
             from backend.services.autonomous_learning import get_learning_engine
@@ -1270,6 +1305,8 @@ def decay_learnings():
 
 @celery_app.task(name='agentium.tasks.task_executor.update_citation_boosts')
 def update_citation_boosts():
+    """Update citation boosts."""
+
     with get_task_db() as db:
         try:
             from backend.services.citation_graph_service import get_citation_graph_service
@@ -1321,6 +1358,8 @@ def update_citation_boosts():
 
 @celery_app.task(name='agentium.tasks.task_executor.cleanup_citation_edges')
 def cleanup_citation_edges():
+    """Cleanup citation edges."""
+
     with get_task_db() as db:
         try:
             from backend.services.citation_graph_service import get_citation_graph_service

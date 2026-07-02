@@ -53,6 +53,7 @@ from backend.services.model_provider import ModelService
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 class CircuitState(Enum):
+    """CircuitState."""
     CLOSED = "closed"      # Normal operation
     OPEN = "open"          # Failing, reject requests
     HALF_OPEN = "half_open"  # Testing if recovered
@@ -91,6 +92,8 @@ class ChannelMetrics:
     
     @property
     def success_rate(self) -> float:
+        """Success rate."""
+
         if self.total_requests == 0:
             return 1.0
         return self.successful_requests / self.total_requests
@@ -119,6 +122,8 @@ import redis
 from backend.core.config import settings
 
 def get_redis_client():
+    """Get redis client."""
+
     try:
         url = getattr(settings, "REDIS_URL", "redis://localhost:6379/0")
         client = redis.Redis.from_url(url, decode_responses=True)
@@ -134,6 +139,8 @@ class RateLimiter:
     """Token bucket rate limiter per channel (Redis or Memory)."""
     
     def __init__(self):
+        """Init."""
+
         self._buckets: Dict[str, Dict[str, Any]] = {}
         self._lock = threading.Lock()
     
@@ -239,14 +246,20 @@ class CircuitBreaker:
     """Circuit breaker for channel failure recovery (Redis or Memory)."""
     
     def __init__(self):
+        """Init."""
+
         self._metrics: Dict[str, ChannelMetrics] = defaultdict(ChannelMetrics)
         self._configs: Dict[str, CircuitBreakerConfig] = {}
         self._lock = threading.Lock()
     
     def register_channel(self, channel_id: str, config: CircuitBreakerConfig = None):
+        """Register channel."""
+
         self._configs[channel_id] = config or CircuitBreakerConfig()
     
     def _get_state(self, channel_id: str, config: CircuitBreakerConfig):
+        """Get state."""
+
         if _redis_client:
             try:
                 state_val = _redis_client.get(f"cb:state:{channel_id}")
@@ -273,6 +286,8 @@ class CircuitBreaker:
         return metrics.circuit_state, metrics.half_open_calls
         
     def _set_state(self, channel_id: str, state: CircuitState):
+        """Set state."""
+
         if _redis_client:
             try:
                 _redis_client.set(f"cb:state:{channel_id}", state.value)
@@ -295,6 +310,8 @@ class CircuitBreaker:
             metrics.half_open_calls = 0
 
     def can_execute(self, channel_id: str) -> bool:
+        """Can execute."""
+
         config = self._configs.get(channel_id, CircuitBreakerConfig())
         with self._lock:
             state, half_calls = self._get_state(channel_id, config)
@@ -311,6 +328,8 @@ class CircuitBreaker:
             return True
             
     def record_success(self, channel_id: str):
+        """Record success."""
+
         config = self._configs.get(channel_id, CircuitBreakerConfig())
         with self._lock:
             if _redis_client:
@@ -332,6 +351,8 @@ class CircuitBreaker:
                 print(f"[CircuitBreaker] Channel {channel_id} circuit CLOSED (recovered)")
     
     def record_failure(self, channel_id: str) -> bool:
+        """Record failure."""
+
         config = self._configs.get(channel_id, CircuitBreakerConfig())
         with self._lock:
             metrics = self._metrics[channel_id]
@@ -361,6 +382,8 @@ class CircuitBreaker:
             return False
             
     def get_metrics(self, channel_id: str) -> Dict[str, Any]:
+        """Get metrics."""
+
         metrics = self._metrics[channel_id]
         config = self._configs.get(channel_id, CircuitBreakerConfig())
         state, _ = self._get_state(channel_id, config)
@@ -701,6 +724,8 @@ class IMAPEmailReceiver:
     """
     
     def __init__(self):
+        """Init."""
+
         self._tasks: Dict[str, asyncio.Task] = {}
         self._running = False
         self._connections: Dict[str, Any] = {}
@@ -999,6 +1024,7 @@ class ChannelManager:
         if allowed_senders:
             # Normalise: strip spaces, +, country code formatting for comparison
             def _normalise(num: str) -> str:
+                """Normalise."""
                 return num.replace('+', '').replace(' ', '').replace('-', '').strip()
             norm_sender = _normalise(sender_id.split('@')[0])  # strip @s.whatsapp.net
             norm_allowed = [_normalise(s) for s in allowed_senders]
@@ -1577,6 +1603,8 @@ class WhatsAppAdapter:
 
     @staticmethod
     async def send_message(config: Dict, recipient: str, content: str) -> bool:
+        """Send message."""
+
         import httpx
 
         phone_number_id = config.get('phone_number_id')
@@ -2323,6 +2351,8 @@ class SignalAdapter:
 
     @staticmethod
     def _rpc_url(config: Dict) -> str:
+        """Rpc url."""
+
         host = config.get('rpc_host', '127.0.0.1')
         port = config.get('rpc_port', 7583)
         return f"http://{host}:{port}"

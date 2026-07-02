@@ -49,12 +49,16 @@ class AcceptanceCriterion:
     # ── serialisation ──────────────────────────────────────────────────────
 
     def to_dict(self) -> Dict[str, Any]:
+        """To dict."""
+
         d = asdict(self)
         d["validator"] = self.validator.value  # store as string in JSON
         return d
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "AcceptanceCriterion":
+        """From dict."""
+
         validator = CriterionValidator(data.get("validator", "output"))
         return cls(
             metric=data["metric"],
@@ -95,10 +99,14 @@ class CriterionResult:
     notes: str = ""
 
     def to_dict(self) -> Dict[str, Any]:
+        """To dict."""
+
         return asdict(self)
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "CriterionResult":
+        """From dict."""
+
         return cls(**data)
 
 

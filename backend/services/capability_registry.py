@@ -561,7 +561,9 @@ def require_capability(capability: Capability):
             # Method implementation
     """
     def decorator(func):
+        """Decorator."""
         async def wrapper(agent: Agent, db: Session, *args, **kwargs):
+            """Wrapper."""
             # Check capability
             if not CapabilityRegistry.can_agent(agent, capability, db):
                 raise PermissionError(

@@ -76,6 +76,8 @@ class URLSafetyGuard:
     """
 
     def __init__(self, blocked_domains: Optional[List[str]] = None):
+        """Init."""
+
         extra = []
         if settings.BROWSER_BLOCKED_DOMAINS:
             extra = [
@@ -135,6 +137,7 @@ class URLSafetyGuard:
 
 @dataclass
 class NavigateResult:
+    """NavigateResult."""
     url: str
     title: str
     status_code: int
@@ -144,6 +147,7 @@ class NavigateResult:
 
 @dataclass
 class ScrapeResult:
+    """ScrapeResult."""
     url: str
     text: str
     html: str
@@ -154,6 +158,7 @@ class ScrapeResult:
 
 @dataclass
 class ScreenshotResult:
+    """ScreenshotResult."""
     url: str
     image_base64: str
     content_type: str = "image/png"
@@ -164,6 +169,7 @@ class ScreenshotResult:
 
 @dataclass
 class SearchResultItem:
+    """SearchResultItem."""
     title: str
     url: str
     snippet: str
@@ -171,6 +177,7 @@ class SearchResultItem:
 
 @dataclass
 class SearchResult:
+    """SearchResult."""
     query: str
     results: List[SearchResultItem]
     success: bool = True
@@ -178,6 +185,7 @@ class SearchResult:
 
 @dataclass
 class BrowserSession:
+    """BrowserSession."""
     session_id: str
     url: str
     title: str
@@ -209,6 +217,8 @@ class BrowserService:
     """
 
     def __init__(self):
+        """Init."""
+
         self._playwright = None
         self._browser = None
         self._safety_guard = URLSafetyGuard()

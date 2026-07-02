@@ -54,6 +54,7 @@ class _S3Backend:
     name = "s3"
 
     def __init__(self):
+        """Initialize the S3 client and ensure the bucket exists."""
         import boto3
         from botocore.config import Config
 
@@ -74,6 +75,7 @@ class _S3Backend:
         self._ensure_bucket()
 
     def _ensure_bucket(self):
+        """Create the bucket if it does not already exist."""
         from botocore.exceptions import ClientError
         try:
             self._client.head_bucket(Bucket=self._bucket)
@@ -100,6 +102,7 @@ class _S3Backend:
         object_name: str,
         content_type: str = "application/octet-stream",
     ) -> Optional[str]:
+        """Upload a file object to S3 and return its public URL."""
         from botocore.exceptions import ClientError
         try:
             self._client.upload_fileobj(
@@ -114,6 +117,7 @@ class _S3Backend:
             return None
 
     def generate_presigned_url(self, object_name: str, expiration: int = 3600) -> Optional[str]:
+        """Generate a temporary presigned URL for the given object."""
         from botocore.exceptions import ClientError
         try:
             return self._client.generate_presigned_url(
@@ -126,7 +130,7 @@ class _S3Backend:
             return None
 
     def delete_file(self, object_name: str) -> bool:
-        from botocore.exceptions import ClientError
+        """Delete an object from S3 and return whether it succeeded."""
         try:
             self._client.delete_object(Bucket=self._bucket, Key=object_name)
             return True
@@ -135,7 +139,7 @@ class _S3Backend:
             return False
 
     def list_files(self, prefix: str = "") -> List[Dict[str, Any]]:
-        from botocore.exceptions import ClientError
+        """List S3 objects under the given prefix."""
         try:
             paginator = self._client.get_paginator("list_objects_v2")
             result = []
@@ -147,6 +151,7 @@ class _S3Backend:
             return []
 
     def _public_url(self, object_name: str) -> str:
+        """Return the public HTTP(S) URL for an S3 object."""
         if self._endpoint:
             base = self._endpoint.rstrip("/")
             return f"{base}/{self._bucket}/{object_name}"
@@ -171,6 +176,7 @@ class _LocalBackend:
     name = "local"
 
     def __init__(self):
+        """Initialize the local storage root directory."""
         _LOCAL_ROOT.mkdir(parents=True, exist_ok=True)
         logger.warning(
             "⚠️  [Storage] S3/MinIO credentials missing or unreachable. "
@@ -188,6 +194,7 @@ class _LocalBackend:
         object_name: str,
         content_type: str = "application/octet-stream",
     ) -> Optional[str]:
+        """Copy a file object to local disk and return its URL."""
         dest = _LOCAL_ROOT / object_name
         try:
             dest.parent.mkdir(parents=True, exist_ok=True)
@@ -211,6 +218,7 @@ class _LocalBackend:
         return self._public_url(object_name)
 
     def delete_file(self, object_name: str) -> bool:
+        """Delete a local file by its object name."""
         dest = _LOCAL_ROOT / object_name
         try:
             if dest.exists():
@@ -245,6 +253,7 @@ class _LocalBackend:
         return entries
 
     def _public_url(self, object_name: str) -> str:
+        """Return the API download URL for a locally stored object."""
         # object_name: "files/<user_id>/<filename>"
         parts = Path(object_name).parts
         if len(parts) >= 3:
@@ -267,6 +276,7 @@ class StorageService:
     """
 
     def __init__(self):
+        """Select and initialize the active storage backend."""
         self._backend = self._init_backend()
         logger.info(
             "✅ [Storage] Active backend: %s",

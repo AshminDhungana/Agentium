@@ -45,6 +45,7 @@ Return ONLY the raw JSON array — no markdown fences, no prose."""
 
 @dataclass
 class SubTaskSpec:
+    """SubTaskSpec."""
     intent: str
     params: dict = field(default_factory=dict)
     depends_on: List[str] = field(default_factory=list)
@@ -54,6 +55,7 @@ class SubTaskSpec:
 
 @dataclass
 class WorkflowPlan:
+    """WorkflowPlan."""
     workflow_id: str
     original_message: str
     subtasks: List[SubTaskSpec]
@@ -70,9 +72,13 @@ class WorkflowPlanner:
     """
 
     def __init__(self, model_config_id: Optional[str] = None):
+        """Init."""
+
         self.model_config_id = model_config_id
 
     async def parse(self, message: str) -> WorkflowPlan:
+        """Parse."""
+
         workflow_id = f"wf_{uuid.uuid4().hex[:12]}"
         try:
             subtasks = await self._llm_parse(message)

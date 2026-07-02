@@ -28,6 +28,25 @@ class ExecutionResult:
         execution_time_ms: int = 0,
         error_message: str = None
     ):
+        """Initialize an ExecutionResult with execution metadata.
+
+        Args:
+            success: Whether the execution succeeded.
+            output_schema: Dictionary mapping column names to type strings.
+            row_count: Number of rows in the output.
+            sample: Sample output rows (max 3).
+            stats: Summary statistics dictionary.
+            stdout: Captured standard output.
+            stderr: Captured standard error.
+            execution_time_ms: Execution time in milliseconds.
+            error_message: Error message if the execution failed.
+
+        Returns:
+            None
+
+        Raises:
+            None
+        """
         self.success = success
         self.output_schema = output_schema
         self.row_count = row_count
@@ -39,6 +58,17 @@ class ExecutionResult:
         self.error_message = error_message
 
     def to_dict(self) -> Dict[str, Any]:
+        """Convert the execution result into a serializable dictionary.
+
+        Args:
+            None
+
+        Returns:
+            Dictionary containing all execution summary fields.
+
+        Raises:
+            None
+        """
         return {
             "success": self.success,
             "output_schema": self.output_schema,
@@ -53,7 +83,17 @@ class ExecutionResult:
 
 
 def analyze_dataframe(df) -> Dict[str, Any]:
-    """Analyze a pandas DataFrame and return summary only."""
+    """Analyze a pandas DataFrame and return a schema and stats summary.
+
+    Args:
+        df: DataFrame to analyze.
+
+    Returns:
+        Dictionary with schema, row_count, sample rows, and statistics.
+
+    Raises:
+        None
+    """
     if df is None or len(df) == 0:
         return {
             "schema": {},
@@ -102,6 +142,9 @@ def execute_code(
 
     Returns:
         ExecutionResult with summary only (no raw data)
+
+    Raises:
+        None
     """
     start_time = time.time()
 

@@ -1,3 +1,5 @@
+"""<module>."""
+
 import logging
 from datetime import datetime, timedelta
 from typing import Dict, Any, List
@@ -13,7 +15,10 @@ from backend.models.entities.task import Task
 logger = logging.getLogger(__name__)
 
 class SelfImprovementService:
+    """SelfImprovementService."""
     def __init__(self):
+        """Init."""
+
         pass
 
     def generate_auto_tools(self, db: Session) -> Dict[str, Any]:
@@ -37,6 +42,7 @@ class SelfImprovementService:
                 # Check if create_from_pattern exists, if not, stub it out
                 if not hasattr(ToolCreationService, 'create_from_pattern'):
                     def mock_create_from_pattern(pattern_data, db_session):
+                        """Mock create from pattern."""
                         logger.info(f"Mock auto-generated tool from pattern: {pattern_data}")
                     ToolCreationService.create_from_pattern = mock_create_from_pattern
                     

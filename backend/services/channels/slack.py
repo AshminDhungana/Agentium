@@ -1,3 +1,5 @@
+"""<module>."""
+
 
 import httpx
 import logging
@@ -55,4 +57,6 @@ class SlackAdapter(BaseChannelAdapter):
             return False
 
     async def validate_config(self) -> bool:
+        """Validate config."""
+
         return "bot_token" in self.config

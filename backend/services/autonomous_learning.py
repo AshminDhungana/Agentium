@@ -38,6 +38,8 @@ class LearningExtraction:
     extracted_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
 
     def to_dict(self) -> Dict[str, Any]:
+        """To dict."""
+
         return {
             "category": self.category,
             "summary": self.summary,
@@ -82,6 +84,8 @@ class AutonomousLearningEngine:
     LOOKBACK_DAYS = 7
 
     def __init__(self):
+        """Init."""
+
         self._stats = LearningStats()
 
     # ── Core Analysis ─────────────────────────────────────────────────────

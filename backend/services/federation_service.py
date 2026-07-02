@@ -68,6 +68,7 @@ def _verify_signature(
 # ──────────────────────────────────────────────────────────────────────────────
 
 class FederationService:
+    """FederationService."""
 
     # ── Secret storage ────────────────────────────────────────────────────────
 
@@ -83,6 +84,8 @@ class FederationService:
 
     @staticmethod
     def _verify_secret(secret: str, hashed_secret: str) -> bool:
+        """Verify secret."""
+
         return FederationService._hash_secret(secret) == hashed_secret
 
     # ── Registration ──────────────────────────────────────────────────────────
@@ -126,6 +129,8 @@ class FederationService:
 
     @staticmethod
     def get_peer(db: Session, peer_id: str) -> FederatedInstance:
+        """Get peer."""
+
         peer = db.query(FederatedInstance).filter(FederatedInstance.id == peer_id).first()
         if not peer:
             raise NotFoundError(error="Peer not found.", code="PEER_NOT_FOUND")
@@ -446,6 +451,8 @@ class FederationService:
 
     @staticmethod
     def delete_peer(db: Session, peer_id: str) -> None:
+        """Delete peer."""
+
         peer = db.query(FederatedInstance).filter(FederatedInstance.id == peer_id).first()
         if not peer:
             raise NotFoundError(error="Peer not found.", code="PEER_NOT_FOUND")
@@ -454,6 +461,8 @@ class FederationService:
 
     @staticmethod
     def update_peer_trust(db: Session, peer_id: str, trust_level: str) -> FederatedInstance:
+        """Update peer trust."""
+
         allowed = {"full", "limited", "read_only"}
         if trust_level not in allowed:
             raise BadRequestError(error=f"trust_level must be one of {allowed}", code="TRUSTLEVEL_MUST_BE_ONE_OF")
@@ -593,6 +602,8 @@ class FederationService:
 
     @staticmethod
     def list_federated_tasks(db: Session, limit: int = 50) -> List[FederatedTask]:
+        """List federated tasks."""
+
         return (
             db.query(FederatedTask)
             .order_by(FederatedTask.delegated_at.desc())

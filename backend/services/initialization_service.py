@@ -63,6 +63,8 @@ class InitializationService:
     COUNTRY_NAME_TIMEOUT_SECONDS = 60  # Time to wait for user input
 
     def __init__(self, db: Optional[Session] = None) -> None:
+        """Init."""
+
         self.db = db
         self.vector_store = get_vector_store()
         self.knowledge_service = get_knowledge_service()
@@ -439,6 +441,7 @@ class InitializationService:
                 # Prefer non-LOCAL providers (they're real cloud-based endpoints).
                 # For LOCAL, only use it if it actually has a configured base_url.
                 def _is_usable(cfg: UserModelConfig) -> bool:
+                    """Is usable."""
                     if cfg.provider != ProviderType.LOCAL:
                         return True
                     # LOCAL must have an explicit base_url to be usable
@@ -1140,6 +1143,7 @@ def trigger_genesis_if_needed(db) -> bool:
         return False
 
     async def _run_genesis() -> None:
+        """Run genesis."""
         from backend.models.database import get_db_context
         try:
             logger.info("🚀 Starting genesis protocol in background task...")

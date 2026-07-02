@@ -29,6 +29,8 @@ class KnowledgeService:
     """
 
     def __init__(self, vector_store: Optional[VectorStore] = None) -> None:
+        """Init."""
+
         self.vector_store: VectorStore = vector_store or get_vector_store()
 
     # ------------------------------------------------------------------

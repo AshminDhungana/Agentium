@@ -40,6 +40,17 @@ class SandboxManager:
     """
 
     def __init__(self):
+        """Initialize the sandbox manager and Docker client.
+
+        Args:
+            None
+
+        Returns:
+            None
+
+        Raises:
+            None
+        """
         self.docker_client = None
         self._init_docker()
 
@@ -68,6 +79,8 @@ class SandboxManager:
         self._pool_lock = None  # Initialized in async context
         
     async def _ensure_pool_lock(self):
+        """Ensure pool lock."""
+
         import asyncio
         if self._pool_lock is None:
             self._pool_lock = asyncio.Lock()

@@ -70,6 +70,8 @@ class APIKeyManager:
     NOTIFICATION_DEBOUNCE_SECONDS = 300  # 5 minutes between "all down" alerts
     
     def __new__(cls):
+        """New."""
+
         if cls._instance is None:
             with cls._lock:
                 if cls._instance is None:
@@ -78,6 +80,8 @@ class APIKeyManager:
         return cls._instance
     
     def __init__(self):
+        """Init."""
+
         if self._initialized:
             return
         
@@ -862,8 +866,10 @@ class APIKeyManager:
                 return result
         """
         def decorator(func: Callable):
+            """Decorator."""
             @wraps(func)
             async def wrapper(*args, **kwargs):
+                """Wrapper."""
                 providers = [provider] + (fallback_providers or [])
                 
                 last_error = None

@@ -584,6 +584,8 @@ Generate the skill JSON now:"""
     # ═══════════════════════════════════════════════════════════════════════
 
     def __init__(self):
+        """Init."""
+
         self._cache: Dict[str, PromptTemplate] = {}
 
     def get_template(

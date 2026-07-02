@@ -20,6 +20,8 @@ class PersistentCouncilService:
     Ensures Head of Council (00001) and 2 Council Members (10001, 10002) exist.
     """
     def __init__(self):
+        """Init."""
+
         self.host_access = {}  # Cache host access instances
 
     # Eternal Agent Specifications
@@ -64,6 +66,8 @@ class PersistentCouncilService:
 
     @staticmethod
     def initialize_persistent_council(db: Session, force_recreate: bool = False) -> Dict[str, Any]:
+        """Initialize persistent council."""
+
         results = {
             'head_of_council': None,
             'council_members': [],

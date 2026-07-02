@@ -22,6 +22,8 @@ class ModelAllocationService:
     """
 
     def __init__(self, db: Session):
+        """Init."""
+
         self.db = db
         self.agent_model_cache: Dict[str, str] = {}  # agentium_id -> model_config_id
 

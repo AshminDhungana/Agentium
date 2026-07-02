@@ -23,6 +23,8 @@ class SkillManager:
     """
 
     def __init__(self):
+        """Init."""
+
         self.vector_store = get_vector_store()
         self._knowledge_gov = None
         self.collections = {

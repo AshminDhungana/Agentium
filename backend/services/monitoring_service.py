@@ -1046,6 +1046,7 @@ class MonitoringService:
 
         # ── Compute baselines ─────────────────────────────────────────────
         def _compute_zscore(values: list, current: float) -> float:
+            """Compute zscore."""
             if len(values) < 3:
                 return 0.0
             mean = sum(values) / len(values)

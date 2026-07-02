@@ -764,7 +764,7 @@ Build a self-governing AI ecosystem where agents operate under constitutional la
 - [x] **API Client Consolidation** — audit `frontend/src/` for inline `fetch()` or `axios` calls outside `frontend/src/services/api.ts`; migrate all to typed request/response generics in the central API module
 - [x] **Hook Deduplication** — merge overlapping `useWebSocket`, `usePolling`, and `useAutoRefresh` hooks into a single `useRealtimeData<T>(endpoint, wsEvent, pollIntervalMs)` hook in `frontend/src/hooks/`
 - [x] **Dark Mode — Phase 13–15 New Pages** — audit `WorkflowDesigner.tsx`, `WorkflowExecutionMonitor.tsx`, `EventTriggerManager.tsx`, `ScalingDashboard.tsx`, and `LearningImpactDashboard.tsx` for hardcoded `bg-white` / `text-black` / `border-gray-*` without `dark:` variants; apply Phase 17.2 semantic token system
-- [ ] **Mobile Responsiveness — Phase 13–15 New Pages** — apply Phase 17.3 breakpoint patterns to `WorkflowsPage`, `WorkflowDesigner`, `ScalingDashboard`, and `EventTriggerManager`; collapse complex layouts below `md:`; test on 375px viewport
+- [x] **Mobile Responsiveness — Phase 13–15 New Pages** — apply Phase 17.3 breakpoint patterns to `WorkflowsPage`, `WorkflowDesigner`, `ScalingDashboard`, and `EventTriggerManager`; collapse complex layouts below `md:`; test on 375px viewport
 - [x] **Shared Component Enforcement** — replace all remaining ad-hoc `Loader2` spinner usages with `<LoadingSpinner>`; replace ad-hoc toast calls with `useToast()`; verify no page introduced after Phase 17 bypasses these shared components
 
 ---
@@ -775,7 +775,7 @@ Build a self-governing AI ecosystem where agents operate under constitutional la
 
 #### Backend
 
-- [ ] **Service Docstrings** — every public method in `backend/services/` must have a Google-style docstring with `Args`, `Returns`, and `Raises` sections; add `interrogate` to CI (`interrogate backend/services/ --fail-under=90`)
+- [x] **Service Docstrings** — every public method in `backend/services/` must have a Google-style docstring with `Args`, `Returns`, and `Raises` sections; add `interrogate` to CI (`interrogate backend/services/ --fail-under=90`)
 - [ ] **OpenAPI Enrichment** — add `summary`, `description`, `response_model`, and example `responses` annotations to every route missing them; confirm `/docs` renders complete documentation for all 80+ endpoints with sample request/response bodies
 - [ ] **Architecture Decision Records** — write `docs/adr/` entries (one Markdown file each) for: dual-storage rationale (PostgreSQL + ChromaDB), constitutional guard two-tier design, Celery over asyncio for background work, agent ID numbering scheme (`0xxxx / 1xxxx / 2xxxx / 3xxxx`), RAG decay scoring algorithm
 - [ ] **`CONTRIBUTING.md`** — document: local dev setup (`docker-compose up`), migration workflow (`alembic upgrade head`), test execution (`pytest`), and a full environment variable reference table with defaults and descriptions for all vars in `backend/.env.example`

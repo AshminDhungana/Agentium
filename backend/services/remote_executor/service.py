@@ -31,6 +31,17 @@ class RemoteExecutorService:
     """
 
     def __init__(self, db_session=None):
+        """Initialize the remote executor service.
+
+        Args:
+            db_session: Optional SQLAlchemy database session.
+
+        Returns:
+            None
+
+        Raises:
+            None
+        """
         self.db = db_session
         self.sandbox_manager = SandboxManager()
         self.guard = execution_guard
@@ -65,6 +76,9 @@ class RemoteExecutorService:
 
         Returns:
             Dict with execution summary (NEVER raw data)
+
+        Raises:
+            None
         """
         execution_id = f"exec_{uuid.uuid4().hex[:12]}"
         start_time = datetime.utcnow()

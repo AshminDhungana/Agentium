@@ -26,6 +26,7 @@ _REGISTRY: Dict[str, Callable] = {}
 def register(name: str):
     """Decorator that registers an async function under *name*."""
     def decorator(fn: Callable) -> Callable:
+        """Decorator."""
         _REGISTRY[name] = fn
         return fn
     return decorator
@@ -51,6 +52,8 @@ async def execute(name: str, params: dict, context: dict = None) -> dict:
 
 
 def list_tools() -> list:
+    """List tools."""
+
     return list(_REGISTRY.keys())
 
 
@@ -87,6 +90,8 @@ async def _fetch_stock_price(params: dict) -> dict:
 
 
 async def _fetch_alpha_vantage(ticker: str) -> dict:
+    """Fetch alpha vantage."""
+
     import os, httpx
     api_key = os.getenv("STOCK_API_KEY", "")
     if not api_key:

@@ -31,6 +31,7 @@ _redis: Optional[redis.Redis] = None
 
 
 def _get_redis() -> redis.Redis:
+    """Return a shared Redis client initialised from the configured REDIS_URL."""
     global _redis
     if _redis is None:
         _redis = redis.Redis.from_url(REDIS_URL, decode_responses=True)
@@ -347,6 +348,7 @@ class EventProcessorService:
     def get_dead_letters(
         db: Session, limit: int = 50, offset: int = 0,
     ) -> List[Dict[str, Any]]:
+        """Return dead-letter event logs ordered newest first."""
         logs = (
             db.query(EventLog)
             .filter(EventLog.status == EventLogStatus.DEAD_LETTER)
@@ -465,6 +467,7 @@ class EventProcessorService:
                 import asyncio
 
                 async def _broadcast():
+                    """Broadcast a JSON event-trigger message to all connected WebSocket clients."""
                     await manager.broadcast(json.dumps({
                         "type": "event_trigger_fired",
                         "trigger_id": trigger.id,
