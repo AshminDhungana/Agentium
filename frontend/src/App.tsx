@@ -159,6 +159,7 @@ function AppWithRedirect() {
                             }
                         />
                         <Route path="settings" element={<SettingsPage />} />
+                        <Route path="workflows" element={<WorkflowsPage />} />
                         <Route path="workflows/:id" element={<WorkflowDesignerPage />} />
                     </Route>
 
@@ -187,6 +188,7 @@ const VotingPage       = lazy(() => import('@/pages/VotingPage').then(m => ({ de
 const MessageLogPage   = lazy(() => import('@/pages/MessageLogPage').then(m => ({ default: m.MessageLogPage })));
 const ABTestingPage    = lazy(() => import('@/pages/ABTestingPage').then(m => ({ default: m.ABTestingPage })));
 const WorkflowDesignerPage = lazy(() => import('@/pages/WorkflowDesignerPage').then(m => ({ default: m.WorkflowDesignerPage })));
+const WorkflowsPage = lazy(() => import('@/pages/WorkflowsPage').then(m => ({ default: m.WorkflowsPage })));
 
 // Full-screen spinner shown while checkAuth() is in-flight on page load
 function AppLoader() {

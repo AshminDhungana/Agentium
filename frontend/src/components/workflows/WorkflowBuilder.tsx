@@ -103,7 +103,7 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ initialTemplat
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="text-sm text-gray-600 dark:text-slate-400 mb-1 block">
                 Workflow Name
@@ -149,10 +149,10 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ initialTemplat
             </Button>
 
             <CardContent className="pt-6">
-              <div className="grid grid-cols-12 gap-4 items-start">
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
 
                 {/* Step index + type selector */}
-                <div className="col-span-2">
+                <div className="col-span-1 md:col-span-2">
                   <div className="text-sm font-medium text-blue-600 dark:text-blue-400 mb-2">
                     Step {step.step_index}
                   </div>
@@ -170,7 +170,7 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ initialTemplat
                 </div>
 
                 {/* Step-type-specific config */}
-                <div className="col-span-6 space-y-3 border-l border-gray-200 dark:border-[#1e2535] pl-4">
+                <div className="col-span-1 md:col-span-6 space-y-3 md:border-l md:border-gray-200 md:dark:border-[#1e2535] md:pl-4">
                   {step.type === 'TASK' && (
                     <>
                       <div>
@@ -221,7 +221,7 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ initialTemplat
                 </div>
 
                 {/* Routing */}
-                <div className="col-span-4 space-y-3 border-l border-gray-200 dark:border-[#1e2535] pl-4">
+                <div className="col-span-1 md:col-span-4 space-y-3 md:border-l md:border-gray-200 md:dark:border-[#1e2535] md:pl-4">
                   <div>
                     <label className="text-xs text-gray-600 dark:text-slate-500 mb-1 block">
                       On Success Step Index
