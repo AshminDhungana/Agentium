@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { showToast } from '@/hooks/useToast';
 import { api } from '@/services/api';
+import { chatStreamApi } from '@/services/chatStream';
 
 export interface MessageAttachment {
     name: string;
@@ -50,106 +51,7 @@ interface ChatState {
     loadHistory: () => Promise<void>;
 }
 
-// Real API implementation for streaming chat
-const sendStreamingMessageToCouncil = async (
-    message: string,
-    onChunk: (chunk: string) => void,
-    onComplete: (meta: any) => void,
-    onError: (error: string) => void
-): Promise<void> => {
-    try {
-        const response = await fetch('/api/v1/chat/send', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('access_token')}`
-            },
-            body: JSON.stringify({
-                message: message,
-                stream: true
-            })
-        });
-
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.detail || `HTTP ${response.status}`);
-        }
-
-        const reader = response.body?.getReader();
-        if (!reader) {
-            throw new Error('No response body');
-        }
-
-        const decoder = new TextDecoder();
-        let buffer = '';
-        let metadata: any = {};
-
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split('\n');
-            buffer = lines.pop() || '';
-
-            for (const line of lines) {
-                if (line.trim().startsWith('data: ')) {
-                    try {
-                        const data = JSON.parse(line.trim().substring(6));
-                        
-                        switch (data.type) {
-                            case 'content':
-                                onChunk(data.content);
-                                break;
-                            case 'status':
-                                // Status updates (e.g., "deliberating...")
-                                break;
-                            case 'complete':
-                                metadata = data.metadata || {};
-                                break;
-                            case 'error':
-                                onError(data.content || 'Unknown error');
-                                return;
-                            case 'done':
-                                onComplete(metadata);
-                                return;
-                        }
-                    } catch (e) {
-                        console.warn('Failed to parse SSE data:', line);
-                    }
-                }
-            }
-        }
-
-        // Handle any remaining data in buffer
-        if (buffer.trim().startsWith('data: ')) {
-            try {
-                const data = JSON.parse(buffer.trim().substring(6));
-                if (data.type === 'complete') {
-                    onComplete(data.metadata || {});
-                } else if (data.type === 'done') {
-                    onComplete(metadata);
-                }
-            } catch (e) {
-                onComplete(metadata);
-            }
-        } else {
-            onComplete(metadata);
-        }
-
-    } catch (error: any) {
-        onError(error.message || 'Failed to connect to Head of Council');
-    }
-};
-
-// Non-streaming API call
-const sendMessageToCouncil = async (message: string): Promise<any> => {
-    const response = await api.post('/api/v1/chat/send', {
-        message: message,
-        stream: false
-    });
-    return response.data;
-};
+// All chat API calls are now routed through chatStreamApi service.
 
 export const useChatStore = create<ChatState>()(
     persist(
@@ -183,7 +85,7 @@ export const useChatStore = create<ChatState>()(
                 }));
 
                 try {
-                    const response = await sendMessageToCouncil(content);
+                    const response = await chatStreamApi.sendMessage(content);
 
                     // Add assistant message
                     const assistantMessage: Message = {
@@ -250,7 +152,7 @@ export const useChatStore = create<ChatState>()(
                 let metadata: any = {};
 
                 try {
-                    await sendStreamingMessageToCouncil(
+                    await chatStreamApi.sendStreamingMessage(
                         content,
                         // On chunk
                         (chunk: string) => {

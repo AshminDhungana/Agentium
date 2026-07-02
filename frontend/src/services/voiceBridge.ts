@@ -8,6 +8,7 @@
  */
 
 import { showToast } from '@/hooks/useToast';
+import { api } from './api';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -106,20 +107,8 @@ class VoiceBridgeService {
   // ── Private ─────────────────────────────────────────────────────────────────
 
   private async _fetchVoiceToken(): Promise<string> {
-    const res = await fetch('/api/v1/auth/voice-token', {
-      method:  'POST',
-      headers: {
-        'Content-Type':  'application/json',
-        'Authorization': `Bearer ${this._getSessionToken()}`,
-      },
-    });
-
-    if (!res.ok) {
-      throw new Error(`HTTP ${res.status}: ${await res.text()}`);
-    }
-
-    const data = await res.json();
-    return data.voice_token as string;
+    const { data } = await api.post<{ voice_token: string }>('/api/v1/auth/voice-token');
+    return data.voice_token;
   }
 
   /**

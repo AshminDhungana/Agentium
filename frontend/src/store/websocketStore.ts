@@ -5,6 +5,7 @@
 
 import { create } from 'zustand';
 import { showToast } from '@/hooks/useToast';
+import { websocketReplayApi } from '@/services/websocketReplay';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -368,27 +369,19 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
         const since = get()._lastMessageTimestamp;
         if (!since) return;
         try {
-            const token = localStorage.getItem('access_token');
-            const headers: Record<string, string> = {};
-            if (token) headers['Authorization'] = `Bearer ${token}`;
-
-            const res = await fetch(`/ws/replay?since=${encodeURIComponent(since)}`, { headers });
-            if (!res.ok) return;
-            const data = await res.json();
-            if (data.events && Array.isArray(data.events)) {
-                if (data.events.length > 0) {
-                    console.log(`[WebSocket] Replaying ${data.events.length} missed events`);
-                }
-                const ws = get()._ws;
-                if (!ws || !ws.onmessage) return;
-
-                data.events.forEach((ev: any) => {
-                    const syntheticEvent = new MessageEvent('message', {
-                        data: JSON.stringify(ev)
-                    });
-                    ws.onmessage!.call(ws, syntheticEvent as any);
-                });
+            const events = await websocketReplayApi.fetchReplay(since);
+            if (events.length > 0) {
+                console.log(`[WebSocket] Replaying ${events.length} missed events`);
             }
+            const ws = get()._ws;
+            if (!ws || !ws.onmessage) return;
+
+            events.forEach((ev: any) => {
+                const syntheticEvent = new MessageEvent('message', {
+                    data: JSON.stringify(ev)
+                });
+                ws.onmessage!.call(ws, syntheticEvent as any);
+            });
         } catch (err) {
             console.error('[WebSocket] Replay fetch failed:', err);
         }
@@ -430,27 +423,20 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
 
         const poll = async () => {
             try {
-                const token = localStorage.getItem('access_token');
-                const headers: Record<string, string> = {};
-                if (token) headers['Authorization'] = `Bearer ${token}`;
-
-                const res = await fetch('/ws/genesis-status', { headers });
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data.status === 'complete') {
-                        console.log('[WebSocket] Genesis complete — reconnecting now');
-                        get()._setError(null);
-                        set({ _genesisPollTimeout: null, _genesisPollActive: false });
-                        get().connect();
-                        return;
-                    }
-                    if (data.status === 'not_started') {
-                        // API key was removed/genesis hasn't started — stop polling
-                        // and fall back to the silent waiting state.
-                        set({ _genesisWaitingForApiKey: true, _genesisPollTimeout: null, _genesisPollActive: false });
-                        get()._setError(null);
-                        return;
-                    }
+                const data = await websocketReplayApi.pollGenesisStatus();
+                if (data.status === 'complete') {
+                    console.log('[WebSocket] Genesis complete — reconnecting now');
+                    get()._setError(null);
+                    set({ _genesisPollTimeout: null, _genesisPollActive: false });
+                    get().connect();
+                    return;
+                }
+                if (data.status === 'not_started') {
+                    // API key was removed/genesis hasn't started — stop polling
+                    // and fall back to the silent waiting state.
+                    set({ _genesisWaitingForApiKey: true, _genesisPollTimeout: null, _genesisPollActive: false });
+                    get()._setError(null);
+                    return;
                 }
             } catch (err) {
                 console.warn('[WebSocket] Genesis status poll failed, will retry:', err);

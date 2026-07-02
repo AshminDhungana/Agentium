@@ -77,25 +77,16 @@ export const chatApi = {
         }
     },
 
-    /**
-     * List all conversations for the current user.
-     */
     listConversations: async (): Promise<ConversationListResponse> => {
         const response = await api.get<ConversationListResponse>(`${API_BASE}/conversations`);
         return response.data;
     },
 
-    /**
-     * Get a specific conversation with its messages.
-     */
     getConversation: async (conversationId: string): Promise<Conversation> => {
         const response = await api.get<Conversation>(`${API_BASE}/conversations/${conversationId}`);
         return response.data;
     },
 
-    /**
-     * Create a new conversation.
-     */
     createConversation: async (title?: string, context?: string): Promise<Conversation> => {
         const response = await api.post<Conversation>(`${API_BASE}/conversations`, {
             title,
@@ -104,9 +95,6 @@ export const chatApi = {
         return response.data;
     },
 
-    /**
-     * Update conversation metadata (title, context).
-     */
     updateConversation: async (
         conversationId: string,
         updates: { title?: string; context?: string },
@@ -118,25 +106,16 @@ export const chatApi = {
         return response.data;
     },
 
-    /**
-     * Soft-delete a conversation.
-     */
     deleteConversation: async (conversationId: string): Promise<{ success: boolean }> => {
         const response = await api.delete(`${API_BASE}/conversations/${conversationId}`);
         return response.data;
     },
 
-    /**
-     * Archive a conversation.
-     */
     archiveConversation: async (conversationId: string): Promise<{ success: boolean }> => {
         const response = await api.post(`${API_BASE}/conversations/${conversationId}/archive`);
         return response.data;
     },
 
-    /**
-     * Full-text search across messages.
-     */
     searchMessages: async (query: string, limit = 20): Promise<ChatHistoryResponse> => {
         const response = await api.get<ChatHistoryResponse>(
             `${API_BASE}/search?q=${encodeURIComponent(query)}&limit=${limit}`,
@@ -144,14 +123,6 @@ export const chatApi = {
         return response.data;
     },
 
-    /**
-     * Delete a specific message.
-     *
-     * The backend does not yet implement per-message deletion — only
-     * conversation-level deletion is supported. Callers should use
-     * `deleteConversation` instead. This method is a no-op stub that
-     * resolves without error so callers don't need conditional guards.
-     */
     deleteMessage: async (_messageId: string): Promise<{ success: boolean }> => {
         console.warn(
             'deleteMessage: per-message deletion is not yet implemented in the backend. ' +
@@ -160,9 +131,6 @@ export const chatApi = {
         return { success: false };
     },
 
-    /**
-     * Get aggregate conversation statistics for the current user.
-     */
     getStats: async (): Promise<{
         total_conversations: number;
         total_messages: number;
@@ -173,9 +141,6 @@ export const chatApi = {
         return response.data;
     },
 
-    /**
-     * Export a conversation as JSON, Markdown, or plain text.
-     */
     exportConversation: async (
         conversationId: string,
         format: 'json' | 'markdown' | 'txt' = 'json',

@@ -28,58 +28,7 @@ import {
     Filter,
 } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-
-// ── Types ─────────────────────────────────────────────────────────────────────
-
-interface EventTrigger {
-    id: string;
-    agentium_id: string;
-    name: string;
-    trigger_type: 'webhook' | 'schedule' | 'threshold' | 'api_poll';
-    config: Record<string, any>;
-    target_workflow_id: string | null;
-    target_agent_id: string | null;
-    is_active: boolean;
-    last_fired_at: string | null;
-    fire_count: number;
-    max_fires_per_minute: number;
-    pause_duration_seconds: number;
-    paused_until: string | null;
-    created_at: string;
-}
-
-interface EventLog {
-    id: string;
-    agentium_id: string;
-    trigger_id: string;
-    event_payload: Record<string, any>;
-    status: 'processed' | 'dead_letter' | 'duplicate';
-    correlation_id: string | null;
-    error: string | null;
-    retry_count: number;
-    created_at: string;
-}
-
-// ── API Helpers ───────────────────────────────────────────────────────────────
-
-const API_BASE = '/api/v1/events';
-
-async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
-    const token = localStorage.getItem('token');
-    const res = await fetch(`${API_BASE}${path}`, {
-        ...options,
-        headers: {
-            'Content-Type': 'application/json',
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            ...options?.headers,
-        },
-    });
-    if (!res.ok) {
-        const err = await res.json().catch(() => ({ detail: res.statusText }));
-        throw new Error(err.detail || res.statusText);
-    }
-    return res.json();
-}
+import { eventTriggersApi, type EventTrigger, type EventLog } from '@/services/eventTriggers';
 
 // ── Trigger Type Config ───────────────────────────────────────────────────────
 
@@ -156,7 +105,7 @@ export const EventTriggerManager: React.FC = () => {
     // ── Data loading ─────────────────────────────────────────────────────────
     const loadTriggers = useCallback(async () => {
         try {
-            const data = await apiFetch<EventTrigger[]>('/triggers');
+            const data = await eventTriggersApi.getAll();
             setTriggers(data);
         } catch (err) {
             console.error('Failed to load triggers:', err);
@@ -165,9 +114,7 @@ export const EventTriggerManager: React.FC = () => {
 
     const loadLogs = useCallback(async () => {
         try {
-            let path = '/logs?limit=100';
-            if (logStatusFilter) path += `&status=${logStatusFilter}`;
-            const data = await apiFetch<EventLog[]>(path);
+            const data = await eventTriggersApi.getLogs(logStatusFilter);
             setLogs(data);
         } catch (err) {
             console.error('Failed to load logs:', err);
@@ -176,7 +123,7 @@ export const EventTriggerManager: React.FC = () => {
 
     const loadDeadLetters = useCallback(async () => {
         try {
-            const data = await apiFetch<EventLog[]>('/dead-letters?limit=50');
+            const data = await eventTriggersApi.getDeadLetters();
             setDeadLetters(data);
         } catch (err) {
             console.error('Failed to load dead letters:', err);
@@ -194,14 +141,11 @@ export const EventTriggerManager: React.FC = () => {
     const handleCreate = async () => {
         if (!formName || !formType) return;
         try {
-            await apiFetch<EventTrigger>('/triggers', {
-                method: 'POST',
-                body: JSON.stringify({
-                    name: formName,
-                    trigger_type: formType,
-                    config: formConfig,
-                    target_workflow_id: formWorkflowId || null,
-                }),
+            await eventTriggersApi.create({
+                name: formName,
+                trigger_type: formType,
+                config: formConfig,
+                target_workflow_id: formWorkflowId || null,
             });
             setShowCreate(false);
             setFormName('');
@@ -216,10 +160,7 @@ export const EventTriggerManager: React.FC = () => {
 
     const handleToggle = async (trigger: EventTrigger) => {
         try {
-            await apiFetch(`/triggers/${trigger.id}`, {
-                method: 'PUT',
-                body: JSON.stringify({ is_active: !trigger.is_active }),
-            });
+            await eventTriggersApi.update(trigger.id, { is_active: !trigger.is_active });
             await loadTriggers();
         } catch (err) {
             console.error('Toggle failed:', err);
@@ -229,7 +170,7 @@ export const EventTriggerManager: React.FC = () => {
     const handleDelete = async (id: string) => {
         if (!window.confirm('Deactivate this event trigger?')) return;
         try {
-            await apiFetch(`/triggers/${id}`, { method: 'DELETE' });
+            await eventTriggersApi.delete(id);
             await loadTriggers();
         } catch (err) {
             console.error('Delete failed:', err);
@@ -239,7 +180,7 @@ export const EventTriggerManager: React.FC = () => {
     const handleRetry = async (logId: string) => {
         setRetrying(logId);
         try {
-            await apiFetch(`/dead-letters/${logId}/retry`, { method: 'POST' });
+            await eventTriggersApi.retryDeadLetter(logId);
             await loadDeadLetters();
         } catch (err) {
             console.error('Retry failed:', err);

@@ -90,6 +90,48 @@ api.interceptors.response.use(
     },
 );
 
+// ── Typed response wrapper ───────────────────────────────────────────────────
+
+export interface ApiResponse<T = unknown> {
+    data: T;
+    status: number;
+    statusText: string;
+}
+
+/**
+ * Like `fetch()`, but always injects the `Authorization` header and
+ * prepends the API base URL (if the provided URL is relative).
+ *
+ * Use this only when `fetch()` is required (SSE streaming, /ws/*).
+ * For normal CRUD, prefer the `axios` instance exported above.
+ */
+export async function rawFetch<T>(
+    url: string,
+    init?: Omit<RequestInit, 'headers'> & {
+        headers?: Record<string, string>;
+    },
+): Promise<T> {
+    const token = localStorage.getItem('access_token');
+    const baseURL = import.meta.env.VITE_API_BASE_URL || '';
+    const resolved = url.startsWith('http') ? url : `${baseURL}${url}`;
+
+    const res = await fetch(resolved, {
+        ...init,
+        headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            ...init?.headers,
+        },
+    });
+
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: res.statusText }));
+        throw new Error(err.detail || `HTTP ${res.status}`);
+    }
+
+    return res.json() as Promise<T>;
+}
+
 // ── Channel type helpers ──────────────────────────────────────────────────────
 
 export type ChannelTypeSlug =

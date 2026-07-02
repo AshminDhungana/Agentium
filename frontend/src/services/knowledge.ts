@@ -1,9 +1,7 @@
 /**
  * Phase 16.3: Knowledge / Citation Graph API service.
  */
-import axios from 'axios';
-
-const API_BASE = '/api/v1/knowledge';
+import { api } from './api';
 
 export interface CitationNode {
   id: string;
@@ -51,8 +49,8 @@ export const knowledgeApi = {
     rootId: string,
     depth: number = 2,
   ): Promise<CitationGraphResponse> => {
-    const { data } = await axios.get<CitationGraphResponse>(
-      `${API_BASE}/citation-graph`,
+    const { data } = await api.get<CitationGraphResponse>(
+      '/api/v1/knowledge/citation-graph',
       { params: { root: rootId, depth } },
     );
     return data;
@@ -64,8 +62,8 @@ export const knowledgeApi = {
   getCitationStats: async (
     limit: number = 20,
   ): Promise<CitationStatsResponse> => {
-    const { data } = await axios.get<CitationStatsResponse>(
-      `${API_BASE}/citation-stats`,
+    const { data } = await api.get<CitationStatsResponse>(
+      '/api/v1/knowledge/citation-stats',
       { params: { limit } },
     );
     return data;

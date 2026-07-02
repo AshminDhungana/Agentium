@@ -3,6 +3,7 @@ import { Sparkles, TrendingUp, AlertTriangle, Cpu, RefreshCw, CheckCircle, Wrenc
 import { EmptyState } from '@/components/ui/EmptyState';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { showToast } from '@/hooks/useToast';
+import { improvementsApi } from '@/services/improvements';
 
 interface ImpactStats {
   success_rate_delta: number;
@@ -31,12 +32,10 @@ export function LearningImpactDashboard() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const resStats = await fetch('/api/v1/improvements/impact');
-      const dataStats = await resStats.json();
+      const dataStats = await improvementsApi.getImpactStats();
       setStats(dataStats);
 
-      const resPatterns = await fetch('/api/v1/improvements/patterns');
-      const dataPatterns = await resPatterns.json();
+      const dataPatterns = await improvementsApi.getPatterns();
       setPatterns(dataPatterns.patterns || []);
     } catch (error) {
       console.error('Failed to fetch learning impact data', error);
@@ -49,7 +48,7 @@ export function LearningImpactDashboard() {
   const manuallyConsolidate = async () => {
     setTriggering(true);
     try {
-      await fetch('/api/v1/improvements/consolidate', { method: 'POST' });
+      await improvementsApi.triggerConsolidation();
       showToast.success('Manual knowledge consolidation triggered successfully!');
     } catch (e) {
       console.error(e);

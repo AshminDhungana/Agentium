@@ -8,6 +8,7 @@
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { api } from '@/services/api';
 
 interface BrowserTask {
   id: string;
@@ -19,7 +20,6 @@ interface BrowserTask {
   error?: string;
 }
 
-const API_BASE = '/api/v1';
 
 // Maps each status to a self-contained Tailwind badge class string
 const STATUS_BADGE: Record<string, string> = {
@@ -46,12 +46,6 @@ const BrowserTaskPanel: React.FC = () => {
   const timerRef   = useRef<ReturnType<typeof setInterval> | null>(null);
   const refreshRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const getAuthHeaders = useCallback((): Record<string, string> => {
-    const token = localStorage.getItem('token');
-    return token
-      ? { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
-      : { 'Content-Type': 'application/json' };
-  }, []);
 
   // Elapsed timer
   useEffect(() => {
@@ -80,20 +74,10 @@ const BrowserTaskPanel: React.FC = () => {
   const captureScreenshot = async (url: string) => {
     try {
       setTask((prev) => ({ ...prev, status: 'capturing' }));
-      const res = await fetch(`${API_BASE}/browser/screenshot`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ url, agent_id: 'browser-ui' }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ detail: 'Screenshot failed' }));
-        setTask((prev) => ({ ...prev, status: 'error', error: err.detail || 'Screenshot failed' }));
-        return;
-      }
-      const data = await res.json();
+      const { data } = await api.post('/api/v1/browser/screenshot', { url, agent_id: 'browser-ui' });
       setTask((prev) => ({ ...prev, screenshot: data.image_base64, status: 'complete' }));
     } catch (err: any) {
-      setTask((prev) => ({ ...prev, status: 'error', error: err.message || 'Network error' }));
+      setTask((prev) => ({ ...prev, status: 'error', error: err.message || 'Screenshot failed' }));
     }
   };
 
@@ -104,18 +88,8 @@ const BrowserTaskPanel: React.FC = () => {
     setElapsed(0);
 
     try {
-      const navRes = await fetch(`${API_BASE}/browser/navigate`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ url, agent_id: 'browser-ui' }),
-      });
-      if (!navRes.ok) {
-        const err = await navRes.json().catch(() => ({ detail: 'Navigation failed' }));
-        setTask((prev) => ({ ...prev, status: 'error', error: err.detail || 'Navigation failed' }));
-        return;
-      }
-      const navData = await navRes.json();
-      setTask((prev) => ({ ...prev, title: navData.title || '', status: 'capturing' }));
+      const { data } = await api.post('/api/v1/browser/navigate', { url, agent_id: 'browser-ui' });
+      setTask((prev) => ({ ...prev, title: data.title || '', status: 'capturing' }));
       await captureScreenshot(url);
     } catch (err: any) {
       setTask((prev) => ({ ...prev, status: 'error', error: err.message || 'Network error' }));

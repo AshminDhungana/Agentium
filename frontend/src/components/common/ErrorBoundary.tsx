@@ -1,6 +1,7 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { AlertTriangle, RotateCcw } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { errorReportingApi } from '@/services/errorReporting';
 
 interface Props {
     children: ReactNode;
@@ -37,40 +38,12 @@ export class ErrorBoundary extends Component<Props, State> {
 
     reportError = async (error: Error, errorInfo: ErrorInfo) => {
         try {
-            const payload = {
+            await errorReportingApi.report({
                 message: error.message || 'Unknown frontend error',
                 name: error.name || 'Error',
                 stack: error.stack || '',
                 component_stack: errorInfo.componentStack || '',
-                url: window.location.href
-            };
-
-            // Get base URL gracefully if running via Vite 
-            const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-            
-            // Try to pull auth token if logged in
-            let token = '';
-            try {
-                const authStorage = localStorage.getItem('auth-storage');
-                if (authStorage) {
-                    const parsed = JSON.parse(authStorage);
-                    token = parsed?.state?.token || '';
-                }
-            } catch (e) {
-                // Ignore parse errors
-            }
-
-            const headers: Record<string, string> = {
-                'Content-Type': 'application/json'
-            };
-            if (token) {
-                headers['Authorization'] = `Bearer ${token}`;
-            }
-
-            await fetch(`${baseUrl}/api/v1/monitoring/frontend/errors`, {
-                method: 'POST',
-                headers,
-                body: JSON.stringify(payload)
+                url: window.location.href,
             });
         } catch (e) {
             // Silently fail if telemetry posting fails (avoids endless error loops)

@@ -1,11 +1,11 @@
 import { create } from 'zustand';
-import axios from 'axios';
 import { BackendStatus } from '@/types';
+import { backendHealthApi } from '@/services/backendHealth';
 import { channelMetricsApi } from '@/services/channelMetrics';
-import type { 
-  AllChannelsMetricsResponse, 
+import type {
+  AllChannelsMetricsResponse,
   ChannelMetricsResponse,
-  ChannelHealthStatus 
+  ChannelHealthStatus
 } from '@/types';
 
 interface BackendState {
@@ -27,13 +27,11 @@ interface BackendState {
   getChannelHealthStatus: (channelId: string) => ChannelHealthStatus | null;
 }
 
-const API_URL = import.meta.env.VITE_API_URL || '';
-
 export const useBackendStore = create<BackendState>()((set, get) => ({
   // ═══════════════════════════════════════════════════════════
   // CONNECTION STATUS
   // ═══════════════════════════════════════════════════════════
-  
+
   status: {
     status: 'connecting',
     lastChecked: new Date()
@@ -43,16 +41,13 @@ export const useBackendStore = create<BackendState>()((set, get) => ({
     const startTime = Date.now();
 
     try {
-      const response = await axios.get(`${API_URL}/health`, {
-        timeout: 5000
-      });
-
+      const data = await backendHealthApi.check();
       const latency = Date.now() - startTime;
 
       set({
         status: {
           status: 'connected',
-          version: response.data.version,
+          version: data.version,
           lastChecked: new Date(),
           latency
         }

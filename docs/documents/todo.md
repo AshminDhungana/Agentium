@@ -761,7 +761,7 @@ Build a self-governing AI ecosystem where agents operate under constitutional la
 
 #### Frontend
 
-- [ ] **API Client Consolidation** — audit `frontend/src/` for inline `fetch()` or `axios` calls outside `frontend/src/services/api.ts`; migrate all to typed request/response generics in the central API module
+- [x] **API Client Consolidation** — audit `frontend/src/` for inline `fetch()` or `axios` calls outside `frontend/src/services/api.ts`; migrate all to typed request/response generics in the central API module
 - [ ] **Hook Deduplication** — merge overlapping `useWebSocket`, `usePolling`, and `useAutoRefresh` hooks into a single `useRealtimeData<T>(endpoint, wsEvent, pollIntervalMs)` hook in `frontend/src/hooks/`
 - [ ] **Dark Mode — Phase 13–15 New Pages** — audit `WorkflowDesigner.tsx`, `WorkflowExecutionMonitor.tsx`, `EventTriggerManager.tsx`, `ScalingDashboard.tsx`, and `LearningImpactDashboard.tsx` for hardcoded `bg-white` / `text-black` / `border-gray-*` without `dark:` variants; apply Phase 17.2 semantic token system
 - [ ] **Mobile Responsiveness — Phase 13–15 New Pages** — apply Phase 17.3 breakpoint patterns to `WorkflowsPage`, `WorkflowDesigner`, `ScalingDashboard`, and `EventTriggerManager`; collapse complex layouts below `md:`; test on 375px viewport
