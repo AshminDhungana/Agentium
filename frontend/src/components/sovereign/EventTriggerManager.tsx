@@ -310,7 +310,7 @@ export const EventTriggerManager: React.FC = () => {
                             value={formConfig.cron_expression || ''}
                             onChange={(e) => setFormConfig({ ...formConfig, cron_expression: e.target.value })}
                         />
-                        <p className="text-xs text--600 mt-1">e.g., "*/5 * * * *" for every 5 minutes</p>
+                        <p className="text-xs text-gray-600 dark:text-gray-500 mt-1">e.g., "*/5 * * * *" for every 5 minutes</p>
                     </div>
                 );
         }
@@ -407,7 +407,7 @@ export const EventTriggerManager: React.FC = () => {
                             <p className={`text-2xl font-bold ${kpi.color}`}>
                                 {kpi.value}
                                 {kpi.total !== undefined && (
-                                    <span className="text-sm font-normal text--600 dark:text-gray-500">
+                                    <span className="text-sm font-normal text-gray-600 dark:text-gray-500">
                                         {' '}/ {kpi.total}
                                     </span>
                                 )}
@@ -664,7 +664,7 @@ export const EventTriggerManager: React.FC = () => {
                                                                 className="shrink-0 p-1 hover:bg-gray-100 dark:hover:bg-[#1e2535] rounded transition-colors"
                                                                 title="Copy URL"
                                                             >
-                                                                <Copy className="w-3.5 h-3.5 text--600" />
+                                                                <Copy className="w-3.5 h-3.5 text-gray-600 dark:text-gray-500" />
                                                             </button>
                                                         </div>
                                                     </div>
@@ -706,7 +706,7 @@ export const EventTriggerManager: React.FC = () => {
                     {/* Filters */}
                     <div className="flex items-center gap-3 flex-wrap">
                         <div className="flex items-center gap-2 bg-white dark:bg-[#161b27] border border-gray-200 dark:border-[#1e2535] rounded-lg px-3 py-2">
-                            <Filter className="w-4 h-4 text--600" />
+                            <Filter className="w-4 h-4 text-gray-600 dark:text-gray-500" />
                             <select
                                 className="bg-transparent text-sm text-gray-700 dark:text-gray-300 outline-none"
                                 title="Filter by event log status"
@@ -727,7 +727,7 @@ export const EventTriggerManager: React.FC = () => {
                         >
                             <RefreshCw className="w-3.5 h-3.5" /> Apply
                         </button>
-                        <span className="text-xs text--600 dark:text-gray-500">
+                        <span className="text-xs text-gray-600 dark:text-gray-500">
                             {logs.length} log entries
                         </span>
                     </div>
@@ -757,7 +757,7 @@ export const EventTriggerManager: React.FC = () => {
                                                 {triggerName}
                                             </span>
                                             {log.correlation_id && (
-                                                <span className="font-mono text-xs text--600 dark:text-gray-500">
+                                                <span className="font-mono text-xs text-gray-600 dark:text-gray-500">
                                                     {log.correlation_id.slice(0, 8)}…
                                                 </span>
                                             )}
@@ -807,7 +807,7 @@ export const EventTriggerManager: React.FC = () => {
                                                 <span className="font-medium text-gray-900 dark:text-white">
                                                     {triggerName}
                                                 </span>
-                                                <span className="text-xs text--600 dark:text-gray-500">
+                                                <span className="text-xs text-gray-600 dark:text-gray-500">
                                                     Retries: {log.retry_count}
                                                 </span>
                                             </div>
@@ -829,7 +829,7 @@ export const EventTriggerManager: React.FC = () => {
                                                 {log.error}
                                             </p>
                                         )}
-                                        <p className="text-xs text--600 dark:text-gray-500">
+                                        <p className="text-xs text-gray-600 dark:text-gray-500">
                                             {new Date(log.created_at).toLocaleString()}
                                         </p>
                                     </div>

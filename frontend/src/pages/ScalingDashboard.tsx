@@ -179,7 +179,7 @@ export const ScalingDashboard: React.FC = () => {
                         </div>
                         <span className="font-semibold text-gray-700 dark:text-gray-300">System Mode</span>
                     </div>
-                    <div className="text-xl font-bold text-green-700 mt-1">
+                    <div className="text-xl font-bold text-green-700 dark:text-green-400 mt-1">
                         Auto-Scaling Active
                     </div>
                 </div>
@@ -195,8 +195,8 @@ export const ScalingDashboard: React.FC = () => {
                         <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
                                 <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-                                <XAxis dataKey="time" stroke="#888888" />
-                                <YAxis stroke="#888888" />
+                                <XAxis dataKey="time" stroke={isDark ? '#9ca3af' : '#888888'} />
+                                <YAxis stroke={isDark ? '#9ca3af' : '#888888'} />
                                 <Tooltip 
                                     contentStyle={{
                                         backgroundColor: isDark ? '#1f2937' : '#ffffff',
