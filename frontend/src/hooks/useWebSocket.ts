@@ -1,3 +1,9 @@
+/**
+ * @deprecated This hook maintains its own independent WebSocket connection
+ * and is fully superseded by `useWebSocketStore` from `@/store/websocketStore`.
+ * It will be removed in a future release. Use the global Zustand store instead.
+ */
+
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useAuthStore } from '@/store/authStore';
 

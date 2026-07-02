@@ -1,10 +1,12 @@
 // src/hooks/useSystemTab.ts
 // Owns all data-fetching, WebSocket lifecycle, and container action logic
-// for the System tab. Keeps SystemTab.tsx purely presentational.
+// for the System tab. Refactored to use useRealtimeData for polled data,
+// keeping the sovereign WebSocket for push-only command-logs.
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useBackendStore } from '@/store/backendStore';
 import { hostAccessApi } from '@/services/hostAccessApi';
+import { useRealtimeData } from './useRealtimeData';
 
 // ── Types (exported so SystemTab.tsx can import them) ─────────────────────────
 
@@ -36,70 +38,59 @@ export interface CommandLog {
 export function useSystemTab() {
     const { status: backendStatus } = useBackendStore();
 
-    const [systemStatus, setSystemStatus]   = useState<SystemStatus | null>(null);
-    const [containers,   setContainers]     = useState<Container[]>([]);
-    const [commandLogs,  setCommandLogs]    = useState<CommandLog[]>([]);
-    const [isLoading,    setIsLoading]      = useState(false); // container action buttons
+    const [commandLogs,  setCommandLogs] = useState<CommandLog[]>([]);
+    const [isLoading,   setIsLoading]      = useState(false);
     const [error,        setError]          = useState<string | null>(null);
 
-    // Stable refs so the reconnect closure never captures a stale function ref
+    // Stable refs for the sovereign WebSocket (push-only, no polling)
     const wsRef            = useRef<{ send: (d: unknown) => void; close: () => void } | null>(null);
     const retryTimeoutRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
     const retriesRef       = useRef(0);
     const mountedRef       = useRef(true);
 
-    // ── Parallel data fetch ───────────────────────────────────────────────────
-    // C11: replaced three sequential fetches with Promise.all — cuts initial
-    //      load time to the duration of the slowest single request.
+    // ── Realtime data (polling + WS refresh) ───────────────────────────────
+    // status and containers are replaced by useRealtimeData to avoid
+    // manually wiring setInterval + refresh + WebSocket debounce.
 
-    const refresh = useCallback(async () => {
-        try {
-            const [status, ctrs, logs] = await Promise.all([
-                hostAccessApi.getSystemStatus(),
-                hostAccessApi.getContainers(),
-                hostAccessApi.getCommandHistory(50),
-            ]);
-            if (!mountedRef.current) return;
-            setSystemStatus(status);
-            setContainers(ctrs);
-            setCommandLogs(logs);
-            setError(null);
-        } catch {
-            if (!mountedRef.current) return;
-            setError('Failed to load system data. Check backend connectivity.');
-        }
-    }, []);
+    const { data: systemStatus, refresh: refreshStatus } = useRealtimeData<SystemStatus>(
+        () => hostAccessApi.getSystemStatus(),
+        ['system_status', 'container_update'],
+        { pollIntervalMs: 10_000 }
+    );
 
-    // ── WebSocket with exponential-backoff reconnect ──────────────────────────
-    // C2: onClose fires a retry with capped backoff instead of silently dying.
+    const { data: containers, refresh: refreshContainers } = useRealtimeData<Container[]>(
+        () => hostAccessApi.getContainers(),
+        ['container_update', 'system_status'],
+        { pollIntervalMs: 10_000 }
+    );
 
+    // ── WebSocket for real-time command logs (push-only) ─────────────────
     const connectWebSocket = useCallback(() => {
         wsRef.current = hostAccessApi.connectWebSocket(
             (data: any) => {
-                retriesRef.current = 0; // successful message resets backoff counter
+                retriesRef.current = 0;
                 if (!mountedRef.current) return;
 
                 if (data.type === 'system_status') {
-                    setSystemStatus(data.payload);
+                    // handled by useRealtimeData above
+                    refreshStatus();
                 } else if (data.type === 'container_update') {
-                    hostAccessApi.getContainers()
-                        .then(ctrs => { if (mountedRef.current) setContainers(ctrs); })
-                        .catch(() => {});
+                    refreshContainers();
                 } else if (data.type === 'command_log') {
-                    setCommandLogs(prev => [data.payload, ...prev]);
+                    setCommandLogs((prev) => [data.payload, ...prev]);
                 }
             },
             () => {
-                // onClose — schedule reconnect with exponential backoff (max 30 s)
+                // onClose — exponential backoff reconnect (max 30s)
                 if (!mountedRef.current) return;
                 const delay = Math.min(1000 * 2 ** retriesRef.current, 30_000);
                 retriesRef.current += 1;
                 retryTimeoutRef.current = setTimeout(connectWebSocket, delay);
             },
         );
-    }, []);
+    }, [refreshStatus, refreshContainers]);
 
-    // ── Container actions ─────────────────────────────────────────────────────
+    // ── Container actions ──────────────────────────────────────────────────
 
     const handleContainerAction = useCallback(async (
         containerId: string,
@@ -109,23 +100,26 @@ export function useSystemTab() {
         try {
             await hostAccessApi.manageContainer(containerId, action);
             const ctrs = await hostAccessApi.getContainers();
-            if (mountedRef.current) setContainers(ctrs);
+            if (mountedRef.current) {
+                // handled by useRealtimeData refresh; call it immediately
+                void refreshContainers();
+            }
         } catch {
             if (mountedRef.current)
                 setError(`Failed to ${action} container. Please try again.`);
         } finally {
             if (mountedRef.current) setIsLoading(false);
         }
-    }, []);
+    }, [refreshContainers]);
 
-    // ── Lifecycle ─────────────────────────────────────────────────────────────
+    // ── Lifecycle ───────────────────────────────────────────────────────────
 
     useEffect(() => {
         mountedRef.current = true;
 
         if (backendStatus.status !== 'connected') return;
 
-        refresh();
+        // Command-log WebSocket (push-only)
         connectWebSocket();
 
         return () => {
@@ -133,15 +127,15 @@ export function useSystemTab() {
             if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
             wsRef.current?.close();
         };
-    }, [backendStatus.status, refresh, connectWebSocket]);
+    }, [backendStatus.status, connectWebSocket]);
 
     return {
-        systemStatus,
-        containers,
+        systemStatus: systemStatus ?? null,
+        containers: containers ?? [],
         commandLogs,
         isLoading,
         error,
-        refresh,
+        refresh: () => { void refreshStatus(); void refreshContainers(); },
         handleContainerAction,
         clearError: () => setError(null),
     };
