@@ -20,6 +20,8 @@ from backend.core.auth import get_current_active_user
 from backend.models.entities.user import User
 from backend.services.storage_service import storage_service
 
+from backend.api.schemas.examples import ErrorResponseExample, SuccessResponseExample, build_responses
+
 router = APIRouter(prefix="/voice", tags=["Voice"])
 
 MAX_AUDIO_SIZE = 25 * 1024 * 1024  # 25MB (OpenAI limit)
@@ -106,7 +108,12 @@ def get_whisper_client(api_key: str):
 
 
 
-@router.get("/enhanced-status")
+@router.get(
+    "/enhanced-status",
+    summary="Get Enhanced Voice Status",
+    description="Get detailed voice status including local fallback availability. Frontend uses this to decide between OpenAI and local voice.",
+    responses=build_responses(None),
+)
 async def get_enhanced_voice_status(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
@@ -138,7 +145,12 @@ async def get_enhanced_voice_status(
     }
 
     
-@router.get("/status")
+@router.get(
+    "/status",
+    summary="Get Voice Status",
+    description="Check if voice features are available for current user. Frontend should call this to show appropriate UI.",
+    responses=build_responses(None),
+)
 async def get_voice_status(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
@@ -151,7 +163,12 @@ async def get_voice_status(
     return check_voice_available(db, str(user_id))
 
 
-@router.post("/transcribe")
+@router.post(
+    "/transcribe",
+    summary="Transcribe Audio",
+    description="Transcribe audio to text using OpenAI Whisper. Requires active OpenAI provider configuration.",
+    responses=build_responses(None),
+)
 async def transcribe_audio(
     audio: UploadFile = File(...),
     language: Optional[str] = Form(None),
@@ -238,7 +255,12 @@ async def transcribe_audio(
                 pass
 
 
-@router.post("/synthesize")
+@router.post(
+    "/synthesize",
+    summary="Text To Speech",
+    description="Convert text to speech using OpenAI TTS. Requires active OpenAI provider configuration.",
+    responses=build_responses(None),
+)
 async def text_to_speech(
     text: str = Form(...),
     voice: str = Form("alloy"),
@@ -330,7 +352,12 @@ async def text_to_speech(
         raise InternalServerError(error=f"Speech synthesis failed: {str(e)}", code="SPEECH_SYNTHESIS_FAILED")
 
 
-@router.get("/audio/{user_id}/{filename}")
+@router.get(
+    "/audio/{user_id}/{filename}",
+    summary="Get Audio File",
+    description="Retrieve a generated audio file.",
+    responses=build_responses(None),
+)
 async def get_audio_file(
     user_id: str,
     filename: str,
@@ -353,7 +380,12 @@ async def get_audio_file(
     return RedirectResponse(url=url)
 
 
-@router.get("/languages")
+@router.get(
+    "/languages",
+    summary="List Supported Languages",
+    description="List languages supported by Whisper transcription.",
+    responses=build_responses(None),
+)
 async def list_supported_languages():
     """List languages supported by Whisper transcription."""
     return {
@@ -375,7 +407,12 @@ async def list_supported_languages():
     }
 
 
-@router.get("/voices")
+@router.get(
+    "/voices",
+    summary="List Tts Voices",
+    description="List available TTS voices.",
+    responses=build_responses(None),
+)
 async def list_tts_voices():
     """List available TTS voices."""
     return {
@@ -393,7 +430,12 @@ async def list_tts_voices():
 
 # ── Voice Channel Stubs (Phase 10.3) ─────────────────────────────────────
 
-@router.post("/twilio/webhook")
+@router.post(
+    "/twilio/webhook",
+    summary="Twilio Voice Webhook",
+    description="Twilio voice webhook handler — Phase 10.3 stub. Receives inbound Twilio voice call webhooks. In production, this would handle call routing, IVR menus, and agent connection. Currently validates the request shape and returns a TwiML response stub for future integration. Requires: TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN in environment.",
+    responses=build_responses(None),
+)
 async def twilio_voice_webhook(
     db: Session = Depends(get_db),
 ):
@@ -426,7 +468,12 @@ async def twilio_voice_webhook(
     }
 
 
-@router.post("/twilio/status")
+@router.post(
+    "/twilio/status",
+    summary="Twilio Status Callback",
+    description="Twilio call status callback — Phase 10.3 stub. Receives status updates for ongoing Twilio calls (ringing, in-progress, completed, failed). Logs the event for future analytics.",
+    responses=build_responses(None),
+)
 async def twilio_status_callback():
     """
     Twilio call status callback — Phase 10.3 stub.
@@ -441,7 +488,12 @@ async def twilio_status_callback():
     }
 
 
-@router.get("/discord/status")
+@router.get(
+    "/discord/status",
+    summary="Discord Voice Status",
+    description="Discord voice connection status — Phase 10.3 stub. Returns the current state of the Discord voice integration. In production, this would report active voice channels, connected users, and bot status. Requires: DISCORD_VOICE_ENABLED=true in environment.",
+    responses=build_responses(None),
+)
 async def discord_voice_status(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
@@ -471,7 +523,12 @@ async def discord_voice_status(
     }
 
 
-@router.get("/channels")
+@router.get(
+    "/channels",
+    summary="List Voice Channels",
+    description="List all available voice channels and their status. Aggregates availability of all voice channel integrations (OpenAI, Twilio, Discord, Browser local).",
+    responses=build_responses(None),
+)
 async def list_voice_channels(
     current_user: User = Depends(get_current_active_user),
 ):

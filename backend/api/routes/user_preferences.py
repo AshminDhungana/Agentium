@@ -14,6 +14,8 @@ from backend.core.auth import get_current_active_user, get_current_agent_tier, g
 from backend.services.user_preference_service import UserPreferenceService, PreferenceCategory
 
 
+from backend.api.schemas.examples import ErrorResponseExample, SuccessResponseExample, build_responses
+
 router = APIRouter(prefix="/preferences", tags=["User Preferences"], redirect_slashes=False)
 
 
@@ -58,7 +60,12 @@ class PreferenceResponse(BaseModel):
 # User Endpoints
 # ═══════════════════════════════════════════════════════════
 
-@router.get("/")
+@router.get(
+    "/",
+    summary="List My Preferences",
+    description="List all preferences for the current user.",
+    responses=build_responses(None),
+)
 @router.get("")  # also handles GET /api/v1/preferences (no trailing slash — prevents 307 redirect through Vite proxy)
 async def list_my_preferences(
     category: Optional[str] = None,
@@ -79,7 +86,12 @@ async def list_my_preferences(
     return [p.to_dict() for p in prefs]
 
 
-@router.get("/{key}")
+@router.get(
+    "/{key}",
+    summary="Get My Preference",
+    description="Get a specific preference value.",
+    responses=build_responses(None),
+)
 async def get_my_preference(
     key: str,
     default: Optional[str] = None,
@@ -100,7 +112,12 @@ async def get_my_preference(
     }
 
 
-@router.post("/")
+@router.post(
+    "/",
+    summary="Create Preference",
+    description="Create a new preference.",
+    responses=build_responses(None),
+)
 @router.post("")  # also handles POST /api/v1/preferences (no trailing slash — prevents 307 redirect)
 async def create_preference(
     request: PreferenceCreateRequest,
@@ -127,7 +144,12 @@ async def create_preference(
     }
 
 
-@router.put("/{key}")
+@router.put(
+    "/{key}",
+    summary="Update Preference",
+    description="Update an existing preference.",
+    responses=build_responses(None),
+)
 async def update_preference(
     key: str,
     request: PreferenceUpdateRequest,
@@ -155,7 +177,12 @@ async def update_preference(
     }
 
 
-@router.delete("/{key}")
+@router.delete(
+    "/{key}",
+    summary="Delete Preference",
+    description="Soft-delete a preference.",
+    responses=build_responses(None),
+)
 async def delete_preference(
     key: str,
     db: Session = Depends(get_db),
@@ -174,7 +201,12 @@ async def delete_preference(
     }
 
 
-@router.post("/bulk")
+@router.post(
+    "/bulk",
+    summary="Bulk Update Preferences",
+    description="Update multiple preferences at once.",
+    responses=build_responses(None),
+)
 async def bulk_update_preferences(
     request: PreferenceBulkUpdateRequest,
     db: Session = Depends(get_db),
@@ -207,7 +239,12 @@ async def bulk_update_preferences(
 # System/Default Endpoints
 # ═══════════════════════════════════════════════════════════
 
-@router.get("/system/defaults")
+@router.get(
+    "/system/defaults",
+    summary="Get Default Preferences",
+    description="Get system default preferences.",
+    responses=build_responses(None),
+)
 async def get_default_preferences():
     """Get system default preferences."""
     return {
@@ -227,7 +264,12 @@ async def get_default_preferences():
     }
 
 
-@router.post("/system/initialize")
+@router.post(
+    "/system/initialize",
+    summary="Initialize Defaults",
+    description="Initialize default preferences for current user.",
+    responses=build_responses(None),
+)
 async def initialize_defaults(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_active_user)
@@ -248,7 +290,12 @@ async def initialize_defaults(
 # Agent Tool Endpoints (for tool registry)
 # ═══════════════════════════════════════════════════════════
 
-@router.get("/agent/list")
+@router.get(
+    "/agent/list",
+    summary="Agent List Preferences",
+    description="List preferences accessible to the calling agent. Used by agent tools to discover available preferences.",
+    responses=build_responses(None),
+)
 async def agent_list_preferences(
     category: Optional[str] = None,
     include_values: bool = True,
@@ -277,7 +324,12 @@ async def agent_list_preferences(
     return result
 
 
-@router.get("/agent/get/{key}")
+@router.get(
+    "/agent/get/{key}",
+    summary="Agent Get Preference",
+    description="Agent tool endpoint to get a preference.",
+    responses=build_responses(None),
+)
 async def agent_get_preference(
     key: str,
     default: Optional[Any] = None,
@@ -303,7 +355,12 @@ async def agent_get_preference(
     return result
 
 
-@router.post("/agent/set/{key}")
+@router.post(
+    "/agent/set/{key}",
+    summary="Agent Set Preference",
+    description="Agent tool endpoint to set a preference.",
+    responses=build_responses(None),
+)
 async def agent_set_preference(
     key: str,
     value: Any,
@@ -335,7 +392,12 @@ async def agent_set_preference(
 # Admin/Optimization Endpoints
 # ═══════════════════════════════════════════════════════════
 
-@router.post("/admin/optimize")
+@router.post(
+    "/admin/optimize",
+    summary="Optimize Preferences",
+    description="Run preference optimization (remove duplicates, clean unused). Admin only.",
+    responses=build_responses(None),
+)
 async def optimize_preferences(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_active_user)
@@ -356,7 +418,12 @@ async def optimize_preferences(
     }
 
 
-@router.get("/admin/recommendations")
+@router.get(
+    "/admin/recommendations",
+    summary="Get Optimization Recommendations",
+    description="Get optimization recommendations. Admin only.",
+    responses=build_responses(None),
+)
 async def get_optimization_recommendations(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_active_user)
@@ -374,7 +441,12 @@ async def get_optimization_recommendations(
     }
 
 
-@router.get("/admin/history/{preference_id}")
+@router.get(
+    "/admin/history/{preference_id}",
+    summary="Get Preference History",
+    description="Get change history for a preference. Admin only.",
+    responses=build_responses(None),
+)
 async def get_preference_history(
     preference_id: str,
     limit: int = Query(50, ge=1, le=100),

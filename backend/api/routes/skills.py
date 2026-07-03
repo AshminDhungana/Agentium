@@ -21,6 +21,8 @@ from backend.services.skill_manager import skill_manager
 from backend.services.skill_rag import skill_rag
 from backend.services.auth import get_current_agent as _get_agent_from_service
 
+from backend.api.schemas.examples import ErrorResponseExample, SuccessResponseExample, build_responses
+
 router = APIRouter(prefix="/skills", tags=["skills"])
 security = HTTPBearer(auto_error=False)
 
@@ -122,7 +124,12 @@ class ReviewRequest(BaseModel):
 # FIXED-PATH ROUTES — must appear before /{skill_id} routes (Fix 2)
 # ===========================================================================
 
-@router.get("/search")
+@router.get(
+    "/search",
+    summary="Search Skills",
+    description="Search skills with semantic query and optional filters. Works for both Sovereign (User) and Agent authentication. creator_id — when supplied, only results whose metadata.creator_id matches are returned.  Used by the frontend \"My Submissions\" tab.",
+    responses=build_responses(None),
+)
 async def search_skills(
     query: str = "",
     domain: Optional[str] = None,
@@ -172,7 +179,12 @@ async def search_skills(
     }
 
 
-@router.get("/stats/popular")
+@router.get(
+    "/stats/popular",
+    summary="Get Popular Skills",
+    description="Get most used verified skills, ordered by usage count.",
+    responses=build_responses(None),
+)
 async def get_popular_skills(
     domain: Optional[str] = None,
     limit: int = 10,
@@ -188,7 +200,12 @@ async def get_popular_skills(
     return {"skills": [s.to_dict() for s in skills]}
 
 
-@router.get("/submissions/pending")
+@router.get(
+    "/submissions/pending",
+    summary="Get Pending Submissions",
+    description="Get skill submissions pending Council review (privileged only).",
+    responses=build_responses(None),
+)
 async def get_pending_submissions(
     db: Session = Depends(get_db),
     auth_context: dict = Depends(get_current_user_or_agent),
@@ -213,7 +230,12 @@ async def get_pending_submissions(
     }
 
 
-@router.post("/submissions/{submission_id}/review")
+@router.post(
+    "/submissions/{submission_id}/review",
+    summary="Review Submission",
+    description="Review a skill submission — approve or reject (privileged only).",
+    responses=build_responses(None),
+)
 async def review_submission(
     submission_id: str,
     body: ReviewRequest,
@@ -263,7 +285,12 @@ async def review_submission(
     }
 
 
-@router.post("/")
+@router.post(
+    "/",
+    summary="Create Skill",
+    description="Create a new skill. Requires Council/Head review unless auto_verify=true (privileged only).",
+    responses=build_responses(None),
+)
 async def create_skill(
     skill_data: dict,
     auto_verify: bool = False,
@@ -304,7 +331,12 @@ async def create_skill(
 # VARIABLE-PATH ROUTES — /{skill_id} must come after all fixed paths (Fix 2)
 # ===========================================================================
 
-@router.get("/{skill_id}/full")
+@router.get(
+    "/{skill_id}/full",
+    summary="Get Skill Full",
+    description="Get a skill with extended metadata: - submission_history - versions (all versions sharing the same skill_name, newest first) - stats - related_skills (same domain, top 5 by usage).",
+    responses=build_responses(None),
+)
 async def get_skill_full(
     skill_id: str,
     db: Session = Depends(get_db),
@@ -404,7 +436,12 @@ async def get_skill_full(
     return skill_dict
 
 
-@router.get("/{skill_id}")
+@router.get(
+    "/{skill_id}",
+    summary="Get Skill",
+    description="Get skill details by ID.",
+    responses=build_responses(None),
+)
 async def get_skill(
     skill_id: str,
     db: Session = Depends(get_db),
@@ -421,7 +458,12 @@ async def get_skill(
     return skill.model_dump()
 
 
-@router.post("/{skill_id}/deprecate")
+@router.post(
+    "/{skill_id}/deprecate",
+    summary="Deprecate Skill",
+    description="Soft-delete a skill by marking it deprecated. Only the creator, privileged agents, or admin users may deprecate.",
+    responses=build_responses(None),
+)
 async def deprecate_skill(
     skill_id: str,
     body: DeprecateRequest,          # Fix 5 — was a bare query-string param
@@ -451,7 +493,12 @@ async def deprecate_skill(
     }
 
 
-@router.post("/{skill_id}/update")
+@router.post(
+    "/{skill_id}/update",
+    summary="Update Skill",
+    description="Create a new version of an existing skill.",
+    responses=build_responses(None),
+)
 async def update_skill(
     skill_id: str,
     updates: dict,
@@ -481,7 +528,12 @@ async def update_skill(
         raise NotFoundError(error=str(exc), code="STREXC")
 
 
-@router.post("/{skill_id}/execute")
+@router.post(
+    "/{skill_id}/execute",
+    summary="Execute With Skill",
+    description="Execute a task using a specific verified skill.",
+    responses=build_responses(None),
+)
 async def execute_with_skill(
     skill_id: str,
     task_input: str,

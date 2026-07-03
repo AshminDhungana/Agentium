@@ -26,6 +26,7 @@ from backend.core.auth import (
 from backend.models.entities.user import User
 from backend.models.entities.audit import AuditLog, AuditLevel, AuditCategory
 from backend.core.voice_auth import create_voice_token, verify_voice_token
+from backend.api.schemas.examples import ErrorResponseExample
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -102,7 +103,11 @@ class ChangePasswordRequest(BaseModel):
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 
-@router.post("/signup", response_model=SignupResponse)
+@router.post(
+    "/signup",
+    response_model=SignupResponse,
+    summary="Register a new user account",
+    description="Creates a pending user account. Requires admin approval before login.\n\n**Rate limit:** 5 attempts per IP per 5 minutes.")  # noqa: D401
 async def signup(
     request: Request,
     payload: SignupRequest,
@@ -154,7 +159,11 @@ async def signup(
 
 
 
-@router.post("/login", response_model=LoginResponse)
+@router.post(
+    "/login",
+    response_model=LoginResponse,
+    summary="Authenticate a user",
+    description="Authenticate a user with username and password, returning a JWT access token.")
 async def login(
     request: Request,
     payload: LoginRequest,
@@ -247,7 +256,11 @@ async def login(
     )
 
 
-@router.post("/refresh", response_model=LoginResponse)
+@router.post(
+    "/refresh",
+    response_model=LoginResponse,
+    summary="Refresh an access token",
+    description="Refresh an access token using a valid refresh token.")
 async def refresh_token_endpoint(
     request: Request,
     payload: RefreshRequest,
@@ -293,7 +306,11 @@ async def refresh_token_endpoint(
     )
 
 
-@router.post("/verify", response_model=VerifyResponse)
+@router.post(
+    "/verify",
+    response_model=VerifyResponse,
+    summary="Verify a bearer token",
+    description="Verify if the current bearer token is valid. Reads token from the Authorization header only.")
 async def verify_token_endpoint(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(_security),
 ):
@@ -334,7 +351,10 @@ async def verify_token_endpoint(
 #     verification route and reads from the Authorization header only.
 
 
-@router.post("/change-password")
+@router.post(
+    "/change-password", response_model=dict,
+    summary="Change own password",
+    description="Change the authenticated user's password. Requires current password for verification.")
 async def change_password(
     request: Request,
     payload: ChangePasswordRequest,
@@ -392,7 +412,10 @@ class VoiceTokenResponse(BaseModel):
     expires_in_minutes: int
 
 
-@router.post("/voice-token", response_model=VoiceTokenResponse)
+@router.post(
+    "/voice-token", response_model=VoiceTokenResponse,
+    summary="Issue a voice bridge token",
+    description="Issue a short-lived voice-scoped JWT for the host-native voice bridge.")
 async def get_voice_token(
     current_user: dict = Depends(get_current_active_user),
     db: Session = Depends(get_db),
@@ -430,7 +453,10 @@ async def get_voice_token(
     return VoiceTokenResponse(voice_token=token, expires_in_minutes=duration)
 
 
-@router.get("/verify-session", response_model=VerifyResponse)
+@router.get(
+    "/verify-session", response_model=VerifyResponse,
+    summary="Verify current session",
+    description="Lightweight session check returning the authenticated user's basic profile.")
 async def verify_session(
     current_user: dict = Depends(get_current_active_user),
 ):

@@ -16,6 +16,8 @@ from backend.models.entities.agents import Agent
 from backend.services.reincarnation_service import reincarnation_service
 from backend.core.auth import get_current_active_user
 
+from backend.api.schemas.examples import ErrorResponseExample, SuccessResponseExample, build_responses
+
 router = APIRouter(prefix="/api/v1/agents/lifecycle", tags=["Agent Lifecycle"])
 
 
@@ -110,7 +112,13 @@ def _get_ws_manager():
 # SPAWNING ENDPOINTS
 # ═══════════════════════════════════════════════════════════
 
-@router.post("/spawn/task", response_model=AgentSpawnResponse)
+@router.post(
+    "/spawn/task",
+    response_model=AgentSpawnResponse,
+    summary="Spawn Task Agent",
+    description="Spawn a new Task Agent (3xxxx). Parent must be a Lead Agent or Council Member. Broadcasts agent_spawned WebSocket event on success.",
+    responses=build_responses(None),
+)
 async def spawn_task_agent(
     request: SpawnTaskAgentRequest,
     background_tasks: BackgroundTasks,
@@ -174,7 +182,13 @@ async def spawn_task_agent(
         raise InternalServerError(error=f"Failed to spawn Task Agent: {str(e)}", code="FAILED_TO_SPAWN_TASK_AGENT")
 
 
-@router.post("/spawn/lead", response_model=AgentSpawnResponse)
+@router.post(
+    "/spawn/lead",
+    response_model=AgentSpawnResponse,
+    summary="Spawn Lead Agent",
+    description="Spawn a new Lead Agent (2xxxx). Parent must be a Council Member or Head of Council. Broadcasts agent_spawned WebSocket event on success.",
+    responses=build_responses(None),
+)
 async def spawn_lead_agent(
     request: SpawnLeadAgentRequest,
     background_tasks: BackgroundTasks,
@@ -241,7 +255,13 @@ async def spawn_lead_agent(
 # PROMOTION ENDPOINT
 # ═══════════════════════════════════════════════════════════
 
-@router.post("/promote", response_model=PromotionResponse)
+@router.post(
+    "/promote",
+    response_model=PromotionResponse,
+    summary="Promote Task To Lead",
+    description="Promote a Task Agent (3xxxx) to Lead Agent (2xxxx). Requires Council or Head authorization. Broadcasts agent_promoted WebSocket event on success.",
+    responses=build_responses(None),
+)
 async def promote_task_to_lead(
     request: PromoteAgentRequest,
     background_tasks: BackgroundTasks,
@@ -314,7 +334,13 @@ async def promote_task_to_lead(
 # LIQUIDATION ENDPOINT
 # ═══════════════════════════════════════════════════════════
 
-@router.post("/liquidate", response_model=LiquidationResponse)
+@router.post(
+    "/liquidate",
+    response_model=LiquidationResponse,
+    summary="Liquidate Agent",
+    description="Liquidate (terminate) an agent with full cleanup. Requires appropriate authorization based on tier hierarchy. Broadcasts agent_liquidated WebSocket event on success.",
+    responses=build_responses(None),
+)
 async def liquidate_agent(
     request: LiquidateAgentRequest,
     background_tasks: BackgroundTasks,
@@ -384,7 +410,13 @@ async def liquidate_agent(
 # CAPACITY MANAGEMENT ENDPOINT
 # ═══════════════════════════════════════════════════════════
 
-@router.get("/capacity", response_model=CapacityResponse)
+@router.get(
+    "/capacity",
+    response_model=CapacityResponse,
+    summary="Get Capacity",
+    description="Get available ID pool capacity for each agent tier.",
+    responses=build_responses(None),
+)
 async def get_capacity(
     current_user: dict = Depends(get_current_active_user),
     db: Session = Depends(get_db)
@@ -412,7 +444,12 @@ async def get_capacity(
 # BULK OPERATIONS
 # ═══════════════════════════════════════════════════════════
 
-@router.post("/bulk/liquidate-idle")
+@router.post(
+    "/bulk/liquidate-idle",
+    summary="Bulk Liquidate Idle Agents",
+    description="Bulk liquidate idle agents. Accepts params as JSON body (preferred) or query params (legacy). Set dry_run=false to actually execute. Admin/Sovereign only.",
+    responses=build_responses(None),
+)
 async def bulk_liquidate_idle_agents(
     body: Optional[BulkLiquidateRequest] = None,
     # Query-param fallback for backward-compat
@@ -465,7 +502,12 @@ async def bulk_liquidate_idle_agents(
 # LIFECYCLE STATS
 # ═══════════════════════════════════════════════════════════
 
-@router.get("/stats/lifecycle")
+@router.get(
+    "/stats/lifecycle",
+    summary="Get Lifecycle Stats",
+    description="Get comprehensive lifecycle statistics (last 30 days).",
+    responses=build_responses(None),
+)
 async def get_lifecycle_stats(
     current_user: dict = Depends(get_current_active_user),
     db: Session = Depends(get_db)

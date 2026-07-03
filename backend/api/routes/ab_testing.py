@@ -19,6 +19,8 @@ from backend.api.dependencies.auth import get_current_user
 from backend.models.entities.user import User
 from backend.models.entities.audit import AuditLog, AuditLevel, AuditCategory
 
+from backend.api.schemas.examples import ErrorResponseExample, SuccessResponseExample, build_responses
+
 router = APIRouter(prefix="/ab-testing", tags=["A/B Model Testing"])
 
 
@@ -246,7 +248,13 @@ def _write_audit(
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
-@router.post("/experiments", response_model=ExperimentSummaryOut)
+@router.post(
+    "/experiments",
+    response_model=ExperimentSummaryOut,
+    summary="Create Experiment",
+    description="Create and auto-start a new A/B test experiment.",
+    responses=build_responses(None),
+)
 async def create_experiment(
     data: ExperimentCreate,
     background_tasks: BackgroundTasks,
@@ -277,7 +285,13 @@ async def create_experiment(
     return _serialize_experiment_summary(experiment)
 
 
-@router.get("/experiments", response_model=PaginatedExperimentsOut)
+@router.get(
+    "/experiments",
+    response_model=PaginatedExperimentsOut,
+    summary="List Experiments",
+    description="List experiments with optional status filter and pagination.",
+    responses=build_responses(None),
+)
 async def list_experiments(
     status: Optional[str] = None,
     limit: int = Query(default=50, ge=1, le=200),
@@ -312,7 +326,13 @@ async def list_experiments(
     }
 
 
-@router.get("/experiments/{experiment_id}", response_model=ExperimentDetailOut)
+@router.get(
+    "/experiments/{experiment_id}",
+    response_model=ExperimentDetailOut,
+    summary="Get Experiment",
+    description="Get detailed experiment results including all runs and comparison.",
+    responses=build_responses(None),
+)
 async def get_experiment(
     experiment_id: str,
     db: Session = Depends(get_db),
@@ -331,7 +351,12 @@ async def get_experiment(
     return _serialize_experiment_detail(experiment)
 
 
-@router.post("/experiments/{experiment_id}/cancel")
+@router.post(
+    "/experiments/{experiment_id}/cancel",
+    summary="Cancel Experiment",
+    description="Cancel a running or pending experiment.",
+    responses=build_responses(None),
+)
 async def cancel_experiment(
     experiment_id: str,
     db: Session = Depends(get_db),
@@ -358,7 +383,12 @@ async def cancel_experiment(
     return {"message": "Experiment cancelled", "id": experiment_id}
 
 
-@router.delete("/experiments/{experiment_id}")
+@router.delete(
+    "/experiments/{experiment_id}",
+    summary="Delete Experiment",
+    description="Delete an experiment and all its runs/results.",
+    responses=build_responses(None),
+)
 async def delete_experiment(
     experiment_id: str,
     db: Session = Depends(get_db),
@@ -386,7 +416,12 @@ async def delete_experiment(
     return {"message": "Experiment deleted", "id": experiment_id}
 
 
-@router.get("/recommendations")
+@router.get(
+    "/recommendations",
+    summary="Get Model Recommendations",
+    description="Get model recommendations based on historical experiments (max 30 days old).",
+    responses=build_responses(None),
+)
 async def get_model_recommendations(
     task_category: Optional[str] = None,
     db: Session = Depends(get_db),
@@ -424,7 +459,13 @@ async def get_model_recommendations(
     return {"recommendations": recommendations, "total_categories": len(recommendations)}
 
 
-@router.post("/quick-test", response_model=ExperimentSummaryOut)
+@router.post(
+    "/quick-test",
+    response_model=ExperimentSummaryOut,
+    summary="Quick Ab Test",
+    description="Quick A/B test — creates the experiment and fires it in the background. Returns immediately with the experiment summary; the client should poll GET /experiments/{id} (or listen for the 'ab_test_update' WebSocket event) to get results.",
+    responses=build_responses(None),
+)
 async def quick_ab_test(
     data: QuickTestRequest,
     background_tasks: BackgroundTasks,
@@ -457,7 +498,13 @@ async def quick_ab_test(
     return _serialize_experiment_summary(experiment)
 
 
-@router.get("/stats", response_model=ABTestingStatsOut)
+@router.get(
+    "/stats",
+    response_model=ABTestingStatsOut,
+    summary="Get Ab Testing Stats",
+    description="Get overall A/B testing statistics in a single query.",
+    responses=build_responses(None),
+)
 async def get_ab_testing_stats(
     db: Session = Depends(get_db),
     current_user: dict = Depends(require_admin),

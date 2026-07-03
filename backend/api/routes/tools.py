@@ -19,6 +19,8 @@ from pydantic import BaseModel
 from backend.core.tool_registry import tool_registry
 from backend.core.auth import get_current_agent_tier, get_current_agent_id
 
+from backend.api.schemas.examples import ErrorResponseExample, SuccessResponseExample, build_responses
+
 router = APIRouter(prefix="/tools", tags=["Tools"])
 
 
@@ -34,7 +36,12 @@ class ExecuteToolRequest(BaseModel):
 
 # ── Routes ─────────────────────────────────────────────────────────────────────
 
-@router.get("/")
+@router.get(
+    "/",
+    summary="List Tools",
+    description="List tools available to the authenticated agent. MCP tools include additional fields: - is_mcp: true - mcp_tier: \"pre_approved\" | \"restricted\" - mcp_server_url: the registered server URL - mcp_original_name: human-readable tool name without the mcp__ prefix.",
+    responses=build_responses(None),
+)
 async def list_tools(
     agent_tier: str = Depends(get_current_agent_tier),
 ):
@@ -53,7 +60,12 @@ async def list_tools(
     }
 
 
-@router.post("/execute")
+@router.post(
+    "/execute",
+    summary="Execute Tool",
+    description="Execute a tool with parameters. For MCP tools the route transparently forwards agent identity to the MCPGovernanceService so tier enforcement and audit logging work correctly. For built-in tools (browser, file, shell) behaviour is identical to before.",
+    responses=build_responses(None),
+)
 async def execute_tool(
     request: ExecuteToolRequest,
     agent_tier: str = Depends(get_current_agent_tier),
@@ -99,7 +111,12 @@ async def execute_tool(
     return result
 
 
-@router.get("/mcp")
+@router.get(
+    "/mcp",
+    summary="List Mcp Tools",
+    description="Convenience endpoint — returns only MCP tools visible to this agent. Useful for agents that want to discover available MCP integrations without parsing the full tool list.",
+    responses=build_responses(None),
+)
 async def list_mcp_tools(
     agent_tier: str = Depends(get_current_agent_tier),
 ):

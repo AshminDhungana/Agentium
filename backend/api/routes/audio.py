@@ -25,12 +25,19 @@ from backend.services.audio_service import get_audio_service, get_speaker_identi
 
 logger = logging.getLogger(__name__)
 
+from backend.api.schemas.examples import ErrorResponseExample, SuccessResponseExample, build_responses
+
 router = APIRouter(prefix="/audio", tags=["Audio Streaming"])
 
 
 # ── REST Endpoints ────────────────────────────────────────────────────────────
 
-@router.get("/status")
+@router.get(
+    "/status",
+    summary="Audio Status",
+    description="Check audio service availability for the current user.",
+    responses=build_responses(None),
+)
 async def audio_status(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
@@ -40,7 +47,12 @@ async def audio_status(
     return svc.get_status(db, str(current_user.id))
 
 
-@router.post("/transcribe")
+@router.post(
+    "/transcribe",
+    summary="Transcribe Audio",
+    description="Single-shot audio transcription via OpenAI Whisper.",
+    responses=build_responses(None),
+)
 async def transcribe_audio(
     audio: UploadFile = File(...),
     language: Optional[str] = Form(None),
@@ -74,7 +86,12 @@ async def transcribe_audio(
         raise InternalServerError(error="Transcription failed", code="TRANSCRIPTION_FAILED")
 
 
-@router.post("/synthesize")
+@router.post(
+    "/synthesize",
+    summary="Synthesize Speech",
+    description="Single-shot text-to-speech via OpenAI TTS. Returns MP3.",
+    responses=build_responses(None),
+)
 async def synthesize_speech(
     text: str = Form(...),
     voice: str = Form("alloy"),
@@ -103,7 +120,12 @@ async def synthesize_speech(
 
 # ── Speaker Identification Endpoints ────────────────────────────────────────────
 
-@router.post("/speakers/register")
+@router.post(
+    "/speakers/register",
+    summary="Register Speaker",
+    description="Enroll a new speaker by uploading a voice sample and an associated name.",
+    responses=build_responses(None),
+)
 async def register_speaker(
     audio: UploadFile = File(...),
     name: str = Form("Unknown Speaker"),
@@ -122,7 +144,12 @@ async def register_speaker(
         logger.error("Speaker registration failed: %s", exc)
         raise InternalServerError(error="Speaker registration failed", code="SPEAKER_REGISTRATION_FAILED")
 
-@router.get("/speakers")
+@router.get(
+    "/speakers",
+    summary="Get Speakers",
+    description="List all enrolled speaker profiles.",
+    responses=build_responses(None),
+)
 async def get_speakers(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
@@ -131,7 +158,12 @@ async def get_speakers(
     identifier = get_speaker_identifier()
     return {"speakers": identifier.list_profiles(db)}
 
-@router.delete("/speakers/{speaker_id}")
+@router.delete(
+    "/speakers/{speaker_id}",
+    summary="Delete Speaker",
+    description="Soft delete a speaker profile.",
+    responses=build_responses(None),
+)
 async def delete_speaker(
     speaker_id: str,
     db: Session = Depends(get_db),

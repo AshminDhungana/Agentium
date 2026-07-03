@@ -24,6 +24,7 @@ from backend.models.entities.user import User
 from backend.services.chat_service import ChatService
 from backend.services.model_provider import ModelService
 from backend.core.auth import get_current_active_user
+from backend.api.schemas.examples import ErrorResponseExample, SuccessResponseExample
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
 
@@ -74,7 +75,20 @@ def _build_enriched_message(message: str, attachments: Optional[List[dict]]) -> 
 # Conversation endpoints
 # ═══════════════════════════════════════════════════════════
 
-@router.get("/conversations")
+@router.get(
+    "/conversations",
+    summary="List conversations",
+    description="List all conversations for the current user.",
+    responses={
+        200: {"description": "Success", "model": SuccessResponseExample},
+        400: {"description": "Bad Request", "model": ErrorResponseExample},
+        401: {"description": "Unauthorized", "model": ErrorResponseExample},
+        403: {"description": "Forbidden", "model": ErrorResponseExample},
+        404: {"description": "Not Found", "model": ErrorResponseExample},
+        429: {"description": "Too Many Requests", "model": ErrorResponseExample},
+        500: {"description": "Internal Server Error", "model": ErrorResponseExample},
+    },
+)
 async def list_conversations(
     include_archived: bool = False,
     db: Session = Depends(get_db),
@@ -99,7 +113,20 @@ async def list_conversations(
     }
 
 
-@router.post("/conversations")
+@router.post(
+    "/conversations",
+    summary="Create a conversation",
+    description="Create a new conversation.",
+    responses={
+        200: {"description": "Success", "model": SuccessResponseExample},
+        400: {"description": "Bad Request", "model": ErrorResponseExample},
+        401: {"description": "Unauthorized", "model": ErrorResponseExample},
+        403: {"description": "Forbidden", "model": ErrorResponseExample},
+        404: {"description": "Not Found", "model": ErrorResponseExample},
+        429: {"description": "Too Many Requests", "model": ErrorResponseExample},
+        500: {"description": "Internal Server Error", "model": ErrorResponseExample},
+    },
+)
 async def create_conversation(
     title: Optional[str] = None,
     context: Optional[str] = None,
@@ -120,7 +147,20 @@ async def create_conversation(
     return conversation.to_dict()
 
 
-@router.get("/conversations/{conversation_id}")
+@router.get(
+    "/conversations/{conversation_id}",
+    summary="Get a conversation",
+    description="Get a specific conversation with messages.",
+    responses={
+        200: {"description": "Success", "model": SuccessResponseExample},
+        400: {"description": "Bad Request", "model": ErrorResponseExample},
+        401: {"description": "Unauthorized", "model": ErrorResponseExample},
+        403: {"description": "Forbidden", "model": ErrorResponseExample},
+        404: {"description": "Not Found", "model": ErrorResponseExample},
+        429: {"description": "Too Many Requests", "model": ErrorResponseExample},
+        500: {"description": "Internal Server Error", "model": ErrorResponseExample},
+    },
+)
 async def get_conversation(
     conversation_id: str,
     include_messages: bool = True,
@@ -142,7 +182,20 @@ async def get_conversation(
     return conversation.to_dict(include_messages=include_messages)
 
 
-@router.post("/conversations/{conversation_id}/archive")
+@router.post(
+    "/conversations/{conversation_id}/archive",
+    summary="Archive a conversation",
+    description="Archive a conversation.",
+    responses={
+        200: {"description": "Success", "model": SuccessResponseExample},
+        400: {"description": "Bad Request", "model": ErrorResponseExample},
+        401: {"description": "Unauthorized", "model": ErrorResponseExample},
+        403: {"description": "Forbidden", "model": ErrorResponseExample},
+        404: {"description": "Not Found", "model": ErrorResponseExample},
+        429: {"description": "Too Many Requests", "model": ErrorResponseExample},
+        500: {"description": "Internal Server Error", "model": ErrorResponseExample},
+    },
+)
 async def archive_conversation(
     conversation_id: str,
     db: Session = Depends(get_db),
@@ -164,7 +217,20 @@ async def archive_conversation(
     return {"success": True, "message": "Conversation archived"}
 
 
-@router.delete("/conversations/{conversation_id}")
+@router.delete(
+    "/conversations/{conversation_id}",
+    summary="Delete a conversation",
+    description="Soft delete a conversation.",
+    responses={
+        200: {"description": "Success", "model": SuccessResponseExample},
+        400: {"description": "Bad Request", "model": ErrorResponseExample},
+        401: {"description": "Unauthorized", "model": ErrorResponseExample},
+        403: {"description": "Forbidden", "model": ErrorResponseExample},
+        404: {"description": "Not Found", "model": ErrorResponseExample},
+        429: {"description": "Too Many Requests", "model": ErrorResponseExample},
+        500: {"description": "Internal Server Error", "model": ErrorResponseExample},
+    },
+)
 async def delete_conversation(
     conversation_id: str,
     db: Session = Depends(get_db),
@@ -186,7 +252,20 @@ async def delete_conversation(
     return {"success": True, "message": "Conversation deleted"}
 
 
-@router.get("/stats")
+@router.get(
+    "/stats",
+    summary="Get chat statistics",
+    description="Get chat statistics for current user.",
+    responses={
+        200: {"description": "Success", "model": SuccessResponseExample},
+        400: {"description": "Bad Request", "model": ErrorResponseExample},
+        401: {"description": "Unauthorized", "model": ErrorResponseExample},
+        403: {"description": "Forbidden", "model": ErrorResponseExample},
+        404: {"description": "Not Found", "model": ErrorResponseExample},
+        429: {"description": "Too Many Requests", "model": ErrorResponseExample},
+        500: {"description": "Internal Server Error", "model": ErrorResponseExample},
+    },
+)
 async def get_chat_stats(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_active_user),
@@ -224,7 +303,20 @@ async def get_chat_stats(
 # Send message
 # ═══════════════════════════════════════════════════════════
 
-@router.post("/send", response_class=StreamingResponse)
+@router.post(
+    "/send", response_class=StreamingResponse,
+    summary="Send a message",
+    description="Send a message to the Head of Council. Returns a streaming response for real-time updates.",
+    responses={
+        200: {"description": "Success", "model": SuccessResponseExample},
+        400: {"description": "Bad Request", "model": ErrorResponseExample},
+        401: {"description": "Unauthorized", "model": ErrorResponseExample},
+        403: {"description": "Forbidden", "model": ErrorResponseExample},
+        404: {"description": "Not Found", "model": ErrorResponseExample},
+        429: {"description": "Too Many Requests", "model": ErrorResponseExample},
+        503: {"description": "Service Unavailable", "model": ErrorResponseExample},
+    },
+)
 async def send_message(
     chat_msg: ChatMessage,
     db: Session = Depends(get_db),
@@ -458,7 +550,20 @@ async def _stream_response(
 # History
 # ═══════════════════════════════════════════════════════════
 
-@router.get("/history")
+@router.get(
+    "/history",
+    summary="Get chat history",
+    description="Get chat history for the current user. Returns messages from the ChatMessage table ordered chronologically.",
+    responses={
+        200: {"description": "Success", "model": SuccessResponseExample},
+        400: {"description": "Bad Request", "model": ErrorResponseExample},
+        401: {"description": "Unauthorized", "model": ErrorResponseExample},
+        403: {"description": "Forbidden", "model": ErrorResponseExample},
+        404: {"description": "Not Found", "model": ErrorResponseExample},
+        429: {"description": "Too Many Requests", "model": ErrorResponseExample},
+        500: {"description": "Internal Server Error", "model": ErrorResponseExample},
+    },
+)
 async def get_chat_history(
     limit: int = 50,
     db: Session = Depends(get_db),

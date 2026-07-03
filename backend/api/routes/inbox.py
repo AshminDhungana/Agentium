@@ -12,6 +12,8 @@ from backend.models.entities.channels import ExternalChannel
 from backend.core.auth import get_current_active_user
 from backend.services.channel_manager import ChannelManager
 
+from backend.api.schemas.examples import ErrorResponseExample, SuccessResponseExample, build_responses
+
 router = APIRouter(prefix="/inbox", tags=["Unified Inbox"])
 
 def _user_id(current_user) -> str:
@@ -25,7 +27,12 @@ class ReplyRequest(BaseModel):
     message_type: str = "text"
     attachments: Optional[list] = None
 
-@router.get("/conversations")
+@router.get(
+    "/conversations",
+    summary="List Unified Conversations",
+    description="List conversations for the unified inbox viewing.",
+    responses=build_responses(None),
+)
 async def list_unified_conversations(
     status: Optional[str] = None,
     channel: Optional[str] = None,
@@ -51,7 +58,12 @@ async def list_unified_conversations(
         "total": len(conversations)
     }
 
-@router.get("/conversations/{conversation_id}")
+@router.get(
+    "/conversations/{conversation_id}",
+    summary="Get Unified Conversation",
+    description="Get a specific conversation to view in the inbox.",
+    responses=build_responses(None),
+)
 async def get_unified_conversation(
     conversation_id: str,
     db: Session = Depends(get_db),
@@ -69,7 +81,12 @@ async def get_unified_conversation(
         
     return conversation.to_dict(include_messages=True)
 
-@router.post("/conversations/{conversation_id}/reply")
+@router.post(
+    "/conversations/{conversation_id}/reply",
+    summary="Reply To Conversation",
+    description="Send a reply to an external channel from the unified inbox.",
+    responses=build_responses(None),
+)
 async def reply_to_conversation(
     conversation_id: str,
     request: ReplyRequest,

@@ -19,20 +19,47 @@ from backend.models.entities.event_trigger import (
     TriggerType,
 )
 from backend.services.event_processor import EventProcessorService
+from backend.api.schemas.examples import ErrorResponseExample, SuccessResponseExample
 
 router = APIRouter(prefix="/events", tags=["Events"])
 
 
 # ── Trigger CRUD ──────────────────────────────────────────────────────────────
 
-@router.get("/triggers", response_model=List[Dict[str, Any]])
+@router.get(
+    "/triggers", response_model=List[Dict[str, Any]],
+    summary="List event triggers",
+    description="List all event triggers.",
+    responses={
+        200: {"description": "Success", "model": SuccessResponseExample},
+        400: {"description": "Bad Request", "model": ErrorResponseExample},
+        401: {"description": "Unauthorized", "model": ErrorResponseExample},
+        403: {"description": "Forbidden", "model": ErrorResponseExample},
+        404: {"description": "Not Found", "model": ErrorResponseExample},
+        429: {"description": "Too Many Requests", "model": ErrorResponseExample},
+        500: {"description": "Internal Server Error", "model": ErrorResponseExample},
+    },
+)
 def list_triggers(db: Session = Depends(get_db)):
     """List all event triggers."""
     triggers = db.query(EventTrigger).order_by(EventTrigger.created_at.desc()).all()
     return [t.to_dict() for t in triggers]
 
 
-@router.post("/triggers", response_model=Dict[str, Any])
+@router.post(
+    "/triggers", response_model=Dict[str, Any],
+    summary="Create an event trigger",
+    description="Create a new event trigger.",
+    responses={
+        200: {"description": "Success", "model": SuccessResponseExample},
+        400: {"description": "Bad Request", "model": ErrorResponseExample},
+        401: {"description": "Unauthorized", "model": ErrorResponseExample},
+        403: {"description": "Forbidden", "model": ErrorResponseExample},
+        404: {"description": "Not Found", "model": ErrorResponseExample},
+        429: {"description": "Too Many Requests", "model": ErrorResponseExample},
+        500: {"description": "Internal Server Error", "model": ErrorResponseExample},
+    },
+)
 def create_trigger(payload: Dict[str, Any], db: Session = Depends(get_db)):
     """Create a new event trigger."""
     name = payload.get("name")
@@ -68,7 +95,20 @@ def create_trigger(payload: Dict[str, Any], db: Session = Depends(get_db)):
     return trigger.to_dict()
 
 
-@router.put("/triggers/{trigger_id}", response_model=Dict[str, Any])
+@router.put(
+    "/triggers/{trigger_id}", response_model=Dict[str, Any],
+    summary="Update an event trigger",
+    description="Update an existing event trigger.",
+    responses={
+        200: {"description": "Success", "model": SuccessResponseExample},
+        400: {"description": "Bad Request", "model": ErrorResponseExample},
+        401: {"description": "Unauthorized", "model": ErrorResponseExample},
+        403: {"description": "Forbidden", "model": ErrorResponseExample},
+        404: {"description": "Not Found", "model": ErrorResponseExample},
+        429: {"description": "Too Many Requests", "model": ErrorResponseExample},
+        500: {"description": "Internal Server Error", "model": ErrorResponseExample},
+    },
+)
 def update_trigger(
     trigger_id: str,
     payload: Dict[str, Any],
@@ -96,7 +136,20 @@ def update_trigger(
     return trigger.to_dict()
 
 
-@router.delete("/triggers/{trigger_id}", response_model=Dict[str, Any])
+@router.delete(
+    "/triggers/{trigger_id}", response_model=Dict[str, Any],
+    summary="Delete an event trigger",
+    description="Deactivate (soft-delete) a trigger.",
+    responses={
+        200: {"description": "Success", "model": SuccessResponseExample},
+        400: {"description": "Bad Request", "model": ErrorResponseExample},
+        401: {"description": "Unauthorized", "model": ErrorResponseExample},
+        403: {"description": "Forbidden", "model": ErrorResponseExample},
+        404: {"description": "Not Found", "model": ErrorResponseExample},
+        429: {"description": "Too Many Requests", "model": ErrorResponseExample},
+        500: {"description": "Internal Server Error", "model": ErrorResponseExample},
+    },
+)
 def delete_trigger(trigger_id: str, db: Session = Depends(get_db)):
     """Deactivate (soft-delete) a trigger."""
     trigger = db.query(EventTrigger).filter(EventTrigger.id == trigger_id).first()
@@ -110,7 +163,20 @@ def delete_trigger(trigger_id: str, db: Session = Depends(get_db)):
 
 # ── Public Webhook Receiver ───────────────────────────────────────────────────
 
-@router.post("/webhook/{trigger_id}", response_model=Dict[str, Any])
+@router.post(
+    "/webhook/{trigger_id}", response_model=Dict[str, Any],
+    summary="Receive a webhook",
+    description="Public endpoint for external webhook delivery. Uses HMAC-SHA256 for authentication (no Bearer token required).",
+    responses={
+        200: {"description": "Success", "model": SuccessResponseExample},
+        400: {"description": "Bad Request", "model": ErrorResponseExample},
+        401: {"description": "Unauthorized", "model": ErrorResponseExample},
+        403: {"description": "Forbidden", "model": ErrorResponseExample},
+        404: {"description": "Not Found", "model": ErrorResponseExample},
+        429: {"description": "Too Many Requests", "model": ErrorResponseExample},
+        500: {"description": "Internal Server Error", "model": ErrorResponseExample},
+    },
+)
 async def receive_webhook(trigger_id: str, request: Request, db: Session = Depends(get_db)):
     """
     Public endpoint for external webhook delivery.
@@ -136,7 +202,20 @@ async def receive_webhook(trigger_id: str, request: Request, db: Session = Depen
 
 # ── Event Logs ────────────────────────────────────────────────────────────────
 
-@router.get("/logs", response_model=List[Dict[str, Any]])
+@router.get(
+    "/logs", response_model=List[Dict[str, Any]],
+    summary="List event logs",
+    description="Paginated event log viewer with optional filters.",
+    responses={
+        200: {"description": "Success", "model": SuccessResponseExample},
+        400: {"description": "Bad Request", "model": ErrorResponseExample},
+        401: {"description": "Unauthorized", "model": ErrorResponseExample},
+        403: {"description": "Forbidden", "model": ErrorResponseExample},
+        404: {"description": "Not Found", "model": ErrorResponseExample},
+        429: {"description": "Too Many Requests", "model": ErrorResponseExample},
+        500: {"description": "Internal Server Error", "model": ErrorResponseExample},
+    },
+)
 def list_event_logs(
     trigger_id: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
@@ -162,7 +241,20 @@ def list_event_logs(
 
 # ── Dead-Letter Queue ─────────────────────────────────────────────────────────
 
-@router.get("/dead-letters", response_model=List[Dict[str, Any]])
+@router.get(
+    "/dead-letters", response_model=List[Dict[str, Any]],
+    summary="List dead letters",
+    description="View events that failed processing multiple times.",
+    responses={
+        200: {"description": "Success", "model": SuccessResponseExample},
+        400: {"description": "Bad Request", "model": ErrorResponseExample},
+        401: {"description": "Unauthorized", "model": ErrorResponseExample},
+        403: {"description": "Forbidden", "model": ErrorResponseExample},
+        404: {"description": "Not Found", "model": ErrorResponseExample},
+        429: {"description": "Too Many Requests", "model": ErrorResponseExample},
+        500: {"description": "Internal Server Error", "model": ErrorResponseExample},
+    },
+)
 def list_dead_letters(
     limit: int = Query(50, le=200),
     offset: int = Query(0, ge=0),
@@ -172,7 +264,20 @@ def list_dead_letters(
     return EventProcessorService.get_dead_letters(db, limit=limit, offset=offset)
 
 
-@router.post("/dead-letters/{log_id}/retry", response_model=Dict[str, Any])
+@router.post(
+    "/dead-letters/{log_id}/retry", response_model=Dict[str, Any],
+    summary="Retry a dead letter",
+    description="Manually retry a dead-lettered event.",
+    responses={
+        200: {"description": "Success", "model": SuccessResponseExample},
+        400: {"description": "Bad Request", "model": ErrorResponseExample},
+        401: {"description": "Unauthorized", "model": ErrorResponseExample},
+        403: {"description": "Forbidden", "model": ErrorResponseExample},
+        404: {"description": "Not Found", "model": ErrorResponseExample},
+        429: {"description": "Too Many Requests", "model": ErrorResponseExample},
+        500: {"description": "Internal Server Error", "model": ErrorResponseExample},
+    },
+)
 def retry_dead_letter(log_id: str, db: Session = Depends(get_db)):
     """Manually retry a dead-lettered event."""
     result = EventProcessorService.retry_dead_letter(db, log_id)

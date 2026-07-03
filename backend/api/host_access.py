@@ -17,6 +17,7 @@ from backend.services.auth import get_current_agent, verify_agent_hierarchy
 from backend.core.exceptions import UnauthorizedError, ForbiddenError, ServiceUnavailableError
 from backend.models.entities.agents import Agent
 from backend.models.entities.audit import AuditLog, AuditLevel, AuditCategory
+from backend.api.schemas.examples import build_responses
 
 router = APIRouter(prefix="/host", tags=["Host System Access"])
 security = HTTPBearer()
@@ -187,7 +188,13 @@ async def get_host_access_service(
 # API Endpoints
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-@router.post("/execute", response_model=CommandResponse)
+@router.post(
+    "/execute",
+    response_model=CommandResponse,
+    summary="Execute command on host",
+    description="Execute an arbitrary command on the host system. Non-Head agents (e.g. Council Members) attempting dangerous commands require Head of Council approval.",
+    responses=build_responses(None),
+)
 async def execute_command(
     request: CommandExecuteRequest,
     background_tasks: BackgroundTasks,
@@ -253,7 +260,13 @@ async def execute_command(
         timestamp=start_time.isoformat()
     )
 
-@router.post("/file/read", response_model=FileResponse)
+@router.post(
+    "/file/read",
+    response_model=FileResponse,
+    summary="Read file from host",
+    description="Read file contents from the host filesystem. Accessible by Head of Council and Council Members.",
+    responses=build_responses(None),
+)
 async def read_file(
     request: FileReadRequest,
     host_access: HostAccessService = Depends(get_host_access_service)
@@ -283,7 +296,13 @@ async def read_file(
         error=result.get('error')
     )
 
-@router.post("/file/write", response_model=FileResponse)
+@router.post(
+    "/file/write",
+    response_model=FileResponse,
+    summary="Write file to host",
+    description="Write file contents to the host filesystem. Only accessible by Head of Council.",
+    responses=build_responses(None),
+)
 async def write_file(
     request: FileWriteRequest,
     background_tasks: BackgroundTasks,
@@ -333,7 +352,13 @@ async def write_file(
         error=result.get('error')
     )
 
-@router.post("/directory/list", response_model=DirectoryResponse)
+@router.post(
+    "/directory/list",
+    response_model=DirectoryResponse,
+    summary="List directory on host",
+    description="Retrieve a parsed list of directory contents on the host system.",
+    responses=build_responses(None),
+)
 async def list_directory(
     request: DirectoryListRequest,
     host_access: HostAccessService = Depends(get_host_access_service)
@@ -380,7 +405,13 @@ async def list_directory(
 # Docker/Container Management Endpoints
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-@router.get("/containers", response_model=List[Dict[str, Any]])
+@router.get(
+    "/containers",
+    response_model=List[Dict[str, Any]],
+    summary="List Docker containers",
+    description="Retrieve list of all Docker containers on the host system.",
+    responses=build_responses(None),
+)
 async def list_containers(
     host_access: HostAccessService = Depends(get_host_access_service)
 ):
@@ -396,7 +427,13 @@ async def list_containers(
     containers = host_access.list_containers()
     return containers
 
-@router.post("/container/action", response_model=ContainerResponse)
+@router.post(
+    "/container/action",
+    response_model=ContainerResponse,
+    summary="Perform container action",
+    description="Perform action (start, stop, restart, remove, pause, unpause) on a specific container. Council Members can only manage Agentium containers.",
+    responses=build_responses(None),
+)
 async def container_action(
     request: ContainerActionRequest,
     background_tasks: BackgroundTasks,
@@ -438,7 +475,13 @@ async def container_action(
         error=result.get('error')
     )
 
-@router.post("/container/execute", response_model=CommandResponse)
+@router.post(
+    "/container/execute",
+    response_model=CommandResponse,
+    summary="Execute command in container",
+    description="Execute a shell command inside a specific Docker container.",
+    responses=build_responses(None),
+)
 async def execute_in_container(
     request: ContainerExecRequest,
     host_access: HostAccessService = Depends(get_host_access_service)
@@ -468,7 +511,13 @@ async def execute_in_container(
         timestamp=datetime.utcnow().isoformat()
     )
 
-@router.post("/container/spawn-agent", response_model=AgentSpawnResponse)
+@router.post(
+    "/container/spawn-agent",
+    response_model=AgentSpawnResponse,
+    summary="Spawn agent container",
+    description="Spawn a new agent instance as a Docker container on the host system. Only accessible by Head of Council.",
+    responses=build_responses(None),
+)
 async def spawn_agent_container(
     request: AgentSpawnRequest,
     background_tasks: BackgroundTasks,
@@ -555,7 +604,13 @@ async def spawn_agent_container(
 # System Information Endpoints
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-@router.get("/system/info", response_model=SystemInfoResponse)
+@router.get(
+    "/system/info",
+    response_model=SystemInfoResponse,
+    summary="Get system information",
+    description="Retrieve comprehensive platform, hardware, uptime, filesystem, and network info from the host.",
+    responses=build_responses(None),
+)
 async def get_system_info(
     request: SystemInfoRequest = Depends(),
     host_access: HostAccessService = Depends(get_host_access_service)
@@ -620,7 +675,12 @@ async def get_system_info(
         timestamp=datetime.utcnow().isoformat()
     )
 
-@router.get("/system/processes")
+@router.get(
+    "/system/processes",
+    summary="Get running processes",
+    description="Retrieve sorted list of running processes on the host system.",
+    responses=build_responses(None),
+)
 async def get_processes(
     limit: int = 50,
     host_access: HostAccessService = Depends(get_host_access_service)

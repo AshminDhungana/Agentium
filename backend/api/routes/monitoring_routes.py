@@ -21,10 +21,17 @@ from backend.core.auth import get_current_active_user
 from backend.core.timing_middleware import get_timing_stats
 from backend.services.reasoning_trace_service import reasoning_trace_service
 
+from backend.api.schemas.examples import ErrorResponseExample, SuccessResponseExample, build_responses
+
 router = APIRouter(prefix="/monitoring", tags=["Monitoring"])
 
 
-@router.get("/dashboard/{monitor_id}")
+@router.get(
+    "/dashboard/{monitor_id}",
+    summary="Get Monitoring Dashboard",
+    description="Get monitoring dashboard data for a specific monitor agent. Returns system health, alerts, violations, and agent health reports.",
+    responses=build_responses(None),
+)
 async def get_monitoring_dashboard(
     monitor_id: str,
     current_user: dict = Depends(get_current_active_user),
@@ -113,7 +120,12 @@ async def get_monitoring_dashboard(
     }
 
 
-@router.get("/agents/{agent_id}/health")
+@router.get(
+    "/agents/{agent_id}/health",
+    summary="Get Agent Health",
+    description="Get health history for a specific agent.",
+    responses=build_responses(None),
+)
 async def get_agent_health(
     agent_id: str,
     days: int = Query(default=7, ge=1, le=30),
@@ -168,7 +180,12 @@ async def get_agent_health(
     }
 
 
-@router.post("/report-violation")
+@router.post(
+    "/report-violation",
+    summary="Report Violation",
+    description="Report a violation by an agent.",
+    responses=build_responses(None),
+)
 async def report_violation(
     reporter_id: str = Query(..., description="ID of the agent reporting"),
     violator_id: str = Query(..., description="ID of the agent violating"),
@@ -228,7 +245,12 @@ async def report_violation(
     }
 
 
-@router.get("/violations")
+@router.get(
+    "/violations",
+    summary="Get Violations",
+    description="Get violations with optional filters.",
+    responses=build_responses(None),
+)
 async def get_violations(
     status: Optional[str] = Query(None, description="Filter by status: open, resolved, dismissed"),
     severity: Optional[str] = Query(None, description="Filter by severity"),
@@ -284,7 +306,12 @@ async def get_violations(
     }
 
 
-@router.patch("/violations/{violation_id}/resolve")
+@router.patch(
+    "/violations/{violation_id}/resolve",
+    summary="Resolve Violation",
+    description="Mark a violation as resolved.",
+    responses=build_responses(None),
+)
 async def resolve_violation(
     violation_id: int,
     resolution_notes: str = Query(..., description="Notes about the resolution"),
@@ -318,7 +345,12 @@ async def resolve_violation(
     }
 
 
-@router.get("/stats")
+@router.get(
+    "/stats",
+    summary="Get Monitoring Stats",
+    description="Get overall monitoring statistics.",
+    responses=build_responses(None),
+)
 async def get_monitoring_stats(
     days: int = Query(default=7, ge=1, le=365),
     current_user: dict = Depends(get_current_active_user),
@@ -374,7 +406,12 @@ async def get_monitoring_stats(
     }
 
 
-@router.get("/metrics")
+@router.get(
+    "/metrics",
+    summary="Get Timing Metrics",
+    description="Returns endpoint-level timing statistics collected by TimingMiddleware. Useful for: - Performance regression gates (Phase 18.2) - Locust / load-test assertion checks - Manual debugging of slow endpoints Fields per endpoint: - ``count``      – total requests seen - ``buffered``   – how many samples are in the ring buffer - ``avg_ms``     – mean latency - ``p95_ms``     – 95ᵗʰ percentile - ``p99_ms``     – 99ᵗʰ percentile - ``min_ms`` / ``max_ms`` – fastest / slowest ever observed.",
+    responses=build_responses(None),
+)
 async def get_timing_metrics(
     current_user: dict = Depends(get_current_active_user)
 ):
@@ -405,7 +442,12 @@ async def get_timing_metrics(
 # REASONING TRACE ENDPOINTS  (Issue #6 — Agent Self-Reasoning Flow)
 # =============================================================================
 
-@router.get("/tasks/{task_id}/reasoning-trace")
+@router.get(
+    "/tasks/{task_id}/reasoning-trace",
+    summary="Get Task Reasoning Trace",
+    description="Return all persisted reasoning traces for a task. Each trace includes: - The 5-phase execution record: goal_interpretation → context_retrieval → plan_generation → step_execution → outcome_validation → completed / failed - Per-step rationale, alternatives considered, inputs/outputs, and outcome - Outcome validation result (passed / failed + notes) - Total tokens consumed and wall-clock duration Use this to inspect *why* an agent made each decision, not just *what* it produced.",
+    responses=build_responses(None),
+)
 async def get_task_reasoning_trace(
     task_id: str,
     current_user: dict = Depends(get_current_active_user),
@@ -433,7 +475,12 @@ async def get_task_reasoning_trace(
     }
 
 
-@router.get("/tasks/{task_id}/reasoning-trace/summary")
+@router.get(
+    "/tasks/{task_id}/reasoning-trace/summary",
+    summary="Get Task Reasoning Trace Summary",
+    description="Lightweight summary of reasoning traces for a task. Returns phase completion counts and validation results without full step detail. Suitable for dashboard widgets and task-list views.",
+    responses=build_responses(None),
+)
 async def get_task_reasoning_trace_summary(
     task_id: str,
     current_user: dict = Depends(get_current_active_user),
@@ -477,7 +524,12 @@ async def get_task_reasoning_trace_summary(
     }
 
 
-@router.get("/agents/{agent_id}/reasoning-traces")
+@router.get(
+    "/agents/{agent_id}/reasoning-traces",
+    summary="Get Agent Reasoning Traces",
+    description="Return recent reasoning traces for a specific agent. Useful for: - Reviewing an agent's decision history across tasks - Identifying patterns in failed or invalid outputs - Auditing which skills and plan strategies were chosen.",
+    responses=build_responses(None),
+)
 async def get_agent_reasoning_traces(
     agent_id: str,
     days: int = Query(default=7,   ge=1,  le=90),
@@ -577,7 +629,12 @@ async def get_agent_reasoning_traces(
     }
 
 
-@router.get("/reasoning-traces/validation-failures")
+@router.get(
+    "/reasoning-traces/validation-failures",
+    summary="Get Validation Failures",
+    description="Return recent traces where outcome validation failed. These represent executions where the agent's output did not satisfy the original goal before the task was marked complete — the validation gate caught the problem and triggered a retry or failure. Use this endpoint to identify systematic reasoning or generation failures across all agents.",
+    responses=build_responses(None),
+)
 async def get_validation_failures(
     days:  int = Query(default=1,  ge=1, le=30),
     limit: int = Query(default=50, ge=1, le=200),
@@ -638,7 +695,12 @@ async def get_validation_failures(
 # Phase 13.2 — Self-Healing & Auto-Recovery Routes
 # ═══════════════════════════════════════════════════════════
 
-@router.get("/self-healing/status")
+@router.get(
+    "/self-healing/status",
+    summary="Get Self Healing Status",
+    description="Get the current system status (normal vs degraded).",
+    responses=build_responses(None),
+)
 async def get_self_healing_status(
     current_user: dict = Depends(get_current_active_user),
     db: Session = Depends(get_db)
@@ -650,7 +712,12 @@ async def get_self_healing_status(
     return SelfHealingService.get_system_mode(db)
 
 
-@router.get("/self-healing/events")
+@router.get(
+    "/self-healing/events",
+    summary="Get Self Healing Events",
+    description="Get a list of recent self-healing actions and events (crashes, degradations).",
+    responses=build_responses(None),
+)
 async def get_self_healing_events(
     limit: int = Query(50, ge=1, le=100),
     days: int = Query(7, ge=1, le=30),
@@ -664,7 +731,12 @@ async def get_self_healing_events(
     return SelfHealingService.get_self_healing_events(db, limit=limit, days=days)
 
 
-@router.post("/admin/rollback/{checkpoint_id}")
+@router.post(
+    "/admin/rollback/{checkpoint_id}",
+    summary="Rollback From Checkpoint",
+    description="Admin-only endpoint to manually trigger a rollback to a specific execution checkpoint.",
+    responses=build_responses(None),
+)
 async def rollback_from_checkpoint(
     checkpoint_id: str,
     current_user: dict = Depends(get_current_active_user),
@@ -712,7 +784,12 @@ async def rollback_from_checkpoint(
 # Phase 13.7 — Zero-Touch Operations Dashboard Routes
 # -----------------------------------------------------------------------------
 
-@router.get("/aggregated")
+@router.get(
+    "/aggregated",
+    summary="Get Aggregated Dashboard Metrics",
+    description="Returns unified metrics for the Zero-Touch Operations Dashboard. Combines health info across agents, tasks, workflows, events, and budget.",
+    responses=build_responses(None),
+)
 async def get_aggregated_dashboard_metrics(
     current_user: dict = Depends(get_current_active_user),
     db: Session = Depends(get_db)
@@ -728,7 +805,12 @@ async def get_aggregated_dashboard_metrics(
         raise InternalServerError(error=f"Failed to fetch aggregated metrics: {str(e)}", code="FAILED_TO_FETCH_AGGREGATED_METRICS")
 
 
-@router.get("/sla")
+@router.get(
+    "/sla",
+    summary="Get Sla Compliance Metrics",
+    description="Returns time-to-resolution compliance rates grouped by task priority.",
+    responses=build_responses(None),
+)
 async def get_sla_compliance_metrics(
     current_user: dict = Depends(get_current_active_user),
     db: Session = Depends(get_db)
@@ -743,7 +825,12 @@ async def get_sla_compliance_metrics(
         raise InternalServerError(error=f"Failed to fetch SLA metrics: {str(e)}", code="FAILED_TO_FETCH_SLA_METRICS")
 
 
-@router.get("/anomalies")
+@router.get(
+    "/anomalies",
+    summary="Get Active Anomalies",
+    description="Returns currently open anomaly violation reports.",
+    responses=build_responses(None),
+)
 async def get_active_anomalies(
     current_user: dict = Depends(get_current_active_user),
     db: Session = Depends(get_db)
@@ -767,7 +854,12 @@ async def get_active_anomalies(
         raise InternalServerError(error=f"Failed to fetch anomalies: {str(e)}", code="FAILED_TO_FETCH_ANOMALIES")
 
 
-@router.get("/incidents")
+@router.get(
+    "/incidents",
+    summary="Get Incident Log",
+    description="Returns the log of auto-remediated incidents via the zero-touch ops engine.",
+    responses=build_responses(None),
+)
 async def get_incident_log(
     limit: int = 50,
     current_user: dict = Depends(get_current_active_user),
@@ -783,7 +875,12 @@ async def get_incident_log(
         raise InternalServerError(error=f"Failed to fetch incident log: {str(e)}", code="FAILED_TO_FETCH_INCIDENT_LOG")
 
 
-@router.post("/chaos-test")
+@router.post(
+    "/chaos-test",
+    summary="Inject Chaos Test",
+    description="Injects a controlled failure into the system for chaos engineering testing. Requires admin privileges.",
+    responses=build_responses(None),
+)
 async def inject_chaos_test(
     payload: dict,
     current_user: dict = Depends(get_current_active_user),
@@ -812,7 +909,12 @@ async def inject_chaos_test(
         raise InternalServerError(error=f"Failed to inject chaos test: {str(e)}", code="FAILED_TO_INJECT_CHAOS_TEST")
 
 
-@router.post("/admin/rollback-audit/{audit_id}")
+@router.post(
+    "/admin/rollback-audit/{audit_id}",
+    summary="Rollback From Audit",
+    description="Admin-only endpoint to revert an auto-remediated action by its AuditLog ID. (This is a placeholder implementation; actual reversal logic depends on the specific action).",
+    responses=build_responses(None),
+)
 async def rollback_from_audit(
     audit_id: str,
     current_user: dict = Depends(get_current_active_user),
@@ -857,7 +959,12 @@ class FrontendErrorRequest(BaseModel):
     component_stack: str = ""
     url: str = ""
 
-@router.post("/frontend/errors")
+@router.post(
+    "/frontend/errors",
+    summary="Report Frontend Error",
+    description="Catch global and widget frontend errors and write them to AuditLog.",
+    responses=build_responses(None),
+)
 async def report_frontend_error(
     error_data: FrontendErrorRequest,
     db: Session = Depends(get_db)

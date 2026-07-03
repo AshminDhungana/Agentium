@@ -13,6 +13,7 @@ from backend.models.database import get_db
 from backend.services.plugin_marketplace_service import PluginMarketplaceService
 from backend.api.routes.rbac import get_current_user_from_token
 from backend.models.entities.user import User
+from backend.api.schemas.examples import build_responses
 
 router = APIRouter(prefix="/plugins", tags=["Plugin Marketplace"])
 
@@ -40,7 +41,12 @@ class PluginReviewRequest(BaseModel):
 
 # --- Public / User Endpoints ---
 
-@router.get("")  # Matches /api/v1/plugins (no trailing slash ambiguity)
+@router.get(
+    "",
+    summary="List Plugins",
+    description="List all published plugins, with optional search and type filter.",
+    responses=build_responses(None),
+)
 def list_plugins(
     query: Optional[str] = None,
     type_filter: Optional[str] = None,
@@ -64,7 +70,13 @@ def list_plugins(
     ]
 
 
-@router.post("", status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    status_code=status.HTTP_201_CREATED,
+    summary="Submit Plugin",
+    description="Submit a new plugin for Council review.",
+    responses=build_responses(None),
+)
 def submit_plugin(
     request: PluginSubmitRequest,
     current_user: User = Depends(get_current_user_from_token),
@@ -86,7 +98,12 @@ def submit_plugin(
     return {"id": plugin.id, "status": plugin.status}
 
 
-@router.post("/{plugin_id}/install")
+@router.post(
+    "/{plugin_id}/install",
+    summary="Install Plugin",
+    description="Install a published plugin for the current user.",
+    responses=build_responses(None),
+)
 def install_plugin(
     plugin_id: str,
     request: PluginInstallRequest,
@@ -103,7 +120,13 @@ def install_plugin(
     return {"id": installation.id, "is_active": installation.is_active}
 
 
-@router.post("/{plugin_id}/reviews", status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/{plugin_id}/reviews",
+    status_code=status.HTTP_201_CREATED,
+    summary="Submit Review",
+    description="Submit a star rating and optional review text for an installed plugin.",
+    responses=build_responses(None),
+)
 def submit_review(
     plugin_id: str,
     request: PluginReviewRequest,
@@ -121,7 +144,12 @@ def submit_review(
 
 # --- Admin Endpoints ---
 
-@router.post("/{plugin_id}/verify")
+@router.post(
+    "/{plugin_id}/verify",
+    summary="Verify Plugin",
+    description="Admin: Mark a submitted plugin as security-verified.",
+    responses=build_responses(None),
+)
 def verify_plugin(
     plugin_id: str,
     current_user: User = Depends(get_current_user_from_token),
@@ -134,7 +162,12 @@ def verify_plugin(
     return {"id": plugin.id, "status": plugin.status}
 
 
-@router.post("/{plugin_id}/publish")
+@router.post(
+    "/{plugin_id}/publish",
+    summary="Publish Plugin",
+    description="Admin: Publish a verified plugin to the public marketplace.",
+    responses=build_responses(None),
+)
 def publish_plugin(
     plugin_id: str,
     current_user: User = Depends(get_current_user_from_token),
@@ -147,7 +180,12 @@ def publish_plugin(
     return {"id": plugin.id, "status": plugin.status}
 
 
-@router.post("/{plugin_id}/request-approval")
+@router.post(
+    "/{plugin_id}/request-approval",
+    summary="Request Council Approval",
+    description="Developer: Request Council approval for a submitted plugin.",
+    responses=build_responses(None),
+)
 def request_council_approval(
     plugin_id: str,
     current_user: User = Depends(get_current_user_from_token),
@@ -162,7 +200,12 @@ class ExecutePluginRequest(BaseModel):
     installation_id: str
     input_data: Dict[str, Any]
 
-@router.post("/{plugin_id}/execute")
+@router.post(
+    "/{plugin_id}/execute",
+    summary="Execute Plugin",
+    description="Execute a plugin within a secure sandbox.",
+    responses=build_responses(None),
+)
 async def execute_plugin(
     plugin_id: str,
     request: ExecutePluginRequest,
@@ -187,7 +230,12 @@ class RevenueRecordRequest(BaseModel):
     currency: str = "USD"
     notes: str = ""
 
-@router.post("/{plugin_id}/revenue")
+@router.post(
+    "/{plugin_id}/revenue",
+    summary="Record Plugin Revenue",
+    description="Record a revenue transaction for a plugin on the ledger.",
+    responses=build_responses(None),
+)
 def record_plugin_revenue(
     plugin_id: str,
     request: RevenueRecordRequest,

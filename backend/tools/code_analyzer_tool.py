@@ -68,7 +68,7 @@ class CodeAnalyzerTool:
     
     def __init__(self):
         self._temp_dir = Path("/tmp/code_analysis")
-        self._temp_dir.mkdir(exist_ok=True)
+        self._temp_dir.mkdir(parents=True, exist_ok=True)
     
     async def execute(
         self,

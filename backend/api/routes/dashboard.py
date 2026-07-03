@@ -18,6 +18,7 @@ from typing import Any, Dict, List
 from fastapi        import APIRouter, Depends
 from sqlalchemy.orm import Session
 
+from backend.api.schemas.examples    import ErrorResponseExample, SuccessResponseExample
 from backend.models.database         import get_db
 from backend.models.entities         import Agent, Task
 from backend.models.entities.agents  import AgentStatus
@@ -89,7 +90,20 @@ def _task_date_key(task: Task) -> datetime:
 
 # ── Endpoint ──────────────────────────────────────────────────────────────────
 
-@router.get("/dashboard/summary")
+@router.get(
+    "/dashboard/summary",
+    summary="Get dashboard summary",
+    description="Pre-aggregated stats for the frontend Dashboard in a single round-trip.",
+    responses={
+        200: {"description": "Success", "model": SuccessResponseExample},
+        400: {"description": "Bad Request", "model": ErrorResponseExample},
+        401: {"description": "Unauthorized", "model": ErrorResponseExample},
+        403: {"description": "Forbidden", "model": ErrorResponseExample},
+        404: {"description": "Not Found", "model": ErrorResponseExample},
+        429: {"description": "Too Many Requests", "model": ErrorResponseExample},
+        500: {"description": "Internal Server Error", "model": ErrorResponseExample},
+    },
+)
 def get_dashboard_summary(
     current_user: dict    = Depends(get_current_active_user),
     db:           Session = Depends(get_db),

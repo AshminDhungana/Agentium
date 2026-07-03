@@ -23,6 +23,8 @@ from backend.services.capability_registry import (
 )
 from backend.core.auth import get_current_active_user
 
+from backend.api.schemas.examples import ErrorResponseExample, SuccessResponseExample, build_responses
+
 router = APIRouter(prefix="/api/v1/capabilities", tags=["Capabilities"])
 
 
@@ -87,7 +89,12 @@ class ValidateReassignmentResponse(BaseModel):
 # ENDPOINTS
 # ═══════════════════════════════════════════════════════════
 
-@router.get("/list")
+@router.get(
+    "/list",
+    summary="List All Capabilities",
+    description="List all available capabilities in the system.",
+    responses=build_responses(None),
+)
 async def list_all_capabilities(
     current_user: dict = Depends(get_current_active_user)
 ):
@@ -118,7 +125,13 @@ async def list_all_capabilities(
     }
 
 
-@router.post("/check", response_model=CapabilityCheckResponse)
+@router.post(
+    "/check",
+    response_model=CapabilityCheckResponse,
+    summary="Check Capability",
+    description="Check if a specific agent has a specific capability.",
+    responses=build_responses(None),
+)
 async def check_capability(
     request: CapabilityCheckRequest,
     current_user: dict = Depends(get_current_active_user),
@@ -150,7 +163,13 @@ async def check_capability(
     )
 
 
-@router.get("/agent/{agentium_id}", response_model=CapabilityProfileResponse)
+@router.get(
+    "/agent/{agentium_id}",
+    response_model=CapabilityProfileResponse,
+    summary="Get Agent Capabilities",
+    description="Get complete capability profile for an agent.",
+    responses=build_responses(None),
+)
 async def get_agent_capabilities(
     agentium_id: str,
     current_user: dict = Depends(get_current_active_user),
@@ -166,7 +185,13 @@ async def get_agent_capabilities(
     return CapabilityProfileResponse(**profile)
 
 
-@router.post("/validate-reassignment", response_model=ValidateReassignmentResponse)
+@router.post(
+    "/validate-reassignment",
+    response_model=ValidateReassignmentResponse,
+    summary="Validate Reassignment",
+    description="Validate whether an agent can be reassigned to a new parent. Rules enforced: 1. Head of Council (0xxxx) can never be reassigned. 2. New parent's tier prefix must be numerically lower than agent's tier. (e.g. lead_agent 2xxxx can only move under council 1xxxx or head 0xxxx) 3. New parent must have the capability to spawn the agent's type: - Receiving a task_agent  → new parent needs `spawn_task_agent` - Receiving a lead_agent  → new parent needs `spawn_lead` 4. Neither agent may be terminated.",
+    responses=build_responses(None),
+)
 async def validate_reassignment(
     request: ValidateReassignmentRequest,
     current_user: dict = Depends(get_current_active_user),
@@ -254,7 +279,12 @@ async def validate_reassignment(
     return ValidateReassignmentResponse(valid=True)
 
 
-@router.post("/grant")
+@router.post(
+    "/grant",
+    summary="Grant Capability",
+    description="Grant a capability to an agent. Requires GRANT_CAPABILITY permission.",
+    responses=build_responses(None),
+)
 async def grant_capability(
     request: GrantCapabilityRequest,
     current_user: dict = Depends(get_current_active_user),
@@ -298,7 +328,12 @@ async def grant_capability(
         raise InternalServerError(error=f"Failed to grant capability: {str(e)}", code="FAILED_TO_GRANT_CAPABILITY")
 
 
-@router.post("/revoke")
+@router.post(
+    "/revoke",
+    summary="Revoke Capability",
+    description="Revoke a capability from an agent. Requires REVOKE_CAPABILITY permission.",
+    responses=build_responses(None),
+)
 async def revoke_capability(
     request: RevokeCapabilityRequest,
     current_user: dict = Depends(get_current_active_user),
@@ -342,7 +377,13 @@ async def revoke_capability(
         raise InternalServerError(error=f"Failed to revoke capability: {str(e)}", code="FAILED_TO_REVOKE_CAPABILITY")
 
 
-@router.get("/audit", response_model=CapabilityAuditResponse)
+@router.get(
+    "/audit",
+    response_model=CapabilityAuditResponse,
+    summary="Capability Audit",
+    description="Generate system-wide capability audit report. Admin/Council only.",
+    responses=build_responses(None),
+)
 async def capability_audit(
     current_user: dict = Depends(get_current_active_user),
     db: Session = Depends(get_db)
@@ -355,7 +396,12 @@ async def capability_audit(
     return CapabilityAuditResponse(**report)
 
 
-@router.delete("/agent/{agentium_id}/all")
+@router.delete(
+    "/agent/{agentium_id}/all",
+    summary="Revoke All Capabilities",
+    description="Revoke ALL capabilities from an agent. Emergency use only. Requires admin/sovereign.",
+    responses=build_responses(None),
+)
 async def revoke_all_capabilities(
     agentium_id: str,
     reason: str = "manual_revocation",

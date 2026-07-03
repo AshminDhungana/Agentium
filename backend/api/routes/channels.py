@@ -43,6 +43,7 @@ from backend.services.channels.whatsapp_unified import UnifiedWhatsAppAdapter, W
 from backend.core.auth import get_current_active_user
 from backend.core.config import settings
 from backend.models.entities.channels import ChannelMetrics, CircuitBreakerState
+from backend.api.schemas.examples import ErrorResponseExample, SuccessResponseExample, build_responses, ListResponseExample
 
 router = APIRouter(tags=["Channels"])
 
@@ -109,7 +110,12 @@ def _get_channel_or_404(channel_id: str, db: Session) -> ExternalChannel:
 # CRUD ENDPOINTS
 # ═══════════════════════════════════════════════════════════
 
-@router.get("/channels/")
+@router.get(
+    "/channels/",
+    summary="List channels",
+    description="Retrieve list of all registered communication channels with status and platform filtering options.",
+    responses=build_responses(ListResponseExample),
+)
 def list_channels(
     status: Optional[str] = None,
     channel_type: Optional[str] = None,
@@ -150,7 +156,13 @@ def list_channels(
     }
 
 
-@router.post("/channels/", status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/channels/",
+    status_code=status.HTTP_201_CREATED,
+    summary="Create channel",
+    description="Register a new external communication channel (WhatsApp, Slack, Telegram, Email, etc.) and generate webhooks/adapters.",
+    responses=build_responses(None),
+)
 def create_channel(
     request: ChannelCreateRequest,
     background_tasks: BackgroundTasks,
@@ -269,7 +281,12 @@ def _get_setup_instructions(channel_type: ChannelType, webhook_url: str) -> Dict
     return instructions.get(channel_type, {"webhook_url": webhook_url})
 
 
-@router.get("/channels/metrics")
+@router.get(
+    "/channels/metrics",
+    summary="Get all channel metrics",
+    description="Retrieve operational and health metrics for all registered channels.",
+    responses=build_responses(None),
+)
 def get_all_channels_metrics(
     current_user: dict = Depends(get_current_active_user),
     db: Session = Depends(get_db)
@@ -312,7 +329,12 @@ def get_all_channels_metrics(
         }
     }
 
-@router.get("/channels/{channel_id}")
+@router.get(
+    "/channels/{channel_id}",
+    summary="Get channel details",
+    description="Retrieve detailed configurations, status, rate limiting info, and health metrics for a single channel.",
+    responses=build_responses(None),
+)
 def get_channel(
     channel_id: str,
     current_user: dict = Depends(get_current_active_user),
@@ -328,7 +350,12 @@ def get_channel(
     return result
 
 
-@router.put("/channels/{channel_id}")
+@router.put(
+    "/channels/{channel_id}",
+    summary="Update channel",
+    description="Update routing settings, configuration object parameters, default target agents, or status for an existing channel.",
+    responses=build_responses(None),
+)
 def update_channel(
     channel_id: str,
     request: ChannelUpdateRequest,
@@ -372,7 +399,13 @@ def update_channel(
     return channel.to_dict()
 
 
-@router.delete("/channels/{channel_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/channels/{channel_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete channel",
+    description="Permanently delete a channel and cleanly shut down all associated adapters/services.",
+    responses=build_responses(None),
+)
 def delete_channel(
     channel_id: str,
     background_tasks: BackgroundTasks,
@@ -389,7 +422,12 @@ def delete_channel(
     db.commit()
 
 
-@router.get("/channels/{channel_id}/messages")
+@router.get(
+    "/channels/{channel_id}/messages",
+    summary="List channel messages",
+    description="Retrieve a paginated list of inbound messages received through a specific channel.",
+    responses=build_responses(None),
+)
 def list_channel_messages(
     channel_id: str,
     limit: int = Query(50, ge=1, le=200),
@@ -425,7 +463,12 @@ def list_channel_messages(
 # TEST CONNECTION
 # ═══════════════════════════════════════════════════════════
 
-@router.post("/channels/{channel_id}/test")
+@router.post(
+    "/channels/{channel_id}/test",
+    summary="Test channel connection",
+    description="Trigger an active credentials and connection test. Set status to ACTIVE on success, ERROR on failure.",
+    responses=build_responses(None),
+)
 async def test_channel(
     channel_id: str,
     current_user: dict = Depends(get_current_active_user),
@@ -655,7 +698,12 @@ async def test_channel(
 # SEND TEST MESSAGE
 # ═══════════════════════════════════════════════════════════
 
-@router.post("/channels/{channel_id}/send")
+@router.post(
+    "/channels/{channel_id}/send",
+    summary="Send test message",
+    description="Send a single outbound message through the selected channel for manual verification/testing.",
+    responses=build_responses(None),
+)
 async def send_test_message(
     channel_id: str,
     request: SendTestMessageRequest,
@@ -702,7 +750,12 @@ async def send_test_message(
 # QR CODE POLLING (WhatsApp)
 # ═══════════════════════════════════════════════════════════
 
-@router.get("/channels/{channel_id}/qr")
+@router.get(
+    "/channels/{channel_id}/qr",
+    summary="Get WhatsApp QR Code",
+    description="Retrieve the pairing QR code string for WhatsApp Web Bridge channels.",
+    responses=build_responses(None),
+)
 async def get_channel_qr(
     channel_id: str,
     current_user: dict = Depends(get_current_active_user),
@@ -753,7 +806,12 @@ async def get_channel_qr(
 # WHATSAPP PROVIDER-SPECIFIC ENDPOINTS
 # ═══════════════════════════════════════════════════════════
 
-@router.get("/channels/{channel_id}/whatsapp/status")
+@router.get(
+    "/channels/{channel_id}/whatsapp/status",
+    summary="Get WhatsApp Detailed Status",
+    description="Retrieve detailed platform connection status, pairing authentication flags, and configured credentials structure.",
+    responses=build_responses(None),
+)
 async def get_whatsapp_detailed_status(
     channel_id: str,
     current_user: dict = Depends(get_current_active_user),
@@ -791,7 +849,12 @@ async def get_whatsapp_detailed_status(
     }
 
 
-@router.post("/channels/{channel_id}/whatsapp/switch-provider")
+@router.post(
+    "/channels/{channel_id}/whatsapp/switch-provider",
+    summary="Switch WhatsApp Provider",
+    description="Switch WhatsApp channel provider backend implementation (cloud_api or web_bridge) and migrate underlying credentials config.",
+    responses=build_responses(None),
+)
 async def switch_whatsapp_provider(
     channel_id: str,
     new_provider: str,
@@ -850,7 +913,12 @@ async def switch_whatsapp_provider(
 # HEALTH & METRICS
 # ═══════════════════════════════════════════════════════════
 
-@router.get("/channels/{channel_id}/health")
+@router.get(
+    "/channels/{channel_id}/health",
+    summary="Get channel health",
+    description="Retrieve operational and health statistics, 24-hour error windows, and rate limit utilization for a channel.",
+    responses=build_responses(None),
+)
 def get_channel_health(
     channel_id: str,
     current_user: dict = Depends(get_current_active_user),
@@ -912,7 +980,12 @@ def get_channel_health(
 
 # ─── Phase 15.3: per-channel logs endpoint ────────────────────────────────────
 
-@router.get("/channels/{channel_id}/logs")
+@router.get(
+    "/channels/{channel_id}/logs",
+    summary="Get channel logs",
+    description="Retrieve paginated log entries of inbound and outbound communication activity for a channel, with filters.",
+    responses=build_responses(None),
+)
 def get_channel_logs(
     channel_id: str,
     limit: int = Query(50, ge=1, le=200),
@@ -976,7 +1049,12 @@ def get_channel_logs(
 
 # ─── Phase 15.3: per-channel settings PATCH ───────────────────────────────────
 
-@router.patch("/channels/{channel_id}/settings")
+@router.patch(
+    "/channels/{channel_id}/settings",
+    summary="Update channel settings",
+    description="Update non-credential settings like rate limits, filters, auto-task flags, and default agents.",
+    responses=build_responses(None),
+)
 def update_channel_settings(
     channel_id: str,
     request: ChannelSettingsRequest,
@@ -1025,7 +1103,12 @@ def update_channel_settings(
     return channel.to_dict()
 
 
-@router.post("/channels/{channel_id}/reset")
+@router.post(
+    "/channels/{channel_id}/reset",
+    summary="Reset channel breaker",
+    description="Reset circuit breaker failure metrics, half-open parameters, and error state back to PENDING status.",
+    responses=build_responses(None),
+)
 def reset_channel(
     channel_id: str,
     current_user: dict = Depends(get_current_active_user),
@@ -1053,7 +1136,12 @@ def reset_channel(
 # METRICS ENDPOINTS
 # ═══════════════════════════════════════════════════════════
 
-@router.get("/channels/{channel_id}/metrics")
+@router.get(
+    "/channels/{channel_id}/metrics",
+    summary="Get channel metrics",
+    description="Retrieve live, granular error tracking and operational latency metrics for a specific channel.",
+    responses=build_responses(None),
+)
 def get_channel_metrics(
     channel_id: str,
     current_user: dict = Depends(get_current_active_user),
@@ -1094,7 +1182,12 @@ def _calculate_health_status(metrics: ChannelMetrics) -> str:
 # CROSS-CHANNEL MESSAGE LOG
 # ═══════════════════════════════════════════════════════════
 
-@router.get("/channels/messages/log")
+@router.get(
+    "/channels/messages/log",
+    summary="Get cross-channel message log",
+    description="Retrieve a detailed, paginated global log of all inbound and outbound messages across all channels with full filters.",
+    responses=build_responses(None),
+)
 def get_message_log(
     # Filters
     channel_id: Optional[str] = Query(None, description="Filter by channel ID"),
@@ -1226,7 +1319,12 @@ def get_message_log(
 # REPLAY FAILED MESSAGE
 # ═══════════════════════════════════════════════════════════
 
-@router.post("/channels/messages/{message_id}/replay")
+@router.post(
+    "/channels/messages/{message_id}/replay",
+    summary="Replay failed message",
+    description="Trigger a manual replay of a single failed message through the message pipeline.",
+    responses=build_responses(None),
+)
 async def replay_message(
     message_id: str,
     current_user: dict = Depends(get_current_active_user),
@@ -1281,7 +1379,12 @@ class BulkReplayRequest(BaseModel):
     limit: int = Field(50, ge=1, le=200, description="Max messages to replay")
 
 
-@router.post("/channels/messages/replay-failed")
+@router.post(
+    "/channels/messages/replay-failed",
+    summary="Replay failed messages in bulk",
+    description="Trigger a background task to replay failed messages, optionally filtered by a specific channel.",
+    responses=build_responses(None),
+)
 async def replay_failed_messages(
     request: BulkReplayRequest,
     background_tasks: BackgroundTasks,

@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from typing import Optional
 from pydantic import BaseModel, Field
 
+from backend.api.schemas.examples import ErrorResponseExample, SuccessResponseExample
 from backend.models.database import get_db
 from backend.models.entities.critics import CriticType, CriticVerdict
 from backend.services.critic_agents import critic_service
@@ -30,7 +31,20 @@ class ReviewRequest(BaseModel):
 
 # ── Endpoints ──
 
-@router.post("/review")
+@router.post(
+    "/review",
+    summary="Submit review",
+    description="Submit a task output for critic review.",
+    responses={
+        200: {"description": "Success", "model": SuccessResponseExample},
+        400: {"description": "Bad Request", "model": ErrorResponseExample},
+        401: {"description": "Unauthorized", "model": ErrorResponseExample},
+        403: {"description": "Forbidden", "model": ErrorResponseExample},
+        404: {"description": "Not Found", "model": ErrorResponseExample},
+        429: {"description": "Too Many Requests", "model": ErrorResponseExample},
+        500: {"description": "Internal Server Error", "model": ErrorResponseExample},
+    },
+)
 async def submit_review(
     request: ReviewRequest,
     current_user: dict = Depends(get_current_active_user),
@@ -60,7 +74,20 @@ async def submit_review(
     return result
 
 
-@router.get("/reviews/{task_id}")
+@router.get(
+    "/reviews/{task_id}",
+    summary="Get task reviews",
+    description="Get all critic reviews for a specific task.",
+    responses={
+        200: {"description": "Success", "model": SuccessResponseExample},
+        400: {"description": "Bad Request", "model": ErrorResponseExample},
+        401: {"description": "Unauthorized", "model": ErrorResponseExample},
+        403: {"description": "Forbidden", "model": ErrorResponseExample},
+        404: {"description": "Not Found", "model": ErrorResponseExample},
+        429: {"description": "Too Many Requests", "model": ErrorResponseExample},
+        500: {"description": "Internal Server Error", "model": ErrorResponseExample},
+    },
+)
 async def get_task_reviews(
     task_id: str,
     current_user: dict = Depends(get_current_active_user),
@@ -71,7 +98,20 @@ async def get_task_reviews(
     return {"task_id": task_id, "reviews": reviews, "total": len(reviews)}
 
 
-@router.get("/stats")
+@router.get(
+    "/stats",
+    summary="Get critic stats",
+    description="Get aggregate statistics for all critic agents.",
+    responses={
+        200: {"description": "Success", "model": SuccessResponseExample},
+        400: {"description": "Bad Request", "model": ErrorResponseExample},
+        401: {"description": "Unauthorized", "model": ErrorResponseExample},
+        403: {"description": "Forbidden", "model": ErrorResponseExample},
+        404: {"description": "Not Found", "model": ErrorResponseExample},
+        429: {"description": "Too Many Requests", "model": ErrorResponseExample},
+        500: {"description": "Internal Server Error", "model": ErrorResponseExample},
+    },
+)
 async def get_critic_stats(
     current_user: dict = Depends(get_current_active_user),
     db: Session = Depends(get_db),

@@ -7,9 +7,16 @@ from backend.models.database import get_db
 from backend.core.auth import get_current_user
 from backend.services.audit_service import AuditService
 
+from backend.api.schemas.examples import ErrorResponseExample, SuccessResponseExample, build_responses
+
 router = APIRouter(prefix="/audit", tags=["Audit"])
 
-@router.get("/escalations")
+@router.get(
+    "/escalations",
+    summary="Get Escalations",
+    description="Get audit logs for privilege escalations and revocations. Only accessible by users with admin privileges.",
+    responses=build_responses(None),
+)
 async def get_escalations(
     skip: int = 0,
     limit: int = Query(100, le=1000),

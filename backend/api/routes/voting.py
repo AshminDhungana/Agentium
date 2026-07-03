@@ -17,6 +17,8 @@ from backend.models.entities.voting import (
 from backend.core.auth import get_current_active_user
 from backend.services.amendment_service import AmendmentService
 
+from backend.api.schemas.examples import ErrorResponseExample, SuccessResponseExample, build_responses
+
 router = APIRouter(prefix="/voting", tags=["voting"])
 
 
@@ -89,7 +91,13 @@ class VoteResponse(BaseModel):
 # Amendment Endpoints
 # ============================================================================
 
-@router.get("/amendments", response_model=List[AmendmentResponse])
+@router.get(
+    "/amendments",
+    response_model=List[AmendmentResponse],
+    summary="List Amendments",
+    description="List all amendment votings, optionally filtered by status.",
+    responses=build_responses(None),
+)
 async def list_amendments(
     status_filter: Optional[str] = Query(None, description="Filter by status"),
     limit: int = Query(20, ge=1, le=100),
@@ -152,7 +160,13 @@ async def list_amendments(
     return result
 
 
-@router.post("/amendments", status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/amendments",
+    status_code=status.HTTP_201_CREATED,
+    summary="Propose Amendment",
+    description="Propose a new constitutional amendment. Requires Council member.",
+    responses=build_responses(None),
+)
 async def propose_amendment(
     proposal: AmendmentProposal,
     db: Session = Depends(get_db),
@@ -182,7 +196,13 @@ async def propose_amendment(
         raise InternalServerError(error=str(e), code="STRE")
 
 
-@router.get("/amendments/{amendment_id}", response_model=dict)
+@router.get(
+    "/amendments/{amendment_id}",
+    response_model=dict,
+    summary="Get Amendment Details",
+    description="Get detailed information about an amendment.",
+    responses=build_responses(None),
+)
 async def get_amendment_details(
     amendment_id: str,
     db: Session = Depends(get_db),
@@ -199,7 +219,12 @@ async def get_amendment_details(
     return detail
 
 
-@router.post("/amendments/{amendment_id}/vote")
+@router.post(
+    "/amendments/{amendment_id}/vote",
+    summary="Cast Amendment Vote",
+    description="Cast a vote on an amendment.",
+    responses=build_responses(None),
+)
 async def cast_amendment_vote(
     amendment_id: str,
     vote_data: VoteCast,
@@ -245,7 +270,12 @@ async def cast_amendment_vote(
         raise InternalServerError(error=str(e), code="STRE")
 
 
-@router.post("/amendments/{amendment_id}/sponsor")
+@router.post(
+    "/amendments/{amendment_id}/sponsor",
+    summary="Sponsor Amendment",
+    description="Add sponsor to an amendment. Requires Council member.",
+    responses=build_responses(None),
+)
 async def sponsor_amendment(
     amendment_id: str,
     db: Session = Depends(get_db),
@@ -264,7 +294,12 @@ async def sponsor_amendment(
         raise BadRequestError(error=str(e), code="STRE")
 
 
-@router.post("/amendments/{amendment_id}/start-voting")
+@router.post(
+    "/amendments/{amendment_id}/start-voting",
+    summary="Start Amendment Voting",
+    description="Start voting on an amendment (transition from DELIBERATING to VOTING).",
+    responses=build_responses(None),
+)
 async def start_amendment_voting(
     amendment_id: str,
     db: Session = Depends(get_db),
@@ -279,7 +314,12 @@ async def start_amendment_voting(
         raise BadRequestError(error=str(e), code="STRE")
 
 
-@router.post("/amendments/{amendment_id}/conclude")
+@router.post(
+    "/amendments/{amendment_id}/conclude",
+    summary="Conclude Amendment Voting",
+    description="Conclude voting on an amendment and execute the result.",
+    responses=build_responses(None),
+)
 async def conclude_amendment_voting(
     amendment_id: str,
     db: Session = Depends(get_db),
@@ -298,7 +338,13 @@ async def conclude_amendment_voting(
 # Task Deliberation Endpoints
 # ============================================================================
 
-@router.get("/deliberations", response_model=List[DeliberationResponse])
+@router.get(
+    "/deliberations",
+    response_model=List[DeliberationResponse],
+    summary="List Deliberations",
+    description="List all task deliberations.",
+    responses=build_responses(None),
+)
 async def list_deliberations(
     status_filter: Optional[str] = Query(None, description="Filter by status"),
     limit: int = Query(20, ge=1, le=100),
@@ -339,7 +385,13 @@ async def list_deliberations(
     return result
 
 
-@router.get("/deliberations/{deliberation_id}", response_model=dict)
+@router.get(
+    "/deliberations/{deliberation_id}",
+    response_model=dict,
+    summary="Get Deliberation Details",
+    description="Get detailed information about a deliberation.",
+    responses=build_responses(None),
+)
 async def get_deliberation_details(
     deliberation_id: str,
     db: Session = Depends(get_db),
@@ -383,7 +435,12 @@ async def get_deliberation_details(
     }
 
 
-@router.post("/deliberations/{deliberation_id}/vote")
+@router.post(
+    "/deliberations/{deliberation_id}/vote",
+    summary="Cast Deliberation Vote",
+    description="Cast a vote in a task deliberation. FIX: Now accepts both ACTIVE and QUORUM_REACHED statuses. The model's cast_vote() method supports voting in both states, but the old route only accepted ACTIVE, causing 400 errors when quorum was already reached.",
+    responses=build_responses(None),
+)
 async def cast_deliberation_vote(
     deliberation_id: str,
     vote_data: VoteCast,
@@ -444,7 +501,12 @@ async def cast_deliberation_vote(
         raise InternalServerError(error=str(e), code="STRE")
 
 
-@router.post("/deliberations/{deliberation_id}/start")
+@router.post(
+    "/deliberations/{deliberation_id}/start",
+    summary="Start Deliberation",
+    description="Start a deliberation (transition from PENDING to ACTIVE).",
+    responses=build_responses(None),
+)
 async def start_deliberation(
     deliberation_id: str,
     db: Session = Depends(get_db),
@@ -464,7 +526,12 @@ async def start_deliberation(
     return {"status": deliberation.status.value, "started_at": deliberation.started_at.isoformat()}
 
 
-@router.post("/deliberations/{deliberation_id}/conclude")
+@router.post(
+    "/deliberations/{deliberation_id}/conclude",
+    summary="Conclude Deliberation",
+    description="Conclude a deliberation and calculate the result.",
+    responses=build_responses(None),
+)
 async def conclude_deliberation(
     deliberation_id: str,
     db: Session = Depends(get_db),

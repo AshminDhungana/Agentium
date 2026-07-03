@@ -21,6 +21,8 @@ from backend.services.browser_service import get_browser_service
 
 logger = logging.getLogger(__name__)
 
+from backend.api.schemas.examples import ErrorResponseExample, SuccessResponseExample, build_responses
+
 router = APIRouter(prefix="/browser", tags=["Browser Control"])
 
 
@@ -60,7 +62,12 @@ class ConfigureSessionRequest(BaseModel):
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
-@router.post("/navigate")
+@router.post(
+    "/navigate",
+    summary="Navigate",
+    description="Navigate to a URL and return page title + status code.",
+    responses=build_responses(None),
+)
 async def navigate(
     req: NavigateRequest,
     db: Session = Depends(get_db),
@@ -78,7 +85,12 @@ async def navigate(
     }
 
 
-@router.post("/scrape")
+@router.post(
+    "/scrape",
+    summary="Scrape",
+    description="Scrape page text/HTML, optionally targeting a CSS selector.",
+    responses=build_responses(None),
+)
 async def scrape(
     req: ScrapeRequest,
     db: Session = Depends(get_db),
@@ -97,7 +109,12 @@ async def scrape(
     }
 
 
-@router.post("/screenshot")
+@router.post(
+    "/screenshot",
+    summary="Screenshot",
+    description="Capture full-page screenshot (base64 PNG).",
+    responses=build_responses(None),
+)
 async def screenshot(
     req: ScreenshotRequest,
     db: Session = Depends(get_db),
@@ -116,7 +133,12 @@ async def screenshot(
     }
 
 
-@router.post("/search")
+@router.post(
+    "/search",
+    summary="Search",
+    description="Perform a safe DuckDuckGo web search.",
+    responses=build_responses(None),
+)
 async def search(
     req: SearchRequest,
     db: Session = Depends(get_db),
@@ -136,7 +158,12 @@ async def search(
     }
 
 
-@router.post("/check-url")
+@router.post(
+    "/check-url",
+    summary="Check Url",
+    description="Validate a URL against the safety guard (SSRF prevention).",
+    responses=build_responses(None),
+)
 async def check_url(
     req: URLCheckRequest,
     current_user: User = Depends(get_current_active_user),
@@ -151,7 +178,12 @@ async def check_url(
     }
 
 
-@router.get("/sessions")
+@router.get(
+    "/sessions",
+    summary="Get Sessions",
+    description="List all active browser sessions.",
+    responses=build_responses(None),
+)
 async def get_sessions(
     current_user: User = Depends(get_current_active_user),
 ):
@@ -173,7 +205,12 @@ async def get_sessions(
     }
 
 
-@router.get("/sessions/{task_id}/stream")
+@router.get(
+    "/sessions/{task_id}/stream",
+    summary="Get Session Stream",
+    description="Get the latest frame for a browser session (polling fallback).",
+    responses=build_responses(None),
+)
 async def get_session_stream(
     task_id: str,
     current_user: User = Depends(get_current_active_user),
@@ -195,7 +232,12 @@ async def get_session_stream(
     }
 
 
-@router.post("/sessions/{task_id}/configure")
+@router.post(
+    "/sessions/{task_id}/configure",
+    summary="Configure Session",
+    description="Configure stream settings.",
+    responses=build_responses(None),
+)
 async def configure_session(
     task_id: str,
     req: ConfigureSessionRequest,

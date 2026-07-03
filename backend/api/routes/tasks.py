@@ -14,6 +14,7 @@ from backend.api.schemas.task import TaskCreate, TaskResponse, TaskUpdate
 from backend.core.auth import get_current_active_user
 from backend.services.task_state_machine import TaskStateMachine, IllegalStateTransition
 from backend.services.acceptance_criteria import AcceptanceCriteriaService  # Phase 6.3
+from backend.api.schemas.examples import ErrorResponseExample, SuccessResponseExample
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
@@ -73,7 +74,18 @@ def _serialize(task: Task) -> dict:
     }
 
 
-@router.post("/", status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/", status_code=status.HTTP_201_CREATED,
+    summary="Create a new task",
+    description="Create a new task with governance metadata. Status changes go through state machine validation.",
+    responses={
+        201: {"description": "Created", "model": SuccessResponseExample},
+        400: {"description": "Bad Request", "model": ErrorResponseExample},
+        401: {"description": "Unauthorized", "model": ErrorResponseExample},
+        403: {"description": "Forbidden", "model": ErrorResponseExample},
+        500: {"description": "Internal Server Error", "model": ErrorResponseExample},
+    },
+)
 async def create_task(
     request: Request,
     task_data: TaskCreate,
@@ -148,7 +160,20 @@ async def create_task(
     return _serialize(task)
 
 
-@router.get("/")
+@router.get(
+    "/",
+    summary="List all tasks",
+    description="List tasks with optional filtering by status, agent, or parent task.",
+    responses={
+        200: {"description": "Success", "model": SuccessResponseExample},
+        400: {"description": "Bad Request", "model": ErrorResponseExample},
+        401: {"description": "Unauthorized", "model": ErrorResponseExample},
+        403: {"description": "Forbidden", "model": ErrorResponseExample},
+        404: {"description": "Not Found", "model": ErrorResponseExample},
+        429: {"description": "Too Many Requests", "model": ErrorResponseExample},
+        500: {"description": "Internal Server Error", "model": ErrorResponseExample},
+    },
+)
 async def list_tasks(
     status: Optional[str] = Query(None),
     agent_id: Optional[str] = Query(None),
@@ -196,7 +221,20 @@ async def list_tasks(
     tasks = query.order_by(Task.created_at.desc()).offset(skip).limit(limit).all()
     return [_serialize(t) for t in tasks]
 
-@router.get("/active")
+@router.get(
+    "/active",
+    summary="Get active tasks",
+    description="Get all active tasks excluding system and idle tasks.",
+    responses={
+        200: {"description": "Success", "model": SuccessResponseExample},
+        400: {"description": "Bad Request", "model": ErrorResponseExample},
+        401: {"description": "Unauthorized", "model": ErrorResponseExample},
+        403: {"description": "Forbidden", "model": ErrorResponseExample},
+        404: {"description": "Not Found", "model": ErrorResponseExample},
+        429: {"description": "Too Many Requests", "model": ErrorResponseExample},
+        500: {"description": "Internal Server Error", "model": ErrorResponseExample},
+    },
+)
 async def get_active_tasks(
     current_user: dict = Depends(get_current_active_user),
     db: Session = Depends(get_db)
@@ -208,7 +246,20 @@ async def get_active_tasks(
     ).order_by(Task.created_at.desc()).all()
     return {"tasks": [_serialize(t) for t in tasks], "total": len(tasks)}
 
-@router.get("/{task_id}")
+@router.get(
+    "/{task_id}",
+    summary="Get a task by ID",
+    description="Get a specific task by ID, optionally including event history.",
+    responses={
+        200: {"description": "Success", "model": SuccessResponseExample},
+        400: {"description": "Bad Request", "model": ErrorResponseExample},
+        401: {"description": "Unauthorized", "model": ErrorResponseExample},
+        403: {"description": "Forbidden", "model": ErrorResponseExample},
+        404: {"description": "Not Found", "model": ErrorResponseExample},
+        429: {"description": "Too Many Requests", "model": ErrorResponseExample},
+        500: {"description": "Internal Server Error", "model": ErrorResponseExample},
+    },
+)
 async def get_task(
     task_id: str,
     include_events: bool = Query(False),  # NEW: Optional event inclusion
@@ -239,7 +290,20 @@ async def get_task(
     return result
 
 
-@router.patch("/{task_id}")
+@router.patch(
+    "/{task_id}",
+    summary="Update a task",
+    description="Update a task. Status changes go through state machine validation.",
+    responses={
+        200: {"description": "Success", "model": SuccessResponseExample},
+        400: {"description": "Bad Request", "model": ErrorResponseExample},
+        401: {"description": "Unauthorized", "model": ErrorResponseExample},
+        403: {"description": "Forbidden", "model": ErrorResponseExample},
+        404: {"description": "Not Found", "model": ErrorResponseExample},
+        429: {"description": "Too Many Requests", "model": ErrorResponseExample},
+        500: {"description": "Internal Server Error", "model": ErrorResponseExample},
+    },
+)
 async def update_task(
     task_id: str,
     task_data: TaskUpdate,
@@ -301,7 +365,20 @@ async def update_task(
     return _serialize(task)
 
 
-@router.post("/{task_id}/execute")
+@router.post(
+    "/{task_id}/execute",
+    summary="Execute a task",
+    description="Execute a task by assigning it to an agent.",
+    responses={
+        200: {"description": "Success", "model": SuccessResponseExample},
+        400: {"description": "Bad Request", "model": ErrorResponseExample},
+        401: {"description": "Unauthorized", "model": ErrorResponseExample},
+        403: {"description": "Forbidden", "model": ErrorResponseExample},
+        404: {"description": "Not Found", "model": ErrorResponseExample},
+        429: {"description": "Too Many Requests", "model": ErrorResponseExample},
+        500: {"description": "Internal Server Error", "model": ErrorResponseExample},
+    },
+)
 async def execute_task(
     task_id: str,
     agent_id: str = Query(...),
@@ -335,7 +412,20 @@ async def execute_task(
 # NEW ENDPOINTS: Task Execution Architecture
 # ═══════════════════════════════════════════════════════════
 
-@router.post("/{task_id}/escalate")
+@router.post(
+    "/{task_id}/escalate",
+    summary="Escalate a task",
+    description="Manually escalate a task to Council. Task must be in a state that allows escalation.",
+    responses={
+        200: {"description": "Success", "model": SuccessResponseExample},
+        400: {"description": "Bad Request", "model": ErrorResponseExample},
+        401: {"description": "Unauthorized", "model": ErrorResponseExample},
+        403: {"description": "Forbidden", "model": ErrorResponseExample},
+        404: {"description": "Not Found", "model": ErrorResponseExample},
+        429: {"description": "Too Many Requests", "model": ErrorResponseExample},
+        500: {"description": "Internal Server Error", "model": ErrorResponseExample},
+    },
+)
 async def escalate_task(
     task_id: str,
     reason: str = Query(..., description="Reason for escalation"),
@@ -366,7 +456,20 @@ async def escalate_task(
     }
 
 
-@router.get("/{task_id}/subtasks")
+@router.get(
+    "/{task_id}/subtasks",
+    summary="Get subtasks",
+    description="Get all subtasks (child tasks) for a parent task.",
+    responses={
+        200: {"description": "Success", "model": SuccessResponseExample},
+        400: {"description": "Bad Request", "model": ErrorResponseExample},
+        401: {"description": "Unauthorized", "model": ErrorResponseExample},
+        403: {"description": "Forbidden", "model": ErrorResponseExample},
+        404: {"description": "Not Found", "model": ErrorResponseExample},
+        429: {"description": "Too Many Requests", "model": ErrorResponseExample},
+        500: {"description": "Internal Server Error", "model": ErrorResponseExample},
+    },
+)
 async def get_subtasks(
     task_id: str,
     current_user: dict = Depends(get_current_active_user),
@@ -391,7 +494,20 @@ async def get_subtasks(
     }
 
 
-@router.get("/{task_id}/events")
+@router.get(
+    "/{task_id}/events",
+    summary="Get task events",
+    description="Get event history for a task (Event Sourcing). Returns immutable event log for complete audit trail.",
+    responses={
+        200: {"description": "Success", "model": SuccessResponseExample},
+        400: {"description": "Bad Request", "model": ErrorResponseExample},
+        401: {"description": "Unauthorized", "model": ErrorResponseExample},
+        403: {"description": "Forbidden", "model": ErrorResponseExample},
+        404: {"description": "Not Found", "model": ErrorResponseExample},
+        429: {"description": "Too Many Requests", "model": ErrorResponseExample},
+        500: {"description": "Internal Server Error", "model": ErrorResponseExample},
+    },
+)
 async def get_task_events(
     task_id: str,
     event_type: Optional[str] = Query(None, description="Filter by event type"),
@@ -427,7 +543,20 @@ async def get_task_events(
     }
 
 
-@router.post("/{task_id}/retry")
+@router.post(
+    "/{task_id}/retry",
+    summary="Retry a task",
+    description="Manually retry a failed or escalated task. Resets retry count and puts task back in progress.",
+    responses={
+        200: {"description": "Success", "model": SuccessResponseExample},
+        400: {"description": "Bad Request", "model": ErrorResponseExample},
+        401: {"description": "Unauthorized", "model": ErrorResponseExample},
+        403: {"description": "Forbidden", "model": ErrorResponseExample},
+        404: {"description": "Not Found", "model": ErrorResponseExample},
+        429: {"description": "Too Many Requests", "model": ErrorResponseExample},
+        500: {"description": "Internal Server Error", "model": ErrorResponseExample},
+    },
+)
 async def retry_task(
     task_id: str,
     current_user: dict = Depends(get_current_active_user),
@@ -462,7 +591,20 @@ async def retry_task(
     }
 
 
-@router.get("/{task_id}/allowed-transitions")
+@router.get(
+    "/{task_id}/allowed-transitions",
+    summary="Get allowed transitions",
+    description="Get list of allowed status transitions for a task.",
+    responses={
+        200: {"description": "Success", "model": SuccessResponseExample},
+        400: {"description": "Bad Request", "model": ErrorResponseExample},
+        401: {"description": "Unauthorized", "model": ErrorResponseExample},
+        403: {"description": "Forbidden", "model": ErrorResponseExample},
+        404: {"description": "Not Found", "model": ErrorResponseExample},
+        429: {"description": "Too Many Requests", "model": ErrorResponseExample},
+        500: {"description": "Internal Server Error", "model": ErrorResponseExample},
+    },
+)
 async def get_allowed_transitions(
     task_id: str,
     current_user: dict = Depends(get_current_active_user),
@@ -487,7 +629,20 @@ async def get_allowed_transitions(
 # Phase 13.1 — Auto-Delegation Endpoints
 # ═══════════════════════════════════════════════════════════
 
-@router.post("/{task_id}/auto-delegate")
+@router.post(
+    "/{task_id}/auto-delegate",
+    summary="Auto-delegate a task",
+    description="Force (re-)delegation of a task through the auto-delegation engine.",
+    responses={
+        200: {"description": "Success", "model": SuccessResponseExample},
+        400: {"description": "Bad Request", "model": ErrorResponseExample},
+        401: {"description": "Unauthorized", "model": ErrorResponseExample},
+        403: {"description": "Forbidden", "model": ErrorResponseExample},
+        404: {"description": "Not Found", "model": ErrorResponseExample},
+        429: {"description": "Too Many Requests", "model": ErrorResponseExample},
+        500: {"description": "Internal Server Error", "model": ErrorResponseExample},
+    },
+)
 async def auto_delegate_task(
     task_id: str,
     current_user: dict = Depends(get_current_active_user),
@@ -513,7 +668,20 @@ async def auto_delegate_task(
         raise BadRequestError(error=str(e), code="STRE")
 
 
-@router.get("/{task_id}/delegation-log")
+@router.get(
+    "/{task_id}/delegation-log",
+    summary="Get delegation log",
+    description="Retrieve the delegation decision trail for a task.",
+    responses={
+        200: {"description": "Success", "model": SuccessResponseExample},
+        400: {"description": "Bad Request", "model": ErrorResponseExample},
+        401: {"description": "Unauthorized", "model": ErrorResponseExample},
+        403: {"description": "Forbidden", "model": ErrorResponseExample},
+        404: {"description": "Not Found", "model": ErrorResponseExample},
+        429: {"description": "Too Many Requests", "model": ErrorResponseExample},
+        500: {"description": "Internal Server Error", "model": ErrorResponseExample},
+    },
+)
 async def get_delegation_log(
     task_id: str,
     current_user: dict = Depends(get_current_active_user),
@@ -532,7 +700,20 @@ async def get_delegation_log(
     }
 
 
-@router.get("/{task_id}/dependency-graph")
+@router.get(
+    "/{task_id}/dependency-graph",
+    summary="Get dependency graph",
+    description="Return the dependency graph (DAG) for a parent task.",
+    responses={
+        200: {"description": "Success", "model": SuccessResponseExample},
+        400: {"description": "Bad Request", "model": ErrorResponseExample},
+        401: {"description": "Unauthorized", "model": ErrorResponseExample},
+        403: {"description": "Forbidden", "model": ErrorResponseExample},
+        404: {"description": "Not Found", "model": ErrorResponseExample},
+        429: {"description": "Too Many Requests", "model": ErrorResponseExample},
+        500: {"description": "Internal Server Error", "model": ErrorResponseExample},
+    },
+)
 async def get_dependency_graph(
     task_id: str,
     current_user: dict = Depends(get_current_active_user),

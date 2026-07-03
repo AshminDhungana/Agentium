@@ -25,6 +25,8 @@ from backend.api.schemas.checkpoint import (
 from backend.api.schemas.task import TaskResponse
 from pydantic import BaseModel
 
+from backend.api.schemas.examples import ErrorResponseExample, SuccessResponseExample, build_responses
+
 router = APIRouter(prefix="/checkpoints", tags=["checkpoints"])
 
 
@@ -174,7 +176,14 @@ def _validate_checkpoint_data(data: Dict[str, Any]) -> ValidationResult:
 
 # ─── Existing routes ──────────────────────────────────────────────────────────
 
-@router.post("", response_model=CheckpointResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=CheckpointResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create Checkpoint",
+    description="Manually create a checkpoint for a specific task line.",
+    responses=build_responses(None),
+)
 def create_checkpoint(
     payload: CheckpointCreate,
     db: Session = Depends(get_db)
@@ -195,7 +204,13 @@ def create_checkpoint(
         raise InternalServerError(error=str(e), code="STRE")
 
 
-@router.get("", response_model=List[CheckpointResponse])
+@router.get(
+    "",
+    response_model=List[CheckpointResponse],
+    summary="List Checkpoints",
+    description="Fetch checkpoints, filterable by session or original task ID.",
+    responses=build_responses(None),
+)
 def list_checkpoints(
     session_id: Optional[str] = None,
     task_id: Optional[str] = None,
@@ -213,7 +228,13 @@ def list_checkpoints(
     return query.order_by(ExecutionCheckpoint.created_at.desc()).limit(limit).all()
 
 
-@router.get("/{checkpoint_id}", response_model=CheckpointResponse)
+@router.get(
+    "/{checkpoint_id}",
+    response_model=CheckpointResponse,
+    summary="Get Checkpoint",
+    description="Get single checkpoint details.",
+    responses=build_responses(None),
+)
 def get_checkpoint(checkpoint_id: str, db: Session = Depends(get_db)):
     """Get single checkpoint details."""
     checkpoint = db.query(ExecutionCheckpoint).filter(ExecutionCheckpoint.id == checkpoint_id).first()
@@ -222,7 +243,13 @@ def get_checkpoint(checkpoint_id: str, db: Session = Depends(get_db)):
     return checkpoint
 
 
-@router.post("/{checkpoint_id}/resume", response_model=TaskResponse)
+@router.post(
+    "/{checkpoint_id}/resume",
+    response_model=TaskResponse,
+    summary="Resume From Checkpoint",
+    description="Time-travel: Restores the given task back to the target checkpoint.",
+    responses=build_responses(None),
+)
 def resume_from_checkpoint(
     checkpoint_id: str,
     db: Session = Depends(get_db)
@@ -243,7 +270,13 @@ def resume_from_checkpoint(
         raise InternalServerError(error=str(e), code="STRE")
 
 
-@router.post("/{checkpoint_id}/branch", response_model=TaskResponse)
+@router.post(
+    "/{checkpoint_id}/branch",
+    response_model=TaskResponse,
+    summary="Branch From Checkpoint",
+    description="Branching: Clones the checkpoint into a new separate task tree to try an alternative approach.",
+    responses=build_responses(None),
+)
 def branch_from_checkpoint(
     checkpoint_id: str,
     payload: CheckpointBranchRequest,
@@ -270,7 +303,13 @@ def branch_from_checkpoint(
 
 # ─── NEW: Branch diff ─────────────────────────────────────────────────────────
 
-@router.get("/compare", response_model=BranchCompareResponse)
+@router.get(
+    "/compare",
+    response_model=BranchCompareResponse,
+    summary="Compare Branches",
+    description="Compare two branches by diffing their latest checkpoints. Produces structured diffs for: - task_state_snapshot (flat key/value) - agent_states (per-agent) - artifacts (per-artifact key).",
+    responses=build_responses(None),
+)
 def compare_branches(
     left_branch: str = Query(..., description="Name of the left/base branch"),
     right_branch: str = Query(..., description="Name of the right/compare branch"),
@@ -397,7 +436,13 @@ def compare_branches(
     )
 
 
-@router.get("/{checkpoint_id}/diff", response_model=UnifiedDiffResponse)
+@router.get(
+    "/{checkpoint_id}/diff",
+    response_model=UnifiedDiffResponse,
+    summary="Compare Two Checkpoints",
+    description="Return a unified diff of the `task_state_snapshot` JSON between two individual checkpoints, identified by primary key. Useful for the Monaco Editor diff view in the frontend.",
+    responses=build_responses(None),
+)
 def compare_two_checkpoints(
     checkpoint_id: str,
     compare_to: str = Query(..., description="ID of the other checkpoint to compare against"),
@@ -453,7 +498,13 @@ def compare_two_checkpoints(
         right_json=right_json,
     )
 
-@router.post("/validate", response_model=ValidationResult)
+@router.post(
+    "/validate",
+    response_model=ValidationResult,
+    summary="Validate Checkpoint File",
+    description="Validate a checkpoint file before import.",
+    responses=build_responses(None),
+)
 async def validate_checkpoint_file(
     file: UploadFile = File(...),
     db: Session = Depends(get_db)
@@ -483,7 +534,13 @@ async def validate_checkpoint_file(
         )
 
 
-@router.post("/import", response_model=ImportResult)
+@router.post(
+    "/import",
+    response_model=ImportResult,
+    summary="Import Checkpoint",
+    description="Import checkpoint from JSON file. Conflict resolution strategies: - skip: Skip conflicting checkpoints - replace: Overwrite existing checkpoints - rename: Auto-rename with suffix - merge: Smart merge of states.",
+    responses=build_responses(None),
+)
 async def import_checkpoint(
     file: UploadFile = File(...),
     target_branch: Optional[str] = Form(None),
@@ -583,7 +640,12 @@ async def import_checkpoint(
         raise BadRequestError(error=str(e), code="STRE")
 
 
-@router.get("/{checkpoint_id}/integrity")
+@router.get(
+    "/{checkpoint_id}/integrity",
+    summary="Get Checkpoint Integrity",
+    description="Get integrity status for a checkpoint.",
+    responses=build_responses(None),
+)
 def get_checkpoint_integrity(
     checkpoint_id: str,
     db: Session = Depends(get_db)
@@ -630,7 +692,12 @@ def get_checkpoint_integrity(
     }
 
 
-@router.post("/{checkpoint_id}/verify")
+@router.post(
+    "/{checkpoint_id}/verify",
+    summary="Verify Checkpoint Integrity",
+    description="Verify and repair checkpoint integrity.",
+    responses=build_responses(None),
+)
 def verify_checkpoint_integrity(
     checkpoint_id: str,
     db: Session = Depends(get_db)
@@ -682,7 +749,13 @@ def verify_checkpoint_integrity(
     }
 
 
-@router.get("/{checkpoint_id}/export", response_model=None)
+@router.get(
+    "/{checkpoint_id}/export",
+    response_model=None,
+    summary="Export Checkpoint",
+    description="Export checkpoint as JSON file with integrity checksum.",
+    responses=build_responses(None),
+)
 def export_checkpoint(
     checkpoint_id: str,
     db: Session = Depends(get_db)

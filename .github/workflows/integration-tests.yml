@@ -115,7 +115,7 @@ jobs:
         run: docker compose -f docker-compose.test.yml down
 
   # ───────────────────────────────────────────────────────────────
-  # Phase 18.2 - Performance Regression Gate
+  #  Performance Regression Gate
   # ───────────────────────────────────────────────────────────────
   performance-tests:
     needs: integration-tests

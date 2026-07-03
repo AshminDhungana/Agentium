@@ -29,6 +29,8 @@ from backend.services.push_notification_service import PushNotificationService
 
 logger = logging.getLogger(__name__)
 
+from backend.api.schemas.examples import ErrorResponseExample, SuccessResponseExample, build_responses
+
 router = APIRouter(prefix="/mobile", tags=["Mobile API"])
 
 
@@ -55,7 +57,13 @@ class NotificationPreferencesRequest(BaseModel):
 
 # ── Device Registration ───────────────────────────────────────────────────────
 
-@router.post("/register-device", response_model=DeviceRegistrationResponse)
+@router.post(
+    "/register-device",
+    response_model=DeviceRegistrationResponse,
+    summary="Register Device",
+    description="Register a mobile device token for push notifications.",
+    responses=build_responses(None),
+)
 def register_device(
     request: DeviceRegistrationRequest,
     current_user: User = Depends(get_current_user_from_token),
@@ -71,7 +79,12 @@ def register_device(
     return {"id": device.id, "status": "active"}
 
 
-@router.delete("/register-device/{token}")
+@router.delete(
+    "/register-device/{token}",
+    summary="Unregister Device",
+    description="Unregister a push notification token.",
+    responses=build_responses(None),
+)
 def unregister_device(
     token: str,
     current_user: User = Depends(get_current_user_from_token),
@@ -84,7 +97,12 @@ def unregister_device(
 
 # ── Device List ───────────────────────────────────────────────────────────────
 
-@router.get("/devices")
+@router.get(
+    "/devices",
+    summary="Get Devices",
+    description="Return all active registered device tokens for the current user. Used by the Mobile page Devices tab to populate the device list.",
+    responses=build_responses(None),
+)
 def get_devices(
     current_user: User = Depends(get_current_user_from_token),
     db: Session = Depends(get_db)
@@ -117,7 +135,12 @@ def get_devices(
 
 # ── Notification Preferences ──────────────────────────────────────────────────
 
-@router.get("/notifications/preferences")
+@router.get(
+    "/notifications/preferences",
+    summary="Get Notification Preferences",
+    description="Get notification preferences for the current user.",
+    responses=build_responses(None),
+)
 def get_notification_preferences(
     current_user: User = Depends(get_current_user_from_token),
     db: Session = Depends(get_db)
@@ -134,7 +157,12 @@ def get_notification_preferences(
     }
 
 
-@router.put("/notifications/preferences")
+@router.put(
+    "/notifications/preferences",
+    summary="Update Notification Preferences",
+    description="Update notification preferences for the current user.",
+    responses=build_responses(None),
+)
 def update_notification_preferences(
     request: NotificationPreferencesRequest,
     current_user: User = Depends(get_current_user_from_token),
@@ -163,7 +191,12 @@ def update_notification_preferences(
 
 # ── Mobile Dashboard ─────────────────────────────────────────────────────────
 
-@router.get("/dashboard")
+@router.get(
+    "/dashboard",
+    summary="Get Mobile Dashboard",
+    description="Condensed dashboard summary optimised for mobile. Returns raw counts and high-level statuses to minimise payload size.",
+    responses=build_responses(None),
+)
 def get_mobile_dashboard(
     current_user: User = Depends(get_current_user_from_token),
     db: Session = Depends(get_db)
@@ -192,7 +225,12 @@ def get_mobile_dashboard(
 
 # ── Mobile Task List ─────────────────────────────────────────────────────────
 
-@router.get("/tasks")
+@router.get(
+    "/tasks",
+    summary="Get Mobile Tasks",
+    description="Paginated task list returning only essential fields for mobile list views.",
+    responses=build_responses(None),
+)
 def get_mobile_tasks(
     limit: int = 20,
     offset: int = 0,
@@ -229,7 +267,12 @@ def get_mobile_tasks(
 
 # ── Mobile Agent List ────────────────────────────────────────────────────────
 
-@router.get("/agents")
+@router.get(
+    "/agents",
+    summary="Get Mobile Agents",
+    description="Condensed agent list for mobile views (type, status, name only).",
+    responses=build_responses(None),
+)
 def get_mobile_agents(
     current_user: User = Depends(get_current_user_from_token),
     db: Session = Depends(get_db)
@@ -249,7 +292,12 @@ def get_mobile_agents(
 
 # ── Active Votes (Push Alert Source) ─────────────────────────────────────────
 
-@router.get("/votes/active")
+@router.get(
+    "/votes/active",
+    summary="Get Active Votes",
+    description="Return active votes with basic metadata for mobile push alert badges.",
+    responses=build_responses(None),
+)
 def get_active_votes(
     current_user: User = Depends(get_current_user_from_token),
     db: Session = Depends(get_db)
@@ -272,7 +320,12 @@ def get_active_votes(
 
 # ── Offline Sync Endpoints ───────────────────────────────────────────────────
 
-@router.get("/offline/constitution")
+@router.get(
+    "/offline/constitution",
+    summary="Get Offline Constitution",
+    description="Return the active constitution text for offline caching. Mobile clients should periodically refresh this and store locally.",
+    responses=build_responses(None),
+)
 def get_offline_constitution(
     current_user: User = Depends(get_current_user_from_token),
     db: Session = Depends(get_db)
@@ -296,7 +349,12 @@ def get_offline_constitution(
     }
 
 
-@router.get("/offline/task-queue")
+@router.get(
+    "/offline/task-queue",
+    summary="Get Offline Task Queue",
+    description="Return queued/pending tasks for offline viewing. Mobile clients can display these when connectivity is lost.",
+    responses=build_responses(None),
+)
 def get_offline_task_queue(
     current_user: User = Depends(get_current_user_from_token),
     db: Session = Depends(get_db)
@@ -332,7 +390,12 @@ class OfflineSyncRequest(BaseModel):
     cached_task_ids: Optional[List[str]] = None
 
 
-@router.post("/offline/sync")
+@router.post(
+    "/offline/sync",
+    summary="Offline Delta Sync",
+    description="Receives a client-side sync manifest and returns only data that has changed since the client's last sync timestamp.",
+    responses=build_responses(None),
+)
 def offline_delta_sync(
     request: OfflineSyncRequest,
     current_user: User = Depends(get_current_user_from_token),
@@ -397,7 +460,12 @@ class VoiceCommandRequest(BaseModel):
     language: str = "en"
 
 
-@router.post("/voice-command")
+@router.post(
+    "/voice-command",
+    summary="Voice Command",
+    description="Accepts transcribed voice text from mobile clients, routes it to the agent orchestrator, and returns the textual response.",
+    responses=build_responses(None),
+)
 async def voice_command(
     request: VoiceCommandRequest,
     current_user: User = Depends(get_current_user_from_token),

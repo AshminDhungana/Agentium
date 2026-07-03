@@ -11,6 +11,8 @@ from backend.models.entities.agents import Agent
 from backend.models.entities.audit import AuditLog, AuditLevel, AuditCategory
 from backend.core.constitutional_guard import ConstitutionalGuard
 
+from backend.api.schemas.examples import ErrorResponseExample, SuccessResponseExample, build_responses
+
 router = APIRouter(prefix="/api/v1/agents", tags=["Agent Reassignment"])
 
 
@@ -39,7 +41,13 @@ def _get_ws_manager():
         return None
 
 
-@router.patch("/{agentium_id}/parent", response_model=ReassignParentResponse)
+@router.patch(
+    "/{agentium_id}/parent",
+    response_model=ReassignParentResponse,
+    summary="Reassign Agent",
+    description="Reassign an agent to a new parent. Runs a two-tier constitutional guard before persisting. Returns 403 BLOCK if the reassignment violates the constitution. Returns 200 with requires_vote=True if a Council vote is needed.",
+    responses=build_responses(None),
+)
 async def reassign_agent(
     agentium_id: str,
     request: ReassignParentRequest,

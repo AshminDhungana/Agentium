@@ -18,6 +18,8 @@ from backend.api.routes.rbac import get_current_user_from_token
 from backend.models.entities.user import User
 from backend.core.config import settings
 
+from backend.api.schemas.examples import ErrorResponseExample, SuccessResponseExample, build_responses
+
 router = APIRouter(prefix="/federation", tags=["Federation"])
 logger = logging.getLogger(__name__)
 
@@ -113,7 +115,13 @@ async def authenticate_peer(
 # Admin endpoints  (require Sovereign / admin login)
 # ──────────────────────────────────────────────────────────────────────────────
 
-@router.post("/peers", status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/peers",
+    status_code=status.HTTP_201_CREATED,
+    summary="Register Peer",
+    description="Register a new peer Agentium instance. Requires admin (Sovereign) privileges.",
+    responses=build_responses(None),
+)
 def register_peer(
     request: PeerRegisterRequest,
     current_user: User = Depends(get_current_user_from_token),
@@ -141,7 +149,12 @@ def register_peer(
     }
 
 
-@router.get("/peers")
+@router.get(
+    "/peers",
+    summary="List Peers",
+    description="List registered peer instances. Query params: - skip  (int, default 0):   offset for pagination. - limit (int, default 100): max records to return. These params are optional — omitting them returns all peers up to the default limit, preserving backward compatibility with existing callers.",
+    responses=build_responses(None),
+)
 def list_peers(
     skip: int = 0,
     limit: int = 100,
@@ -174,7 +187,13 @@ def list_peers(
     ]
 
 
-@router.delete("/peers/{peer_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/peers/{peer_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete Peer",
+    description="Remove a peer instance. Requires admin privileges.",
+    responses=build_responses(None),
+)
 def delete_peer(
     peer_id: str,
     current_user: User = Depends(get_current_user_from_token),
@@ -186,7 +205,12 @@ def delete_peer(
     FederationService.delete_peer(db, peer_id)
 
 
-@router.patch("/peers/{peer_id}/trust")
+@router.patch(
+    "/peers/{peer_id}/trust",
+    summary="Update Peer Trust",
+    description="Update the trust level of a registered peer.",
+    responses=build_responses(None),
+)
 def update_peer_trust(
     peer_id: str,
     request: PeerTrustUpdateRequest,
@@ -204,7 +228,12 @@ def update_peer_trust(
 # Outgoing task delegation
 # ──────────────────────────────────────────────────────────────────────────────
 
-@router.post("/tasks/delegate")
+@router.post(
+    "/tasks/delegate",
+    summary="Delegate Task",
+    description="Delegate a local task to a peer instance. Creates a FederatedTask record and dispatches HTTP delivery via Celery.",
+    responses=build_responses(None),
+)
 def delegate_task(
     request: TaskDelegateRequest,
     current_user: User = Depends(get_current_user_from_token),
@@ -229,7 +258,12 @@ def delegate_task(
     }
 
 
-@router.get("/tasks")
+@router.get(
+    "/tasks",
+    summary="List Federated Tasks",
+    description="List recent federated tasks (incoming and outgoing).",
+    responses=build_responses(None),
+)
 def list_federated_tasks(
     current_user: User = Depends(get_current_user_from_token),
     db: Session = Depends(get_db),
@@ -256,7 +290,12 @@ def list_federated_tasks(
 # Incoming webhook endpoints  (authenticated via authenticate_peer dependency)
 # ──────────────────────────────────────────────────────────────────────────────
 
-@router.post("/webhooks/tasks/receive")
+@router.post(
+    "/webhooks/tasks/receive",
+    summary="Receive Delegated Task",
+    description="Receive a task delegated from a peer instance. Creates a real local Task record so agents pick it up.",
+    responses=build_responses(None),
+)
 async def receive_delegated_task(
     request: Request,
     db: Session = Depends(get_db),
@@ -282,7 +321,12 @@ async def receive_delegated_task(
     return {"accepted": True, "local_task_id": fed_task.local_task_id}
 
 
-@router.post("/webhooks/tasks/result")
+@router.post(
+    "/webhooks/tasks/result",
+    summary="Receive Task Result",
+    description="Receive a result callback from a peer after it finishes a delegated task. Updates the originating FederatedTask record and local Task status.",
+    responses=build_responses(None),
+)
 async def receive_task_result(
     request: Request,
     db: Session = Depends(get_db),
@@ -311,7 +355,12 @@ async def receive_task_result(
     return {"acknowledged": True, "fed_task_status": fed_task.status}
 
 
-@router.post("/webhooks/heartbeat")
+@router.post(
+    "/webhooks/heartbeat",
+    summary="Receive Heartbeat",
+    description="Respond to an active heartbeat probe from a peer. authenticate_peer already updates last_heartbeat_at, so we just return OK.",
+    responses=build_responses(None),
+)
 async def receive_heartbeat(
     request: Request,
     db: Session = Depends(get_db),
@@ -329,7 +378,12 @@ async def receive_heartbeat(
 
 # ── Phase 11.2: Knowledge & Voting Routes ─────────────────────────────────
 
-@router.post("/knowledge/sync/{peer_id}")
+@router.post(
+    "/knowledge/sync/{peer_id}",
+    summary="Sync Knowledge From Peer",
+    description="Manually trigger a pull of domain knowledge (constitution) from a peer.",
+    responses=build_responses(None),
+)
 def sync_knowledge_from_peer(
     peer_id: str,
     db: Session = Depends(get_db),
@@ -361,7 +415,12 @@ class CreateVoteRequest(BaseModel):
     peer_ids: List[str]
     duration_hours: int = 48
 
-@router.post("/votes")
+@router.post(
+    "/votes",
+    summary="Create Federated Vote",
+    description="Creates a federated vote spanning multiple instances.",
+    responses=build_responses(None),
+)
 def create_federated_vote(
     request: CreateVoteRequest,
     current_user: User = Depends(get_current_user_from_token),
@@ -389,7 +448,12 @@ class CastVoteRequest(BaseModel):
     proposal_id: str
     decision: str  # e.g., "PASS", "REJECT", "VETO"
 
-@router.post("/webhooks/votes/cast")
+@router.post(
+    "/webhooks/votes/cast",
+    summary="Webhook Cast Federated Vote",
+    description="Webhook: A peer instance sends their decision on a federated proposal here.",
+    responses=build_responses(None),
+)
 async def webhook_cast_federated_vote(
     request: Request,
     db: Session = Depends(get_db),
@@ -419,7 +483,12 @@ class FederateKnowledgeRequest(BaseModel):
     documents: List[str]
     metadatas: List[Dict[str, Any]]
 
-@router.post("/knowledge-share")
+@router.post(
+    "/knowledge-share",
+    summary="Receive Federated Knowledge",
+    description="Phase 13.4: Cross-Agent Knowledge Sharing Ingest payload into local knowledge store with source = 'federated', performing deduplication.",
+    responses=build_responses(None),
+)
 async def receive_federated_knowledge(
     request: FederateKnowledgeRequest,
     db: Session = Depends(get_db),

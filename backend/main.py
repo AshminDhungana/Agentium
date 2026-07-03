@@ -18,6 +18,7 @@ from backend.celery_app import celery_app
 from pydantic import BaseModel
 from typing import Optional, Dict, Any, List
 from backend.models.entities.user import User
+from backend.api.schemas.examples import build_responses
 
 from backend.services.api_manager import init_api_manager
 import backend.services.api_manager as api_manager_module
@@ -609,7 +610,12 @@ app.include_router(knowledge_routes.router,          prefix="/api/v1")
 
 # ── Health Check ──────────────────────────────────────────────────────────────
 
-@app.get("/api/health")
+@app.get(
+    "/api/health",
+    summary="Health check",
+    description="Check the system and database health status.",
+    responses=build_responses(None),
+)
 async def health_check_api():
     """Health check endpoint."""
     db_status = check_health()
@@ -626,7 +632,12 @@ async def health_check_api():
 
 # ── Agent Management ──────────────────────────────────────────────────────────
 
-@app.post("/api/v1/agents/create")
+@app.post(
+    "/api/v1/agents/create",
+    summary="Create agent",
+    description="Create a new agent with governance compliance.",
+    responses=build_responses(None),
+)
 async def create_agent(
     role: str,
     responsibilities: list,
@@ -668,7 +679,12 @@ async def create_agent(
     return agent.to_dict()
 
 
-@app.get("/api/v1/agents")
+@app.get(
+    "/api/v1/agents",
+    summary="List agents",
+    description="List all agents with optional status and tier filters.",
+    responses=build_responses(None),
+)
 async def list_agents(
     tier: int = None,
     status: str = None,
@@ -691,7 +707,12 @@ async def list_agents(
     return {"agents": [agent.to_dict() for agent in agents]}
 
 
-@app.get("/api/v1/agents/{agentium_id}")
+@app.get(
+    "/api/v1/agents/{agentium_id}",
+    summary="Get agent details",
+    description="Retrieve detailed configuration and statistics for a specific agent.",
+    responses=build_responses(None),
+)
 async def get_agent(
     agentium_id: str,
     db: Session = Depends(get_db)
@@ -705,7 +726,12 @@ async def get_agent(
 
 # ── Constitution Management ───────────────────────────────────────────────────
 
-@app.get("/api/v1/constitution")
+@app.get(
+    "/api/v1/constitution",
+    summary="Get active constitution",
+    description="Retrieve the current active version of the constitution rules.",
+    responses=build_responses(None),
+)
 async def get_constitution(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
@@ -721,7 +747,12 @@ async def get_constitution(
     return constitution.to_dict()
 
 
-@app.post("/api/v1/constitution/update")
+@app.post(
+    "/api/v1/constitution/update",
+    summary="Update constitution",
+    description="Update constitution preamble, articles, prohibited actions, or sovereign preferences.",
+    responses=build_responses(None),
+)
 async def update_constitution(
     updates: ConstitutionUpdateRequest,
     db: Session = Depends(get_db),
@@ -821,14 +852,24 @@ async def update_constitution(
 
 # ── Monitoring & Health ───────────────────────────────────────────────────────
 
-@app.get("/api/v1/monitoring/health")
+@app.get(
+    "/api/v1/monitoring/health",
+    summary="Get system health",
+    description="Get comprehensive monitoring health status of the system.",
+    responses=build_responses(None),
+)
 async def get_system_health(db: Session = Depends(get_db)):
     """Get comprehensive system health status."""
     return {"status": "healthy", "service": "MonitoringService", "timestamp": datetime.utcnow().isoformat()}
 
 # ── Idle Governance ───────────────────────────────────────────────────────────
 
-@app.get("/api/v1/governance/idle/status")
+@app.get(
+    "/api/v1/governance/idle/status",
+    summary="Get idle governance status",
+    description="Retrieve status metrics of the background idle governance engine.",
+    responses=build_responses(None),
+)
 async def get_idle_governance_status():
     """Get current status of idle governance engine."""
     stats = idle_governance.get_statistics()
@@ -844,7 +885,12 @@ async def get_idle_governance_status():
     }
 
 
-@app.post("/api/v1/governance/idle/pause")
+@app.post(
+    "/api/v1/governance/idle/pause",
+    summary="Pause idle governance",
+    description="Pause the idle governance loop manually.",
+    responses=build_responses(None),
+)
 async def pause_idle_governance():
     """Manually pause idle governance (for debugging/maintenance)."""
     if idle_governance.is_running:
@@ -853,7 +899,12 @@ async def pause_idle_governance():
     return {"status": "already_stopped", "message": "Idle governance was not running"}
 
 
-@app.post("/api/v1/governance/idle/resume")
+@app.post(
+    "/api/v1/governance/idle/resume",
+    summary="Resume idle governance",
+    description="Resume the idle governance loop manually.",
+    responses=build_responses(None),
+)
 async def resume_idle_governance(db: Session = Depends(get_db)):
     """Manually resume idle governance."""
     if not idle_governance.is_running:
@@ -864,7 +915,12 @@ async def resume_idle_governance(db: Session = Depends(get_db)):
 
 # ── Model & Token Status ──────────────────────────────────────────────────────
 
-@app.get("/api/v1/status/tokens")
+@app.get(
+    "/api/v1/status/tokens",
+    summary="Get token status",
+    description="Retrieve token optimizer limits and idle budget status.",
+    responses=build_responses(None),
+)
 async def get_token_status():
     """Get token optimizer and budget status."""
     optimizer_status = token_optimizer.get_status()
@@ -876,7 +932,12 @@ async def get_token_status():
     }
 
 
-@app.get("/api/v1/status/models")
+@app.get(
+    "/api/v1/status/models",
+    summary="Get model allocation status",
+    description="Retrieve model allocation statistics and assignments.",
+    responses=build_responses(None),
+)
 async def get_model_status():
     """Get model allocation status."""
     if not model_allocator:
@@ -887,7 +948,12 @@ async def get_model_status():
 
 # ── MCP Tool Registry Status (convenience summary endpoint) ───────────────────
 
-@app.get("/api/v1/mcp/status")
+@app.get(
+    "/api/v1/mcp/status",
+    summary="Get MCP status",
+    description="Retrieve summary statistics of registered Model Context Protocol tools.",
+    responses=build_responses(None),
+)
 async def get_mcp_status():
     """
     Quick summary of MCP tool bridge status.

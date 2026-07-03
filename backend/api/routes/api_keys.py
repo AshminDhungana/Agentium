@@ -20,6 +20,9 @@ from backend.models.database import get_db
 from backend.models.entities.user_config import UserModelConfig, ProviderType, ConnectionStatus
 from backend.services.api_key_manager import api_key_manager, APIKeyHealthStatus
 from backend.core.auth import get_current_user
+from backend.api.schemas.examples import ErrorResponseExample, SuccessResponseExample
+
+from backend.api.schemas.examples import ErrorResponseExample, SuccessResponseExample, build_responses
 
 router = APIRouter(prefix="/api-keys", tags=["API Key Resilience"])
 
@@ -130,7 +133,20 @@ class CreateKeyResponse(BaseModel):
 # Routes
 # =============================================================================
 
-@router.post("/", response_model=CreateKeyResponse, status_code=201)
+@router.post(
+    "/", response_model=CreateKeyResponse, status_code=201,
+    summary="Create an API key",
+    description="Save a new API key and auto-trigger the Genesis Protocol if the system has not been initialized yet.\n\nEncrypts and persists the key as a UserModelConfig row.\nIf Head 00001 does not exist, fires POST /genesis/initialize in a background task so the HTTP response is returned immediately and the frontend can poll GET /api/v1/genesis/status for progress.\n\nReturns whether genesis was triggered so the frontend can show the appropriate status message without an extra round-trip.",
+    responses={
+        200: {"description": "Success", "model": SuccessResponseExample},
+        400: {"description": "Bad Request", "model": ErrorResponseExample},
+        401: {"description": "Unauthorized", "model": ErrorResponseExample},
+        403: {"description": "Forbidden", "model": ErrorResponseExample},
+        404: {"description": "Not Found", "model": ErrorResponseExample},
+        429: {"description": "Too Many Requests", "model": ErrorResponseExample},
+        500: {"description": "Internal Server Error", "model": ErrorResponseExample},
+    },
+)
 async def create_api_key(
     request: CreateKeyRequest,
     db: Session = Depends(get_db),
@@ -212,7 +228,20 @@ async def create_api_key(
     )
 
 
-@router.get("/health", response_model=HealthReportResponse)
+@router.get(
+    "/health", response_model=HealthReportResponse,
+    summary="Get API key health report",
+    description="Get comprehensive health report for all API keys. Returns overall system status and per-provider breakdown.",
+    responses={
+        200: {"description": "Success", "model": SuccessResponseExample},
+        400: {"description": "Bad Request", "model": ErrorResponseExample},
+        401: {"description": "Unauthorized", "model": ErrorResponseExample},
+        403: {"description": "Forbidden", "model": ErrorResponseExample},
+        404: {"description": "Not Found", "model": ErrorResponseExample},
+        429: {"description": "Too Many Requests", "model": ErrorResponseExample},
+        500: {"description": "Internal Server Error", "model": ErrorResponseExample},
+    },
+)
 async def get_health_report(
     provider: Optional[str] = Query(None, description="Filter by specific provider"),
     db: Session = Depends(get_db),
@@ -227,7 +256,10 @@ async def get_health_report(
     return report
 
 
-@router.get("/health/{provider}", response_model=ProviderHealthSummary)
+@router.get(
+    "/health/{provider}", response_model=ProviderHealthSummary,
+    summary="Get provider health status",
+    description="Get detailed health status for a specific provider.", responses=build_responses(None))
 async def get_provider_health(
     provider: str,
     db: Session = Depends(get_db),
@@ -244,7 +276,13 @@ async def get_provider_health(
     return report["providers"][provider]
 
 
-@router.get("/availability", response_model=List[ProviderAvailabilityResponse])
+@router.get(
+    "/availability",
+    response_model=List[ProviderAvailabilityResponse],
+    summary="Get Provider Availability",
+    description="Quick check of which providers have healthy keys available. Returns list of all providers with availability status.",
+    responses=build_responses(None),
+)
 async def get_provider_availability(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
@@ -275,7 +313,13 @@ async def get_provider_availability(
     return result
 
 
-@router.post("/test-failover", response_model=FailoverTestResponse)
+@router.post(
+    "/test-failover",
+    response_model=FailoverTestResponse,
+    summary="Test Failover",
+    description="Test the failover mechanism for a provider. This attempts to get an active key without making actual API calls. Useful for verifying failover configuration.",
+    responses=build_responses(None),
+)
 async def test_failover(
     provider: str,
     db: Session = Depends(get_db),
@@ -322,7 +366,13 @@ async def test_failover(
     }
 
 
-@router.get("/{key_id}/status", response_model=KeyHealthResponse)
+@router.get(
+    "/{key_id}/status",
+    response_model=KeyHealthResponse,
+    summary="Get Key Status",
+    description="Get detailed status for a specific API key.",
+    responses=build_responses(None),
+)
 async def get_key_status(
     key_id: str,
     db: Session = Depends(get_db),
@@ -358,7 +408,13 @@ async def get_key_status(
     }
 
 
-@router.post("/{key_id}/recover", response_model=RecoverKeyResponse)
+@router.post(
+    "/{key_id}/recover",
+    response_model=RecoverKeyResponse,
+    summary="Recover Key",
+    description="Manually recover an API key from cooldown or error state. This resets failure count, clears cooldown, and sets status to ACTIVE.",
+    responses=build_responses(None),
+)
 async def recover_key(
     key_id: str,
     request: RecoverKeyRequest,
@@ -392,7 +448,13 @@ async def recover_key(
     }
 
 
-@router.post("/{key_id}/budget", response_model=UpdateBudgetResponse)
+@router.post(
+    "/{key_id}/budget",
+    response_model=UpdateBudgetResponse,
+    summary="Update Key Budget",
+    description="Update monthly budget limit for a specific API key. Set monthly_budget_usd=0 for unlimited budget.",
+    responses=build_responses(None),
+)
 async def update_key_budget(
     key_id: str,
     request: UpdateBudgetRequest,
@@ -425,7 +487,13 @@ async def update_key_budget(
     }
 
 
-@router.post("/{key_id}/rotate", response_model=RotateKeyResponse)
+@router.post(
+    "/{key_id}/rotate",
+    response_model=RotateKeyResponse,
+    summary="Rotate Api Key",
+    description="Rotate an API key with zero downtime. 1. Creates new key with temporary lower priority 2. Tests new key 3. Swaps priorities (new becomes primary) 4. Old key enters 1-hour cooldown then can be deleted.",
+    responses=build_responses(None),
+)
 async def rotate_api_key(
     key_id: str,
     request: RotateKeyRequest,
@@ -468,7 +536,12 @@ async def rotate_api_key(
     }
 
 
-@router.delete("/{key_id}")
+@router.delete(
+    "/{key_id}",
+    summary="Delete Key",
+    description="Delete an API key configuration. By default, only keys in cooldown or error state can be deleted. Use force=true to delete active keys (use with caution).",
+    responses=build_responses(None),
+)
 async def delete_key(
     key_id: str,
     force: bool = Query(False, description="Force delete even if key is active"),
@@ -515,7 +588,12 @@ async def delete_key(
     }
 
 
-@router.get("/{key_id}/spend-history")
+@router.get(
+    "/{key_id}/spend-history",
+    summary="Get Spend History",
+    description="Get spend history for a specific API key from ModelUsageLog.",
+    responses=build_responses(None),
+)
 async def get_spend_history(
     key_id: str,
     days: int = Query(30, ge=1, le=365),

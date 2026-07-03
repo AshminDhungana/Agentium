@@ -27,6 +27,8 @@ from backend.core.auth import get_current_active_user
 from backend.models.entities.user import User
 from backend.services.storage_service import storage_service
 
+from backend.api.schemas.examples import ErrorResponseExample, SuccessResponseExample, build_responses
+
 router = APIRouter(prefix="/files", tags=["Files"])
 
 MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB max file size
@@ -126,7 +128,13 @@ async def _read_file_chunked(file: UploadFile, max_size: int) -> bytes:
     return b"".join(chunks)
 
 
-@router.post("/upload", status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/upload",
+    status_code=status.HTTP_201_CREATED,
+    summary="Upload Files",
+    description="Upload one or more files. Returns metadata for each uploaded file, including extracted_text for PDFs and image metadata that the AI can consume directly.",
+    responses=build_responses(None),
+)
 async def upload_files(
     files: List[UploadFile] = File(...),
     db: Session = Depends(get_db),
@@ -287,7 +295,12 @@ async def upload_files(
     }
 
 
-@router.get("/list")
+@router.get(
+    "/list",
+    summary="List Files",
+    description="List all files for the current user from S3.",
+    responses=build_responses(None),
+)
 async def list_files(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
@@ -326,7 +339,12 @@ async def list_files(
     }
 
 
-@router.get("/stats")
+@router.get(
+    "/stats",
+    summary="Get File Stats",
+    description="Get file statistics for the current user from S3. Must be defined before /{filename} and /download/{user_id}/{filename} to prevent FastAPI matching 'stats' as a path parameter.",
+    responses=build_responses(None),
+)
 async def get_file_stats(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
@@ -368,7 +386,12 @@ async def get_file_stats(
     return stats
 
 
-@router.get("/download/{user_id}/{filename}")
+@router.get(
+    "/download/{user_id}/{filename}",
+    summary="Download File",
+    description="Download a specific file. Users can only access their own files unless they're admin. Behaviour differs by active storage backend: - S3/MinIO: redirects to a presigned URL. - Local:    streams the file directly from disk.",
+    responses=build_responses(None),
+)
 async def download_file(
     user_id: str,
     filename: str,
@@ -412,7 +435,12 @@ async def download_file(
     return RedirectResponse(url=url)
 
 
-@router.delete("/{filename}")
+@router.delete(
+    "/{filename}",
+    summary="Delete File",
+    description="Delete a file.",
+    responses=build_responses(None),
+)
 async def delete_file(
     filename: str,
     db: Session = Depends(get_db),
@@ -435,7 +463,12 @@ async def delete_file(
     }
 
 
-@router.get("/preview/{user_id}/{filename}")
+@router.get(
+    "/preview/{user_id}/{filename}",
+    summary="Preview File",
+    description="Preview a file (for images/videos that can be displayed inline). Same security as download but with inline disposition.",
+    responses=build_responses(None),
+)
 async def preview_file(
     user_id: str,
     filename: str,

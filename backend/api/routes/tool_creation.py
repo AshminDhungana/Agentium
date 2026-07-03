@@ -31,6 +31,8 @@ from backend.services.tool_deprecation import ToolDeprecationService
 from backend.services.tool_analytics import ToolAnalyticsService
 from backend.services.tool_marketplace import ToolMarketplaceService
 
+from backend.api.schemas.examples import ErrorResponseExample, SuccessResponseExample, build_responses
+
 router = APIRouter(prefix="/tool-management", tags=["Tool Creation - Phase 6.8"])
 
 
@@ -116,7 +118,12 @@ class UpdateListingRequest(BaseModel):
 # CORE — Propose, Vote, List
 # ═══════════════════════════════════════════════════════════════
 
-@router.post("/propose")
+@router.post(
+    "/propose",
+    summary="Propose Tool",
+    description="Agent proposes a new tool. - Head (0xxxx): auto-approved and activated immediately - Council (1xxxx) / Lead (2xxxx): triggers Council vote - Task agents (3xxxx): blocked.",
+    responses=build_responses(None),
+)
 async def propose_tool(
     request: ToolCreationRequest,
     db: Session = Depends(get_db),
@@ -142,7 +149,12 @@ async def propose_tool(
     return result
 
 
-@router.get("/")
+@router.get(
+    "/",
+    summary="List Tools",
+    description="List all tools, optionally filtered by status or authorized tier. Task agents only see tools authorized for their tier. Head/Council see all.",
+    responses=build_responses(None),
+)
 async def list_tools(
     status_filter: Optional[str] = None,
     authorized_for_tier: Optional[str] = None,
@@ -168,7 +180,12 @@ async def list_tools(
 # DEPRECATION — static routes (must be before /{tool_name}/*)
 # ═══════════════════════════════════════════════════════════════
 
-@router.get("/deprecated")
+@router.get(
+    "/deprecated",
+    summary="List Deprecated",
+    description="List all deprecated and sunset tools.",
+    responses=build_responses(None),
+)
 async def list_deprecated(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_active_user),
@@ -178,7 +195,12 @@ async def list_deprecated(
     return service.list_deprecated_tools()
 
 
-@router.post("/run-sunset-cleanup")
+@router.post(
+    "/run-sunset-cleanup",
+    summary="Run Sunset Cleanup",
+    description="Trigger sunset cleanup manually. Head/Council only.",
+    responses=build_responses(None),
+)
 async def run_sunset_cleanup(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_active_user),
@@ -194,7 +216,12 @@ async def run_sunset_cleanup(
 # ANALYTICS — static routes (must be before /{tool_name}/*)
 # ═══════════════════════════════════════════════════════════════
 
-@router.get("/analytics/report")
+@router.get(
+    "/analytics/report",
+    summary="Get Analytics Report",
+    description="Full analytics report across all tools. Head/Council only.",
+    responses=build_responses(None),
+)
 async def get_analytics_report(
     days: int = 30,
     db: Session = Depends(get_db),
@@ -207,7 +234,12 @@ async def get_analytics_report(
     return service.get_full_report(days=days)
 
 
-@router.get("/analytics/errors")
+@router.get(
+    "/analytics/errors",
+    summary="Get Recent Errors",
+    description="Recent failed tool calls. Head/Council only.",
+    responses=build_responses(None),
+)
 async def get_recent_errors(
     tool_name: Optional[str] = None,
     limit: int = 50,
@@ -221,7 +253,12 @@ async def get_recent_errors(
     return service.get_recent_errors(tool_name=tool_name, limit=limit)
 
 
-@router.get("/analytics/agent/{agentium_id}")
+@router.get(
+    "/analytics/agent/{agentium_id}",
+    summary="Get Agent Tool Usage",
+    description="Which tools has an agent been using? Agents can only view their own usage. Head/Council can view any agent.",
+    responses=build_responses(None),
+)
 async def get_agent_tool_usage(
     agentium_id: str,
     days: int = 30,
@@ -244,7 +281,12 @@ async def get_agent_tool_usage(
 # MARKETPLACE — static routes (must be before /{tool_name}/*)
 # ═══════════════════════════════════════════════════════════════
 
-@router.post("/marketplace/publish")
+@router.post(
+    "/marketplace/publish",
+    summary="Publish Tool",
+    description="Publish an activated tool to the marketplace. Head/Council only.",
+    responses=build_responses(None),
+)
 async def publish_tool(
     body: PublishListingRequest,
     db: Session = Depends(get_db),
@@ -267,7 +309,12 @@ async def publish_tool(
     return result
 
 
-@router.get("/marketplace")
+@router.get(
+    "/marketplace",
+    summary="Browse Marketplace",
+    description="Browse marketplace listings. All authenticated agents can browse.",
+    responses=build_responses(None),
+)
 async def browse_marketplace(
     category: Optional[str] = None,
     tags: Optional[str] = None,
@@ -291,7 +338,12 @@ async def browse_marketplace(
     )
 
 
-@router.post("/marketplace/{listing_id}/import")
+@router.post(
+    "/marketplace/{listing_id}/import",
+    summary="Import Tool",
+    description="Stage a marketplace tool for import. Head/Council only.",
+    responses=build_responses(None),
+)
 async def import_tool(
     listing_id: str,
     db: Session = Depends(get_db),
@@ -309,7 +361,12 @@ async def import_tool(
 
 
 # FIX: Added listing_id parameter to match service signature
-@router.post("/marketplace/finalize-import")
+@router.post(
+    "/marketplace/finalize-import",
+    summary="Finalize Import",
+    description="Finalize a staged marketplace import. Head/Council only.",
+    responses=build_responses(None),
+)
 async def finalize_import(
     body: FinalizeImportRequest,
     db: Session = Depends(get_db),
@@ -329,7 +386,12 @@ async def finalize_import(
     return result
 
 
-@router.post("/marketplace/{listing_id}/rate")
+@router.post(
+    "/marketplace/{listing_id}/rate",
+    summary="Rate Tool",
+    description="Rate a marketplace tool listing (1.0 - 5.0). All agents can rate.",
+    responses=build_responses(None),
+)
 async def rate_tool(
     listing_id: str,
     body: RateToolRequest,
@@ -349,7 +411,12 @@ async def rate_tool(
     return result
 
 
-@router.post("/marketplace/{listing_id}/yank")
+@router.post(
+    "/marketplace/{listing_id}/yank",
+    summary="Yank Listing",
+    description="Retract a marketplace listing. Head or original publisher only.",
+    responses=build_responses(None),
+)
 async def yank_listing(
     listing_id: str,
     body: YankListingRequest,
@@ -371,7 +438,12 @@ async def yank_listing(
     return result
 
 
-@router.post("/marketplace/{tool_name}/update-listing")
+@router.post(
+    "/marketplace/{tool_name}/update-listing",
+    summary="Update Listing",
+    description="Refresh a marketplace listing to the tool's current active version. Head/Council only.",
+    responses=build_responses(None),
+)
 async def update_listing(
     tool_name: str,
     db: Session = Depends(get_db),
@@ -392,7 +464,12 @@ async def update_listing(
 # WILDCARD ROUTES — /{tool_name}/* must come LAST
 # ═══════════════════════════════════════════════════════════════
 
-@router.post("/{tool_name}/vote")
+@router.post(
+    "/{tool_name}/vote",
+    summary="Vote On Tool",
+    description="Council member casts a vote on a pending tool proposal. Council only.",
+    responses=build_responses(None),
+)
 async def vote_on_tool(
     tool_name: str,
     body: VoteRequest,
@@ -411,7 +488,12 @@ async def vote_on_tool(
     return result
 
 
-@router.post("/{tool_name}/execute")
+@router.post(
+    "/{tool_name}/execute",
+    summary="Execute Tool",
+    description="Execute a registered tool with analytics recording. Note: for normal tool execution prefer POST /tools/execute which has full tier enforcement via the tool registry. This endpoint is for tools created via the tool creation workflow. Access: Head (0xxxx), Council (1xxxx), Lead (2xxxx) only. Task agents (3xxxx) must go through the standard /tools/execute route where per-tool tier authorization is checked against the registry.",
+    responses=build_responses(None),
+)
 async def execute_tool(
     tool_name: str,
     body: ExecuteToolRequest,
@@ -438,7 +520,12 @@ async def execute_tool(
     return service.execute_tool(tool_name, agent_id, body.kwargs, body.task_id)
 
 
-@router.get("/{tool_name}/analytics")
+@router.get(
+    "/{tool_name}/analytics",
+    summary="Get Tool Analytics",
+    description="Per-tool analytics. Head/Council only.",
+    responses=build_responses(None),
+)
 async def get_tool_analytics(
     tool_name: str,
     days: int = 30,
@@ -452,7 +539,12 @@ async def get_tool_analytics(
     return service.get_tool_stats(tool_name=tool_name, days=days)
 
 
-@router.post("/{tool_name}/deprecate")
+@router.post(
+    "/{tool_name}/deprecate",
+    summary="Deprecate Tool",
+    description="Soft-deprecate a tool. Still callable but marked deprecated. Head/Council only.",
+    responses=build_responses(None),
+)
 async def deprecate_tool(
     tool_name: str,
     body: DeprecateRequest,
@@ -476,7 +568,12 @@ async def deprecate_tool(
     return result
 
 
-@router.post("/{tool_name}/schedule-sunset")
+@router.post(
+    "/{tool_name}/schedule-sunset",
+    summary="Schedule Sunset",
+    description="Schedule hard-removal date (minimum 7 days). Head/Council only.",
+    responses=build_responses(None),
+)
 async def schedule_sunset(
     tool_name: str,
     body: ScheduleSunsetRequest,
@@ -498,7 +595,12 @@ async def schedule_sunset(
     return result
 
 
-@router.post("/{tool_name}/execute-sunset")
+@router.post(
+    "/{tool_name}/execute-sunset",
+    summary="Execute Sunset",
+    description="Hard-remove a tool. Requires sunset date passed (or Head force). Head only for force.",
+    responses=build_responses(None),
+)
 async def execute_sunset(
     tool_name: str,
     body: ForceSunsetRequest,
@@ -517,7 +619,12 @@ async def execute_sunset(
     return result
 
 
-@router.post("/{tool_name}/restore")
+@router.post(
+    "/{tool_name}/restore",
+    summary="Restore Tool",
+    description="Restore a deprecated tool to active. Head/Council only.",
+    responses=build_responses(None),
+)
 async def restore_tool(
     tool_name: str,
     body: RestoreRequest,
@@ -539,7 +646,12 @@ async def restore_tool(
     return result
 
 
-@router.post("/{tool_name}/versions/propose-update")
+@router.post(
+    "/{tool_name}/versions/propose-update",
+    summary="Propose Tool Update",
+    description="Propose a code update to an existing tool. Head/Council/Lead only.",
+    responses=build_responses(None),
+)
 async def propose_tool_update(
     tool_name: str,
     body: ProposeUpdateRequest,
@@ -562,7 +674,12 @@ async def propose_tool_update(
     return result
 
 
-@router.post("/{tool_name}/versions/approve-update")
+@router.post(
+    "/{tool_name}/versions/approve-update",
+    summary="Approve Tool Update",
+    description="Approve and activate a pending tool version. Head/Council only.",
+    responses=build_responses(None),
+)
 async def approve_tool_update(
     tool_name: str,
     body: ApproveUpdateRequest,
@@ -583,7 +700,12 @@ async def approve_tool_update(
     return result
 
 
-@router.post("/{tool_name}/versions/rollback")
+@router.post(
+    "/{tool_name}/versions/rollback",
+    summary="Rollback Tool",
+    description="Roll back a tool to a specific prior version. Head/Council only.",
+    responses=build_responses(None),
+)
 async def rollback_tool(
     tool_name: str,
     body: RollbackRequest,
@@ -606,7 +728,12 @@ async def rollback_tool(
     return result
 
 
-@router.get("/{tool_name}/versions/changelog")
+@router.get(
+    "/{tool_name}/versions/changelog",
+    summary="Get Changelog",
+    description="Get full version history and changelog for a tool.",
+    responses=build_responses(None),
+)
 async def get_changelog(
     tool_name: str,
     db: Session = Depends(get_db),
@@ -617,7 +744,12 @@ async def get_changelog(
     return service.get_changelog(tool_name)
 
 
-@router.get("/{tool_name}/versions/diff")
+@router.get(
+    "/{tool_name}/versions/diff",
+    summary="Get Version Diff",
+    description="Get a unified diff between two versions. Head/Council only.",
+    responses=build_responses(None),
+)
 async def get_version_diff(
     tool_name: str,
     version_a: int,

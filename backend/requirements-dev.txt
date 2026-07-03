@@ -7,7 +7,7 @@ pytest-env==1.1.5
 factory-boy==3.3.1
 faker==33.3.0
 
-# --- Performance Testing (Phase 18.2 Regression Gate) ---
+# --- Performance Testing  ---
 locust>=2.29
 pytest-benchmark>=4.0
 py-cpuinfo>=9.0

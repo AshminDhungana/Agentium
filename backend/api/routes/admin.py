@@ -34,8 +34,9 @@ from backend.core.auth import get_current_active_user
 from backend.models.database import get_db
 from backend.models.entities.user import User, VALID_ROLES, ROLE_PRIMARY_SOVEREIGN
 from backend.models.entities.audit import AuditLog, AuditLevel, AuditCategory
+from backend.api.schemas.examples import ErrorResponseExample, SuccessResponseExample, build_responses
 
-router = APIRouter()
+router = APIRouter(tags=["Admin"])
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -181,7 +182,12 @@ def _user_dict(u: User) -> dict:
 # GET /api/v1/admin/budget
 # ──────────────────────────────────────────────────────────────────────────────
 
-@router.get("/admin/budget")
+@router.get(
+    "/admin/budget",
+    summary="Get budget status",
+    description="Retrieve token and cost usage limits and current day's accumulated consumption stats.",
+    responses=build_responses(None),
+)
 async def get_budget_status(
     current_user: dict = Depends(get_current_active_user),
     db: Session = Depends(get_db),
@@ -231,7 +237,12 @@ async def get_budget_status(
 # POST /api/v1/admin/budget
 # ──────────────────────────────────────────────────────────────────────────────
 
-@router.post("/admin/budget")
+@router.post(
+    "/admin/budget",
+    summary="Update budget limits",
+    description="Update the system-wide daily token and cost limit guidelines. Requires admin or sovereign permissions.",
+    responses=build_responses(None),
+)
 async def update_budget(
     request: BudgetUpdateRequest,
     current_user: dict = Depends(get_current_active_user),
@@ -272,7 +283,12 @@ async def update_budget(
 # GET /api/v1/admin/budget/history
 # ──────────────────────────────────────────────────────────────────────────────
 
-@router.get("/admin/budget/history")
+@router.get(
+    "/admin/budget/history",
+    summary="Get budget history",
+    description="Retrieve a day-by-day and per-provider breakdown of real API usage for a period of days.",
+    responses=build_responses(None),
+)
 async def get_budget_history(
     days: int = 7,
     admin: dict = Depends(require_admin),
@@ -328,7 +344,12 @@ async def get_budget_history(
 # User management
 # ──────────────────────────────────────────────────────────────────────────────
 
-@router.get("/admin/users/pending")
+@router.get(
+    "/admin/users/pending",
+    summary="Get pending users",
+    description="Retrieve all registered users who are currently awaiting administrative approval.",
+    responses=build_responses(None),
+)
 async def get_pending_users(
     admin: dict = Depends(require_admin),
     db: Session = Depends(get_db),
@@ -338,7 +359,12 @@ async def get_pending_users(
     return {"users": [_user_dict(u) for u in users], "total": len(users)}
 
 
-@router.get("/admin/users")
+@router.get(
+    "/admin/users",
+    summary="Get all users",
+    description="Retrieve a paginated list of approved users, optionally including pending ones and filtering by username/email.",
+    responses=build_responses(None),
+)
 async def get_all_users(
     include_pending: bool = False,
     search: Optional[str] = Query(None, description="Filter by username or email (case-insensitive)"),
@@ -371,7 +397,12 @@ async def get_all_users(
     }
 
 
-@router.post("/admin/users/{user_id}/approve")
+@router.post(
+    "/admin/users/{user_id}/approve",
+    summary="Approve user",
+    description="Approve a pending user registration and make the account active.",
+    responses=build_responses(None),
+)
 async def approve_user(
     user_id: str,
     admin: dict = Depends(require_admin),
@@ -402,7 +433,12 @@ async def approve_user(
     return {"success": True, "message": f"User {user.username} approved successfully"}
 
 
-@router.post("/admin/users/{user_id}/reject")
+@router.post(
+    "/admin/users/{user_id}/reject",
+    summary="Reject user",
+    description="Reject and permanently delete a pending user registration.",
+    responses=build_responses(None),
+)
 async def reject_user(
     user_id: str,
     admin: dict = Depends(require_admin),
@@ -435,7 +471,12 @@ async def reject_user(
     return {"success": True, "message": f"User {username} rejected and removed"}
 
 
-@router.delete("/admin/users/{user_id}")
+@router.delete(
+    "/admin/users/{user_id}",
+    summary="Delete user",
+    description="Permanently delete an approved user account. Admin cannot delete their own account.",
+    responses=build_responses(None),
+)
 async def delete_user(
     user_id: str,
     admin: dict = Depends(require_admin),
@@ -468,7 +509,12 @@ async def delete_user(
     return {"success": True, "message": f"User {username} deleted successfully"}
 
 
-@router.post("/admin/users/{user_id}/change-password")
+@router.post(
+    "/admin/users/{user_id}/change-password",
+    summary="Change user password",
+    description="Administrative override to set a new password for any user.",
+    responses=build_responses(None),
+)
 async def change_user_password(
     user_id: str,
     request: AdminPasswordChangeRequest,
@@ -497,7 +543,12 @@ async def change_user_password(
     return {"success": True, "message": f"Password changed for user {user.username}"}
 
 
-@router.post("/admin/users/{user_id}/role")
+@router.post(
+    "/admin/users/{user_id}/role",
+    summary="Change user role",
+    description="Update a user's RBAC role and administrative privilege flags.",
+    responses=build_responses(None),
+)
 async def change_user_role(
     user_id: str,
     request: RoleChangeRequest,
@@ -550,7 +601,12 @@ async def change_user_role(
 # GET /api/v1/admin/slow-queries
 # ──────────────────────────────────────────────────────────────────────────────
 
-@router.get("/admin/slow-queries")
+@router.get(
+    "/admin/slow-queries",
+    summary="Get slow queries",
+    description="Retrieve a list of slow database queries logged by the system for optimization analysis.",
+    responses=build_responses(None),
+)
 async def get_slow_queries(
     limit: int = 20,
     admin: dict = Depends(require_admin),
@@ -574,7 +630,12 @@ async def get_slow_queries(
 # Config history / restore (unchanged)
 # ──────────────────────────────────────────────────────────────────────────────
 
-@router.get("/admin/config-history/{entity_type}/{entity_id}")
+@router.get(
+    "/admin/config-history/{entity_type}/{entity_id}",
+    summary="Get config history",
+    description="Retrieve version history commits for a specific configuration entity.",
+    responses=build_responses(None),
+)
 async def get_config_history(
     entity_type: str,
     entity_id: str,
@@ -585,7 +646,12 @@ async def get_config_history(
     return {"history": history}
 
 
-@router.post("/admin/config-restore/{entity_type}/{entity_id}")
+@router.post(
+    "/admin/config-restore/{entity_type}/{entity_id}",
+    summary="Restore config snapshot",
+    description="Roll back a configuration entity to a specific version commit snapshot.",
+    responses=build_responses(None),
+)
 async def restore_config_snapshot(
     entity_type: str,
     entity_id: str,
@@ -688,6 +754,7 @@ def _get_redis_sync():
         "Uses SCAN so it is safe on large keyspaces. "
         "Requires admin privileges."
     ),
+    responses=build_responses(None),
 )
 async def list_blocked_ips(
     admin: dict = Depends(require_admin),
@@ -748,6 +815,7 @@ async def list_blocked_ips(
         "Also clears the 4xx error counters so Celery does not re-block on the "
         "next detection cycle. The action is audit-logged."
     ),
+    responses=build_responses(None),
 )
 async def unblock_ip(
     ip: str,
@@ -823,6 +891,7 @@ async def unblock_ip(
     "/admin/pricing/sync",
     summary="Phase 16.3 — Synchronize model pricing",
     description="Synchronize model pricing details from LiteLLM's public repository registry.",
+    responses=build_responses(None),
 )
 async def sync_model_pricing(
     admin: dict = Depends(require_admin),

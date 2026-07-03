@@ -27,10 +27,18 @@ from backend.models.entities.remote_execution import (
     SandboxStatus,
 )
 
+from backend.api.schemas.examples import ErrorResponseExample, SuccessResponseExample, build_responses
+
 router = APIRouter(prefix="/remote-executor", tags=["Remote Execution"])
 
 
-@router.post("/execute", response_model=CodeExecutionResponse)
+@router.post(
+    "/execute",
+    response_model=CodeExecutionResponse,
+    summary="Execute Code",
+    description="Execute code in isolated sandbox. Returns summary only – raw data never leaves sandbox. Requires authenticated user.",
+    responses=build_responses(None),
+)
 async def execute_code(
     request: CodeExecutionRequest,
     background_tasks: BackgroundTasks,
@@ -64,7 +72,13 @@ async def execute_code(
     return CodeExecutionResponse(**result)
 
 
-@router.post("/sandboxes", response_model=SandboxResponse)
+@router.post(
+    "/sandboxes",
+    response_model=SandboxResponse,
+    summary="Create Sandbox",
+    description="Create a persistent sandbox for multiple executions. Requires admin.",
+    responses=build_responses(None),
+)
 async def create_sandbox(
     request: SandboxCreateRequest,
     db: Session = Depends(get_db),
@@ -105,7 +119,12 @@ async def create_sandbox(
     return SandboxResponse(**sandbox)
 
 
-@router.delete("/sandboxes/{sandbox_id}")
+@router.delete(
+    "/sandboxes/{sandbox_id}",
+    summary="Destroy Sandbox",
+    description="Destroy a sandbox and clean up resources.",
+    responses=build_responses(None),
+)
 async def destroy_sandbox(
     sandbox_id: str,
     db: Session = Depends(get_db),
@@ -133,7 +152,13 @@ async def destroy_sandbox(
     return {"success": success, "sandbox_id": sandbox_id}
 
 
-@router.get("/sandboxes", response_model=List[SandboxResponse])
+@router.get(
+    "/sandboxes",
+    response_model=List[SandboxResponse],
+    summary="List Sandboxes",
+    description="List all sandboxes.",
+    responses=build_responses(None),
+)
 async def list_sandboxes(
     agent_id_filter: Optional[str] = None,
     db: Session = Depends(get_db),
@@ -147,7 +172,13 @@ async def list_sandboxes(
     return [SandboxResponse(**s) for s in sandboxes]
 
 
-@router.get("/executions/{execution_id}", response_model=ExecutionSummaryResponse)
+@router.get(
+    "/executions/{execution_id}",
+    response_model=ExecutionSummaryResponse,
+    summary="Get Execution",
+    description="Get execution record and summary.",
+    responses=build_responses(None),
+)
 async def get_execution(
     execution_id: str,
     db: Session = Depends(get_db),
@@ -177,7 +208,12 @@ async def get_execution(
     )
 
 
-@router.post("/validate")
+@router.post(
+    "/validate",
+    summary="Validate Code",
+    description="Validate code without executing (security check only).",
+    responses=build_responses(None),
+)
 async def validate_code(
     request: CodeExecutionRequest,
     current_user: dict = Depends(get_current_active_user),

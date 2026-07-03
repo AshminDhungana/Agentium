@@ -19,6 +19,8 @@ from backend.models.entities.user import User
 from backend.api.dependencies.auth import get_current_user
 import redis.asyncio as redis
 
+from backend.api.schemas.examples import ErrorResponseExample, SuccessResponseExample, build_responses
+
 router = APIRouter()
 
 
@@ -607,7 +609,12 @@ async def websocket_chat_endpoint(
             pass
 
 
-@router.get("/genesis-status")
+@router.get(
+    "/genesis-status",
+    summary="Genesis Status",
+    description="Lightweight HTTP status check for the genesis bootstrap process. The chat WebSocket connection is gated on Head 00001 existing, but a client that hits that gate is closed before it's ever added to ConnectionManager — so it cannot receive a WebSocket broadcast telling it genesis has finished. This endpoint gives the frontend something cheap to poll instead of repeatedly retrying the full WS handshake. Returns one of: - \"not_started\": no API key configured yet, genesis hasn't been triggered - \"running\":      API key exists, genesis is in progress - \"complete\":     Head 00001 exists, chat is ready to connect.",
+    responses=build_responses(None),
+)
 async def genesis_status(current_user=Depends(get_current_user)):
     """
     Lightweight HTTP status check for the genesis bootstrap process.
@@ -638,7 +645,12 @@ async def genesis_status(current_user=Depends(get_current_user)):
         return {"status": "running" if genesis_triggered else "not_started"}
 
 
-@router.get("/replay")
+@router.get(
+    "/replay",
+    summary="Replay Events",
+    description="Fetch buffered broadcast events for reconnection replay.",
+    responses=build_responses(None),
+)
 async def replay_events(since: str, current_user=Depends(get_current_user)):
     """Fetch buffered broadcast events for reconnection replay."""
     try:

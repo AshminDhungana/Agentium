@@ -22,6 +22,8 @@ from backend.services.channel_manager import (
 from backend.core.auth import WebhookAuth
 from backend.core.security import decrypt_api_key
 
+from backend.api.schemas.examples import ErrorResponseExample, SuccessResponseExample, build_responses
+
 router = APIRouter(prefix="/webhooks", tags=["Webhooks"])
 
 
@@ -75,7 +77,12 @@ def verify_signature(secret: str, body: bytes, signature: str, algorithm: str = 
 # WhatsApp Webhook (Supports both Cloud API and Web Bridge)
 # ═══════════════════════════════════════════════════════════
 
-@router.get("/whatsapp/{webhook_path}")
+@router.get(
+    "/whatsapp/{webhook_path}",
+    summary="Whatsapp Verify",
+    description="WhatsApp verification endpoint (GET). For Cloud API: Meta sends challenge here to verify webhook. For Web Bridge: Returns status info.",
+    responses=build_responses(None),
+)
 def whatsapp_verify(
     webhook_path: str,
     request: Request,
@@ -118,7 +125,12 @@ def whatsapp_verify(
         return {"status": "webhook_active", "provider": "web_bridge"}
 
 
-@router.post("/whatsapp/{webhook_path}")
+@router.post(
+    "/whatsapp/{webhook_path}",
+    summary="Whatsapp Webhook",
+    description="Receive WhatsApp messages. Supports both Cloud API (with signature) and Web Bridge (plain JSON).",
+    responses=build_responses(None),
+)
 async def whatsapp_webhook(
     webhook_path: str,
     request: Request,
@@ -210,7 +222,12 @@ async def whatsapp_webhook(
 # Slack Webhook
 # ═══════════════════════════════════════════════════════════
 
-@router.post("/slack/{webhook_path}")
+@router.post(
+    "/slack/{webhook_path}",
+    summary="Slack Webhook",
+    description="Receive Slack events with signature verification.",
+    responses=build_responses(None),
+)
 async def slack_webhook(
     webhook_path: str,
     request: Request,
@@ -313,7 +330,12 @@ async def slack_webhook(
 # Telegram Webhook
 # ═══════════════════════════════════════════════════════════
 
-@router.post("/telegram/{webhook_path}")
+@router.post(
+    "/telegram/{webhook_path}",
+    summary="Telegram Webhook",
+    description="Receive Telegram updates. Security is path-based (secret token in URL).",
+    responses=build_responses(None),
+)
 async def telegram_webhook(
     webhook_path: str,
     request: Request,
@@ -376,7 +398,12 @@ async def telegram_webhook(
 # Discord Webhook
 # ═══════════════════════════════════════════════════════════
 
-@router.post("/discord/{webhook_path}")
+@router.post(
+    "/discord/{webhook_path}",
+    summary="Discord Webhook",
+    description="Receive Discord interactions and gateway events. Responds to Discord PING (type 1) immediately.",
+    responses=build_responses(None),
+)
 async def discord_webhook(
     webhook_path: str,
     request: Request,
@@ -462,7 +489,12 @@ async def discord_webhook(
 # Signal Webhook (signal-cli)
 # ═══════════════════════════════════════════════════════════
 
-@router.post("/signal/{webhook_path}")
+@router.post(
+    "/signal/{webhook_path}",
+    summary="Signal Webhook",
+    description="Receive Signal messages forwarded by signal-cli JSON-RPC daemon.",
+    responses=build_responses(None),
+)
 async def signal_webhook(
     webhook_path: str,
     request: Request,
@@ -511,7 +543,12 @@ async def signal_webhook(
 # Google Chat Webhook
 # ═══════════════════════════════════════════════════════════
 
-@router.post("/google_chat/{webhook_path}")
+@router.post(
+    "/google_chat/{webhook_path}",
+    summary="Google Chat Webhook",
+    description="Receive Google Chat bot events.",
+    responses=build_responses(None),
+)
 async def google_chat_webhook(
     webhook_path: str,
     request: Request,
@@ -563,7 +600,12 @@ async def google_chat_webhook(
 # Microsoft Teams Webhook
 # ═══════════════════════════════════════════════════════════
 
-@router.post("/teams/{webhook_path}")
+@router.post(
+    "/teams/{webhook_path}",
+    summary="Teams Webhook",
+    description="Receive Microsoft Teams Bot Framework Activity objects.",
+    responses=build_responses(None),
+)
 async def teams_webhook(
     webhook_path: str,
     request: Request,
@@ -613,7 +655,12 @@ async def teams_webhook(
 # Zalo Webhook
 # ═══════════════════════════════════════════════════════════
 
-@router.post("/zalo/{webhook_path}")
+@router.post(
+    "/zalo/{webhook_path}",
+    summary="Zalo Webhook",
+    description="Receive Zalo Official Account events. Zalo expects {\"error\": 0} on success.",
+    responses=build_responses(None),
+)
 async def zalo_webhook(
     webhook_path: str,
     request: Request,
@@ -665,7 +712,12 @@ async def zalo_webhook(
 # Matrix Webhook
 # ═══════════════════════════════════════════════════════════
 
-@router.post("/matrix/{webhook_path}")
+@router.post(
+    "/matrix/{webhook_path}",
+    summary="Matrix Webhook",
+    description="Receive Matrix room events via Application Service.",
+    responses=build_responses(None),
+)
 async def matrix_webhook(
     webhook_path: str,
     request: Request,
@@ -713,7 +765,12 @@ async def matrix_webhook(
 # iMessage Webhook (BlueBubbles)
 # ═══════════════════════════════════════════════════════════
 
-@router.post("/imessage/{webhook_path}")
+@router.post(
+    "/imessage/{webhook_path}",
+    summary="Imessage Webhook",
+    description="Receive iMessage events from BlueBubbles server.",
+    responses=build_responses(None),
+)
 async def imessage_webhook(
     webhook_path: str,
     request: Request,
@@ -759,7 +816,12 @@ async def imessage_webhook(
 # Email Webhook (SendGrid / Mailgun)
 # ═══════════════════════════════════════════════════════════
 
-@router.post("/email/{webhook_path}")
+@router.post(
+    "/email/{webhook_path}",
+    summary="Email Webhook",
+    description="Receive inbound email via SendGrid Inbound Parse or Mailgun.",
+    responses=build_responses(None),
+)
 async def email_webhook(
     webhook_path: str,
     request: Request,
@@ -822,7 +884,12 @@ async def email_webhook(
 # Webhook Health & Status
 # ═══════════════════════════════════════════════════════════
 
-@router.get("/health/{channel_id}")
+@router.get(
+    "/health/{channel_id}",
+    summary="Webhook Health",
+    description="Get webhook health status for a channel.",
+    responses=build_responses(None),
+)
 async def webhook_health(
     channel_id: str,
     db: Session = Depends(get_db)

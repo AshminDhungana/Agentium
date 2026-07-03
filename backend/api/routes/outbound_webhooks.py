@@ -18,6 +18,8 @@ from backend.models.entities.webhook import WebhookSubscription, WebhookDelivery
 from backend.core.auth import get_current_user
 from backend.services.webhook_dispatch_service import WebhookDispatchService
 
+from backend.api.schemas.examples import ErrorResponseExample, SuccessResponseExample, build_responses
+
 router = APIRouter(prefix="/webhooks", tags=["Outbound Webhooks"])
 
 
@@ -57,7 +59,13 @@ class WebhookWithSecretResponse(WebhookResponse):
 # CRUD Endpoints
 # ═══════════════════════════════════════════════════════════
 
-@router.post("/subscriptions", response_model=WebhookWithSecretResponse)
+@router.post(
+    "/subscriptions",
+    response_model=WebhookWithSecretResponse,
+    summary="Create Subscription",
+    description="Create a new outbound webhook subscription. If no secret is provided, one is auto-generated. The secret is only shown in the creation response.",
+    responses=build_responses(None),
+)
 async def create_subscription(
     request: CreateWebhookRequest,
     db: Session = Depends(get_db),
@@ -97,7 +105,12 @@ async def create_subscription(
     return result
 
 
-@router.get("/subscriptions")
+@router.get(
+    "/subscriptions",
+    summary="List Subscriptions",
+    description="List all webhook subscriptions for the authenticated user.",
+    responses=build_responses(None),
+)
 async def list_subscriptions(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
@@ -113,7 +126,12 @@ async def list_subscriptions(
     return {"subscriptions": [s.to_dict() for s in subscriptions]}
 
 
-@router.get("/subscriptions/{subscription_id}")
+@router.get(
+    "/subscriptions/{subscription_id}",
+    summary="Get Subscription",
+    description="Get a specific webhook subscription.",
+    responses=build_responses(None),
+)
 async def get_subscription(
     subscription_id: str,
     db: Session = Depends(get_db),
@@ -124,7 +142,12 @@ async def get_subscription(
     return sub.to_dict()
 
 
-@router.put("/subscriptions/{subscription_id}")
+@router.put(
+    "/subscriptions/{subscription_id}",
+    summary="Update Subscription",
+    description="Update a webhook subscription.",
+    responses=build_responses(None),
+)
 async def update_subscription(
     subscription_id: str,
     request: UpdateWebhookRequest,
@@ -154,7 +177,12 @@ async def update_subscription(
     return sub.to_dict()
 
 
-@router.delete("/subscriptions/{subscription_id}")
+@router.delete(
+    "/subscriptions/{subscription_id}",
+    summary="Delete Subscription",
+    description="Delete a webhook subscription and all its delivery logs.",
+    responses=build_responses(None),
+)
 async def delete_subscription(
     subscription_id: str,
     db: Session = Depends(get_db),
@@ -171,7 +199,12 @@ async def delete_subscription(
 # Delivery Logs
 # ═══════════════════════════════════════════════════════════
 
-@router.get("/subscriptions/{subscription_id}/deliveries")
+@router.get(
+    "/subscriptions/{subscription_id}/deliveries",
+    summary="Get Deliveries",
+    description="Get delivery log for a webhook subscription.",
+    responses=build_responses(None),
+)
 async def get_deliveries(
     subscription_id: str,
     limit: int = Query(50, ge=1, le=200),
@@ -195,7 +228,12 @@ async def get_deliveries(
 # Test Webhook
 # ═══════════════════════════════════════════════════════════
 
-@router.post("/subscriptions/{subscription_id}/test")
+@router.post(
+    "/subscriptions/{subscription_id}/test",
+    summary="Test Webhook",
+    description="Send a test event to a webhook subscription. Sends a `test.ping` event with a sample payload.",
+    responses=build_responses(None),
+)
 async def test_webhook(
     subscription_id: str,
     db: Session = Depends(get_db),
@@ -239,7 +277,12 @@ async def test_webhook(
 # Supported Events
 # ═══════════════════════════════════════════════════════════
 
-@router.get("/events")
+@router.get(
+    "/events",
+    summary="List Supported Events",
+    description="List all supported webhook event types.",
+    responses=build_responses(None),
+)
 async def list_supported_events(
     current_user: dict = Depends(get_current_user),
 ):

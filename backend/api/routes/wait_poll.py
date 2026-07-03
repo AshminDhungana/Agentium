@@ -30,6 +30,7 @@ from backend.models.entities.wait_condition import (
     WaitStrategy,
 )
 from backend.services.wait_poll_service import WaitPollService
+from backend.api.schemas.examples import ErrorResponseExample, SuccessResponseExample, build_responses
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Wait & Poll"])
@@ -65,6 +66,8 @@ def _get_condition_or_404(db: Session, condition_id: str) -> WaitCondition:
     "/wait-conditions/",
     status_code=status.HTTP_201_CREATED,
     summary="Create a WaitCondition and put the task into WAITING state",
+    description="Create a new WaitCondition for a task, placing the task into WAITING state. The task will remain waiting until the condition is resolved or cancelled.",
+    responses=build_responses(None),
 )
 def create_wait_condition(
     body: CreateWaitConditionRequest,
@@ -109,6 +112,8 @@ def create_wait_condition(
 @router.get(
     "/wait-conditions/{condition_id}",
     summary="Get a WaitCondition by ID",
+    description="Retrieve a single WaitCondition by its unique identifier. Returns the condition's current status, strategy, and metadata.",
+    responses=build_responses(None),
 )
 def get_wait_condition(
     condition_id: str,
@@ -121,6 +126,8 @@ def get_wait_condition(
 @router.get(
     "/wait-conditions/task/{task_id}",
     summary="List all WaitConditions for a task",
+    description="List all WaitConditions associated with a specific task, ordered by creation date (most recent first).",
+    responses=build_responses(None),
 )
 def list_wait_conditions_for_task(
     task_id: str,
@@ -139,6 +146,8 @@ def list_wait_conditions_for_task(
 @router.post(
     "/wait-conditions/{condition_id}/resolve",
     summary="Manually resolve a WaitCondition (WEBHOOK / MANUAL strategies)",
+    description="Manually resolve an active WaitCondition. The parent task will transition back to IN_PROGRESS. Only conditions in ACTIVE status can be resolved.",
+    responses=build_responses(None),
 )
 def resolve_wait_condition(
     condition_id: str,
@@ -162,6 +171,8 @@ def resolve_wait_condition(
 @router.post(
     "/wait-conditions/{condition_id}/cancel",
     summary="Cancel an active WaitCondition",
+    description="Cancel an active WaitCondition. If the parent task is in WAITING state, it will revert to IN_PROGRESS.",
+    responses=build_responses(None),
 )
 def cancel_wait_condition(
     condition_id: str,

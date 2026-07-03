@@ -21,6 +21,7 @@ from backend.models.entities.user import User  # Your user model
 from pydantic import BaseModel
 
 from backend.core.exceptions import ForbiddenError, BadRequestError
+from backend.api.schemas.examples import build_responses
 
 router = APIRouter(prefix="/sovereign", tags=["sovereign"])
 
@@ -75,7 +76,12 @@ def _get_head_service() -> HostAccessService:
 
 # ── System status ─────────────────────────────────────────────────────────────
 
-@router.get("/system/status")
+@router.get(
+    "/system/status",
+    summary="Get system status",
+    description="Retrieve real-time host system status (CPU, memory, disk, network) using psutil.",
+    responses=build_responses(None),
+)
 async def get_system_status(
     current_user: User = Depends(get_current_sovereign_user)
 ):
@@ -168,7 +174,12 @@ async def get_system_status(
 
 # ── Containers ────────────────────────────────────────────────────────────────
 
-@router.get("/containers")
+@router.get(
+    "/containers",
+    summary="List containers",
+    description="List all Docker containers (agents) on the host system.",
+    responses=build_responses(None),
+)
 async def list_containers(
     current_user: User = Depends(get_current_sovereign_user)
 ):
@@ -177,7 +188,12 @@ async def list_containers(
     head = _get_head_service()
     return head.list_containers()
 
-@router.post("/containers/{container_id}/{action}")
+@router.post(
+    "/containers/{container_id}/{action}",
+    summary="Manage container",
+    description="Start, stop, restart, or remove agent containers.",
+    responses=build_responses(None),
+)
 async def manage_container(
     container_id: str,
     action: str,
@@ -222,7 +238,12 @@ async def manage_container(
 
 # ── Commands ──────────────────────────────────────────────────────────────────
 
-@router.post("/command")
+@router.post(
+    "/command",
+    summary="Execute sovereign command",
+    description="Execute an emergency override command (execute command, read file, or write file) bypassing the Head of Council.",
+    responses=build_responses(None),
+)
 async def execute_sovereign_command(
     command_req: SovereignCommandRequest,
     db: Session = Depends(get_db),
@@ -284,7 +305,12 @@ async def execute_sovereign_command(
 
 # ── Audit logs ────────────────────────────────────────────────────────────────
 
-@router.get("/audit")
+@router.get(
+    "/audit",
+    summary="Get audit logs",
+    description="Retrieve filtered, ordered system audit logs.",
+    responses=build_responses(None),
+)
 async def get_audit_logs(
     agentium_id: Optional[str] = None,
     level: Optional[str] = None,
@@ -311,7 +337,12 @@ async def get_audit_logs(
 
 # ── Agent block / unblock ─────────────────────────────────────────────────────
 
-@router.post("/agents/{agentium_id}/block")
+@router.post(
+    "/agents/{agentium_id}/block",
+    summary="Block agent",
+    description="Emergency block an agent from executing further actions.",
+    responses=build_responses(None),
+)
 async def block_agent(
     agentium_id: str,
     req: BlockAgentRequest,
@@ -345,7 +376,12 @@ async def block_agent(
 
     return {"status": "blocked", "agentium_id": agentium_id}
 
-@router.post("/agents/{agentium_id}/unblock")
+@router.post(
+    "/agents/{agentium_id}/unblock",
+    summary="Unblock agent",
+    description="Remove an active emergency block from a previously blocked agent.",
+    responses=build_responses(None),
+)
 async def unblock_agent(
     agentium_id: str,
     db: Session = Depends(get_db),
@@ -372,7 +408,12 @@ async def unblock_agent(
 
 # ── File system ───────────────────────────────────────────────────────────────
 
-@router.get("/files")
+@router.get(
+    "/files",
+    summary="Read file",
+    description="Read file contents directly from the host filesystem.",
+    responses=build_responses(None),
+)
 async def read_file(
     path: str = Query(...),
     current_user: User = Depends(get_current_sovereign_user)
@@ -382,7 +423,12 @@ async def read_file(
     head = _get_head_service()
     return head.read_file(path)
 
-@router.post("/files")
+@router.post(
+    "/files",
+    summary="Write file",
+    description="Write file contents directly to the host filesystem (human-initiated override).",
+    responses=build_responses(None),
+)
 async def write_file(
     req: WriteFileRequest,
     current_user: User = Depends(get_current_sovereign_user)
@@ -392,7 +438,12 @@ async def write_file(
     head = _get_head_service()
     return head.write_file(req.path, req.content)
 
-@router.get("/directory")
+@router.get(
+    "/directory",
+    summary="List directory",
+    description="List directory entries on the host filesystem.",
+    responses=build_responses(None),
+)
 async def list_directory(
     path: str = Query(default="/"),
     current_user: User = Depends(get_current_sovereign_user)
@@ -504,7 +555,12 @@ async def notify_sovereign(message: dict):
 
 # ── Command history ───────────────────────────────────────────────────────────
 
-@router.get("/commands")
+@router.get(
+    "/commands",
+    summary="Get command history",
+    description="Get sovereign manual command intervention history.",
+    responses=build_responses(None),
+)
 async def get_command_history(
     limit: int = Query(50, le=1000),
     db: Session = Depends(get_db),

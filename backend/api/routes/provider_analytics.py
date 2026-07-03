@@ -18,6 +18,8 @@ from backend.models.database import get_db
 from backend.models.entities.user_config import ModelUsageLog, ProviderType
 from backend.core.auth import get_current_user
 
+from backend.api.schemas.examples import ErrorResponseExample, SuccessResponseExample, build_responses
+
 router = APIRouter(prefix="/provider-analytics", tags=["Provider Analytics"])
 
 
@@ -33,7 +35,12 @@ def _provider_str(p) -> str:
 # Endpoints
 # ─────────────────────────────────────────────────────────────────────────────
 
-@router.get("/summary")
+@router.get(
+    "/summary",
+    summary="Get Provider Summary",
+    description="Aggregated per-provider stats: total_requests, successful_requests, failed_requests, success_rate_pct, avg_latency_ms, total_cost_usd, total_tokens, avg_cost_per_request.",
+    responses=build_responses(None),
+)
 async def get_provider_summary(
     days: int = Query(default=30, ge=1, le=365),
     db: Session = Depends(get_db),
@@ -91,7 +98,12 @@ async def get_provider_summary(
     }
 
 
-@router.get("/cost-over-time")
+@router.get(
+    "/cost-over-time",
+    summary="Get Cost Over Time",
+    description="Daily cost per provider for the last N days. Returns list of { date, <provider>: cost, ... } objects suitable for Recharts LineChart.",
+    responses=build_responses(None),
+)
 async def get_cost_over_time(
     days: int = Query(default=14, ge=1, le=90),
     db: Session = Depends(get_db),
@@ -143,7 +155,12 @@ async def get_cost_over_time(
     }
 
 
-@router.get("/model-breakdown")
+@router.get(
+    "/model-breakdown",
+    summary="Get Model Breakdown",
+    description="Per-model breakdown: requests, success rate, avg latency, cost, tokens. Optionally filter by provider.",
+    responses=build_responses(None),
+)
 async def get_model_breakdown(
     days: int = Query(default=30, ge=1, le=365),
     provider: Optional[str] = Query(default=None),
@@ -205,7 +222,12 @@ async def get_model_breakdown(
     }
 
 
-@router.get("/latency-percentiles")
+@router.get(
+    "/latency-percentiles",
+    summary="Get Latency Percentiles",
+    description="Per-provider latency: avg, min, max, and p50 approximation.",
+    responses=build_responses(None),
+)
 async def get_latency_percentiles(
     days: int = Query(default=7, ge=1, le=30),
     db: Session = Depends(get_db),

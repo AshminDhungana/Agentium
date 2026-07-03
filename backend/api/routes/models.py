@@ -23,6 +23,8 @@ from backend.models.entities.user_config import (
 from backend.services.model_provider import ModelService
 from backend.core.security import encrypt_api_key, decrypt_api_key
 
+from backend.api.schemas.examples import ErrorResponseExample, SuccessResponseExample, build_responses
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/models", tags=["Model Configuration"])
@@ -196,7 +198,13 @@ def _update_head_preferred_config_if_default(db: Session, config: UserModelConfi
 # Routes
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-@router.get("/providers", response_model=List[ProviderInfo])
+@router.get(
+    "/providers",
+    response_model=List[ProviderInfo],
+    summary="List Providers",
+    description="List ALL available provider types. Model lists fetched dynamically.",
+    responses=build_responses(None),
+)
 async def list_providers():
     """List ALL available provider types. Model lists fetched dynamically."""
     providers = [
@@ -314,7 +322,13 @@ async def list_providers():
     return providers
 
 
-@router.post("/configs", response_model=ModelConfigResponse)
+@router.post(
+    "/configs",
+    response_model=ModelConfigResponse,
+    summary="Create Config",
+    description="Create a new model configuration.",
+    responses=build_responses(None),
+)
 async def create_config(
     config: ModelConfigCreate,
     db: Session = Depends(get_db),
@@ -376,7 +390,13 @@ async def create_config(
     return serialized
 
 
-@router.post("/configs/universal", response_model=ModelConfigResponse)
+@router.post(
+    "/configs/universal",
+    response_model=ModelConfigResponse,
+    summary="Create Universal Config",
+    description="Create configuration for ANY custom OpenAI-compatible provider.",
+    responses=build_responses(None),
+)
 async def create_universal_config(
     input: UniversalProviderCreate,
     db: Session = Depends(get_db),
@@ -434,7 +454,13 @@ async def create_universal_config(
     return serialized
 
 
-@router.get("/configs", response_model=List[ModelConfigResponse])
+@router.get(
+    "/configs",
+    response_model=List[ModelConfigResponse],
+    summary="List Configs",
+    description="List user's model configurations.",
+    responses=build_responses(None),
+)
 async def list_configs(
     db: Session = Depends(get_db),
     user_id: str = "sovereign",
@@ -444,7 +470,13 @@ async def list_configs(
     return [_serialize_config(c) for c in configs]
 
 
-@router.get("/configs/{config_id}", response_model=ModelConfigResponse)
+@router.get(
+    "/configs/{config_id}",
+    response_model=ModelConfigResponse,
+    summary="Get Config",
+    description="Get specific configuration.",
+    responses=build_responses(None),
+)
 async def get_config(
     config_id: str,
     db: Session = Depends(get_db),
@@ -458,7 +490,13 @@ async def get_config(
     return _serialize_config(config)
 
 
-@router.put("/configs/{config_id}", response_model=ModelConfigResponse)
+@router.put(
+    "/configs/{config_id}",
+    response_model=ModelConfigResponse,
+    summary="Update Config",
+    description="Update configuration.",
+    responses=build_responses(None),
+)
 async def update_config(
     config_id: str,
     updates: ModelConfigUpdate,
@@ -506,7 +544,12 @@ async def update_config(
     return serialized
 
 
-@router.delete("/configs/{config_id}")
+@router.delete(
+    "/configs/{config_id}",
+    summary="Delete Config",
+    description="Delete configuration.",
+    responses=build_responses(None),
+)
 async def delete_config(
     config_id: str,
     db: Session = Depends(get_db),
@@ -553,7 +596,13 @@ async def delete_config(
     return {"message": "Configuration deleted"}
 
 
-@router.post("/configs/{config_id}/test", response_model=TestResult)
+@router.post(
+    "/configs/{config_id}/test",
+    response_model=TestResult,
+    summary="Test Config",
+    description="Test specific configuration.",
+    responses=build_responses(None),
+)
 async def test_config(
     config_id: str,
     db: Session = Depends(get_db),
@@ -575,7 +624,12 @@ async def test_config(
     )
 
 
-@router.post("/configs/{config_id}/fetch-models")
+@router.post(
+    "/configs/{config_id}/fetch-models",
+    summary="Fetch Models",
+    description="Dynamically fetch available models from provider API.",
+    responses=build_responses(None),
+)
 async def fetch_models(
     config_id: str,
     db: Session = Depends(get_db),
@@ -612,7 +666,13 @@ async def fetch_models(
     }
 
 
-@router.post("/providers/fetch-models-direct", response_model=FetchModelsResponse)
+@router.post(
+    "/providers/fetch-models-direct",
+    response_model=FetchModelsResponse,
+    summary="Fetch Provider Models Direct",
+    description="Fetch available models from a provider WITHOUT requiring an existing config. Used during the configuration setup wizard.",
+    responses=build_responses(None),
+)
 async def fetch_provider_models_direct(request: FetchModelsRequest):
     """
     Fetch available models from a provider WITHOUT requiring an existing config.
@@ -646,7 +706,12 @@ async def fetch_provider_models_direct(request: FetchModelsRequest):
     )
 
 
-@router.post("/configs/{config_id}/set-default")
+@router.post(
+    "/configs/{config_id}/set-default",
+    summary="Set Default",
+    description="Set a configuration as the default.",
+    responses=build_responses(None),
+)
 async def set_default(
     config_id: str,
     db: Session = Depends(get_db),
@@ -666,7 +731,12 @@ async def set_default(
     return {"message": "Configuration set as default", "config_id": config_id}
 
 
-@router.get("/configs/{config_id}/usage")
+@router.get(
+    "/configs/{config_id}/usage",
+    summary="Get Usage",
+    description="Get usage statistics for a configuration.",
+    responses=build_responses(None),
+)
 async def get_usage(
     config_id: str,
     days: int = 7,

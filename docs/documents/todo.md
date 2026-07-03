@@ -776,7 +776,7 @@ Build a self-governing AI ecosystem where agents operate under constitutional la
 #### Backend
 
 - [x] **Service Docstrings** — every public method in `backend/services/` must have a Google-style docstring with `Args`, `Returns`, and `Raises` sections; add `interrogate` to CI (`interrogate backend/services/ --fail-under=90`)
-- [ ] **OpenAPI Enrichment** — add `summary`, `description`, `response_model`, and example `responses` annotations to every route missing them; confirm `/docs` renders complete documentation for all 80+ endpoints with sample request/response bodies
+- [x] **OpenAPI Enrichment** — add `summary`, `description`, `response_model`, and example `responses` annotations to every route missing them; confirm `/docs` renders complete documentation for all 80+ endpoints with sample request/response bodies
 - [ ] **Architecture Decision Records** — write `docs/adr/` entries (one Markdown file each) for: dual-storage rationale (PostgreSQL + ChromaDB), constitutional guard two-tier design, Celery over asyncio for background work, agent ID numbering scheme (`0xxxx / 1xxxx / 2xxxx / 3xxxx`), RAG decay scoring algorithm
 - [ ] **`CONTRIBUTING.md`** — document: local dev setup (`docker-compose up`), migration workflow (`alembic upgrade head`), test execution (`pytest`), and a full environment variable reference table with defaults and descriptions for all vars in `backend/.env.example`
 - [ ] **`ARCHITECTURE.md`** — Mermaid diagram of the full stack: services, data flows, WebSocket event bus, Celery beat task schedule, and all external integrations; include agent hierarchy visualization

@@ -22,6 +22,8 @@ from backend.api.schemas.mcp_schemas import (
     MCPAuditResponse,
 )
 
+from backend.api.schemas.examples import ErrorResponseExample, SuccessResponseExample, build_responses
+
 router = APIRouter(prefix="/api/v1/mcp-tools", tags=["MCP Tools"])
 
 
@@ -40,7 +42,13 @@ def _bridge():
 
 # ── Existing routes (unchanged) ────────────────────────────────────────────────
 
-@router.get("", response_model=MCPToolListResponse)
+@router.get(
+    "",
+    response_model=MCPToolListResponse,
+    summary="List Mcp Tools",
+    description="Perform the list mcp tools operation.",
+    responses=build_responses(None),
+)
 async def list_mcp_tools(
     status_filter: Optional[str] = Query(None, alias="status"),
     tier_filter: Optional[str] = Query(None, alias="tier"),
@@ -59,7 +67,14 @@ async def list_mcp_tools(
     )
 
 
-@router.post("", response_model=MCPToolResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=MCPToolResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Propose Mcp Server",
+    description="Perform the propose mcp server operation.",
+    responses=build_responses(None),
+)
 async def propose_mcp_server(
     req: ProposeMCPServerRequest,
     db: Session = Depends(get_db),
@@ -83,7 +98,13 @@ async def propose_mcp_server(
 
 # ── Phase 15.2: Stats routes (placed BEFORE /{tool_id} to avoid routing conflicts) ──
 
-@router.get("/stats", tags=["MCP Tools", "Phase 15.2"])
+@router.get(
+    "/stats",
+    tags=["MCP Tools", "Phase 15.2"],
+    summary="Get All Mcp Stats",
+    description="Return real-time invocation stats for all MCP tools from Redis. Response time target: <50 ms (pure Redis read, no DB query). Each item contains: tool_id, invocation_count, error_count, avg_latency_ms, error_rate, last_used_ts.",
+    responses=build_responses(None),
+)
 async def get_all_mcp_stats(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_active_user),
@@ -104,7 +125,13 @@ async def get_all_mcp_stats(
         return []
 
 
-@router.get("/stats/health", tags=["MCP Tools", "Phase 15.2"])
+@router.get(
+    "/stats/health",
+    tags=["MCP Tools", "Phase 15.2"],
+    summary="Get Stats Health",
+    description="Check connectivity and health of the Redis stats layer.",
+    responses=build_responses(None),
+)
 async def get_stats_health(
     current_user: dict = Depends(get_current_active_user),
 ) -> Dict[str, Any]:
@@ -116,7 +143,13 @@ async def get_stats_health(
         return {"status": "unavailable", "error": str(exc)}
 
 
-@router.get("/revoked", tags=["MCP Tools", "Phase 15.2"])
+@router.get(
+    "/revoked",
+    tags=["MCP Tools", "Phase 15.2"],
+    summary="Get Revoked Tools",
+    description="Return the list of tool IDs currently in the Redis revocation SET. Admin / Sovereign only.",
+    responses=build_responses(None),
+)
 async def get_revoked_tools(
     current_user: dict = Depends(get_current_active_user),
 ) -> Dict[str, Any]:
@@ -136,7 +169,13 @@ async def get_revoked_tools(
 
 # ── Existing /{tool_id} routes (unchanged) ─────────────────────────────────────
 
-@router.get("/{tool_id}", response_model=MCPToolResponse)
+@router.get(
+    "/{tool_id}",
+    response_model=MCPToolResponse,
+    summary="Get Mcp Tool",
+    description="Perform the get mcp tool operation.",
+    responses=build_responses(None),
+)
 async def get_mcp_tool(
     tool_id: str,
     db: Session = Depends(get_db),
@@ -149,7 +188,13 @@ async def get_mcp_tool(
     return MCPToolResponse(**tool.to_dict())
 
 
-@router.get("/{tool_id}/stats", tags=["MCP Tools", "Phase 15.2"])
+@router.get(
+    "/{tool_id}/stats",
+    tags=["MCP Tools", "Phase 15.2"],
+    summary="Get Tool Stats",
+    description="Return real-time invocation stats for a single MCP tool. Reads from Redis — no DB query.",
+    responses=build_responses(None),
+)
 async def get_tool_stats(
     tool_id: str,
     db: Session = Depends(get_db),
@@ -184,7 +229,13 @@ async def get_tool_stats(
         raise InternalServerError(error=str(exc), code="STREXC")
 
 
-@router.post("/{tool_id}/approve", response_model=MCPToolResponse)
+@router.post(
+    "/{tool_id}/approve",
+    response_model=MCPToolResponse,
+    summary="Approve Mcp Tool",
+    description="Approve a pending MCP tool. Immediately registers it into the live ToolRegistry so agents can use it. Phase 15.2: also removes tool from the Redis revocation SET if present.",
+    responses=build_responses(None),
+)
 async def approve_mcp_tool(
     tool_id: str,
     req: ApproveMCPToolRequest,
@@ -212,7 +263,13 @@ async def approve_mcp_tool(
     return MCPToolResponse(**tool.to_dict())
 
 
-@router.post("/{tool_id}/revoke", response_model=MCPToolResponse)
+@router.post(
+    "/{tool_id}/revoke",
+    response_model=MCPToolResponse,
+    summary="Revoke Mcp Tool",
+    description="Emergency revocation — removes tool from live ToolRegistry in < 1s. Phase 15.2: also writes to Redis revocation SET for immediate enforcement. Agents attempting to use a revoked tool receive 404/block immediately.",
+    responses=build_responses(None),
+)
 async def revoke_mcp_tool(
     tool_id: str,
     req: RevokeMCPToolRequest,
@@ -240,7 +297,13 @@ async def revoke_mcp_tool(
     return MCPToolResponse(**tool.to_dict())
 
 
-@router.post("/{tool_id}/execute", response_model=MCPExecutionResponse)
+@router.post(
+    "/{tool_id}/execute",
+    response_model=MCPExecutionResponse,
+    summary="Execute Mcp Tool",
+    description="Admin/direct execution path. Agents should use /tools/execute instead.",
+    responses=build_responses(None),
+)
 async def execute_mcp_tool(
     tool_id: str,
     req: ExecuteMCPToolRequest,
@@ -265,7 +328,13 @@ async def execute_mcp_tool(
         raise InternalServerError(error=str(exc), code="STREXC")
 
 
-@router.get("/{tool_id}/health", response_model=MCPHealthResponse)
+@router.get(
+    "/{tool_id}/health",
+    response_model=MCPHealthResponse,
+    summary="Check Tool Health",
+    description="Perform the check tool health operation.",
+    responses=build_responses(None),
+)
 async def check_tool_health(
     tool_id: str,
     db: Session = Depends(get_db),
@@ -279,7 +348,13 @@ async def check_tool_health(
         raise NotFoundError(error=str(exc), code="STREXC")
 
 
-@router.get("/{tool_id}/audit", response_model=MCPAuditResponse)
+@router.get(
+    "/{tool_id}/audit",
+    response_model=MCPAuditResponse,
+    summary="Get Tool Audit Log",
+    description="Perform the get tool audit log operation.",
+    responses=build_responses(None),
+)
 async def get_tool_audit_log(
     tool_id: str,
     limit: int = Query(100, le=1000),

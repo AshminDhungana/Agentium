@@ -15,6 +15,8 @@ from backend.models.entities.user import User
 from backend.services.rbac_service import RBACService, VALID_CAPABILITIES
 from backend.core.auth import security
 
+from backend.api.schemas.examples import ErrorResponseExample, SuccessResponseExample, build_responses
+
 router = APIRouter(prefix="/rbac", tags=["Role-Based Access Control"])
 
 
@@ -61,7 +63,12 @@ def get_current_user_from_token(
 
 # --- Endpoints --- #
 
-@router.get("/roles")
+@router.get(
+    "/roles",
+    summary="List Users With Roles",
+    description="List all users and their roles (requires Sovereign).",
+    responses=build_responses(None),
+)
 def list_users_with_roles(
     current_user: User = Depends(get_current_user_from_token),
     db: Session = Depends(get_db),
@@ -92,7 +99,12 @@ def list_users_with_roles(
     return result
 
 
-@router.get("/capabilities")
+@router.get(
+    "/capabilities",
+    summary="List Capabilities",
+    description="Return the sorted list of capability strings that are valid for delegation. This is the authoritative source for the frontend capability picker — the UI should derive its selectable capabilities from this endpoint rather than maintaining its own hardcoded list.",
+    responses=build_responses(None),
+)
 def list_capabilities(
     current_user: User = Depends(get_current_user_from_token),
 ):
@@ -108,7 +120,12 @@ def list_capabilities(
     return sorted(VALID_CAPABILITIES)
 
 
-@router.post("/delegate")
+@router.post(
+    "/delegate",
+    summary="Delegate Capability",
+    description="Delegate capabilities to another user. Only Primary Sovereign.",
+    responses=build_responses(None),
+)
 def delegate_capability(
     request: DelegateRequest,
     current_user: User = Depends(get_current_user_from_token),
@@ -134,7 +151,12 @@ def delegate_capability(
         raise BadRequestError(error=str(e), code="STRE")
 
 
-@router.delete("/delegate/{delegation_id}")
+@router.delete(
+    "/delegate/{delegation_id}",
+    summary="Revoke Delegation",
+    description="Revoke an active delegation.",
+    responses=build_responses(None),
+)
 def revoke_delegation(
     delegation_id: str,
     current_user: User = Depends(get_current_user_from_token),
@@ -150,7 +172,12 @@ def revoke_delegation(
         raise BadRequestError(error=str(e), code="STRE")
 
 
-@router.post("/emergency-transfer")
+@router.post(
+    "/emergency-transfer",
+    summary="Emergency Override Transfer",
+    description="Emergency transfer of Primary Sovereign role.",
+    responses=build_responses(None),
+)
 def emergency_override_transfer(
     request: EmergencyTransferRequest,
     current_user: User = Depends(get_current_user_from_token),
@@ -177,7 +204,12 @@ def emergency_override_transfer(
         raise BadRequestError(error=str(e), code="STRE")
 
 
-@router.get("/permissions/me")
+@router.get(
+    "/permissions/me",
+    summary="Get My Permissions",
+    description="Get effective permissions for the current user.",
+    responses=build_responses(None),
+)
 def get_my_permissions(
     current_user: User = Depends(get_current_user_from_token),
     db: Session = Depends(get_db),

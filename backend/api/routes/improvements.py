@@ -2,11 +2,26 @@ from fastapi import APIRouter, Depends
 import redis.asyncio as aioredis
 import os
 
+from backend.api.schemas.examples import ErrorResponseExample, SuccessResponseExample
+
 router = APIRouter(prefix="/improvements", tags=["Continuous Improvement"])
 
 redis_url = os.getenv("REDIS_URL", "redis://redis:6379/0")
 
-@router.get("/impact")
+@router.get(
+    "/impact",
+    summary="Get learning impact",
+    description="Learning Impact Tracker: read success_rate_delta and other stats.",
+    responses={
+        200: {"description": "Success", "model": SuccessResponseExample},
+        400: {"description": "Bad Request", "model": ErrorResponseExample},
+        401: {"description": "Unauthorized", "model": ErrorResponseExample},
+        403: {"description": "Forbidden", "model": ErrorResponseExample},
+        404: {"description": "Not Found", "model": ErrorResponseExample},
+        429: {"description": "Too Many Requests", "model": ErrorResponseExample},
+        500: {"description": "Internal Server Error", "model": ErrorResponseExample},
+    },
+)
 async def get_learning_impact():
     """
     Learning Impact Tracker: read success_rate_delta and other stats
@@ -17,7 +32,7 @@ async def get_learning_impact():
         tools_generated = await r.hget("agentium:learning:impact", "tools_generated") or "4"
         anti_patterns_warned = await r.hget("agentium:learning:impact", "anti_patterns_warned") or "12"
         await r.close()
-        
+
         return {
             "success_rate_delta": float(success_rate_delta),
             "tools_generated": int(tools_generated),
@@ -34,7 +49,20 @@ async def get_learning_impact():
     except Exception as e:
         return {"error": str(e)}
 
-@router.get("/patterns")
+@router.get(
+    "/patterns",
+    summary="Get patterns",
+    description="Get best practices and anti-patterns from the system.",
+    responses={
+        200: {"description": "Success", "model": SuccessResponseExample},
+        400: {"description": "Bad Request", "model": ErrorResponseExample},
+        401: {"description": "Unauthorized", "model": ErrorResponseExample},
+        403: {"description": "Forbidden", "model": ErrorResponseExample},
+        404: {"description": "Not Found", "model": ErrorResponseExample},
+        429: {"description": "Too Many Requests", "model": ErrorResponseExample},
+        500: {"description": "Internal Server Error", "model": ErrorResponseExample},
+    },
+)
 async def get_patterns():
     return {
         "patterns": [
@@ -43,6 +71,19 @@ async def get_patterns():
         ]
     }
 
-@router.post("/consolidate")
+@router.post(
+    "/consolidate",
+    summary="Trigger consolidation",
+    description="Trigger model consolidation process.",
+    responses={
+        200: {"description": "Success", "model": SuccessResponseExample},
+        400: {"description": "Bad Request", "model": ErrorResponseExample},
+        401: {"description": "Unauthorized", "model": ErrorResponseExample},
+        403: {"description": "Forbidden", "model": ErrorResponseExample},
+        404: {"description": "Not Found", "model": ErrorResponseExample},
+        429: {"description": "Too Many Requests", "model": ErrorResponseExample},
+        500: {"description": "Internal Server Error", "model": ErrorResponseExample},
+    },
+)
 async def trigger_consolidation():
     return {"status": "started"}

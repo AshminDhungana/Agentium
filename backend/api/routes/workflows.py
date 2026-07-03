@@ -7,6 +7,7 @@ from datetime import datetime
 from backend.models.database import get_db_context
 from backend.models.entities.workflow import Workflow, WorkflowExecution
 from backend.services.workflow_engine import WorkflowEngine
+from backend.api.schemas.examples import ErrorResponseExample, SuccessResponseExample
 
 router = APIRouter(prefix="/workflows", tags=["Workflows"])
 
@@ -15,28 +16,67 @@ def get_db():
     with get_db_context() as db:
         yield db
 
-@router.post("/", response_model=Dict[str, Any])
+@router.post(
+    "/", response_model=Dict[str, Any],
+    summary="Create a workflow",
+    description="Create a new automation workflow.",
+    responses={
+        200: {"description": "Success", "model": SuccessResponseExample},
+        400: {"description": "Bad Request", "model": ErrorResponseExample},
+        401: {"description": "Unauthorized", "model": ErrorResponseExample},
+        403: {"description": "Forbidden", "model": ErrorResponseExample},
+        404: {"description": "Not Found", "model": ErrorResponseExample},
+        429: {"description": "Too Many Requests", "model": ErrorResponseExample},
+        500: {"description": "Internal Server Error", "model": ErrorResponseExample},
+    },
+)
 def create_workflow(payload: Dict[str, Any], db: Session = Depends(get_db)):
     """Create a new automation workflow."""
     name = payload.get("name")
     template = payload.get("template_json")
     agent_id = payload.get("agent_id", "A0001")
     cron = payload.get("schedule_cron")
-    
+
     if not name or not template:
         raise BadRequestError(error="name and template_json required", code="NAME_AND_TEMPLATEJSON_REQUIRED")
-        
+
     wf = WorkflowEngine.create_workflow(db, name, template, agent_id, cron)
     db.commit()
     return wf.to_dict()
 
-@router.get("/", response_model=List[Dict[str, Any]])
+@router.get(
+    "/", response_model=List[Dict[str, Any]],
+    summary="List workflows",
+    description="List all workflows.",
+    responses={
+        200: {"description": "Success", "model": SuccessResponseExample},
+        400: {"description": "Bad Request", "model": ErrorResponseExample},
+        401: {"description": "Unauthorized", "model": ErrorResponseExample},
+        403: {"description": "Forbidden", "model": ErrorResponseExample},
+        404: {"description": "Not Found", "model": ErrorResponseExample},
+        429: {"description": "Too Many Requests", "model": ErrorResponseExample},
+        500: {"description": "Internal Server Error", "model": ErrorResponseExample},
+    },
+)
 def list_workflows(db: Session = Depends(get_db)):
     """List all workflows."""
     workflows = db.query(Workflow).filter(Workflow.is_active == True).all()
     return [wf.to_dict() for wf in workflows]
 
-@router.get("/{workflow_id}", response_model=Dict[str, Any])
+@router.get(
+    "/{workflow_id}", response_model=Dict[str, Any],
+    summary="Get a workflow",
+    description="Get workflow definition.",
+    responses={
+        200: {"description": "Success", "model": SuccessResponseExample},
+        400: {"description": "Bad Request", "model": ErrorResponseExample},
+        401: {"description": "Unauthorized", "model": ErrorResponseExample},
+        403: {"description": "Forbidden", "model": ErrorResponseExample},
+        404: {"description": "Not Found", "model": ErrorResponseExample},
+        429: {"description": "Too Many Requests", "model": ErrorResponseExample},
+        500: {"description": "Internal Server Error", "model": ErrorResponseExample},
+    },
+)
 def get_workflow(workflow_id: str, db: Session = Depends(get_db)):
     """Get workflow definition."""
     wf = db.query(Workflow).filter(Workflow.id == workflow_id).first()
@@ -44,7 +84,20 @@ def get_workflow(workflow_id: str, db: Session = Depends(get_db)):
         raise NotFoundError(error="Workflow not found", code="WORKFLOW_NOT_FOUND")
     return wf.to_dict()
 
-@router.put("/{workflow_id}", response_model=Dict[str, Any])
+@router.put(
+    "/{workflow_id}", response_model=Dict[str, Any],
+    summary="Update a workflow",
+    description="Update workflow template.",
+    responses={
+        200: {"description": "Success", "model": SuccessResponseExample},
+        400: {"description": "Bad Request", "model": ErrorResponseExample},
+        401: {"description": "Unauthorized", "model": ErrorResponseExample},
+        403: {"description": "Forbidden", "model": ErrorResponseExample},
+        404: {"description": "Not Found", "model": ErrorResponseExample},
+        429: {"description": "Too Many Requests", "model": ErrorResponseExample},
+        500: {"description": "Internal Server Error", "model": ErrorResponseExample},
+    },
+)
 def update_workflow(workflow_id: str, payload: Dict[str, Any], db: Session = Depends(get_db)):
     """Update workflow template."""
     template = payload.get("template_json")
@@ -57,7 +110,20 @@ def update_workflow(workflow_id: str, payload: Dict[str, Any], db: Session = Dep
     except Exception as e:
         raise BadRequestError(error=str(e), code="STRE")
 
-@router.post("/{workflow_id}/execute", response_model=Dict[str, Any])
+@router.post(
+    "/{workflow_id}/execute", response_model=Dict[str, Any],
+    summary="Execute a workflow",
+    description="Trigger a workflow execution.",
+    responses={
+        200: {"description": "Success", "model": SuccessResponseExample},
+        400: {"description": "Bad Request", "model": ErrorResponseExample},
+        401: {"description": "Unauthorized", "model": ErrorResponseExample},
+        403: {"description": "Forbidden", "model": ErrorResponseExample},
+        404: {"description": "Not Found", "model": ErrorResponseExample},
+        429: {"description": "Too Many Requests", "model": ErrorResponseExample},
+        500: {"description": "Internal Server Error", "model": ErrorResponseExample},
+    },
+)
 def execute_workflow(workflow_id: str, payload: Dict[str, Any], db: Session = Depends(get_db)):
     """Trigger a workflow execution."""
     context = payload.get("context", {})
@@ -67,7 +133,20 @@ def execute_workflow(workflow_id: str, payload: Dict[str, Any], db: Session = De
     except ValueError as e:
         raise NotFoundError(error=str(e), code="STRE")
 
-@router.get("/executions/{execution_id}", response_model=Dict[str, Any])
+@router.get(
+    "/executions/{execution_id}", response_model=Dict[str, Any],
+    summary="Get execution status",
+    description="Get status of an execution.",
+    responses={
+        200: {"description": "Success", "model": SuccessResponseExample},
+        400: {"description": "Bad Request", "model": ErrorResponseExample},
+        401: {"description": "Unauthorized", "model": ErrorResponseExample},
+        403: {"description": "Forbidden", "model": ErrorResponseExample},
+        404: {"description": "Not Found", "model": ErrorResponseExample},
+        429: {"description": "Too Many Requests", "model": ErrorResponseExample},
+        500: {"description": "Internal Server Error", "model": ErrorResponseExample},
+    },
+)
 def get_execution_status(execution_id: str, db: Session = Depends(get_db)):
     """Get status of an execution."""
     execution = db.query(WorkflowExecution).filter(WorkflowExecution.id == execution_id).first()
@@ -75,12 +154,38 @@ def get_execution_status(execution_id: str, db: Session = Depends(get_db)):
         raise NotFoundError(error="Execution not found", code="EXECUTION_NOT_FOUND")
     return execution.to_dict()
 
-@router.get("/{workflow_id}/eta", response_model=Dict[str, Any])
+@router.get(
+    "/{workflow_id}/eta", response_model=Dict[str, Any],
+    summary="Get workflow ETA",
+    description="Calculate ETA based on historical data.",
+    responses={
+        200: {"description": "Success", "model": SuccessResponseExample},
+        400: {"description": "Bad Request", "model": ErrorResponseExample},
+        401: {"description": "Unauthorized", "model": ErrorResponseExample},
+        403: {"description": "Forbidden", "model": ErrorResponseExample},
+        404: {"description": "Not Found", "model": ErrorResponseExample},
+        429: {"description": "Too Many Requests", "model": ErrorResponseExample},
+        500: {"description": "Internal Server Error", "model": ErrorResponseExample},
+    },
+)
 def get_workflow_eta(workflow_id: str, db: Session = Depends(get_db)):
     """Calculate ETA based on historical data."""
     return WorkflowEngine.calculate_eta(db, workflow_id)
 
-@router.get("/{workflow_id}/docs", response_model=Dict[str, str])
+@router.get(
+    "/{workflow_id}/docs", response_model=Dict[str, str],
+    summary="Get workflow docs",
+    description="Auto-generate documentation for a workflow.",
+    responses={
+        200: {"description": "Success", "model": SuccessResponseExample},
+        400: {"description": "Bad Request", "model": ErrorResponseExample},
+        401: {"description": "Unauthorized", "model": ErrorResponseExample},
+        403: {"description": "Forbidden", "model": ErrorResponseExample},
+        404: {"description": "Not Found", "model": ErrorResponseExample},
+        429: {"description": "Too Many Requests", "model": ErrorResponseExample},
+        500: {"description": "Internal Server Error", "model": ErrorResponseExample},
+    },
+)
 def get_workflow_docs(workflow_id: str, db: Session = Depends(get_db)):
     """Auto-generate documentation for a workflow."""
     doc = WorkflowEngine.auto_document(db, workflow_id)
