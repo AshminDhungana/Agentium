@@ -91,7 +91,7 @@ class TestObserverRole:
 
         response = client.post("/api/v1/tasks", json=payload, headers=headers)
         assert response.status_code == 403
-        assert "read-only" in response.json()["detail"].lower()
+        assert "read-only" in response.json()["error"].lower()
 
     def test_observer_cannot_mutate_existing_resource(self, client):
         """Observer DELETE on any protected endpoint should be blocked."""
@@ -105,7 +105,7 @@ class TestObserverRole:
         # Any state-changing method to any protected route should be blocked
         response = client.delete("/api/v1/tasks/00000000-0000-0000-0000-000000000000", headers=headers)
         assert response.status_code == 403
-        assert "read-only" in response.json()["detail"].lower()
+        assert "read-only" in response.json()["error"].lower()
 
     def test_observer_can_read(self, client):
         """Observer GET requests should succeed (not blocked by middleware)."""
@@ -165,7 +165,10 @@ class TestRateLimiting:
         # Third request should be rate-limited
         response = test_client.get("/test")
         assert response.status_code == 429
-        assert "Rate limit exceeded" in response.json()["detail"]
+        # detail is a dict, check for specific sub-fields
+        detail = response.json()["detail"]
+        assert detail.get("rate_limit") == 2
+        assert detail.get("tier") == "general"
 
     def test_rate_limit_resets_after_window(self, monkeypatch):
         """Once the sliding window has elapsed, requests are allowed again."""
@@ -241,7 +244,7 @@ class TestWebhookHMAC:
         )
 
         assert response.status_code == 400
-        assert "Invalid HMAC" in response.json().get("detail", "")
+        assert "Invalid HMAC" in response.json().get("error", "")
 
     def test_hmac_accepts_valid_payload(self, client, seeded_db):
         """A correctly signed payload should be accepted (200)."""
@@ -287,7 +290,7 @@ class TestWebhookHMAC:
             headers={"Content-Type": "application/json"}
         )
         assert response.status_code == 400
-        assert "Invalid HMAC" in response.json().get("detail", "")
+        assert "Invalid HMAC" in response.json().get("error", "")
 
 
 # ── Group 5 — Input Sanitization (XSS) ────────────────────────────────

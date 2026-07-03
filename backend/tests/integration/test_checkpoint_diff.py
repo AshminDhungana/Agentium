@@ -158,7 +158,7 @@ class TestCheckpointDiffEndpoint:
 
         response = client.get(f"/api/v1/checkpoints/{cp.id}/diff", params={"compare_to": cp.id})
         assert response.status_code == 400
-        assert "itself" in response.json()["detail"].lower() or "cannot" in response.json()["detail"].lower()
+        assert "itself" in response.json()["error"].lower() or "cannot" in response.json()["error"].lower()
 
     def test_missing_checkpoint_returns_404(self, client, seeded_db: Session):
         """When either checkpoint does not exist, 404 is returned."""

@@ -143,11 +143,9 @@ def test_reassign_agent_block(client, db_session):
 
     assert response.status_code == 403
     data = response.json()
-    # FastAPI wraps HTTPException.detail: {"detail": ...}
-    # The route nests another "detail" key inside, so the path is:
-    # data["detail"]["detail"]["verdict"]
-    assert data["detail"]["detail"]["verdict"] == "BLOCK"
-    assert "cannot supervise" in data["detail"]["detail"]["explanation"]
+    # Error response shape: {error, code, detail}
+    assert data["detail"]["verdict"] == "BLOCK"
+    assert "cannot supervise" in data["detail"]["explanation"]
 
     # Verify no DB mutation
     db_session.refresh(council)

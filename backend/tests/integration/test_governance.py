@@ -883,7 +883,7 @@ class TestVotingAPI:
         )
         # BUG-GOV-003: this should eventually be 201; for now it's 403
         assert resp.status_code == 403
-        assert "unauthorized" in resp.json()["detail"].lower()
+        assert "unauthorized" in resp.json()["error"].lower()
 
     def test_cast_amendment_vote_accepted(
         self, client, auth_headers, seeded_db: Session
@@ -938,7 +938,7 @@ class TestVotingAPI:
             headers=auth_headers,
         )
         assert resp.status_code == 400
-        assert "VOTING" in resp.json()["detail"].upper()
+        assert "VOTING" in resp.json()["error"].upper()
 
     def test_cast_amendment_vote_rejected_not_eligible(
         self, client, auth_headers, seeded_db: Session
@@ -1068,7 +1068,7 @@ class TestVotingAPI:
             headers=auth_headers,
         )
         assert resp.status_code == 400
-        assert "not currently accepting votes" in resp.json()["detail"].lower()
+        assert "not currently accepting votes" in resp.json()["error"].lower()
 
     def test_list_deliberations_returns_existing(
         self, client, auth_headers, seeded_db: Session

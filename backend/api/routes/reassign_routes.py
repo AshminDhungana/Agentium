@@ -116,16 +116,16 @@ async def reassign_agent(
         db.add(audit)
         db.commit()
 
-        raise ForbiddenError(error={
-                "error": "Constitutional Block",
-                "code": "CONSTITUTIONAL_BLOCK",
-                "detail": {
-                    "verdict": "BLOCK",
-                    "explanation": decision.explanation,
-                    "citations": decision.citations,
-                    "severity": decision.severity.value,
-                },
-            }, code="ERROR")
+        raise ForbiddenError(
+            error="Constitutional Block",
+            code="CONSTITUTIONAL_BLOCK",
+            detail={
+                "verdict": "BLOCK",
+                "explanation": decision.explanation,
+                "citations": decision.citations,
+                "severity": decision.severity.value,
+            },
+        )
 
     # ------------------------------------------------------------------
     # 4. Handle VOTE_REQUIRED
