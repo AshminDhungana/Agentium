@@ -1,4 +1,19 @@
-// src/components/federation/PeerTable.tsx
+/**
+ * @description Table displaying federated peer instances with inline
+ * trust-level editing and delete confirmation.
+ * @example
+ * ```tsx
+ * import { PeerTable } from '@/components/federation/PeerTable';
+ *
+ * <PeerTable peers={peers} isLoading={false} hasSearch={false} deletingPeerId={null} onDeleteRequest={handleDelete} onTrustChange={handleTrust} />
+ * ```
+ * @param {PeerInstance[]} props.peers - Filtered list of peers to render.
+ * @param {boolean} props.isLoading - Whether the initial fetch is in-flight.
+ * @param {boolean} props.hasSearch - Whether the parent's search has an active query.
+ * @param {string | null} props.deletingPeerId - ID of peer pending delete confirmation.
+ * @param {(peerId: string) => void} props.onDeleteRequest - Sets a row into confirm state.
+ * @param {(peerId: string, trust: TrustLevel) => void} props.onTrustChange - Called when trust level changes.
+ */
 // Extracted from FederationPage — renders the peers table with:
 //  - Inline delete confirmation (replaces window.confirm)
 //  - Editable trust-level select per row (uses PATCH /peers/{id}/trust)

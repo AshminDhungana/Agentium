@@ -1,4 +1,15 @@
-// src/components/channels/MessageLogViewer.tsx
+/**
+ * @description Paginated message log viewer for a specific channel.
+ * Uses the unified endpoint for filtering, pagination, and enriched metadata.
+ * @example
+ * ```tsx
+ * import { MessageLogViewer } from '@/components/channels/MessageLogViewer';
+ *
+ * <MessageLogViewer channelId={channel.id} limit={50} />
+ * ```
+ * @param {string} props.channelId - Channel ID to fetch logs for.
+ * @param {number} [props.limit] - Maximum number of messages to fetch (default: 50).
+ */
 // ─────────────────────────────────────────────────────────────────────────────
 // Changes vs. the previous version:
 //   1. Switched from `channelMetricsApi.getChannelLogs()` (old per-channel

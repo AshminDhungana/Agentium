@@ -4,6 +4,20 @@ import { browserApi, BrowserFrameResponse } from '../../services/browserApi';
 import { Monitor, RefreshCw, AlertCircle, X, Maximize2, Minimize2, Video, Pause, Play } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
+/**
+ * @description Live browser task viewer that subscribes to WebSocket `browser_frame`
+ * events and renders real-time screenshot frames.
+ * @listens browser_frame — WebSocket event for live browser screenshot frames.
+ * @example
+ * ```tsx
+ * import { BrowserTaskViewer } from '@/components/tasks/BrowserTaskViewer';
+ *
+ * <BrowserTaskViewer taskId={task.id} onClose={close} mode="modal" />
+ * ```
+ * @param {string} props.taskId - The task ID to monitor for browser frames.
+ * @param {() => void} [props.onClose] - Callback to close the viewer.
+ * @param {'tab' | 'modal'} [props.mode] - Render mode: inline tab or modal overlay (default: 'modal').
+ */
 export interface BrowserTaskViewerProps {
     taskId: string;
     onClose?: () => void;

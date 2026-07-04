@@ -1,6 +1,13 @@
 /**
- * CheckpointImportModal — Phase 7
- * Modal for importing checkpoints with validation and conflict resolution.
+ * @description Modal for importing checkpoints with validation and conflict resolution.
+ * @example
+ * ```tsx
+ * import { CheckpointImportModal } from '@/components/checkpoints/CheckpointImportModal';
+ *
+ * <CheckpointImportModal onClose={close} onImport={handleImport} />
+ * ```
+ * @param {() => void} props.onClose - Callback to close the modal.
+ * @param {(data: object) => Promise<void>} props.onImport - Callback with the validated import data.
  */
 
 import React, { useState, useCallback, useRef } from 'react';

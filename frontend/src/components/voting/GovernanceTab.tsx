@@ -1,8 +1,12 @@
 /**
- * GovernanceTab
- *
- * Idle governance status panel with pause/resume controls.
+ * @description Idle governance status panel with pause/resume controls.
  * Extracted from VotingPage to keep the parent file lean.
+ * @example
+ * ```tsx
+ * import { GovernanceTab } from '@/components/voting/GovernanceTab';
+ *
+ * <GovernanceTab />
+ * ```
  */
 
 import React, { useState, useEffect, useCallback } from 'react';

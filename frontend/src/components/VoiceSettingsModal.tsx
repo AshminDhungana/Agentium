@@ -1,3 +1,14 @@
+/**
+ * @description Modal for voice settings and speaker profile enrollment.
+ * Supports microphone recording for speaker registration.
+ * @example
+ * ```tsx
+ * import { VoiceSettingsModal } from '@/components/VoiceSettingsModal';
+ *
+ * <VoiceSettingsModal onClose={close} />
+ * ```
+ * @param {() => void} props.onClose - Callback to close the modal.
+ */
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Mic, Trash2, Play, Square, Settings2 } from 'lucide-react';
 import { voiceApi } from '@/services/voiceApi';

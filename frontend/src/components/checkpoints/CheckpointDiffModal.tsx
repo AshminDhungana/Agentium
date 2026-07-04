@@ -1,3 +1,17 @@
+/**
+ * @description Modal for viewing checkpoint branch diffs with field-level comparison.
+ * Renders a navigable tree of changes between two checkpoints.
+ * @example
+ * ```tsx
+ * import { CheckpointDiffModal } from '@/components/checkpoints/CheckpointDiffModal';
+ *
+ * <CheckpointDiffModal leftBranch="main" rightBranch="feature" onClose={close} />
+ * ```
+ * @param {string} [props.taskId] - Optional task ID to scope the comparison.
+ * @param {string} props.leftBranch - Left branch / checkpoint identifier.
+ * @param {string} props.rightBranch - Right branch / checkpoint identifier.
+ * @param {() => void} props.onClose - Callback to close the modal.
+ */
 import { showToast } from '@/hooks/useToast';
 import React, { useState, useEffect, useRef } from 'react';
 import { useFocusTrap } from '../../hooks/useFocusTrap';

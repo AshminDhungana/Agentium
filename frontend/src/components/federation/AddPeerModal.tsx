@@ -3,6 +3,19 @@
 // Owns its own form state internally; calls onSubmit with typed RegisterPeerRequest.
 // The parent controls visibility by conditionally mounting this component.
 
+/**
+ * @description Modal for adding a new peer instance to the federation.
+ * Owns its own form state and calls onSubmit with typed RegisterPeerRequest.
+ * @example
+ * ```tsx
+ * import { AddPeerModal } from '@/components/federation/AddPeerModal';
+ *
+ * <AddPeerModal isSubmitting={isLoading} onClose={close} onSubmit={handleAdd} />
+ * ```
+ * @param {boolean} props.isSubmitting - Whether the API call is in-flight.
+ * @param {() => void} props.onClose - Callback to close the modal.
+ * @param {(data: RegisterPeerRequest) => Promise<void>} props.onSubmit - Called with validated form data.
+ */
 import { useState, useRef } from 'react';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { Plus } from 'lucide-react';

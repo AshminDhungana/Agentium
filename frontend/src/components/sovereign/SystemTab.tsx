@@ -1,4 +1,14 @@
-// src/components/sovereign/SystemTab.tsx
+/**
+ * @description System health tab for the Sovereign Dashboard.
+ * Displays CPU, memory, disk usage, and service status.
+ * Purely presentational; data-fetching is handled by useSystemTab.
+ * @example
+ * ```tsx
+ * import { SystemTab } from '@/components/sovereign/SystemTab';
+ *
+ * <SystemTab />
+ * ```
+ */
 // System tab panel extracted from SovereignDashboard.
 // All data-fetching and WebSocket logic lives in useSystemTab — this
 // component is purely presentational.

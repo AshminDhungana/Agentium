@@ -1,7 +1,15 @@
 /**
- * DetailPanel
+ * @description Expanded view for a selected amendment or deliberation.
+ * Renders vote buttons, vote history, and metadata for the voting interface.
+ * @example
+ * ```tsx
+ * import { DetailPanel } from '@/components/voting/DetailPanel';
  *
- * Expanded view for a selected amendment or deliberation.
+ * <DetailPanel item={amendment} isAmendment onVoteCast={refetch} />
+ * ```
+ * @param {AmendmentVoting | TaskDeliberation} props.item - The selected voting item.
+ * @param {boolean} props.isAmendment - Whether this is an amendment (vs deliberation).
+ * @param {() => void} [props.onVoteCast] - Callback after a vote is successfully cast.
  */
 
 import React, { useState, useEffect, useRef } from 'react';

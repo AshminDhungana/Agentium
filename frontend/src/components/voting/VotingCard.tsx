@@ -1,7 +1,16 @@
 /**
- * VotingCard
+ * @description Summary card for a single amendment or deliberation.
+ * Displays status badge, vote tally bar, and countdown timer.
+ * @example
+ * ```tsx
+ * import { VotingCard } from '@/components/voting/VotingCard';
  *
- * Summary card for a single amendment or deliberation.
+ * <VotingCard item={amendment} isSelected={false} onClick={handleClick} isAmendment />
+ * ```
+ * @param {AmendmentVoting | TaskDeliberation} props.item - The voting item to display.
+ * @param {boolean} props.isSelected - Whether this card is currently selected.
+ * @param {() => void} props.onClick - Callback when the card is clicked.
+ * @param {boolean} props.isAmendment - Whether this item is an amendment (vs deliberation).
  */
 
 import React from 'react';

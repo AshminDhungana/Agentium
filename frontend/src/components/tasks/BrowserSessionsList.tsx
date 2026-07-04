@@ -1,3 +1,15 @@
+/**
+ * @description List component showing active browser automation sessions.
+ * Polls the browser API every 10 seconds to refresh session data.
+ * @example
+ * ```tsx
+ * import { BrowserSessionsList } from '@/components/tasks/BrowserSessionsList';
+ *
+ * <BrowserSessionsList tasks={tasks} onSelectTask={handleSelect} />
+ * ```
+ * @param {Task[]} props.tasks - Array of tasks to filter for browser sessions.
+ * @param {(taskId: string) => void} props.onSelectTask - Callback when a session is selected.
+ */
 import React, { useEffect, useState } from 'react';
 import { Monitor, RefreshCw } from 'lucide-react';
 import { browserApi, BrowserSessionInfo } from '../../services/browserApi';

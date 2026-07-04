@@ -1,6 +1,17 @@
 // src/components/mcp/MCPToolRegistry.tsx
 
 
+/**
+ * @description Registry for MCP (Model Context Protocol) tools with approval
+ * tiering, live stats, and revocation controls. Subscribes to WebSocket
+ * events for real-time tool status updates.
+ * @example
+ * ```tsx
+ * import { MCPToolRegistry } from '@/components/mcp/MCPToolRegistry';
+ *
+ * <MCPToolRegistry />
+ * ```
+ */
 import { useEffect, useState, useCallback, useRef } from 'react';
 import {
     Plus,

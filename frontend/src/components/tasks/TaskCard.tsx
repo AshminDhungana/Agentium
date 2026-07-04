@@ -1,3 +1,16 @@
+/**
+ * @description Card component displaying a single task's metadata,
+ * status badge, priority, and optional action buttons.
+ * @example
+ * ```tsx
+ * import { TaskCard } from '@/components/tasks/TaskCard';
+ *
+ * <TaskCard task={task} onClick={handleSelect} onViewLive={handleLive} />
+ * ```
+ * @param {Task} props.task - The task to display.
+ * @param {(task: Task) => void} [props.onClick] - Callback when the card is clicked.
+ * @param {(task: Task) => void} [props.onViewLive] - Callback for viewing live browser session.
+ */
 import React from 'react';
 import { Task } from '../../types';
 import { Clock, User, Zap, CheckCircle2, AlertCircle, MessageSquare, RefreshCw, Monitor } from 'lucide-react';

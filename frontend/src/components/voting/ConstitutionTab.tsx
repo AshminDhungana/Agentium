@@ -1,8 +1,12 @@
 /**
- * ConstitutionTab
+ * @description Displays the current active constitution text.
+ * Fetches and renders the constitution content from the API.
+ * @example
+ * ```tsx
+ * import { ConstitutionTab } from '@/components/voting/ConstitutionTab';
  *
- * Displays the current active constitution text.
- * Extracted from VotingPage to keep the parent file lean.
+ * <ConstitutionTab />
+ * ```
  */
 
 import React, { useState, useEffect } from 'react';

@@ -21,6 +21,19 @@ interface StepData {
   on_failure_step?: number;
 }
 
+/**
+ * @description Mobile-optimized read-only viewer for workflow steps.
+ * Renders a collapsible list of steps with type icons and config summary.
+ * @example
+ * ```tsx
+ * import { MobileWorkflowViewer } from '@/components/workflows/MobileWorkflowViewer';
+ *
+ * <MobileWorkflowViewer workflowName="Data Pipeline" version={2} steps={steps} />
+ * ```
+ * @param {string} props.workflowName - Display name of the workflow.
+ * @param {number} props.version - Workflow version number.
+ * @param {StepData[]} props.steps - Array of step definitions to display.
+ */
 interface MobileWorkflowViewerProps {
   workflowName: string;
   version: number;

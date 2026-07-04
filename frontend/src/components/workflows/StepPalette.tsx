@@ -1,3 +1,14 @@
+/**
+ * @description Palette of draggable step types for the workflow designer canvas.
+ * Provides tiles for TASK, CONDITION, PARALLEL, HUMAN_APPROVAL, and DELAY steps.
+ * @example
+ * ```tsx
+ * import { StepPalette } from '@/components/workflows/StepPalette';
+ *
+ * <StepPalette onStepAdd={addStep} />
+ * ```
+ * @param {(type: string, defaultConfig: Record<string, unknown>) => void} props.onStepAdd - Callback when a step type is selected.
+ */
 import React, { useRef, useCallback } from 'react';
 import { useReactFlow } from '@xyflow/react';
 import {

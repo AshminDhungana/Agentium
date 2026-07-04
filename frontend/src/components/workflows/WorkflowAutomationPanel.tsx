@@ -7,6 +7,16 @@ import { Plus, Play, CheckCircle, Clock, XCircle, Power } from 'lucide-react';
 import { showToast } from '@/hooks/useToast';
 import { EmptyState } from '@/components/ui/EmptyState';
 
+/**
+ * @description Panel for managing and executing automation workflows.
+ * Lists workflows, triggers execution, and monitors execution status.
+ * @example
+ * ```tsx
+ * import { WorkflowAutomationPanel } from '@/components/workflows/WorkflowAutomationPanel';
+ *
+ * <WorkflowAutomationPanel />
+ * ```
+ */
 export const WorkflowAutomationPanel: React.FC = () => {
   const [workflows, setWorkflows]               = useState<any[]>([]);
   const [loading, setLoading]                   = useState(true);

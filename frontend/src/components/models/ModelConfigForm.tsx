@@ -1,5 +1,14 @@
 /**
- * frontend/src/components/models/ModelConfigForm.tsx
+ * @description Form for adding or editing AI provider model configurations.
+ * Supports all provider types with provider-specific fields and validation.
+ * @example
+ * ```tsx
+ * import { ModelConfigForm } from '@/components/models/ModelConfigForm';
+ *
+ * <ModelConfigForm onSubmit={handleSubmit} onCancel={handleCancel} />
+ * ```
+ * @param {(config: ModelConfig) => Promise<void>} props.onSubmit - Callback with validated configuration data.
+ * @param {() => void} props.onCancel - Callback to cancel the form.
  */
 
 import React, { useState, useEffect } from 'react';

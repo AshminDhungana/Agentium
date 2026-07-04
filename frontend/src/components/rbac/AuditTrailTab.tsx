@@ -1,5 +1,15 @@
 // src/components/rbac/AuditTrailTab.tsx
 
+/**
+ * @description Tab component displaying paginated audit trail logs
+ * with filtering by category, level, actor, and date range.
+ * @example
+ * ```tsx
+ * import { AuditTrailTab } from '@/components/rbac/AuditTrailTab';
+ *
+ * <AuditTrailTab />
+ * ```
+ */
 import { useCallback, useEffect, useState } from 'react';
 import {
     Activity,

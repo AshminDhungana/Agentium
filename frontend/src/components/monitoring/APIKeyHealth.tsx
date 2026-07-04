@@ -1,3 +1,13 @@
+/**
+ * @description Widget displaying health and status of all configured API keys.
+ * Shows provider, remaining quota, rate limit status, and last error.
+ * @example
+ * ```tsx
+ * import { APIKeyHealth } from '@/components/monitoring/APIKeyHealth';
+ *
+ * <APIKeyHealth />
+ * ```
+ */
 import { useState, useEffect, useCallback } from 'react';
 import {
     Key,

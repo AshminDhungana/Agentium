@@ -1,10 +1,14 @@
 /**
- * ProposeAmendmentModal
+ * @description Modal for proposing a new constitutional amendment.
+ * Extracted from VotingPage and improved with inline field validation.
+ * @example
+ * ```tsx
+ * import { ProposeAmendmentModal } from '@/components/voting/ProposeAmendmentModal';
  *
- * Modal for proposing a new constitutional amendment.
- * Extracted from VotingPage and improved with:
- * - Inline field validation (errors appear beneath each field, not just as toasts)
- * - Error cleared when user starts correcting a field
+ * <ProposeAmendmentModal onClose={close} onSuccess={refetch} />
+ * ```
+ * @param {() => void} props.onClose - Callback to close the modal.
+ * @param {() => void} props.onSuccess - Callback after successful proposal submission.
  */
 
 import React, { useState, useRef } from 'react';

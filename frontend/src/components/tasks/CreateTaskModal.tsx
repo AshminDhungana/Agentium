@@ -1,3 +1,15 @@
+/**
+ * @description Modal for creating a new task with priority, type,
+ * and optional constitutional basis fields.
+ * @example
+ * ```tsx
+ * import { CreateTaskModal } from '@/components/tasks/CreateTaskModal';
+ *
+ * <CreateTaskModal onConfirm={handleCreate} onClose={close} />
+ * ```
+ * @param {(data: object) => Promise<void>} props.onConfirm - Callback with validated task data.
+ * @param {() => void} props.onClose - Callback to close the modal.
+ */
 import React, { useState, useRef } from 'react';
 import { X, FileText, AlertCircle, Sparkles } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';

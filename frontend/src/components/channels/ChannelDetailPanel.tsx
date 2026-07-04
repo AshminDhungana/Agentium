@@ -1,6 +1,15 @@
-// src/components/channels/ChannelDetailPanel.tsx
-// ─────────────────────────────────────────────────────────────────────────────
-// Phase 15.3 — Channel Health Monitoring, Logs & Settings
+/**
+ * @description Slide-in panel for channel health, logs, and settings management.
+ * Phase 15.3 — Channel Health Monitoring, Logs & Settings.
+ * @example
+ * ```tsx
+ * import { ChannelDetailPanel } from '@/components/channels/ChannelDetailPanel';
+ *
+ * <ChannelDetailPanel channelId={channel.id} onClose={closePanel} />
+ * ```
+ * @param {string} props.channelId - The selected channel ID.
+ * @param {() => void} props.onClose - Callback to close the panel.
+ */
 //
 // A right-side slide-in panel that opens when a channel is selected in
 // ChannelsPage. Three tabs:

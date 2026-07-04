@@ -1,3 +1,16 @@
+/**
+ * @description Animated circular health score indicator with color coding.
+ * Displays a numeric score with optional label, sized internally based on the size prop.
+ * @example
+ * ```tsx
+ * import { HealthScore } from '@/components/monitoring/HealthScore';
+ *
+ * <HealthScore score={95} size="lg" showLabel={false} />
+ * ```
+ * @param {number} props.score - Health score value (0–100).
+ * @param {'sm' | 'md' | 'lg'} [props.size] - Render size preset (default: 'md').
+ * @param {boolean} [props.showLabel] - Whether to show the numeric label (default: true).
+ */
 import React from 'react';
 import { HeartPulse, Activity } from 'lucide-react';
 

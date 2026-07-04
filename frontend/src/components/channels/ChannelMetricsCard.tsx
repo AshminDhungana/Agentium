@@ -1,3 +1,14 @@
+/**
+ * @description Card displaying channel health metrics with status color coding.
+ * @example
+ * ```tsx
+ * import { ChannelMetricsCard } from '@/components/channels/ChannelMetricsCard';
+ *
+ * <ChannelMetricsCard metrics={metrics} healthStatus="healthy" />
+ * ```
+ * @param {ChannelMetrics} props.metrics - Channel metrics data from the API.
+ * @param {ChannelHealthStatus} props.healthStatus - Current health status for color coding.
+ */
 import { HealthIndicator } from '@/components/HealthIndicator';
 import type { ChannelMetrics, ChannelHealthStatus } from '@/types';
 

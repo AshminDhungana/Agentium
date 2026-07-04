@@ -1,3 +1,17 @@
+/**
+ * @description Monaco-based diff viewer for comparing two checkpoint JSON snapshots.
+ * @example
+ * ```tsx
+ * import { CheckpointDiffViewer } from '@/components/checkpoints/CheckpointDiffViewer';
+ *
+ * <CheckpointDiffViewer checkpointId="cp-1" compareToId="cp-2" onClose={close} />
+ * ```
+ * @param {string} props.checkpointId - Base checkpoint ID.
+ * @param {string} props.compareToId - Checkpoint to compare against.
+ * @param {string} [props.leftLabel] - Label for the left side of the diff.
+ * @param {string} [props.rightLabel] - Label for the right side of the diff.
+ * @param {() => void} props.onClose - Callback to close the viewer.
+ */
 import React, { useState, useEffect, useRef } from 'react';
 import { X, AlertCircle, Code2, GitCompare, ChevronsRight } from 'lucide-react';
 import { DiffEditor } from '@monaco-editor/react';

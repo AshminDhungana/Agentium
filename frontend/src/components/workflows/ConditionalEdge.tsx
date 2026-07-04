@@ -7,13 +7,16 @@ import {
 } from '@xyflow/react';
 
 /**
- * Custom edge for the workflow designer.
+ * @description Custom React Flow edge for the workflow designer.
+ * Renders success (green, solid), failure (red, dashed), or default (gray) edges
+ * with labels. The `data.animated` flag adds a moving dash animation.
+ * @example
+ * ```tsx
+ * import { ConditionalEdge } from '@/components/workflows/ConditionalEdge';
  *
- * - `sourceHandle === 'success'` → solid green edge labeled "✓ True"
- * - `sourceHandle === 'failure'` → dashed red edge labeled "✗ False"
- * - default                      → solid gray edge, no label
- *
- * The `data.animated` flag adds a moving dash animation for live execution.
+ * <ConditionalEdge {...edgeProps} />
+ * ```
+ * @param {EdgeProps} props - React Flow edge props including source, target, and data.
  */
 export function ConditionalEdge({
   id,

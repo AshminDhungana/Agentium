@@ -1,3 +1,14 @@
+/**
+ * @description React Flow node component for rendering workflow steps in the designer.
+ * Displays step type icon, label, and connection handles.
+ * @example
+ * ```tsx
+ * import { WorkflowStepNode } from '@/components/workflows/WorkflowStepNode';
+ *
+ * <WorkflowStepNode data={nodeData} selected={false} />
+ * ```
+ * @param {NodeProps} props - React Flow node props including type, selected, and data.
+ */
 import React, { memo } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import {

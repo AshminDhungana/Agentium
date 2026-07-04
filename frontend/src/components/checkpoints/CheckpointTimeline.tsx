@@ -1,4 +1,14 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+/**
+ * @description Interactive timeline view of all checkpoints with phase grouping,
+ * search, and expand/collapse per branch.
+ * @example
+ * ```tsx
+ * import { CheckpointTimeline } from '@/components/checkpoints/CheckpointTimeline';
+ *
+ * <CheckpointTimeline taskId={taskId} />
+ * ```
+ * @param {string} [props.taskId] - Optional task ID to filter checkpoints.
+ */
 import { showToast } from '@/hooks/useToast';
 import { Download, Upload } from 'lucide-react';
 import {

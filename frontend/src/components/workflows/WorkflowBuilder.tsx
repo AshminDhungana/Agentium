@@ -16,6 +16,18 @@ interface WorkflowTemplate {
   steps: StepConfig[];
 }
 
+/**
+ * @description Visual workflow builder with drag-and-drop step configuration.
+ * Supports task, condition, parallel, human_approval, and delay step types.
+ * @example
+ * ```tsx
+ * import { WorkflowBuilder } from '@/components/workflows/WorkflowBuilder';
+ *
+ * <WorkflowBuilder onSave={handleSave} />
+ * ```
+ * @param {WorkflowTemplate} [props.initialTemplate] - Optional starting template.
+ * @param {(name: string, template: WorkflowTemplate, cron?: string) => void} props.onSave - Callback with validated workflow data.
+ */
 interface WorkflowBuilderProps {
   initialTemplate?: WorkflowTemplate;
   onSave: (name: string, template: WorkflowTemplate, cron?: string) => void;

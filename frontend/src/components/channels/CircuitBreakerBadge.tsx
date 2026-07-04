@@ -1,3 +1,14 @@
+/**
+ * @description Badge component showing the current circuit breaker state for a channel.
+ * Displays CLOSED (green), HALF-OPEN (yellow), or OPEN (red, pulsing).
+ * @example
+ * ```tsx
+ * import { CircuitBreakerBadge } from '@/components/channels/CircuitBreakerBadge';
+ *
+ * <CircuitBreakerBadge state="closed" />
+ * ```
+ * @param {CircuitBreakerState} props.state - Current circuit breaker state.
+ */
 import type { CircuitBreakerState } from '@/types';
 
 interface CircuitBreakerBadgeProps {

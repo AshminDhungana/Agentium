@@ -1,10 +1,12 @@
 /**
- * VoiceIndicator.tsx
- * - On login: auto-connects, shows spinner, then updates icon to connected/error
- * - On click when offline/error: retries connection
- * - If retry fails: detects OS, shows a toast-style notification with
- *   the exact install command for their platform
- * - On click when connected: disconnects / disables
+ * @description Voice bridge status indicator with auto-connect on login.
+ * Shows connection state, retries on click, and platform-specific install hints.
+ * @example
+ * ```tsx
+ * import { VoiceIndicator } from '@/components/VoiceIndicator';
+ *
+ * <VoiceIndicator />
+ * ```
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';

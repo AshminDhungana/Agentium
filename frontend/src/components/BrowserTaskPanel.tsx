@@ -1,5 +1,13 @@
 /**
- * BrowserTaskPanel.tsx 
+ * @description Panel displaying live browser task progress with periodic screenshot refresh.
+ * Polls the browser API to show the current page state.
+ * @example
+ * ```tsx
+ * import { BrowserTaskPanel } from '@/components/BrowserTaskPanel';
+ *
+ * <BrowserTaskPanel />
+ * ```
+ *
  *
  * Displays live browser task progress with periodic screenshot refresh.
  * Uses polling against /api/v1/browser/screenshot to show the current page state.

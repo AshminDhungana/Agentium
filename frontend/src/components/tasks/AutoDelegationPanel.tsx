@@ -1,3 +1,15 @@
+/**
+ * @description Panel displaying a task's complexity score, tier assignment,
+ * and candidate agent rankings for the auto-delegation engine.
+ * @example
+ * ```tsx
+ * import { AutoDelegationPanel } from '@/components/tasks/AutoDelegationPanel';
+ *
+ * <AutoDelegationPanel task={task} onTaskUpdated={handleUpdate} />
+ * ```
+ * @param {Task} props.task - The task whose auto-delegation metadata is displayed.
+ * @param {(task: Task) => void} [props.onTaskUpdated] - Callback when delegation data changes.
+ */
 import React, { useState } from 'react';
 import { Task } from '../../types';
 import { tasksService } from '../../services/tasks';

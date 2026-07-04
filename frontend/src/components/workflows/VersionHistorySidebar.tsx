@@ -1,3 +1,17 @@
+/**
+ * @description Sidebar showing version history for a workflow with rollback capability.
+ * @example
+ * ```tsx
+ * import { VersionHistorySidebar } from '@/components/workflows/VersionHistorySidebar';
+ *
+ * <VersionHistorySidebar workflowId="wf-1" currentVersion={3} onRollback={handleRollback} isExpanded onToggle={toggle} />
+ * ```
+ * @param {string} props.workflowId - The workflow ID to fetch versions for.
+ * @param {number} props.currentVersion - The currently active version number.
+ * @param {() => void} props.onRollback - Callback to trigger a rollback.
+ * @param {boolean} props.isExpanded - Whether the sidebar is expanded (desktop) or collapsed.
+ * @param {() => void} props.onToggle - Callback to toggle sidebar expansion.
+ */
 import React, { useState, useEffect } from 'react';
 import { api } from '@/services/api';
 import { showToast } from '@/hooks/useToast';

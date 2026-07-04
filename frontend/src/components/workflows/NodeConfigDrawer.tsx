@@ -1,3 +1,19 @@
+/**
+ * @description Slide-over drawer for editing a workflow step's configuration.
+ * Renders form fields specific to the selected step type.
+ * @example
+ * ```tsx
+ * import { NodeConfigDrawer } from '@/components/workflows/NodeConfigDrawer';
+ *
+ * <NodeConfigDrawer isOpen nodeData={data} onSave={save} onDelete={del} onClose={close} allStepIndexes={[0,1,2]} />
+ * ```
+ * @param {boolean} props.isOpen - Whether the drawer is visible.
+ * @param {() => void} props.onClose - Callback to close the drawer.
+ * @param {WorkflowNodeData | null} props.nodeData - The step data being edited.
+ * @param {(stepIndex: number, changes: Partial<WorkflowNodeData>) => void} props.onSave - Callback to save changes.
+ * @param {(stepIndex: number) => void} props.onDelete - Callback to delete the step.
+ * @param {number[]} props.allStepIndexes - All step indexes for routing dropdowns.
+ */
 import React, { useState, useEffect } from 'react';
 import { SlideOver } from '@/components/ui/SlideOver';
 import { Button } from '@/components/ui/button';

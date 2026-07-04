@@ -4,6 +4,20 @@
 // Validates that the payload is legal JSON before calling onSubmit.
 // The parent controls visibility by conditionally mounting this component.
 
+/**
+ * @description Modal for delegating a task to a federated peer instance.
+ * Validates JSON payload before submission.
+ * @example
+ * ```tsx
+ * import { DelegateTaskModal } from '@/components/federation/DelegateTaskModal';
+ *
+ * <DelegateTaskModal peers={peers} isSubmitting={false} onClose={close} onSubmit={handleDelegate} />
+ * ```
+ * @param {PeerInstance[]} props.peers - Active peers to populate the target dropdown.
+ * @param {boolean} props.isSubmitting - Whether the API call is in-flight.
+ * @param {() => void} props.onClose - Callback to close the modal.
+ * @param {(data: DelegateTaskRequest) => Promise<void>} props.onSubmit - Called with validated form data.
+ */
 import { useState, useRef } from 'react';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { Send, AlertCircle } from 'lucide-react';

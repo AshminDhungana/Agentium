@@ -1,9 +1,16 @@
 /**
- * BranchDiffView — Phase 6 + Phase 7
- *
- * Side-by-side branch comparison UI.
+ * @description Side-by-side branch comparison UI for checkpoint diffs.
  * Visualises diffs for task state, agent states, and artifacts
  * returned by GET /api/v1/checkpoints/compare.
+ * @example
+ * ```tsx
+ * import { BranchDiffView } from '@/components/checkpoints/BranchDiffView';
+ *
+ * <BranchDiffView leftBranch="main" rightBranch="feature" taskId={taskId} />
+ * ```
+ * @param {string} [props.leftBranch] - Left branch name for comparison.
+ * @param {string} [props.rightBranch] - Right branch name for comparison.
+ * @param {string} [props.taskId] - Optional task ID to scope the comparison.
  */
 
 import React, { useState, useCallback } from 'react';

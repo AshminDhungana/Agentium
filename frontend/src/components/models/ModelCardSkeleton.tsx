@@ -1,9 +1,13 @@
 /**
- * frontend/src/components/models/ModelCardSkeleton.tsx
- *
- * Animated placeholder that matches the exact shape of ModelCard.
+ * @description Animated placeholder that matches the exact shape of ModelCard.
  * Shown in the grid while configs are loading or refreshing, instead of
  * replacing the whole page with a full-screen spinner.
+ * @example
+ * ```tsx
+ * import { ModelCardSkeleton } from '@/components/models/ModelCardSkeleton';
+ *
+ * <ModelCardSkeleton />
+ * ```
  */
 
 import React from 'react';

@@ -1,12 +1,17 @@
 /**
- * QuorumBar
+ * @description Visual vote tally bar with a quorum threshold marker.
+ * Quorum prop is clamped to [0, 1] before rendering.
+ * @example
+ * ```tsx
+ * import { QuorumBar } from '@/components/voting/QuorumBar';
  *
- * Visual vote tally bar with a quorum threshold marker.
- *
- * Fix: quorum prop is now clamped to [0, 1] before use. The old inline
- * version passed `min_quorum / totalEligible` without clamping, which
- * could produce values > 1 when min_quorum > totalEligible, pushing the
- * marker outside the bar bounds.
+ * <QuorumBar votesFor={12} votesAgainst={3} votesAbstain={1} total={20} quorum={0.6} />
+ * ```
+ * @param {number} props.votesFor - Number of "for" votes.
+ * @param {number} props.votesAgainst - Number of "against" votes.
+ * @param {number} props.votesAbstain - Number of "abstain" votes.
+ * @param {number} props.total - Total eligible voters.
+ * @param {number} [props.quorum] - Quorum threshold as a fraction (0.0–1.0, default: 0.6).
  */
 
 import React from 'react';

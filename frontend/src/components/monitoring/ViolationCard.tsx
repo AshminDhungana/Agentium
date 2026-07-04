@@ -1,3 +1,16 @@
+/**
+ * @description Card displaying a single constitutional violation report
+ * with severity badge, details, and optional resolve/dismiss actions.
+ * @example
+ * ```tsx
+ * import { ViolationCard } from '@/components/monitoring/ViolationCard';
+ *
+ * <ViolationCard violation={violation} onResolve={handleResolve} onDismiss={handleDismiss} />
+ * ```
+ * @param {ViolationReport} props.violation - The violation data to display.
+ * @param {(id: string) => void} [props.onResolve] - Callback to resolve the violation.
+ * @param {(id: string) => void} [props.onDismiss] - Callback to dismiss the violation.
+ */
 import React from 'react';
 import { ViolationReport } from '../../types';
 import { AlertOctagon, ShieldAlert, AlertTriangle, Info, Clock, User, CheckCircle2, XCircle } from 'lucide-react';

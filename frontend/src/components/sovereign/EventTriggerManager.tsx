@@ -1,4 +1,14 @@
-// src/components/sovereign/EventTriggerManager.tsx
+/**
+ * @description Tab component for managing event triggers (webhooks, schedules,
+ * thresholds, API polling) as part of the Sovereign Dashboard.
+ * Phase 13.6 — Intelligent Event Processing UI.
+ * @example
+ * ```tsx
+ * import { EventTriggerManager } from '@/components/sovereign/EventTriggerManager';
+ *
+ * <EventTriggerManager />
+ * ```
+ */
 // Phase 13.6 — Intelligent Event Processing UI
 // Integrated as a tab inside SovereignDashboard.tsx
 

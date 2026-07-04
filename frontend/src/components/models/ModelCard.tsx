@@ -1,12 +1,16 @@
 /**
- * frontend/src/components/models/ModelCard.tsx
- *
- * Individual provider configuration card.
+ * @description Individual provider configuration card for the Models page.
  * Extracted from ModelsPage so it can be memoised — the grid only re-renders
  * cards that actually changed, not the entire list on every action.
+ * @example
+ * ```tsx
+ * import { ModelCard } from '@/components/models/ModelCard';
  *
- * All mutable state lives in useModelConfigs (the parent hook).
- * This component is intentionally pure: same props → same output.
+ * <ModelCard config={config} onUpdate={handleUpdate} onDelete={handleDelete} />
+ * ```
+ * @param {ModelConfig} props.config - The model configuration to display.
+ * @param {(config: ModelConfig) => void} props.onUpdate - Callback to update the configuration.
+ * @param {(id: string) => void} props.onDelete - Callback to delete the configuration.
  */
 
 import React, { useMemo, useRef, useEffect, useState } from 'react';
