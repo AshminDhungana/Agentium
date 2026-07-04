@@ -283,15 +283,105 @@ export const AgentsPage: React.FC<AgentsPageProps> = () => {
 
 ### Database Migrations
 
-Use Alembic for schema changes:
+Database migrations are managed by **Alembic**. All migration scripts are located in `backend/alembic/versions/`.
+
+#### Apply migrations
+
+When starting the application for the first time, or after pulling new code that includes schema changes:
 
 ```bash
-# Generate migration
 cd backend
-alembic revision --autogenerate -m "Add knowledge moderation queue"
+alembic upgrade head
+```
 
-# Review the generated script before committing
-# Ensure it handles both PostgreSQL AND ChromaDB consistency
+#### Create a new migration
+
+After modifying SQLAlchemy models in `backend/models/entities/`:
+
+```bash
+cd backend
+alembic revision --autogenerate -m "Description of changes"
+```
+
+> ⚠️ **Always review the generated script before committing.** Ensure it handles both PostgreSQL and ChromaDB consistency.
+
+#### Downgrade migrations
+
+To revert the last migration:
+
+```bash
+cd backend
+alembic downgrade -1
+```
+
+To revert to a specific revision:
+
+```bash
+cd backend
+alembic downgrade <revision_id>
+```
+
+To revert all migrations and start from scratch:
+
+```bash
+cd backend
+alembic downgrade base
+```
+
+## 🧪 Test Execution
+
+Tests are organized by scope and run inside Docker containers. No local Python or Node.js installation is required.
+
+### Backend Tests
+
+#### Run all backend tests
+
+```bash
+docker compose exec backend pytest
+```
+
+#### Run tests with coverage
+
+```bash
+docker compose exec backend pytest --cov=services --cov-report=term-missing --cov-fail-under=80
+```
+
+#### Run a specific test
+
+```bash
+docker compose exec backend pytest backend/tests/test_governance.py -v
+```
+
+#### Run integration tests
+
+Integration tests exercise the full stack (PostgreSQL, Redis, ChromaDB, and API). They are located in `backend/tests/integration/`.
+
+```bash
+docker compose exec backend pytest backend/tests/integration/ -v
+```
+
+### Frontend Tests
+
+#### Run frontend tests
+
+```bash
+cd frontend
+npm test
+```
+
+### Linting and Type Checking
+
+```bash
+# Backend linting
+docker compose exec backend flake8 backend/
+
+# Frontend linting
+cd frontend
+npm run lint
+
+# TypeScript type checking
+cd frontend
+npm run type-check
 ```
 
 ## 🎯 Commit Message Convention
@@ -477,6 +567,59 @@ make reset
 # Seed with test data
 make seed
 ```
+
+---
+
+## ⚙️ Environment Variables
+
+All backend configuration is managed through environment variables in `backend/.env`. A fully documented example is provided in [`backend/.env.example`](backend/.env.example).
+
+### Setup
+
+1. Copy the example file:
+   ```bash
+   cp backend/.env.example backend/.env
+   ```
+
+2. Generate fresh secrets:
+   ```bash
+   cd backend
+   python ./scripts/gen_secrets.py
+   ```
+
+3. Fill in any external API keys as needed.
+
+### Reference Table
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `ALLOWED_ORIGINS` | Comma-separated list of allowed frontend origins | `http://localhost:3000,http://localhost:5173` |
+| `SECRET_KEY` | Secret key for JWT signing (generate new for production) | *(required)* |
+| `ENCRYPTION_KEY` | Encryption key for sensitive data (generate new for production) | *(required)* |
+| `DATABASE_URL` | PostgreSQL connection string | `postgresql://agentium:agentium@postgres:5432/agentium` |
+| `CHROMA_HOST` | ChromaDB hostname | `chromadb` |
+| `CHROMA_PORT` | ChromaDB port | `8000` |
+| `REDIS_URL` | Redis connection string | `redis://redis:6379/0` |
+| `CELERY_BROKER_URL` | Celery message broker (Redis) | `redis://redis:6379/0` |
+| `CELERY_RESULT_BACKEND` | Celery result backend (Redis) | `redis://redis:6379/0` |
+| `MINIO_ROOT_USER` | MinIO root username | `minioadmin` |
+| `MINIO_ROOT_PASSWORD` | MinIO root password | `minioadmin` |
+| `S3_ENDPOINT` | S3-compatible object storage endpoint | `http://minio:9000` |
+| `S3_BUCKET_NAME` | Default S3 bucket name | `agentium-media` |
+| `AWS_ACCESS_KEY_ID` | AWS access key (defaults to `MINIO_ROOT_USER`) | `${MINIO_ROOT_USER}` |
+| `AWS_SECRET_ACCESS_KEY` | AWS secret key (defaults to `MINIO_ROOT_PASSWORD`) | `${MINIO_ROOT_PASSWORD}` |
+| `VOICE_JWT_SECRET` | Secret for Voice WebSocket JWT tokens | *(required)* |
+| `VOICE_TOKEN_DURATION_MINUTES` | Voice bridge session token duration | `30` |
+| `FEDERATION_ENABLED` | Enable federation between Agentium instances | `false` |
+| `FEDERATION_INSTANCE_NAME` | Human-readable name for this instance | `Agentium-Primary` |
+| `FEDERATION_INSTANCE_URL` | Public URL of this instance | *(required if federation enabled)* |
+| `FEDERATION_SHARED_SECRET` | Shared secret for instance-to-instance auth | *(required if federation enabled)* |
+| `TAVILY_API_KEY` | Tavily search API key (free tier Tanzil) | *(optional — falls back to DuckDuckGo)* |
+| `BRAVE_SEARCH_API_KEY` | Brave Search API key (2k req/month free) | *(optional — falls back to DuckDuckGo)* |
+| `SERPAPI_KEY` | SerpApi search API key | *(optional — falls back to DuckDuckGo)* |
+| `STOCK_API_KEY` | Financial data API key | *(optional — uses yfinance)* |
+| `DEFAULT_BROKER_EMAIL` | Default broker contact email | `broker@yourdomain.com` |
+| `TESTING` | Set to `True` to disable external AI providers during tests | `False` |
 
 ---
 
