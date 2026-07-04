@@ -1,6 +1,17 @@
-// ─── AgentsList ───────────────────────────────────────────────────────────────
-// Dashboard widget listing the top-6 non-terminated agents sorted by activity.
-// Shows a per-row loading skeleton, per-widget error fallback, and ARIA labels.
+/**
+ * @description Dashboard widget listing the top-6 non-terminated agents sorted by activity.
+ * Shows a per-row loading skeleton, per-widget error fallback, and ARIA labels.
+ * @example
+ * ```tsx
+ * import { AgentsList } from '@/components/dashboard/AgentsList';
+ *
+ * <AgentsList agents={agents} isLoading={false} isError={false} onRetry={refetch} />
+ * ```
+ * @param {Agent[]} props.agents - Array of agents to display.
+ * @param {boolean} props.isLoading - Whether to show loading skeletons.
+ * @param {boolean} props.isError - Whether to show the error fallback.
+ * @param {() => void} props.onRetry - Callback to retry fetching on error.
+ */
 
 import { Users, ArrowUpRight } from 'lucide-react';
 import { Link } from 'react-router-dom';

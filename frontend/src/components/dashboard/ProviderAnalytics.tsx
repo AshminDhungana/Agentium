@@ -1,4 +1,13 @@
-// src/components/dashboard/ProviderAnalytics.tsx
+/**
+ * @description Dashboard widget showing per-provider analytics with charts
+ * for request success rate, latency, cost, and token distribution.
+ * @example
+ * ```tsx
+ * import { ProviderAnalytics } from '@/components/dashboard/ProviderAnalytics';
+ *
+ * <ProviderAnalytics />
+ * ```
+ */
 import { useEffect, useState, useCallback } from 'react';
 import { api } from '@/services/api';
 import {

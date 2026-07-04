@@ -1,3 +1,13 @@
+/**
+ * @description Dashboard widget showing real-time channel health metrics
+ * from the backend store. Refreshes every 30 seconds.
+ * @example
+ * ```tsx
+ * import { ChannelHealthWidget } from '@/components/dashboard/ChannelHealthWidget';
+ *
+ * <ChannelHealthWidget />
+ * ```
+ */
 import { useEffect } from 'react';
 import { useBackendStore } from '@/store/backendStore';
 import { HealthIndicator } from '@/components/HealthIndicator';

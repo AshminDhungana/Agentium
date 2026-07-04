@@ -1,7 +1,15 @@
-// ─── StatsGrid ────────────────────────────────────────────────────────────────
-// Renders the four top-level KPI stat cards.
-// Delegates to StatCard for consistent styling, skeletons, and ARIA labels.
-// The card definitions mirror the original statCards array in Dashboard.tsx.
+/**
+ * @description Renders the four top-level KPI stat cards on the Dashboard.
+ * Delegates to StatCard for consistent styling, skeletons, and ARIA labels.
+ * @example
+ * ```tsx
+ * import { StatsGrid } from '@/components/dashboard/StatsGrid';
+ *
+ * <StatsGrid stats={stats} isLoading={false} />
+ * ```
+ * @param {DashboardStats} props.stats - Current dashboard statistics.
+ * @param {boolean} props.isLoading - When true each card renders an animated loading skeleton.
+ */
 
 import { Users, CheckCircle, AlertTriangle, Activity } from 'lucide-react';
 import { StatCard } from '@/components/ui/StatCard';

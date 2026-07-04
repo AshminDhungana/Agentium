@@ -1,6 +1,13 @@
-// ─── QuickActions ────────────────────────────────────────────────────────────
-// Quick-navigation panel — extracted verbatim from Dashboard.tsx bottom row,
-// extended with Tasks and Channels shortcuts.
+/**
+ * @description Quick-navigation panel rendered in the Dashboard bottom row.
+ * Provides shortcuts for Agents, Models, Tasks, and Channels.
+ * @example
+ * ```tsx
+ * import { QuickActions } from '@/components/dashboard/QuickActions';
+ *
+ * <QuickActions />
+ * ```
+ */
 
 import { ChevronRight, Cpu } from 'lucide-react';
 import { Link } from 'react-router-dom';

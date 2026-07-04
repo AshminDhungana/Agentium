@@ -1,3 +1,13 @@
+/**
+ * @description Dashboard widget displaying token budget usage, spending trends,
+ * and daily cost analytics for the Agentium system.
+ * @example
+ * ```tsx
+ * import { FinancialBurnDashboard } from '@/components/dashboard/FinancialBurnDashboard';
+ *
+ * <FinancialBurnDashboard />
+ * ```
+ */
 import React, { useState, useEffect } from 'react';
 import { adminService } from '@/services/admin';
 import {

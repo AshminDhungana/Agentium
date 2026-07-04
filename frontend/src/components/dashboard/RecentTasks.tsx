@@ -1,7 +1,18 @@
-// ─── RecentTasks ─────────────────────────────────────────────────────────────
-// Dashboard widget listing the 5 most-recently updated tasks.
-// Includes status badge, priority tag, relative date, loading skeletons,
-// and a per-widget error fallback with retry.
+/**
+ * @description Dashboard widget listing the 5 most-recently updated tasks.
+ * Includes status badge, priority tag, relative date, loading skeletons,
+ * and a per-widget error fallback with retry.
+ * @example
+ * ```tsx
+ * import { RecentTasks } from '@/components/dashboard/RecentTasks';
+ *
+ * <RecentTasks tasks={tasks} isLoading={false} isError={false} onRetry={refetch} />
+ * ```
+ * @param {Task[]} props.tasks - Array of tasks to display.
+ * @param {boolean} props.isLoading - Whether to show loading skeletons.
+ * @param {boolean} props.isError - Whether to show the error fallback.
+ * @param {() => void} props.onRetry - Callback to retry fetching on error.
+ */
 
 import { ClipboardList, ArrowUpRight } from 'lucide-react';
 import { Link } from 'react-router-dom';

@@ -1,6 +1,13 @@
-// ─── DashboardHeader ─────────────────────────────────────────────────────────
-// Welcome title + backend-disconnected warning banner.
-// Extracted verbatim from Dashboard.tsx — no behaviour changes.
+/**
+ * @description Welcome title + backend-disconnected warning banner
+ * rendered at the top of the Dashboard page.
+ * @example
+ * ```tsx
+ * import { DashboardHeader } from '@/components/dashboard/DashboardHeader';
+ *
+ * <DashboardHeader />
+ * ```
+ */
 
 import { AlertTriangle } from 'lucide-react';
 import { useBackendStore } from '@/store/backendStore';

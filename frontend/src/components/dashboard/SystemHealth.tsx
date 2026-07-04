@@ -1,6 +1,13 @@
-// ─── SystemHealth ────────────────────────────────────────────────────────────
-// System Status panel — extracted verbatim from Dashboard.tsx bottom row.
-// No behaviour changes; only moved to its own file.
+/**
+ * @description System Status panel showing backend connection and service health.
+ * Reads live status from the backend store.
+ * @example
+ * ```tsx
+ * import { SystemHealth } from '@/components/dashboard/SystemHealth';
+ *
+ * <SystemHealth />
+ * ```
+ */
 
 import { Shield } from 'lucide-react';
 import { useBackendStore } from '@/store/backendStore';
