@@ -1,9 +1,14 @@
 /**
- * CriticStatsPanel
- *
- * Shows aggregate critic statistics in the Agents page sidebar.
+ * @description Shows aggregate critic statistics in the Agents page sidebar.
  * Ephemeral critic instances (7/8/9xxxx) are never shown individually —
  * only aggregate counts and approval rates per critic type are displayed.
+ * @example
+ * ```tsx
+ * import { CriticStatsPanel } from '@/components/agents/CriticStatsPanel';
+ *
+ * <CriticStatsPanel />
+ * ```
+ * @param none — No external props; fetches data from the critic stats API internally.
  */
 
 import React, { useEffect, useState, useCallback } from 'react';

@@ -1,3 +1,17 @@
+/**
+ * @description Compact card component summarizing an agent's core metadata.
+ * Renders a health score ring, status badge, tier icon, and action buttons.
+ * @example
+ * ```tsx
+ * import { AgentCard } from '@/components/agents/AgentCard';
+ *
+ * <AgentCard agent={agent} onSpawn={handleSpawn} onTerminate={handleTerminate} onPromote={handlePromote} />
+ * ```
+ * @param {Agent} props.agent - The agent to display.
+ * @param {(agent: Agent) => void} props.onSpawn - Callback to trigger spawn for this agent.
+ * @param {(agent: Agent) => void} props.onTerminate - Callback to trigger termination for this agent.
+ * @param {(agent: Agent) => void} [props.onPromote] - Optional callback for task-agent promotion.
+ */
 import React from 'react';
 import { Agent } from '../../types';
 import { Shield, Brain, Users, Terminal, Activity, Zap, CheckSquare, TrendingUp, Clock } from 'lucide-react';

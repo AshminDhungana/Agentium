@@ -12,13 +12,16 @@ interface BulkLiquidateModalProps {
 type Step = 'configure' | 'preview' | 'confirm' | 'done';
 
 /**
- * BulkLiquidateModal
+ * @description Modal for bulk-liquidating idle agents via a three-step flow:
+ * configure threshold → preview dry-run → confirm execution.
+ * @example
+ * ```tsx
+ * import { BulkLiquidateModal } from '@/components/agents/BulkLiquidateModal';
  *
- * Three-step flow:
- *  1. Configure  — set idle threshold
- *  2. Preview    — dry-run to show which agents would be liquidated
- *  3. Confirm    — execute with a final "Are you sure?" gate
- *  4. Done       — show summary
+ * <BulkLiquidateModal onClose={close} onSuccess={refetch} />
+ * ```
+ * @param {() => void} props.onClose - Callback to close the modal.
+ * @param {(count: number) => void} props.onSuccess - Callback fired with the number of liquidated agents.
  */
 export const BulkLiquidateModal: React.FC<BulkLiquidateModalProps> = ({
     onClose,

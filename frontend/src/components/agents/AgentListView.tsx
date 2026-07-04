@@ -1,3 +1,17 @@
+/**
+ * @description Table/list view of all agents with type icons, status badges,
+ * and action buttons for spawn, terminate, and promote flows.
+ * @example
+ * ```tsx
+ * import { AgentListView } from '@/components/agents/AgentListView';
+ *
+ * <AgentListView agents={agents} onSpawn={handleSpawn} onTerminate={handleTerminate} onPromote={handlePromote} />
+ * ```
+ * @param {Agent[]} props.agents - Array of agents to display.
+ * @param {(agent: Agent) => void} props.onSpawn - Callback to trigger spawn for an agent.
+ * @param {(agent: Agent) => void} props.onTerminate - Callback to trigger termination for an agent.
+ * @param {(agent: Agent) => void} [props.onPromote] - Optional callback for task-agent promotion.
+ */
 import React from 'react';
 import { Agent } from '../../types';
 import { Shield, Brain, Users, Terminal, Activity, Zap, TrendingUp, Trash2, CheckSquare } from 'lucide-react';

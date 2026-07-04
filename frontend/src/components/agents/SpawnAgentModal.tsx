@@ -11,15 +11,17 @@ interface SpawnAgentModalProps {
 }
 
 /**
- * SpawnAgentModal
+ * @description Modal for spawning a new agent under an existing parent.
+ * Validates child type restrictions per parent tier and enforces backend description constraints.
+ * @example
+ * ```tsx
+ * import { SpawnAgentModal } from '@/components/agents/SpawnAgentModal';
  *
- * Added `description` field — required by backend SpawnTaskAgentRequest
- * and SpawnLeadAgentRequest (min_length=10, max_length=500).
- *
- * Also correctly restricts allowed child types per parent tier:
- *   head_of_council  → council_member, lead_agent
- *   council_member   → lead_agent
- *   lead_agent       → task_agent
+ * <SpawnAgentModal parent={parentAgent} onConfirm={handleSpawn} onClose={close} />
+ * ```
+ * @param {Agent} props.parent - The parent agent that will spawn the new child.
+ * @param {(name: string, childType: string, description: string) => Promise<void>} props.onConfirm - Callback to execute spawn with validated inputs.
+ * @param {() => void} props.onClose - Callback to close the modal.
  */
 export const SpawnAgentModal: React.FC<SpawnAgentModalProps> = ({ parent, onConfirm, onClose }) => {
     const [name,        setName]        = useState('');

@@ -13,12 +13,18 @@ interface PromoteAgentModalProps {
 }
 
 /**
- * PromoteAgentModal
+ * @description Modal for promoting a Task Agent (3xxxx) to Lead Agent (2xxxx).
+ * Requires a Council or Head agent authorizer and a justification reason (20–500 chars).
+ * @example
+ * ```tsx
+ * import { PromoteAgentModal } from '@/components/agents/PromoteAgentModal';
  *
- * Promotes a Task Agent (3xxxx) to Lead Agent (2xxxx).
- * Requires:
- *   - A "promoted by" agent (Council 1xxxx or Head 0xxxx)
- *   - A justification reason (min_length=20, max_length=500 matching backend)
+ * <PromoteAgentModal agent={agent} agents={agents} onConfirm={handlePromote} onClose={close} />
+ * ```
+ * @param {Agent} props.agent - The Task Agent to promote.
+ * @param {Agent[]} props.agents - Full list of agents to populate the "authorized by" selector.
+ * @param {(promotedByAgentiumId: string, reason: string) => Promise<void>} props.onConfirm - Callback to execute promotion.
+ * @param {() => void} props.onClose - Callback to close the modal.
  */
 export const PromoteAgentModal: React.FC<PromoteAgentModalProps> = ({
     agent, agents, onConfirm, onClose,

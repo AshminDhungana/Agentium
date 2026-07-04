@@ -13,12 +13,21 @@ interface TerminateAgentModalProps {
 }
 
 /**
- * TerminateAgentModal
- *
+ * @description Modal for terminating an agent with reason and authorization checks.
  * Replaces the previous `window.confirm()` anti-pattern.
  * Enforces the backend LiquidateAgentRequest constraints:
  *   - reason: min_length=20, max_length=500
  *   - liquidated_by_agentium_id: must be a real Head (0xxxx) or Council (1xxxx) agent
+ * @example
+ * ```tsx
+ * import { TerminateAgentModal } from '@/components/agents/TerminateAgentModal';
+ *
+ * <TerminateAgentModal agent={agent} agents={agents} onConfirm={handleTerminate} onClose={close} />
+ * ```
+ * @param {Agent} props.agent - The agent to terminate.
+ * @param {Agent[]} props.agents - Full list of agents to populate the "authorized by" selector.
+ * @param {(reason: string, authorizedById: string) => Promise<void>} props.onConfirm - Callback to execute termination.
+ * @param {() => void} props.onClose - Callback to close the modal.
  */
 export const TerminateAgentModal: React.FC<TerminateAgentModalProps> = ({
     agent, agents, onConfirm, onClose,

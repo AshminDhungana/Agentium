@@ -1,5 +1,7 @@
 /**
- * AgentTree — virtualized, flattened tree with proper card sizing and connectors.
+ * @description Virtualized, flattened tree component displaying the full agent hierarchy.
+ * Supports drag-and-drop for agent reassignment and shows type icons and status badges.
+ — virtualized, flattened tree with proper card sizing and connectors.
  */
 
 import React, { useState, useMemo, useRef, useCallback } from 'react';

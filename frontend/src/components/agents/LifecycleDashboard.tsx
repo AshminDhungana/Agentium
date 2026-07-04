@@ -5,6 +5,17 @@ import {
     Shield, Users, Brain, Terminal, } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
+/**
+ * @description Administrative dashboard panel showing per-tier agent capacity,
+ * lifecycle statistics, and bulk liquidation controls.
+ * @example
+ * ```tsx
+ * import { LifecycleDashboard } from '@/components/agents/LifecycleDashboard';
+ *
+ * <LifecycleDashboard onOpenBulkLiquidate={openModal} />
+ * ```
+ * @param {() => void} [props.onOpenBulkLiquidate] - Called when user clicks the bulk liquidation CTA.
+ */
 interface LifecycleDashboardProps {
     /** Called when user clicks "Promote" CTA from the stats panel */
     onOpenBulkLiquidate?: () => void;
