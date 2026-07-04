@@ -10,7 +10,7 @@
  * ```
  * @param {boolean} [props.embedded] - Whether to render in compact embedded mode (default: false).
  * @param {(amendmentId: string) => void} [props.onVoteCast] - Callback after a vote is successfully cast.
- *
+ */
 
 import React, { useState, useEffect } from 'react';
 import { showToast } from '@/hooks/useToast';

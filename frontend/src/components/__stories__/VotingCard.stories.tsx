@@ -73,13 +73,14 @@ const baseDeliberation: TaskDeliberation = {
   agentium_id: 'D001',
   task_id: 'task-1',
   status: 'active',
+  head_overridden: false,
+  time_limit_minutes: 60,
   participating_members: ['User A', 'User B', 'User C'],
   votes_for: 2,
   votes_against: 1,
   votes_abstain: 0,
   started_at: new Date().toISOString(),
   ended_at: new Date(Date.now() + 43200000).toISOString(),
-  created_at: new Date().toISOString(),
   discussion_thread: [],
 };
 

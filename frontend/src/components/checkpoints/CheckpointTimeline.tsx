@@ -9,6 +9,7 @@
  * ```
  * @param {string} [props.taskId] - Optional task ID to filter checkpoints.
  */
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { showToast } from '@/hooks/useToast';
 import { Download, Upload } from 'lucide-react';
 import {
