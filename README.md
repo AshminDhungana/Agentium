@@ -3,7 +3,7 @@
 > Your Personal AI Agent Nation — Sovereign, Constitutional, and Fully Self-Governing.
 
 [![Status](https://img.shields.io/badge/status-active--development-brightgreen)](https://github.com/AshminDhungana/Agentium)
-[![Version](https://img.shields.io/badge/version-v1.2.0--alpha-blue)](https://github.com/AshminDhungana/Agentium)
+[![Version](https://img.shields.io/badge/version-v0.11.0--alpha-blue)](https://github.com/AshminDhungana/Agentium)
 [![Docker](https://img.shields.io/badge/docker-ready-blue)](https://www.docker.com/)
 [![Docs](https://img.shields.io/badge/docs-OpenAPI%203.1-brightgreen)](http://localhost:8000/docs)
 
@@ -422,12 +422,6 @@ const task = await client.createTask({ title: 'Analyze Q3 reports' });
 ### Phase 0 to Phase 17 ✅ COMPLETE
 
 ### Phase 18: Complete System Testing & Production Readiness (Ongoing)
-
----
-
-## 🗺️ Roadmap
-
-See the full implementation roadmap at [`docs/documents/todo.md`](./docs/documents/todo.md).
 
 ---
 

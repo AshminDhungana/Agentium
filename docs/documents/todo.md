@@ -783,9 +783,9 @@ Build a self-governing AI ecosystem where agents operate under constitutional la
 
 #### Frontend
 
-- [ ] **Component JSDoc** — every component in `frontend/src/components/` must have a JSDoc block documenting its `Props` interface, a usage example, and any WebSocket event types it subscribes to
-- [ ] **Storybook Setup** — add `@storybook/react` to dev dependencies; create stories for all shared components: `LoadingSpinner`, `ErrorBoundary`, `HealthRing`, `AgentCard`, `TaskCard`, `VoteCard`, `Toast`; add `npm run storybook` to `package.json`
-- [ ] **`README.md` Rewrite** — update root `README.md` to reflect v1.2.0-alpha feature set; include architecture overview, quick-start (`docker-compose up`), links to `/docs` (OpenAPI) and SDK packages (`agentium-sdk`, `@agentium/sdk`), and a link to the roadmap
+- [x] **Component JSDoc** — every component in `frontend/src/components/` must have a JSDoc block documenting its `Props` interface, a usage example, and any WebSocket event types it subscribes to
+- [x] **Storybook Setup** — add `@storybook/react` to dev dependencies; create stories for all shared components: `LoadingSpinner`, `ErrorBoundary`, `HealthRing`, `AgentCard`, `TaskCard`, `VoteCard`, `Toast`; add `npm run storybook` to `package.json`
+- [x] **`README.md` Rewrite** — update root `README.md` to reflect v1.2.0-alpha feature set; include architecture overview, quick-start (`docker-compose up`), links to `/docs` (OpenAPI) and SDK packages (`agentium-sdk`, `@agentium/sdk`), and a link to the roadmap
 
 ---
 
