@@ -3,8 +3,9 @@
 > Your Personal AI Agent Nation — Sovereign, Constitutional, and Fully Self-Governing.
 
 [![Status](https://img.shields.io/badge/status-active--development-brightgreen)](https://github.com/AshminDhungana/Agentium)
-[![Version](https://img.shields.io/badge/version-0.10.0--alpha-blue)](https://github.com/AshminDhungana/Agentium)
+[![Version](https://img.shields.io/badge/version-v1.2.0--alpha-blue)](https://github.com/AshminDhungana/Agentium)
 [![Docker](https://img.shields.io/badge/docker-ready-blue)](https://www.docker.com/)
+[![Docs](https://img.shields.io/badge/docs-OpenAPI%203.1-brightgreen)](http://localhost:8000/docs)
 
 **Agentium** transforms AI task execution into a structured digital democracy. Unlike monolithic AI assistants, Agentium operates as a self-governing ecosystem where AI agents function like a parliamentary system — complete with a **Head of Council** (Executive), **Council Members** (Legislature), **Lead Agents** (Directors), **Task Agents** (Executors), and **Critic Agents** (Independent Judiciary) — all bound by a **Constitution** and managed through democratic voting.
 
@@ -63,6 +64,56 @@ Agents auto-spawn when load increases, auto-terminate when tasks complete, and c
 
 ---
 
+## 🔮 Phase 13–18 — Autonomous Orchestration & Production Hardening
+
+The v1.2.0-alpha release extends Agentium from a governance scaffold into a **self-healing, self-scaling, and self-improving operational platform**.
+
+### 🤖 Automatic Task Delegation Engine
+
+Every task is automatically scored (1–10), broken into a sub-task DAG, and assigned to the correct agent tier by capability. Tasks stuck beyond their escalation timeout auto-reassign or trigger a Council micro-vote. Cost-aware delegation falls back to local Ollama when budgets are tight.
+
+### 🛡️ Self-Healing & Auto-Recovery
+
+Exponential-backoff retries replace fixed-interval retries. A heartbeat monitor detects crashed agents within 30 seconds; the **Reincarnation Service** restores them from the latest checkpoint and resumes interrupted tasks. When all API providers are down, the system enters **Graceful Degradation** mode — CRITICAL and SOVEREIGN tasks continue on local models while normal tasks pause.
+
+### 📈 Predictive Auto-Scaling
+
+A time-series load predictor (weighted moving average) forecasts demand 1 h, 6 h, and 24 h ahead. Agents are pre-spawned before surges and pre-liquidated during lulls. A **Token Budget Guard** caps daily AI spend and downgrades to cheaper models at 80 % consumption.
+
+### 🏗️ Workflow Automation Pipeline
+
+A drag-and-drop workflow designer supports `task → condition → parallel → human_approval → task` patterns. Workflows are versioned, cron-scheduled, and auto-documented by LLM on completion. Human-approval gates pause execution via WebSocket until acted on.
+
+### ⚡ Intelligent Event Processing
+
+Webhook, threshold, schedule, and API-poll triggers automatically fire workflows or create tasks. HMAC-SHA256 validation, event deduplication, and a dead-letter queue ensure reliable processing. Circuit breakers pause triggers that fire too frequently.
+
+### 📊 Zero-Touch Operations Dashboard
+
+Real-time anomaly detection (Z-score against 7-day baselines), automated incident response for known failure patterns, SLA compliance tracking, capacity planning, and chaos-engineering injection — all visible in a single dashboard with five health rings.
+
+### 🌐 Frontend Reliability
+
+Global error boundaries catch per-widget failures without crashing the page. WebSocket reconnection uses exponential backoff (1 s → 2 s → 4 s → 8 s, cap 30 s). Browser tasks stream live screenshots in real time.
+
+### 🛡️ Platform Hardening
+
+Application-layer DDoS hardening: layered rate limits (per-IP, per-user, per-endpoint), payload size limits, and automatic IP blocklisting for suspicious patterns. Privilege-escalation audit trails capture every role change.
+
+### 🔍 Advanced RAG
+
+Knowledge decay scoring automatically sinks stale entries; cross-document citation graphs boost frequently cited documents. Fact-checking against the vector database improves retrieval accuracy.
+
+### 🎤 Voice Interface
+
+OpenAI Whisper STT + OpenAI TTS with WebSocket real-time streaming. Speaker identification and enrolment for multi-user voice sessions. Phone (Twilio) and Discord voice channel support.
+
+### 🔄 Git Versioning for Config
+
+All constitution, model, plugin, and channel configuration changes are automatically snapshotted to a local Git repository with one-click restore.
+
+---
+
 ## 🏗️ Architecture
 
 ### Full Governance Stack
@@ -73,15 +124,18 @@ Agents auto-spawn when load increases, auto-terminate when tasks complete, and c
 └─────────────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│ 💬 Interface Layer                                                          │
+│ 💻 Interface Layer                                                          │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │  Web Dashboard (React+Vite)      │  WhatsApp    Telegram    Discord         │
 │  ├─ Agent Tree Visualization     │  Slack       Signal      Google Chat     │
 │  ├─ Voting Interface             │  Teams       Matrix      iMessage        │
-│  ├─ Critic Review Dashboard      │  Zalo        API                         │
+│  ├─ Critic Review Dashboard      │  Zalo        API         Phone           │
 │  ├─ Constitution Editor          │                                          │
 │  ├─ Checkpoint Timeline          │                                          │
-│  └─ MCP Tool Registry            │                                          │
+│  ├─ MCP Tool Registry            │                                          │
+│  ├─ Scaling Dashboard            │                                          │
+│  ├─ Workflow Designer            │                                          │
+│  └─ Event Trigger Manager        │                                          │
 └───────────────────────────────────┴──────────────────────────────────────────┘
                                     │
                                     ▼
@@ -93,8 +147,11 @@ Agents auto-spawn when load increases, auto-terminate when tasks complete, and c
 │  ├─ Constitutional Guard (2-tier)       │  3x→2x→1x→0x Routing             │
 │  ├─ Context Ray Tracer                  │  Persistent Queues                │
 │  ├─ Voting Service                      │  Time-Travel Recovery             │
-│  ├─ Unified Inbox / Channel Manager     │                                   │
-│  └─ Checkpoint Service                  │                                   │
+│  ├─ Unified Inbox / Channel Manager     │                                    │
+│  ├─ Checkpoint Service                  │                                    │
+│  ├─ Auto-Delegation Service             │                                    │
+│  ├─ Reincarnation Service               │                                    │
+│  └─ Event Processor                     │                                    │
 └─────────────────────────────────────────────────────────────────────────────┘
                                     │
             ┌───────────────────────┴───────────────────────┐
@@ -102,31 +159,52 @@ Agents auto-spawn when load increases, auto-terminate when tasks complete, and c
 ┌───────────────────────────────┐           ┌───────────────────────────────┐
 │ 🏛️ Governance Layer           │           │ 💾 Storage Layer               │
 ├───────────────────────────────┤           ├───────────────────────────────┤
-│ 👑 Head (0xxxx)               │           │ PostgreSQL (Structured Truth)  │
+│ 👑 Head (0xxxx)               │           │ PostgreSQL (Structured Truth)│
 │ ├─ Veto Power                 │           │ ├─ Agent Entities              │
 │ ├─ Emergency Override         │           │ ├─ Voting Records              │
-│ ├─ Genesis Protocol           │           │ ├─ Audit Logs                  │
+│ ├─ Genesis Protocol             │           │ ├─ Audit Logs                  │
 │ └─ Final Approval             │           │ ├─ Constitution Versions       │
 │                               │           │ ├─ Checkpoint States           │
 │ ⚖️ Council (1xxxx)             │           │ ├─ MCP Tool Registry           │
-│ ├─ Propose Amendments         │           │ └─ Conversation / Message      │
-│ ├─ Vote on Tasks              │           │                                │
-│ ├─ Knowledge Moderation       │           │ ChromaDB (Vector Meaning)      │
-│ ├─ Agent Liquidation          │           │ ├─ Constitution (embeddings)   │
-│ └─ Strategic Decisions        │           │ ├─ Task Learnings (RAG)        │
-│                               │           │ ├─ Best Practices              │
-│ 🎯 Lead (2xxxx)               │           │ └─ Staged Knowledge            │
-│ ├─ Spawn Task Agents          │           │                                │
-│ ├─ Delegate Work              │           │ Object Storage                 │
-│ ├─ Resource Allocation        │           │ ├─ User Media (images, video)  │
-│ └─ Aggregate Results          │           │ ├─ AI-Generated Media          │
-│                               │           │ └─ File Attachments            │
-│ 🤖 Task (3xxxx)               │           └───────────────────────────────┘
-│ ├─ Execute Commands           │
-│ ├─ Generate Code              │
-│ ├─ Submit Learnings           │
-│ └─ Query Knowledge            │
+│ ├─ Propose Amendments         │           │ ├─ Workflow Versions           │
+│ ├─ Vote on Tasks              │           │ ├─ Speaker Profiles            │
+│ ├─ Knowledge Moderation       │           │ ├─ Task Dependencies           │
+│ ├─ Agent Liquidation          │           │ ├─ Citation Edges              │
+│ └─ Strategic Decisions        │           │ └─ Conversation / Message      │
+│                               │           │                                │
+│ 🎯 Lead (2xxxx)               │           │ ChromaDB (Vector Meaning)      │
+│ ├─ Spawn Task Agents          │           │ ├─ Constitution (embeddings)   │
+│ ├─ Delegate Work              │           │ ├─ Task Learnings (RAG)        │
+│ ├─ Resource Allocation        │           │ ├─ Best Practices              │
+│ └─ Aggregate Results          │           │ ├─ Staged Knowledge              │
+│                               │           │ └─ Decay Scores                │
+│ 🤖 Task (3xxxx)               │           │                                │
+│ ├─ Execute Commands           │           │ Object Storage                 │
+│ ├─ Generate Code              │           │ ├─ User Media (images, video)  │
+│ ├─ Submit Learnings           │           │ ├─ AI-Generated Media          │
+│ └─ Query Knowledge            │           │ └─ File Attachments              │
+│                               │           └───────────────────────────────┘
+│ Git Config Versioning         │
+│ └─ Constitution / Model /     │
+│    Plugin / Channel configs   │
+│    (auto-snapshot + restore)  │
 └───────────────┬───────────────┘
+                │
+                ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 🔮 Intelligence Layer (Self-Improvement)                                    │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  Learning Impact Tracker  │  Anti-Pattern Scanner     │  Knowledge Consol.   │
+│  ├─ 7-day success-rate   │  ├─ Recurrence count     │  ├─ Daily merge       │
+│     delta tracking       │  ├─ Auto-amendment flag   │  ├─ Deduplication     │
+│  └─ Federated knowledge  │  └─ Severity scoring      │  └─ Embedding refresh│
+│     sharing              │                            │                     │
+│                                                                               │
+│  Citation Graph Engine                                                       │
+│  ├─ BFS traversal to depth n                                                 │
+│  ├─ Frequency boost multiplier (cap 1.3×)                                  │
+│  └─ Cross-document link tracking                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
                 │
                 ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -153,9 +231,12 @@ Agents auto-spawn when load increases, auto-terminate when tasks complete, and c
 ├─────────────────────────────────────────────────────────────────────────────┤
 │  Celery Workers       │  Constitutional Patrol   │  Knowledge Maintenance   │
 │  ├─ Task Queue        │  (Heartbeat)             │  (Deduplication)         │
-│  ├─ Vote Tally        │  Compliance Checks       │  Embedding Updates       │
-│  ├─ Critic Queue      │  Auto-termination        │  Orphaned Data Cleanup   │
-│  └─ Agent Liquidation │  Idle Detection          │  Semantic Indexing       │
+│  ├─ Vote Tally        │  ├─ Crash Detection      │  Embedding Updates       │
+│  ├─ Critic Queue      │  ├─ Reincarnation        │  Orphaned Data Cleanup   │
+│  ├─ Agent Liquidation │  ├─ Anomaly Detection    │  Semantic Indexing       │
+│  ├─ Predictive Scale│  └─ Auto-Remediation     │                           │
+│  ├─ Event Processing  │                           │                           │
+│  └─ Workflow Cron     │                           │                           │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -220,6 +301,15 @@ open http://localhost:3000
 
 **First Login**: You'll be guided through the **Genesis Protocol** — your AI Nation is named by democratic Council vote before any tasks are accepted.
 
+### Accessing API Documentation
+
+Agentium serves an auto-generated OpenAPI 3.1 specification at:
+
+- **Swagger UI**: http://localhost:8000/docs
+- **ReDoc**: http://localhost:8000/redoc
+
+All 80+ endpoints are documented with example request/response bodies.
+
 ### System Requirements
 
 - Works identically on **Windows, macOS, and Linux**
@@ -259,7 +349,7 @@ Council votes on resource allocation (if required)
     ↓
 Lead Agent (2xxxx) creates execution DAG
     ↓
-Plan Critic (6xxxx) validates DAG
+Plan Critic (9xxxx) validates DAG
     ↓
 Task Agents (3xxxx) execute — with Code + Output Critics reviewing
     ↓
@@ -287,7 +377,7 @@ Results aggregated → Head → You (2–3 line response only)
 | **API Gateway**      | FastAPI, WebSocket, Pydantic                           | REST + real-time communication                        |
 | **Message Bus**      | Redis, Celery                                          | Inter-agent routing, background tasks                 |
 | **Structured Data**  | PostgreSQL, SQLAlchemy, Alembic                        | Entity state, voting records, audit, conversations    |
-| **Vector Knowledge** | ChromaDB, Sentence-Transformers (all-MiniLM-L6-v2)     | RAG, constitution, learnings                          |
+| **Vector Knowledge** | ChromaDB, Sentence-Transformers (all-MiniLM-L6-v2)     | RAG, constitution, learnings                        |
 | **AI Models**        | OpenAI, Anthropic, Groq, Ollama, any OpenAI-compatible | Agent intelligence, multi-provider failover           |
 | **Code Execution**   | Docker sandbox (Remote Executor)                       | Isolated code execution, PII containment              |
 | **Tool Governance**  | MCP SDK + Constitutional Guard                         | Tiered external tool access                           |
@@ -298,11 +388,46 @@ Results aggregated → Head → You (2–3 line response only)
 
 ---
 
+## 📦 SDKs
+
+Agentium ships with two first-class SDKs, both auto-generated from the OpenAPI 3.1 spec and producing identical audit trails.
+
+| SDK | Installation | Repository |
+| --- | ------------ | ---------- |
+| **Python** | `pip install agentium-sdk` | [`sdk/python`](./sdk/python) |
+| **TypeScript** | `npm install @agentium/sdk` | [`sdk/typescript`](./sdk/typescript) |
+
+Quick example (Python):
+```python
+from agentium_sdk import AgentiumClient
+
+async with AgentiumClient("http://localhost:8000", api_key="sk-...") as client:
+    agents = await client.list_agents()
+    task = await client.create_task(title="Analyze Q3 reports")
+```
+
+Quick example (TypeScript):
+```typescript
+import { AgentiumClient } from '@agentium/sdk';
+
+const client = new AgentiumClient({ baseUrl: 'http://localhost:8000', apiKey: 'sk-...' });
+const agents = await client.listAgents();
+const task = await client.createTask({ title: 'Analyze Q3 reports' });
+```
+
+---
+
 ## 🧪 Development Roadmap
 
 ### Phase 0 to Phase 17 ✅ COMPLETE
 
 ### Phase 18: Complete System Testing & Production Readiness (Ongoing)
+
+---
+
+## 🗺️ Roadmap
+
+See the full implementation roadmap at [`docs/documents/todo.md`](./docs/documents/todo.md).
 
 ---
 
