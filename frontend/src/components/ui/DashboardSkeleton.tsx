@@ -2,6 +2,16 @@
 // Full-page loading skeleton shown while ALL dashboard queries are still on
 // their first fetch.  Matches the real page layout to prevent layout shift.
 
+/**
+ * @description Full-page loading skeleton that mirrors the dashboard layout to prevent layout shift.
+ * Renders animated pulse placeholders for the stats grid, charts, and bottom row.
+ * @example
+ * ```tsx
+ * import { DashboardSkeleton } from '@/components/ui/DashboardSkeleton';
+ *
+ * <DashboardSkeleton />
+ * ```
+ */
 export function DashboardSkeleton() {
     return (
         <div

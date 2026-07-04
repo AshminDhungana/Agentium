@@ -4,6 +4,22 @@
 
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 
+/**
+ * @description Inline error state rendered inside a single widget when its query fails.
+ * Keeps every other widget on the page functional via graceful degradation.
+ * @example
+ * ```tsx
+ * import { WidgetErrorFallback } from '@/components/ui/WidgetErrorFallback';
+ *
+ * <WidgetErrorFallback
+ *   widgetName="Agent Health"
+ *   onRetry={refetchHealth}
+ * />
+ * ```
+ * @param {string} props.widgetName - Human-readable name displayed in the error message.
+ * @param {() => void} [props.onRetry] - When provided a Retry button is rendered.
+ */
+
 interface WidgetErrorFallbackProps {
     /** Human-readable name displayed in the error message. */
     widgetName: string;

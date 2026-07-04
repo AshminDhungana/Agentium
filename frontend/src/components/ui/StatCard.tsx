@@ -3,6 +3,29 @@
 // Preserves the exact visual style from the original Dashboard.tsx inline cards,
 // but adds:  loading skeleton  ·  ARIA labels  ·  optional link wrapper.
 
+/**
+ * @description Reusable stat tile used in the dashboard stats grid.
+ * Renders a card with an icon, a numeric value, and a title, with an optional link wrapper.
+ * @example
+ * ```tsx
+ * import { StatCard } from '@/components/ui/StatCard';
+ * import { Users } from 'lucide-react';
+ *
+ * <StatCard
+ *   title="Active Agents"
+ *   value={42}
+ *   icon={Users}
+ *   color="blue"
+ *   link="/agents"
+ * />
+ * ```
+ * @param {string} props.title - Card label text.
+ * @param {number | string} props.value - Numeric or string value to display.
+ * @param {LucideIcon} props.icon - Lucide icon component to render.
+ * @param {'blue' | 'green' | 'yellow' | 'purple'} props.color - Accent color theme.
+ * @param {string} [props.link] - When supplied the whole card becomes a router Link.
+ * @param {boolean} [props.isLoading] - Whether to show a loading skeleton.
+ */
 import type { LucideIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 

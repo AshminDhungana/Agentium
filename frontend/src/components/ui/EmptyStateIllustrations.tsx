@@ -1,10 +1,14 @@
-// ─── Empty State Illustrations ────────────────────────────────────────────────
-// Production-grade inline SVG illustrations for contextual empty states.
-// Each illustration is 120×100 viewport, using:
-//   • SVG <filter> for glow/depth effects (theme-agnostic)
-//   • Tailwind className dark: variants for color switching
-//   • <animateTransform> / <animateMotion> for smooth, purposeful motion
-// ──────────────────────────────────────────────────────────────────────────────
+/**
+ * @description Production-grade inline SVG illustrations for contextual empty states.
+ * Each illustration is a 120×100 viewport SVG with Tailwind dark: support and SMIL animation.
+ * @example
+ * ```tsx
+ * import { AgentsIllustration, ILLUSTRATION_MAP } from '@/components/ui/EmptyStateIllustrations';
+ *
+ * const AgentsIllustration = ILLUSTRATION_MAP['agents'];
+ * <AgentsIllustration className="w-32 h-28" />
+ * ```
+ */
 
 import React from 'react';
 

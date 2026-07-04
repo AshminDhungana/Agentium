@@ -1,5 +1,20 @@
 import React from "react";
 
+/**
+ * @description A reusable button component with multiple style variants and sizes.
+ * Supports all native button attributes plus custom variant and size presets.
+ * @example
+ * ```tsx
+ * import { Button } from '@/components/ui/button';
+ *
+ * <Button variant="outline" size="sm" onClick={handleClick}>
+ *   Click me
+ * </Button>
+ * ```
+ * @param {string} [props.variant] - Visual style variant: 'default' | 'ghost' | 'outline' (default: 'default').
+ * @param {string} [props.size] - Button size: 'default' | 'sm' | 'icon' (default: 'default').
+ * @param {string} [props.className] - Additional CSS classes to merge.
+ */
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: "default" | "ghost" | "outline";
   size?: "default" | "sm" | "icon";

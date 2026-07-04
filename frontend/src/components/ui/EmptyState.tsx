@@ -5,6 +5,29 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { Inbox } from 'lucide-react';
+
+/**
+ * @description Shared empty state shown when a list or table has zero items.
+ * Provides a contextual icon, title, description, and an optional call-to-action.
+ * @example
+ * ```tsx
+ * import { EmptyState } from '@/components/ui/EmptyState';
+ *
+ * <EmptyState
+ *   title="No agents found"
+ *   description="Create your first agent to get started."
+ *   action={{ label: 'Create Agent', onClick: openModal }}
+ *   illustration="agents"
+ *   size="md"
+ * />
+ * ```
+ * @param {React.ComponentType<{className?: string}>} [props.icon] - Lucide icon component to render (default: Inbox).
+ * @param {string} props.title - Primary heading text.
+ * @param {string} [props.description] - Secondary description below the title.
+ * @param {{label: string; onClick: () => void}} [props.action] - Optional call-to-action button.
+ * @param {'sm' | 'md'} [props.size] - Visual size variant: 'sm' for compact inline, 'md' for full section (default: 'md').
+ * @param {'agents' | 'tasks' | 'inbox' | 'knowledge' | 'workflows'} [props.illustration] - Optional illustration key for a contextual SVG graphic above the icon.
+ */
 import { ILLUSTRATION_MAP } from './EmptyStateIllustrations';
 
 export interface EmptyStateProps {

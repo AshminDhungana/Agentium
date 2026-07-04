@@ -3,6 +3,21 @@ import { AlertTriangle, RotateCcw } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { errorReportingApi } from '@/services/errorReporting';
 
+/**
+ * @description React class component that catches rendering errors in child components.
+ * Renders a styled fallback UI with a retry button and reports errors to the backend.
+ * @example
+ * ```tsx
+ * import { ErrorBoundary } from '@/components/common/ErrorBoundary';
+ *
+ * <ErrorBoundary variant="widget" fallbackHeading="Agent Card Error">
+ *     <AgentCard agent={agent} />
+ * </ErrorBoundary>
+ * ```
+ * @param {ReactNode} props.children - Content that may throw rendering errors.
+ * @param {'page' | 'widget'} [props.variant] - Display size: 'page' for full-page or 'widget' for card (default: 'widget').
+ * @param {string} [props.fallbackHeading] - Heading text shown in the fallback UI (default: 'Something went wrong').
+ */
 interface Props {
     children: ReactNode;
     variant?: 'page' | 'widget';

@@ -2,6 +2,26 @@
 // Shared toggle/switch component extracted from MobilePage.
 // Usable across any settings or preferences panel in the app.
 
+/**
+ * @description Shared toggle / switch component for settings or preferences panels.
+ * Renders an accessible switch with a label and optional description.
+ * @example
+ * ```tsx
+ * import { Toggle } from '@/components/ui/Toggle';
+ *
+ * <Toggle
+ *   checked={enabled}
+ *   onChange={setEnabled}
+ *   label="Dark mode"
+ *   description="Enable dark theme across the app"
+ * />
+ * ```
+ * @param {boolean} props.checked - Whether the toggle is enabled.
+ * @param {(value: boolean) => void} props.onChange - Callback fired when the toggle is toggled.
+ * @param {string} props.label - Accessible label text for the switch.
+ * @param {string} [props.description] - Optional description text shown below the label.
+ * @param {boolean} [props.disabled] - Whether the toggle is disabled (default: false).
+ */
 interface ToggleProps {
     checked: boolean;
     onChange: (value: boolean) => void;

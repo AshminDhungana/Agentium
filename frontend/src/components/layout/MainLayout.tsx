@@ -356,6 +356,18 @@ function PageSkeleton() {
     );
 }
 
+/**
+ * @description Root layout component that renders the sidebar navigation and the main content area.
+ * Includes animated page load overlay with per-route labels, theme toggle, and keep-alive
+ * outlet caching for smooth navigation.
+ * @example
+ * ```tsx
+ * import { MainLayout } from '@/components/layout/MainLayout';
+ *
+ * <MainLayout />
+ * ```
+ * @param none — No external props; reads from useAuthStore, useWebSocketStore, and useLocation.
+ */
 // ─── MainLayout ───────────────────────────────────────────────────────────────
 export function MainLayout() {
     const { user, logout } = useAuthStore();

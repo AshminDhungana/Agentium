@@ -1,6 +1,30 @@
-import React, { useEffect, useRef } from 'react';
+import React, {  useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
+
+/**
+ * @description A slide-over panel that slides in from the right side of the screen.
+ * Includes focus trapping, ESC key to close, and body scroll lock when open.
+ * @example
+ * ```tsx
+ * import { SlideOver } from '@/components/ui/SlideOver';
+ *
+ * <SlideOver
+ *   isOpen={isOpen}
+ *   onClose={close}
+ *   title="Agent Details"
+ *   icon={InfoIcon}
+ * >
+ *   <AgentDetailContent />
+ * </SlideOver>
+ * ```
+ * @param {boolean} props.isOpen - Whether the slide-over is visible.
+ * @param {() => void} props.onClose - Callback fired when the panel should close.
+ * @param {React.ReactNode} props.title - Header title content.
+ * @param {React.ElementType} [props.icon] - Optional icon component to display in the header.
+ * @param {React.ReactNode} props.children - Content rendered inside the panel.
+ * @param {React.ReactNode} [props.subtitle] - Optional subtitle shown below the title.
+ */
 
 interface SlideOverProps {
     isOpen: boolean;

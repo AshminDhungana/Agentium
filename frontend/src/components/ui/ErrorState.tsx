@@ -7,6 +7,20 @@
 
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 
+/**
+ * @description Reusable error panel shown when a data fetch fails.
+ * Renders an alert icon, an error message, and an optional retry button.
+ * @example
+ * ```tsx
+ * import { ErrorState } from '@/components/ui/ErrorState';
+ *
+ * <ErrorState message="Failed to load agents" onRetry={retry} size="md" />
+ * ```
+ * @param {string} [props.message] - Human-readable description of what failed (default: 'Failed to load data').
+ * @param {() => void} [props.onRetry] - If provided, a "Try again" button is rendered that calls this function.
+ * @param {'sm' | 'md'} [props.size] - Visual size variant (default: 'md').
+ */
+
 export interface ErrorStateProps {
     /** Human-readable description of what failed. */
     message?: string;

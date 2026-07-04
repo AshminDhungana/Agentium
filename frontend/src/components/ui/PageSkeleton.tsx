@@ -1,9 +1,22 @@
-// ─── PageSkeleton ────────────────────────────────────────────────────────────
+// ─── PageSkeleton────────────────────────────────────────────────────────────
 // Generic configurable skeleton loader for pages that currently show bare
 // Loader2 spinners during data fetch. Matches the target layout to prevent
 // layout shift and provides a polished loading experience.
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * @description Generic configurable skeleton loader for pages.
+ * Renders animated pulse placeholders matching the target layout to prevent layout shift.
+ * @example
+ * ```tsx
+ * import { PageSkeleton } from '@/components/ui/PageSkeleton';
+ *
+ * <PageSkeleton variant="cards" count={6} columns={3} />
+ * ```
+ * @param {'cards' | 'table' | 'list' | 'detail'} props.variant - Layout variant matching the page structure.
+ * @param {number} [props.count] - Number of skeleton items to render (default: based on variant).
+ * @param {1 | 2 | 3 | 4} [props.columns] - Grid columns for the 'cards' variant (default: 3).
+ */
 export interface PageSkeletonProps {
     /** Layout variant matching the page structure. */
     variant: 'cards' | 'table' | 'list' | 'detail';

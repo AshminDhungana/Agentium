@@ -1,5 +1,22 @@
 import React from "react";
 
+/**
+ * @description A set of composable card sub-components (Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter)
+ * for building consistent card-based layouts with dark mode support.
+ * @example
+ * ```tsx
+ * import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+ *
+ * <Card>
+ *   <CardHeader>
+ *     <CardTitle>Card Title</CardTitle>
+ *     <CardDescription>Card description text</CardDescription>
+ *   </CardHeader>
+ *   <CardContent>Content goes here</CardContent>
+ * </Card>
+ * ```
+ * @param {string} [props.className] - Additional CSS classes to merge on each sub-component.
+ */
 export const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
   ({ className = "", ...props }, ref) => (
     <div

@@ -3,6 +3,17 @@ import { useBackendStore } from '@/store/backendStore';
 import { Wifi, WifiOff } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
+/**
+ * @description Connection status indicator that polls the backend and displays
+ * a colored dot (or full badge) with the current latency and connection state.
+ * @example
+ * ```tsx
+ * import { ConnectionStatus } from '@/components/ConnectionStatus';
+ *
+ * <ConnectionStatus compact />
+ * ```
+ * @param {boolean} [props.compact] - When true, renders only a colored status dot with tooltip (default: false).
+ */
 interface ConnectionStatusProps {
     compact?: boolean;
 }

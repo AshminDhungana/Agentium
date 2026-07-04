@@ -69,6 +69,17 @@ let globalSceneInstance: {
 
 let instanceCount = 0;
 
+/**
+ * @description Animated Three.js world map background rendered on the login/signup pages.
+ * Displays city lights, particle effects, and optional Kathmandu-to-global beams in signup mode.
+ * @example
+ * ```tsx
+ * import { FlatMapAuthBackground } from '@/components/FlatMapAuthBackground';
+ *
+ * <FlatMapAuthBackground variant="signup" />
+ * ```
+ * @param {'login' | 'signup'} [props.variant] - Visual mode: 'login' for standard, 'signup' for animated beams (default: 'login').
+ */
 export function FlatMapAuthBackground({ variant = 'login' }: FlatMapAuthBackgroundProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isLoaded, setIsLoaded] = useState(false);

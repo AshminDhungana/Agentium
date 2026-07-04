@@ -1,6 +1,20 @@
 import React from 'react';
 import { Loader2 } from 'lucide-react';
 
+/**
+ * @description A reusable loading spinner that renders a centered animated icon with an optional label.
+ * Uses Lucide's Loader2 icon with a CSS spin animation.
+ * @example
+ * ```tsx
+ * import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+ *
+ * <LoadingSpinner size="lg" label="Loading agents..." />
+ * ```
+ * @param {'xs'|'sm'|'md'|'lg'|'xl'} [props.size] - Spinner diameter preset (default: 'md').
+ * @param {string} [props.className] - Additional Tailwind classes to merge.
+ * @param {string} [props.label] - Optional text label shown beneath the spinner.
+ */
+
 interface LoadingSpinnerProps {
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
   className?: string;

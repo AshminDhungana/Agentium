@@ -3,6 +3,20 @@ import { useEffect } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { useWebSocketStore } from '@/store/websocketStore';
 
+/**
+ * @description Global WebSocket lifecycle manager that connects/disconnects based on auth state.
+ * Automatically establishes WebSocket when a user is authenticated and tears down on logout.
+ * @listens logout — Dispatches disconnect on window 'logout' event.
+ * @example
+ * ```tsx
+ * import { GlobalWebSocketProvider } from '@/components/GlobalWebSocketProvider';
+ *
+ * <GlobalWebSocketProvider>
+ *   <App />
+ * </GlobalWebSocketProvider>
+ * ```
+ * @param {React.ReactNode} props.children - Child components wrapped by the provider.
+ */
 export function GlobalWebSocketProvider({ children }: { children: React.ReactNode }) {
     const { user, isInitialized } = useAuthStore();
     const { connect, disconnect } = useWebSocketStore();
