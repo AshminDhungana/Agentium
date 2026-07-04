@@ -1,13 +1,14 @@
 /**
- * Phase 16.3: Interactive Citation Graph visualization.
+ * @description Interactive Citation Graph visualization (Phase 16.3).
+ * Renders a force-directed graph of document citation relationships using SVG.
+ * Supports click-to-expand and hover tooltips.
+ * @example
+ * ```tsx
+ * import { CitationGraph } from '@/components/knowledge/CitationGraph';
  *
- * Uses SVG + basic force simulation (no external D3 dependency required).
- * Renders nodes (documents) and edges (citation links) with:
- *   - Node size proportional to citation_count
- *   - Node colour by collection_key
- *   - Directed edges drawn as lines with arrows
- *   - Click-to-expand (calls API with root=clicked node)
- *   - Hover tooltip showing doc ID
+ * <CitationGraph />
+ * ```
+ * @param none — No external props; configuration and data fetching is internal.
  */
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { knowledgeApi, CitationNode, CitationEdge, TopCitedDoc } from '../../services/knowledge';

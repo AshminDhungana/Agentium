@@ -1,12 +1,16 @@
 /**
- * VotingInterface Component - Real-time voting display for active amendments.
+ * @description Real-time voting display for active amendments.
  * Can be embedded in MonitoringPage or used standalone.
+ * Features live countdown, vote tally, and cast-vote controls.
+ * @example
+ * ```tsx
+ * import { VotingInterface } from '@/components/council/VotingInterface';
  *
- * Fixes:
- * - alert() → toast
- * - Static getTimeRemaining → live countdown via setInterval
- * - Unused XCircle import removed
- */
+ * <VotingInterface embedded onVoteCast={refetch} />
+ * ```
+ * @param {boolean} [props.embedded] - Whether to render in compact embedded mode (default: false).
+ * @param {(amendmentId: string) => void} [props.onVoteCast] - Callback after a vote is successfully cast.
+ *
 
 import React, { useState, useEffect } from 'react';
 import { showToast } from '@/hooks/useToast';

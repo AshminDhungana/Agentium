@@ -3,6 +3,20 @@ import { useAuthStore } from '@/store/authStore';
 import { Shield } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
+/**
+ * @description Route guard that waits for the auth store to initialise before
+ * making any redirect decisions. Renders a spinner while auth is resolving.
+ * @example
+ * ```tsx
+ * import { ProtectedRoute } from '@/components/common/ProtectedRoute';
+ *
+ * <ProtectedRoute requireSovereign>
+ *     <SovereignDashboard />
+ * </ProtectedRoute>
+ * ```
+ * @param {React.ReactNode} props.children - Content to render when authenticated.
+ * @param {boolean} [props.requireSovereign] - When true, only allows Sovereign access (default: false).
+ */
 interface ProtectedRouteProps {
     children: React.ReactNode;
     requireSovereign?: boolean;
