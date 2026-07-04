@@ -15,6 +15,7 @@
 import React from 'react';
 import { Agent } from '../../types';
 import { Shield, Brain, Users, Terminal, Activity, Zap, CheckSquare, TrendingUp, Clock } from 'lucide-react';
+import { HealthRing } from '@/components/ui/HealthRing';
 
 interface AgentCardProps {
     agent:       Agent;
@@ -22,33 +23,6 @@ interface AgentCardProps {
     onTerminate: (agent: Agent) => void;
     /** Optional — only shown for task_agents; triggers promotion flow */
     onPromote?:  (agent: Agent) => void;
-}
-
-// ─── Health score ring ────────────────────────────────────────────────────────
-function HealthRing({ score }: { score: number }) {
-    const radius        = 14;
-    const circumference = 2 * Math.PI * radius;
-    const filled        = (score / 100) * circumference;
-    const color         = score >= 80 ? '#10b981' : score >= 50 ? '#f59e0b' : '#ef4444';
-
-    return (
-        <svg
-            width="36" height="36" viewBox="0 0 36 36"
-            className="absolute -top-1.5 -right-1.5"
-            aria-label={`Health: ${score}%`}
-        >
-            <circle cx="18" cy="18" r={radius} fill="none" strokeWidth="3" className="stroke-slate-200 dark:stroke-slate-700" />
-            <circle
-                cx="18" cy="18" r={radius} fill="none" strokeWidth="3"
-                stroke={color}
-                strokeDasharray={`${filled} ${circumference}`}
-                strokeLinecap="round"
-                transform="rotate(-90 18 18)"
-                style={{ transition: 'stroke-dasharray 0.5s ease' }}
-            />
-            <text x="18" y="22" textAnchor="middle" fontSize="8" fontWeight="700" fill={color}>{score}</text>
-        </svg>
-    );
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
