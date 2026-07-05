@@ -13,6 +13,13 @@ from enum import Enum
 import httpx
 import hmac
 import hashlib
+import logging
+logger = logging.getLogger(__name__)
+
+try:
+    from backend.core.config import settings
+except ImportError:
+    settings = None  # type: ignore
 
 from backend.services.channels.base import BaseChannelAdapter
 from backend.models.entities.channels import ExternalMessage, ExternalChannel, ChannelStatus
@@ -542,10 +549,6 @@ class UnifiedWhatsAppAdapter(BaseChannelAdapter):
     @staticmethod
     def verify_cloud_signature(app_secret: str, body: bytes, signature: str) -> bool:
         """Verify Meta webhook signature."""
-import logging
-from backend.core.config import settings
-logger = logging.getLogger(__name__)
-
         if not signature:
             return False
         

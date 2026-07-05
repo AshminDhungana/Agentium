@@ -10,10 +10,15 @@ import json
 from typing import Optional, Dict, Any, AsyncGenerator, List, Callable, Tuple
 from abc import ABC, abstractmethod
 from datetime import datetime
+import logging
 
 from backend.models.database import get_db_context
 from backend.models.entities.user_config import UserModelConfig, ProviderType, ModelUsageLog, ConnectionStatus
 
+try:
+    from backend.core.config import settings
+except ImportError:
+    settings = None  # type: ignore
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Per-model pricing table
@@ -1359,10 +1364,6 @@ class ModelService:
     @staticmethod
     def _get_default_models(provider: ProviderType) -> List[str]:
         """Get current curated defaults when live API fetch fails."""
-import logging
-from backend.core.config import settings
-logger = logging.getLogger(__name__)
-
         defaults = {
             ProviderType.OPENAI: [
                 "gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.4-nano",

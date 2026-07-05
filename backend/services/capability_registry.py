@@ -11,6 +11,9 @@ from enum import Enum
 from backend.models.entities.agents import Agent, AgentType
 from backend.models.entities.audit import AuditLog, AuditLevel, AuditCategory
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class Capability(str, Enum):
     """All possible capabilities in the system."""
@@ -564,9 +567,6 @@ def require_capability(capability: Capability):
         """Decorator."""
         async def wrapper(agent: Agent, db: Session, *args, **kwargs):
             """Wrapper."""
-import logging
-logger = logging.getLogger(__name__)
-
             # Check capability
             if not CapabilityRegistry.can_agent(agent, capability, db):
                 raise PermissionError(

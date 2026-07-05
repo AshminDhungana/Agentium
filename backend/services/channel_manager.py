@@ -35,6 +35,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from collections import defaultdict
 import threading
+import logging
+logger = logging.getLogger(__name__)
 
 from sqlalchemy.orm import Session
 
@@ -3118,10 +3120,7 @@ end tell
     @staticmethod
     async def get_chats(config: Dict) -> List[Dict]:
         """Get recent chats via BlueBubbles."""
-import logging
-
         import httpx
-logger = logging.getLogger(__name__)
 
         bb_url = config.get('bb_url', settings.BB_BASE_URL).rstrip('/')
         bb_password = config.get('bb_password')
