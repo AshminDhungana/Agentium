@@ -4,6 +4,7 @@ Thumbs.db
 *~
 *.swp
 
+.env
 logs.txt
 
 # IDE
