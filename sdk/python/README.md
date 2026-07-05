@@ -15,7 +15,7 @@ import asyncio
 from agentium_sdk import AgentiumClient
 
 async def main():
-    async with AgentiumClient("http://localhost:8000", api_key="your-key") as client:
+    async with AgentiumClient("http://localhost:8000", api_key="your-key") as client:  # pragma: allowlist secret
         # Check health
         health = await client.health()
         print(f"Status: {health.status}")
@@ -39,7 +39,7 @@ asyncio.run(main())
 
 ### API Key
 ```python
-client = AgentiumClient("http://localhost:8000", api_key="sk-...")
+client = AgentiumClient("http://localhost:8000", api_key="sk-...")  # pragma: allowlist secret
 ```
 
 ### JWT (username/password)
@@ -54,7 +54,7 @@ async with AgentiumClient("http://localhost:8000") as client:
 ```python
 from agentium_sdk import AgentiumClient, NotFoundError, RateLimitError
 
-async with AgentiumClient("http://localhost:8000", api_key="sk-...") as client:
+async with AgentiumClient("http://localhost:8000", api_key="sk-...") as client:  # pragma: allowlist secret
     try:
         agent = await client.get_agent("99999")
     except NotFoundError:

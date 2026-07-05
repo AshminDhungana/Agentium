@@ -79,6 +79,13 @@ jobs:
         with:
           python-version: "3.11"
 
+      # ── Secret Hygiene (Phase 18.5) ──────────────────────────────────────────
+      - name: Check for newly committed secrets (detect-secrets)
+        run: |
+          python -m pip install "detect-secrets>=1.5.0"
+          detect-secrets scan --baseline .secrets.baseline --all-files
+        # Exit code is non-zero if new secrets are found, failing the build.
+
       - name: Install dependencies
         working-directory: ./backend
         run: |

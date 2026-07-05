@@ -43,7 +43,7 @@ const PYTHON_SAMPLE = `from agentium_sdk import AgentiumClient
 
 async with AgentiumClient(
     "http://localhost:8000",
-    api_key="sk-your-key-here",
+    api_key="sk-your-key-here", // pragma: allowlist secret
 ) as client:
     # Health check
     health = await client.health()

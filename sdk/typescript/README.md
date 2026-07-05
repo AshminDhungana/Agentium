@@ -15,7 +15,7 @@ import { AgentiumClient } from '@agentium/sdk';
 
 const client = new AgentiumClient({
   baseUrl: 'http://localhost:8000',
-  apiKey: 'your-api-key',
+  apiKey: 'your-api-key', // pragma: allowlist secret
 });
 
 // List agents
@@ -36,7 +36,7 @@ console.log(`Task created: ${task.id}`);
 ```typescript
 const client = new AgentiumClient({
   baseUrl: 'http://localhost:8000',
-  apiKey: 'sk-...',
+  apiKey: 'sk-...', // pragma: allowlist secret
 });
 ```
 

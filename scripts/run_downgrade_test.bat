@@ -13,7 +13,7 @@ REM ============================================================================
 setlocal
 
 REM Use the test postgres running in docker
-set DATABASE_URL=postgresql://agentium:agentium@localhost:5432/agentium_test
+set DATABASE_URL=postgresql://agentium:agentium@localhost:5432/agentium_test  REM pragma: allowlist secret
 
 REM Create the test database if it doesn't exist
 psql postgresql://agentium:agentium@localhost:5432/postgres -c "DROP DATABASE IF EXISTS agentium_test; CREATE DATABASE agentium_test;"

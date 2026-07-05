@@ -4,7 +4,7 @@
  * Usage:
  *   import { AgentiumClient } from '@agentium/sdk';
  *
- *   const client = new AgentiumClient({ baseUrl: 'http://localhost:8000', apiKey: 'sk-...' });
+ *   const client = new AgentiumClient({ baseUrl: 'http://localhost:8000', apiKey: 'sk-...' });  // pragma: allowlist secret
  *   const agents = await client.listAgents();
  */
 
