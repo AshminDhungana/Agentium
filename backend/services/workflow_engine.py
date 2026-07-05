@@ -237,7 +237,10 @@ class WorkflowEngine:
 
         # Enqueue the task via Celery as the agent dispatch trigger.
         from backend.services.tasks.task_executor import execute_task_async
-        execute_task_async.delay(str(task.id), None)
+        try:
+            execute_task_async.delay(task.agentium_id, None)
+        except Exception:
+            logger.warning("Task dispatch failed for %s, workflow will wait", task.agentium_id, exc_info=True)
         return True
 
     @staticmethod

@@ -101,14 +101,23 @@ def execute_task_async(self, task_id: str, agent_id: str):
     with get_task_db() as db:
         try:
             logger.info(f"Executing task {task_id} with agent {agent_id}")
-            
+
             # Load task and agent
             task = db.query(Task).filter_by(agentium_id=task_id).first()
-            agent = db.query(Agent).filter_by(agentium_id=agent_id).first()
-            
-            if not task or not agent:
-                raise ValueError("Task or agent not found")
-            
+
+            if not task:
+                raise ValueError(f"Task {task_id} not found")
+
+            agent = None
+            if agent_id:
+                agent = db.query(Agent).filter_by(agentium_id=agent_id).first()
+
+            if not agent:
+                agent = db.query(Agent).filter(Agent.status == 'active').first()
+
+            if not agent:
+                raise ValueError(f"No active agent found for task {task_id}")
+
             # Execute with skill RAG
             result = agent.execute_with_skill_rag(task, db)
             

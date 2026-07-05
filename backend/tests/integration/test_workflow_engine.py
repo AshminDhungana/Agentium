@@ -121,10 +121,15 @@ class TestWorkflowEngine:
         assert execution.status == WorkflowExecutionStatus.RUNNING
         assert execution.current_step_index == 0
 
-        # Step 0: task
+        # Step 0: task — dispatches to agent pool and sets status to PAUSED
         WorkflowEngine.execute_current_step(db=db_session, execution_id=execution.id)
         db_session.refresh(execution)
         assert execution.current_step_index == 1
+        assert execution.status == WorkflowExecutionStatus.PAUSED
+
+        # Simulate task completion callback: resume the workflow
+        execution.status = WorkflowExecutionStatus.RUNNING
+        db_session.commit()
 
         # Step 1: condition (true because context["status"] == "ok")
         WorkflowEngine.execute_current_step(db=db_session, execution_id=execution.id)
