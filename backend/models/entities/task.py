@@ -483,8 +483,7 @@ class Task(BaseEntity):
         Implements self-healing: retry → escalate to Council.
         """
         import json
-logger = logging.getLogger(__name__)
-        
+
         self.error_count += 1
         # Structured failure reason (NEW)
         self.last_error = json.dumps({

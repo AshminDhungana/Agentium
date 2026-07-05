@@ -955,3 +955,28 @@ The backend triggers the card with a structured payload containing the question 
 ## Changelog
 
 ### v0.9.0-alpha \_(in progress)
+
+Context
+During the TODO/FIXME audit of Phase 18.5, a TODO block was found in backend/services/chat_service.py:207 requesting the implementation of System-Generated Media Interception.
+
+Description
+When the LLM response (Head of Council) generates a media artifact (e.g., an image URL or Markdown ![img](url)), the system should:
+
+Parse the response text to detect media references (Markdown image syntax ![alt](url) and raw URLs pointing to common image extensions .png, .jpg, .jpeg, .gif, .webp, .svg, .mp4).
+Download/process the media using httpx (async) or aiohttp (avoid requests in async paths).
+Upload the processed media via StorageService.store_file() (MinIO/S3-backed, already available at backend/services/storage_service contentious paths).
+Replace the original transient URLs in result["content"] with the new permanent S3/MinIO URLs.
+Update any relevant metadata (e.g., media_urls) before broadcasting the response to the Unified Inbox.
+Acceptance Criteria
+
+Regex/markdown parser detects at least the standard Markdown image syntax and raw image URLs.
+
+Failed downloads are logged gracefully (do not block the chat response).
+
+New S3/MinIO URLs are injected back into result["content"] before ChannelManager.broadcast_message() is called.
+
+Unit tests in backend/tests/ cover: (a) image URL interception, (b) non-media text passthrough, (c) failed download graceful fallback.
+Related
+backend/services/chat_service.py (method _handle_chat_message)
+backend/services/storage_service.py (method store_file)
+backend/services/channel_manager.py (method broadcast_message)
