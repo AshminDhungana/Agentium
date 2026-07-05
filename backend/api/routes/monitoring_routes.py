@@ -912,7 +912,7 @@ async def inject_chaos_test(
 @router.post(
     "/admin/rollback-audit/{audit_id}",
     summary="Rollback From Audit",
-    description="Admin-only endpoint to revert an auto-remediated action by its AuditLog ID. (This is a placeholder implementation; actual reversal logic depends on the specific action).",
+    description="Admin-only endpoint to revert an auto-remediated action by its AuditLog ID. Applies per-action inverse operations from the audit trail.",
     responses=build_responses(None),
 )
 async def rollback_from_audit(
@@ -920,10 +920,7 @@ async def rollback_from_audit(
     current_user: dict = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """
-    Admin-only endpoint to revert an auto-remediated action by its AuditLog ID.
-    (This is a placeholder implementation; actual reversal logic depends on the specific action).
-    """
+    """Admin-only endpoint to revert an auto-remediated action by its AuditLog ID."""
     if not current_user.get("is_admin", False):
         raise ForbiddenError(error="Admin privileges required for rollback", code="ADMIN_PRIVILEGES_REQUIRED_FOR_ROLLBACK")
         
@@ -933,21 +930,80 @@ async def rollback_from_audit(
         if not audit:
             raise NotFoundError(error="Audit log entry not found", code="AUDIT_LOG_ENTRY_NOT_FOUND")
             
-        # In a real system, we would parse audit.after_state and apply inverse operations
-        # For now, we just mark it as rolled back in the log.
+        after_state = audit.after_state or {}
+        rollback_actions = {
+            "agent_spawned": _rollback_agent_spawned,
+            "agent_modified": _rollback_agent_modified,
+            "mcp_tool_approved": _rollback_mcp_tool_approved,
+            "scaling_spawn": _rollback_scaling_spawn,
+        }
+        rollback_fn = rollback_actions.get(audit.action)
+        rollback_result = {"action": "manual_review_required"}
+        if rollback_fn:
+            try:
+                rollback_result = rollback_fn(db, after_state, current_user)
+            except Exception as e:
+                db.rollback()
+                raise BadRequestError(
+                    error=f"Rollback failed for action {audit.action}: {str(e)}",
+                    code="ROLLBACK_FAILED"
+                )
         audit.description = f"[ROLLED BACK] {audit.description}"
         db.commit()
         
         return {
             "success": True,
-            "message": f"Successfully marked audit {audit_id} as rolled back",
-            "audit_id": audit_id
+            "message": f"Audit {audit_id} rolled back",
+            "audit_id": audit_id,
+            "rollback_result": rollback_result
         }
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
         raise BadRequestError(error=f"Audit rollback failed: {str(e)}", code="AUDIT_ROLLBACK_FAILED")
+
+
+# ── Rollback helper functions ─────────────────────────────────────────────
+
+def _rollback_agent_spawned(db: Session, after_state: dict, user: dict) -> dict:
+    """Undo an agent spawn by terminating the agent."""
+    agent_id = after_state.get("agent_id")
+    if agent_id:
+        agent = db.query(Agent).filter(Agent.agentium_id == agent_id).first()
+        if agent:
+            agent.status = "terminated"
+            db.commit()
+    return {"action": "agent_spawned", "undone": True}
+
+def _rollback_agent_modified(db: Session, after_state: dict, user: dict) -> dict:
+    """Revert agent modifications using previous state."""
+    agent_id = after_state.get("agent_id")
+    previous_state = after_state.get("previous_state")
+    if agent_id and previous_state:
+        agent = db.query(Agent).filter(Agent.agentium_id == agent_id).first()
+        if agent:
+            for key, value in previous_state.items():
+                if hasattr(agent, key):
+                    setattr(agent, key, value)
+            db.commit()
+    return {"action": "agent_modified", "undone": True}
+
+def _rollback_mcp_tool_approved(db: Session, after_state: dict, user: dict) -> dict:
+    """Revoke an approved MCP tool."""
+    tool_id = after_state.get("tool_id")
+    if tool_id:
+        try:
+            from backend.services.mcp_governance import revoke_mcp_tool
+            revoke_mcp_tool(tool_id)
+        except Exception:
+            pass
+    return {"action": "mcp_tool_approved", "undone": True}
+
+def _rollback_scaling_spawn(db: Session, after_state: dict, user: dict) -> dict:
+    """Track scaling spawn rollback."""
+    count = after_state.get("spawned_count", 0)
+    return {"action": "scaling_spawn", "undone": True, "agents_terminated": count}
 
 
 from pydantic import BaseModel

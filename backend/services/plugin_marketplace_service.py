@@ -88,12 +88,30 @@ class PluginMarketplaceService:
         if plugin.status != "submitted":
             raise BadRequestError(error="Only 'submitted' plugins can be sent for approval.", code="ONLY_SUBMITTED_PLUGINS_CAN_BE")
 
-        # In a full implementation, we would create a VotingProposal record here
-        # For now, we simulate the proposal creation and return a mock proposal ID
-        proposal_id = f"proposal-plugin-{plugin_id[:8]}"
-        
-        logger.info(f"Plugin Marketplace: Created Council approval proposal {proposal_id} for plugin {plugin.name}")
-        return proposal_id
+        from backend.models.entities.voting import AmendmentVoting, AmendmentStatus
+        from backend.utils.agentium_id import AgentiumIDGenerator
+
+        proposal = AmendmentVoting(
+            title=f"Plugin approval: {plugin.name}",
+            description=f"Approve plugin {plugin.name} (v{plugin.version}) for marketplace. "
+                        f"Author: {plugin.author}. Category: {plugin.category}.",
+            amendment_type="plugin_approval",
+            proposer_id="system",
+            status=AmendmentStatus.PENDING,
+            quorum=0.5,
+            threshold=0.5,
+            duration_hours=48,
+            auto_apply=False,
+        )
+        db.add(proposal)
+        db.commit()
+        db.refresh(proposal)
+
+        logger.info(
+            "Plugin Marketplace: Created Council approval proposal %s for plugin %s",
+            proposal.agentium_id, plugin.name
+        )
+        return proposal.agentium_id
 
     @staticmethod
     def publish_plugin(db: Session, plugin_id: str, admin_user: User) -> Plugin:

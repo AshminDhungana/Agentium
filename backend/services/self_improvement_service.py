@@ -33,26 +33,44 @@ class SelfImprovementService:
                 AuditLog.action == "tool_invocation"
             ).all()
 
-            # Mock detection for pattern >= 5 times with > 90% success
-            # We will simulate triggering ToolCreationService
+            from collections import Counter
+            tool_sequences = []
+            current_sequence = []
+
+            for log in logs:
+                if log.after_state and "tool_name" in log.after_state:
+                    current_sequence.append(log.after_state["tool_name"])
+                    if len(current_sequence) >= 3:
+                        tool_sequences.append(tuple(current_sequence[-3:]))
+
             generated = 0
-            
             try:
                 from backend.services.tool_creation_service import ToolCreationService
-                # Check if create_from_pattern exists, if not, stub it out
-                if not hasattr(ToolCreationService, 'create_from_pattern'):
-                    def mock_create_from_pattern(pattern_data, db_session):
-                        """Mock create from pattern."""
-                        logger.info(f"Mock auto-generated tool from pattern: {pattern_data}")
-                    ToolCreationService.create_from_pattern = mock_create_from_pattern
-                    
-                # We would normally extract actual sequential tool usage,
-                # For this implementation, we will log a dummy pattern if logs exist.
-                if len(logs) > 10:
-                    ToolCreationService.create_from_pattern("frequent_sql_query_pattern", db)
-                    generated += 1
+                pattern_counts = Counter(tool_sequences)
+
+                for pattern, count in pattern_counts.items():
+                    if count < 5:
+                        continue
+                    error_count = sum(
+                        1 for log in logs
+                        if log.level == AuditLevel.ERROR and log.after_state
+                        and log.after_state.get("tool_name") in pattern
+                    )
+                    success_rate = 1.0 - (error_count / count) if count > 0 else 1.0
+
+                    if success_rate > 0.9:
+                        pattern_data = {
+                            "sequence": list(pattern),
+                            "count": count,
+                            "success_rate": success_rate
+                        }
+                        try:
+                            ToolCreationService.create_from_pattern(pattern_data, db)
+                            generated += 1
+                        except Exception as e:
+                            logger.error("create_from_pattern failed: %s", e)
             except Exception as e:
-                logger.error(f"Failed to generate tool from pattern: {e}")
+                logger.error("Failed to generate tool from pattern: %s", e)
                 
             return {
                 "patterns_analyzed": len(logs),

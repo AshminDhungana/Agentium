@@ -228,10 +228,16 @@ class WorkflowEngine:
         db.add(task)
         db.flush()
         
-        # If task is sync, execute inline (or assume true for mock)
-        # In a real agentic flow, we'd pause workflow, dispatch task to agents, and task completion hook resumes workflow.
-        # Here we mock synchronous execution update.
+        # Dispatch the task to the agent pool asynchronously.
+        # Workflow pauses until the task completion hook resumes it.
+        execution.status = WorkflowExecutionStatus.PAUSED
         execution.context_data[f"step_{step.step_index}_task_id"] = task.id
+        execution.context_data[f"step_{step.step_index}_task_status"] = "dispatched"
+        db.commit()
+
+        # Enqueue the task via Celery as the agent dispatch trigger.
+        from backend.services.tasks.task_executor import execute_task_async
+        execute_task_async.delay(str(task.id), None)
         return True
 
     @staticmethod
@@ -250,9 +256,33 @@ class WorkflowEngine:
 
     @staticmethod
     def _execute_parallel_step(db: Session, execution: WorkflowExecution, step: WorkflowStep) -> bool:
-        """Spawn multiple sub-workflows or tasks in parallel."""
-        # Stub: dispatch parallel celery tasks
+        """Spawn multiple sub-workflows or tasks in parallel via Celery group."""
+        from celery import group
+        from backend.services.tasks.task_executor import execute_task_async
+
+        parallel_tasks = step.config.get("tasks", [])
+        if not parallel_tasks:
+            execution.context_data[f"step_{step.step_index}_parallel"] = "no_tasks"
+            return True
+
+        task_ids = []
+        for task_spec in parallel_tasks:
+            task = Task(
+                title=task_spec.get("title", "Parallel workflow task"),
+                description=task_spec.get("description", ""),
+                priority=TaskPriority.NORMAL,
+                workflow_id=execution.workflow_id,
+                context_data=execution.context_data,
+                created_by="workflow_parallel"
+            )
+            db.add(task)
+            task_ids.append(str(task.id))
+        db.commit()
+
+        group(execute_task_async.s(tid, None) for tid in task_ids).apply_async()
+
         execution.context_data[f"step_{step.step_index}_parallel"] = "dispatched"
+        execution.context_data[f"step_{step.step_index}_parallel_task_ids"] = task_ids
         return True
 
     @staticmethod
@@ -379,10 +409,33 @@ class WorkflowEngine:
     def register_cron_schedules():
         """
         Dynamically reload Celery Beat schedules based on Workflow.schedule_cron.
-        Implementation relies on django-celery-beat or custom redbeat logic.
+        Queries active workflows with a cron expression and syncs them to the
+        Celery Beat periodic task registry.
         """
-        # (Placeholder for Cron syncing with Celery Beat backend)
-        logger.info("Cron schedules synced for Workflows")
+        from backend.celery_app import celery_app
+        from celery.schedules import crontab
+
+        try:
+            with get_db_context() as db:
+                workflows = db.query(Workflow).filter(
+                    Workflow.is_active == True,
+                    Workflow.schedule_cron.isnot(None)
+                ).all()
+
+                for wf in workflows:
+                    try:
+                        parts = wf.schedule_cron.split()
+                        schedule_entry = crontab(minute=parts[0], hour=parts[1], day_of_month=parts[2], month_of_year=parts[3], day_of_week=parts[4])
+                        celery_app.conf.beat_schedule[f"workflow-{wf.id}"] = {
+                            "task": "agentium.services.workflow_engine.workflow_step_runner",
+                            "schedule": schedule_entry,
+                            "args": (str(wf.id),),
+                        }
+                        logger.info("Registered cron schedule for workflow %s", wf.id)
+                    except (ValueError, IndexError) as e:
+                        logger.error("Failed to register cron for workflow %s: %s", wf.id, e)
+        except Exception as e:
+            logger.error("Error syncing workflow cron schedules: %s", e)
 
     @staticmethod
     def calculate_eta(db: Session, workflow_id: str) -> dict:

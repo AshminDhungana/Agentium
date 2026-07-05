@@ -5,6 +5,7 @@ Agent Orchestrator - Central routing and governance coordinator
 import asyncio
 import logging
 import time
+from textwrap import dedent
 from collections import defaultdict
 from typing import Optional, Dict, Any, List
 from datetime import datetime, timedelta
@@ -481,10 +482,21 @@ class AgentOrchestrator:
         tool_name = re.sub(r'[^a-z0-9]+', '_', raw_name.lower()).strip('_') or "unnamed_tool"
 
         try:
+            # Generate a basic Python function template from the tool name and content
+            safe_name = re.sub(r"[^a-z0-9_]", "", tool_name.lower()).strip("_") or "unnamed_tool"
+            generated_template = dedent(f'''
+def {safe_name}(input_data: dict) -> dict:
+    """
+    Auto-generated tool from agent request: {content[:200]}
+    """
+    # TODO: Implement the tool logic here based on the agent's requirements
+    raise NotImplementedError("This tool was auto-generated and needs implementation.")
+''').strip()
+
             request = ToolCreationRequest(
                 tool_name=tool_name,
                 description=f"Agent-initiated tool proposal: {content[:200]}",
-                code_template="# Stub — replace with real implementation",
+                code_template=generated_template,
                 parameters=[],
                 authorized_tiers=[],
                 rationale=content,

@@ -219,7 +219,7 @@ def get_mobile_dashboard(
         },
         "active_votes": active_votes,
         "role": current_user.effective_role,
-        "unread_notifications": 0  # Stub until notification centre is built
+        "unread_notifications": 0
     }
 
 

@@ -63,8 +63,6 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     
-    # Encryption for API keys - auto-generate valid key if not provided
-    # In production, set this via environment variable for persistence
     ENCRYPTION_KEY: str = Field(
         default_factory=lambda: Fernet.generate_key().decode(),
         env="ENCRYPTION_KEY"

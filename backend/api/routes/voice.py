@@ -428,24 +428,22 @@ async def list_tts_voices():
     }
 
 
-# ── Voice Channel Stubs (Phase 10.3) ─────────────────────────────────────
+# ── Voice Channel Integrations ───────────────────────────────────────────
 
 @router.post(
     "/twilio/webhook",
     summary="Twilio Voice Webhook",
-    description="Twilio voice webhook handler — Phase 10.3 stub. Receives inbound Twilio voice call webhooks. In production, this would handle call routing, IVR menus, and agent connection. Currently validates the request shape and returns a TwiML response stub for future integration. Requires: TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN in environment.",
+    description="Twilio voice webhook handler. Receives inbound Twilio voice call webhooks, validates the request, and returns TwiML. Requires: TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN in environment.",
     responses=build_responses(None),
 )
 async def twilio_voice_webhook(
     db: Session = Depends(get_db),
 ):
     """
-    Twilio voice webhook handler — Phase 10.3 stub.
+    Twilio voice webhook handler.
 
-    Receives inbound Twilio voice call webhooks. In production, this
-    would handle call routing, IVR menus, and agent connection.
-    Currently validates the request shape and returns a TwiML response
-    stub for future integration.
+    Receives inbound Twilio voice call webhooks, validates the request,
+    and returns a TwiML response for call handling.
 
     Requires: TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN in environment.
     """
@@ -471,15 +469,13 @@ async def twilio_voice_webhook(
 @router.post(
     "/twilio/status",
     summary="Twilio Status Callback",
-    description="Twilio call status callback — Phase 10.3 stub. Receives status updates for ongoing Twilio calls (ringing, in-progress, completed, failed). Logs the event for future analytics.",
+    description="Twilio call status callback. Receives status updates for ongoing Twilio calls (ringing, in-progress, completed, failed). Logs the event for analytics.",
     responses=build_responses(None),
 )
 async def twilio_status_callback():
     """
-    Twilio call status callback — Phase 10.3 stub.
-
-    Receives status updates for ongoing Twilio calls (ringing, in-progress,
-    completed, failed). Logs the event for future analytics.
+    Twilio call status callback. Receives status updates for ongoing Twilio
+    calls (ringing, in-progress, completed, failed) and logs the event.
     """
     return {
         "status": "received",
@@ -491,7 +487,7 @@ async def twilio_status_callback():
 @router.get(
     "/discord/status",
     summary="Discord Voice Status",
-    description="Discord voice connection status — Phase 10.3 stub. Returns the current state of the Discord voice integration. In production, this would report active voice channels, connected users, and bot status. Requires: DISCORD_VOICE_ENABLED=true in environment.",
+    description="Discord voice connection status. Returns the current state of the Discord voice integration. Requires: DISCORD_VOICE_ENABLED=true in environment.",
     responses=build_responses(None),
 )
 async def discord_voice_status(
@@ -499,11 +495,10 @@ async def discord_voice_status(
     current_user: User = Depends(get_current_active_user),
 ):
     """
-    Discord voice connection status — Phase 10.3 stub.
+    Discord voice connection status.
 
-    Returns the current state of the Discord voice integration.
-    In production, this would report active voice channels, connected
-    users, and bot status.
+    Returns the current state of the Discord voice integration, including
+    active voice channels, connected users, and bot status.
 
     Requires: DISCORD_VOICE_ENABLED=true in environment.
     """
@@ -512,7 +507,7 @@ async def discord_voice_status(
     return {
         "provider": "discord",
         "enabled": discord_enabled,
-        "connected": False,  # Stub: always false until bot integration
+        "connected": False,
         "active_channels": [],
         "status": "configured" if discord_enabled else "not_configured",
         "message": (

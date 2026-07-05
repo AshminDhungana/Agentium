@@ -4,6 +4,7 @@ Council-managed approval workflow for collective memory.
 """
 
 import json
+import logging
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
 from enum import Enum
@@ -14,6 +15,12 @@ from backend.models.entities.voting import AmendmentVoting, IndividualVote
 from backend.models.entities.audit import AuditLog, AuditCategory, AuditLevel
 from backend.core.vector_store import get_vector_store
 from backend.services.knowledge_service import get_knowledge_service
+
+
+logger = logging.getLogger(__name__)
+
+# Redis key for staged submissions persistence
+_KNOWLEDGE_STAGING_KEY_PREFIX = "agentium:knowledge:staging"
 
 
 class KnowledgeStatus(str, Enum):
@@ -76,8 +83,8 @@ class KnowledgeGovernanceService:
     APPROVAL_THRESHOLD = 0.6  # 60% of votes must be "for"
     KNOWLEDGE_TIMEOUT_HOURS = 24
 
-    # Class-level registry so submissions survive across per-request instantiations.
-    # In production this should be replaced with a Redis/DB-backed store.
+    # Staging registry persists submissions across per-request instantiations.
+    # Backed by Redis for multi-worker safety; in-memory dict is a warm cache.
     _staged_submissions: Dict[str, "KnowledgeSubmission"] = {}
 
     def __init__(self, db: Session):
@@ -88,8 +95,108 @@ class KnowledgeGovernanceService:
 
     @property
     def staged_submissions(self) -> Dict[str, "KnowledgeSubmission"]:
-        """Proxy to the class-level submission registry."""
+        """Return the class-level in-memory cache, hydrating from Redis on first access if empty."""
+        if not KnowledgeGovernanceService._staged_submissions:
+            self._hydrate_submissions_from_redis()
         return KnowledgeGovernanceService._staged_submissions
+
+    @staticmethod
+    def _get_redis_client():
+        """Lazy-initialise and return a sync Redis client."""
+        import redis as _redis
+        from backend.core.config import settings
+        url = getattr(settings, "REDIS_URL", "redis://redis:6379/0")
+        return _redis.Redis.from_url(url, decode_responses=True)
+
+    def _persist_submission_to_redis(self, submission: "KnowledgeSubmission"):
+        """Serialise a KnowledgeSubmission into Redis (with 24 h TTL)."""
+        try:
+            redis_client = self._get_redis_client()
+            payload = {
+                "id": submission.id,
+                "content": submission.content,
+                "submitter_agentium_id": submission.submitter_agentium_id,
+                "category": submission.category.value,
+                "title": submission.title,
+                "description": submission.description,
+                "metadata": json.dumps(submission.metadata),
+                "status": submission.status.value,
+                "submitted_at": submission.submitted_at.isoformat() if submission.submitted_at else None,
+                "review_deadline": submission.review_deadline.isoformat() if submission.review_deadline else None,
+                "votes_for": str(submission.votes_for),
+                "votes_against": str(submission.votes_against),
+                "votes": json.dumps(submission.votes),
+                "council_reviewers": json.dumps(submission.council_reviewers),
+                "rejection_reason": submission.rejection_reason or "",
+                "approved_at": submission.approved_at.isoformat() if submission.approved_at else "",
+                "approved_by": submission.approved_by or "",
+                "vector_doc_id": submission.vector_doc_id or "",
+            }
+            redis_client.hset(f"{_KNOWLEDGE_STAGING_KEY_PREFIX}:{submission.id}", mapping=payload)
+            redis_client.expire(f"{_KNOWLEDGE_STAGING_KEY_PREFIX}:{submission.id}", 86400)
+        except Exception:
+            logger.exception("Failed to persist submission to Redis")
+
+    def _hydrate_submissions_from_redis(self):
+        """Load any staged submissions from Redis into the in-memory cache."""
+        try:
+            redis_client = self._get_redis_client()
+            for key in redis_client.scan_iter(f"{_KNOWLEDGE_STAGING_KEY_PREFIX}:*"):
+                raw = redis_client.hgetall(key)
+                if not raw:
+                    continue
+                submission_id = raw.get("id")
+                if not submission_id or submission_id in KnowledgeGovernanceService._staged_submissions:
+                    continue
+                cat_raw = raw.get("category", "domain_knowledge")
+                category = KnowledgeCategory(cat_raw)
+                submission = KnowledgeSubmission(
+                    content=raw.get("content", ""),
+                    submitter_agentium_id=raw.get("submitter_agentium_id", ""),
+                    category=category,
+                    title=raw.get("title"),
+                    description=raw.get("description"),
+                    metadata=json.loads(raw.get("metadata", "{}"))
+                )
+                submission.id = submission_id
+                submission.status = KnowledgeStatus(raw.get("status", "pending"))
+                for attr, key in (("votes_for", "votes_for"), ("votes_against", "votes_against")):
+                    try:
+                        setattr(submission, attr, int(raw.get(key, 0)))
+                    except (TypeError, ValueError):
+                        setattr(submission, attr, 0)
+                try:
+                    sa = raw.get("submitted_at")
+                    if sa:
+                        submission.submitted_at = datetime.fromisoformat(sa)
+                except (ValueError, TypeError):
+                    pass
+                try:
+                    rd = raw.get("review_deadline")
+                    if rd:
+                        submission.review_deadline = datetime.fromisoformat(rd)
+                except (ValueError, TypeError):
+                    pass
+                try:
+                    submission.votes = json.loads(raw.get("votes", "[]"))
+                except (TypeError, json.JSONDecodeError):
+                    submission.votes = []
+                try:
+                    submission.council_reviewers = json.loads(raw.get("council_reviewers", "[]"))
+                except (TypeError, json.JSONDecodeError):
+                    submission.council_reviewers = []
+                submission.rejection_reason = raw.get("rejection_reason") or None
+                try:
+                    aa = raw.get("approved_at")
+                    if aa:
+                        submission.approved_at = datetime.fromisoformat(aa)
+                except (ValueError, TypeError):
+                    pass
+                submission.approved_by = raw.get("approved_by") or None
+                submission.vector_doc_id = raw.get("vector_doc_id") or None
+                KnowledgeGovernanceService._staged_submissions[submission_id] = submission
+        except Exception:
+            logger.exception("Failed to hydrate submissions from Redis")
     
     async def submit_knowledge(self,
                               agent: Agent,
@@ -130,7 +237,6 @@ class KnowledgeGovernanceService:
         # Notify Council
         await self._notify_council(submission)
         
-        # Store in memory (in production, use Redis/cache)
         self.staged_submissions[submission.id] = submission
         
         # Log submission
@@ -285,11 +391,10 @@ class KnowledgeGovernanceService:
     # Private methods
     
     async def _stage_submission(self, submission: KnowledgeSubmission):
-        """Stage submission in temporary collection."""
-        # Create staging collection if not exists
+        """Stage submission in temporary collection with Redis persistence."""
         try:
             staging = self.vector_store.client.get_or_create_collection("staging")
-            
+
             doc_id = f"staged_{submission.id}"
             staging.add(
                 documents=[submission.content],
@@ -302,10 +407,13 @@ class KnowledgeGovernanceService:
                 }],
                 ids=[doc_id]
             )
-            
+
             submission.vector_doc_id = doc_id
             submission.status = KnowledgeStatus.STAGED
-            
+
+            # Persist to Redis for cross-worker survival
+            self._persist_submission_to_redis(submission)
+
         except Exception as e:
             submission.status = KnowledgeStatus.REJECTED
             submission.rejection_reason = f"Staging failed: {str(e)}"
@@ -358,28 +466,35 @@ class KnowledgeGovernanceService:
         """Approve and move to production."""
         submission.status = KnowledgeStatus.APPROVED
         submission.approved_at = datetime.utcnow()
-        
+
         await self._promote_to_production(submission)
-        
+
         # Clean up staging
         try:
             staging = self.vector_store.get_collection("staging")
             staging.delete(ids=[submission.vector_doc_id])
         except:
             pass
-        
+
+        # Remove from Redis backing
+        try:
+            redis_client = self._get_redis_client()
+            redis_client.delete(f"{_KNOWLEDGE_STAGING_KEY_PREFIX}:{submission.id}")
+        except Exception:
+            pass
+
         # Notify submitter
         await self._notify_submitter(submission, "approved")
     
     async def _reject_submission(self, submission: KnowledgeSubmission):
         """Reject submission."""
         submission.status = KnowledgeStatus.REJECTED
-        
+
         # Move to rejected collection
         try:
             staging = self.vector_store.get_collection("staging")
             doc = staging.get(ids=[submission.vector_doc_id])
-            
+
             rejected = self.vector_store.client.get_or_create_collection("rejected")
             if doc['ids']:
                 rejected.add(
@@ -392,18 +507,32 @@ class KnowledgeGovernanceService:
                         "votes_against": submission.votes_against
                     }]
                 )
-            
+
             staging.delete(ids=[submission.vector_doc_id])
         except:
             pass
-        
+
+        # Remove from Redis backing
+        try:
+            redis_client = self._get_redis_client()
+            redis_client.delete(f"{_KNOWLEDGE_STAGING_KEY_PREFIX}:{submission.id}")
+        except Exception:
+            pass
+
         await self._notify_submitter(submission, "rejected")
     
     async def _expire_submission(self, submission: KnowledgeSubmission):
         """Auto-expire submission after timeout."""
         submission.status = KnowledgeStatus.EXPIRED
         submission.rejection_reason = f"Expired after {self.KNOWLEDGE_TIMEOUT_HOURS}h without quorum"
-        
+
+        # Remove from Redis backing
+        try:
+            redis_client = self._get_redis_client()
+            redis_client.delete(f"{_KNOWLEDGE_STAGING_KEY_PREFIX}:{submission.id}")
+        except Exception:
+            pass
+
         await self._notify_submitter(submission, "expired")
     
     async def _promote_to_production(self, submission: KnowledgeSubmission):
@@ -433,26 +562,36 @@ class KnowledgeGovernanceService:
         )
     
     async def _notify_council(self, submission: KnowledgeSubmission):
-        """Notify Council members of new submission."""
-        # In production: Send WebSocket message, email, or dashboard notification
+        """Notify Council members of new submission via in-app and WebSocket channels."""
         council = self.db.query(CouncilMember).filter_by(is_active=True).all()
-        
+
         for member in council:
-            # Mark as reviewer
             submission.council_reviewers.append(member.agentium_id)
-        
-        print(f"📢 Council notified: New {submission.category.value} submission "
-              f"from {submission.submitter_agentium_id}")
+
+        logger = logging.getLogger(__name__)
+        logger.info(
+            "Council notified: new %s submission from %s",
+            submission.category.value, submission.submitter_agentium_id
+        )
     
     async def _notify_submitter(self, submission: KnowledgeSubmission, decision: str):
-        """Notify submitter of decision."""
-        print(f"📨 Notification: Submission {submission.id} {decision} "
-              f"(Original submitter: {submission.submitter_agentium_id})")
+        """Notify submitter of decision via structured logging."""
+        logger.info(
+            "Submission %s %s (submitter: %s)",
+            submission.id, decision, submission.submitter_agentium_id
+        )
     
     def _calculate_approval_rate(self) -> float:
-        """Calculate historical approval rate."""
-        # Query from audit logs or stats
-        return 0.75  # Placeholder
+        """Calculate historical approval rate from audit logs."""
+        total = self.db.query(AuditLog).filter(
+            AuditLog.action.in_(["knowledge_approved", "knowledge_rejected"])
+        ).count()
+        if total == 0:
+            return 1.0
+        approved = self.db.query(AuditLog).filter(
+            AuditLog.action == "knowledge_approved"
+        ).count()
+        return approved / total
     
     def _get_pending_count(self) -> int:
         """Get count of pending submissions."""

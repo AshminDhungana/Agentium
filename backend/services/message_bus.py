@@ -445,15 +445,16 @@ class MessageBus:
                 error="Only Head of Council (00001) can broadcast"
             )]
         
-        # Get all active agents from Redis or DB (simplified - in production use agent registry)
         results = []
-        tiers = ['1', '2', '3']  # Broadcast to all subordinate tiers
-        
-        for tier in tiers:
-            # In production, query actual agent IDs from PostgreSQL
-            # For now, send to tier channels
+        from backend.models.entities.agents import Agent, AgentType
+        active_agents = self.db.query(Agent).filter(
+            Agent.status == "active",
+            Agent.agent_type != AgentType.HEAD_OF_COUNCIL
+        ).all()
+
+        for agent in active_agents:
             msg_copy = message.copy()
-            msg_copy.recipient_id = f"{tier}xxxx"  # Broadcast channel pattern
+            msg_copy.recipient_id = agent.agentium_id
             result = await self.publish(msg_copy)
             results.append(result)
         
