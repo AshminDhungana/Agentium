@@ -797,8 +797,8 @@ Build a self-governing AI ecosystem where agents operate under constitutional la
 
 - [x] **`TODO` / `FIXME` Audit** — run `grep -rn "TODO\|FIXME\|HACK\|XXX" backend/ frontend/`; for each hit: resolve inline, convert to a GitHub Issue with a link comment, or document rationale; target zero unresolved hits inside `backend/services/` and `frontend/src/components/`
 - [x] **Placeholder Comment Removal** — remove all `# In production:`, `# TODO: replace with real implementation`, `# Stub`, and equivalent comments that describe missing functionality (the implementation must be complete before the comment is removed)
-- [ ] **Debug Artifact Purge** — grep for `print()` in Python and `console.log()` in TypeScript outside test files; replace with `logging.getLogger(__name__).debug()` and `logger.debug()` respectively; remove all hardcoded `localhost` URLs outside configuration files
-- [ ] **Secret Hygiene** — run `detect-secrets scan --baseline .secrets.baseline`; add baseline check to CI; fail build on any newly detected secret
+- [x] **Debug Artifact Purge** — grep for `print()` in Python and `console.log()` in TypeScript outside test files; replace with `logging.getLogger(__name__).debug()` and `logger.debug()` respectively; remove all hardcoded `localhost` URLs outside configuration files
+- [x] **Secret Hygiene** — run `detect-secrets scan --baseline .secrets.baseline`; add baseline check to CI; fail build on any newly detected secret
 - [ ] **Dependency Audit** — run `pip-audit` against `requirements.txt` and `npm audit` against `frontend/package.json`; resolve all HIGH and CRITICAL CVEs; document accepted LOW / MEDIUM risks in `SECURITY.md`
 - [ ] **Dead Code Elimination** — run `vulture backend/ --min-confidence 80` to detect unused Python functions and variables; run `ts-prune` on the frontend; remove all confirmed dead code with no external references
 - [ ] **Docker Image Hardening** — switch `Dockerfile` to a non-root user (`USER agentium:agentium`); pin all base image tags to digests (`python:3.11-slim@sha256:...`); run `docker scout cves` and resolve HIGH / CRITICAL findings; verify final image size is minimized via multi-stage build

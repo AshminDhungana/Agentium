@@ -323,7 +323,15 @@ class WebSearchTool:
 
         # ── Provider order ────────────────────────────────────────────────────
         if provider == "auto":
-            order = _PROVIDER_PRIORITY
+            # Only try API-key providers if their keys are actually set
+            order = []
+            if os.environ.get("TAVILY_API_KEY"):
+                order.append("tavily")
+            if os.environ.get("BRAVE_SEARCH_API_KEY"):
+                order.append("brave")
+            if os.environ.get("SERPAPI_KEY"):
+                order.append("serpapi")
+            order.append("duckduckgo")  # zero-config fallback
         elif provider in _PROVIDER_PRIORITY:
             order = [provider, "duckduckgo"]  # always keep DDG as final fallback
         else:

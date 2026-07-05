@@ -34,7 +34,7 @@ def create_voice_token(username: str, user_id: Optional[str] = None) -> str:
     if not _VOICE_SECRET:
         raise RuntimeError(
             "VOICE_JWT_SECRET is not set. "
-            "Add it to backend/.env before using the voice bridge."
+            "Set the VOICE_JWT_SECRET environment variable before using the voice bridge."
         )
 
     now = datetime.utcnow()

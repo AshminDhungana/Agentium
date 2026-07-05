@@ -186,8 +186,6 @@ services:
       dockerfile: Dockerfile.privileged
     container_name: agentium-backend
     privileged: true
-    env_file:
-      - ./backend/.env
     cap_add:
       - ALL
     security_opt:
@@ -230,6 +228,20 @@ services:
       - STOCK_API_KEY=${STOCK_API_KEY:-}
       - STOCK_API_PROVIDER=${STOCK_API_PROVIDER:-yfinance}
       - DEFAULT_BROKER_EMAIL=${DEFAULT_BROKER_EMAIL:-}
+      # ── Core config (works without backend/.env; all values have defaults) ────
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173}
+      - SECRET_KEY=${SECRET_KEY:-a6b1f393fed4b7d1611577a0ee3b32f6f8db91e1b04e46aa77e83709f58e2984}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-ZXEectOcdOcriqTCylzEIt0fhO5vR4ZTSeB_VO1cqoU=}
+      - VOICE_JWT_SECRET=${VOICE_JWT_SECRET:-L9NtEbjjvukHFWv37HfAX5ah5FvI27cz}
+      - VOICE_TOKEN_DURATION_MINUTES=${VOICE_TOKEN_DURATION_MINUTES:-30}
+      - FEDERATION_ENABLED=${FEDERATION_ENABLED:-false}
+      - FEDERATION_INSTANCE_NAME=${FEDERATION_INSTANCE_NAME:-Agentium-Primary}
+      - FEDERATION_INSTANCE_URL=${FEDERATION_INSTANCE_URL:-https://your-agentium.example.com}
+      - FEDERATION_SHARED_SECRET=${FEDERATION_SHARED_SECRET:-50c7f2c86e624a8d11a167080fa981013aa44a7b24ee76930cb44cf6b951c985}
+      - TAVILY_API_KEY=${TAVILY_API_KEY:-}
+      - BRAVE_SEARCH_API_KEY=${BRAVE_SEARCH_API_KEY:-}
+      - SERPAPI_KEY=${SERPAPI_KEY:-}
+      - TESTING=${TESTING:-false}
     volumes:
       - ./backend:/app/backend
       - chroma_data:/app/chroma_data
@@ -310,6 +322,20 @@ services:
       - STOCK_API_KEY=${STOCK_API_KEY:-}
       - STOCK_API_PROVIDER=${STOCK_API_PROVIDER:-yfinance}
       - DEFAULT_BROKER_EMAIL=${DEFAULT_BROKER_EMAIL:-}
+      # ── Core config (works without backend/.env; all values have defaults) ────
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173}
+      - SECRET_KEY=${SECRET_KEY:-a6b1f393fed4b7d1611577a0ee3b32f6f8db91e1b04e46aa77e83709f58e2984}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-ZXEectOcdOcriqTCylzEIt0fhO5vR4ZTSeB_VO1cqoU=}
+      - VOICE_JWT_SECRET=${VOICE_JWT_SECRET:-L9NtEbjjvukHFWv37HfAX5ah5FvI27cz}
+      - VOICE_TOKEN_DURATION_MINUTES=${VOICE_TOKEN_DURATION_MINUTES:-30}
+      - FEDERATION_ENABLED=${FEDERATION_ENABLED:-false}
+      - FEDERATION_INSTANCE_NAME=${FEDERATION_INSTANCE_NAME:-Agentium-Primary}
+      - FEDERATION_INSTANCE_URL=${FEDERATION_INSTANCE_URL:-https://your-agentium.example.com}
+      - FEDERATION_SHARED_SECRET=${FEDERATION_SHARED_SECRET:-50c7f2c86e624a8d11a167080fa981013aa44a7b24ee76930cb44cf6b951c985}
+      - TAVILY_API_KEY=${TAVILY_API_KEY:-}
+      - BRAVE_SEARCH_API_KEY=${BRAVE_SEARCH_API_KEY:-}
+      - SERPAPI_KEY=${SERPAPI_KEY:-}
+      - TESTING=${TESTING:-false}
     volumes:
       - ./backend:/app/backend
       - chroma_data:/app/chroma_data
@@ -390,6 +416,20 @@ services:
       - STOCK_API_KEY=${STOCK_API_KEY:-}
       - STOCK_API_PROVIDER=${STOCK_API_PROVIDER:-yfinance}
       - DEFAULT_BROKER_EMAIL=${DEFAULT_BROKER_EMAIL:-}
+      # ── Core config (works without backend/.env; all values have defaults) ────
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173}
+      - SECRET_KEY=${SECRET_KEY:-a6b1f393fed4b7d1611577a0ee3b32f6f8db91e1b04e46aa77e83709f58e2984}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-ZXEectOcdOcriqTCylzEIt0fhO5vR4ZTSeB_VO1cqoU=}
+      - VOICE_JWT_SECRET=${VOICE_JWT_SECRET:-L9NtEbjjvukHFWv37HfAX5ah5FvI27cz}
+      - VOICE_TOKEN_DURATION_MINUTES=${VOICE_TOKEN_DURATION_MINUTES:-30}
+      - FEDERATION_ENABLED=${FEDERATION_ENABLED:-false}
+      - FEDERATION_INSTANCE_NAME=${FEDERATION_INSTANCE_NAME:-Agentium-Primary}
+      - FEDERATION_INSTANCE_URL=${FEDERATION_INSTANCE_URL:-https://your-agentium.example.com}
+      - FEDERATION_SHARED_SECRET=${FEDERATION_SHARED_SECRET:-50c7f2c86e624a8d11a167080fa981013aa44a7b24ee76930cb44cf6b951c985}
+      - TAVILY_API_KEY=${TAVILY_API_KEY:-}
+      - BRAVE_SEARCH_API_KEY=${BRAVE_SEARCH_API_KEY:-}
+      - SERPAPI_KEY=${SERPAPI_KEY:-}
+      - TESTING=${TESTING:-false}
     depends_on:
       backend:
         condition: service_healthy
