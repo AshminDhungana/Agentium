@@ -3,6 +3,7 @@ WebSocket endpoint for real-time chat with authentication.
 """
 
 import json
+import logging
 from contextlib import contextmanager
 from datetime import datetime
 from typing import Optional, Dict, Any, List
@@ -22,6 +23,8 @@ import redis.asyncio as redis
 from backend.api.schemas.examples import ErrorResponseExample, SuccessResponseExample, build_responses
 
 router = APIRouter()
+
+logger = logging.getLogger(__name__)
 
 
 # ── DB session helper ─────────────────────────────────────────────────────────
@@ -653,9 +656,6 @@ async def genesis_status(current_user=Depends(get_current_user)):
 )
 async def replay_events(since: str, current_user=Depends(get_current_user)):
     """Fetch buffered broadcast events for reconnection replay."""
-import logging
-logger = logging.getLogger(__name__)
-
     try:
         r          = await manager._get_redis()
         events_str = await r.lrange("agentium:ws:buffer", 0, 99)
