@@ -252,8 +252,6 @@ def get_system_agent_id(db: Session) -> str:
 
 def init_db():
     """
-import logging
-
     Initialize database — create all tables via SQLAlchemy metadata.
     Imports every entity so their mappers register with Base.metadata
     before create_all() runs.
@@ -354,7 +352,6 @@ import logging
     
     # ── Dynamic Model Pricing ────────────────────────────────────────────────
     from backend.models.entities.model_pricing import ModelPricing  # noqa: F401
-logger = logging.getLogger(__name__)
 
     # Create all tables that don't exist yet
     Base.metadata.create_all(bind=engine)

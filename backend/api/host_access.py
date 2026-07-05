@@ -10,6 +10,7 @@ from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
 from datetime import datetime
 import asyncio
+import logging
 
 from backend.models.database import get_db
 from backend.services.host_access import HostAccessService, RestrictedHostAccess
@@ -731,10 +732,6 @@ def log_host_operation(
     details: str
 ):
     """Background task to log host operations to database."""
-import logging
-from backend.core.config import settings
-logger = logging.getLogger(__name__)
-
     try:
         audit = AuditLog(
             level=AuditLevel.INFO if success else AuditLevel.WARNING,
@@ -756,4 +753,4 @@ logger = logging.getLogger(__name__)
         db.add(audit)
         db.commit()
     except Exception as e:
-        logger.error(f"Failed to log audit: {e}")
+        logging.error(f"Failed to log audit: {e}")
