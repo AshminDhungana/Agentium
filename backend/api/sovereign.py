@@ -567,9 +567,6 @@ async def get_command_history(
     current_user: User = Depends(get_current_sovereign_user)
 ):
     """Get sovereign command history."""
-import logging
-logger = logging.getLogger(__name__)
-
     # C9: added "container_remove" — previously remove actions were silently
     #     omitted from the history log because the filter list was incomplete.
     logs = db.query(AuditLog).filter(
