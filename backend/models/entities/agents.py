@@ -4,6 +4,7 @@ Implements the four-tier system with automatic ID generation.
 Includes IDLE GOVERNANCE support for persistent agents.
 """
 
+import logging
 from datetime import datetime
 from typing import Optional, List, Dict, Any, Type, Union
 from sqlalchemy import Column, String, Text, DateTime, ForeignKey, Integer, Enum, Boolean, event, select, Index
@@ -53,6 +54,7 @@ class Agent(BaseEntity):
     __table_args__ = (
         Index('idx_agent_type_status', 'agent_type', 'status'),  # For hierarchical queries
         Index('idx_parent_id', 'parent_id'),                     # For tree traversal
+        {'extend_existing': True},                               # Allow redefinition in test/reload scenarios
     )
     
     # Identification
