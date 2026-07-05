@@ -495,7 +495,7 @@ async def sovereign_websocket(
     # Accept connection only after successful auth
     await websocket.accept()
     active_connections.append(websocket)
-    print(f"[Sovereign WebSocket] ✅ Admin connected: {username}")
+    logger.info(f"[Sovereign WebSocket] ✅ Admin connected: {username}")
 
     try:
         while True:
@@ -521,7 +521,7 @@ async def sovereign_websocket(
                 })
 
     except WebSocketDisconnect:
-        print(f"[Sovereign WebSocket] ❌ Disconnected: {username}")
+        logger.error(f"[Sovereign WebSocket] ❌ Disconnected: {username}")
     except json.JSONDecodeError:
         await websocket.send_json({
             "type": "error",
@@ -529,7 +529,7 @@ async def sovereign_websocket(
             "timestamp": datetime.utcnow().isoformat()
         })
     except Exception as e:
-        print(f"[Sovereign WebSocket] Error: {e}")
+        logger.error(f"[Sovereign WebSocket] Error: {e}")
         try:
             await websocket.close(code=1011, reason=f"Server error: {str(e)}")
         except Exception:
@@ -567,6 +567,9 @@ async def get_command_history(
     current_user: User = Depends(get_current_sovereign_user)
 ):
     """Get sovereign command history."""
+import logging
+logger = logging.getLogger(__name__)
+
     # C9: added "container_remove" — previously remove actions were silently
     #     omitted from the history log because the filter list was incomplete.
     logs = db.query(AuditLog).filter(

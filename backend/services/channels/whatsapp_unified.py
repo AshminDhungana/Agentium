@@ -227,7 +227,7 @@ class UnifiedWhatsAppAdapter(BaseChannelAdapter):
     
     def _validate_bridge_config(self) -> bool:
         """Validate Web Bridge configuration."""
-        bridge_url = self.config.get("bridge_url", "ws://localhost:3000")
+        bridge_url = self.config.get("bridge_url", settings.WHATSAPP_BRIDGE_URL)
         return bool(bridge_url)
     
     async def _start_bridge_connection(self) -> bool:
@@ -270,7 +270,7 @@ class UnifiedWhatsAppAdapter(BaseChannelAdapter):
     async def _bridge_connection_loop(self) -> None:
         """Maintain persistent WebSocket connection to bridge."""
         channel_id = self.channel.id
-        bridge_url = self.config.get("bridge_url", "ws://localhost:3000")
+        bridge_url = self.config.get("bridge_url", settings.WHATSAPP_BRIDGE_URL)
         bridge_token = self.config.get("bridge_token")
         
         reconnect_delay = 5
@@ -284,7 +284,7 @@ class UnifiedWhatsAppAdapter(BaseChannelAdapter):
                     separator = "&" if "?" in bridge_url else "?"
                     connect_url = f"{bridge_url}{separator}token={bridge_token}"
 
-                print(f"[WhatsApp Bridge {channel_id}] Connecting to {bridge_url}...")
+                logger.info(f"[WhatsApp Bridge {channel_id}] Connecting to {bridge_url}...")
 
                 async with websockets.connect(connect_url) as ws:
                     conn = self._bridge_connections.get(channel_id)
@@ -293,20 +293,20 @@ class UnifiedWhatsAppAdapter(BaseChannelAdapter):
                         conn.connected = True
                         conn.last_ping = datetime.utcnow()
                     
-                    print(f"[WhatsApp Bridge {channel_id}] Connected")
+                    logger.info(f"[WhatsApp Bridge {channel_id}] Connected")
                     
                     # Listen for messages
                     async for message in ws:
                         try:
                             await self._handle_bridge_message(message)
                         except Exception as e:
-                            print(f"[WhatsApp Bridge {channel_id}] Message handler error: {e}")
+                            logger.error(f"[WhatsApp Bridge {channel_id}] Message handler error: {e}")
                 
             except asyncio.CancelledError:
-                print(f"[WhatsApp Bridge {channel_id}] Connection cancelled")
+                logger.info(f"[WhatsApp Bridge {channel_id}] Connection cancelled")
                 raise
             except Exception as e:
-                print(f"[WhatsApp Bridge {channel_id}] Connection error: {e}")
+                logger.error(f"[WhatsApp Bridge {channel_id}] Connection error: {e}")
                 
                 # Update connection state
                 conn = self._bridge_connections.get(channel_id)
@@ -323,7 +323,7 @@ class UnifiedWhatsAppAdapter(BaseChannelAdapter):
         try:
             data = json.loads(raw_message)
         except json.JSONDecodeError:
-            print(f"[WhatsApp Bridge] Invalid JSON: {raw_message[:200]}")
+            logger.info(f"[WhatsApp Bridge] Invalid JSON: {raw_message[:200]}")
             return
         
         # Bridge sends "event" key (not "type")
@@ -336,7 +336,7 @@ class UnifiedWhatsAppAdapter(BaseChannelAdapter):
                 conn.qr_code = data.get("qr_code") or data.get("qr")
                 conn.qr_expires_at = datetime.utcnow() + timedelta(minutes=5)
                 conn.authenticated = False
-            print(f"[WhatsApp Bridge {channel_id}] QR code received")
+            logger.info(f"[WhatsApp Bridge {channel_id}] QR code received")
 
         elif msg_type in ("authenticated", "status"):
             connected = data.get("connected", False) or data.get("authenticated", False)
@@ -351,8 +351,8 @@ class UnifiedWhatsAppAdapter(BaseChannelAdapter):
                     if qr:
                         conn.qr_code = qr
                         conn.qr_expires_at = datetime.utcnow() + timedelta(minutes=5)
-                        print(f"[WhatsApp Bridge {channel_id}] QR extracted from status snapshot")
-            print(f"[WhatsApp Bridge {channel_id}] Status: {msg_type} connected={connected}")
+                        logger.info(f"[WhatsApp Bridge {channel_id}] QR extracted from status snapshot")
+            logger.info(f"[WhatsApp Bridge {channel_id}] Status: {msg_type} connected={connected}")
 
         elif msg_type == "disconnected":
             if conn:
@@ -360,13 +360,13 @@ class UnifiedWhatsAppAdapter(BaseChannelAdapter):
                 conn.authenticated = False
                 conn.qr_code = None
             await self._set_channel_status("pending")
-            print(f"[WhatsApp Bridge {channel_id}] Disconnected from WhatsApp — status reset to pending")
+            logger.info(f"[WhatsApp Bridge {channel_id}] Disconnected from WhatsApp — status reset to pending")
 
         elif msg_type == "message":
             await self._process_bridge_incoming(data)
 
         elif msg_type == "error":
-            print(f"[WhatsApp Bridge {channel_id}] Error: {data.get('message') or data.get('error')}")
+            logger.error(f"[WhatsApp Bridge {channel_id}] Error: {data.get('message') or data.get('error')}")
     
     async def _set_channel_status(self, status: str) -> None:
         """Update channel status in the database."""
@@ -386,9 +386,9 @@ class UnifiedWhatsAppAdapter(BaseChannelAdapter):
                 if channel:
                     channel.status = new_status
                     db.commit()
-                    print(f"[WhatsApp Bridge {self.channel.id}] DB status → {status}")
+                    logger.info(f"[WhatsApp Bridge {self.channel.id}] DB status → {status}")
         except Exception as e:
-            print(f"[WhatsApp Bridge {self.channel.id}] Failed to update DB status: {e}")
+            logger.error(f"[WhatsApp Bridge {self.channel.id}] Failed to update DB status: {e}")
 
     async def _process_bridge_incoming(self, data: Dict[str, Any]) -> None:
         """Process incoming message from bridge and route to ChannelManager."""
@@ -542,6 +542,10 @@ class UnifiedWhatsAppAdapter(BaseChannelAdapter):
     @staticmethod
     def verify_cloud_signature(app_secret: str, body: bytes, signature: str) -> bool:
         """Verify Meta webhook signature."""
+import logging
+from backend.core.config import settings
+logger = logging.getLogger(__name__)
+
         if not signature:
             return False
         

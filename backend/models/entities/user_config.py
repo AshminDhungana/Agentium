@@ -10,6 +10,7 @@ from sqlalchemy import Column, String, Integer, Float, Boolean, DateTime, Enum, 
 from sqlalchemy.orm import validates
 from sqlalchemy.orm import relationship
 from backend.models.entities.base import BaseEntity
+from backend.core.config import settings
 
 
 class ProviderType(str, enum.Enum):
@@ -264,7 +265,7 @@ class UserModelConfig(BaseEntity):
         """Get the effective API base URL."""
         # Local provider: always resolve to a local URL, never fall through to OpenAI
         if self.provider == ProviderType.LOCAL:
-            return self.local_server_url or self.api_base_url or "http://localhost:11434/v1"
+            return self.local_server_url or self.api_base_url or settings.OLLAMA_BASE_URL
 
         if self.api_base_url:
             return self.api_base_url

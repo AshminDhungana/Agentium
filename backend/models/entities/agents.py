@@ -338,7 +338,7 @@ class Agent(BaseEntity):
             return True
         
         except Exception as db_exception:
-            print(f"[Graceful Degradation] DB/Vector Store failed during constitution alignment: {db_exception}")
+            logger.error(f"[Graceful Degradation] DB/Vector Store failed during constitution alignment: {db_exception}")
             # ── GRACEFUL FALLBACK TO TEXT FILE ──
             fallback_path = os.path.join(
                 os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))),
@@ -369,7 +369,7 @@ class Agent(BaseEntity):
                 return True
                 
             except Exception as fallback_exc:
-                print(f"[FATAL] Constitution fallback also failed: {fallback_exc}")
+                logger.error(f"[FATAL] Constitution fallback also failed: {fallback_exc}")
                 return False
 
     # -----------------------------------------------------------------------
@@ -1504,6 +1504,7 @@ class TaskAgent(Agent):
 
 # Import CriticAgent here to avoid circular imports
 from backend.models.entities.critics import CriticAgent
+logger = logging.getLogger(__name__)
 
 AGENT_TYPE_MAP: Dict[AgentType, Type[Agent]] = {
     AgentType.HEAD_OF_COUNCIL: HeadOfCouncil,

@@ -405,7 +405,7 @@ try:
     output['execution_time_ms'] = execution_time
     output['success'] = True
 
-    print(json.dumps(output))
+    logger.debug(json.dumps(output))
 
 except Exception as e:
     output = {
@@ -418,5 +418,5 @@ except Exception as e:
         'sample': [],
         'stats': {}
     }
-    print(json.dumps(output))
+    logger.debug(json.dumps(output))
 '''

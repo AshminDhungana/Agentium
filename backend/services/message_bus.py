@@ -8,6 +8,7 @@ import os
 import json
 import asyncio
 import fnmatch
+import logging
 import redis.asyncio as redis
 from typing import Optional, Dict, Any, List, Callable, Set
 from datetime import datetime
@@ -16,6 +17,8 @@ from contextlib import asynccontextmanager
 
 from backend.models.schemas.messages import AgentMessage, MessageReceipt, RouteResult
 from backend.core.vector_store import vector_store, get_vector_store
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -230,7 +233,7 @@ class ContextRayTracer:
         total = len(messages)
         kept = len(visible)
         if total > 0 and kept < total:
-            print(
+            logger.debug(
                 f"[ContextRayTracer] Agent {agent_id}: "
                 f"{kept}/{total} messages visible"
             )
@@ -295,11 +298,11 @@ class MessageBus:
     
     async def connect(self, redis_url: Optional[str] = None):
         """Initialize Redis connection."""
-        url = redis_url or os.getenv("REDIS_URL", "redis://localhost:6379/0")
+        url = redis_url or os.getenv("REDIS_URL", "redis://redis:6379/0")
         self._redis = await redis.from_url(url, decode_responses=True)
         self._pubsub = self._redis.pubsub()
         self._running = True
-        print(f"MessageBus connected to {url}")
+        logger.info(f"MessageBus connected to {url}")
     
     async def disconnect(self):
         """Cleanup Redis connections."""
@@ -485,7 +488,7 @@ class MessageBus:
                     if data.get('type') == 'notification':
                         await callback(AgentMessage(**data))
         except Exception as e:
-            print(f"Pub/Sub listen error for {agent_id}: {e}")
+            logger.error(f"Pub/Sub listen error for {agent_id}: {e}")
     
     async def consume_stream(
         self,
@@ -529,7 +532,7 @@ class MessageBus:
                             await self._redis.xadd("agent:dlq:stream", fields)
                             await self._redis.xdel(stream_key, msg_id)
                             await self._redis.delete(fail_key)
-                            print(f"[DLQ] Moved message {msg_id} to DLQ stream after {fails} failures.")
+                            logger.info(f"[DLQ] Moved message {msg_id} to DLQ stream after {fails} failures.")
                             continue
 
                         # Deserialise visible_to from JSON string
@@ -546,7 +549,7 @@ class MessageBus:
 
             return results
         except Exception as e:
-            print(f"Stream consume error: {e}")
+            logger.error(f"Stream consume error: {e}")
             return []
     
     async def acknowledge(self, receipt: MessageReceipt):
@@ -600,7 +603,7 @@ class MessageBus:
         try:
             return await asyncio.to_thread(self._get_parent_id_sync, agent_id)
         except Exception as e:
-            print(f"Parent lookup error for {agent_id}: {e}")
+            logger.error(f"Parent lookup error for {agent_id}: {e}")
             return self._get_pattern_parent(agent_id)
 
     def _get_parent_id_sync(self, agent_id: str) -> Optional[str]:
@@ -631,7 +634,7 @@ class MessageBus:
         except ImportError:
             pass
         except Exception as e:
-            print(f"Sync parent lookup error: {e}")
+            logger.error(f"Sync parent lookup error: {e}")
             
         return None
 
@@ -668,7 +671,7 @@ class MessageBus:
                 'timestamp': datetime.utcnow().isoformat()
             }
         except Exception as e:
-            print(f"Context enrichment error: {e}")
+            logger.error(f"Context enrichment error: {e}")
             return None
     
     async def health_check(self) -> Dict[str, Any]:

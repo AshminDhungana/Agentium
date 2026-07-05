@@ -595,12 +595,12 @@ def send_federation_result(
 
 @worker_ready.connect
 def on_worker_ready(**kwargs):
-    print("🥬 Celery worker ready for Agentium tasks")
-    print("   Task Execution Architecture: Governance Alignment active")
-    print("   Phase 15.2: MCP stats broadcast registered (every 30s)")
-    print("   Phase 15.3: Channel health broadcast registered (every 5m)")
-    print("   Phase 17.1: Suspicious pattern detection registered (every 5m)")
-    print("   Federation tasks registered: deliver_federated_task, federation_heartbeat, "
+    logger.info("Celery worker ready for Agentium tasks")
+    logger.info("   Task Execution Architecture: Governance Alignment active")
+    logger.info("   Phase 15.2: MCP stats broadcast registered (every 30s)")
+    logger.info("   Phase 15.3: Channel health broadcast registered (every 5m)")
+    logger.info("   Phase 17.1: Suspicious pattern detection registered (every 5m)")
+    logger.info("   Federation tasks registered: deliver_federated_task, federation_heartbeat, "
           "federation_cleanup_stale, send_federation_result")
 
     from backend.services.tasks.task_executor import start_imap_receivers

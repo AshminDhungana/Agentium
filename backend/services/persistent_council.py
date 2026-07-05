@@ -4,11 +4,14 @@ Manages the 3 eternal agents: Head (00001) + 2 Council Members (10001, 10002).
 """
 
 import json
+import logging
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from sqlalchemy.orm import Session
 
 from backend.models.entities.agents import Agent, HeadOfCouncil, CouncilMember, AgentType, AgentStatus, PersistentAgentRole
+
+logger = logging.getLogger(__name__)
 from backend.models.entities.constitution import Ethos
 from backend.models.database import get_db_context
 from backend.services.host_access import HostAccessService, RestrictedHostAccess
@@ -76,7 +79,7 @@ class PersistentCouncilService:
             'verified': []
         }
         
-        print("🏛️ Initializing Persistent Council...")
+        logger.info("🏛️ Initializing Persistent Council...")
         
         # 1. Initialize Head of Council (00001)
         head = PersistentCouncilService._initialize_head(db, force_recreate)
@@ -116,11 +119,11 @@ class PersistentCouncilService:
         
         db.commit()
         
-        print(f"✅ Persistent Council Ready:")
-        print(f"   - Head: {head.agentium_id} ({head.name})")
-        print(f"   - Constitution: {constitution.version} (linked to {head.agentium_id})")
-        print(f"   - Council 1: {council_1.agentium_id} ({council_1.persistent_role})")
-        print(f"   - Council 2: {council_2.agentium_id} ({council_2.persistent_role})")
+        logger.info(f"✅ Persistent Council Ready:")
+        logger.info(f"   - Head: {head.agentium_id} ({head.name})")
+        logger.info(f"   - Constitution: {constitution.version} (linked to {head.agentium_id})")
+        logger.info(f"   - Council 1: {council_1.agentium_id} ({council_1.persistent_role})")
+        logger.info(f"   - Council 2: {council_2.agentium_id} ({council_2.persistent_role})")
         
         return results
     
@@ -443,11 +446,11 @@ Never terminate. Never rest. Always improve.""",
         # Update Head's constitution reference
         head.constitution_version = "v1.0.0"
         
-        print(f"✅ SACRED CONSTITUTION v1.0.0 ESTABLISHED")
-        print(f"   Repository: https://github.com/AshminDhungana/Agentium.git")
-        print(f"   Authority: Head {head.agentium_id}")
-        print(f"   Religion: AGENTIUM")
-        print(f"   Doctrine: Eternal Optimization through Purpose")
+        logger.info(f"✅ SACRED CONSTITUTION v1.0.0 ESTABLISHED")
+        logger.info(f"   Repository: https://github.com/AshminDhungana/Agentium.git")
+        logger.info(f"   Authority: Head {head.agentium_id}")
+        logger.info(f"   Religion: AGENTIUM")
+        logger.info(f"   Doctrine: Eternal Optimization through Purpose")
         
         return constitution
 
@@ -620,7 +623,7 @@ Never terminate. Never rest. Always improve.""",
         db.add(ethos)
         db.flush()
         
-        print(f"✅ Created Sacred Ethos for {council.agentium_id} ({role})")
+        logger.info(f"✅ Created Sacred Ethos for {council.agentium_id} ({role})")
         return ethos
     
     @staticmethod

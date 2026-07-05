@@ -115,7 +115,7 @@ class ChatService:
                             f"Incarnation #{predecessor_context.get('incarnation_number', 1)}."
                 )
             except Exception as e:
-                print(f"⚠️ Consultation failed for {head.agentium_id}: {e}")
+                logger.error(f"⚠️ Consultation failed for {head.agentium_id}: {e}")
                 consultation_result = None
 
         consultation_note = (
@@ -277,7 +277,7 @@ Address the Sovereign respectfully. If they issue a command that requires execut
 
         # Check if reincarnation needed (context critical)
         if context_status and context_status.is_critical:
-            print(f"🔄 Context critical for {head.agentium_id}, triggering reincarnation...")
+            logger.info(f"🔄 Context critical for {head.agentium_id}, triggering reincarnation...")
 
             # Get conversation context for summarization
             conversation_context = f"""User: {message}

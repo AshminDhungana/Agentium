@@ -18,7 +18,7 @@ from backend.models.entities.base import Base
 # Configuration
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "postgresql://agentium:agentium@localhost:5432/agentium"
+    "postgresql://agentium:agentium@postgres:5432/agentium"
 )
 
 # Engine configuration with pooling
@@ -140,7 +140,7 @@ def _ensure_api_key_resilience_columns(db: Session):
             if "already exists" not in str(e).lower() and "duplicate" not in str(e).lower():
                 raise
 
-    print(f"✅ Added {len(columns_to_add)} API Key Resilience columns to user_model_configs")
+    logger.info(f"✅ Added {len(columns_to_add)} API Key Resilience columns to user_model_configs")
 
 
 def get_next_agentium_id(db: Session, prefix: str) -> str:
@@ -252,6 +252,8 @@ def get_system_agent_id(db: Session) -> str:
 
 def init_db():
     """
+import logging
+
     Initialize database — create all tables via SQLAlchemy metadata.
     Imports every entity so their mappers register with Base.metadata
     before create_all() runs.
@@ -352,6 +354,7 @@ def init_db():
     
     # ── Dynamic Model Pricing ────────────────────────────────────────────────
     from backend.models.entities.model_pricing import ModelPricing  # noqa: F401
+logger = logging.getLogger(__name__)
 
     # Create all tables that don't exist yet
     Base.metadata.create_all(bind=engine)

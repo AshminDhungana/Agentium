@@ -93,7 +93,7 @@ def _cache_key(query: str, max_results: int) -> str:
 def _cache_get(key: str) -> Optional[Dict]:
     try:
         import redis as _redis
-        url = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+        url = os.environ.get("REDIS_URL", "redis://redis:6379/0")
         r = _redis.from_url(url, decode_responses=True, socket_timeout=1)
         raw = r.get(key)
         return json.loads(raw) if raw else None
@@ -104,7 +104,7 @@ def _cache_get(key: str) -> Optional[Dict]:
 def _cache_set(key: str, data: Dict) -> None:
     try:
         import redis as _redis
-        url = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+        url = os.environ.get("REDIS_URL", "redis://redis:6379/0")
         r = _redis.from_url(url, decode_responses=True, socket_timeout=1)
         r.setex(key, _CACHE_TTL_SECONDS, json.dumps(data))
     except Exception:

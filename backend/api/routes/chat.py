@@ -9,6 +9,7 @@ Changes vs original:
   - FIX: Persisted ChatMessage now stores attachment metadata for history reload.
 """
 import json
+import logging
 import uuid
 from typing import AsyncGenerator, List, Optional
 from fastapi import APIRouter, Depends, status
@@ -23,6 +24,8 @@ from backend.models.entities import Agent, HeadOfCouncil, Task
 from backend.models.entities.user import User
 from backend.services.chat_service import ChatService
 from backend.services.model_provider import ModelService
+
+logger = logging.getLogger(__name__)
 from backend.core.auth import get_current_active_user
 from backend.api.schemas.examples import ErrorResponseExample, SuccessResponseExample
 
@@ -62,7 +65,7 @@ def _build_enriched_message(message: str, attachments: Optional[List[dict]]) -> 
         from backend.services.file_processor import build_file_context_for_ai
         file_context = build_file_context_for_ai(attachments, max_total_chars=30_000)
     except Exception as exc:
-        print(f"[chat.py] file_processor unavailable: {exc}")
+        logger.warning(f"[chat.py] file_processor unavailable: {exc}")
         return message
 
     if not file_context:
@@ -404,7 +407,7 @@ async def _stream_response(
                     config_id  = str(_default.id)
                     model_name = _default.default_model
             except Exception as _fb_err:
-                print(f"[chat.py] Config fallback failed: {_fb_err}")
+                logger.error(f"[chat.py] Config fallback failed: {_fb_err}")
 
         provider = await ModelService.get_provider("sovereign", config_id)
         if not provider:
@@ -449,7 +452,7 @@ async def _stream_response(
             non_empty_lines = [ln for ln in full_text.split("\n") if ln.strip()]
             if len(non_empty_lines) > 3:
                 full_text = "\n".join(non_empty_lines[:3])
-                print(
+                logger.debug(
                     f"[chat.py] Response truncated for 2-3 line policy: "
                     f"{original_length} chars → {len(full_text)} chars"
                 )
@@ -501,7 +504,7 @@ async def _stream_response(
                 ))
                 db.commit()
             except Exception as _persist_err:
-                print(f"[chat.py] ChatMessage persist failed (non-fatal): {_persist_err}")
+                logger.error(f"[chat.py] ChatMessage persist failed (non-fatal): {_persist_err}")
                 try:
                     db.rollback()
                 except Exception:
@@ -515,7 +518,7 @@ async def _stream_response(
             }
 
     except Exception as exc:
-        print(f"[chat.py] Streaming error: {exc}")
+        logger.error(f"[chat.py] Streaming error: {exc}")
         yield f"data: {json.dumps({'type': 'error', 'content': 'An unexpected error occurred during processing.'})}\n\n"
 
     finally:
@@ -543,7 +546,7 @@ async def _stream_response(
 
             asyncio.create_task(_do_broadcast())
         except Exception as exc:
-            print(f"[chat.py] Broadcast task error: {exc}")
+            logger.error(f"[chat.py] Broadcast task error: {exc}")
 
 
 # ═══════════════════════════════════════════════════════════

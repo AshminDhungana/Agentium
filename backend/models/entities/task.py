@@ -437,7 +437,7 @@ class Task(BaseEntity):
                     # FAST: Only Constitution awareness, no ethos execution
                     ritual = agent.pre_task_ritual(db)
                     if ritual["constitution_refreshed"]:
-                        print(f"📖 Agent {agent_id} refreshed Constitution awareness (v{ritual['constitution_version']})")
+                        logger.info(f"📖 Agent {agent_id} refreshed Constitution awareness (v{ritual['constitution_version']})")
 
     def complete(self, result_summary: str, result_data: Dict = None):
         """Mark task as completed - Ethos execution happens here (post-task)."""
@@ -465,9 +465,9 @@ class Task(BaseEntity):
                         post_results = agent.post_task_ritual(db)
                         
                         if post_results["ethos_executed"]:
-                            print(f"✨ Agent {agent_id} completed {post_results['ethos_tasks_completed']} ethos improvements")
+                            logger.info(f"✨ Agent {agent_id} completed {post_results['ethos_tasks_completed']} ethos improvements")
                         if post_results["constitution_refreshed"]:
-                            print(f"📖 Agent {agent_id} refreshed Constitution (post-task)")
+                            logger.info(f"📖 Agent {agent_id} refreshed Constitution (post-task)")
         
         self._update_agent_stats(success=True)
     
@@ -483,6 +483,7 @@ class Task(BaseEntity):
         Implements self-healing: retry → escalate to Council.
         """
         import json
+logger = logging.getLogger(__name__)
         
         self.error_count += 1
         # Structured failure reason (NEW)

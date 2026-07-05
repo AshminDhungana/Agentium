@@ -842,8 +842,8 @@ class ReincarnationService:
         if not context_manager.should_reincarnate(agent_id):
             return None
         
-        print(f"🔄 REINCARNATION TRIGGERED for {agent_id}")
-        print(f"   Context at {context_manager.check_status(agent_id).usage_percentage:.1%}")
+        logger.info(f"🔄 REINCARNATION TRIGGERED for {agent_id}")
+        logger.info(f"   Context at {context_manager.check_status(agent_id).usage_percentage:.1%}")
         
         # Execute reincarnation cycle
         return await ReincarnationService.execute_reincarnation(
@@ -882,7 +882,7 @@ class ReincarnationService:
         
         try:
             # STEP 1: Summarize the conversation/context
-            print(f"   Step 1: Summarizing {incarnation_data.get('total_tokens_processed', 0)} tokens...")
+            logger.info(f"   Step 1: Summarizing {incarnation_data.get('total_tokens_processed', 0)} tokens...")
             summary = await ReincarnationService._summarize_context(
                 agent=agent,
                 db=db,
@@ -897,7 +897,7 @@ class ReincarnationService:
             context_manager.add_wisdom(agent_id, summary, topics)
             
             # STEP 2: Update ethos with this life summary
-            print(f"   Step 2: Updating ethos with life summary...")
+            logger.info(f"   Step 2: Updating ethos with life summary...")
             await ReincarnationService._update_ethos_with_wisdom(
                 agent=agent,
                 db=db,
@@ -907,7 +907,7 @@ class ReincarnationService:
             result["ethos_updated"] = True
             
             # STEP 3: Gracefully terminate current agent (NOT full liquidation)
-            print(f"   Step 3: Terminating {agent_id}...")
+            logger.info(f"   Step 3: Terminating {agent_id}...")
             termination_note = f"Reincarnation cycle {result['incarnation_number']}: Context limit reached. Wisdom transferred to successor."
             
             # Special handling for persistent agents (they respawn immediately)
@@ -943,7 +943,7 @@ class ReincarnationService:
             db.flush()
             
             # STEP 4: Spawn successor
-            print(f"   Step 4: Spawning successor...")
+            logger.info(f"   Step 4: Spawning successor...")
             successor = await ReincarnationService._spawn_successor(
                 agent=agent,
                 db=db,
@@ -976,16 +976,16 @@ class ReincarnationService:
                 )
                 db.add(birth_audit)
                 
-                print(f"   ✨ Reincarnation complete: {agent_id} → {successor.agentium_id}")
+                logger.info(f"   ✨ Reincarnation complete: {agent_id} → {successor.agentium_id}")
             else:
-                print(f"   ⚠️ Failed to spawn successor for {agent_id}")
+                logger.error(f"   ⚠️ Failed to spawn successor for {agent_id}")
             
             db.commit()
             return result
             
         except Exception as e:
             db.rollback()
-            print(f"   ❌ Reincarnation failed: {e}")
+            logger.error(f"   ❌ Reincarnation failed: {e}")
             raise
     
     @staticmethod
@@ -1019,7 +1019,7 @@ Provide a concise summary (max 300 words) that the successor agent will inherit.
             )
             return response.get("content", "No wisdom extracted")
         except Exception as e:
-            print(f"⚠️ Failed to summarize context: {e}")
+            logger.error(f"⚠️ Failed to summarize context: {e}")
             return f"[Incarnation {incarnation}] Context limit reached. Manual summary unavailable."
     
     @staticmethod

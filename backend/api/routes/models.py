@@ -24,6 +24,7 @@ from backend.services.model_provider import ModelService
 from backend.core.security import encrypt_api_key, decrypt_api_key
 
 from backend.api.schemas.examples import ErrorResponseExample, SuccessResponseExample, build_responses
+from backend.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -314,7 +315,7 @@ async def list_providers():
             display_name="Local (Ollama/LM Studio)",
             requires_api_key=False,
             requires_base_url=False,
-            default_base_url="http://localhost:11434/v1",
+            default_base_url=settings.OLLAMA_BASE_URL,
             description="Run models locally with Ollama or LM Studio",
             popular_models=["llama3.1", "mistral", "gemma2", "qwen2"]
         ),

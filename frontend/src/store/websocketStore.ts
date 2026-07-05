@@ -6,6 +6,7 @@
 import { create } from 'zustand';
 import { showToast } from '@/hooks/useToast';
 import { websocketReplayApi } from '@/services/websocketReplay';
+import { logger } from '@/utils/logger';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -228,7 +229,7 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
         // Clear the "waiting for API key" flag and immediately try to connect.
         // This is called by the Models page after a successful API key save,
         // which ensures chat becomes active without requiring a page reload.
-        console.log('[WebSocket] API key added — re-attempting connection');
+        logger.debug('[WebSocket] API key added — re-attempting connection');
         set({ _genesisWaitingForApiKey: false });
         get().disconnect(true);
         setTimeout(() => get().connect(), 100);
@@ -320,7 +321,7 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
             // entirely, producing an immediate reconnect on every pong failure
             // and causing the rapid 499 loop visible in nginx logs.
             const pongTimeout = setTimeout(() => {
-                console.warn('[WebSocket] Pong timeout — scheduling reconnect with backoff');
+                logger.warn('[WebSocket] Pong timeout — scheduling reconnect with backoff');
                 get()._setError('Connection lost (pong timeout)');
                 get()._stopHeartbeat();
                 // Cleanly close the socket without triggering the onclose
@@ -360,7 +361,7 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
         if (!s._connectionStable) {
             set({ _connectionStable: true, _reconnectAttempts: 0 });
             get()._updateStats({ reconnectAttempts: 0 });
-            console.log('[WebSocket] Connection stable — backoff counter reset');
+            logger.debug('[WebSocket] Connection stable — backoff counter reset');
             get()._fetchReplay();
         }
     },
@@ -371,7 +372,7 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
         try {
             const events = await websocketReplayApi.fetchReplay(since);
             if (events.length > 0) {
-                console.log(`[WebSocket] Replaying ${events.length} missed events`);
+                logger.debug(`[WebSocket] Replaying ${events.length} missed events`);
             }
             const ws = get()._ws;
             if (!ws || !ws.onmessage) return;
@@ -383,7 +384,7 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
                 ws.onmessage!.call(ws, syntheticEvent as any);
             });
         } catch (err) {
-            console.error('[WebSocket] Replay fetch failed:', err);
+            logger.error('[WebSocket] Replay fetch failed:', err);
         }
     },
 
@@ -405,7 +406,7 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
         }
 
         if (attempt >= WS_CONFIG.GENESIS_POLL_MAX_ATTEMPTS) {
-            console.error('[WebSocket] Genesis poll exceeded max attempts — giving up');
+            logger.error('[WebSocket] Genesis poll exceeded max attempts — giving up');
             set({ _genesisPollActive: false });
             // Without this, isConnecting stays true forever (it's deliberately
             // kept true through the whole 1013 polling window — see onclose),
@@ -425,7 +426,7 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
             try {
                 const data = await websocketReplayApi.pollGenesisStatus();
                 if (data.status === 'complete') {
-                    console.log('[WebSocket] Genesis complete — reconnecting now');
+                    logger.debug('[WebSocket] Genesis complete — reconnecting now');
                     get()._setError(null);
                     set({ _genesisPollTimeout: null, _genesisPollActive: false });
                     get().connect();
@@ -439,7 +440,7 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
                     return;
                 }
             } catch (err) {
-                console.warn('[WebSocket] Genesis status poll failed, will retry:', err);
+                logger.warn('[WebSocket] Genesis status poll failed, will retry:', err);
             }
 
             // Still running (or transient fetch error) — poll again.
@@ -463,7 +464,7 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
         // reconnect timer / effect re-runs would keep re-connecting and the
         // "System Initializing" banner would flash on every attempt.
         if (get()._genesisWaitingForApiKey) {
-            console.debug('[WebSocket] connect() suppressed — waiting for API key');
+            logger.debug('[WebSocket] connect() suppressed — waiting for API key');
             return;
         }
 
@@ -477,7 +478,7 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
         // can both pass the readyState guards above and open duplicate sockets.
         const now = Date.now();
         if (now - s._lastConnectTime < WS_CONFIG.MIN_CONNECT_INTERVAL_MS) {
-            console.debug('[WebSocket] connect() called too soon — debounced');
+            logger.debug('[WebSocket] connect() called too soon — debounced');
             return;
         }
         set({ _lastConnectTime: now });
@@ -490,7 +491,7 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const wsUrl = `${protocol}//${window.location.host}/ws/chat`;
 
-        console.log(`[WebSocket] Connecting to ${wsUrl} (attempt ${get()._reconnectAttempts + 1})`);
+        logger.debug(`[WebSocket] Connecting to ${wsUrl} (attempt ${get()._reconnectAttempts + 1})`);
 
         try {
             const ws = new WebSocket(wsUrl);
@@ -498,7 +499,7 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
 
             const connectionTimeout = setTimeout(() => {
                 if (ws.readyState !== WebSocket.OPEN) {
-                    console.error('[WebSocket] Connection timeout');
+                    logger.error('[WebSocket] Connection timeout');
                     ws.close();
                     get()._setError('Connection timeout');
                 }
@@ -506,7 +507,7 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
             set({ _connectionTimeout: connectionTimeout });
 
             ws.onopen = () => {
-                console.log('[WebSocket] ✅ Connected — sending auth handshake');
+                logger.debug('[WebSocket] ✅ Connected — sending auth handshake');
                 get()._clearAllTimers();
                 ws.send(JSON.stringify({ type: 'auth', token }));
             };
@@ -548,7 +549,7 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
                     }
 
                     if (data.type === 'auth_required') {
-                        console.warn('[WebSocket] Received auth_required — resending auth');
+                        logger.warn('[WebSocket] Received auth_required — resending auth');
                         ws.send(JSON.stringify({ type: 'auth', token }));
                         return;
                     }
@@ -569,7 +570,7 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
                             // blindly retrying the full WS handshake every 10s. This
                             // reconnects within ~2s of genesis actually finishing instead
                             // of however much of the old 10s window was left.
-                            console.warn('[WebSocket] system_not_ready — genesis in progress, polling status every 2s');
+                            logger.warn('[WebSocket] system_not_ready — genesis in progress, polling status every 2s');
                             set({ _genesisWaitingForApiKey: false });
                             get()._setError(
                                 (data.content as string | undefined) ??
@@ -581,7 +582,7 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
                             // Set the waiting flag so connect() is a no-op until
                             // notifyApiKeyAdded() is called. Clear any error so
                             // no banner appears and no retry loop starts.
-                            console.warn('[WebSocket] system_not_ready — no API key configured yet, staying silent');
+                            logger.warn('[WebSocket] system_not_ready — no API key configured yet, staying silent');
                             set({ _genesisWaitingForApiKey: true });
                             get()._setError(null);
                         }
@@ -607,12 +608,12 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
                         }
                     }
                 } catch (e) {
-                    console.error('[WebSocket] Failed to parse message:', e);
+                    logger.error('[WebSocket] Failed to parse message:', e);
                 }
             };
 
             ws.onerror = (event) => {
-                console.error('[WebSocket] Error:', event);
+                logger.error('[WebSocket] Error:', event);
             };
 
             ws.onclose = (event) => {
@@ -679,7 +680,7 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
             };
 
         } catch (err) {
-            console.error('[WebSocket] Failed to create connection:', err);
+            logger.error('[WebSocket] Failed to create connection:', err);
             get()._setError('Failed to create WebSocket connection');
             get()._setConnecting(false);
         }
@@ -713,7 +714,7 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
 
     // ── Reconnect ──────────────────────────────────────────────────────────
     reconnect: () => {
-        console.log('[WebSocket] Manual reconnect triggered');
+        logger.debug('[WebSocket] Manual reconnect triggered');
         set({ _reconnectAttempts: 0 });
         get()._updateStats({ reconnectAttempts: 0 });
         get().disconnect(true);
@@ -733,11 +734,11 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
                 }));
                 return true;
             } catch (e) {
-                console.error('[WebSocket] Send error:', e);
+                logger.error('[WebSocket] Send error:', e);
                 return false;
             }
         }
-        console.warn('[WebSocket] Not connected — queuing message');
+        logger.warn('[WebSocket] Not connected — queuing message');
         set({ _messageQueue: [...get()._messageQueue, { content, timestamp: Date.now(), attachments }] });
         return false;
     },

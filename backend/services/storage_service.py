@@ -19,13 +19,14 @@ S3_BUCKET_NAME         Default: agentium-media
 S3_FORCE_PATH_STYLE    true (default) — required for MinIO
 STORAGE_LOCAL_PATH     Local fallback root dir. Default: ./data/uploads
 APP_BASE_URL           Used to build download URLs in local mode.
-                       Default: http://localhost:8000
+                       Default: from settings.BASE_API_URL
 """
 
 import io
 import os
 import logging
 import shutil
+from backend.core.config import settings
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import BinaryIO, Dict, Any, List, Optional
@@ -41,7 +42,7 @@ _BUCKET           = os.getenv("S3_BUCKET_NAME", "agentium-media")
 _REGION           = os.getenv("AWS_REGION", "us-east-1")
 _FORCE_PATH_STYLE = os.getenv("S3_FORCE_PATH_STYLE", "true").lower() == "true"
 _LOCAL_ROOT       = Path(os.getenv("STORAGE_LOCAL_PATH", "./data/uploads")).resolve()
-_APP_BASE_URL     = os.getenv("APP_BASE_URL", "http://localhost:8000").rstrip("/")
+_APP_BASE_URL     = os.getenv("APP_BASE_URL", settings.BASE_API_URL).rstrip("/")
 
 
 # ─────────────────────────────────────────────────────────────────────────────

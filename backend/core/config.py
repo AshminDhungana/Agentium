@@ -70,7 +70,16 @@ class Settings(BaseSettings):
     
     # CORS
     ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:5173"
-    
+
+    # ------------------------------------------------------------------
+    # Local service fallbacks (kept in config so the rest of the
+    # codebase never hard-codes a localhost URL)
+    # ------------------------------------------------------------------
+    OLLAMA_BASE_URL: str = Field(default="http://localhost:11434/v1", env="OLLAMA_BASE_URL")
+    WHATSAPP_BRIDGE_URL: str = Field(default="ws://localhost:3000", env="WHATSAPP_BRIDGE_URL")
+    BB_BASE_URL: str = Field(default="http://localhost:1234", env="BB_BASE_URL")
+    BASE_API_URL: str = Field(default="http://localhost:8000", env="BASE_API_URL")
+
     # Monitoring
     HEALTH_CHECK_INTERVAL: int = 300  # seconds
     

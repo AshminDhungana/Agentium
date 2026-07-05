@@ -317,7 +317,7 @@ class BaseModelProvider(ABC):
                 db.commit()
         except Exception as exc:
             # Logging must never crash the main request path
-            print(f"⚠️  _log_usage failed: {exc}")
+            logger.error(f"⚠️  _log_usage failed: {exc}")
 
 
 class OpenAICompatibleProvider(BaseModelProvider):
@@ -790,7 +790,7 @@ class LocalProvider(OpenAICompatibleProvider):
         import openai
 
         client = openai.AsyncOpenAI(
-            base_url=self.base_url or "http://localhost:11434/v1",
+            base_url=self.base_url or settings.OLLAMA_BASE_URL,
             api_key="ollama"
         )
 
@@ -818,7 +818,7 @@ class LocalProvider(OpenAICompatibleProvider):
         """Fallback for raw HTTP local servers."""
         import aiohttp
 
-        url = f"{self.base_url}/generate" if self.base_url else "http://localhost:11434/api/generate"
+        url = f"{self.base_url}/generate" if self.base_url else settings.OLLAMA_BASE_URL.replace("/v1", "/api/generate")
 
         async with aiohttp.ClientSession() as session:
             async with session.post(url, json={
@@ -1150,7 +1150,7 @@ class ModelService:
                     model_ids = sorted([m.id for m in models.data])
                     return model_ids if model_ids else ModelService._get_default_models(provider)
                 except Exception as e:
-                    print(f"Anthropic list_models error: {e}")
+                    logger.error(f"Anthropic list_models error: {e}")
                     return ModelService._get_default_models(provider)
 
             # ── GEMINI ────────────────────────────────────────────────────────────
@@ -1175,7 +1175,7 @@ class ModelService:
                             return sorted(models) if models else ModelService._get_default_models(provider)
                         else:
                             err = await resp.text()
-                            print(f"Gemini list error {resp.status}: {err}")
+                            logger.error(f"Gemini list error {resp.status}: {err}")
                             return ModelService._get_default_models(provider)
 
             # ── GROQ ─────────────────────────────────────────────────────────────
@@ -1318,7 +1318,7 @@ class ModelService:
             # ── LOCAL (Ollama / LM Studio) ────────────────────────────────────────
             elif provider == ProviderType.LOCAL:
                 import aiohttp
-                url = base_url or "http://localhost:11434"
+                url = base_url or settings.OLLAMA_BASE_URL
                 if url.endswith('/v1'):
                     url = url[:-3]
                 # Try Ollama native /api/tags first
@@ -1353,12 +1353,16 @@ class ModelService:
                 return ModelService._get_default_models(provider)
 
         except Exception as e:
-            print(f"Error fetching models for {provider}: {e}")
+            logger.error(f"Error fetching models for {provider}: {e}")
             return ModelService._get_default_models(provider)
 
     @staticmethod
     def _get_default_models(provider: ProviderType) -> List[str]:
         """Get current curated defaults when live API fetch fails."""
+import logging
+from backend.core.config import settings
+logger = logging.getLogger(__name__)
+
         defaults = {
             ProviderType.OPENAI: [
                 "gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.4-nano",

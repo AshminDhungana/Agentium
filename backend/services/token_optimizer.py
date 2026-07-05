@@ -10,6 +10,7 @@ KEY CHANGES (v2):
 """
 
 import asyncio
+import logging
 from typing import Optional, Dict, Any, List
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
@@ -21,6 +22,7 @@ from backend.services.api_manager import init_api_manager, ModelCapability
 import backend.services.api_manager as api_manager_module
 from backend.services.model_allocation import init_model_allocator, model_allocator
 
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Persistent Budget Configuration (DB-backed)
@@ -111,7 +113,7 @@ class SystemBudgetConfig:
 
         except Exception as e:
             # Non-fatal: in-memory fallback is already updated
-            print(f"⚠️ Could not persist budget to DB: {e}")
+            logger.warning(f"Could not persist budget to DB: {e}")
 
 
 # ---------------------------------------------------------------------------
@@ -205,7 +207,7 @@ class IdleBudgetManager:
         self.daily_token_limit = daily_token_limit
         self.daily_cost_limit = daily_cost_limit
         SystemBudgetConfig.save(daily_token_limit, daily_cost_limit)
-        print(f"💰 Budget updated → tokens: {daily_token_limit:,} | cost: ${daily_cost_limit:.2f}/day")
+        logger.info(f"Budget updated → tokens: {daily_token_limit:,} | cost: ${daily_cost_limit:.2f}/day")
 
     # ------------------------------------------------------------------
     # Real usage from DB
@@ -400,7 +402,7 @@ class TokenOptimizer:
     async def enter_idle_mode(self, db: Session):
         """Enter idle mode."""
 
-        print("🌙 ENTERING IDLE MODE - Switching to local models")
+        logger.info("Entering idle mode - switching to local models")
         self.idle_mode_active = True
 
         local_model = api_manager_module.api_manager._get_best_local_model()
@@ -433,12 +435,12 @@ class TokenOptimizer:
             "budget_status": idle_budget.get_status(),
         })
 
-        print(f"✅ {len(agents)} agents switched to {local_model.model_name}")
+        logger.info(f"{len(agents)} agents switched to {local_model.model_name}")
 
     async def wake_from_idle(self, db: Session):
         """Wake from idle."""
 
-        print("☀️ WAKING FROM IDLE MODE - Restoring optimized models")
+        logger.info("Waking from idle mode - restoring optimized models")
         self.idle_mode_active = False
         self.last_activity_at = datetime.utcnow()
 
@@ -469,7 +471,7 @@ class TokenOptimizer:
             "budget_status": idle_budget.get_status(),
         })
 
-        print("✅ All agents restored to optimized models")
+        logger.info("All agents restored to optimized models")
 
     async def allocate_model_for_agent(self, agent: Agent, task: Task, db: Session) -> str:
         """Allocate an optimal model for the given agent and task."""
@@ -552,7 +554,7 @@ class TokenOptimizer:
                 "timestamp": datetime.utcnow().isoformat(),
             })
         except ImportError:
-            print("⚠️ WebSocket manager not available")
+            logger.warning("WebSocket manager not available")
 
     def get_status(self) -> Dict[str, Any]:
         """Get status."""

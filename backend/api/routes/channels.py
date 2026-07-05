@@ -1209,6 +1209,7 @@ def get_message_log(
     Returns messages across all channels with audit context.
     """
     from sqlalchemy import or_
+logger = logging.getLogger(__name__)
 
     query = db.query(ExternalMessage)
 
@@ -1422,7 +1423,7 @@ async def replay_failed_messages(
                     msg.status = "processing"
                     batch_db.commit()
             except Exception as e:
-                print(f"[ReplayBatch] Failed to replay {mid}: {e}")
+                logger.error(f"[ReplayBatch] Failed to replay {mid}: {e}")
 
     background_tasks.add_task(_replay_batch, message_ids)
 

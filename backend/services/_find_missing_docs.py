@@ -1,9 +1,12 @@
 """Find public methods without docstrings in the specified files."""
+import logging
+
 
 import ast
 import sys
 from pathlib import Path
 from typing import List, Tuple
+logger = logging.getLogger(__name__)
 
 FILES = [
     "alert_manager.py", "amendment_service.py", "api_manager.py", "audio_service.py",
@@ -23,13 +26,13 @@ if __name__ == "__main__":
     for rel_file in FILES:
         file_path = base / rel_file
         if not file_path.exists():
-            print(f"NOT FOUND: {rel_file}")
+            logger.info(f"NOT FOUND: {rel_file}")
             continue
         source = file_path.read_text(encoding="utf-8")
         try:
             tree = ast.parse(source)
         except SyntaxError as e:
-            print(f"SYNTAX ERROR in {rel_file}: {e}")
+            logger.error(f"SYNTAX ERROR in {rel_file}: {e}")
             continue
         # Collect classes and their public methods
         classes = {}
@@ -56,13 +59,13 @@ if __name__ == "__main__":
 
         total = sum(len(v) for v in classes.values()) + len(module_methods)
         if total > 0:
-            print(f"{rel_file}: {total} missing")
+            logger.info(f"{rel_file}: {total} missing")
             if module_methods:
                 for name, lineno in module_methods:
-                    print(f"  module {name}@{lineno}")
+                    logger.info(f"  module {name}@{lineno}")
             for cls_name, methods in classes.items():
                 if methods:
                     for name, lineno in methods:
-                        print(f"  {cls_name}.{name}@{lineno}")
+                        logger.info(f"  {cls_name}.{name}@{lineno}")
         else:
-            print(f"{rel_file}: 0 missing")
+            logger.info(f"{rel_file}: 0 missing")

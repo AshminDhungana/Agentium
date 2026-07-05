@@ -74,7 +74,7 @@ def _build_enriched_message(content: str, attachments: List[dict]) -> str:
         from backend.services.file_processor import build_file_context_for_ai
         file_context = build_file_context_for_ai(attachments, max_total_chars=30_000)
     except Exception as exc:
-        print(f"[WebSocket] file_processor import/call failed: {exc}")
+        logger.error(f"[WebSocket] file_processor import/call failed: {exc}")
         file_context = ""
 
     if not file_context:
@@ -180,7 +180,7 @@ class ConnectionManager:
 
         self.active_connections[websocket] = user_info
         self.user_connections[username]    = websocket
-        print(f"[WebSocket] ✅ Authenticated: {username} ({datetime.utcnow().isoformat()})")
+        logger.info(f"[WebSocket] ✅ Authenticated: {username} ({datetime.utcnow().isoformat()})")
         return user_info
 
     def disconnect(self, websocket: WebSocket) -> Optional[str]:
@@ -191,7 +191,7 @@ class ConnectionManager:
             username  = user_info.get("username")
             if username and username in self.user_connections:
                 del self.user_connections[username]
-            print(f"[WebSocket] ❌ Disconnected: {username}")
+            logger.error(f"[WebSocket] ❌ Disconnected: {username}")
         return username
 
     # ── send helpers ─────────────────────────────────────────────────────────
@@ -203,7 +203,7 @@ class ConnectionManager:
                 await self.user_connections[username].send_json(message)
                 return True
             except Exception as exc:
-                print(f"[WebSocket] Error sending to {username}: {exc}")
+                logger.error(f"[WebSocket] Error sending to {username}: {exc}")
         return False
 
     async def broadcast(self, message: dict, exclude: Optional[WebSocket] = None) -> None:
@@ -217,7 +217,7 @@ class ConnectionManager:
             pipeline.expire("agentium:ws:buffer", 60)
             await pipeline.execute()
         except Exception as exc:
-            print(f"[WebSocket] Event buffer push error: {exc}")
+            logger.error(f"[WebSocket] Event buffer push error: {exc}")
 
         disconnected = []
         for connection, user_info in list(self.active_connections.items()):
@@ -226,7 +226,7 @@ class ConnectionManager:
             try:
                 await connection.send_json(message)
             except Exception as exc:
-                print(f"[WebSocket] Broadcast error to {user_info.get('username')}: {exc}")
+                logger.error(f"[WebSocket] Broadcast error to {user_info.get('username')}: {exc}")
                 disconnected.append(connection)
         for conn in disconnected:
             self.disconnect(conn)
@@ -601,7 +601,7 @@ async def websocket_chat_endpoint(
     except WebSocketDisconnect:
         manager.disconnect(websocket)
     except Exception as exc:
-        print(f"[WebSocket] Unexpected error: {exc}")
+        logger.error(f"[WebSocket] Unexpected error: {exc}")
         manager.disconnect(websocket)
         try:
             await websocket.close(code=1011, reason="Internal server error")
@@ -653,6 +653,9 @@ async def genesis_status(current_user=Depends(get_current_user)):
 )
 async def replay_events(since: str, current_user=Depends(get_current_user)):
     """Fetch buffered broadcast events for reconnection replay."""
+import logging
+logger = logging.getLogger(__name__)
+
     try:
         r          = await manager._get_redis()
         events_str = await r.lrange("agentium:ws:buffer", 0, 99)
@@ -668,5 +671,5 @@ async def replay_events(since: str, current_user=Depends(get_current_user)):
         events.sort(key=lambda x: x.get("timestamp", ""))
         return {"events": events}
     except Exception as exc:
-        print(f"[WebSocket] Replay fetch error: {exc}")
+        logger.error(f"[WebSocket] Replay fetch error: {exc}")
         return {"events": []}

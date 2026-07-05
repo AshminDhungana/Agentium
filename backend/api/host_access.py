@@ -595,7 +595,7 @@ async def spawn_agent_container(
         name=request.name,
         agent_type=request.agent_type,
         status=result.get('status', 'failed'),
-        api_endpoint=f"http://localhost:8000/agents/{new_id}" if result['success'] else None,
+        api_endpoint=f"{settings.BASE_API_URL}/agents/{new_id}" if result['success'] else None,
         error=result.get('error'),
         spawn_duration_ms=spawn_duration
     )
@@ -731,6 +731,10 @@ def log_host_operation(
     details: str
 ):
     """Background task to log host operations to database."""
+import logging
+from backend.core.config import settings
+logger = logging.getLogger(__name__)
+
     try:
         audit = AuditLog(
             level=AuditLevel.INFO if success else AuditLevel.WARNING,
@@ -752,4 +756,4 @@ def log_host_operation(
         db.add(audit)
         db.commit()
     except Exception as e:
-        print(f"Failed to log audit: {e}")
+        logger.error(f"Failed to log audit: {e}")

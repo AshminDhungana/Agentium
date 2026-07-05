@@ -94,6 +94,8 @@ async def reply_to_conversation(
     current_user: User = Depends(get_current_active_user)
 ):
     """Send a reply to an external channel from the unified inbox."""
+import logging
+
     conversation = db.query(Conversation).filter(
         Conversation.id == conversation_id,
         Conversation.user_id == _user_id(current_user),
@@ -156,6 +158,7 @@ async def reply_to_conversation(
     try:
         from backend.api.routes.websocket import manager as ws_manager
         import asyncio
+logger = logging.getLogger(__name__)
         asyncio.create_task(
             ws_manager.broadcast({
                 "type": "message_created",
@@ -163,6 +166,6 @@ async def reply_to_conversation(
             })
         )
     except Exception as e:
-        print(f"WebSocket broadcast error: {e}")
+        logger.error(f"WebSocket broadcast error: {e}")
         
     return {"success": True, "message": sys_msg.to_dict()}

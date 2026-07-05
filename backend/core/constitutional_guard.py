@@ -185,7 +185,7 @@ class ConstitutionalGuard:
         try:
             import redis.asyncio as aioredis
             import os
-            redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+            redis_url = os.getenv("REDIS_URL", "redis://redis:6379/0")
             self._redis = await aioredis.from_url(redis_url, decode_responses=True)
         except Exception as exc:
             logger.warning("Redis unavailable for ConstitutionalGuard cache: %s", exc)

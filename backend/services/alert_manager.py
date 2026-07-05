@@ -222,7 +222,7 @@ class AlertManager:
         msg["Subject"] = (
             f"[Agentium {alert.severity.value.upper()}] {alert.alert_type}"
         )
-        msg["From"] = settings.SMTP_USER or "agentium@localhost"
+        msg["From"] = settings.SMTP_USER or "agentium@example.com"
         msg["To"] = settings.ALERT_EMAIL_TO
 
         # Plain text body

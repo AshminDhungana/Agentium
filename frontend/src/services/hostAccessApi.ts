@@ -7,6 +7,7 @@
  *  - There is no duplication of auth logic here.
  */
 import { api } from './api';
+import { logger } from '@/utils/logger';
 
 export const hostAccessApi = {
     // ── System Status ──────────────────────────────────────────────────────────
@@ -137,7 +138,7 @@ export const hostAccessApi = {
         const ws = new WebSocket(`${wsBase}/api/v1/sovereign/ws?token=${token}`);
 
         ws.onopen = () => {
-            console.log('Sovereign WebSocket connected');
+            logger.debug('Sovereign WebSocket connected');
         };
 
         ws.onmessage = (event) => {
@@ -145,16 +146,16 @@ export const hostAccessApi = {
                 const data = JSON.parse(event.data);
                 onMessage(data);
             } catch (err) {
-                console.error('Failed to parse WebSocket message:', err);
+                logger.error('Failed to parse WebSocket message:', err);
             }
         };
 
         ws.onerror = (error) => {
-            console.error('Sovereign WebSocket error:', error);
+            logger.error('Sovereign WebSocket error:', error);
         };
 
         ws.onclose = () => {
-            console.log('Sovereign WebSocket disconnected');
+            logger.debug('Sovereign WebSocket disconnected');
             onClose?.();
         };
 

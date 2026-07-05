@@ -325,7 +325,7 @@ class CapabilityRegistry:
             }
         )
         
-        print(f"✅ Capability granted: {agent.agentium_id} → {capability.value}")
+        logger.info(f"✅ Capability granted: {agent.agentium_id} → {capability.value}")
         return True
     
     @staticmethod
@@ -398,7 +398,7 @@ class CapabilityRegistry:
             }
         )
         
-        print(f"⚠️ Capability revoked: {agent.agentium_id} ✗ {capability.value}")
+        logger.warning(f"⚠️ Capability revoked: {agent.agentium_id} ✗ {capability.value}")
         return True
     
     @staticmethod
@@ -488,7 +488,7 @@ class CapabilityRegistry:
             }
         )
         
-        print(f"🔒 All capabilities revoked: {agent.agentium_id} ({len(revoked_list)} capabilities)")
+        logger.info(f"🔒 All capabilities revoked: {agent.agentium_id} ({len(revoked_list)} capabilities)")
     
     @staticmethod
     def capability_audit_report(db: Session) -> Dict[str, Any]:
@@ -564,6 +564,9 @@ def require_capability(capability: Capability):
         """Decorator."""
         async def wrapper(agent: Agent, db: Session, *args, **kwargs):
             """Wrapper."""
+import logging
+logger = logging.getLogger(__name__)
+
             # Check capability
             if not CapabilityRegistry.can_agent(agent, capability, db):
                 raise PermissionError(

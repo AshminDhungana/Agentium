@@ -125,12 +125,12 @@ def get_redis_client():
     """Get redis client."""
 
     try:
-        url = getattr(settings, "REDIS_URL", "redis://localhost:6379/0")
+        url = getattr(settings, "REDIS_URL", "redis://redis:6379/0")
         client = redis.Redis.from_url(url, decode_responses=True)
         client.ping()
         return client
     except Exception as e:
-        print(f"[RateLimiter/CircuitBreaker] Redis unavailable, using memory fallback: {e}")
+        logger.warning(f"[RateLimiter/CircuitBreaker] Redis unavailable, using memory fallback: {e}")
         return None
 
 _redis_client = get_redis_client()
@@ -183,7 +183,7 @@ class RateLimiter:
                 pipe.execute()
                 return True, None
             except Exception as e:
-                print(f"[RateLimiter] Redis error, falling back: {e}")
+                logger.error(f"[RateLimiter] Redis error, falling back: {e}")
                 
         # In-memory fallback
         with self._lock:
@@ -348,7 +348,7 @@ class CircuitBreaker:
             state, _ = self._get_state(channel_id, config)
             if state == CircuitState.HALF_OPEN:
                 self._set_state(channel_id, CircuitState.CLOSED)
-                print(f"[CircuitBreaker] Channel {channel_id} circuit CLOSED (recovered)")
+                logger.info(f"[CircuitBreaker] Channel {channel_id} circuit CLOSED (recovered)")
     
     def record_failure(self, channel_id: str) -> bool:
         """Record failure."""
@@ -373,11 +373,11 @@ class CircuitBreaker:
             if state == CircuitState.CLOSED:
                 if consecutive_failures >= config.failure_threshold:
                     self._set_state(channel_id, CircuitState.OPEN)
-                    print(f"[CircuitBreaker] Channel {channel_id} circuit OPENED")
+                    logger.info(f"[CircuitBreaker] Channel {channel_id} circuit OPENED")
                     return True
             elif state == CircuitState.HALF_OPEN:
                 self._set_state(channel_id, CircuitState.OPEN)
-                print(f"[CircuitBreaker] Channel {channel_id} circuit RE-OPENED")
+                logger.info(f"[CircuitBreaker] Channel {channel_id} circuit RE-OPENED")
                 return True
             return False
             
@@ -737,7 +737,7 @@ class IMAPEmailReceiver:
         
         task = asyncio.create_task(self._monitor_mailbox(channel_id, config))
         self._tasks[channel_id] = task
-        print(f"[IMAP] Started monitoring for channel {channel_id}")
+        logger.info(f"[IMAP] Started monitoring for channel {channel_id}")
     
     async def stop_channel(self, channel_id: str):
         """Stop IMAP monitoring for a channel."""
@@ -750,7 +750,7 @@ class IMAPEmailReceiver:
                 except:
                     pass
                 del self._connections[channel_id]
-            print(f"[IMAP] Stopped monitoring for channel {channel_id}")
+            logger.info(f"[IMAP] Stopped monitoring for channel {channel_id}")
     
     async def _monitor_mailbox(self, channel_id: str, config: Dict[str, Any]):
         """
@@ -782,7 +782,7 @@ class IMAPEmailReceiver:
                     if msg.raw_payload and 'uid' in msg.raw_payload:
                         processed_uids.add(msg.raw_payload['uid'])
         except Exception as e:
-            print(f"[IMAP] Error loading processed UIDs: {e}")
+            logger.error(f"[IMAP] Error loading processed UIDs: {e}")
         
         while True:
             try:
@@ -794,7 +794,7 @@ class IMAPEmailReceiver:
                 await client.login(username, password)
                 await client.select(folder)
                 
-                print(f"[IMAP] Connected to {imap_host} for channel {channel_id}")
+                logger.info(f"[IMAP] Connected to {imap_host} for channel {channel_id}")
                 
                 # Check for new messages
                 while True:
@@ -872,7 +872,7 @@ class IMAPEmailReceiver:
                                     )
                                     
                                     processed_uids.add(uid)
-                                    print(f"[IMAP] Processed message {uid} from {from_addr}")
+                                    logger.info(f"[IMAP] Processed message {uid} from {from_addr}")
                                     
                                     # Mark as seen
                                     await client.store(uid, '+FLAGS', '\\Seen')
@@ -890,13 +890,13 @@ class IMAPEmailReceiver:
                             await asyncio.sleep(poll_interval)
                             
                     except Exception as e:
-                        print(f"[IMAP] Error processing messages: {e}")
+                        logger.error(f"[IMAP] Error processing messages: {e}")
                         await asyncio.sleep(poll_interval)
                         
             except asyncio.CancelledError:
                 raise
             except Exception as e:
-                print(f"[IMAP] Connection error for channel {channel_id}: {e}")
+                logger.error(f"[IMAP] Connection error for channel {channel_id}: {e}")
                 await asyncio.sleep(poll_interval)
     
     async def stop_all(self):
@@ -938,15 +938,15 @@ class ChannelManager:
                 try:
                     adapter = UnifiedWhatsAppAdapter(channel)
                     await adapter.initialize()
-                    print(f"[ChannelManager] WhatsApp web_bridge initialised for {channel.id}")
+                    logger.info(f"[ChannelManager] WhatsApp web_bridge initialised for {channel.id}")
                 except Exception as exc:
-                    print(f"[ChannelManager] WhatsApp web_bridge init failed for {channel.id}: {exc}")
+                    logger.error(f"[ChannelManager] WhatsApp web_bridge init failed for {channel.id}: {exc}")
 
         # Start IMAP for email channels
         if channel.channel_type == ChannelType.EMAIL:
             if channel.config.get('imap_host') or channel.config.get('enable_imap'):
                 await imap_receiver.start_channel(channel.id, channel.config)
-                print(f"[ChannelManager] Started IMAP receiver for {channel.id}")
+                logger.info(f"[ChannelManager] Started IMAP receiver for {channel.id}")
 
     @staticmethod
     async def shutdown_channel(channel_id: str, db: Session = None):
@@ -969,11 +969,11 @@ class ChannelManager:
                 try:
                     adapter = UnifiedWhatsAppAdapter(channel)
                     await adapter.shutdown()
-                    print(f"[ChannelManager] WhatsApp web_bridge shut down for {channel_id}")
+                    logger.info(f"[ChannelManager] WhatsApp web_bridge shut down for {channel_id}")
                 except Exception as exc:
-                    print(f"[ChannelManager] WhatsApp web_bridge shutdown error for {channel_id}: {exc}")
+                    logger.error(f"[ChannelManager] WhatsApp web_bridge shutdown error for {channel_id}: {exc}")
 
-        print(f"[ChannelManager] Shutdown channel {channel_id}")
+        logger.info(f"[ChannelManager] Shutdown channel {channel_id}")
 
     @staticmethod
     async def receive_message(
@@ -1029,7 +1029,7 @@ class ChannelManager:
             norm_sender = _normalise(sender_id.split('@')[0])  # strip @s.whatsapp.net
             norm_allowed = [_normalise(s) for s in allowed_senders]
             if norm_sender not in norm_allowed:
-                print(f"[ChannelManager] Blocked message from {sender_id} — not in allowed_senders")
+                logger.info(f"[ChannelManager] Blocked message from {sender_id} — not in allowed_senders")
                 raise ValueError(f"Sender {sender_id} not in allowed senders list")
 
         # Circuit breaker check
@@ -1166,7 +1166,7 @@ class ChannelManager:
                         })
                     )
                 except Exception as eval_err:
-                    print(f"[ChannelManager] WebSocket Unified Inbox broadcast failed: {eval_err}")
+                    logger.error(f"[ChannelManager] WebSocket Unified Inbox broadcast failed: {eval_err}")
             # -------------------------------------
 
             # Record success
@@ -1306,7 +1306,7 @@ class ChannelManager:
                     "timestamp": datetime.utcnow().isoformat()
                 })
             except Exception as ws_err:
-                print(f"[ChannelManager] WebSocket broadcast failed: {ws_err}")
+                logger.error(f"[ChannelManager] WebSocket broadcast failed: {ws_err}")
 
     @staticmethod
     async def send_response(
@@ -1437,7 +1437,7 @@ class ChannelManager:
 
             except Exception as e:
                 retry_count += 1
-                print(f"[ChannelManager] Send attempt {retry_count} failed: {e}")
+                logger.error(f"[ChannelManager] Send attempt {retry_count} failed: {e}")
                 
                 if retry_count >= max_retries:
                     circuit_opened = circuit_breaker.record_failure(channel.id)
@@ -1531,9 +1531,9 @@ class ChannelManager:
                     countdown=300,  # 5 minutes
                     max_retries=3
                 )
-                print(f"[ChannelManager] Queued message {message_id} for retry")
+                logger.info(f"[ChannelManager] Queued message {message_id} for retry")
             except Exception as e:
-                print(f"[ChannelManager] Failed to queue retry: {e}")
+                logger.error(f"[ChannelManager] Failed to queue retry: {e}")
 
     @staticmethod
     def get_channel_health(channel_id: str) -> Dict[str, Any]:
@@ -1586,7 +1586,7 @@ class ChannelManager:
                         broadcast_count += 1
                         
             except Exception as e:
-                print(f"[ChannelManager] Broadcast failed for channel {channel.id}: {e}")
+                logger.error(f"[ChannelManager] Broadcast failed for channel {channel.id}: {e}")
                 
         return broadcast_count
 
@@ -2150,7 +2150,7 @@ class EmailAdapter:
             await client.logout()
             return True
         except Exception as e:
-            print(f"[EmailAdapter] IMAP verification failed: {e}")
+            logger.error(f"[EmailAdapter] IMAP verification failed: {e}")
             return False
 
 
@@ -2462,7 +2462,7 @@ class SignalAdapter:
                             await callback(envelope)
                             
                 except Exception as e:
-                    print(f"[SignalAdapter] Receive error: {e}")
+                    logger.error(f"[SignalAdapter] Receive error: {e}")
                     await asyncio.sleep(5)
 
 
@@ -3051,7 +3051,7 @@ end tell
         """Send via BlueBubbles REST API."""
         import httpx
 
-        bb_url = config.get('bb_url', 'http://localhost:1234').rstrip('/')
+        bb_url = config.get('bb_url', settings.BB_BASE_URL).rstrip('/')
         bb_password = config.get('bb_password')
 
         if not bb_password:
@@ -3118,9 +3118,12 @@ end tell
     @staticmethod
     async def get_chats(config: Dict) -> List[Dict]:
         """Get recent chats via BlueBubbles."""
-        import httpx
+import logging
 
-        bb_url = config.get('bb_url', 'http://localhost:1234').rstrip('/')
+        import httpx
+logger = logging.getLogger(__name__)
+
+        bb_url = config.get('bb_url', settings.BB_BASE_URL).rstrip('/')
         bb_password = config.get('bb_password')
 
         async with httpx.AsyncClient(timeout=30.0) as client:

@@ -7,10 +7,13 @@ Raw data NEVER leaves this module – only schema, stats, and small samples.
 import sys
 import json
 import time
+import logging
 import traceback
 from typing import Any, Dict, List
 from io import StringIO
 from contextlib import redirect_stdout, redirect_stderr
+
+logger = logging.getLogger(__name__)
 
 
 class ExecutionResult:
@@ -246,4 +249,4 @@ result = data
 """
 
     result = execute_code(test_code)
-    print(json.dumps(result.to_dict(), indent=2))
+    logger.debug(json.dumps(result.to_dict(), indent=2))

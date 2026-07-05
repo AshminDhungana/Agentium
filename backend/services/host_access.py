@@ -28,7 +28,7 @@ class HostAccessService:
             self.docker_client = docker.DockerClient(base_url=f'unix://{self.docker_socket}')
         except Exception as e:
             self.docker_client = None
-            print(f"Warning: Docker client not available: {e}")
+            logger.warning(f"Warning: Docker client not available: {e}")
     
     def _log_operation(self, action: str, target: str, details: Dict[str, Any], 
                       level: AuditLevel = AuditLevel.INFO):
@@ -43,7 +43,7 @@ class HostAccessService:
             'level': level.value
         }
         # Persist to database (implement based on your system)
-        print(f"[AUDIT] {log_entry}")
+        logger.info(f"[AUDIT] {log_entry}")
         return log_entry
     
     def execute_command(self, command: List[str], cwd: Optional[str] = None,
@@ -335,12 +335,15 @@ class RestrictedHostAccess:
         """
         Request host operation - requires Head of Council approval.
         """
+import logging
+logger = logging.getLogger(__name__)
+
         # Log the request
         request_id = f"{self.agentium_id}-{datetime.utcnow().timestamp()}"
         
         # In real implementation, this would create a voting session
         # For now, auto-approve for demonstration (DANGEROUS - change for production)
-        print(f"[REQUEST] {self.agentium_id} requests {operation}: {params}")
+        logger.info(f"[REQUEST] {self.agentium_id} requests {operation}: {params}")
         
         # Route through Head of Council service
         if hasattr(self.head_proxy, operation):

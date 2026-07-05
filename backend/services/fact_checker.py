@@ -109,7 +109,6 @@ class FactChecker:
 
         checker = FactChecker()
         result = checker.check_claim("Python was created by Guido van Rossum")
-        print(result.confidence, result.sources)
     """
 
     # Distance thresholds for ChromaDB (L2 distance — lower is more similar)
