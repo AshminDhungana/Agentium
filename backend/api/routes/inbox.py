@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, status
+import logging
 from backend.core.exceptions import BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, TooLargeError, RateLimitError, InternalServerError, ServiceUnavailableError
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
@@ -15,6 +16,8 @@ from backend.services.channel_manager import ChannelManager
 from backend.api.schemas.examples import ErrorResponseExample, SuccessResponseExample, build_responses
 
 router = APIRouter(prefix="/inbox", tags=["Unified Inbox"])
+
+logger = logging.getLogger(__name__)
 
 def _user_id(current_user) -> str:
     """Extract user id whether current_user is an ORM object or a dict."""
@@ -94,8 +97,6 @@ async def reply_to_conversation(
     current_user: User = Depends(get_current_active_user)
 ):
     """Send a reply to an external channel from the unified inbox."""
-import logging
-
     conversation = db.query(Conversation).filter(
         Conversation.id == conversation_id,
         Conversation.user_id == _user_id(current_user),
@@ -158,7 +159,6 @@ import logging
     try:
         from backend.api.routes.websocket import manager as ws_manager
         import asyncio
-logger = logging.getLogger(__name__)
         asyncio.create_task(
             ws_manager.broadcast({
                 "type": "message_created",
