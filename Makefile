@@ -1,6 +1,6 @@
 # Agentium Makefile
 
-.PHONY: up down restart voice-reinstall voice-logs voice-status uninstall-voice test hallmark test-integration load-test benchmark perf-gate test-staging
+.PHONY: up down restart voice-reinstall voice-logs voice-status uninstall-voice test hallmark test-integration load-test benchmark perf-gate test-staging audit audit-fix
 
 # -- Normal start -- voice bridge installs automatically --
 up:
@@ -96,3 +96,19 @@ perf-gate: benchmark load-test
 test-staging:
 	@echo "Running performance gates against staging: $(STAGING_HOST)"
 	@make load-test STAGING_HOST=$(STAGING_HOST)
+
+# --- Security Audit Targets (Phase 18.5) ---
+
+## Run all security audits (pip-audit + npm audit)
+audit:
+	@echo "==> Running pip-audit on backend/requirements.txt..."
+	@cd backend && pip-audit --requirement requirements.txt --format=markdown || true
+	@echo "==> Running npm audit on frontend..."
+	@cd frontend && npm audit || true
+
+## Attempt to auto-fix resolvable frontend vulnerabilities (npm audit fix)
+audit-fix:
+	@echo "==> Running npm audit fix..."
+	@cd frontend && npm audit fix
+	@echo "==> Re-running audits..."
+	@make audit
