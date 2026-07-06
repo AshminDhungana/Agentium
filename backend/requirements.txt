@@ -46,7 +46,7 @@ python-telegram-bot==22.6
 twilio==9.4.1
 slack-sdk==3.35.0
 requests==2.33.0
-urllib3>=2.6.3
+urllib3>=1.26.0,<2.1
 google-auth==2.37.0
 google-auth-oauthlib==1.2.1
 msal==1.31.0
@@ -116,7 +116,8 @@ torchaudio==2.11.0
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 🔐 SECURITY
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-cryptography==48.0.1
+# (pyproject.toml). Pin kept for deterministic builds. Version chosen to avoid known CVEs.
+cryptography>=43.0.0,<46.0.0
 itsdangerous==2.2.0
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -138,7 +139,7 @@ GitPython==3.1.50
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 🧪 TESTING
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-pytest==9.0.3
+pytest==8.4.0
 pytest-asyncio==0.25.0
 pytest-cov==6.0.0
 factory-boy==3.3.1
