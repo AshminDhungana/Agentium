@@ -32,7 +32,7 @@ from __future__ import annotations
 import functools
 import inspect
 import logging
-from typing import Any, Callable, Concatenate, ParamSpec, TypeVar, cast
+from typing import Any, Callable, ParamSpec, TypeVar, cast
 
 from sqlalchemy.orm import Session
 

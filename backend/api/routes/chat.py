@@ -539,7 +539,6 @@ async def _stream_response(
                         user_id=broadcast_payload["user_id"],
                         content=broadcast_payload["content"],
                         db=broadcast_db,
-                        is_silent=True,
                     )
                 finally:
                     broadcast_db.close()

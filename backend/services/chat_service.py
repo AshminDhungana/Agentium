@@ -260,7 +260,6 @@ Address the Sovereign respectfully. If they issue a command that requires execut
                     user_id=sovereign_user.id,
                     content=result["content"],
                     db=db,
-                    is_silent=True
                 )
             )
 

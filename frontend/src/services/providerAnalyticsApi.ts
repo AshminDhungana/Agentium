@@ -61,7 +61,7 @@ export interface LatencyPercentile {
 
 // ─── Service ──────────────────────────────────────────────────────────────────
 
-export const providerAnalyticsApi = {
+const providerAnalyticsApi = {
   /**
    * Aggregated per-provider stats over the given look-back window.
    * Used by the ProviderAnalytics dashboard card.

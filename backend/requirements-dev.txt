@@ -27,3 +27,6 @@ interrogate>=1.7.0
 # 🔐 SECRET SCANNING (Phase 18.5)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 detect-secrets>=1.5.0
+
+#  DEAD CODE DETECTION (Phase 18.5)
+vulture==2.14

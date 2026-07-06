@@ -13,7 +13,7 @@ Fixes (Phase 6.8):
 - persistent_council import removed from propose_tool (was imported but never called)
 """
 from sqlalchemy.orm import Session
-from backend.models.schemas.tool_creation import ToolCreationRequest, ToolApprovalRequest
+from backend.models.schemas.tool_creation import ToolCreationRequest
 from backend.models.entities.tool_staging import ToolStaging
 from backend.models.entities.voting import AmendmentVoting, AmendmentStatus
 from backend.models.entities.audit import AuditLog, AuditLevel, AuditCategory

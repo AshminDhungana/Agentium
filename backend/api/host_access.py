@@ -14,7 +14,7 @@ import logging
 
 from backend.models.database import get_db
 from backend.services.host_access import HostAccessService, RestrictedHostAccess
-from backend.services.auth import get_current_agent, verify_agent_hierarchy
+from backend.services.auth import get_current_agent
 from backend.core.exceptions import UnauthorizedError, ForbiddenError, ServiceUnavailableError
 from backend.models.entities.agents import Agent
 from backend.models.entities.audit import AuditLog, AuditLevel, AuditCategory

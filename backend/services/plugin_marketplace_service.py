@@ -89,7 +89,6 @@ class PluginMarketplaceService:
             raise BadRequestError(error="Only 'submitted' plugins can be sent for approval.", code="ONLY_SUBMITTED_PLUGINS_CAN_BE")
 
         from backend.models.entities.voting import AmendmentVoting, AmendmentStatus
-        from backend.utils.agentium_id import AgentiumIDGenerator
 
         proposal = AmendmentVoting(
             title=f"Plugin approval: {plugin.name}",

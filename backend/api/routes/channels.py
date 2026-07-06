@@ -33,7 +33,7 @@ from sqlalchemy.orm import Session, subqueryload  # FIX: added subqueryload
 from backend.models.database import get_db
 from backend.models.entities.channels import ExternalChannel, ExternalMessage, ChannelType, ChannelStatus
 from backend.services.channel_manager import (
-    ChannelManager, WhatsAppAdapter, SlackAdapter, TelegramAdapter,
+    ChannelManager, SlackAdapter, TelegramAdapter,
     DiscordAdapter, SignalAdapter, GoogleChatAdapter, TeamsAdapter,
     ZaloAdapter, MatrixAdapter, iMessageAdapter, EmailAdapter,
     circuit_breaker, rate_limiter, PLATFORM_RATE_LIMITS, imap_receiver,

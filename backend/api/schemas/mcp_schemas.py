@@ -2,7 +2,7 @@
 Pydantic Schemas for MCP Tools API — Phase 6.7
 """
 from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, Field
 
 
 # ── Request schemas ────────────────────────────────────────────────────────────

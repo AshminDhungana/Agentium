@@ -654,7 +654,7 @@ Never terminate. Never rest. Always improve.""",
         return [a for a in agents if isinstance(a, CouncilMember)]
     
     @staticmethod
-    def report_idle_activity(db: Session, agentium_id: str, activity: str, tokens_saved: int = 0):
+    def report_idle_activity(db: Session, agentium_id: str, tokens_saved: int = 0):
         """Record idle activity for a persistent agent."""
         agent = db.query(Agent).filter_by(agentium_id=agentium_id).first()
         if not agent or not agent.is_persistent:

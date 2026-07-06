@@ -28,8 +28,8 @@ except ImportError:
     PANDAS_AVAILABLE = False
 
 try:
-    import pyarrow as pa
-    import pyarrow.parquet as pq
+    import pyarrow
+    import pyarrow.parquet
     PARQUET_AVAILABLE = True
 except ImportError:
     PARQUET_AVAILABLE = False
@@ -86,7 +86,7 @@ class DataTransformTool:
         
         # Execute action
         if action == "convert":
-            result = self._convert(data, input_format, output_format, options or {})
+            result = self._convert(data, output_format, options or {})
         elif action == "filter":
             result = self._filter_data(data, query, options or {})
         elif action == "aggregate":
@@ -133,7 +133,7 @@ class DataTransformTool:
         else:
             raise ValueError(f"Cannot parse format: {format}")
     
-    def _convert(self, data: Any, from_fmt: str, to_fmt: str, options: Dict) -> Any:
+    def _convert(self, data: Any, to_fmt: str, options: Dict) -> Any:
         """Convert between formats."""
         if to_fmt == "json":
             return json.dumps(data, indent=2)

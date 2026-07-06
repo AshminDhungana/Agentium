@@ -14,12 +14,11 @@ import asyncio
 from backend.models.database import get_db
 from backend.models.entities.channels import ExternalChannel, ChannelStatus
 from backend.services.channel_manager import (
-    ChannelManager, WhatsAppAdapter, SlackAdapter, TelegramAdapter,
+    ChannelManager, SlackAdapter, TelegramAdapter,
     DiscordAdapter, SignalAdapter, GoogleChatAdapter, TeamsAdapter, 
     ZaloAdapter, MatrixAdapter, iMessageAdapter, EmailAdapter,
     circuit_breaker, rate_limiter, PLATFORM_RATE_LIMITS
 )
-from backend.core.auth import WebhookAuth
 from backend.core.security import decrypt_api_key
 
 from backend.api.schemas.examples import ErrorResponseExample, SuccessResponseExample, build_responses

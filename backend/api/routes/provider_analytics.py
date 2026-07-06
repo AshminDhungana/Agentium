@@ -186,9 +186,7 @@ async def get_model_breakdown(
     ).filter(ModelUsageLog.created_at >= since)
 
     if provider:
-        query = query.filter(
-            func.lower(func.cast(ModelUsageLog.provider, db.bind.dialect.type_compiler.__class__.__bases__[0].__init__.__class__)) == provider.lower()
-        ) if False else query.filter(ModelUsageLog.provider == provider.upper())
+        query = query.filter(func.lower(ModelUsageLog.provider) == provider.lower())
 
     rows = (
         query

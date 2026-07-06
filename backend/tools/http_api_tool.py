@@ -124,7 +124,8 @@ class HttpApiTool:
                     data=data,
                     json=json_data,
                     timeout=aiohttp.ClientTimeout(total=timeout),
-                    ssl=verify_ssl
+                    ssl=verify_ssl,
+                    allow_redirects=follow_redirects,
                 ) as response:
                     
                     latency = time.time() - start_time

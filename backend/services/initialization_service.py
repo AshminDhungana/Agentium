@@ -2,8 +2,6 @@
 Initialization Service for Agentium.
 Genesis protocol - bootstraps the governance system from scratch.
 """
-from backend.services import self_healing_service
-from backend.services import self_healing_service
 import os
 import asyncio
 import json
@@ -23,7 +21,7 @@ from backend.models.entities.agents import (
 )
 from backend.models.entities.constitution import Constitution, Ethos
 from backend.models.entities.user import User
-from backend.models.entities.user_config import UserModelConfig as UserConfig
+from backend.models.entities.user_config import UserModelConfig
 from backend.models.entities.user_config import ProviderType, ConnectionStatus
 from backend.models.entities.voting import IndividualVote
 from backend.services.knowledge_service import get_knowledge_service
@@ -183,7 +181,6 @@ class InitializationService:
                         user_id=sovereign_user_id,  # plain scalar — not an ORM attribute
                         content=message,
                         db=fresh_db,
-                        is_silent=False,
                     )
 
             # Fire and forget — don't block genesis on external channels

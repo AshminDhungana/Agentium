@@ -13,7 +13,7 @@ from backend.models.entities.monitoring import (
     TaskVerification, PerformanceMetric, MonitoringAlert
 )
 from backend.models.entities.task import Task, SubTask, TaskStatus
-from backend.models.database import get_db_context, get_next_agentium_id
+from backend.models.database import get_db_context
 from backend.models.database import get_system_agent_id
 import logging
 import asyncio

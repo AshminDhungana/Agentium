@@ -54,11 +54,6 @@ export const listWebhookSubscriptions = async (): Promise<WebhookSubscription[]>
   return data.subscriptions || [];
 };
 
-export const getWebhookSubscription = async (id: string): Promise<WebhookSubscription> => {
-  const { data } = await api.get(`/webhooks/subscriptions/${id}`);
-  return data;
-};
-
 export const createWebhookSubscription = async (params: CreateWebhookParams): Promise<WebhookSubscription> => {
   const { data } = await api.post('/webhooks/subscriptions', params);
   return data;

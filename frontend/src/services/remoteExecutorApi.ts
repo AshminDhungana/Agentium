@@ -60,7 +60,7 @@ export interface ExecutionRecord {
 
 // ─── Service ──────────────────────────────────────────────────────────────────
 
-export const remoteExecutorApi = {
+const remoteExecutorApi = {
   /**
    * List all persistent sandboxes visible to the current user.
    * Used by the Execution / Developer panel to manage sandbox lifecycle.

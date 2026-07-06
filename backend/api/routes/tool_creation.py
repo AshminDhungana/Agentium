@@ -403,7 +403,6 @@ async def rate_tool(
     service = ToolMarketplaceService(db)
     result  = service.rate_tool(
         listing_id=listing_id,
-        rated_by=agent_id,
         rating=body.rating,
     )
     if not result.get("rated"):

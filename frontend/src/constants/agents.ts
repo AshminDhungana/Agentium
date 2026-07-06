@@ -8,8 +8,6 @@ export const VALID_AGENT_TYPES = [
     'task_agent',
 ] as const;
 
-export type ValidAgentType = typeof VALID_AGENT_TYPES[number];
-
 export const AGENT_TYPE_LABELS: Record<string, string> = {
     head_of_council: 'Head of Council',
     council_member:  'Council Member',
@@ -73,21 +71,6 @@ export function isAgentWsEvent(type: string, content?: string | null): boolean {
     }
     return false;
 }
-
-// ─── Tier ID Prefixes ─────────────────────────────────────────────────────────
-
-export const TIER_PREFIXES = {
-    head:    '0',
-    council: '1',
-    lead:    '2',
-    task:    '3',
-    /**
-     * All critic prefixes — includes both legacy singletons (4/5/6) and the
-     * new ephemeral per-task critics (7/8/9).  Use isCriticAgentId() from
-     * utils/agentIds for reliable checks rather than testing prefixes directly.
-     */
-    critics: ['4', '5', '6', '7', '8', '9'],
-} as const;
 
 /** All prefixes that should be hidden from the main agents list/tree. */
 export const HIDDEN_FROM_AGENTS_PAGE: string[] = ['4', '5', '6', '7', '8', '9'];

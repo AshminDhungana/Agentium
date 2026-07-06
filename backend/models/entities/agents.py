@@ -272,7 +272,7 @@ class Agent(BaseEntity):
             task_description=task_description
         )
 
-    def embed_execution_memory(self, task_result: str, success: bool = True):
+    def embed_execution_memory(self, success: bool = True):
         """
         Store execution pattern in vector DB for future agents.
         Called in post_task_ritual.

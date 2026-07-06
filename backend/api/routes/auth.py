@@ -25,7 +25,7 @@ from backend.core.auth import (
 )
 from backend.models.entities.user import User
 from backend.models.entities.audit import AuditLog, AuditLevel, AuditCategory
-from backend.core.voice_auth import create_voice_token, verify_voice_token
+from backend.core.voice_auth import create_voice_token
 from backend.api.schemas.examples import ErrorResponseExample
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])

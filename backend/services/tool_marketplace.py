@@ -299,7 +299,6 @@ class ToolMarketplaceService:
     def rate_tool(
         self,
         listing_id: str,
-        rated_by: str,
         rating: float,
     ) -> Dict[str, Any]:
         """

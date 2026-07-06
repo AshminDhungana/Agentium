@@ -10,7 +10,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, Query
 from backend.core.exceptions import BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, TooLargeError, RateLimitError, InternalServerError, ServiceUnavailableError
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from backend.models.database import get_db

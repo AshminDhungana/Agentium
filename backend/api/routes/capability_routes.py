@@ -18,8 +18,7 @@ from backend.models.database import get_db
 from backend.models.entities.agents import Agent
 from backend.services.capability_registry import (
     CapabilityRegistry,
-    Capability,
-    capability_registry
+    Capability
 )
 from backend.core.auth import get_current_active_user
 

@@ -63,7 +63,7 @@ export interface UpdateListingResult {
 
 // ─── Plugin Marketplace (/api/v1/plugins) ─────────────────────────────────────
 
-export const pluginMarketplaceService = {
+const pluginMarketplaceService = {
     /**
      * List published plugins with optional full-text search and type filter.
      * Uses axios `params` for query-string serialisation — avoids manually
@@ -130,7 +130,7 @@ export const pluginMarketplaceService = {
 // Separate from the plugin marketplace above — these tools are created via the
 // ToolCreationService and council-approved workflow, not the plugin registry.
 
-export const toolCreationMarketplaceService = {
+const toolCreationMarketplaceService = {
     /**
      * Refresh a marketplace listing to the tool's current active version.
      *

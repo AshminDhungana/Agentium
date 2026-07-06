@@ -294,39 +294,3 @@ export const checkpointsService = {
 // ============================================================================
 // Utility Functions
 // ============================================================================
-
-/**
- * Get human-readable phase label.
- */
-export function getPhaseLabel(phase: CheckpointPhase): string {
-    switch (phase) {
-        case 'plan_approved':
-            return 'Plan Approved';
-        case 'execution_complete':
-            return 'Execution Complete';
-        case 'critique_passed':
-            return 'Critique Passed';
-        case 'manual':
-            return 'Manual Checkpoint';
-        default:
-            return phase;
-    }
-}
-
-/**
- * Get color for phase.
- */
-export function getPhaseColor(phase: CheckpointPhase): string {
-    switch (phase) {
-        case 'plan_approved':
-            return '#3b82f6';
-        case 'execution_complete':
-            return '#f59e0b';
-        case 'critique_passed':
-            return '#10b981';
-        case 'manual':
-            return '#8b5cf6';
-        default:
-            return '#6b7280';
-    }
-}

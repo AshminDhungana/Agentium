@@ -66,7 +66,6 @@ except ImportError:
 
 try:
     from docx import Document as DocxDocument
-    from docx.shared import Pt, RGBColor
     DOCX_AVAILABLE = True
 except ImportError:
     DOCX_AVAILABLE = False
@@ -80,7 +79,7 @@ except ImportError:
     logger.warning("openpyxl not installed — .xlsx editing unavailable")
 
 try:
-    from playwright.async_api import async_playwright, Browser, Page
+    from playwright.async_api import async_playwright
     PLAYWRIGHT_AVAILABLE = True
 except ImportError:
     PLAYWRIGHT_AVAILABLE = False

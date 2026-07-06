@@ -27,7 +27,6 @@ except ImportError:
     PYLINT_AVAILABLE = False
 
 try:
-    import bandit
     from bandit.core import manager as bandit_manager
     BANDIT_AVAILABLE = True
 except ImportError:

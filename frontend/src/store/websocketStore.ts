@@ -761,12 +761,6 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
     },
 }));
 
-// ── Auto-connect on init ──────────────────────────────────────────────────────
-export const initWebSocket = () => {
-    const token = localStorage.getItem('access_token');
-    if (token) useWebSocketStore.getState().connect();
-};
-
 // ── Cross-tab token change ────────────────────────────────────────────────────
 if (typeof window !== 'undefined') {
     window.addEventListener('storage', (e) => {
