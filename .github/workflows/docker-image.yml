@@ -42,7 +42,7 @@ jobs:
             echo "python=${PYTHON_DIGEST}" >> "$GITHUB_OUTPUT"
           else
             echo "::warning::No .pinned-digests.env found; using default. Run 'make pin-digests' locally."
-            echo "python=sha256:f5ef0344c9886ff24d34797578d5d7dd6e8911ae0fe5962bb55d0f89603ec361" >> "$GITHUB_OUTPUT"
+            echo "python=sha256:74012ddba2bc217440b5dc8ea21012baa9ef20eab68bccfd98f269e0b1da581f" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Set up Docker Buildx

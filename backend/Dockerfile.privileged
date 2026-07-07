@@ -2,7 +2,7 @@
 # Agentium Backend Dockerfile (Privileged)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-ARG PYTHON_DIGEST=sha256:f5cf0344c9886ff24d34797578d5d7dd6e8911ae0fe5962bb55d0f89603ec361
+ARG PYTHON_DIGEST=sha256:74012ddba2bc217440b5dc8ea21012baa9ef20eab68bccfd98f269e0b1da581f
 FROM python:3.11-slim-bookworm@${PYTHON_DIGEST}
 
 # Install system dependencies for host-level access
