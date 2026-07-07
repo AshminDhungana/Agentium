@@ -482,7 +482,7 @@ jobs:
             ${ARM64_IMAGE}
 
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  # Security Scan with Docker Scout
+  # Security Scan with Trivy
   # Runs after manifests are merged
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   security-scan:
@@ -491,7 +491,7 @@ jobs:
     if: github.event_name != 'pull_request'
     permissions:
       contents: read
-      packages: write
+      packages: read
       security-events: write
 
     steps:
@@ -509,27 +509,41 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Docker Scout Scan — Backend
-        uses: docker/scout-action@v1
+      - name: Run Trivy vulnerability scanner — Backend
+        uses: aquasecurity/trivy-action@0.20.0
         with:
-          command: cves
-          image: ${{ env.REGISTRY }}/${{ steps.lowercase.outputs.IMAGE_PREFIX_LOWER }}/backend:${{ github.sha }}
-          only-severity: high,critical
-          sarif-file: backend-scout-results.sarif
+          image-ref: ${{ env.REGISTRY }}/${{ steps.lowercase.outputs.IMAGE_PREFIX_LOWER }}/backend:${{ github.sha }}
+          format: 'sarif'
+          output: 'backend-scout-results.sarif'
+          severity: 'HIGH,CRITICAL'
+          exit-code: '0'
+          ignore-unfixed: true
 
-      - name: Docker Scout Scan — Frontend
-        uses: docker/scout-action@v1
+      - name: Run Trivy vulnerability scanner — Frontend
+        uses: aquasecurity/trivy-action@0.20.0
         with:
-          command: cves
-          image: ${{ env.REGISTRY }}/${{ steps.lowercase.outputs.IMAGE_PREFIX_LOWER }}/frontend:${{ github.sha }}
-          only-severity: high,critical
+          image-ref: ${{ env.REGISTRY }}/${{ steps.lowercase.outputs.IMAGE_PREFIX_LOWER }}/frontend:${{ github.sha }}
+          format: 'sarif'
+          output: 'frontend-scout-results.sarif'
+          severity: 'HIGH,CRITICAL'
+          exit-code: '0'
+          ignore-unfixed: true
 
-      - name: Docker Scout Scan — WhatsApp Bridge
-        uses: docker/scout-action@v1
+      - name: Run Trivy vulnerability scanner — WhatsApp Bridge
+        uses: aquasecurity/trivy-action@0.20.0
         with:
-          command: cves
-          image: ${{ env.REGISTRY }}/${{ steps.lowercase.outputs.IMAGE_PREFIX_LOWER }}/whatsapp-bridge:${{ github.sha }}
-          only-severity: high,critical
+          image-ref: ${{ env.REGISTRY }}/${{ steps.lowercase.outputs.IMAGE_PREFIX_LOWER }}/whatsapp-bridge:${{ github.sha }}
+          format: 'sarif'
+          output: 'whatsapp-bridge-scout-results.sarif'
+          severity: 'HIGH,CRITICAL'
+          exit-code: '0'
+          ignore-unfixed: true
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: '.'
 
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   # Update Docker Compose with new image references
