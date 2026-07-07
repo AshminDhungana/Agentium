@@ -61,6 +61,7 @@ export function HealthIndicator({
     <div className="relative group">
       <div
         className={`${sizeClasses[size]} rounded-full ${getStatusColor()} transition-all duration-300`}
+        role="img"
         aria-label={getTooltipText()}
       />
       {showTooltip && (

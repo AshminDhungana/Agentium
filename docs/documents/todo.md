@@ -801,13 +801,13 @@ Build a self-governing AI ecosystem where agents operate under constitutional la
 - [x] **Secret Hygiene** — run `detect-secrets scan --baseline .secrets.baseline`; add baseline check to CI; fail build on any newly detected secret
 - [x] **Dependency Audit** — run `pip-audit` against `requirements.txt` and `npm audit` against `frontend/package.json`; resolve all HIGH and CRITICAL CVEs; document accepted LOW / MEDIUM risks in `SECURITY.md`
 - [x] **Dead Code Elimination** — run `vulture backend/ --min-confidence 80` to detect unused Python functions and variables; run `ts-prune` on the frontend; remove all confirmed dead code with no external references
-- [ ] **Docker Image Hardening** — switch `Dockerfile` to a non-root user (`USER agentium:agentium`); pin all base image tags to digests (`python:3.11-slim@sha256:...`); run `docker scout cves` and resolve HIGH / CRITICAL findings; verify final image size is minimized via multi-stage build
+- [x] **Docker Image Hardening** — switch `Dockerfile` to a non-root user (`USER agentium:agentium`); pin all base image tags to digests (`python:3.11-slim@sha256:...`); run `docker scout cves` and resolve HIGH / CRITICAL findings; verify final image size is minimized via multi-stage build
 
 #### Final Smoke Test
 
-- [ ] Deploy to a clean staging environment via `docker-compose up --build` with no pre-existing volumes; confirm all containers reach `healthy` status within 60 seconds
-- [ ] Verify all 5 monitoring health rings (`Agents / Tasks / Workflows / Events / Budget`) show green in `MonitoringPage.tsx` under no-load conditions
-- [ ] Confirm `/docs` OpenAPI spec loads without errors and all endpoints are fully documented with example payloads
+- [x] Deploy to a clean staging environment via `docker-compose up --build` with no pre-existing volumes; confirm all containers reach `healthy` status within 60 seconds
+- [x] Verify all 5 monitoring health rings (`Agents / Tasks / Workflows / Events / Budget`) show green in `MonitoringPage.tsx` under no-load conditions
+- [x] Confirm `/docs` OpenAPI spec loads without errors and all endpoints are fully documented with example payloads
 - [ ] Run `npx lighthouse-ci` in CI against the staging frontend; enforce ≥ 90 score on Performance, Accessibility, and Best Practices
 - [ ] Execute `alembic downgrade base && alembic upgrade head` against the staging database to verify full migration reversibility with no data errors
 

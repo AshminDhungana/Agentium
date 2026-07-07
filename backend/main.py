@@ -615,6 +615,7 @@ app.include_router(knowledge_routes.router,          prefix="/api/v1")
     summary="Health check",
     description="Check the system and database health status.",
     responses=build_responses(None),
+    tags=["System"],
 )
 async def health_check_api():
     """Health check endpoint."""
@@ -637,6 +638,7 @@ async def health_check_api():
     summary="Create agent",
     description="Create a new agent with governance compliance.",
     responses=build_responses(None),
+    tags=["Agents"],
 )
 async def create_agent(
     role: str,
@@ -684,6 +686,7 @@ async def create_agent(
     summary="List agents",
     description="List all agents with optional status and tier filters.",
     responses=build_responses(None),
+    tags=["Agents"],
 )
 async def list_agents(
     tier: int = None,
@@ -712,6 +715,7 @@ async def list_agents(
     summary="Get agent details",
     description="Retrieve detailed configuration and statistics for a specific agent.",
     responses=build_responses(None),
+    tags=["Agents"],
 )
 async def get_agent(
     agentium_id: str,
@@ -731,6 +735,7 @@ async def get_agent(
     summary="Get active constitution",
     description="Retrieve the current active version of the constitution rules.",
     responses=build_responses(None),
+    tags=["Constitution"],
 )
 async def get_constitution(
     db: Session = Depends(get_db),
@@ -752,6 +757,7 @@ async def get_constitution(
     summary="Update constitution",
     description="Update constitution preamble, articles, prohibited actions, or sovereign preferences.",
     responses=build_responses(None),
+    tags=["Constitution"],
 )
 async def update_constitution(
     updates: ConstitutionUpdateRequest,
@@ -857,6 +863,7 @@ async def update_constitution(
     summary="Get system health",
     description="Get comprehensive monitoring health status of the system.",
     responses=build_responses(None),
+    tags=["Monitoring"],
 )
 async def get_system_health(db: Session = Depends(get_db)):
     """Get comprehensive system health status."""
@@ -869,6 +876,7 @@ async def get_system_health(db: Session = Depends(get_db)):
     summary="Get idle governance status",
     description="Retrieve status metrics of the background idle governance engine.",
     responses=build_responses(None),
+    tags=["Governance"],
 )
 async def get_idle_governance_status():
     """Get current status of idle governance engine."""
@@ -890,6 +898,7 @@ async def get_idle_governance_status():
     summary="Pause idle governance",
     description="Pause the idle governance loop manually.",
     responses=build_responses(None),
+    tags=["Governance"],
 )
 async def pause_idle_governance():
     """Manually pause idle governance (for debugging/maintenance)."""
@@ -904,6 +913,7 @@ async def pause_idle_governance():
     summary="Resume idle governance",
     description="Resume the idle governance loop manually.",
     responses=build_responses(None),
+    tags=["Governance"],
 )
 async def resume_idle_governance(db: Session = Depends(get_db)):
     """Manually resume idle governance."""
@@ -920,6 +930,7 @@ async def resume_idle_governance(db: Session = Depends(get_db)):
     summary="Get token status",
     description="Retrieve token optimizer limits and idle budget status.",
     responses=build_responses(None),
+    tags=["Status"],
 )
 async def get_token_status():
     """Get token optimizer and budget status."""
@@ -937,6 +948,7 @@ async def get_token_status():
     summary="Get model allocation status",
     description="Retrieve model allocation statistics and assignments.",
     responses=build_responses(None),
+    tags=["Status"],
 )
 async def get_model_status():
     """Get model allocation status."""
@@ -953,6 +965,7 @@ async def get_model_status():
     summary="Get MCP status",
     description="Retrieve summary statistics of registered Model Context Protocol tools.",
     responses=build_responses(None),
+    tags=["MCP Tools"],
 )
 async def get_mcp_status():
     """

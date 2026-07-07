@@ -487,7 +487,7 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
                                             </p>
 
                                             {provider.popular_models && provider.popular_models.length > 0 && (
-                                                <div className="flex flex-wrap gap-1.5" aria-label={`Popular models for ${provider.display_name}`}>
+                                                <div className="flex flex-wrap gap-1.5" role="list" aria-label={`Popular models for ${provider.display_name}`}>
                                                     {provider.popular_models.slice(0, 3).map((model, idx) => (
                                                         <span
                                                             key={idx}

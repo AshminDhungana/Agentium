@@ -2,8 +2,11 @@
 # Agentium Frontend Dockerfile ━━ Multi-Stage Hardened
 # ═════════════════════════════════════════════════════════════════
 
-# ── Build stage ──
+# Global ARGs (must come before first FROM to be usable in FROM lines)
 ARG NODE_DIGEST=sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293
+ARG NGINX_DIGEST=sha256:54f2a904c251d5a34adf545a72d32515a15e08418dae0266e23be2e18c66fefa
+
+# ── Build stage ──
 FROM node:20-alpine@${NODE_DIGEST} AS builder
 
 WORKDIR /app
@@ -16,7 +19,6 @@ RUN npm run build
 
 
 # ── Production stage ──
-ARG NGINX_DIGEST=sha256:54f2a904c251d5a34adf545a72d32515a15e08418dae0266e23be2e18c66fefa
 FROM nginx:alpine@${NGINX_DIGEST}
 
 # Create non-root user for nginx (keep UID 101 to match nginx:alpine default user UID)

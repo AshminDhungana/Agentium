@@ -131,7 +131,7 @@ export function PageSkeleton({ variant, count, columns = 3 }: PageSkeletonProps)
     const itemCount = count ?? (variant === 'table' ? 8 : variant === 'cards' ? 6 : 5);
 
     return (
-        <div className="space-y-6 p-6" aria-busy="true" aria-label="Loading…">
+        <div className="space-y-6 p-6" aria-busy="true" role="region" aria-label="Loading content">
             {/* Page title skeleton */}
             <div className="flex items-center justify-between">
                 <Pulse className="h-7 w-48" />
