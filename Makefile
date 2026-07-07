@@ -1,6 +1,6 @@
 # Agentium Makefile
 
-.PHONY: up down restart voice-reinstall voice-logs voice-status uninstall-voice test hallmark test-integration load-test benchmark perf-gate test-staging audit audit-fix
+.PHONY: up down restart voice-reinstall voice-logs voice-status uninstall-voice test hallmark test-integration load-test benchmark perf-gate test-staging audit audit-fix pin-digests docker-scout
 
 # -- Normal start -- voice bridge installs automatically --
 up:
@@ -112,3 +112,24 @@ audit-fix:
 	@cd frontend && npm audit fix
 	@echo "==> Re-running audits..."
 	@make audit
+
+# ── Docker Image Hardening (Phase 18.5) ──────────────────────────────
+
+## Pin base image digests to .pinned-digests.env
+pin-digests:
+	@echo "==> Pinning base image digests..."
+	@bash scripts/pin-digests.sh
+
+## Run docker scout CVE scan on all built images (fails on HIGH/CRITICAL)
+docker-scout:
+	@echo "==> Running docker scout on all images..."
+	@bash scripts/docker-scout.sh high
+
+## Build all images locally before scanning
+docker-scout-build: pin-digests
+	@echo "==> Building all Docker images..."
+	@docker build -t agentium-backend:privileged -f backend/Dockerfile.privileged backend/
+	@docker build -t agentium-frontend:latest -f frontend/Dockerfile frontend/
+	@docker build -t agentium-whatsapp:latest -f bridges/whatsapp/Dockerfile bridges/whatsapp/
+	@echo "==> Built all images. Running docker scout..."
+	@bash scripts/docker-scout.sh high

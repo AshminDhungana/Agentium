@@ -1,30 +1,39 @@
-# Build stage
-FROM node:20-alpine AS builder
+# ═════════════════════════════════════════════════════════════════
+# Agentium Frontend Dockerfile ━━ Multi-Stage Hardened
+# ═════════════════════════════════════════════════════════════════
+
+# ── Build stage ──
+FROM node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293 AS builder
 
 WORKDIR /app
 
-# Copy package files FIRST (this layer is cached unless package.json changes)
 COPY package.json package-lock.json* ./
-
-# Install dependencies AND types in ONE RUN command
-# This prevents cache invalidation from the extra npm install
 RUN npm install && npm install --save-dev @types/node
 
-# Copy source code (cache preserved if package files unchanged)
 COPY . .
-
-# Build for production
 RUN npm run build
 
 
-# Production stage
-FROM nginx:alpine
+# ── Production stage ──
+FROM nginx:alpine@sha256:54f2a904c251d5a34adf545a72d32515a15e08418dae0266e23be2e18c66fefa
+
+# Create non-root user for nginx (keep UID 101 to match nginx:alpine default user UID)
+RUN adduser -S -G www-data -u 101 agentium-nginx 2>/dev/null || true && \
+    mkdir -p /var/cache/nginx /var/log/nginx /run && \
+    chown -R 101:www-data /var/cache/nginx /var/log/nginx /usr/share/nginx/html /run
 
 # Copy built files from builder
-COPY --from=builder /app/dist /usr/share/nginx/html
+COPY --from=builder --chown=101:www-data /app/dist /usr/share/nginx/html
 
 # Copy nginx config
-COPY --from=builder /app/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=builder --chown=101:www-data /app/nginx.conf /etc/nginx/conf.d/default.conf
+
+# Set worker processes to auto and pid path for non-root
+RUN sed -i 's/user  nginx;/user agentium-nginx;/g' /etc/nginx/nginx.conf && \
+    sed -i '/^pid/d' /etc/nginx/nginx.conf && \
+    echo 'pid /tmp/nginx.pid;' >> /etc/nginx/nginx.conf
+
+USER 101
 
 EXPOSE 3000
 

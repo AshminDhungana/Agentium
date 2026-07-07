@@ -2,7 +2,7 @@
 # Agentium Backend Dockerfile
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-FROM python:3.11-slim as builder
+FROM python:3.11-slim-bookworm@sha256:f5ef0344c9886ff24d34797578d5d7dd6e8911ae0fe5962bb55d0f89603ec361 AS builder
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -41,7 +41,7 @@ RUN pip install --no-cache-dir --default-timeout=300 -r requirements.txt
 # Production Stage
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-FROM python:3.11-slim
+FROM python:3.11-slim-bookworm@sha256:f5ef0344c9886ff24d34797578d5d7dd6e8911ae0fe5962bb55d0f89603ec361
 
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
