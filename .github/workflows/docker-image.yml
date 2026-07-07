@@ -34,6 +34,17 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Read pinned digests
+        id: digests
+        run: |
+          if [ -f .pinned-digests.env ]; then
+            source .pinned-digests.env
+            echo "python=${PYTHON_DIGEST}" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::No .pinned-digests.env found; using default. Run 'make pin-digests' locally."
+            echo "python=sha256:f5ef0344c9886ff24d34797578d5d7dd6e8911ae0fe5962bb55d0f89603ec361" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -83,6 +94,8 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           platforms: ${{ matrix.platform }}
+          build-args: |
+            PYTHON_DIGEST=${{ steps.digests.outputs.python }}
 
       - name: Export digest
         if: github.event_name != 'pull_request'
@@ -138,13 +151,13 @@ jobs:
           # Pull the per-platform images
           AMD64_IMAGE="${{ env.REGISTRY }}/${{ steps.lowercase.outputs.IMAGE_PREFIX_LOWER }}/backend:${{ github.sha }}-linux-amd64"
           ARM64_IMAGE="${{ env.REGISTRY }}/${{ steps.lowercase.outputs.IMAGE_PREFIX_LOWER }}/backend:${{ github.sha }}-linux-arm64"
-          
+
           # Build tag arguments from metadata output (convert each tag to -t flag)
           TAG_ARGS=""
           while IFS= read -r tag; do
             [ -n "$tag" ] && TAG_ARGS="$TAG_ARGS -t $tag"
           done <<< "${{ steps.meta.outputs.tags }}"
-          
+
           # Create manifest list with all tags
           docker buildx imagetools create \
             -t ${{ env.REGISTRY }}/${{ steps.lowercase.outputs.IMAGE_PREFIX_LOWER }}/backend:${{ github.sha }} \
@@ -172,6 +185,19 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Read pinned digests
+        id: digests
+        run: |
+          if [ -f .pinned-digests.env ]; then
+            source .pinned-digests.env
+            echo "node=${NODE_DIGEST}" >> "$GITHUB_OUTPUT"
+            echo "nginx=${NGINX_DIGEST}" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::No .pinned-digests.env found; using defaults."
+            echo "node=sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293" >> "$GITHUB_OUTPUT"
+            echo "nginx=sha256:54f2a904c251d5a34adf545a72d32515a15e08418dae0266e23be2e18c66fefa" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -223,6 +249,8 @@ jobs:
           cache-to: type=gha,mode=max
           build-args: |
             VITE_API_URL=${{ vars.VITE_API_URL || 'http://localhost:8000' }}
+            NODE_DIGEST=${{ steps.digests.outputs.node }}
+            NGINX_DIGEST=${{ steps.digests.outputs.nginx }}
           platforms: ${{ matrix.platform }}
 
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -272,13 +300,13 @@ jobs:
           # Pull the per-platform images
           AMD64_IMAGE="${{ env.REGISTRY }}/${{ steps.lowercase.outputs.IMAGE_PREFIX_LOWER }}/frontend:${{ github.sha }}-linux-amd64"
           ARM64_IMAGE="${{ env.REGISTRY }}/${{ steps.lowercase.outputs.IMAGE_PREFIX_LOWER }}/frontend:${{ github.sha }}-linux-arm64"
-          
+
           # Build tag arguments from metadata output (convert each tag to -t flag)
           TAG_ARGS=""
           while IFS= read -r tag; do
             [ -n "$tag" ] && TAG_ARGS="$TAG_ARGS -t $tag"
           done <<< "${{ steps.meta.outputs.tags }}"
-          
+
           # Create manifest list with all tags
           docker buildx imagetools create \
             -t ${{ env.REGISTRY }}/${{ steps.lowercase.outputs.IMAGE_PREFIX_LOWER }}/frontend:${{ github.sha }} \
@@ -286,9 +314,9 @@ jobs:
             ${AMD64_IMAGE} \
             ${ARM64_IMAGE}
 
-
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   # Build & Push WhatsApp Bridge Image (Multi-Platform)
+  # Native runners for AMD64 and ARM64, then merge
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   build-whatsapp-bridge:
     strategy:
@@ -306,6 +334,17 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Read pinned digests
+        id: digests
+        run: |
+          if [ -f .pinned-digests.env ]; then
+            source .pinned-digests.env
+            echo "node=${NODE_DIGEST}" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::No .pinned-digests.env found; using default."
+            echo "node=sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -355,6 +394,8 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          build-args: |
+            NODE_DIGEST=${{ steps.digests.outputs.node }}
           platforms: ${{ matrix.platform }}
 
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -416,7 +457,7 @@ jobs:
             ${ARM64_IMAGE}
 
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  # Security Scan with Trivy
+  # Security Scan with Docker Scout
   # Runs after manifests are merged
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   security-scan:
@@ -425,15 +466,14 @@ jobs:
     if: github.event_name != 'pull_request'
     permissions:
       contents: read
+      packages: write
       security-events: write
 
     steps:
-      - name: Lowercase image reference
-        id: image
+      - name: Lowercase image prefix
+        id: lowercase
         run: |
-          IMAGE_PREFIX_LOWER="${IMAGE_PREFIX,,}"
-          IMAGE="${{ env.REGISTRY }}/${IMAGE_PREFIX_LOWER}/backend:latest"
-          echo "ref=${IMAGE}" >> "$GITHUB_OUTPUT"
+          echo "IMAGE_PREFIX_LOWER=${IMAGE_PREFIX,,}" >> "$GITHUB_OUTPUT"
         env:
           IMAGE_PREFIX: ${{ env.IMAGE_PREFIX }}
 
@@ -444,18 +484,27 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
+      - name: Docker Scout Scan — Backend
+        uses: docker/scout-action@v1
         with:
-          image-ref: ${{ steps.image.outputs.ref }}
-          format: sarif
-          output: trivy-results.sarif
-          exit-code: '0'
+          command: cves
+          image: ${{ env.REGISTRY }}/${{ steps.lowercase.outputs.IMAGE_PREFIX_LOWER }}/backend:${{ github.sha }}
+          only-severity: high,critical
+          sarif-file: backend-scout-results.sarif
 
-      - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v3
+      - name: Docker Scout Scan — Frontend
+        uses: docker/scout-action@v1
         with:
-          sarif_file: trivy-results.sarif
+          command: cves
+          image: ${{ env.REGISTRY }}/${{ steps.lowercase.outputs.IMAGE_PREFIX_LOWER }}/frontend:${{ github.sha }}
+          only-severity: high,critical
+
+      - name: Docker Scout Scan — WhatsApp Bridge
+        uses: docker/scout-action@v1
+        with:
+          command: cves
+          image: ${{ env.REGISTRY }}/${{ steps.lowercase.outputs.IMAGE_PREFIX_LOWER }}/whatsapp-bridge:${{ github.sha }}
+          only-severity: high,critical
 
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   # Update Docker Compose with new image references
@@ -483,7 +532,7 @@ jobs:
             VERSION="${GITHUB_REF#refs/heads/}"
           fi
           echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
-      
+
       - name: Lowercase image references
         id: lowercase
         run: |
@@ -495,7 +544,7 @@ jobs:
         env:
           VERSION: ${{ steps.version.outputs.VERSION }}
           REGISTRY: ${{ env.REGISTRY }}
-          IMAGE_PREFIX: ${{ steps.lowercase.outputs.IMAGE_PREFIX_LOWER }} 
+          IMAGE_PREFIX: ${{ steps.lowercase.outputs.IMAGE_PREFIX_LOWER }}
         run: |
           BACKEND_IMAGE="${REGISTRY}/${IMAGE_PREFIX}/backend:${VERSION}"
           FRONTEND_IMAGE="${REGISTRY}/${IMAGE_PREFIX}/frontend:${VERSION}"
