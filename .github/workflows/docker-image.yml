@@ -539,11 +539,26 @@ jobs:
           exit-code: '0'
           ignore-unfixed: true
 
-      - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v3
+      - name: Upload Backend Trivy scan results
+        uses: github/codeql-action/upload-sarif@v4
         if: always()
         with:
-          sarif_file: '.'
+          sarif_file: 'backend-scout-results.sarif'
+          category: 'trivy-backend'
+
+      - name: Upload Frontend Trivy scan results
+        uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        with:
+          sarif_file: 'frontend-scout-results.sarif'
+          category: 'trivy-frontend'
+
+      - name: Upload WhatsApp Bridge Trivy scan results
+        uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        with:
+          sarif_file: 'whatsapp-bridge-scout-results.sarif'
+          category: 'trivy-whatsapp-bridge'
 
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   # Update Docker Compose with new image references
