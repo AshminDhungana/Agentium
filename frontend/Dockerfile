@@ -3,11 +3,11 @@
 # ═════════════════════════════════════════════════════════════════
 
 # Global ARGs (must come before first FROM to be usable in FROM lines)
-ARG NODE_DIGEST=sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293
-ARG NGINX_DIGEST=sha256:54f2a904c251d5a34adf545a72d32515a15e08418dae0266e23be2e18c66fefa
+ARG NODE_BASE=node:20-alpine
+ARG NGINX_BASE=nginx:alpine
 
 # ── Build stage ──
-FROM node:20-alpine@${NODE_DIGEST} AS builder
+FROM ${NODE_BASE} AS builder
 
 WORKDIR /app
 
@@ -19,7 +19,7 @@ RUN npm run build
 
 
 # ── Production stage ──
-FROM nginx:alpine@${NGINX_DIGEST}
+FROM ${NGINX_BASE}
 
 # Create non-root user for nginx (keep UID 101 to match nginx:alpine default user UID)
 RUN adduser -S -G www-data -u 101 agentium-nginx 2>/dev/null || true && \

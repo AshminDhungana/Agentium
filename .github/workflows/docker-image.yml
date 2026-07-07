@@ -37,13 +37,20 @@ jobs:
       - name: Read pinned digests
         id: digests
         run: |
-          if [ -f .pinned-digests.env ]; then
-            source .pinned-digests.env
-            echo "python=${PYTHON_DIGEST}" >> "$GITHUB_OUTPUT"
-          else
-            echo "::warning::No .pinned-digests.env found; using default. Run 'make pin-digests' locally."
-            echo "python=sha256:74012ddba2bc217440b5dc8ea21012baa9ef20eab68bccfd98f269e0b1da581f" >> "$GITHUB_OUTPUT"
+          python_base="python:3.11-slim-bookworm"
+          if [ "${{ matrix.platform }}" == "linux/amd64" ]; then
+            if [ -f .pinned-digests.env ]; then
+              source .pinned-digests.env
+              if [ -n "${PYTHON_DIGEST:-}" ]; then
+                python_base="python:3.11-slim-bookworm@${PYTHON_DIGEST}"
+              fi
+            else
+              echo "::warning::No .pinned-digests.env found; using default. Run 'make pin-digests' locally."
+              python_base="python:3.11-slim-bookworm@sha256:74012ddba2bc217440b5dc8ea21012baa9ef20eab68bccfd98f269e0b1da581f"
+            fi
           fi
+          echo "python_base=${python_base}" >> "$GITHUB_OUTPUT"
+
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -95,7 +102,7 @@ jobs:
           cache-to: type=gha,mode=max
           platforms: ${{ matrix.platform }}
           build-args: |
-            PYTHON_DIGEST=${{ steps.digests.outputs.python }}
+            PYTHON_BASE=${{ steps.digests.outputs.python_base }}
 
       - name: Export digest
         if: github.event_name != 'pull_request'
@@ -189,15 +196,26 @@ jobs:
       - name: Read pinned digests
         id: digests
         run: |
-          if [ -f .pinned-digests.env ]; then
-            source .pinned-digests.env
-            echo "node=${NODE_DIGEST}" >> "$GITHUB_OUTPUT"
-            echo "nginx=${NGINX_DIGEST}" >> "$GITHUB_OUTPUT"
-          else
-            echo "::warning::No .pinned-digests.env found; using defaults."
-            echo "node=sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293" >> "$GITHUB_OUTPUT"
-            echo "nginx=sha256:54f2a904c251d5a34adf545a72d32515a15e08418dae0266e23be2e18c66fefa" >> "$GITHUB_OUTPUT"
+          node_base="node:20-alpine"
+          nginx_base="nginx:alpine"
+          if [ "${{ matrix.platform }}" == "linux/amd64" ]; then
+            if [ -f .pinned-digests.env ]; then
+              source .pinned-digests.env
+              if [ -n "${NODE_DIGEST:-}" ]; then
+                node_base="node:20-alpine@${NODE_DIGEST}"
+              fi
+              if [ -n "${NGINX_DIGEST:-}" ]; then
+                nginx_base="nginx:alpine@${NGINX_DIGEST}"
+              fi
+            else
+              echo "::warning::No .pinned-digests.env found; using defaults."
+              node_base="node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293"
+              nginx_base="nginx:alpine@sha256:54f2a904c251d5a34adf545a72d32515a15e08418dae0266e23be2e18c66fefa"
+            fi
           fi
+          echo "node_base=${node_base}" >> "$GITHUB_OUTPUT"
+          echo "nginx_base=${nginx_base}" >> "$GITHUB_OUTPUT"
+
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -249,8 +267,8 @@ jobs:
           cache-to: type=gha,mode=max
           build-args: |
             VITE_API_URL=${{ vars.VITE_API_URL || 'http://localhost:8000' }}
-            NODE_DIGEST=${{ steps.digests.outputs.node }}
-            NGINX_DIGEST=${{ steps.digests.outputs.nginx }}
+            NODE_BASE=${{ steps.digests.outputs.node_base }}
+            NGINX_BASE=${{ steps.digests.outputs.nginx_base }}
           platforms: ${{ matrix.platform }}
 
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -338,13 +356,20 @@ jobs:
       - name: Read pinned digests
         id: digests
         run: |
-          if [ -f .pinned-digests.env ]; then
-            source .pinned-digests.env
-            echo "node=${NODE_DIGEST}" >> "$GITHUB_OUTPUT"
-          else
-            echo "::warning::No .pinned-digests.env found; using default."
-            echo "node=sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293" >> "$GITHUB_OUTPUT"
+          node_base="node:20-alpine"
+          if [ "${{ matrix.platform }}" == "linux/amd64" ]; then
+            if [ -f .pinned-digests.env ]; then
+              source .pinned-digests.env
+              if [ -n "${NODE_DIGEST:-}" ]; then
+                node_base="node:20-alpine@${NODE_DIGEST}"
+              fi
+            else
+              echo "::warning::No .pinned-digests.env found; using default."
+              node_base="node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293"
+            fi
           fi
+          echo "node_base=${node_base}" >> "$GITHUB_OUTPUT"
+
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -395,7 +420,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
-            NODE_DIGEST=${{ steps.digests.outputs.node }}
+            NODE_BASE=${{ steps.digests.outputs.node_base }}
           platforms: ${{ matrix.platform }}
 
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

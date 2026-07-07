@@ -4,6 +4,9 @@
 set -euo pipefail
 
 OUTFILE=".pinned-digests.env"
+# NOTE: These digests are architecture-specific. On Linux/AMD64 CI runners, the
+# workflow passes the pinned digest. On other platforms (ARM64), the multi-arch
+# tag is used directly without pinning.
 
 echo "🐍 Fetching python:3.11-slim-bookworm digest..."
 PYTHON_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' python:3.11-slim-bookworm 2>/dev/null | cut -d'@' -f2)
