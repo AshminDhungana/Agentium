@@ -510,7 +510,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run Trivy vulnerability scanner — Backend
-        uses: aquasecurity/trivy-action@0.20.0
+        uses: aquasecurity/trivy-action@master
         with:
           image-ref: ${{ env.REGISTRY }}/${{ steps.lowercase.outputs.IMAGE_PREFIX_LOWER }}/backend:${{ github.sha }}
           format: 'sarif'
@@ -520,7 +520,7 @@ jobs:
           ignore-unfixed: true
 
       - name: Run Trivy vulnerability scanner — Frontend
-        uses: aquasecurity/trivy-action@0.20.0
+        uses: aquasecurity/trivy-action@master
         with:
           image-ref: ${{ env.REGISTRY }}/${{ steps.lowercase.outputs.IMAGE_PREFIX_LOWER }}/frontend:${{ github.sha }}
           format: 'sarif'
@@ -530,7 +530,7 @@ jobs:
           ignore-unfixed: true
 
       - name: Run Trivy vulnerability scanner — WhatsApp Bridge
-        uses: aquasecurity/trivy-action@0.20.0
+        uses: aquasecurity/trivy-action@master
         with:
           image-ref: ${{ env.REGISTRY }}/${{ steps.lowercase.outputs.IMAGE_PREFIX_LOWER }}/whatsapp-bridge:${{ github.sha }}
           format: 'sarif'
