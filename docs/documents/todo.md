@@ -808,7 +808,7 @@ Build a self-governing AI ecosystem where agents operate under constitutional la
 - [x] Deploy to a clean staging environment via `docker-compose up --build` with no pre-existing volumes; confirm all containers reach `healthy` status within 60 seconds
 - [x] Verify all 5 monitoring health rings (`Agents / Tasks / Workflows / Events / Budget`) show green in `MonitoringPage.tsx` under no-load conditions
 - [x] Confirm `/docs` OpenAPI spec loads without errors and all endpoints are fully documented with example payloads
-- [ ] Run `npx lighthouse-ci` in CI against the staging frontend; enforce ≥ 90 score on Performance, Accessibility, and Best Practices
+- [x] Run `npx lighthouse-ci` in CI against the staging frontend; enforce ≥ 90 score on Performance, Accessibility, and Best Practices
 - [ ] Execute `alembic downgrade base && alembic upgrade head` against the staging database to verify full migration reversibility with no data errors
 
 ---
