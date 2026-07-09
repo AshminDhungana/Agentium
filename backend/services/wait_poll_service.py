@@ -24,6 +24,7 @@ from backend.models.entities.wait_condition import (
     WaitStrategy,
 )
 from backend.models.entities.task import Task, TaskStatus
+from backend.models.entities.remote_execution import RemoteExecutionRecord, ExecutionStatus
 
 logger = logging.getLogger(__name__)
 
@@ -185,6 +186,8 @@ class WaitPollService:
             # Pure timeout — already handled by is_overdue(); if we get here,
             # it hasn't expired yet.
             return False, None
+        elif strategy == WaitStrategy.EXECUTION:
+            return cls._check_execution(cfg)
         elif strategy in (WaitStrategy.WEBHOOK, WaitStrategy.MANUAL):
             # These are resolved externally; nothing to poll.
             return False, None
@@ -296,6 +299,54 @@ class WaitPollService:
 
         except Exception as exc:
             logger.debug("Redis poll failed for key '%s': %s", key, exc)
+            return False, None
+
+    # ── Execution ───────────────────────────────────────────────────────────
+
+    @classmethod
+    def _check_execution(cls, cfg: Dict) -> Tuple[bool, Optional[Dict]]:
+        """
+        Poll a RemoteExecutionRecord by execution_id.
+
+        Config keys:
+          execution_id   (required) — the execution_id returned by RemoteExecutorService
+        """
+        execution_id = cfg.get("execution_id")
+        if not execution_id:
+            logger.warning("_check_execution: missing execution_id in config")
+            return False, None
+
+        # Query database for the execution record
+        from backend.models.database import get_db_context
+        try:
+            with get_db_context() as db:
+                record = db.query(RemoteExecutionRecord).filter(
+                    RemoteExecutionRecord.execution_id == execution_id
+                ).first()
+
+                if not record:
+                    logger.debug("_check_execution: execution %s not yet in DB", execution_id)
+                    return False, None
+
+                status = record.status
+                if status == ExecutionStatus.COMPLETED:
+                    return True, {
+                        "execution_id": execution_id,
+                        "status": "completed",
+                        "summary": record.summary,
+                        "execution_time_ms": record.execution_time_ms,
+                    }
+                elif status in (ExecutionStatus.FAILED, ExecutionStatus.TIMEOUT, ExecutionStatus.CANCELLED):
+                    return True, {
+                        "execution_id": execution_id,
+                        "status": "failed",
+                        "error": record.error_message,
+                    }
+                else:
+                    # PENDING, RUNNING → still waiting
+                    return False, None
+        except Exception as exc:
+            logger.debug("_check_execution failed for %s: %s", execution_id, exc)
             return False, None
 
     # ─────────────────────────────────────────────────────────────────────
