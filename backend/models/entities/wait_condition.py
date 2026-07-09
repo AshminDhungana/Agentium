@@ -20,6 +20,7 @@ class WaitStrategy(str, enum.Enum):
     TIMEOUT     = "timeout"      # Pure time-based wait (no external check)
     WEBHOOK     = "webhook"      # Resolved by an inbound webhook call
     MANUAL      = "manual"       # Resolved manually via API
+    EXECUTION   = "execution"    # Wait for a RemoteExecutionRecord to complete
 
 
 class WaitConditionStatus(str, enum.Enum):
