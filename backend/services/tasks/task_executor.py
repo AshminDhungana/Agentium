@@ -1231,6 +1231,49 @@ def poll_wait_conditions():
             return {"error": str(exc)}
 
 
+@celery_app.task(name='agentium.tasks.task_executor.poll_execution_conditions')
+def poll_execution_conditions():
+    """Poll wait conditions with EXECUTION strategy every 20 seconds."""
+    from backend.services.wait_poll_service import WaitPollService
+    from backend.models.entities.wait_condition import WaitCondition, WaitStrategy, WaitConditionStatus
+
+    with get_task_db() as db:
+        try:
+            # Only fetch ACTIVE EXECUTION conditions
+            active = (
+                db.query(WaitCondition)
+                .filter(
+                    WaitCondition.status == WaitConditionStatus.ACTIVE,
+                    WaitCondition.strategy == WaitStrategy.EXECUTION,
+                )
+                .all()
+            )
+
+            summary = {"resolved": 0, "expired": 0, "errors": 0, "skipped": 0}
+
+            for condition in active:
+                try:
+                    result = WaitPollService._evaluate(db, condition)
+                    if result == "resolved":
+                        summary["resolved"] += 1
+                    elif result == "expired":
+                        summary["expired"] += 1
+                    else:
+                        summary["skipped"] += 1
+                except Exception as exc:
+                    summary["errors"] += 1
+                    logger.error("Error evaluating EXECUTION WaitCondition %s: %s",
+                                 condition.agentium_id, exc, exc_info=True)
+
+            db.commit()
+            if any(v > 0 for v in summary.values()):
+                logger.info(f"poll_execution_conditions: {summary}")
+            return summary
+        except Exception as exc:
+            logger.error(f"poll_execution_conditions failed: {exc}", exc_info=True)
+            return {"error": str(exc)}
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # Phase 16.1 — Slow Query Logging
 # ══════════════════════════════════════════════════════════════════════════════

@@ -185,6 +185,12 @@ celery_app.conf.beat_schedule = {
         'schedule': 30.0,   # every 30 seconds — matches default poll_interval_seconds
     },
 
+    # ── Phase 19.2: Execution Wait Timer ─────────────────────────────────────
+    'poll-execution-conditions': {
+        'task': 'agentium.tasks.task_executor.poll_execution_conditions',
+        'schedule': 20.0,   # every 20 seconds — matches spec "at most every 20 seconds"
+    },
+
     # ── Phase 16.1: Database Connection Pool Tuning & Slow Query Logging ──────
     'log-slow-query-summary-daily': {
         'task': 'agentium.tasks.task_executor.log_slow_query_summary_daily',

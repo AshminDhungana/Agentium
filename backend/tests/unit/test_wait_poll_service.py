@@ -1,7 +1,7 @@
 """Unit tests for WaitPollService — EXECUTION strategy extends Phase 16 wait & poll."""
 import pytest
 from unittest.mock import MagicMock, patch
-from backend.models.entities.wait_condition import WaitStrategy, WaitConditionStatus
+from backend.models.entities.wait_condition import WaitCondition, WaitConditionStatus, WaitStrategy
 from backend.models.entities.remote_execution import RemoteExecutionRecord, ExecutionStatus
 from backend.services.wait_poll_service import WaitPollService
 
@@ -90,3 +90,30 @@ class TestCheckExecution:
         result = WaitPollService._check_execution(cfg)
         assert result[0] is False
         assert result[1] is None
+
+
+class TestPollExecutionConditions:
+    @patch("backend.services.tasks.task_executor.get_task_db")
+    def test_poll_execution_conditions_only_executions(self, mock_get_db):
+        """poll_execution_conditions only evaluates EXECUTION strategy conditions."""
+        from backend.services.tasks.task_executor import poll_execution_conditions
+
+        # Setup mock
+        mock_db = MagicMock()
+        mock_get_db.return_value.__enter__.return_value = mock_db
+
+        # Create mock conditions - only EXECUTION should be queried
+        mock_exec_cond = MagicMock(spec=WaitCondition)
+        mock_exec_cond.agentium_id = "WC00001"
+        mock_exec_cond.strategy = WaitStrategy.EXECUTION
+
+        mock_db.query.return_value.filter.return_value.all.return_value = [mock_exec_cond]
+
+        # Call the task
+        result = poll_execution_conditions()
+
+        # Verify result structure
+        assert "resolved" in result
+        assert "expired" in result
+        assert "errors" in result
+        assert "skipped" in result
