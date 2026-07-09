@@ -29,6 +29,8 @@ class TestChatServiceMediaInterception:
         admin = User(
             id="user-admin-123",
             username="admin",
+            email="admin@agentium.test",
+            hashed_password="fake-hash-for-test",
             is_admin=True,
             is_active=True
         )
@@ -77,7 +79,7 @@ class TestChatServiceMediaInterception:
         """Bare https://.../image.jpg URL gets replaced."""
         head = HeadOfCouncil(agentium_id="HEAD00001", name="Test", is_active=True)
         seeded_db.add(head)
-        admin = User(id="user-admin-123", username="admin", is_admin=True, is_active=True)
+        admin = User(id="user-admin-123", username="admin", email="admin@agentium.test", hashed_password="fake-hash-for-test", is_admin=True, is_active=True)
         seeded_db.add(admin)
         seeded_db.commit()
 
@@ -116,7 +118,7 @@ class TestChatServiceMediaInterception:
         """Text without media URLs passes through unchanged."""
         head = HeadOfCouncil(agentium_id="HEAD00001", name="Test", is_active=True)
         seeded_db.add(head)
-        admin = User(id="user-admin-123", username="admin", is_admin=True, is_active=True)
+        admin = User(id="user-admin-123", username="admin", email="admin@agentium.test", hashed_password="fake-hash-for-test", is_admin=True, is_active=True)
         seeded_db.add(admin)
         seeded_db.commit()
 
@@ -145,7 +147,7 @@ class TestChatServiceMediaInterception:
         """Failed media download preserves original URL, doesn't crash."""
         head = HeadOfCouncil(agentium_id="HEAD00001", name="Test", is_active=True)
         seeded_db.add(head)
-        admin = User(id="user-admin-123", username="admin", is_admin=True, is_active=True)
+        admin = User(id="user-admin-123", username="admin", email="admin@agentium.test", hashed_password="fake-hash-for-test", is_admin=True, is_active=True)
         seeded_db.add(admin)
         seeded_db.commit()
 
@@ -181,7 +183,7 @@ class TestChatServiceMediaInterception:
         """New storage URLs stored in ChatMessage metadata.media_urls."""
         head = HeadOfCouncil(agentium_id="HEAD00001", name="Test", is_active=True)
         seeded_db.add(head)
-        admin = User(id="user-admin-123", username="admin", is_admin=True, is_active=True)
+        admin = User(id="user-admin-123", username="admin", email="admin@agentium.test", hashed_password="fake-hash-for-test", is_admin=True, is_active=True)
         seeded_db.add(admin)
         seeded_db.commit()
 
