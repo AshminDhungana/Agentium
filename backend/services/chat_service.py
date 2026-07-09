@@ -4,6 +4,7 @@ Handles message processing, task creation, context management, and reincarnation
 """
 
 import logging
+import httpx
 from datetime import datetime
 from typing import Dict, Any, Optional
 from sqlalchemy.orm import Session
@@ -15,6 +16,7 @@ from backend.services.context_manager import context_manager
 from backend.services.reincarnation_service import reincarnation_service
 from backend.services.clarification_service import clarification_service
 from backend.services.model_provider import ModelService
+from backend.services.media_interceptor import MediaInterceptor
 from backend.core.llm_client import LLMClient
 from backend.models.entities.user_config import ConnectionStatus
 
@@ -204,8 +206,26 @@ Address the Sovereign respectfully. If they issue a command that requires execut
         tokens_used = result.get("tokens_used", 0)
         context_status = context_manager.update_usage(head.agentium_id, tokens_used)
 
-        # See https://github.com/AshminDhungana/Agentium/issues/11 for rationale
-        # on System-Generated Media Interception.
+        # ── System-Generated Media Interception (Issue #11) ────────────────────
+        # Intercept media URLs in LLM response, download & store permanently,
+        # rewrite content with storage URLs before persistence + broadcast.
+        if sovereign_user:
+            try:
+                # Reuse a single httpx client for all downloads in this request
+                async with httpx.AsyncClient(timeout=MediaInterceptor.DOWNLOAD_TIMEOUT) as http_client:
+                    result["content"], media_urls = await MediaInterceptor.intercept_and_store(
+                        text=result["content"],
+                        user_id=str(sovereign_user.id),
+                        db=db,
+                        http_client=http_client
+                    )
+                    # Attach media URLs to result for metadata persistence
+                    if media_urls:
+                        result["media_urls"] = media_urls
+            except Exception as e:
+                # Graceful degradation: log but don't block response
+                logger.warning(f"[ChatService] Media interception failed (non-fatal): {e}")
+        # ────────────────────────────────────────────────────────────────────────
 
         # Broadcast response to user's external channels (Unified Inbox)
         # Getting user_id from db session isn't directly passed here typically,
@@ -242,6 +262,7 @@ Address the Sovereign respectfully. If they issue a command that requires execut
                     metadata={
                         "agent_id": head.agentium_id,
                         "model": result.get("model", model_name),
+                        "media_urls": result.get("media_urls", []),
                     },
                 ))
                 db.commit()
