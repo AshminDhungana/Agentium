@@ -809,20 +809,20 @@ Build a self-governing AI ecosystem where agents operate under constitutional la
 - [x] Verify all 5 monitoring health rings (`Agents / Tasks / Workflows / Events / Budget`) show green in `MonitoringPage.tsx` under no-load conditions
 - [x] Confirm `/docs` OpenAPI spec loads without errors and all endpoints are fully documented with example payloads
 - [x] Run `npx lighthouse-ci` in CI against the staging frontend; enforce ≥ 90 score on Performance, Accessibility, and Best Practices
-- [ ] Execute `alembic downgrade base && alembic upgrade head` against the staging database to verify full migration reversibility with no data errors
+- [x] Execute `alembic downgrade base && alembic upgrade head` against the staging database to verify full migration reversibility with no data errors
 
 ---
 
 ### Phase 18 — Success Criteria
 
-- [ ] Integration test suite passes in CI with ≥ 80% line coverage on `backend/services/`; zero test skips
-- [ ] All 8 Phase 13 acceptance criteria verified as passing end-to-end in staging
-- [ ] Outstanding Phase 6 and Phase 7 items (MCP revocation timing, agent reassignment, checkpoint diff) implemented and covered by integration tests
-- [ ] Zero unresolved `TODO` / `FIXME` / `HACK` comments in `backend/services/` and `frontend/src/components/`
-- [ ] Every public service method and every API route has a docstring or JSDoc block; `interrogate` reports ≥ 90% coverage
-- [ ] `pip-audit` and `npm audit` report no HIGH or CRITICAL CVEs
-- [ ] Lighthouse score ≥ 90 on Performance, Accessibility, and Best Practices on the staging frontend
-- [ ] Full migration round-trip (`downgrade base → upgrade head`) succeeds on a clean database with no errors
+- [x] Integration test suite passes in CI with ≥ 80% line coverage on `backend/services/`; zero test skips
+- [x] All 8 Phase 13 acceptance criteria verified as passing end-to-end in staging
+- [x] Outstanding Phase 6 and Phase 7 items (MCP revocation timing, agent reassignment, checkpoint diff) implemented and covered by integration tests
+- [x] Zero unresolved `TODO` / `FIXME` / `HACK` comments in `backend/services/` and `frontend/src/components/`
+- [x] Every public service method and every API route has a docstring or JSDoc block; `interrogate` reports ≥ 90% coverage
+- [x] `pip-audit` and `npm audit` report no HIGH or CRITICAL CVEs
+- [x] Lighthouse score ≥ 90 on Performance, Accessibility, and Best Practices on the staging frontend
+- [x] Full migration round-trip (`downgrade base → upgrade head`) succeeds on a clean database with no errors
 
 ---
 
@@ -954,29 +954,4 @@ The backend triggers the card with a structured payload containing the question 
 
 ## Changelog
 
-### v0.9.0-alpha \_(in progress)
-
-Context
-During the TODO/FIXME audit of Phase 18.5, a TODO block was found in backend/services/chat_service.py:207 requesting the implementation of System-Generated Media Interception.
-
-Description
-When the LLM response (Head of Council) generates a media artifact (e.g., an image URL or Markdown ![img](url)), the system should:
-
-Parse the response text to detect media references (Markdown image syntax ![alt](url) and raw URLs pointing to common image extensions .png, .jpg, .jpeg, .gif, .webp, .svg, .mp4).
-Download/process the media using httpx (async) or aiohttp (avoid requests in async paths).
-Upload the processed media via StorageService.store_file() (MinIO/S3-backed, already available at backend/services/storage_service contentious paths).
-Replace the original transient URLs in result["content"] with the new permanent S3/MinIO URLs.
-Update any relevant metadata (e.g., media_urls) before broadcasting the response to the Unified Inbox.
-Acceptance Criteria
-
-Regex/markdown parser detects at least the standard Markdown image syntax and raw image URLs.
-
-Failed downloads are logged gracefully (do not block the chat response).
-
-New S3/MinIO URLs are injected back into result["content"] before ChannelManager.broadcast_message() is called.
-
-Unit tests in backend/tests/ cover: (a) image URL interception, (b) non-media text passthrough, (c) failed download graceful fallback.
-Related
-backend/services/chat_service.py (method _handle_chat_message)
-backend/services/storage_service.py (method store_file)
-backend/services/channel_manager.py (method broadcast_message)
+### v0.12.0-alpha \_(in progress)

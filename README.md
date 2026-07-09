@@ -3,7 +3,7 @@
 > Your Personal AI Agent Nation — Sovereign, Constitutional, and Fully Self-Governing.
 
 [![Status](https://img.shields.io/badge/status-active--development-brightgreen)](https://github.com/AshminDhungana/Agentium)
-[![Version](https://img.shields.io/badge/version-v0.11.0--alpha-blue)](https://github.com/AshminDhungana/Agentium)
+[![Version](https://img.shields.io/badge/version-v0.12.0--alpha-blue)](https://github.com/AshminDhungana/Agentium)
 [![Docker](https://img.shields.io/badge/docker-ready-blue)](https://www.docker.com/)
 [![Docs](https://img.shields.io/badge/docs-OpenAPI%203.1-brightgreen)](http://localhost:8000/docs)
 
