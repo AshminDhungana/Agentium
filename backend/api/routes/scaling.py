@@ -105,6 +105,7 @@ async def manual_scaling_override(
                 ReincarnationService.spawn_task_agent(
                     parent=head,
                     name=f"Manual-Spawn-{datetime.utcnow().strftime('%H%M%S')}-{i}",
+                    description=f"Manually spawned Task Agent via scaling override (count: {count})",
                     db=db
                 )
                 spawned += 1

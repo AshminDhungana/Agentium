@@ -918,17 +918,6 @@ The backend triggers the card with a structured payload containing an array of q
 
 ---
 
-### 19.2 Single-Use Agent Timer (Execution Wait)
-
-A short-lived timer the agent can invoke to pause and wait for a command or external process to finish.
-
-**Behavior:**
-
-- Agent determines the end time based on the running program's expected duration
-- Re-checks at most every **20 seconds** if the process hasn't completed
-- Automatically resumes once the wait condition is met or time expires
-
----
 
 ### Behavior
 
@@ -951,6 +940,8 @@ The card uses the existing Tailwind dark-mode design system with a rounded conta
 ### Data Payload
 
 The backend triggers the card with a structured payload containing the question text, a required flag, and an array of options each with an ID, display label, and internal value. An optional expiration timer can be included after which the card enters an expired state if left unanswered.
+
+
 
 ## Changelog
 

@@ -501,6 +501,7 @@ def auto_scale_check():
                             ReincarnationService.spawn_task_agent(
                                 parent=head,
                                 name=f"AutoScale-Agent-{datetime.utcnow().strftime('%H%M%S')}-{i}",
+                                description=f"Auto-spawned Task Agent for queue depth scaling (threshold: {threshold}, pending: {pending_count})",
                                 db=db,
                             )
                             spawned += 1
