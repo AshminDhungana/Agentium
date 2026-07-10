@@ -6,15 +6,58 @@ Tests the full pipeline: LLM response -> MediaInterceptor -> Storage -> Broadcas
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from io import BytesIO
+from datetime import datetime
+from typing import Dict, Any
 
 from backend.services.chat_service import ChatService
 from backend.models.entities.agents import HeadOfCouncil
 from backend.models.entities.user import User
+from backend.models.entities.user_config import UserModelConfig, ProviderType, ConnectionStatus
 from backend.models.database import get_db_context
+from backend.services.model_provider import ModelService, OpenAICompatibleProvider
+
+
+class MockProvider(OpenAICompatibleProvider):
+    """Mock provider that doesn't make real API calls."""
+
+    def __init__(self):
+        # Don't call super().__init__ to avoid needing a real config
+        self.config = MagicMock()
+        self.config.provider = ProviderType.OPENAI_COMPATIBLE
+        self.config.default_model = "test-model"
+        self.config.max_tokens = 4000
+        self.config.temperature = 0.7
+        self.config.top_p = 1.0
+        self.config.timeout_seconds = 60
+        self.api_key = "test-key"
+        self.base_url = "http://test-url"
+
+    async def generate(self, system_prompt: str, user_message: str, **kwargs) -> Dict[str, Any]:
+        return {
+            "content": "Mock response",
+            "model": "test-model",
+            "tokens_used": 10,
+            "prompt_tokens": 5,
+            "completion_tokens": 5,
+            "latency_ms": 10,
+            "cost_usd": 0.0,
+            "finish_reason": "stop",
+        }
+
+    async def generate_with_tools(self, *args, **kwargs) -> Dict[str, Any]:
+        # This will be overridden by the test's mock
+        return await self.generate("", "")
 
 
 class TestChatServiceMediaInterception:
     """Integration tests for media interception in chat flow."""
+
+    @pytest.fixture(autouse=True)
+    def mock_model_provider(self, monkeypatch):
+        """Mock ModelService.get_provider to return a mock provider."""
+        mock_provider = MockProvider()
+        monkeypatch.setattr(ModelService, "get_provider", AsyncMock(return_value=mock_provider))
+        yield
 
     @pytest.mark.asyncio
     async def test_markdown_image_intercepted_and_stored(self, seeded_db, monkeypatch):
@@ -37,6 +80,22 @@ class TestChatServiceMediaInterception:
             is_active=True
         )
         seeded_db.add(admin)
+        seeded_db.commit()
+
+        # Create and configure default model config for the head
+        model = UserModelConfig(
+            provider=ProviderType.OPENAI_COMPATIBLE,
+            config_name="test-config",
+            default_model="test-model",
+            status=ConnectionStatus.ACTIVE,
+            is_default=True,
+            api_base_url="http://test-url",
+        )
+        seeded_db.add(model)
+        seeded_db.flush()
+
+        # Associate with the Head of Council
+        head.preferred_config_id = str(model.id)
         seeded_db.commit()
 
         # Mock LLM response with markdown image
@@ -85,6 +144,22 @@ class TestChatServiceMediaInterception:
         seeded_db.add(admin)
         seeded_db.commit()
 
+        # Create and configure default model config for the head
+        model = UserModelConfig(
+            provider=ProviderType.OPENAI_COMPATIBLE,
+            config_name="test-config-2",
+            default_model="test-model",
+            status=ConnectionStatus.ACTIVE,
+            is_default=True,
+            api_base_url="http://test-url",
+        )
+        seeded_db.add(model)
+        seeded_db.flush()
+
+        # Associate with the Head of Council
+        head.preferred_config_id = str(model.id)
+        seeded_db.commit()
+
         mock_llm_result = {
             "content": "See this photo: https://cdn.example.com/photo.jpg",
             "model": "test-model",
@@ -124,6 +199,22 @@ class TestChatServiceMediaInterception:
         seeded_db.add(admin)
         seeded_db.commit()
 
+        # Create and configure default model config for the head
+        model = UserModelConfig(
+            provider=ProviderType.OPENAI_COMPATIBLE,
+            config_name="test-config-3",
+            default_model="test-model",
+            status=ConnectionStatus.ACTIVE,
+            is_default=True,
+            api_base_url="http://test-url",
+        )
+        seeded_db.add(model)
+        seeded_db.flush()
+
+        # Associate with the Head of Council
+        head.preferred_config_id = str(model.id)
+        seeded_db.commit()
+
         mock_llm_result = {
             "content": "Hello! This is just plain text with no images.",
             "model": "test-model",
@@ -151,6 +242,22 @@ class TestChatServiceMediaInterception:
         seeded_db.add(head)
         admin = User(id="user-admin-media-4", username="admin_media_4", email="admin_media_4@agentium.test", hashed_password="fake-hash-for-test", is_admin=True, is_active=True)
         seeded_db.add(admin)
+        seeded_db.commit()
+
+        # Create and configure default model config for the head
+        model = UserModelConfig(
+            provider=ProviderType.OPENAI_COMPATIBLE,
+            config_name="test-config-4",
+            default_model="test-model",
+            status=ConnectionStatus.ACTIVE,
+            is_default=True,
+            api_base_url="http://test-url",
+        )
+        seeded_db.add(model)
+        seeded_db.flush()
+
+        # Associate with the Head of Council
+        head.preferred_config_id = str(model.id)
         seeded_db.commit()
 
         mock_llm_result = {
@@ -189,6 +296,22 @@ class TestChatServiceMediaInterception:
         seeded_db.add(admin)
         seeded_db.commit()
 
+        # Create and configure default model config for the head
+        model = UserModelConfig(
+            provider=ProviderType.OPENAI_COMPATIBLE,
+            config_name="test-config-5",
+            default_model="test-model",
+            status=ConnectionStatus.ACTIVE,
+            is_default=True,
+            api_base_url="http://test-url",
+        )
+        seeded_db.add(model)
+        seeded_db.flush()
+
+        # Associate with the Head of Council
+        head.preferred_config_id = str(model.id)
+        seeded_db.commit()
+
         mock_llm_result = {
             "content": "![Chart](https://charts.example.com/chart.png)",
             "model": "test-model",
@@ -220,6 +343,6 @@ class TestChatServiceMediaInterception:
         from backend.models.entities.chat_message import ChatMessage
         msg = seeded_db.query(ChatMessage).filter_by(role="head_of_council").first()
         assert msg is not None
-        assert msg.metadata is not None
-        assert "media_urls" in msg.metadata
-        assert "https://s3.bucket/files/user-admin-media-5/chart.png" in msg.metadata["media_urls"]
+        assert msg.message_metadata is not None
+        assert "media_urls" in msg.message_metadata
+        assert "https://s3.bucket/files/user-admin-media-5/chart.png" in msg.message_metadata["media_urls"]

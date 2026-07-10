@@ -12,7 +12,7 @@ from backend.services.wait_poll_service import WaitPollService
 from backend.models.entities.wait_condition import WaitStrategy, WaitConditionStatus, WaitCondition
 from backend.models.entities.task import Task, TaskStatus
 from backend.models.entities.remote_execution import RemoteExecutionRecord, ExecutionStatus
-from backend.models.entities.agents import Agent
+from backend.models.entities.agents import Agent, AgentType, AgentStatus
 
 
 class TestExecutionWaitIntegration:
@@ -47,6 +47,20 @@ class TestExecutionWaitIntegration:
 
     def _create_execution_record(self, db, execution_id, task_id, agentium_id="40001"):
         """Helper to create a RemoteExecutionRecord with required agentium_id."""
+        # First, ensure the agent exists
+        agent = db.query(Agent).filter(Agent.agentium_id == "30001").first()
+        if not agent:
+            agent = Agent(
+                agentium_id="30001",
+                name="Test Agent",
+                agent_type=AgentType.TASK_AGENT,
+                status=AgentStatus.ACTIVE,
+                is_active=True,
+            )
+            db.add(agent)
+            db.commit()
+            db.refresh(agent)
+
         record = RemoteExecutionRecord(
             execution_id=execution_id,
             agent_id="30001",

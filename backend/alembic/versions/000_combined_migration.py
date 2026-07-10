@@ -28,7 +28,7 @@ ANALYZE_TABLES = [
 
 # ── Enum objects for 006_wait_poll (create_type=False — DO $$ blocks handle creation) ──
 wait_strategy_enum = postgresql.ENUM(
-    "http_poll", "redis_key", "timeout", "webhook", "manual",
+    "http_poll", "redis_key", "timeout", "webhook", "manual", "execution",
     name="waitstrategy",
     create_type=False,
 )
@@ -125,6 +125,18 @@ def upgrade() -> None:
                     'sovereign', 'critical', 'high', 'normal', 'low', 'idle',
                     'SOVEREIGN', 'CRITICAL', 'HIGH', 'NORMAL', 'LOW', 'IDLE'
                 );
+            END IF;
+        END $$;
+    """)
+
+    # waitstrategy — add "execution" value if enum exists but is missing it
+    op.execute("""
+        DO $$
+        BEGIN
+            IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'waitstrategy') THEN
+                IF NOT EXISTS (SELECT 1 FROM pg_enum WHERE enumlabel = 'execution' AND enumtypid = 'waitstrategy'::regtype) THEN
+                    ALTER TYPE waitstrategy ADD VALUE 'execution';
+                END IF;
             END IF;
         END $$;
     """)

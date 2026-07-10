@@ -206,6 +206,10 @@ Address the Sovereign respectfully. If they issue a command that requires execut
         tokens_used = result.get("tokens_used", 0)
         context_status = context_manager.update_usage(head.agentium_id, tokens_used)
 
+        # ── Get sovereign user for media interception and channel broadcast ────────
+        from backend.models.entities.user import User
+        sovereign_user = db.query(User).filter_by(is_admin=True, is_active=True).first()
+
         # ── System-Generated Media Interception (Issue #11) ────────────────────
         # Intercept media URLs in LLM response, download & store permanently,
         # rewrite content with storage URLs before persistence + broadcast.
@@ -228,16 +232,7 @@ Address the Sovereign respectfully. If they issue a command that requires execut
         # ────────────────────────────────────────────────────────────────────────
 
         # Broadcast response to user's external channels (Unified Inbox)
-        # Getting user_id from db session isn't directly passed here typically,
-        # but the conversation context should have a linked user. 
-        # Alternatively we can broadcast to all admins if we don't have user_id, 
-        # but Agentium assumes sovereign = admin. Let's find an active admin.
-        from backend.models.entities.user import User
         from backend.services.channel_manager import ChannelManager
-        
-        # In a multi-tenant system we'd capture the exact user who invoked the chat.
-        # For sovereign we just take the first active admin user.
-        sovereign_user = db.query(User).filter_by(is_admin=True, is_active=True).first()
 
         # ── Persist both turns to ChatMessage so history survives navigation ──
         if sovereign_user:
@@ -252,14 +247,14 @@ Address the Sovereign respectfully. If they issue a command that requires execut
                     user_id=user_str_id,
                     role="sovereign",
                     content=message,
-                    metadata={"source": "websocket"},
+                    message_metadata={"source": "websocket"},
                 ))
                 db.add(ChatMsg(
                     id=msg_id,
                     user_id=user_str_id,
                     role="head_of_council",
                     content=result["content"],
-                    metadata={
+                    message_metadata={
                         "agent_id": head.agentium_id,
                         "model": result.get("model", model_name),
                         "media_urls": result.get("media_urls", []),
