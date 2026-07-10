@@ -116,7 +116,6 @@ function AppWithRedirect() {
             <Toaster position="top-right" />
 
             <GlobalWebSocketProvider>
-                <ErrorBoundary variant="page" fallbackHeading="Application Error">
                 <Routes>
                     {/* Auth Routes */}
                     <Route element={<AuthLayout />}>
@@ -165,7 +164,6 @@ function AppWithRedirect() {
 
                     <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
-                </ErrorBoundary>
             </GlobalWebSocketProvider>
         </>
     );
@@ -294,7 +292,9 @@ function AuthLayout() {
 export default function App() {
     return (
         <Router>
-            <AppWithRedirect />
+            <ErrorBoundary variant="page" fallbackHeading="Application Error">
+                <AppWithRedirect />
+            </ErrorBoundary>
         </Router>
     );
 }
