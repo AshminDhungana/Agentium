@@ -131,7 +131,7 @@ class TestExecutionWaitIntegration:
         assert condition.resolution_data["status"] == "completed"
 
     def test_agent_wait_times_out_on_execution_failure(self, db, test_task):
-        """If execution fails, wait condition expires and task fails."""
+        """If execution fails, wait condition resolves with failure data and task fails."""
         # Advance task through proper state transitions to IN_PROGRESS
         test_task.set_status(TaskStatus.APPROVED, actor_id="00001", note="Auto-approved for test")
         time.sleep(0.1)
@@ -170,4 +170,7 @@ class TestExecutionWaitIntegration:
         condition = db.query(WaitCondition).filter(
             WaitCondition.task_id == test_task.id
         ).first()
-        assert condition.status == WaitConditionStatus.EXPIRED
+        # When execution fails, the wait condition is RESOLVED with failure data (not EXPIRED)
+        assert condition.status == WaitConditionStatus.RESOLVED
+        assert condition.resolution_data.get("status") == "failed"
+        assert "Container crashed" in condition.resolution_data.get("error", "")
