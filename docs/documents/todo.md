@@ -847,9 +847,9 @@ OpenAI TTS — Text-to-Speech
 
 **High Priority (actively blocking)**
 
-- [ ] `auto_scale_check` Celery task only logs scaling intent — does not actually call `AgentLifecycleService.spawn_agent()` — agents are never auto-spawned
-- [ ] WebSocket reconnection logic lacks exponential backoff; clients disconnect permanently on transient network issues
-- [ ] Frontend has no global error boundaries — one crashing component brings down the full page
+- [x] `auto_scale_check` Celery task only logs scaling intent — does not actually call `AgentLifecycleService.spawn_agent()` — agents are never auto-spawned
+- [x] WebSocket reconnection logic lacks exponential backoff; clients disconnect permanently on transient network issues
+- [x] Frontend has no global error boundaries — one crashing component brings down the full page
 
 **Medium Priority**
 

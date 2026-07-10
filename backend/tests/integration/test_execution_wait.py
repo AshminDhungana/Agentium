@@ -79,7 +79,13 @@ class TestExecutionWaitIntegration:
         Full flow: Agent executes code -> gets execution_id -> enters WAIT ->
         Celery polls -> execution completes -> task resumes IN_PROGRESS.
         """
-        # 1. Create remote executor and run a simple async execution
+        # 1. Advance task through proper state transitions to IN_PROGRESS
+        # (PENDING -> APPROVED -> IN_PROGRESS is the shortcut for simple/critical tasks)
+        test_task.set_status(TaskStatus.APPROVED, actor_id="00001", note="Auto-approved for test")
+        time.sleep(0.1)  # Ensure unique TaskEvent.agentium_id (millisecond precision)
+        test_task.set_status(TaskStatus.IN_PROGRESS, actor_id="30001", note="Task execution started")
+
+        # Create remote executor and run a simple async execution
         # (In integration test, we create a mock execution record directly)
         execution_id = f"exec_test_{int(time.time())}"
 
@@ -126,6 +132,11 @@ class TestExecutionWaitIntegration:
 
     def test_agent_wait_times_out_on_execution_failure(self, db, test_task):
         """If execution fails, wait condition expires and task fails."""
+        # Advance task through proper state transitions to IN_PROGRESS
+        test_task.set_status(TaskStatus.APPROVED, actor_id="00001", note="Auto-approved for test")
+        time.sleep(0.1)
+        test_task.set_status(TaskStatus.IN_PROGRESS, actor_id="30001", note="Task execution started")
+
         execution_id = f"exec_fail_{int(time.time())}"
 
         record = self._create_execution_record(db, execution_id, test_task.id, agentium_id="40002")

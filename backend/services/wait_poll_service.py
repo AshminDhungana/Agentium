@@ -146,7 +146,7 @@ class WaitPollService:
         """
         Evaluate a single condition.
 
-        Returns: "resolved" | "expired" | "pending"
+        Returns: "resolved" | "expired" | "pending" | "failed"
         """
         # Hard deadline check (always first)
         if condition.is_overdue():
@@ -161,18 +161,24 @@ class WaitPollService:
             return "expired"
 
         # Strategy dispatch
-        resolved, data = cls._check_strategy(condition)
+        resolved, data = cls._check_strategy(db, condition)
 
         if resolved:
-            condition.resolve(data)
-            cls._resume_task(db, condition)
-            return "resolved"
+            # Check if the execution failed - if so, fail the task instead of resuming
+            if data and data.get("status") == "failed":
+                condition.resolve(data)
+                cls._handle_failed_execution(db, condition, data.get("error"))
+                return "failed"
+            else:
+                condition.resolve(data)
+                cls._resume_task(db, condition)
+                return "resolved"
 
         return "pending"
 
     @classmethod
     def _check_strategy(
-        cls, condition: WaitCondition
+        cls, db: Session, condition: WaitCondition
     ) -> Tuple[bool, Optional[Dict]]:
         """Dispatch to the appropriate strategy checker."""
         strategy = condition.strategy
@@ -187,7 +193,7 @@ class WaitPollService:
             # it hasn't expired yet.
             return False, None
         elif strategy == WaitStrategy.EXECUTION:
-            return cls._check_execution(cfg)
+            return cls._check_execution(db, cfg)
         elif strategy in (WaitStrategy.WEBHOOK, WaitStrategy.MANUAL):
             # These are resolved externally; nothing to poll.
             return False, None
@@ -304,7 +310,7 @@ class WaitPollService:
     # ── Execution ───────────────────────────────────────────────────────────
 
     @classmethod
-    def _check_execution(cls, cfg: Dict) -> Tuple[bool, Optional[Dict]]:
+    def _check_execution(cls, db: Session, cfg: Dict) -> Tuple[bool, Optional[Dict]]:
         """
         Poll a RemoteExecutionRecord by execution_id.
 
@@ -316,37 +322,31 @@ class WaitPollService:
             logger.warning("_check_execution: missing execution_id in config")
             return False, None
 
-        # Query database for the execution record
-        from backend.models.database import get_db_context
-        try:
-            with get_db_context() as db:
-                record = db.query(RemoteExecutionRecord).filter(
-                    RemoteExecutionRecord.execution_id == execution_id
-                ).first()
+        # Query database for the execution record using the passed session
+        record = db.query(RemoteExecutionRecord).filter(
+            RemoteExecutionRecord.execution_id == execution_id
+        ).first()
 
-                if not record:
-                    logger.debug("_check_execution: execution %s not yet in DB", execution_id)
-                    return False, None
+        if not record:
+            logger.debug("_check_execution: execution %s not yet in DB", execution_id)
+            return False, None
 
-                status = record.status
-                if status == ExecutionStatus.COMPLETED:
-                    return True, {
-                        "execution_id": execution_id,
-                        "status": "completed",
-                        "summary": record.summary,
-                        "execution_time_ms": record.execution_time_ms,
-                    }
-                elif status in (ExecutionStatus.FAILED, ExecutionStatus.TIMEOUT, ExecutionStatus.CANCELLED):
-                    return True, {
-                        "execution_id": execution_id,
-                        "status": "failed",
-                        "error": record.error_message,
-                    }
-                else:
-                    # PENDING, RUNNING → still waiting
-                    return False, None
-        except Exception as exc:
-            logger.debug("_check_execution failed for %s: %s", execution_id, exc)
+        status = record.status
+        if status == ExecutionStatus.COMPLETED:
+            return True, {
+                "execution_id": execution_id,
+                "status": "completed",
+                "summary": record.summary,
+                "execution_time_ms": record.execution_time_ms,
+            }
+        elif status in (ExecutionStatus.FAILED, ExecutionStatus.TIMEOUT, ExecutionStatus.CANCELLED):
+            return True, {
+                "execution_id": execution_id,
+                "status": "failed",
+                "error": record.error_message,
+            }
+        else:
+            # PENDING, RUNNING → still waiting
             return False, None
 
     # ─────────────────────────────────────────────────────────────────────
@@ -389,6 +389,22 @@ class WaitPollService:
                 can_retry=False,
             )
             logger.warning("Task %s failed due to expired WaitCondition", task.agentium_id)
+        except Exception as exc:
+            logger.error("Failed to mark task %s as failed: %s", task.id, exc)
+
+    @classmethod
+    def _handle_failed_execution(cls, db: Session, condition: WaitCondition, error: str) -> None:
+        """Transition the parent task to FAILED when the execution fails."""
+        task = db.query(Task).filter(Task.id == condition.task_id).first()
+        if not task or task.status != TaskStatus.WAITING:
+            return
+        try:
+            task.fail(
+                error_message=f"WaitCondition {condition.agentium_id} execution failed: "
+                              f"{error}",
+                can_retry=False,
+            )
+            logger.warning("Task %s failed due to failed execution", task.agentium_id)
         except Exception as exc:
             logger.error("Failed to mark task %s as failed: %s", task.id, exc)
 

@@ -114,8 +114,8 @@ class Task(BaseEntity):
     idle_task_category = Column(String(50), nullable=True)
     estimated_tokens = Column(Integer, default=0)
     tokens_used = Column(Integer, default=0)
-    
-    status = Column(Enum(TaskStatus), default=TaskStatus.PENDING, nullable=False)
+
+    status = Column(Enum(TaskStatus, values_callable=lambda obj: [e.value for e in obj], create_constraint=True), default=TaskStatus.PENDING, nullable=False)
     status_history = Column(JSON, default=list)
     
     created_by = Column(String(10), nullable=False)

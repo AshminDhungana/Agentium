@@ -77,6 +77,11 @@ def db_engine():
 
     Base.metadata.create_all(bind=engine_test)
 
+    # Ensure waitstrategy enum has 'execution' value (Phase 19.2)
+    with engine_test.connect() as conn:
+        conn.execute(text("ALTER TYPE waitstrategy ADD VALUE IF NOT EXISTS 'execution'"))
+        conn.commit()
+
     yield engine_test
 
     # Best-effort tear down: named constraints created with use_alter=True
