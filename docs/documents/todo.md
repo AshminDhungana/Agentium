@@ -942,6 +942,161 @@ The card uses the existing Tailwind dark-mode design system with a rounded conta
 The backend triggers the card with a structured payload containing the question text, a required flag, and an array of options each with an ID, display label, and internal value. An optional expiration timer can be included after which the card enters an expired state if left unanswered.
 
 
+## 19.3 Outbound Rate-Limit Resilience & Graceful API-Key-Failure Handling
+ 
+**Goal:** Agentium never crashes, stalls, or silently drops a task when a provider throttles (429), rejects a key (401/403), or goes down. A bad key or a burst of 429s must never take down a worker or the queue — the task fails over to another key/provider, or is marked `FAILED` with a clear reason, while every other task keeps running.
+ 
+Work through the steps below **in order** — each one is a single, self-contained task, and later steps assume earlier ones are done.
+ 
+---
+ 
+### Step 1 — Trace the current failure path
+- Files: `backend/services/agent_orchestrator.py`, `backend/services/task_executor.py`
+- Trace `AgentOrchestrator._execute_task_inner()` up through whatever actually invokes `execute_task()` on the Celery side. List every catch block currently in that path.
+- Force `LLMClient.generate_with_tools()` to raise (simulate all keys exhausted) and record whether: (a) the worker crashes/hangs, (b) the `Task` row gets marked `FAILED`, (c) an `AuditLog` entry is written, (d) the worker picks up the next task.
+- ✅ Done when: you have a written yes/no answer for all four checks. This is the baseline Step 12 fixes against.
+
+### Step 2 — Add jitter to backoff
+- File: `backend/core/llm_client.py`, function `_delay()`
+- Replace `min(base_retry_delay * 2**attempt, max_retry_delay)` with full-jitter: `random.uniform(0, min(max_retry_delay, base_retry_delay * 2**attempt))`.
+- ✅ Done when: two concurrent retries against the same failure no longer produce identical delay values.
+
+### Step 3 — Classify errors into three tiers
+- File: `backend/core/llm_client.py`
+- Add `classify_error()` returning:
+  - `TRANSIENT` (timeout/502/503/504) → retry same key, backoff+jitter
+  - `RATE_LIMITED` (429) → rotate key/provider, backoff+jitter
+  - `PERMANENT_KEY_FAILURE` (401/403/402, "invalid api key", "insufficient_quota") → rotate immediately, no backoff, mark key unhealthy
+- Prefer typed SDK exceptions (`openai.RateLimitError`, `anthropic.AuthenticationError`, etc.) over string matching; use substring matching only where no typed exception exists.
+- ✅ Done when: every existing call to `_is_rate_limit()` / `_is_retryable()` is replaced by `classify_error()`.
+
+### Step 4 — Make permanent key failures skip straight to the next config
+- File: `backend/core/llm_client.py`
+- When `classify_error()` returns `PERMANENT_KEY_FAILURE`, advance to the next entry in `configs_to_try` immediately — don't spend a retry attempt on a key that can't succeed.
+- ✅ Done when: a simulated 401 on the primary key causes the very next call to go straight to the secondary key with no delay.
+
+### Step 5 — Cap the combined retry budget across layers
+- Files: `backend/core/llm_client.py`, `celery_app.py`
+- Audit every Celery task calling into `LLMClient`/`ModelService`. Some already define their own `max_retries=3`/`5` on top of `LLMClient`'s internal retries. Set one explicit combined ceiling.
+- ✅ Done when: you can state the max possible number of provider calls for one task, end to end, as a fixed number.
+
+### Step 6 — Add rate-limit fields to the data model
+- File: `backend/models/entities/user_config.py`
+- Add to `UserModelConfig`: `requests_per_minute` (int, default `60`), `tokens_per_minute` (optional int), `max_concurrent_requests` (int, sensible default). Write the Alembic migration.
+- Using requests-per-minute (not per-second) as the unit keeps every provider's real-world limit a whole number — the slowest tier some providers allow (1 request every 2 seconds) is `30` in this unit, and the fastest (2500/sec) is `150000`. No fractional values anywhere in config or UI.
+- ✅ Done when: migration runs cleanly and existing rows backfill to `requests_per_minute = 60`.
+
+### Step 7 — Add the rate-limit field to the model page (where the API key is entered)
+- Files: the model-configuration page/form where a provider API key is added or edited (frontend) + its backend route
+- Add an input labeled "Rate limit (requests per minute)" pre-filled with `60`, with the hint "check your provider's plan page — e.g. 1 request every 2 seconds = 30/min." Wire it to `requests_per_minute` from Step 6.
+- Below the input box, add a small line of helper text that updates live as the user types, showing the same value converted to per-second (e.g. typing `30` shows "≈ 0.5 requests/second" underneath; typing `120` shows "≈ 2 requests/second"). This is read-only, computed client-side (`value / 60`), and never sent to the backend — it's purely so the user can sanity-check the number against how their provider documents its limit.
+- The value the user enters is the value displayed back to them on that same page (no unit conversion visible in the stored/saved value) — always requests/minute, both on input and whenever the configured limit is shown elsewhere (key list, settings, dashboard). Only the live helper text under the box is per-second.
+- ✅ Done when: saving with the field untouched stores `60`; entering `30` stores `30`, shows "≈ 0.5 requests/second" live under the box while typing, and the model page shows "30 requests/minute" for that key afterward.
+
+### Step 8 — Build the per-provider token bucket
+- File: `backend/services/model_provider.py` (reuse the Lua pattern in `backend/core/middleware.py::RateLimitMiddleware._LUA_ADMIT`)
+- Before every SDK call, acquire a token from a Redis-backed bucket keyed by `provider_config_id`. Convert the config's `requests_per_minute` into a smooth per-second refill rate internally (`requests_per_minute / 60.0`) — do **not** just drop `requests_per_minute` tokens at the start of each minute and then block for 60 seconds; that would let a burst of 30 requests fire back-to-back instead of spread evenly. The stored/displayed unit stays requests/minute; only the internal refill math is per-second.
+- Wait if no token is available.
+- ✅ Done when: a config set to `30` requests/minute actually sends calls roughly 2 seconds apart, not 30 at once followed by a 1-minute stall.
+
+### Step 9 — Add a concurrency cap alongside the rate limiter
+- File: `backend/services/model_provider.py`
+- Add an in-process `asyncio.Semaphore` per provider config, plus a Redis-backed counter for cross-worker/cross-replica concurrency, using `max_concurrent_requests` from Step 6.
+- ✅ Done when: concurrency for any provider config never exceeds its configured max, verified across two worker processes at once.
+
+### Step 10 — Read provider rate-limit headers and correct the bucket
+- File: `backend/services/model_provider.py`
+- Add `parse_rate_limit_headers(provider, headers)` reading `anthropic-ratelimit-requests-remaining`/`-reset` or `x-ratelimit-remaining-requests`/`x-ratelimit-reset-requests`. If remaining ≤ a configurable threshold (default 2), pause new calls on that config until the reported reset time. This only tightens the effective rate — never loosens it past the `requests_per_minute` value from Step 7.
+- ✅ Done when: a mock provider returning low-remaining headers on a *success* response causes the next call to wait, with no 429 involved.
+
+### Step 11 — Bound and cool down auto-scaling
+- File: `backend/services/task_executor.py`, function `auto_scale_check()`
+- Add a max-live-agents ceiling and a minimum cooldown between auto-scale rounds (today it spawns 3 agents every time pending count exceeds 10, uncapped).
+- ✅ Done when: a sustained backlog no longer produces unbounded agent growth.
+
+### Step 12 — Catch total exhaustion and fail the task cleanly
+- File: wherever Step 1 found the gap (likely `execute_task`/`_execute_task_inner`)
+- Add `try/except` around the LLM-call section catching the `RuntimeError` from full exhaustion, setting `Task.status = FAILED` with a structured reason (`rate_limited`, `all_keys_invalid`, `provider_unreachable`), writing an `AuditLog` entry, and returning cleanly.
+- ✅ Done when: repeating Step 1's forced-exception test now shows all four checks passing.
+
+### Step 13 — Wire the local (Ollama) fallback into the failover chain
+- Files: `backend/services/api_key_manager.py`, `backend/core/llm_client.py`
+- Confirm whether `fallback_configs` is ever auto-populated with a local/offline config when all remote keys fail. If not, add that wiring.
+- ✅ Done when: killing all remote keys in a test still produces a completed (if slower) task via Ollama.
+
+### Step 14 — Audit every call site for real fallback lists
+- Files: `agent_orchestrator.py`, chat routes, any other caller of `LLMClient.generate()`/`generate_with_tools()`
+- Ensure every call site passes a real `fallback_configs` list (other keys of the same provider + at least one other provider), not just a bare `config_id`.
+- ✅ Done when: no call site relies on a single key with nothing to fall back to.
+
+### Step 15 — Add a user-facing degradation message
+- Files: wherever task results surface to chat/external channels
+- When all configs/retries are exhausted, return "The AI provider is temporarily unavailable or rate-limited; this task has been queued for retry" instead of a raw `RuntimeError`/500.
+- ✅ Done when: a forced total-exhaustion test shows this message in the UI/channel, not a stack trace.
+
+### Step 16 — Merge the two health-tracking systems
+- Files: `llm_client.py` (`ProviderCircuitBreaker`), `api_key_manager.py`
+- Merge the in-process circuit breaker (keyed by `config_id`) with `APIKeyManager`'s DB-backed cooldown/health state (keyed by key ID) into one source of truth.
+- ✅ Done when: both layers always report the same health status for the same key at the same time.
+
+### Step 17 — Reuse SDK client instances
+- File: `backend/services/model_provider.py`
+- Construct one `openai.AsyncOpenAI(...)`/`anthropic.AsyncAnthropic(...)` per provider config and reuse it instead of building a new client on every call.
+- ✅ Done when: client construction happens once per config, not once per request.
+
+### Step 18 — Expose per-provider metrics on the dashboard
+- Files: `monitoring_routes.py`, `celery_app.py` (reuse the `broadcast_mcp_stats`/`broadcast_channel_health` pattern)
+- Broadcast outbound requests/minute, current concurrency, 429 rate, circuit-breaker state, and key health per provider config — same requests/minute unit used everywhere else.
+- ✅ Done when: the dashboard shows live numbers for at least one real provider config.
+
+### Step 19 — Alert before exhaustion
+- File: `api_key_manager.py`
+- Extend the existing "notify on total key failure" alert to also fire at a configurable warning threshold (e.g. 80% of a provider's configured rate).
+- ✅ Done when: driving a config to 80% of its configured rate produces a warning alert before any failure.
+
+### Step 20 — Build the mock-provider test harness
+- File: new `backend/tests/integration/test_provider_resilience.py`
+- Stand up a fake OpenAI-compatible endpoint that can be told to return, on command: 429 + `Retry-After`, 401, 403, 503, low-remaining headers on success, or normal success. Point a test `UserModelConfig` at it.
+- ✅ Done when: the harness can be told which response to return next and tests can assert against it.
+
+### Step 21 — Test: 429 burst
+- Drive N concurrent task executions against the mock provider set to always 429.
+- ✅ Done when: backoff has jitter (no synchronized retry timestamps), rotation to a fallback key occurs, and every task completes.
+
+### Step 22 — Test: invalid/expired key
+- Set the primary key to always fail with 401.
+- ✅ Done when: no repeated retries against it, immediate rotation to the next config, key marked unhealthy, task completes via fallback.
+
+### Step 23 — Test: total exhaustion
+- Fail every configured key/provider.
+- ✅ Done when: the worker doesn't crash, the task is marked `FAILED` with a reason, an `AuditLog` entry exists, and the worker immediately continues with the next queued task.
+
+### Step 24 — Test: default and user-configured rate limits are respected
+- Add a key with no rate value (expect `60`/min default) and a key with an explicit low value (e.g. `30`/min, matching "1 request every 2 seconds"). Drive concurrent load at each.
+- ✅ Done when: requests are spaced evenly across each minute at the configured rate, and the `30`/min key never receives a 429.
+
+### Step 25 — Test: header-based correction
+- Mock provider returns success responses with `remaining-requests` near zero.
+- ✅ Done when: Agentium pauses new calls on that config until the reported reset time, without needing an actual 429.
+
+### Step 26 — Extend the load test
+- File: `backend/tests/load/locustfile.py`
+- Drive provider-facing load specifically (not just Agentium's own REST API). Record RPS actually reaching the mock provider, queue depth (`pending_count`), retry counts, and worker stability over a sustained run.
+- ✅ Done when: a sustained run report exists showing all four metrics.
+---
+ 
+## Definition of done
+ 
+- [ ] All 26 steps above checked off.
+- [ ] A 429 burst produces zero failed tasks.
+- [ ] An invalid key rotates immediately with no wasted retries.
+- [ ] A total provider outage marks the task `FAILED` cleanly — worker keeps processing everything else.
+- [ ] A key with no configured rate limit never exceeds 60 requests/minute; a key configured for 30/minute never gets a 429 under load.
+- [ ] Low-remaining headers pause calls before a 429 happens.
+- [ ] Circuit breaker and key-health state never disagree.
+- [ ] Per-provider requests/minute, concurrency, 429-rate, and health are visible on the dashboard, and match what's shown on the model page.
+
+
 
 ## Changelog
 

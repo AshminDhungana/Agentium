@@ -399,10 +399,12 @@ class WaitPollService:
         if not task or task.status != TaskStatus.WAITING:
             return
         try:
-            task.fail(
-                error_message=f"WaitCondition {condition.agentium_id} execution failed: "
-                              f"{error}",
-                can_retry=False,
+            # WAITING -> FAILED is a valid transition; WAITING -> ESCALATED is NOT.
+            # Use set_status directly instead of task.fail() which tries to escalate.
+            task.set_status(
+                TaskStatus.FAILED,
+                actor_id="wait_poll_service",
+                note=f"WaitCondition {condition.agentium_id} execution failed: {error}",
             )
             logger.warning("Task %s failed due to failed execution", task.agentium_id)
         except Exception as exc:
