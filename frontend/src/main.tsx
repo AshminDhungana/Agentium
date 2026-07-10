@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import App from './App';
 import { authService } from './services/auth';
+import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import './index.css';
 
 // Initialize authentication from stored token
@@ -20,7 +21,9 @@ const queryClient = new QueryClient({
 });
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
-    <QueryClientProvider client={queryClient}>
+  <QueryClientProvider client={queryClient}>
+    <ErrorBoundary variant="page" fallbackHeading="Application Error">
       <App />
-    </QueryClientProvider>
+    </ErrorBoundary>
+  </QueryClientProvider>
 );
