@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useState, useRef, useCallback, useEffect, useLayoutEffect, Suspense } from 'react';
 import { VoiceIndicator } from '@/components/VoiceIndicator';
+import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 
 // ─── Timing constants ─────────────────────────────────────────────────────────
 //
@@ -309,9 +310,12 @@ function KeepAliveOutlet() {
                                 : 'none',
                         }}
                     >
-                        <Suspense fallback={<PageSkeleton />}>
-                            {outlet}
-                        </Suspense>
+                        {/* ErrorBoundary for failed lazy chunk loads */}
+                        <ErrorBoundary variant="widget" fallbackHeading="Page Load Failed">
+                            <Suspense fallback={<PageSkeleton />}>
+                                {outlet}
+                            </Suspense>
+                        </ErrorBoundary>
                     </div>
                 );
             })}
