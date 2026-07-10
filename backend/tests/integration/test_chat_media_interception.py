@@ -10,6 +10,7 @@ from io import BytesIO
 from backend.services.chat_service import ChatService
 from backend.models.entities.agents import HeadOfCouncil
 from backend.models.entities.user import User
+from backend.models.database import get_db_context
 
 
 class TestChatServiceMediaInterception:
@@ -26,10 +27,11 @@ class TestChatServiceMediaInterception:
         )
         seeded_db.add(head)
 
+        # Use unique username and ID to avoid conflict with seeded_db fixture's admin user
         admin = User(
-            id="user-admin-123",
-            username="admin",
-            email="admin@agentium.test",
+            id="user-admin-media-1",
+            username="admin_media_1",
+            email="admin_media_1@agentium.test",
             hashed_password="fake-hash-for-test",
             is_admin=True,
             is_active=True
@@ -53,7 +55,7 @@ class TestChatServiceMediaInterception:
             # Mock StorageService.upload_file to return fake S3 URL
             from backend.services.storage_service import storage_service
             storage_service.upload_file = MagicMock(
-                return_value="https://s3.bucket/files/user-admin-123/abc123.png"
+                return_value="https://s3.bucket/files/user-admin-media-1/abc123.png"
             )
 
             # Mock httpx download
@@ -70,7 +72,7 @@ class TestChatServiceMediaInterception:
                 result = await ChatService.process_message(head, "Show me sales", seeded_db)
 
         # Verify: content rewritten with storage URL
-        assert "https://s3.bucket/files/user-admin-123/abc123.png" in result["content"]
+        assert "https://s3.bucket/files/user-admin-media-1/abc123.png" in result["content"]
         assert "https://charts.example.com/sales.png" not in result["content"]
         assert "![Sales Chart]" in result["content"]  # alt text preserved
 
@@ -79,7 +81,7 @@ class TestChatServiceMediaInterception:
         """Bare https://.../image.jpg URL gets replaced."""
         head = HeadOfCouncil(agentium_id="HEAD00001", name="Test", is_active=True)
         seeded_db.add(head)
-        admin = User(id="user-admin-123", username="admin", email="admin@agentium.test", hashed_password="fake-hash-for-test", is_admin=True, is_active=True)
+        admin = User(id="user-admin-media-2", username="admin_media_2", email="admin_media_2@agentium.test", hashed_password="fake-hash-for-test", is_admin=True, is_active=True)
         seeded_db.add(admin)
         seeded_db.commit()
 
@@ -96,7 +98,7 @@ class TestChatServiceMediaInterception:
 
             from backend.services.storage_service import storage_service
             storage_service.upload_file = MagicMock(
-                return_value="https://s3.bucket/files/user-admin-123/xyz789.jpg"
+                return_value="https://s3.bucket/files/user-admin-media-2/xyz789.jpg"
             )
 
             with patch("backend.services.media_interceptor.httpx.AsyncClient") as mock_client_class:
@@ -110,7 +112,7 @@ class TestChatServiceMediaInterception:
 
                 result = await ChatService.process_message(head, "Show photo", seeded_db)
 
-        assert "https://s3.bucket/files/user-admin-123/xyz789.jpg" in result["content"]
+        assert "https://s3.bucket/files/user-admin-media-2/xyz789.jpg" in result["content"]
         assert "https://cdn.example.com/photo.jpg" not in result["content"]
 
     @pytest.mark.asyncio
@@ -118,7 +120,7 @@ class TestChatServiceMediaInterception:
         """Text without media URLs passes through unchanged."""
         head = HeadOfCouncil(agentium_id="HEAD00001", name="Test", is_active=True)
         seeded_db.add(head)
-        admin = User(id="user-admin-123", username="admin", email="admin@agentium.test", hashed_password="fake-hash-for-test", is_admin=True, is_active=True)
+        admin = User(id="user-admin-media-3", username="admin_media_3", email="admin_media_3@agentium.test", hashed_password="fake-hash-for-test", is_admin=True, is_active=True)
         seeded_db.add(admin)
         seeded_db.commit()
 
@@ -147,7 +149,7 @@ class TestChatServiceMediaInterception:
         """Failed media download preserves original URL, doesn't crash."""
         head = HeadOfCouncil(agentium_id="HEAD00001", name="Test", is_active=True)
         seeded_db.add(head)
-        admin = User(id="user-admin-123", username="admin", email="admin@agentium.test", hashed_password="fake-hash-for-test", is_admin=True, is_active=True)
+        admin = User(id="user-admin-media-4", username="admin_media_4", email="admin_media_4@agentium.test", hashed_password="fake-hash-for-test", is_admin=True, is_active=True)
         seeded_db.add(admin)
         seeded_db.commit()
 
@@ -183,7 +185,7 @@ class TestChatServiceMediaInterception:
         """New storage URLs stored in ChatMessage metadata.media_urls."""
         head = HeadOfCouncil(agentium_id="HEAD00001", name="Test", is_active=True)
         seeded_db.add(head)
-        admin = User(id="user-admin-123", username="admin", email="admin@agentium.test", hashed_password="fake-hash-for-test", is_admin=True, is_active=True)
+        admin = User(id="user-admin-media-5", username="admin_media_5", email="admin_media_5@agentium.test", hashed_password="fake-hash-for-test", is_admin=True, is_active=True)
         seeded_db.add(admin)
         seeded_db.commit()
 
@@ -200,7 +202,7 @@ class TestChatServiceMediaInterception:
 
             from backend.services.storage_service import storage_service
             storage_service.upload_file = MagicMock(
-                return_value="https://s3.bucket/files/user-admin-123/chart.png"
+                return_value="https://s3.bucket/files/user-admin-media-5/chart.png"
             )
 
             with patch("backend.services.media_interceptor.httpx.AsyncClient") as mock_client_class:
@@ -220,4 +222,4 @@ class TestChatServiceMediaInterception:
         assert msg is not None
         assert msg.metadata is not None
         assert "media_urls" in msg.metadata
-        assert "https://s3.bucket/files/user-admin-123/chart.png" in msg.metadata["media_urls"]
+        assert "https://s3.bucket/files/user-admin-media-5/chart.png" in msg.metadata["media_urls"]

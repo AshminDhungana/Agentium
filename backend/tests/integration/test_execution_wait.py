@@ -9,19 +9,19 @@ from datetime import datetime
 from backend.services.remote_executor.service import RemoteExecutorService
 from backend.services.agent_orchestrator import AgentOrchestrator
 from backend.services.wait_poll_service import WaitPollService
-from backend.models.entities.wait_condition import WaitStrategy, WaitConditionStatus
+from backend.models.entities.wait_condition import WaitStrategy, WaitConditionStatus, WaitCondition
 from backend.models.entities.task import Task, TaskStatus
 from backend.models.entities.remote_execution import RemoteExecutionRecord, ExecutionStatus
-from backend.models.database import get_db_context
+from backend.models.entities.agents import Agent
 
 
 class TestExecutionWaitIntegration:
     """End-to-end test of agent waiting for execution completion."""
 
     @pytest.fixture
-    def db(self):
-        with get_db_context() as db:
-            yield db
+    def db(self, seeded_db):
+        """Use the seeded_db fixture which provides proper transaction handling."""
+        return seeded_db
 
     @pytest.fixture
     def test_task(self, db):
@@ -36,11 +36,29 @@ class TestExecutionWaitIntegration:
         db.commit()
         db.refresh(task)
         yield task
-        # Cleanup
-        db.query(WaitCondition).filter(WaitCondition.task_id == task.id).delete()
-        db.query(RemoteExecutionRecord).filter(RemoteExecutionRecord.task_id == task.id).delete()
-        db.delete(task)
+        # Cleanup - use try/except to handle case where session is already rolled back
+        try:
+            db.query(WaitCondition).filter(WaitCondition.task_id == task.id).delete()
+            db.query(RemoteExecutionRecord).filter(RemoteExecutionRecord.task_id == task.id).delete()
+            db.delete(task)
+            db.commit()
+        except Exception:
+            db.rollback()
+
+    def _create_execution_record(self, db, execution_id, task_id, agentium_id="40001"):
+        """Helper to create a RemoteExecutionRecord with required agentium_id."""
+        record = RemoteExecutionRecord(
+            execution_id=execution_id,
+            agent_id="30001",
+            agentium_id=agentium_id,
+            task_id=task_id,
+            code="result = {'value': 42}",
+            language="python",
+            status=ExecutionStatus.RUNNING,
+        )
+        db.add(record)
         db.commit()
+        return record
 
     def test_agent_can_wait_for_execution_completion(self, db, test_task):
         """
@@ -51,16 +69,7 @@ class TestExecutionWaitIntegration:
         # (In integration test, we create a mock execution record directly)
         execution_id = f"exec_test_{int(time.time())}"
 
-        record = RemoteExecutionRecord(
-            execution_id=execution_id,
-            agent_id="30001",
-            task_id=test_task.id,
-            code="result = {'value': 42}",
-            language="python",
-            status=ExecutionStatus.RUNNING,
-        )
-        db.add(record)
-        db.commit()
+        record = self._create_execution_record(db, execution_id, test_task.id)
 
         # 2. Agent enters WAIT state via orchestrator
         orchestrator = AgentOrchestrator(db)
@@ -105,16 +114,7 @@ class TestExecutionWaitIntegration:
         """If execution fails, wait condition expires and task fails."""
         execution_id = f"exec_fail_{int(time.time())}"
 
-        record = RemoteExecutionRecord(
-            execution_id=execution_id,
-            agent_id="30001",
-            task_id=test_task.id,
-            code="raise Exception('boom')",
-            language="python",
-            status=ExecutionStatus.RUNNING,
-        )
-        db.add(record)
-        db.commit()
+        record = self._create_execution_record(db, execution_id, test_task.id, agentium_id="40002")
 
         orchestrator = AgentOrchestrator(db)
         orchestrator.enter_wait(
