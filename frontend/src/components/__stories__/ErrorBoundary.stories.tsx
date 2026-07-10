@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { ErrorBoundary } from '../common/ErrorBoundary';
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 
 /**
  * ErrorBoundary stories — renders a component that intentionally throws errors
@@ -8,6 +8,11 @@ import React from 'react';
  */
 
 const BrokenComponent = () => { throw new Error('Intentional crash for Storybook!'); };
+
+// Simulate a lazy component that fails to load
+const FailingLazyComponent = lazy(() =>
+  Promise.reject(new Error('Chunk load failed'))
+);
 
 const meta: Meta<typeof ErrorBoundary> = {
   title: 'Common/ErrorBoundary',
@@ -49,6 +54,34 @@ export const PageFallback: Story = {
   render: (args) => (
     <ErrorBoundary {...args}>
       <BrokenComponent />
+    </ErrorBoundary>
+  ),
+};
+
+// New story: Root-level error boundary (as used in main.tsx)
+export const RootErrorFallback: Story = {
+  args: {
+    variant: 'page',
+    fallbackHeading: 'Application Error',
+  },
+  render: (args) => (
+    <ErrorBoundary {...args}>
+      <BrokenComponent />
+    </ErrorBoundary>
+  ),
+};
+
+// New story: Widget error boundary for chunk loading (as used in MainLayout)
+export const ChunkLoadErrorFallback: Story = {
+  args: {
+    variant: 'widget',
+    fallbackHeading: 'Page Load Failed',
+  },
+  render: (args) => (
+    <ErrorBoundary {...args}>
+      <Suspense fallback={<div>Loading...</div>}>
+        <FailingLazyComponent />
+      </Suspense>
     </ErrorBoundary>
   ),
 };
