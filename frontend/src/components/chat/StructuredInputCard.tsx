@@ -6,9 +6,9 @@ import { CardQuestion, type QuestionValue } from './CardQuestion';
 import { CardSummary } from './CardSummary';
 
 const CONTAINER =
-  'my-2 rounded-xl border border-[#1e2535] bg-[#161b27] p-4 shadow-sm transition-all duration-200';
+  'my-2 max-w-full rounded-xl border border-[#1e2535] bg-[#161b27] p-4 shadow-sm transition-all duration-200 motion-reduce:transition-none';
 const CONFIRM_BTN =
-  'flex items-center gap-2 px-5 py-2 bg-indigo-600 dark:bg-indigo-500 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 dark:hover:bg-indigo-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-md shadow-indigo-500/25';
+  'flex items-center gap-2 px-5 py-2 bg-indigo-600 dark:bg-indigo-500 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 dark:hover:bg-indigo-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-md shadow-indigo-500/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-[#161b27]';
 
 function isAnswered(q: StructuredInputCardPayload['questions'][number], v: QuestionValue): boolean {
   if (v.otherText && v.otherText.trim() !== '') return true;

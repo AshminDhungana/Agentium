@@ -11,7 +11,7 @@ interface Props {
 
 const OTHER_ID = '__other__';
 const OPTION_ROW =
-  'flex items-center gap-3 w-full px-3.5 py-2.5 rounded-xl border text-sm transition-colors cursor-pointer min-h-[44px]';
+  'flex items-center gap-3 w-full px-3.5 py-2.5 rounded-xl border text-sm transition-colors cursor-pointer min-h-[44px] focus-within:ring-2 focus-within:ring-indigo-500';
 
 export function CardQuestion({ q, value, onChange, disabled }: Props) {
   const isMulti = q.input_type === 'multi_select';
