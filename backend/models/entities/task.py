@@ -62,15 +62,16 @@ class TaskType(str, enum.Enum):
     # Governance types
     CONSTITUTIONAL = "constitutional"
     SYSTEM = "system"
-    
+
     # User task types (NEW)
     ONE_TIME = "one_time"      # NEW: Single execution task
     RECURRING = "recurring"    # NEW: Recurring scheduled task
-    
+
     # Execution types
     EXECUTION = "execution"
     RESEARCH = "research"
     AUTOMATION = "automation"
+    BROWSER = "browser"          # NEW: live-screenshot/stream browser task
     ANALYSIS = "analysis"
     COMMUNICATION = "communication"
     CONSTITUTION_READ = "constitution_read"
