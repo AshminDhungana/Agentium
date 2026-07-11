@@ -29,7 +29,12 @@ def test_ws_card_response_persisted(client, db_session, auth_headers, ws_client)
     })
     # The orchestrator persists a sovereign message on a background event loop,
     # so poll briefly for the row instead of reading immediately (avoids a race).
-    from models.entities.chat_message import ChatMessage
+    # NB: import via the `backend.models.entities` root (consistent with the rest
+    # of the codebase). Importing the bare `models.entities` root creates a
+    # *parallel* package in sys.modules, which re-declares ReasoningTraceModel's
+    # `reasoning_traces` table onto the shared Base.metadata and raises
+    # "Table 'reasoning_traces' is already defined".
+    from backend.models.entities.chat_message import ChatMessage
     deadline = time.time() + 2.0
     found = False
     while time.time() < deadline:
