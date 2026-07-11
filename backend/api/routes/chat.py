@@ -11,7 +11,10 @@ Changes vs original:
 import json
 import logging
 import uuid
+from datetime import datetime
 from typing import AsyncGenerator, List, Optional
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, status
 from backend.core.exceptions import BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, TooLargeError, RateLimitError, InternalServerError, ServiceUnavailableError
 from fastapi.responses import StreamingResponse
@@ -24,6 +27,10 @@ from backend.models.entities import Agent, HeadOfCouncil, Task
 from backend.models.entities.user import User
 from backend.services.chat_service import ChatService
 from backend.services.model_provider import ModelService
+from backend.models.schemas.structured_input import StructuredInputCard
+from backend.services.structured_input_service import render_external_text
+from backend.api.routes.websocket import manager as ws_manager
+from backend.models.entities.chat_message import ChatMessage as ChatMessageEntity
 
 logger = logging.getLogger(__name__)
 from backend.core.auth import get_current_active_user
@@ -359,6 +366,53 @@ async def send_message(
         task_created=response.get("task_created", False),
         task_id=response.get("task_id"),
     )
+
+
+# ═══════════════════════════════════════════════════════════
+# Structured Input Card
+# ═══════════════════════════════════════════════════════════
+
+@router.post(
+    "/card",
+    summary="Send a structured input card",
+    description="Persist an agent-issued structured input card and broadcast it to the chat thread.",
+    responses={
+        200: {"description": "Success", "model": SuccessResponseExample},
+        400: {"description": "Bad Request", "model": ErrorResponseExample},
+        401: {"description": "Unauthorized", "model": ErrorResponseExample},
+        403: {"description": "Forbidden", "model": ErrorResponseExample},
+        404: {"description": "Not Found", "model": ErrorResponseExample},
+        429: {"description": "Too Many Requests", "model": ErrorResponseExample},
+        500: {"description": "Internal Server Error", "model": ErrorResponseExample},
+    },
+)
+async def send_structured_card(
+    card: StructuredInputCard,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[dict, Depends(get_current_active_user)],
+):
+    """Persist an agent-issued structured input card and broadcast it to the chat thread."""
+    msg = ChatMessageEntity(
+        id=str(uuid.uuid4()),
+        user_id=str(current_user.get("user_id", "")),
+        role="head_of_council",
+        content=card.title or "Please answer the following:",
+        message_type="input_card",
+        message_metadata={"card": card.model_dump()},
+        created_at=datetime.utcnow(),
+        is_deleted="N",
+    )
+    db.add(msg)
+    db.commit()
+    db.refresh(msg)
+    # External channels get the plain-text fallback instead of the inline card.
+    await ws_manager.broadcast({
+        "type": "message",
+        "role": "head_of_council",
+        "message": msg.to_dict(),
+        "external_text": render_external_text(card),
+    })
+    return {"status": "ok", "message": msg.to_dict()}
 
 
 async def _stream_response(
