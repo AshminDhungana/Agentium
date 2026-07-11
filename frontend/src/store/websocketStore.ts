@@ -7,6 +7,7 @@ import { create } from 'zustand';
 import { showToast } from '@/hooks/useToast';
 import { websocketReplayApi } from '@/services/websocketReplay';
 import { logger } from '@/utils/logger';
+import type { StructuredInputAnswer } from '../types/structuredInput';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -760,6 +761,33 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
         return false;
     },
 }));
+
+/**
+ * Submit a structured input card answer over the WebSocket.
+ * Sends a `type: 'message'` frame with empty content plus a `card_response`
+ * payload. The backend (api/routes/websocket.py) reads `card_response` and
+ * persists it on the sovereign message (Task 4).
+ */
+export function submitCardAnswer(answer: StructuredInputAnswer): boolean {
+    const s = useWebSocketStore.getState();
+    if (s._ws?.readyState === WebSocket.OPEN) {
+        try {
+            s._ws.send(JSON.stringify({
+                type: 'message',
+                content: '',
+                timestamp: new Date().toISOString(),
+                attachments: [],
+                card_response: answer,
+            }));
+            return true;
+        } catch (e) {
+            logger.error('[WebSocket] submitCardAnswer error:', e);
+            return false;
+        }
+    }
+    logger.warn('[WebSocket] Not connected — cannot submit card answer');
+    return false;
+}
 
 // ── Cross-tab token change ────────────────────────────────────────────────────
 if (typeof window !== 'undefined') {
