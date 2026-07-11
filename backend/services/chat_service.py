@@ -67,6 +67,34 @@ class ChatService:
                 logger.warning(f"Default config fallback failed for Head {head.agentium_id}: {fallback_err}")
         # ─────────────────────────────────────────────────────────────────────────
 
+        # ── Persist the inbound (user) turn BEFORE any model round-trip ──────────
+        # The user's message — including structured card answers carried in
+        # extra_metadata["card_response"] — must be recorded even when no model
+        # provider is configured.  The old persistence code lived only in the
+        # post-LLM block, so a missing provider (CI, headless deploys) silently
+        # dropped the inbound message and any attached card answer.
+        from backend.models.entities.user import User
+        from backend.models.entities.chat_message import ChatMessage as ChatMsg
+        import uuid as _uuid
+        sovereign_user = db.query(User).filter_by(is_admin=True, is_active=True).first()
+
+        if sovereign_user:
+            try:
+                db.add(ChatMsg(
+                    id=str(_uuid.uuid4()),
+                    user_id=str(sovereign_user.id),
+                    role="sovereign",
+                    content=message,
+                    message_metadata={**{"source": "websocket"}, **(extra_metadata or {})},
+                ))
+                db.commit()
+            except Exception as _persist_err:
+                logger.warning(f"ChatMessage (inbound) persist failed (non-fatal): {_persist_err}")
+                try:
+                    db.rollback()
+                except Exception:
+                    pass
+
         # Register context tracking if not exists
         context_manager.register_agent(
             head.agentium_id,
@@ -206,10 +234,6 @@ Address the Sovereign respectfully. If they issue a command that requires execut
         tokens_used = result.get("tokens_used", 0)
         context_status = context_manager.update_usage(head.agentium_id, tokens_used)
 
-        # ── Get sovereign user for media interception and channel broadcast ────────
-        from backend.models.entities.user import User
-        sovereign_user = db.query(User).filter_by(is_admin=True, is_active=True).first()
-
         # ── System-Generated Media Interception (Issue #11) ────────────────────
         # Intercept media URLs in LLM response, download & store permanently,
         # rewrite content with storage URLs before persistence + broadcast.
@@ -234,24 +258,14 @@ Address the Sovereign respectfully. If they issue a command that requires execut
         # Broadcast response to user's external channels (Unified Inbox)
         from backend.services.channel_manager import ChannelManager
 
-        # ── Persist both turns to ChatMessage so history survives navigation ──
+        # ── Persist the Head-of-Council turn.  The inbound (user) turn is ──
+        #    persisted earlier, before the model round-trip, so it is never lost.
         if sovereign_user:
             try:
-                from backend.models.entities.chat_message import ChatMessage as ChatMsg
-                import uuid as _uuid
-                user_str_id = str(sovereign_user.id)
                 msg_id = str(_uuid.uuid4())
-
-                db.add(ChatMsg(
-                    id=str(_uuid.uuid4()),
-                    user_id=user_str_id,
-                    role="sovereign",
-                    content=message,
-                    message_metadata={**{"source": "websocket"}, **(extra_metadata or {})},
-                ))
                 db.add(ChatMsg(
                     id=msg_id,
-                    user_id=user_str_id,
+                    user_id=str(sovereign_user.id),
                     role="head_of_council",
                     content=result["content"],
                     message_metadata={
@@ -262,7 +276,7 @@ Address the Sovereign respectfully. If they issue a command that requires execut
                 ))
                 db.commit()
             except Exception as _persist_err:
-                logger.warning(f"ChatMessage persist failed (non-fatal): {_persist_err}")
+                logger.warning(f"ChatMessage (outbound) persist failed (non-fatal): {_persist_err}")
                 try:
                     db.rollback()
                 except Exception:
