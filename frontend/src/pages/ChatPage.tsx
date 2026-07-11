@@ -7,7 +7,9 @@ import { useShallow } from 'zustand/react/shallow';
 import { useAuthStore } from '@/store/authStore';
 import { useWebSocketStore } from '@/store/websocketStore';
 import { useChatStore } from '@/store/chatStore';
+import { submitCardAnswer } from '@/store/websocketStore';
 import type { Message, MessageMetadata, MessageAttachment as Attachment } from '@/store/chatStore';
+import { StructuredInputCard } from '@/components/chat/StructuredInputCard';
 import { inboxApi, UnifiedConversation, UnifiedMessage } from '@/services/inboxApi';
 import { api } from '@/services/api';
 import {
@@ -283,6 +285,11 @@ export function ChatPage() {
                 // with loadChatHistory. It is consumed and reset in the scroll
                 // useEffect below (Issue 3).
                 setMessages((prev) => [...prev, newMessage]);
+                // A structured input card arrived — register it as the active card
+                // (replacing any previously-unanswered one). See chatStore lifecycle.
+                if (newMessage.metadata?.card) {
+                    useChatStore.getState().registerCard(newMessage.metadata.card.card_id, true);
+                }
                 if (msg.metadata?.task_created) {
                     showToast.success(`Task ${msg.metadata.task_id} created`);
                 }
@@ -441,6 +448,11 @@ export function ChatPage() {
                 // into the AI prompt without a second round-trip to storage.
                 extracted_text: f.apiFile!.extracted_text ?? null,
             }));
+
+        // If an active structured input card exists, a free-text reply means
+        // the user abandoned it — auto-dismiss rather than leaving it dangling.
+        const activeCardId = useChatStore.getState().activeCardId;
+        if (activeCardId) useChatStore.getState().dismissCard(activeCardId);
 
         // Optimistically append the user message
         const userMsgId = crypto.randomUUID();
@@ -990,38 +1002,47 @@ export function ChatPage() {
                                             </div>
 
                                             <div className={`flex flex-col max-w-[75%] ${isUser ? 'items-end' : 'items-start'}`}>
-                                                <div className={`px-4 py-3 rounded-2xl ${isUser ? 'bg-gradient-to-br from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/20 dark:shadow-blue-900/40'
-                                                        : isError ? 'bg-orange-50 dark:bg-orange-500/10 border border-orange-200 dark:border-orange-500/20 text-orange-900 dark:text-orange-300'
-                                                            : message.role === 'system' ? 'bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-900 dark:text-red-300'
-                                                                : 'bg-white dark:bg-[#161b27] border border-gray-200 dark:border-[#1e2535] text-gray-900 dark:text-gray-100 shadow-sm dark:shadow-[0_2px_12px_rgba(0,0,0,0.2)]'
-                                                    }`}>
-                                                    <p className="text-[15px] leading-relaxed whitespace-pre-wrap">{message.content}</p>
-                                                    {message.attachments?.map((att, i) => (
-                                                        <div key={i}>{renderAttachment(att, isUser)}</div>
-                                                    ))}
-                                                    {message.metadata?.task_created && (
-                                                        <div className="mt-3 pt-3 border-t border-white/20 flex items-center gap-2 text-xs">
-                                                            <CheckCircle className="w-3.5 h-3.5" />
-                                                            Task {message.metadata.task_id} created
-                                                        </div>
-                                                    )}
-                                                </div>
+                                                {message.metadata?.card ? (
+                                                    <StructuredInputCard
+                                                        card={message.metadata.card}
+                                                        onSubmit={(answer) => submitCardAnswer(answer)}
+                                                    />
+                                                ) : (
+                                                    <div className={`px-4 py-3 rounded-2xl ${isUser ? 'bg-gradient-to-br from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/20 dark:shadow-blue-900/40'
+                                                            : isError ? 'bg-orange-50 dark:bg-orange-500/10 border border-orange-200 dark:border-orange-500/20 text-orange-900 dark:text-orange-300'
+                                                                : message.role === 'system' ? 'bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-900 dark:text-red-300'
+                                                                    : 'bg-white dark:bg-[#161b27] border border-gray-200 dark:border-[#1e2535] text-gray-900 dark:text-gray-100 shadow-sm dark:shadow-[0_2px_12px_rgba(0,0,0,0.2)]'
+                                                        }`}>
+                                                        <p className="text-[15px] leading-relaxed whitespace-pre-wrap">{message.content}</p>
+                                                        {message.attachments?.map((att, i) => (
+                                                            <div key={i}>{renderAttachment(att, isUser)}</div>
+                                                        ))}
+                                                        {message.metadata?.task_created && (
+                                                            <div className="mt-3 pt-3 border-t border-white/20 flex items-center gap-2 text-xs">
+                                                                <CheckCircle className="w-3.5 h-3.5" />
+                                                                Task {message.metadata.task_id} created
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
                                                 <div className={`flex items-center gap-2 mt-1.5 px-1 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
                                                     <span className="text-xs text--600 dark:text-gray-500">
                                                         {formatTimestamp(message.timestamp)}
                                                     </span>
-                                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                        <button onClick={() => copyMessage(message.content)}
-                                                            className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-[#1e2535] text--600 dark:text-gray-500 transition-colors" title="Copy">
-                                                            <Copy className="w-3 h-3" />
-                                                        </button>
-                                                        {!isUser && voiceAvailable && (
-                                                            <button onClick={() => handleSpeakMessage(message.id, message.content)}
-                                                                className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-[#1e2535] text--600 dark:text-gray-500 transition-colors" title="Read aloud">
-                                                                {isSpeaking === message.id ? <VolumeX className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
+                                                    {!message.metadata?.card && (
+                                                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            <button onClick={() => copyMessage(message.content)}
+                                                                className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-[#1e2535] text--600 dark:text-gray-500 transition-colors" title="Copy">
+                                                                <Copy className="w-3 h-3" />
                                                             </button>
-                                                        )}
-                                                    </div>
+                                                            {!isUser && voiceAvailable && (
+                                                                <button onClick={() => handleSpeakMessage(message.id, message.content)}
+                                                                    className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-[#1e2535] text--600 dark:text-gray-500 transition-colors" title="Read aloud">
+                                                                    {isSpeaking === message.id ? <VolumeX className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>
