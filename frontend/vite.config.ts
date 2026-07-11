@@ -37,6 +37,16 @@ export default defineConfig({
   },
   test: {
     projects: [{
+      // Component unit tests for the structured input card (jsdom).
+      // Scoped to src/components/chat so it never disturbs the other suites.
+      test: {
+        name: 'unit',
+        environment: 'jsdom',
+        globals: true,
+        setupFiles: ['./src/test/setup.ts'],
+        include: ['src/components/chat/**/*.test.{ts,tsx}'],
+      },
+    }, {
       extends: true,
       plugins: [
       // The plugin will run tests for the stories defined in your Storybook config
