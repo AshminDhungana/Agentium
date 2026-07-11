@@ -3,6 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { showToast } from '@/hooks/useToast';
 import { api } from '@/services/api';
 import { chatStreamApi } from '@/services/chatStream';
+import type { StructuredInputCardPayload } from '../types/structuredInput';
 
 export interface MessageAttachment {
     name: string;
@@ -25,9 +26,9 @@ export interface MessageMetadata {
     source?: string;
     /** True when the message bubble should render in error styling */
     error?: boolean;
-    prompt_type?: string;
-    requires_response?: boolean;
     connection_id?: number;
+    /** structured input card payload (replaces prompt_type/requires_response) */
+    card?: StructuredInputCardPayload;
 }
 
 export interface Message {
