@@ -875,11 +875,15 @@ OpenAI TTS — Text-to-Speech
 
 When the system needs structured input from a user inside the **chat window**, it renders an inline multi-select checkbox card directly in the message thread. The user can select multiple options at once and confirm with a single click, keeping the conversation compact.
 
+**Status:** ✅ Implemented (2026-07-11). Implemented as one `StructuredInputCard` component (N=1..3 questions); the card is a `ChatMessage` with `message_type='input_card'` + `metadata.card`; external channels use `render_external_text()`.
+
 This interaction is **exclusive to the chat window**. When the user is on an external channel such as WhatsApp, SMS, or email, the system falls back to a plain text message listing numbered options and asks for a comma-separated reply.
 
 ### 19.1.1 Multi-Question Elicitation Card (Chat-Window Only)
 
 An extension of the multi-select checkbox card that lets the Head of Council (or any agent) ask **a small batch of questions in a single turn**, instead of one question per card. This reduces back-and-forth when the agent needs a few related pieces of information to proceed (e.g. destination, budget, dates) — without recreating the cognitive overload of a long form.
+
+**Status:** ✅ Implemented (2026-07-11). Same `StructuredInputCard` component; questions ordered in payload array order (backend orders easy→hard), hard cap 3 enforced by the Pydantic schema, `>3` chunked via `chunk_questions` sharing a `card_group_id`.
 
 **Batching rule (informed by form-UX research):**
 
