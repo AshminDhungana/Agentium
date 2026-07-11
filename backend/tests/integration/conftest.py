@@ -356,12 +356,41 @@ def ws_client(db_session, redis_client, vector_store, celery_eager):
     original_get_vector_store = backend.core.vector_store.get_vector_store
     backend.core.vector_store.get_vector_store = lambda: vector_store
 
-    with TestClient(app) as test_client:
-        with test_client.websocket_connect("/ws/chat") as ws:
-            yield ws
+    # The WebSocket endpoint opens its own DB sessions via get_fresh_db()
+    # (SessionLocal), a *separate connection* that cannot see the
+    # transactional test session's uncommitted seeded data (Head 00001, the
+    # admin user).  Genesis only flush()es under TESTING, so the WS handler's
+    # separate connection finds neither — auth fails, the card_response
+    # message is never processed, and persistence can't be observed.
+    #
+    # Production is unaffected: there the dependency override is absent and
+    # get_fresh_db() keeps opening real SessionLocal() sessions against the
+    # live DB (where the admin/head are committed).  We only realign the WS
+    # handler's sessions with the test's shared session for the connection's
+    # lifetime so it sees the same seeded transaction the HTTP routes do.
+    import backend.api.routes.websocket as ws_module
+    from contextlib import contextmanager
 
-    backend.core.vector_store.get_vector_store = original_get_vector_store
-    app.dependency_overrides.clear()
+    original_get_fresh_db = ws_module.get_fresh_db
+
+    @contextmanager
+    def _shared_fresh_db():
+        # Yield the test's shared session directly.  Do NOT commit/close it
+        # here — process_message() manages its own commits (savepoints under
+        # the test's outer transaction) and the session is owned by the
+        # db_session fixture, which rolls back at teardown.
+        yield db_session
+
+    ws_module.get_fresh_db = _shared_fresh_db
+
+    try:
+        with TestClient(app) as test_client:
+            with test_client.websocket_connect("/ws/chat") as ws:
+                yield ws
+    finally:
+        ws_module.get_fresh_db = original_get_fresh_db
+        backend.core.vector_store.get_vector_store = original_get_vector_store
+        app.dependency_overrides.clear()
 
 
 @pytest_asyncio.fixture(scope="function")
