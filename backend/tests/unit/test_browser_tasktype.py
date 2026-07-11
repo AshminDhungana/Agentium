@@ -1,5 +1,5 @@
 # backend/tests/unit/test_browser_tasktype.py
-from models.entities.task import TaskType
+from backend.models.entities.task import TaskType
 from models.schemas.task import TaskCreate
 
 def test_browser_tasktype_exists():
