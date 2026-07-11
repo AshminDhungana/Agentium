@@ -13,7 +13,7 @@ export function CardSummary({ card, values, dismissed }: {
   return (
     <div className="my-2 rounded-xl border border-[#1e2535] bg-[#161b27]/60 p-4" role="status" aria-live="polite">
       <p className="text-xs font-medium text-slate-400 mb-2">
-        {dismissed ? 'Answered in chat' : 'Your answers'}
+        {dismissed ? 'No longer accepting responses' : 'Your answers'}
       </p>
       <dl className="space-y-1.5">
         {card.questions.map((q) => (

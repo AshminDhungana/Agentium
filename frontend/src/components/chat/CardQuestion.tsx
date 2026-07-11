@@ -6,14 +6,13 @@ interface Props {
   q: Q;
   value: QuestionValue;
   onChange: (next: QuestionValue) => void;
-  disabled?: boolean;
 }
 
 const OTHER_ID = '__other__';
 const OPTION_ROW =
   'flex items-center gap-3 w-full px-3.5 py-2.5 rounded-xl border text-sm transition-colors cursor-pointer min-h-[44px] focus-within:ring-2 focus-within:ring-indigo-500';
 
-export function CardQuestion({ q, value, onChange, disabled }: Props) {
+export function CardQuestion({ q, value, onChange }: Props) {
   const isMulti = q.input_type === 'multi_select';
   const otherChecked = value.otherText !== null;
 
@@ -27,8 +26,13 @@ export function CardQuestion({ q, value, onChange, disabled }: Props) {
     }
   };
 
-  const setOther = (text: string) =>
-    onChange({ selectedIds: value.selectedIds, otherText: text === '' ? null : text });
+  const setOther = (text: string) => {
+    const otherText = text === '' ? null : text;
+    // Radio semantics: enabling "Other" on a single-select deselects the fixed
+    // options so the answer can't carry both an option id and free text.
+    const selectedIds = !isMulti && otherText !== null ? [] : value.selectedIds;
+    onChange({ selectedIds, otherText });
+  };
 
   const Wrapper = isMulti ? 'group' : 'radiogroup';
   return (
@@ -36,7 +40,6 @@ export function CardQuestion({ q, value, onChange, disabled }: Props) {
       role={Wrapper}
       aria-labelledby={`q-${q.id}-label`}
       className="border-t border-[#1e2535] first:border-t-0 pt-4 first:pt-0"
-      disabled={disabled}
     >
       <legend id={`q-${q.id}-label`} className="text-sm font-medium text-slate-700 dark:text-slate-200 mb-2">
         {q.question}

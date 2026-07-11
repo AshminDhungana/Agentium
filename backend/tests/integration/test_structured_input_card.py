@@ -1,4 +1,5 @@
-import json
+import time
+
 from models.schemas.structured_input import CardOption, CardQuestion, StructuredInputCard
 
 
@@ -15,6 +16,7 @@ def test_post_card_creates_input_card_message(client, db_session, auth_headers):
     assert body["message"]["message_type"] == "input_card"
     assert body["message"]["metadata"]["card"]["card_id"] == "card-1"
 
+
 def test_ws_card_response_persisted(client, db_session, auth_headers, ws_client):
     ws_client.send_json({"type": "auth", "token": auth_headers["Authorization"].split(" ")[1]})
     # receive welcome/system
@@ -25,8 +27,17 @@ def test_ws_card_response_persisted(client, db_session, auth_headers, ws_client)
         "card_response": {"card_id": "card-1",
                            "answers": [{"question_id": "q1", "selected_option_ids": ["a"], "other_text": None}]},
     })
-    # The orchestrator persists a sovereign message; poll DB for metadata.card_response
+    # The orchestrator persists a sovereign message on a background event loop,
+    # so poll briefly for the row instead of reading immediately (avoids a race).
     from models.entities.chat_message import ChatMessage
-    rows = db_session.query(ChatMessage).filter(
-        ChatMessage.message_metadata.isnot(None)).all()
-    assert any(r.message_metadata.get("card_response", {}).get("card_id") == "card-1" for r in rows)
+    deadline = time.time() + 2.0
+    found = False
+    while time.time() < deadline:
+        db_session.expire_all()
+        rows = db_session.query(ChatMessage).filter(
+            ChatMessage.message_metadata.isnot(None)).all()
+        if any(r.message_metadata.get("card_response", {}).get("card_id") == "card-1" for r in rows):
+            found = True
+            break
+        time.sleep(0.05)
+    assert found, "card_response was not persisted within the timeout"

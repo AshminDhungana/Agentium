@@ -14,7 +14,7 @@ class CardQuestion(BaseModel):
     question: str
     input_type: Literal["single_select", "multi_select"]
     required: bool = True
-    options: list[CardOption]
+    options: list[CardOption] = Field(..., min_length=1)  # at least one fixed option (Other is implicit)
 
 
 class StructuredInputCard(BaseModel):

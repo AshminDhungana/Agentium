@@ -4,6 +4,7 @@ import type { StructuredInputCardPayload, StructuredInputAnswer, CardAnswerQuest
 import { useChatStore } from '../../store/chatStore';
 import { CardQuestion, type QuestionValue } from './CardQuestion';
 import { CardSummary } from './CardSummary';
+import { showToast } from '@/hooks/useToast';
 
 const CONTAINER =
   'my-2 max-w-full rounded-xl border border-[#1e2535] bg-[#161b27] p-4 shadow-sm transition-all duration-200 motion-reduce:transition-none';
@@ -15,7 +16,7 @@ function isAnswered(q: StructuredInputCardPayload['questions'][number], v: Quest
   return v.selectedIds.length > 0;
 }
 
-export function StructuredInputCard({ card, onSubmit }: { card: StructuredInputCardPayload; onSubmit: (a: StructuredInputAnswer) => void }) {
+export function StructuredInputCard({ card, onSubmit }: { card: StructuredInputCardPayload; onSubmit: (a: StructuredInputAnswer) => boolean | void }) {
   const status = useChatStore((s) => s.cardStatus[card.card_id]);
   const confirmCard = useChatStore((s) => s.confirmCard);
   const expireCard = useChatStore((s) => s.expireCard);
@@ -54,13 +55,23 @@ export function StructuredInputCard({ card, onSubmit }: { card: StructuredInputC
     answers: card.questions.map<CardAnswerQuestion>((q) => ({
       question_id: q.id,
       selected_option_ids: values[q.id].selectedIds,
-      other_text: values[q.id].otherText,
+      // Drop the whitespace-only "Other" sentinel so a half-typed Other
+      // doesn't emit a stray space in the persisted answer.
+      other_text: values[q.id].otherText?.trim() || null,
     })),
   });
 
   const handleConfirm = () => {
     if (!canConfirm) return;
-    onSubmit(buildAnswer());
+    const answer = buildAnswer();
+    // onSubmit sends the answer over WS and returns false if it couldn't be
+    // sent. Only collapse to the summary once the answer is actually on its way —
+    // otherwise the user sees "answered" while the backend got nothing.
+    const sent = onSubmit(answer);
+    if (sent === false) {
+      showToast.error('Connection lost — your answer was not sent. Please try again.');
+      return;
+    }
     confirmCard(card.card_id);
   };
 

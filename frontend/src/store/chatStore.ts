@@ -71,6 +71,9 @@ export const useChatStore = create<ChatState>()(
             activeCardId: null,
 
             registerCard: (cardId, replaceActive) => set((s) => {
+                // Idempotent: a re-delivered card message (e.g. on WS reconnect)
+                // must not revert an already-answered/expired one back to active.
+                if (s.cardStatus[cardId]) return s;
                 const status: ChatState['cardStatus'] = { ...s.cardStatus, [cardId]: 'active' as const };
                 // "only one active card at a time": a new request replaces any unanswered one
                 if (replaceActive && s.activeCardId && s.activeCardId !== cardId) {
