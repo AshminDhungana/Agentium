@@ -12,6 +12,7 @@ from backend.api import host_access
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, Request
 from backend.core.exceptions import BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, TooLargeError, RateLimitError, InternalServerError, ServiceUnavailableError
+from backend.core.config import settings
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from backend.celery_app import celery_app
@@ -436,12 +437,33 @@ async def lifespan(app: FastAPI):
     logger.info("🎉 Agentium startup complete!")
     logger.info("   Phase 17.1: DDoS hardening active — unified RateLimitMiddleware + blocklist + payload limits")
 
+    # ─────────────────────────────────────────────────────────────
+    # 10. Browser live-screenshot streaming (Phase 14.1) — FastAPI-owned Chromium
+    # ─────────────────────────────────────────────────────────────
+    # The BrowserService owns the Playwright/Chromium process inside FastAPI
+    # (tasks run in a separate Celery process and cannot drive the browser).
+    try:
+        if settings.BROWSER_ENABLED:
+            from backend.services.browser_service import get_browser_service
+            await get_browser_service().initialize()
+            logger.info("✅ Browser service initialized (live screenshot streaming ready)")
+    except Exception as exc:  # never let Chromium failure break boot
+        logger.error(f"❌ Browser service init skipped: {exc}")
+
     yield  # ── Application runs here ──────────────────────────────
 
     # ─────────────────────────────────────────────────────────────
     # Shutdown Sequence
     # ─────────────────────────────────────────────────────────────
     logger.info("🛑 Shutting down Agentium...")
+
+    # Tear down browser service (stop active streams + close Chromium)
+    try:
+        if settings.BROWSER_ENABLED:
+            from backend.services.browser_service import get_browser_service
+            await get_browser_service().shutdown()
+    except Exception as exc:
+        logger.error(f"❌ Browser service shutdown error: {exc}")
 
     if os.environ.get("TESTING") != "true":
         try:
