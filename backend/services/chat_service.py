@@ -28,7 +28,7 @@ class ChatService:
     """Service for handling Sovereign ↔ Head of Council chat with reincarnation support."""
 
     @staticmethod
-    async def process_message(head: HeadOfCouncil, message: str, db: Session):
+    async def process_message(head: HeadOfCouncil, message: str, db: Session, extra_metadata: Optional[dict] = None):
         """
         Process message with context management and potential reincarnation.
         Preserves task state across reincarnations.
@@ -247,7 +247,7 @@ Address the Sovereign respectfully. If they issue a command that requires execut
                     user_id=user_str_id,
                     role="sovereign",
                     content=message,
-                    message_metadata={"source": "websocket"},
+                    message_metadata={**{"source": "websocket"}, **(extra_metadata or {})},
                 ))
                 db.add(ChatMsg(
                     id=msg_id,

@@ -344,6 +344,26 @@ def client(db_session, redis_client, vector_store, celery_eager):
     app.dependency_overrides.clear()
 
 
+@pytest.fixture(scope="function")
+def ws_client(db_session, redis_client, vector_store, celery_eager):
+    """A connected WebSocket session to /ws/chat, with test DB/vector overrides."""
+    def override_get_db():
+        yield db_session
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    import backend.core.vector_store
+    original_get_vector_store = backend.core.vector_store.get_vector_store
+    backend.core.vector_store.get_vector_store = lambda: vector_store
+
+    with TestClient(app) as test_client:
+        with test_client.websocket_connect("/ws/chat") as ws:
+            yield ws
+
+    backend.core.vector_store.get_vector_store = original_get_vector_store
+    app.dependency_overrides.clear()
+
+
 @pytest_asyncio.fixture(scope="function")
 async def async_client(db_session, redis_client, vector_store, celery_eager):
     """Async httpx client with ASGI transport for testing async FastAPI routes."""

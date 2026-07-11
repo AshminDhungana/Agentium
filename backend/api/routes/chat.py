@@ -45,6 +45,8 @@ class ChatMessage(BaseModel):
     # NEW: optional attachments forwarded from the frontend after file upload.
     # Each dict contains at minimum: name, type, size, url, extracted_text (optional).
     attachments: Optional[List[dict]] = Field(default=None)
+    # NEW: structured input card answer (mirrors the WebSocket card_response frame).
+    card_response: Optional[dict] = None
 
 
 class ChatResponse(BaseModel):
@@ -359,7 +361,8 @@ async def send_message(
 
     # FIX: non-streaming path also enriches the message with file content
     enriched_message = _build_enriched_message(chat_msg.message, chat_msg.attachments)
-    response = await ChatService.process_message(head, enriched_message, db)
+    extra_metadata = {"card_response": chat_msg.card_response} if chat_msg.card_response else None
+    response = await ChatService.process_message(head, enriched_message, db, extra_metadata=extra_metadata)
     return ChatResponse(
         response=response["content"],
         agent_id=head.agentium_id,

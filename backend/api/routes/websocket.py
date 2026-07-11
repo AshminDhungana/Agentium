@@ -567,10 +567,12 @@ async def websocket_chat_endpoint(
             if msg_type == "message":
                 content     = data.get("content", "").strip()
                 attachments: List[dict] = data.get("attachments") or []
+                card_response = data.get("card_response")
 
                 enriched_message = _build_enriched_message(content, attachments)
 
-                if not enriched_message:
+                # A card answer carries no free-text content; don't drop it.
+                if not enriched_message and not card_response:
                     continue
 
                 with get_fresh_db() as db:
@@ -583,7 +585,10 @@ async def websocket_chat_endpoint(
                         })
                         continue
 
-                    response = await ChatService.process_message(head, enriched_message, db)
+                    extra_metadata = {"card_response": card_response} if card_response else None
+                    response = await ChatService.process_message(
+                        head, enriched_message, db, extra_metadata=extra_metadata
+                    )
 
                 await websocket.send_json({
                     "type":      "message",
