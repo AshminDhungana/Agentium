@@ -39,6 +39,8 @@ export default defineConfig({
     projects: [{
       // Component unit tests for the structured input card (jsdom).
       // Scoped to src/components/chat so it never disturbs the other suites.
+      // extends: true pulls in the root resolve.alias ('@' -> ./src) and react() plugin.
+      extends: true,
       test: {
         name: 'unit',
         environment: 'jsdom',
