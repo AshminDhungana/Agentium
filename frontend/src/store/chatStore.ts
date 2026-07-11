@@ -45,6 +45,13 @@ interface ChatState {
     messages: Message[];
     isLoading: boolean;
     currentStreamingMessage: string;
+    // Structured input card lifecycle (only one active card at a time).
+    cardStatus: Record<string, 'active' | 'confirmed' | 'expired' | 'dismissed'>;
+    activeCardId: string | null;
+    registerCard: (cardId: string, replaceActive: boolean) => void;
+    confirmCard: (cardId: string) => void;
+    expireCard: (cardId: string) => void;
+    dismissCard: (cardId: string) => void;
     sendMessage: (content: string) => Promise<void>;
     sendStreamingMessage: (content: string, onChunk: (chunk: string) => void) => Promise<void>;
     setMessages: (updater: Message[] | ((prev: Message[]) => Message[])) => void;
@@ -60,6 +67,29 @@ export const useChatStore = create<ChatState>()(
             messages: [],
             isLoading: false,
             currentStreamingMessage: '',
+            cardStatus: {},
+            activeCardId: null,
+
+            registerCard: (cardId, replaceActive) => set((s) => {
+                const status: ChatState['cardStatus'] = { ...s.cardStatus, [cardId]: 'active' as const };
+                // "only one active card at a time": a new request replaces any unanswered one
+                if (replaceActive && s.activeCardId && s.activeCardId !== cardId) {
+                    status[s.activeCardId] = 'dismissed';
+                }
+                return { cardStatus: status, activeCardId: cardId };
+            }),
+            confirmCard: (cardId) => set((s) => ({
+                cardStatus: { ...s.cardStatus, [cardId]: 'confirmed' },
+                activeCardId: s.activeCardId === cardId ? null : s.activeCardId,
+            })),
+            expireCard: (cardId) => set((s) => ({
+                cardStatus: { ...s.cardStatus, [cardId]: 'expired' },
+                activeCardId: s.activeCardId === cardId ? null : s.activeCardId,
+            })),
+            dismissCard: (cardId) => set((s) => ({
+                cardStatus: { ...s.cardStatus, [cardId]: 'dismissed' },
+                activeCardId: s.activeCardId === cardId ? null : s.activeCardId,
+            })),
 
             // Allows external callers (ChatPage) to write messages into the store
             // so they survive navigation (component unmount/remount).
