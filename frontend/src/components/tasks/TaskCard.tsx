@@ -281,7 +281,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, onClick, onViewLive })
                 </div>
 
                 {/* View Live Button for Browser Tasks */}
-                {task.task_type === 'browser' && (task.status === 'in_progress' || task.status === 'executing') && onViewLive && (
+                {task.task_type === 'browser' && task.status === 'in_progress' && onViewLive && (
                     <button
                         onClick={(e) => { e.stopPropagation(); onViewLive(task); }}
                         className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-400 border border-violet-200 dark:border-violet-500/20 hover:bg-violet-200 dark:hover:bg-violet-500/25 transition-colors duration-150 mx-auto"
