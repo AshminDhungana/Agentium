@@ -13,7 +13,7 @@
  * @param {string} [props.taskId] - Optional task ID to scope the comparison.
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { showToast } from '@/hooks/useToast';
 import {
     GitBranch,
@@ -381,13 +381,22 @@ export const BranchDiffView: React.FC<BranchDiffViewProps> = ({
     defaultRightBranch = '',
     defaultTaskId = '',
 }) => {
-    const [leftBranch, setLeftBranch] = useState(defaultLeftBranch);
-    const [rightBranch, setRightBranch] = useState(defaultRightBranch);
+    const params = new URLSearchParams(window.location.search);
+    const [leftBranch, setLeftBranch] = useState(params.get('left') || defaultLeftBranch);
+    const [rightBranch, setRightBranch] = useState(params.get('right') || defaultRightBranch);
     const [taskId, setTaskId] = useState(defaultTaskId);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [result, setResult] = useState<BranchCompareResult | null>(null);
     const [hideUnchanged, setHideUnchanged] = useState(true);
+
+    useEffect(() => {
+        const p = new URLSearchParams(window.location.search);
+        if (leftBranch) p.set('left', leftBranch); else p.delete('left');
+        if (rightBranch) p.set('right', rightBranch); else p.delete('right');
+        const newUrl = `${window.location.pathname}?${p.toString()}`;
+        window.history.replaceState(null, '', newUrl);
+    }, [leftBranch, rightBranch]);
 
     const compare = useCallback(async () => {
         if (!leftBranch.trim() || !rightBranch.trim()) return;
