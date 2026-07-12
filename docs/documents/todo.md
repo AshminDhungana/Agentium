@@ -854,7 +854,7 @@ OpenAI TTS — Text-to-Speech
 **Medium Priority**
 
 - [x] Browser task live screenshot stream UI (route + CDP capture + View Live gating + browserApi types all complete; see Phase 14.1)
-- [x] Checkpoint diff view (branch comparison) — backend `compare_branches()` was dead code (route reimplements diff inline); frontend `CheckpointDiffViewer.tsx` uses `/compare` route instead
+- [x] Checkpoint diff view (branch comparison) — root cause: `GET /checkpoints/compare` was shadowed by the path-param `GET /{checkpoint_id}` route (declared after it), so it 404'd; fixed by declaring `/compare` first. Also added recursive nested diffs + Monaco side-by-side/inline toggle & copy. Frontend `BranchDiffView.tsx` consumes `/compare`; `CheckpointDiffViewer.tsx` uses `/{id}/diff`. Removed the dead `compare_branches()` service method (route diffs inline).
 - [ ] Channel health monitoring, logs, and settings UI incomplete
 - [ ] Speaker identification not production-ready (framework in place, model not integrated)
 
