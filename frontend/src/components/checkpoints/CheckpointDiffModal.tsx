@@ -17,7 +17,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { AlertCircle, X, ChevronRight, ChevronDown, Plus, Minus, FileText, GitBranch } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import { checkpointsService, BranchCompareResult, FieldDiff, AgentStateDiff, ArtifactDiff, DiffStatus } from '../../services/checkpoints';
+import { checkpointsService, BranchCompareResult, FieldDiff, AgentStateDiff, ArtifactDiff } from '../../services/checkpoints';
 
 interface CheckpointDiffModalProps {
     taskId?: string;

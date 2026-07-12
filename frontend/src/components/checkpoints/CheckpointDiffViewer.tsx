@@ -205,7 +205,7 @@ export const CheckpointDiffViewer: React.FC<CheckpointDiffViewerProps> = ({
                 {!isLoading && !error && data && (
                     <div className="flex items-center justify-between px-6 py-2.5 border-t border-slate-200 dark:border-[#1e2535] bg-slate-50/50 dark:bg-[#1e2535]/20 text-xs text-slate-500 dark:text-slate-400">
                         <div className="flex items-center gap-4">
-                            <span>Diff mode: <strong className="text-slate-700 dark:text-slate-300">Unified (side-by-side)</strong></span>
+                            <span>Diff mode: <strong className="text-slate-700 dark:text-slate-300">Unified ({sideBySide ? 'side-by-side' : 'inline'})</strong></span>
                             <span className="text-slate-300 dark:text-slate-600">|</span>
                             <span>Language: JSON</span>
                         </div>
