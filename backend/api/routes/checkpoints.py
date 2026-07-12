@@ -72,6 +72,9 @@ class FieldDiff(BaseModel):
     left: Any
     right: Any
     status: str  # "added" | "removed" | "changed" | "unchanged"
+    children: Optional[List["FieldDiff"]] = None  # recursive nested diffs
+
+FieldDiff.model_rebuild()
 
 
 class AgentStateDiff(BaseModel):
@@ -103,7 +106,7 @@ class BranchCompareResponse(BaseModel):
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
 def _diff_dicts(left: Dict[str, Any], right: Dict[str, Any]) -> List[FieldDiff]:
-    """Produce a flat list of FieldDiff between two dicts."""
+    """Produce a (recursive) list of FieldDiff between two dicts."""
     diffs: List[FieldDiff] = []
     all_keys = set(left.keys()) | set(right.keys())
     for key in sorted(all_keys):
@@ -112,7 +115,14 @@ def _diff_dicts(left: Dict[str, Any], right: Dict[str, Any]) -> List[FieldDiff]:
         elif key not in right:
             diffs.append(FieldDiff(key=key, left=left[key], right=None, status="removed"))
         elif left[key] != right[key]:
-            diffs.append(FieldDiff(key=key, left=left[key], right=right[key], status="changed"))
+            if isinstance(left[key], dict) and isinstance(right[key], dict):
+                children = _diff_dicts(left[key], right[key])
+                diffs.append(FieldDiff(
+                    key=key, left=left[key], right=right[key],
+                    status="changed", children=children,
+                ))
+            else:
+                diffs.append(FieldDiff(key=key, left=left[key], right=right[key], status="changed"))
         else:
             diffs.append(FieldDiff(key=key, left=left[key], right=right[key], status="unchanged"))
     return diffs

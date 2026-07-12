@@ -216,3 +216,33 @@ class TestBranchCompareEndpoint:
         score = next(d for d in body["task_state_diffs"] if d["key"] == "score")
         assert score["status"] == "changed"
         assert score["left"] == 1 and score["right"] == 2
+
+    def test_compare_branches_nested_diff_has_children(self, client, seeded_db: Session):
+        task = _create_task(seeded_db, "Nested Diff")
+        cp_a = CheckpointService.create_checkpoint(
+            db=seeded_db, task_id=task.id,
+            phase=CheckpointPhase.EXECUTION_COMPLETE, actor_id="test",
+        )
+        cp_a.branch_name = "main"
+        cp_a.task_state_snapshot = {"nested": {"a": 1, "b": 2}}
+        seeded_db.commit()
+
+        cp_b = CheckpointService.create_checkpoint(
+            db=seeded_db, task_id=task.id,
+            phase=CheckpointPhase.EXECUTION_COMPLETE, actor_id="test",
+        )
+        cp_b.branch_name = "feature"
+        cp_b.task_state_snapshot = {"nested": {"a": 1, "b": 99}}
+        seeded_db.commit()
+
+        response = client.get(
+            "/api/v1/checkpoints/compare",
+            params={"left_branch": "main", "right_branch": "feature"},
+        )
+        assert response.status_code == 200, response.text
+        body = response.json()
+        nested = next(d for d in body["task_state_diffs"] if d["key"] == "nested")
+        assert nested["status"] == "changed"
+        assert nested["children"] is not None
+        child_b = next(c for c in nested["children"] if c["key"] == "b")
+        assert child_b["left"] == 2 and child_b["right"] == 99
