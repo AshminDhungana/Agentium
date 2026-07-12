@@ -160,7 +160,7 @@ Build a self-governing AI ecosystem where agents operate under constitutional la
 - [x] Research, form-filling, price monitoring, social posting, e-commerce via Playwright (headless Chromium)
 - [x] URL whitelist/blacklist, SSRF prevention, content filtering, screenshot audit logging
 - [x] Per-session memory / cookie isolation
-- [ ] Live screenshot stream UI for browser tasks (frontend not fully wired)
+- [x] Live screenshot stream UI for browser tasks (CDP Page.startScreencast capture + View Live gating wired; browser tasks 1–6 complete)
 
 ### 10.2 Advanced RAG
 
@@ -853,7 +853,7 @@ OpenAI TTS — Text-to-Speech
 
 **Medium Priority**
 
-- [ ] Browser task live screenshot stream UI not built (route exists, frontend viewer missing)
+- [x] Browser task live screenshot stream UI (route + CDP capture + View Live gating + browserApi types all complete; see Phase 14.1)
 - [ ] Checkpoint diff view (branch comparison) not built
 - [ ] Channel health monitoring, logs, and settings UI incomplete
 - [ ] Speaker identification not production-ready (framework in place, model not integrated)
