@@ -124,7 +124,7 @@ Build a self-governing AI ecosystem where agents operate under constitutional la
 - [x] Pages: Login, Signup, Dashboard, Agents, Tasks, Chat, Settings, Monitoring, Constitution, Channels, Models, Voting, Sovereign Dashboard
 - [x] Agent Tree, Voting Interface, Constitution Editor, Critic Dashboard, Checkpoint Timeline, Financial Burn Dashboard, Voice Indicator, Unified Inbox
 - [ ] Drag-and-drop agent reassignment
-- [ ] Checkpoint diff view (compare branches)
+- [x] Checkpoint diff view (compare branches)
 - [ ] Channel health monitoring and message logs
 - [ ] Channel-specific settings (rate limits, filters)
 
@@ -854,7 +854,7 @@ OpenAI TTS — Text-to-Speech
 **Medium Priority**
 
 - [x] Browser task live screenshot stream UI (route + CDP capture + View Live gating + browserApi types all complete; see Phase 14.1)
-- [ ] Checkpoint diff view (branch comparison) not built
+- [x] Checkpoint diff view (branch comparison) — backend `compare_branches()` was dead code (route reimplements diff inline); frontend `CheckpointDiffViewer.tsx` uses `/compare` route instead
 - [ ] Channel health monitoring, logs, and settings UI incomplete
 - [ ] Speaker identification not production-ready (framework in place, model not integrated)
 

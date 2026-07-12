@@ -7,7 +7,6 @@ for Phase 6.5 Time-Travel and Branching functionality.
 Improvements (from verification review):
   - create_checkpoint() now serialises real agent_states
   - resume_from_checkpoint() restores full relational state
-  - compare_branches() added for execution branch diff
 """
 
 from typing import Optional, Dict, List, Any, Tuple 
@@ -236,82 +235,6 @@ class CheckpointService:
         db.commit()
         db.refresh(new_task)
         return new_task
-
-    # ═══════════════════════════════════════════════════════════
-    # BRANCH COMPARISON
-    # ═══════════════════════════════════════════════════════════
-
-    @staticmethod
-    def compare_branches(
-        db: Session,
-        checkpoint_id_a: str,
-        checkpoint_id_b: str,
-    ) -> Dict[str, Any]:
-        """
-        Compare two checkpoints (typically branches from the same parent)
-        and produce a diff summary.
-
-        Returns:
-            Dict with task_diff, agent_diff, artifact_diff, and metadata.
-        """
-        ck_a = db.query(ExecutionCheckpoint).filter(
-            ExecutionCheckpoint.id == checkpoint_id_a
-        ).first()
-        ck_b = db.query(ExecutionCheckpoint).filter(
-            ExecutionCheckpoint.id == checkpoint_id_b
-        ).first()
-
-        if not ck_a:
-            raise ValueError(f"Checkpoint {checkpoint_id_a} not found.")
-        if not ck_b:
-            raise ValueError(f"Checkpoint {checkpoint_id_b} not found.")
-
-        snap_a = ck_a.task_state_snapshot or {}
-        snap_b = ck_b.task_state_snapshot or {}
-
-        # ── Task-level diff ──────────────────────────────────────
-        task_diff = {}
-        all_keys = set(list(snap_a.keys()) + list(snap_b.keys()))
-        # Skip internal / noisy keys
-        skip_keys = {"subtask_snapshots", "id", "created_at", "updated_at"}
-        for key in sorted(all_keys - skip_keys):
-            val_a = snap_a.get(key)
-            val_b = snap_b.get(key)
-            if val_a != val_b:
-                task_diff[key] = {"branch_a": val_a, "branch_b": val_b}
-
-        # ── Agent-state diff ─────────────────────────────────────
-        agents_a = ck_a.agent_states or {}
-        agents_b = ck_b.agent_states or {}
-        agent_diff = {}
-        all_agent_ids = set(list(agents_a.keys()) + list(agents_b.keys()))
-        for aid in sorted(all_agent_ids):
-            state_a = agents_a.get(aid, {})
-            state_b = agents_b.get(aid, {})
-            if state_a != state_b:
-                agent_diff[aid] = {"branch_a": state_a, "branch_b": state_b}
-
-        # ── Artifact diff ────────────────────────────────────────
-        arts_a = set(str(a) for a in (ck_a.artifacts or []))
-        arts_b = set(str(a) for a in (ck_b.artifacts or []))
-        artifact_diff = {
-            "only_in_a": sorted(arts_a - arts_b),
-            "only_in_b": sorted(arts_b - arts_a),
-            "common": sorted(arts_a & arts_b),
-        }
-
-        return {
-            "checkpoint_a": checkpoint_id_a,
-            "checkpoint_b": checkpoint_id_b,
-            "branch_a_name": ck_a.branch_name,
-            "branch_b_name": ck_b.branch_name,
-            "same_parent": ck_a.parent_checkpoint_id == ck_b.parent_checkpoint_id,
-            "task_diff": task_diff,
-            "agent_diff": agent_diff,
-            "artifact_diff": artifact_diff,
-            "phase_a": ck_a.phase.value if ck_a.phase else None,
-            "phase_b": ck_b.phase.value if ck_b.phase else None,
-        }
 
     # ═══════════════════════════════════════════════════════════
     # CLEANUP
