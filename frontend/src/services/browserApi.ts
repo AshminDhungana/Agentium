@@ -23,11 +23,8 @@ export interface CheckUrlRequest {
 
 export interface CheckUrlResponse {
   url: string;
-  reachable: boolean;
-  status_code: number | null;
-  content_type: string | null;
-  redirect_url: string | null;
-  error: string | null;
+  safe: boolean;
+  reason?: string;
 }
 
 export interface ScrapeRequest {
@@ -42,12 +39,9 @@ export interface ScrapeRequest {
 
 export interface ScrapeResponse {
   url: string;
-  title: string | null;
   text: string;
-  html: string | null;
-  links: string[];
-  images: string[];
-  metadata: Record<string, string>;
+  html: string;
+  word_count: number;
 }
 
 export interface ScreenshotRequest {
@@ -64,11 +58,10 @@ export interface ScreenshotRequest {
 
 export interface ScreenshotResponse {
   url: string;
-  /** Base64-encoded PNG image */
-  screenshot_base64: string;
-  width: number;
-  height: number;
-  captured_at: string;
+  /** Base64-encoded PNG image (backend key: image_base64) */
+  image_base64: string;
+  content_type?: string;
+  audit_log_id?: string | null;
 }
 
 export interface BrowserSessionInfo {
@@ -118,8 +111,8 @@ export const browserApi = {
 
   /**
    * Take a full-page screenshot of a URL.
-   * Returns a base64-encoded PNG string that can be rendered as
-   * `<img src={\`data:image/png;base64,${result.screenshot_base64}\`} />`.
+   * Returns a base64-encoded PNG string (image_base64) that can be rendered as
+   * `<img src={\`data:image/png;base64,${result.image_base64}\`} />`.
    */
   screenshot: async (request: ScreenshotRequest): Promise<ScreenshotResponse> => {
     const response = await api.post<ScreenshotResponse>(`${BASE}/screenshot`, request);
