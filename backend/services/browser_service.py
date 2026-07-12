@@ -28,6 +28,11 @@ from backend.models.entities.audit import AuditLog, AuditLevel, AuditCategory
 
 logger = logging.getLogger(__name__)
 
+# WebSocket manager used to broadcast browser frames. Populated lazily by
+# _capture_loop (avoids an import cycle at module load) and kept at module
+# level so it can be patched in tests.
+websocket_manager = None
+
 
 # ---------------------------------------------------------------------------
 # URL Safety Guard — SSRF Prevention
@@ -197,6 +202,7 @@ class BrowserSession:
     action_log: List[Dict] = field(default_factory=list)
     _context: Any = field(default=None, repr=False)
     _page: Any = field(default=None, repr=False)
+    _cdp: Any = field(default=None, repr=False)  # CDP session for Page.startScreencast
     _capture_task: Any = field(default=None, repr=False)
 
 
@@ -317,70 +323,95 @@ class BrowserService:
         except Exception as e:
             logger.warning(f"Navigation error in stream {task_id}: {e}")
             self.record_action(task_id, f"Navigation error: {e}")
-            
-        # Start capture loop
+
+        # Open a CDP session and start the screencast pipeline. Frames are
+        # pushed by Chrome as Page.screencastFrame events (browser-paced) and
+        # acked via Page.screencastFrameAck for backpressure.
+        session._cdp = await context.new_cdp_session(page)
+        await session._cdp.send("Page.startScreencast", {
+            "format": "jpeg",
+            "quality": 60,
+            "maxWidth": 1280,
+            # everyNthFrame yields ~1 frame per (60 / fps) ticks.
+            "everyNthFrame": max(1, round(60 / max(0.5, fps))),
+        })
+
+        # Start capture loop (event-driven; consumes screencast frames)
         session._capture_task = asyncio.create_task(self._capture_loop(task_id))
         
     async def _capture_loop(self, task_id: str):
-        """Loop that captures screenshots and emits WebSocket events."""
-        from backend.api.routes.websocket import manager as websocket_manager
-        
+        """Receive CDP screencast frames and broadcast them via WebSocket."""
+        global websocket_manager
+        if websocket_manager is None:
+            from backend.api.routes.websocket import manager as _mgr
+            websocket_manager = _mgr
+
         session = self._sessions.get(task_id)
-        if not session:
+        if not session or not session._cdp:
             return
-            
+
         frame_number = 0
-        while task_id in self._sessions and session.status != "completed":
+        last_emit = 0.0
+        min_interval = 1.0 / max(0.5, session.fps)
+        stop = {"done": False}
+
+        async def _on_frame(payload: dict):
+            nonlocal frame_number, last_emit
+            data_b64 = payload.get("data", "")
+            if not data_b64:
+                return
+            now = time.time()
+            if now - last_emit < min_interval:
+                # throttle to honor fps; still ack to avoid backpressure buildup
+                await session._cdp.send("Page.screencastFrameAck",
+                                        {"sessionId": payload["sessionId"], "dataSize": len(data_b64)})
+                return
+            last_emit = now
+            frame_number += 1
             try:
-                if session.status == "paused":
-                    await asyncio.sleep(1.0)
-                    continue
-                    
-                start_time = time.time()
-                
-                # Capture frame as JPEG
-                jpeg_bytes = await session._page.screenshot(type="jpeg", quality=60)
-                frame_b64 = base64.b64encode(jpeg_bytes).decode('utf-8')
-                
-                session.latest_frame = frame_b64
-                session.title = await session._page.title()
+                session.latest_frame = data_b64
+                # page.title() is a coroutine in real Playwright but may be a
+                # plain callable in tests; tolerate both.
+                title = session._page.title()
+                if asyncio.iscoroutine(title):
+                    title = await title
+                session.title = title
                 session.url = session._page.url
-                frame_number += 1
-                
-                # Emit WebSocket event
                 await websocket_manager.emit_browser_frame(
-                    task_id=task_id,
-                    frame=frame_b64,
-                    url=session.url,
-                    title=session.title,
-                    action_log=session.action_log[-50:],  # keep it bounded
-                    frame_number=frame_number
+                    task_id=task_id, frame=data_b64, url=session.url,
+                    title=session.title, action_log=session.action_log[-50:],
+                    frame_number=frame_number,
                 )
-                
-                elapsed = time.time() - start_time
-                sleep_time = max(0, (1.0 / session.fps) - elapsed)
-                await asyncio.sleep(sleep_time)
-                
-            except Exception as e:
-                logger.error(f"Error in capture loop for task {task_id}: {e}")
-                await asyncio.sleep(2.0)  # back off on error
+            finally:
+                await session._cdp.send("Page.screencastFrameAck",
+                                        {"sessionId": payload["sessionId"], "dataSize": len(data_b64)})
+
+        session._cdp.on("Page.screencastFrame", lambda p: asyncio.create_task(_on_frame(p)))
+        while task_id in self._sessions and session.status != "completed":
+            await asyncio.sleep(1.0)
                 
     async def stop_stream(self, task_id: str) -> None:
-        """Stop a stream and cleanup its browser context."""
+        """Stop a stream and cleanup its browser context and CDP session."""
         session = self._sessions.pop(task_id, None)
         if not session:
             return
-            
-        session.status = "completed"
+
+        try:
+            if session._cdp:
+                await session._cdp.send("Page.stopScreencast")
+                await session._cdp.detach()
+        except Exception as e:
+            logger.warning(f"Error stopping screencast for {task_id}: {e}")
+
         if session._capture_task:
             session._capture_task.cancel()
-            
+
         try:
             if session._context:
                 await session._context.close()
         except Exception as e:
             logger.warning(f"Error closing browser context for task {task_id}: {e}")
-            
+
         logger.info(f"Stopped browser stream for task {task_id}")
 
     def get_session(self, task_id: str) -> Optional[BrowserSession]:
