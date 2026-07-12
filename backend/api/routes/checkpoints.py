@@ -228,79 +228,6 @@ def list_checkpoints(
     return query.order_by(ExecutionCheckpoint.created_at.desc()).limit(limit).all()
 
 
-@router.get(
-    "/{checkpoint_id}",
-    response_model=CheckpointResponse,
-    summary="Get Checkpoint",
-    description="Get single checkpoint details.",
-    responses=build_responses(None),
-)
-def get_checkpoint(checkpoint_id: str, db: Session = Depends(get_db)):
-    """Get single checkpoint details."""
-    checkpoint = db.query(ExecutionCheckpoint).filter(ExecutionCheckpoint.id == checkpoint_id).first()
-    if not checkpoint:
-        raise NotFoundError(error="Checkpoint not found", code="CHECKPOINT_NOT_FOUND")
-    return checkpoint
-
-
-@router.post(
-    "/{checkpoint_id}/resume",
-    response_model=TaskResponse,
-    summary="Resume From Checkpoint",
-    description="Time-travel: Restores the given task back to the target checkpoint.",
-    responses=build_responses(None),
-)
-def resume_from_checkpoint(
-    checkpoint_id: str,
-    db: Session = Depends(get_db)
-):
-    """
-    Time-travel: Restores the given task back to the target checkpoint.
-    """
-    try:
-        restored_task = CheckpointService.resume_from_checkpoint(
-            db=db,
-            checkpoint_id=checkpoint_id,
-            actor_id="user_api"
-        )
-        return restored_task
-    except ValueError as e:
-        raise NotFoundError(error=str(e), code="STRE")
-    except Exception as e:
-        raise InternalServerError(error=str(e), code="STRE")
-
-
-@router.post(
-    "/{checkpoint_id}/branch",
-    response_model=TaskResponse,
-    summary="Branch From Checkpoint",
-    description="Branching: Clones the checkpoint into a new separate task tree to try an alternative approach.",
-    responses=build_responses(None),
-)
-def branch_from_checkpoint(
-    checkpoint_id: str,
-    payload: CheckpointBranchRequest,
-    db: Session = Depends(get_db)
-):
-    """
-    Branching: Clones the checkpoint into a new separate task tree
-    to try an alternative approach.
-    """
-    try:
-        new_task = CheckpointService.branch_from_checkpoint(
-            db=db,
-            checkpoint_id=checkpoint_id,
-            branch_name=payload.branch_name,
-            new_supervisor_id=payload.new_supervisor_id,
-            actor_id="user_api"
-        )
-        return new_task
-    except ValueError as e:
-        raise NotFoundError(error=str(e), code="STRE")
-    except Exception as e:
-        raise InternalServerError(error=str(e), code="STRE")
-
-
 # ─── NEW: Branch diff ─────────────────────────────────────────────────────────
 
 @router.get(
@@ -434,6 +361,79 @@ def compare_branches(
         artifact_diffs=artifact_diffs,
         summary=summary,
     )
+
+
+@router.get(
+    "/{checkpoint_id}",
+    response_model=CheckpointResponse,
+    summary="Get Checkpoint",
+    description="Get single checkpoint details.",
+    responses=build_responses(None),
+)
+def get_checkpoint(checkpoint_id: str, db: Session = Depends(get_db)):
+    """Get single checkpoint details."""
+    checkpoint = db.query(ExecutionCheckpoint).filter(ExecutionCheckpoint.id == checkpoint_id).first()
+    if not checkpoint:
+        raise NotFoundError(error="Checkpoint not found", code="CHECKPOINT_NOT_FOUND")
+    return checkpoint
+
+
+@router.post(
+    "/{checkpoint_id}/resume",
+    response_model=TaskResponse,
+    summary="Resume From Checkpoint",
+    description="Time-travel: Restores the given task back to the target checkpoint.",
+    responses=build_responses(None),
+)
+def resume_from_checkpoint(
+    checkpoint_id: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Time-travel: Restores the given task back to the target checkpoint.
+    """
+    try:
+        restored_task = CheckpointService.resume_from_checkpoint(
+            db=db,
+            checkpoint_id=checkpoint_id,
+            actor_id="user_api"
+        )
+        return restored_task
+    except ValueError as e:
+        raise NotFoundError(error=str(e), code="STRE")
+    except Exception as e:
+        raise InternalServerError(error=str(e), code="STRE")
+
+
+@router.post(
+    "/{checkpoint_id}/branch",
+    response_model=TaskResponse,
+    summary="Branch From Checkpoint",
+    description="Branching: Clones the checkpoint into a new separate task tree to try an alternative approach.",
+    responses=build_responses(None),
+)
+def branch_from_checkpoint(
+    checkpoint_id: str,
+    payload: CheckpointBranchRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Branching: Clones the checkpoint into a new separate task tree
+    to try an alternative approach.
+    """
+    try:
+        new_task = CheckpointService.branch_from_checkpoint(
+            db=db,
+            checkpoint_id=checkpoint_id,
+            branch_name=payload.branch_name,
+            new_supervisor_id=payload.new_supervisor_id,
+            actor_id="user_api"
+        )
+        return new_task
+    except ValueError as e:
+        raise NotFoundError(error=str(e), code="STRE")
+    except Exception as e:
+        raise InternalServerError(error=str(e), code="STRE")
 
 
 @router.get(

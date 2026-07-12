@@ -174,3 +174,45 @@ class TestCheckpointDiffEndpoint:
 
         response = client.get(f"/api/v1/checkpoints/{cp.id}/diff", params={"compare_to": fake_id})
         assert response.status_code == 404
+
+
+# ===========================================================================
+# Branch Compare Endpoint
+# ===========================================================================
+
+class TestBranchCompareEndpoint:
+    """
+    GET /api/v1/checkpoints/compare?left_branch=L&right_branch=R
+    Structured, field-level diff of two branches' latest checkpoints.
+    """
+
+    def test_compare_branches_returns_structured_diff(self, client, seeded_db: Session):
+        task = _create_task(seeded_db, "Branch Compare")
+        cp_a = CheckpointService.create_checkpoint(
+            db=seeded_db, task_id=task.id,
+            phase=CheckpointPhase.EXECUTION_COMPLETE, actor_id="test",
+        )
+        cp_a.branch_name = "main"
+        cp_a.task_state_snapshot = {"status": "done", "score": 1}
+        seeded_db.commit()
+
+        cp_b = CheckpointService.create_checkpoint(
+            db=seeded_db, task_id=task.id,
+            phase=CheckpointPhase.EXECUTION_COMPLETE, actor_id="test",
+        )
+        cp_b.branch_name = "feature"
+        cp_b.task_state_snapshot = {"status": "done", "score": 2}
+        seeded_db.commit()
+
+        response = client.get(
+            "/api/v1/checkpoints/compare",
+            params={"left_branch": "main", "right_branch": "feature"},
+        )
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert body["left_branch"] == "main"
+        assert body["right_branch"] == "feature"
+        assert body["summary"]["changed"] >= 1
+        score = next(d for d in body["task_state_diffs"] if d["key"] == "score")
+        assert score["status"] == "changed"
+        assert score["left"] == 1 and score["right"] == 2
