@@ -5,6 +5,13 @@ from backend.models.entities.task import TaskType
 from backend.api.routes import tasks as tasks_route
 
 
+class _Events:
+    """Stand-in for a Task's events relationship (real one has .count())."""
+
+    def count(self):
+        return 0
+
+
 class _FakeTask:
     """Minimal stand-in for a Task ORM row.
 
@@ -23,7 +30,7 @@ class _FakeTask:
         self.execution_context = execution_context
         self.assigned_task_agent_ids = []
         self.status = status
-        self.events = []
+        self.events = _Events()
         # _serialize() compares error_count > 0 and reads these as ints
         self.error_count = 0
         self.retry_count = 0
