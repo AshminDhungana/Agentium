@@ -6,6 +6,8 @@ from fastapi import APIRouter, Depends, status, Query, Request
 from backend.core.exceptions import BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, TooLargeError, RateLimitError, InternalServerError, ServiceUnavailableError
 from sqlalchemy.orm import Session, noload
 from typing import List, Optional
+import logging
+import re
 
 from backend.models.database import get_db
 from backend.models.entities.task import Task, TaskStatus, TaskType, TaskPriority
@@ -14,9 +16,33 @@ from backend.api.schemas.task import TaskCreate, TaskResponse, TaskUpdate
 from backend.core.auth import get_current_active_user
 from backend.services.task_state_machine import TaskStateMachine, IllegalStateTransition
 from backend.services.acceptance_criteria import AcceptanceCriteriaService  # Phase 6.3
+from backend.services.browser_service import get_browser_service
 from backend.api.schemas.examples import ErrorResponseExample, SuccessResponseExample
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/tasks", tags=["tasks"])
+
+
+_URL_RE = re.compile(r"https?://[^\s'\"]+", re.IGNORECASE)
+
+
+def _resolve_browser_url(task) -> str | None:
+    """Best-effort target URL for a browser task.
+
+    Order: execution_context JSON {'url': ...} → first http(s) URL found in
+    description → None (caller skips streaming if None).
+    """
+    ctx = getattr(task, "execution_context", None) or ""
+    try:
+        import json
+        data = json.loads(ctx) if isinstance(ctx, str) and ctx.strip() else {}
+        if isinstance(data, dict) and data.get("url"):
+            return data["url"]
+    except Exception:
+        pass
+    m = _URL_RE.search(task.description or "")
+    return m.group(0) if m else None
 
 
 def _serialize(task: Task) -> dict:
@@ -404,6 +430,20 @@ async def execute_task(
     
     db.commit()
     db.refresh(task)
+
+    # Phase 14.1: kick off a live screenshot stream for browser tasks.
+    # Runs in the FastAPI process (owns Chromium); Celery cannot do this.
+    if task.task_type == TaskType.BROWSER:
+        url = _resolve_browser_url(task)
+        if url:
+            try:
+                await get_browser_service().start_stream(
+                    task_id=task.agentium_id, url=url, agent_id=agent_id, fps=2.0
+                )
+            except Exception as exc:
+                logger.error(f"Failed to start browser stream for {task.agentium_id}: {exc}")
+        else:
+            logger.warning(f"Browser task {task.agentium_id} has no resolvable URL; stream skipped")
 
     return {"status": "success", "task": _serialize(task)}
 

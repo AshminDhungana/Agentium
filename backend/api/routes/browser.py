@@ -233,6 +233,18 @@ async def get_session_stream(
 
 
 @router.post(
+    "/sessions/{task_id}/stop",
+    summary="Stop a browser live stream",
+    description="Stop the live screenshot stream for a task (FastAPI process).",
+    responses=build_responses(None),
+)
+async def stop_session(task_id: str):
+    """Stop the live screenshot stream for a task (FastAPI process)."""
+    await get_browser_service().stop_stream(task_id)
+    return {"status": "stopped", "task_id": task_id}
+
+
+@router.post(
     "/sessions/{task_id}/configure",
     summary="Configure Session",
     description="Configure stream settings.",
