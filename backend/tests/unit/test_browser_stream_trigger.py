@@ -24,6 +24,11 @@ class _FakeTask:
         self.assigned_task_agent_ids = []
         self.status = status
         self.events = []
+        # _serialize() compares error_count > 0 and reads these as ints
+        self.error_count = 0
+        self.retry_count = 0
+        self.max_retries = 0
+        self.completion_percentage = 0
 
     def set_status(self, *a, **k):
         # no-op: real Task.set_status validates state transitions
