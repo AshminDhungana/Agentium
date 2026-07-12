@@ -13,7 +13,7 @@
  * @param {string} [props.taskId] - Optional task ID to scope the comparison.
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { showToast } from '@/hooks/useToast';
 import {
     GitBranch,
@@ -105,7 +105,7 @@ function renderValue(v: any): string {
 
 // ─── Single diff row ──────────────────────────────────────────────────────────
 
-const DiffRow: React.FC<{ diff: FieldDiff; hideUnchanged: boolean }> = ({ diff, hideUnchanged }) => {
+const DiffRow: React.FC<{ diff: FieldDiff; hideUnchanged: boolean; depth?: number }> = ({ diff, hideUnchanged, depth = 0 }) => {
     if (hideUnchanged && diff.status === 'unchanged') return null;
     const cfg = getStatusCfg(diff.status);
     const leftVal = renderValue(diff.left);
@@ -113,7 +113,7 @@ const DiffRow: React.FC<{ diff: FieldDiff; hideUnchanged: boolean }> = ({ diff, 
     const isMultiline = leftVal.includes('\n') || rightVal.includes('\n');
 
     return (
-        <div className={`border-b border-slate-100 dark:border-[#1e2535] last:border-0 ${cfg.rowBg}`}>
+        <div className={`border-b border-slate-100 dark:border-[#1e2535] last:border-0 ${cfg.rowBg} ${depth > 0 ? 'ml-3 pl-3 border-l border-slate-200 dark:border-[#1e2535]' : ''}`}>
             {/* Key header */}
             <div className="flex items-center gap-2 px-3 py-1.5 border-b border-slate-100 dark:border-[#1e2535]/60">
                 <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${cfg.badge}`}>
@@ -137,6 +137,13 @@ const DiffRow: React.FC<{ diff: FieldDiff; hideUnchanged: boolean }> = ({ diff, 
                     </div>
                 )}
             </div>
+            {diff.children && diff.children.length > 0 && (
+                <div className="border-t border-slate-100 dark:border-[#1e2535]">
+                    {diff.children.map((c, i) => (
+                        <DiffRow key={i} diff={c} hideUnchanged={hideUnchanged} depth={depth + 1} />
+                    ))}
+                </div>
+            )}
         </div>
     );
 };
@@ -374,13 +381,22 @@ export const BranchDiffView: React.FC<BranchDiffViewProps> = ({
     defaultRightBranch = '',
     defaultTaskId = '',
 }) => {
-    const [leftBranch, setLeftBranch] = useState(defaultLeftBranch);
-    const [rightBranch, setRightBranch] = useState(defaultRightBranch);
+    const params = new URLSearchParams(window.location.search);
+    const [leftBranch, setLeftBranch] = useState(params.get('left') || defaultLeftBranch);
+    const [rightBranch, setRightBranch] = useState(params.get('right') || defaultRightBranch);
     const [taskId, setTaskId] = useState(defaultTaskId);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [result, setResult] = useState<BranchCompareResult | null>(null);
     const [hideUnchanged, setHideUnchanged] = useState(true);
+
+    useEffect(() => {
+        const p = new URLSearchParams(window.location.search);
+        if (leftBranch) p.set('left', leftBranch); else p.delete('left');
+        if (rightBranch) p.set('right', rightBranch); else p.delete('right');
+        const newUrl = `${window.location.pathname}?${p.toString()}`;
+        window.history.replaceState(null, '', newUrl);
+    }, [leftBranch, rightBranch]);
 
     const compare = useCallback(async () => {
         if (!leftBranch.trim() || !rightBranch.trim()) return;
