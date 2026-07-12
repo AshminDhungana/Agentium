@@ -45,6 +45,7 @@ export interface FieldDiff {
     left: any;
     right: any;
     status: DiffStatus;
+    children?: FieldDiff[];
 }
 
 export interface AgentStateDiff {
@@ -58,6 +59,7 @@ export interface ArtifactDiff {
     status: DiffStatus;
     left: any;
     right: any;
+    children?: FieldDiff[];
 }
 
 export interface BranchCompareResult {

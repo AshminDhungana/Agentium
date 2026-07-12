@@ -15,8 +15,9 @@
 import { showToast } from '@/hooks/useToast';
 import React, { useState, useEffect, useRef } from 'react';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
-import { AlertCircle, X, ChevronRight, ChevronDown, Plus, Minus, FileText } from 'lucide-react';
-import { checkpointsService, BranchCompareResult, FieldDiff, AgentStateDiff, ArtifactDiff } from '../../services/checkpoints';
+import { AlertCircle, X, ChevronRight, ChevronDown, Plus, Minus, FileText, GitBranch } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { checkpointsService, BranchCompareResult, FieldDiff, AgentStateDiff, ArtifactDiff, DiffStatus } from '../../services/checkpoints';
 
 interface CheckpointDiffModalProps {
     taskId?: string;
@@ -78,32 +79,36 @@ const ValueDisplay: React.FC<{ value: any; isDiff?: boolean; type?: 'added' | 'r
     );
 };
 
-const FieldDiffView: React.FC<{ diff: FieldDiff }> = ({ diff }) => {
-    if (diff.status === 'unchanged') return null;
+const FieldDiffView: React.FC<{ diff: FieldDiff; depth?: number }> = ({ diff, depth = 0 }) => {
+    if (diff.status === 'unchanged' && !diff.children) return null;
 
     return (
-        <div className="mb-4 last:mb-0">
-            <div className="flex items-center gap-2 mb-1">
-                <span className="text-sm font-semibold font-mono text-slate-700 dark:text-slate-200">{diff.key}</span>
-                <DiffBadge type={diff.status} />
-            </div>
-            
-            {diff.status === 'added' ? (
-                <ValueDisplay value={diff.right} isDiff type="added" />
-            ) : diff.status === 'removed' ? (
-                <ValueDisplay value={diff.left} isDiff type="removed" />
-            ) : (
-                <div className="grid grid-cols-2 gap-2">
-                    <div>
-                        <div className="text-xs text-slate-600 mb-1">Previous ({diff.key})</div>
-                        <ValueDisplay value={diff.left} isDiff type="removed" />
-                    </div>
-                    <div>
-                        <div className="text-xs text-slate-600 mb-1">New ({diff.key})</div>
-                        <ValueDisplay value={diff.right} isDiff type="added" />
-                    </div>
+        <div className={depth > 0 ? 'ml-4 pl-3 border-l border-slate-200 dark:border-[#1e2535]' : ''}>
+            <div className="mb-4 last:mb-0">
+                <div className="flex items-center gap-2 mb-1">
+                    <span className="text-sm font-semibold font-mono text-slate-700 dark:text-slate-200">{diff.key}</span>
+                    <DiffBadge type={diff.status} />
                 </div>
-            )}
+
+                {diff.status === 'added' ? (
+                    <ValueDisplay value={diff.right} isDiff type="added" />
+                ) : diff.status === 'removed' ? (
+                    <ValueDisplay value={diff.left} isDiff type="removed" />
+                ) : diff.children ? (
+                    <div className="grid grid-cols-2 gap-2">
+                        <div><div className="text-xs text-slate-600 mb-1">Previous ({diff.key})</div><ValueDisplay value={diff.left} /></div>
+                        <div><div className="text-xs text-slate-600 mb-1">New ({diff.key})</div><ValueDisplay value={diff.right} /></div>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-2 gap-2">
+                        <div><div className="text-xs text-slate-600 mb-1">Previous ({diff.key})</div><ValueDisplay value={diff.left} isDiff type="removed" /></div>
+                        <div><div className="text-xs text-slate-600 mb-1">New ({diff.key})</div><ValueDisplay value={diff.right} isDiff type="added" /></div>
+                    </div>
+                )}
+            </div>
+            {diff.children?.map((c, i) => (
+                <FieldDiffView key={i} diff={c} depth={depth + 1} />
+            ))}
         </div>
     );
 };
@@ -318,7 +323,3 @@ export const CheckpointDiffModal: React.FC<CheckpointDiffModalProps> = ({
         </div>
     );
 };
-
-// Required wrapper to provide GitBranch icon
-import { GitBranch } from 'lucide-react';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
