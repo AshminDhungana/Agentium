@@ -18,6 +18,7 @@ import { DiffEditor } from '@monaco-editor/react';
 import { checkpointsService, CheckpointDiffResult } from '../../services/checkpoints';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
+import { showToast } from '@/hooks/useToast';
 
 // ---------------------------------------------------------------------------
 // Props
@@ -49,6 +50,19 @@ export const CheckpointDiffViewer: React.FC<CheckpointDiffViewerProps> = ({
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [editorTheme, setEditorTheme] = useState<'vs' | 'vs-dark'>('vs');
+    const [sideBySide, setSideBySide] = useState(true);
+    const [copied, setCopied] = useState(false);
+
+    const copyRawDiff = async () => {
+        if (!data) return;
+        try {
+            await navigator.clipboard.writeText(data.unified_diff);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1500);
+        } catch {
+            showToast.error('Unable to copy to clipboard');
+        }
+    };
 
     const containerRef = useRef<HTMLDivElement>(null);
     useFocusTrap(containerRef, true);
@@ -169,7 +183,7 @@ export const CheckpointDiffViewer: React.FC<CheckpointDiffViewerProps> = ({
                                 minimap: { enabled: false },
                                 scrollBeyondLastLine: false,
                                 wordWrap: 'on',
-                                renderSideBySide: true,
+                                renderSideBySide: sideBySide,
                                 diffWordWrap: 'on',
                                 fontSize: 13,
                                 lineNumbers: 'on',
@@ -195,7 +209,21 @@ export const CheckpointDiffViewer: React.FC<CheckpointDiffViewerProps> = ({
                             <span className="text-slate-300 dark:text-slate-600">|</span>
                             <span>Language: JSON</span>
                         </div>
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => setSideBySide(s => !s)}
+                                aria-label="Toggle side-by-side / inline diff"
+                                className="px-2 py-1 rounded text-xs border border-slate-200 dark:border-[#1e2535] hover:bg-slate-100 dark:hover:bg-[#1e2535] transition-colors"
+                            >
+                                {sideBySide ? 'Inline' : 'Side-by-side'}
+                            </button>
+                            <button
+                                onClick={copyRawDiff}
+                                aria-label="Copy raw unified diff"
+                                className="px-2 py-1 rounded text-xs border border-slate-200 dark:border-[#1e2535] hover:bg-slate-100 dark:hover:bg-[#1e2535] transition-colors"
+                            >
+                                {copied ? 'Copied!' : 'Copy'}
+                            </button>
                             <Code2 className="w-3 h-3" />
                             <span>Monaco Editor</span>
                         </div>
