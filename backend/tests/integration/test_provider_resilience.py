@@ -188,6 +188,63 @@ class TestTotalExhaustion:
 
 
 @pytest.mark.integration
+class TestRateLimitsRespected:
+    """
+    Task 24: default (60/min) and explicit (30/min) rate limits are honoured.
+    The token bucket refills at rpm/60 per second, so a 30/min config spaces
+    calls ~2s apart and a 60/min config ~1s apart. Driving load at each config
+    must NOT cause the (always-200) provider to return a single 429 — the
+    limiter is what enforces the spacing, not the provider rejecting us.
+    """
+
+    async def test_rate_limits_respected(self, seeded_db: Session, monkeypatch):
+        # The pre-exhaustion warning (Task 19) runs a synchronous DB query on
+        # the rate-limiter hot path via asyncio.to_thread. That is Task 19's
+        # concern (covered by its own test) and its DB session contends with the
+        # test transaction; isolate the token bucket here by stubbing it.
+        monkeypatch.setattr(
+            api_key_manager, "check_rate_budget_warning", lambda *a, **k: None)
+
+        srv = FakeProviderServer(default_status=200)
+        created = []
+        try:
+            cfg60 = make_fake_config(srv.base_url, rpm=60)
+            created.append(str(cfg60.id))
+            cfg30 = make_fake_config(srv.base_url, rpm=30)
+            created.append(str(cfg30.id))
+
+            async def drive(cfg):
+                t0 = time.monotonic()
+                for i in range(4):
+                    # generate_with_agent reads agent.ethos; a fresh unique
+                    # agentium_id per call avoids the ModelUsageLog unique key.
+                    agent = types.SimpleNamespace(
+                        ethos=None, agentium_id=f"rl-{cfg.id}-{i}")
+                    # db=None (not the long-lived seeded_db fixture session):
+                    # record_spend/update_token_count run inside LLMClient and
+                    # reopen their own committed get_db_context() sessions, so
+                    # they don't hold a row lock open on user_model_configs for
+                    # the whole test (which serializes every later call on the
+                    # same config row).
+                    await LLMClient(db=None).generate(
+                        agent=agent, user_message="hi",
+                        config_id=str(cfg.id), fallback_configs=[])
+                return time.monotonic() - t0
+
+            elapsed30 = await drive(cfg30)
+            elapsed60 = await drive(cfg60)
+
+            # 3 inter-call gaps: >=1.5s @ 30/min (~2s target), >=0.5s @ 60/min.
+            assert elapsed30 >= (4 - 1) * 1.5, elapsed30
+            assert elapsed60 >= (4 - 1) * 0.5, elapsed60
+            assert srv._status_counts.get(429, 0) == 0  # never throttled by provider
+            assert cfg30 and cfg60
+        finally:
+            srv.shutdown()
+            _delete_fake_configs(created)
+
+
+@pytest.mark.integration
 class TestExhaustionBroadcastsDegradation:
     """
     Task 15: on total provider exhaustion the worker must surface a friendly
