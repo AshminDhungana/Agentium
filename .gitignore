@@ -14,6 +14,8 @@ logs.txt
 docs/superpowers/
 .superpowers/*
 .claude
+.agents
+skills-lock.json
 
 # Node
 node_modules/
