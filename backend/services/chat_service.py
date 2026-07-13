@@ -177,12 +177,21 @@ Address the Sovereign respectfully. If they issue a command that requires execut
         # completely unaffected.
         # FIX: Handle model generation failures with try/except
         try:
+            # Phase 19.3 (Task 14): provider failover chain so a throttled/expired
+            # Head key rolls over to a sibling key / cross-provider / local Ollama.
+            from backend.services.api_key_manager import api_key_manager
+            fallback_configs = (
+                api_key_manager.get_fallback_config_ids(config_id)
+                if config_id
+                else []
+            )
             llm_client = LLMClient(db=db)
             result = await llm_client.generate_with_tools(
                 agent=head,
                 user_message=message,
                 db=db,
                 config_id=config_id,
+                fallback_configs=fallback_configs,
                 system_prompt_override=full_prompt,
                 agent_tier=f"{head.agentium_id[0]}xxxx",
             )

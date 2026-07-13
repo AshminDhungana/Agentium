@@ -294,3 +294,81 @@ class TestLLMClientGenerateWithTools:
             with pytest.raises(RuntimeError) as exc_info:
                 await llm_client.generate_with_tools(agent, user_message="do something", db=MagicMock(), max_retries=0)
             assert "exhausted" in str(exc_info.value)
+
+
+class TestCallSitesPassFallback:
+    """Task 14: every LLMClient call site must pass a real fallback_configs list.
+
+    The Path A chokepoint (skill_rag.execute_with_skills) is covered by the
+    integration test test_provider_resilience.py. Here we assert the Path B
+    orchestrator builds the chain via api_key_manager.get_fallback_config_ids
+    and forwards it to LLMClient.generate_with_tools.
+    """
+
+    @pytest.mark.asyncio
+    async def test_orchestrator_passes_fallback(self):
+        from backend.services import agent_orchestrator
+        import backend.services.token_optimizer as token_optimizer_mod
+        from backend.services.api_key_manager import api_key_manager
+        from backend.services.prompt_template_manager import prompt_template_manager
+
+        captured = {}
+        fb_list = ["fb-config-1", "fb-config-2", "fb-config-3"]
+        config_id = "primary-config-id"
+
+        # api_manager is None outside the app lifespan; substitute a mock so the
+        # unrelated model-lookup line (api_manager.models.get(...)) is a no-op.
+        mock_api_manager = MagicMock()
+        mock_api_manager.models.get.return_value = None
+
+        class FakePreferredConfig:
+            provider = "openai"
+            default_model = "gpt-4o"
+
+        class FakeAgent:
+            agentium_id = "30001"
+            preferred_config_id = config_id
+            preferred_config = FakePreferredConfig()
+            ethos = {}
+            def compress_ethos(self, *a, **k):
+                pass
+
+        class FakeTask:
+            agentium_id = "T30001"
+            description = "do the thing"
+
+        db = MagicMock()
+        agent = FakeAgent()
+        task = FakeTask()
+
+        with patch.object(
+            token_optimizer_mod.token_optimizer,
+            "allocate_model_for_agent",
+            new=AsyncMock(return_value=config_id),
+        ), patch.object(
+            api_key_manager,
+            "get_fallback_config_ids",
+            return_value=fb_list,
+        ) as mock_get_fb, patch.object(
+            prompt_template_manager,
+            "build_system_prompt",
+            return_value=("sys", 1, False),
+        ), patch.object(
+            agent_orchestrator,
+            "api_manager",
+            mock_api_manager,
+        ), patch.object(
+            LLMClient,
+            "generate_with_tools",
+            new=AsyncMock(return_value={"content": "x", "completed_steps": [], "tokens_used": 1}),
+        ) as mock_gen:
+            orchestrator = agent_orchestrator.AgentOrchestrator(db)
+            await orchestrator._execute_task_inner(task, agent, db)
+
+        # The orchestrator must build the failover chain from the allocated
+        # config and forward it to LLMClient (we observe the value it passes by
+        # having get_fallback_config_ids return a sentinel list).
+        mock_get_fb.assert_called_once_with(config_id)
+        captured.update(mock_gen.call_args.kwargs)
+        assert captured.get("fallback_configs") == fb_list, "no fallback_configs forwarded to generate_with_tools"
+        assert captured.get("config_id") == config_id

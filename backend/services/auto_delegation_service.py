@@ -222,10 +222,20 @@ class SubTaskBreaker:
                 return []
 
             llm_client = LLMClient(db=db)
+            # Phase 19.3 (Task 14): fail over the Head's primary config to its
+            # sibling/cross-provider/local chain on 429/401 instead of dropping
+            # the decomposition.
+            from backend.services.api_key_manager import api_key_manager
+            fallback_configs = (
+                api_key_manager.get_fallback_config_ids(head.preferred_config_id)
+                if getattr(head, "preferred_config_id", None)
+                else []
+            )
             result = await llm_client.generate(
                 agent=head,
                 user_message=prompt,
                 db=db,
+                fallback_configs=fallback_configs,
                 system_prompt_override=(
                     "You are a task decomposition specialist. "
                     "Break complex tasks into concrete, actionable sub-tasks. "

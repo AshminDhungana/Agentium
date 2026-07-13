@@ -204,12 +204,20 @@ class AgentOrchestrator:
         # Falls back gracefully to plain generation when no tools are available
         # for the tier (tools list is empty → provider ignores the parameter).
         tier_str = f"{agent.agentium_id[0]}xxxx"
+        # Phase 19.3 (Task 14): provider failover chain for this config so a
+        # 429/401/provider-outage on the primary rolls over to sibling keys,
+        # a cross-provider key, then the local Ollama fallback.
+        from backend.services.api_key_manager import api_key_manager
+        fallback_configs = (
+            api_key_manager.get_fallback_config_ids(config_id) if config_id else []
+        )
         llm_client = LLMClient(db=db)
         result = await llm_client.generate_with_tools(
             agent=agent,
             user_message=task.description,
             db=db,
             config_id=config_id,
+            fallback_configs=fallback_configs,
             system_prompt_override=system_prompt,
             agent_tier=tier_str,
             task_id=getattr(task, "agentium_id", None),

@@ -1011,10 +1011,19 @@ Provide a concise summary (max 300 words) that the successor agent will inherit.
 
         try:
             llm_client = LLMClient(db=db)
+            # Phase 19.3 (Task 14): fail over the agent's primary config on
+            # 429/401 instead of silently returning the manual-summary fallback.
+            from backend.services.api_key_manager import api_key_manager
+            fallback_configs = (
+                api_key_manager.get_fallback_config_ids(agent.preferred_config_id)
+                if getattr(agent, "preferred_config_id", None)
+                else []
+            )
             response = await llm_client.generate(
                 agent=agent,
                 user_message=prompt,
                 db=db,
+                fallback_configs=fallback_configs,
                 system_prompt_override="You are a summarization assistant. Be concise."
             )
             return response.get("content", "No wisdom extracted")
