@@ -213,43 +213,81 @@ class APIKeyManager:
             key.current_spend_usd = 0.0
             key.last_spend_reset = now
 
+    # Phase 19.3: cap on the fallback chain length. LLMClient.generate
+    # already bounds configs_to_try to (1 + MAX_FALLBACK_CONFIGS); keep the
+    # produced list at most one longer so the primary + fallbacks fit.
+    MAX_FALLBACK_CONFIGS = 3
+
     @with_db_session
     def get_fallback_config_ids(
         self, config_id: str, db: Optional[Session] = None
     ) -> List[str]:
         """
-        Phase 19.3 (base): return fallback UserModelConfig ids to try when the
-        given config is exhausted. Order:
-          1. other ACTIVE configs of the SAME provider (priority failover)
-          2. ACTIVE configs of OTHER providers (cross-provider failover)
-        The local Ollama fallback is prepended/appended by Task 13's wiring;
-        Task 14 ensures every call site passes a real list from here.
-        Returns [] if the config is unknown.
+        Phase 19.3: ordered provider failover list for a primary config id.
+        Order:
+          1. other ACTIVE, healthy keys of the SAME provider (priority asc)
+          2. ONE ACTIVE, healthy key of a DIFFERENT provider (cross-provider)
+          3. the local/Ollama config (never throttled by the cloud) — also
+             caches it on self._local_fallback_config for callers that need
+             the base URL.
+        Excludes keys in ConnectionStatus.ERROR. Returns [] if unknown.
+        Consumed by Task 12 (routing) and Task 14 (call-site audit).
         """
         primary = db.query(UserModelConfig).filter_by(id=config_id).first()
         if not primary:
             return []
-        provider = primary.provider
+
+        out: List[str] = []
+
+        # 1. same provider, other healthy keys
         same_provider = (
             db.query(UserModelConfig)
             .filter(
-                UserModelConfig.provider == provider,
-                UserModelConfig.is_active == True,
+                UserModelConfig.provider == primary.provider,
                 UserModelConfig.id != config_id,
+                UserModelConfig.is_active == True,
+                UserModelConfig.status != ConnectionStatus.ERROR,
             )
             .order_by(UserModelConfig.priority.asc())
             .all()
         )
-        other_providers = (
+        out += [k.id for k in same_provider]
+
+        # 2. one key from a different (cloud) provider — exclude LOCAL here so
+        #    it is added exactly once in step 3 (the offline special case).
+        other_provider = (
             db.query(UserModelConfig)
             .filter(
-                UserModelConfig.provider != provider,
+                UserModelConfig.provider != primary.provider,
+                UserModelConfig.provider != ProviderType.LOCAL,
                 UserModelConfig.is_active == True,
+                UserModelConfig.status != ConnectionStatus.ERROR,
             )
             .order_by(UserModelConfig.priority.asc())
-            .all()
+            .first()
         )
-        return [c.id for c in same_provider] + [c.id for c in other_providers]
+        if other_provider:
+            out.append(other_provider.id)
+
+        # 3. local / Ollama fallback (offline, never rate-limited by the cloud)
+        local = (
+            db.query(UserModelConfig)
+            .filter(
+                UserModelConfig.provider == ProviderType.LOCAL,
+                UserModelConfig.is_active == True,
+            )
+            .first()
+        )
+        if local:
+            out.append(local.id)
+            self._local_fallback_config = {
+                "id": str(local.id),
+                "provider": local.provider.value,
+                "base_url": local.local_server_url or "http://localhost:11434/v1",
+            }
+
+        # Bound to primary + MAX_FALLBACK_CONFIGS (LLMClient enforces the same).
+        return out[: self.MAX_FALLBACK_CONFIGS + 1]
 
     # =====================================================================
     # Failure Handling & Recovery

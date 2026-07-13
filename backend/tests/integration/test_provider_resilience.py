@@ -22,6 +22,12 @@ from sqlalchemy.orm import Session
 from backend.models.entities.task import Task, TaskStatus, TaskType, TaskPriority
 from backend.models.entities.agents import Agent, AgentStatus
 from backend.models.entities.audit import AuditLog
+from backend.models.entities.user_config import (
+    UserModelConfig,
+    ProviderType,
+    ConnectionStatus,
+)
+from backend.services.api_key_manager import api_key_manager
 from backend.services.tasks.task_executor import execute_task_async
 
 
@@ -126,3 +132,61 @@ class TestExhaustionFailsCleanly:
             .count()
             >= 1
         )
+
+
+def _make_config(db: Session, provider, model: str, priority: int = 1) -> UserModelConfig:
+    """Create an unsaved, ACTIVE UserModelConfig for fallback-chain tests."""
+    cfg = UserModelConfig(
+        provider=provider,
+        config_name=f"{provider.value.lower()}-{uuid.uuid4().hex[:6]}",
+        default_model=model,
+        is_active=True,
+        status=ConnectionStatus.ACTIVE,
+        priority=priority,
+    )
+    if provider == ProviderType.LOCAL:
+        cfg.local_server_url = "http://localhost:11434/v1"
+    db.add(cfg)
+    db.flush()
+    return cfg
+
+
+@pytest.mark.integration
+class TestLocalFallbackChain:
+    """
+    Task 13: get_fallback_config_ids must build an ordered failover chain that
+    ends in the local/Ollama config (offline, never cloud-rate-limited) so a
+    task can still complete when every remote key is exhausted.
+    """
+
+    def test_fallback_includes_local(self, seeded_db: Session):
+        remote = _make_config(seeded_db, ProviderType.OPENAI, "gpt-4o", priority=1)
+        _make_config(seeded_db, ProviderType.OPENAI, "gpt-4o-mini", priority=2)  # same-provider
+        _make_config(seeded_db, ProviderType.ANTHROPIC, "claude-3-5-sonnet", priority=1)  # cross-provider
+        local = _make_config(seeded_db, ProviderType.LOCAL, "llama3")
+
+        fb = api_key_manager.get_fallback_config_ids(remote.id, db=seeded_db)
+
+        # Local/Ollama must be present and is the last (offline) link.
+        assert local.id in fb
+        assert fb[-1] == local.id
+        # Same-provider secondary precedes the cross-provider key precedes local.
+        assert remote.id not in fb  # primary itself is never in its own fallback list
+        # Cached for callers that need the base URL.
+        assert api_key_manager._local_fallback_config is not None
+        assert api_key_manager._local_fallback_config["id"] == str(local.id)
+
+    def test_fallback_excludes_error_keys_and_is_capped(self, seeded_db: Session):
+        remote = _make_config(seeded_db, ProviderType.OPENAI, "gpt-4o", priority=1)
+        # Same-provider key in ERROR must be excluded.
+        bad = _make_config(seeded_db, ProviderType.OPENAI, "gpt-4o-bad", priority=2)
+        bad.status = ConnectionStatus.ERROR
+        seeded_db.flush()
+        local = _make_config(seeded_db, ProviderType.LOCAL, "llama3")
+
+        fb = api_key_manager.get_fallback_config_ids(remote.id, db=seeded_db)
+        assert bad.id not in fb
+        assert local.id in fb
+        # primary never listed; capped at MAX_FALLBACK_CONFIGS + 1 = 4
+        assert remote.id not in fb
+        assert len(fb) <= api_key_manager.MAX_FALLBACK_CONFIGS + 1
