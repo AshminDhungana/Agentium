@@ -11,7 +11,7 @@ from typing import Optional
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, UploadFile, File, Depends, status, Form
-from backend.core.exceptions import BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, TooLargeError, RateLimitError, InternalServerError, ServiceUnavailableError
+from backend.core.exceptions import BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, TooLargeError, RateLimitError, InternalServerError, ServiceUnavailableError, ServerSTTUnavailable
 from fastapi.responses import FileResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
@@ -64,21 +64,30 @@ def check_voice_available(db: Session, user_id: str) -> dict:
     Check if voice features are available for this user.
     Returns status and message.
     """
+    from backend.services.whisper_cpp_service import get_whisper_cpp_service
+
+    if get_whisper_cpp_service().is_available():
+        return {
+            "available": True,
+            "message": "Local whisper.cpp STT ready",
+            "provider": "whisper_cpp",
+        }
+
     api_key = get_openai_api_key(db, user_id)
-    
+
     if api_key:
         return {
             "available": True,
             "message": "Voice features ready",
             "provider": "openai"
         }
-    
+
     # Check if user has any model configs at all
     from backend.models.entities.user_config import UserModelConfig
     has_configs = db.query(UserModelConfig).filter(
         UserModelConfig.user_id == user_id
     ).count() > 0
-    
+
     if has_configs:
         return {
             "available": False,
@@ -123,25 +132,34 @@ async def get_enhanced_voice_status(
     Frontend uses this to decide between OpenAI and local voice.
     """
     user_id = str(current_user.id)
-    
+
     # Check OpenAI availability
     openai_status = check_voice_available(db, user_id)
-    
-    # Always return local as fallback option
+
+    # Check whisper.cpp availability
+    from backend.services.whisper_cpp_service import get_whisper_cpp_service
+    whisper_available = get_whisper_cpp_service().is_available()
+
     return {
+        "whisper_cpp": {
+            "available": whisper_available,
+            "message": "Local whisper.cpp STT (primary)" if whisper_available
+                       else "whisper.cpp not built into this image",
+            "supports_recognition": whisper_available,
+        },
         "openai": {
             "available": openai_status["available"],
             "message": openai_status["message"],
-            "action_required": openai_status.get("action_required")
+            "action_required": openai_status.get("action_required"),
         },
         "local": {
             "available": True,  # Browser API is always "available" as a concept
             "message": "Browser-native Web Speech API (fallback)",
             "supports_recognition": True,
-            "supports_synthesis": True
+            "supports_synthesis": True,
         },
-        "recommended": "openai" if openai_status["available"] else "local",
-        "current": "openai" if openai_status["available"] else "local"
+        "recommended": "whisper_cpp" if whisper_available else ("openai" if openai_status["available"] else "local"),
+        "current": "whisper_cpp" if whisper_available else ("openai" if openai_status["available"] else "local"),
     }
 
     
@@ -231,10 +249,10 @@ async def transcribe_audio(
                 language=language,
                 response_format="text"
             )
-        
+
         # Calculate duration estimate
         duration_seconds = len(content) / 16000  # Rough estimate
-        
+
         return {
             "success": True,
             "text": transcript,
@@ -243,7 +261,9 @@ async def transcribe_audio(
             "audio_size_bytes": len(content),
             "transcribed_at": datetime.utcnow().isoformat()
         }
-        
+
+    except ServerSTTUnavailable:
+        raise  # let the global handler return 503 + STT_UNAVAILABLE
     except Exception as e:
         raise InternalServerError(error=f"Transcription failed: {str(e)}", code="TRANSCRIPTION_FAILED")
     finally:
