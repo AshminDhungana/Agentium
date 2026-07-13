@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 
 from backend.services.model_provider import ModelService
 from backend.services.api_key_manager import api_key_manager
+from backend.services.provider_rate_limiter import provider_rate_limiter
 
 logger = logging.getLogger(__name__)
 
@@ -308,6 +309,14 @@ class LLMClient:
                     last_error = exc
                     effective_config_id = attempt_config_id or "default"
                     tier = self.classify_error(exc)
+                    # Task 18: feed the per-provider 429 counter so the dashboard
+                    # shows a live rate-limit rate per config.
+                    if tier is ErrorTier.RATE_LIMITED:
+                        try:
+                            await provider_rate_limiter.record_rate_limited(
+                                effective_config_id)
+                        except Exception:
+                            pass
                     is_rl = tier is ErrorTier.RATE_LIMITED
                     logger.warning(
                         "LLMClient.generate: %s on config %s (attempt %d/%d): %s",
@@ -407,6 +416,14 @@ class LLMClient:
                     last_error = exc
                     effective_config_id = attempt_config_id or "default"
                     tier = self.classify_error(exc)
+                    # Task 18: feed the per-provider 429 counter so the dashboard
+                    # shows a live rate-limit rate per config.
+                    if tier is ErrorTier.RATE_LIMITED:
+                        try:
+                            await provider_rate_limiter.record_rate_limited(
+                                effective_config_id)
+                        except Exception:
+                            pass
                     is_rl = tier is ErrorTier.RATE_LIMITED
                     logger.warning(
                         "LLMClient.generate_with_tools: %s on config %s (attempt %d/%d): %s",

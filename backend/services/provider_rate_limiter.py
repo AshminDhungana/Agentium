@@ -69,6 +69,14 @@ _RATELIMIT_KEY = "agentium:provider:ratelimit:{config_id}"
 _CONCURRENCY_KEY = "agentium:provider:concurrency:{config_id}"
 _PAUSE_KEY = "agentium:provider:pause:{config_id}"
 
+# Per-provider outbound metrics (Task 18): surfaced live on the dashboard.
+#   :requests_total  → cumulative INCR of outbound requests
+#   :window          → 60s sliding window (ZSET by ts) → requests_last_min
+#   :rate_limited    → cumulative count of classified 429s
+_METRICS_TOTAL_KEY = "agentium:provider:metrics:{config_id}:requests_total"
+_METRICS_WINDOW_KEY = "agentium:provider:metrics:{config_id}:window"
+_METRICS_RL_KEY = "agentium:provider:metrics:{config_id}:rate_limited"
+
 # Cross-worker concurrency cap: INCR the counter, reject if over the limit.
 #   KEYS[1] = concurrency counter key
 #   ARGV[1] = max concurrent
@@ -159,6 +167,7 @@ class ProviderRateLimiter:
                 # float from the native fallback). Divide by 1000 for seconds.
                 allowed = int(res[0]) == 1
                 if allowed:
+                    await self._record_request(config_id)
                     return
                 wait = max(0.05, float(res[1]) / 1000.0)
                 await asyncio.sleep(wait)
@@ -199,6 +208,69 @@ class ProviderRateLimiter:
         no-op today; it exists for interface stability and future quota models.
         """
         return
+
+    # ── Outbound metrics (Task 18) ─────────────────────────────────────────────
+
+    async def _record_request(self, config_id: str) -> None:
+        """Increment outbound-request counters for ``config_id``.
+
+        ``:requests_total`` is a cumulative INCR; ``:window`` is a 60s sliding
+        window (ZSET keyed by timestamp) used to derive ``requests_last_min``.
+        Best-effort: any Redis failure is swallowed (fail-open).
+        """
+        try:
+            r = await self._get_redis()
+            now = time.time()
+            total_key = _METRICS_TOTAL_KEY.format(config_id=config_id)
+            await r.incr(total_key)
+            await r.expire(total_key, 600)
+            win_key = _METRICS_WINDOW_KEY.format(config_id=config_id)
+            # Unique member so concurrent requests in the same ms don't collide.
+            member = f"{now}:{os.getpid()}:{id(self)}"
+            await r.zadd(win_key, {member: now})
+            await r.zremrangebyscore(win_key, "-inf", now - 60)
+            await r.expire(win_key, 90)
+        except Exception:
+            pass
+
+    async def record_rate_limited(self, config_id: str) -> None:
+        """Increment the cumulative 429 / rate-limited counter for ``config_id``."""
+        try:
+            r = await self._get_redis()
+            rl_key = _METRICS_RL_KEY.format(config_id=config_id)
+            await r.incr(rl_key)
+            await r.expire(rl_key, 600)
+        except Exception:
+            pass
+
+    async def get_metrics(self, config_id: str) -> Dict[str, int]:
+        """Return outbound metrics for ``config_id``.
+
+        ``requests_last_min`` = count of requests in the trailing 60s window.
+        All counters fall back to 0 if Redis is unreachable (fail-open).
+        """
+        try:
+            r = await self._get_redis()
+            now = time.time()
+            win_key = _METRICS_WINDOW_KEY.format(config_id=config_id)
+            await r.zremrangebyscore(win_key, "-inf", now - 60)
+            last_min = await r.zcard(win_key)
+            total = await r.get(_METRICS_TOTAL_KEY.format(config_id=config_id))
+            rl = await r.get(_METRICS_RL_KEY.format(config_id=config_id))
+            conc = await r.get(_CONCURRENCY_KEY.format(config_id=config_id))
+            return {
+                "requests_last_min": int(last_min or 0),
+                "requests_total": int(total or 0),
+                "rate_limited_count": int(rl or 0),
+                "concurrency": int(conc or 0),
+            }
+        except Exception:
+            return {
+                "requests_last_min": 0,
+                "requests_total": 0,
+                "rate_limited_count": 0,
+                "concurrency": 0,
+            }
 
     # ── Rate-limit header correction ───────────────────────────────────────────
 

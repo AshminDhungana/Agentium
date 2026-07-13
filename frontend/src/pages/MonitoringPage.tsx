@@ -6,6 +6,7 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { monitoringService } from '../services/monitoring';
 import { MonitoringDashboard, ViolationReport, AgentHealthReport } from '../types';
 import { useWebSocketStore } from '../store/websocketStore';
+import { ProviderResiliencePanel } from '../components/monitoring/ProviderResiliencePanel';
 import { ErrorState } from '@/components/ui/ErrorState';
 import {
     Activity,
@@ -1282,6 +1283,11 @@ export const MonitoringPage: React.FC = () => {
                                     )}
                                 </div>
                             </div>
+                        </div>
+
+                        {/* ── Per-Provider Resilience (Phase 19.3 / Task 18) ── */}
+                        <div className="mt-6">
+                            <ProviderResiliencePanel />
                         </div>
                     </>
                 )}

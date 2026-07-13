@@ -219,6 +219,12 @@ celery_app.conf.beat_schedule = {
         'schedule': 300.0,  # every 5 minutes — aligns with health-check-every-5-minutes
     },
 
+    # ── Phase 19.3 (Task 18): Per-Provider Resilience Metrics Broadcast ────────
+    'provider-metrics-broadcast': {
+        'task': 'agentium.celery_app.broadcast_provider_metrics',
+        'schedule': 30.0,  # every 30 seconds — matches mcp-stats-broadcast cadence
+    },
+
     # ── Phase 17.1: Application-Layer DDoS Hardening ──────────────────────────
     # Queries the Redis 4xx weighted-sum counters written by ErrorCounterMiddleware.
     # IPs whose weighted score exceeds BLOCK_THRESHOLD (100) within the 5-minute
@@ -378,6 +384,135 @@ def broadcast_channel_health():
 
     except Exception as exc:
         logger.error("[ChannelHealth] broadcast_channel_health task failed: %s", exc)
+    finally:
+        db.close()
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Phase 19.3 (Task 18) — Per-Provider Resilience Metrics Broadcast Task
+# ──────────────────────────────────────────────────────────────────────────────
+
+@celery_app.task(name="agentium.celery_app.broadcast_provider_metrics", ignore_result=True)
+def broadcast_provider_metrics():
+    """
+    Phase 19.3 (Task 18): read live per-provider outbound metrics and push a
+    'provider_metrics_update' WebSocket event to all connected dashboards.
+
+    Runs every 30 seconds via Celery Beat. The frontend's ProviderResiliencePanel
+    subscribes to this event for live requests/min, concurrency, 429 rate,
+    circuit-breaker state, and key health per provider config.
+
+    WebSocket payload:
+        {
+            "type":      "provider_metrics_update",
+            "metrics":   [ { config_id, provider, requests_per_minute,
+                            requests_last_min, concurrency, rate_limited_count,
+                            circuit_state, key_status }, ... ],
+            "timestamp": "<ISO>"
+        }
+    """
+    import asyncio
+    from datetime import datetime
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from sqlalchemy.pool import NullPool
+
+    DATABASE_URL = os.getenv(
+        "DATABASE_URL",
+        "postgresql://postgres:postgres@postgres:5432/agentium"
+    )
+    engine = create_engine(DATABASE_URL, poolclass=NullPool, pool_pre_ping=True)
+    Session = sessionmaker(bind=engine)
+    db = Session()
+
+    try:
+        from backend.models.entities.user_config import (
+            UserModelConfig,
+            ConnectionStatus,
+        )
+        from backend.services.api_key_manager import api_key_manager
+        from backend.services.provider_rate_limiter import provider_rate_limiter
+
+        configs = (
+            db.query(UserModelConfig).filter_by(is_active=True).all()
+        )
+        if not configs:
+            logger.debug("[ProviderMetrics] No active configs — skipping broadcast")
+            return
+
+        async def _gather() -> list:
+            metrics = []
+            for cfg in configs:
+                prov = cfg.provider.value if hasattr(cfg.provider, "value") else str(cfg.provider)
+                rpm = getattr(cfg, "requests_per_minute", None) or 60
+                try:
+                    redis_metrics = await provider_rate_limiter.get_metrics(str(cfg.id))
+                except Exception:
+                    redis_metrics = {
+                        "requests_last_min": 0,
+                        "requests_total": 0,
+                        "rate_limited_count": 0,
+                        "concurrency": 0,
+                    }
+                try:
+                    key_status = api_key_manager._get_key_status(cfg)
+                except Exception:
+                    key_status = "unknown"
+                try:
+                    circuit_state = (
+                        "open" if not api_key_manager.is_config_healthy(str(cfg.id))
+                        else "closed"
+                    )
+                except Exception:
+                    circuit_state = "unknown"
+                metrics.append({
+                    "config_id":          str(cfg.id),
+                    "provider":           prov,
+                    "requests_per_minute": rpm,
+                    "requests_last_min":  redis_metrics.get("requests_last_min", 0),
+                    "concurrency":        redis_metrics.get("concurrency", 0),
+                    "rate_limited_count": redis_metrics.get("rate_limited_count", 0),
+                    "circuit_state":      circuit_state,
+                    "key_status":         key_status,
+                })
+            return metrics
+
+        loop = asyncio.new_event_loop()
+        try:
+            metrics = loop.run_until_complete(_gather())
+        finally:
+            loop.close()
+
+        if not metrics:
+            return
+
+        message = {
+            "type":      "provider_metrics_update",
+            "metrics":   metrics,
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+
+        try:
+            from backend.api.routes.websocket import manager
+
+            bcast_loop = asyncio.new_event_loop()
+            try:
+                # Tolerate a test double that replaces broadcast with a plain
+                # (non-awaitable) callable — always run the coroutine if present.
+                sent = manager.broadcast(message)
+                if asyncio.iscoroutine(sent):
+                    bcast_loop.run_until_complete(sent)
+                logger.debug(
+                    "[ProviderMetrics] Broadcast metrics for %d configs", len(metrics)
+                )
+            finally:
+                bcast_loop.close()
+
+        except Exception as exc:
+            logger.debug("[ProviderMetrics] WebSocket broadcast skipped (non-fatal): %s", exc)
+
+    except Exception as exc:
+        logger.error("[ProviderMetrics] broadcast_provider_metrics task failed: %s", exc)
     finally:
         db.close()
 

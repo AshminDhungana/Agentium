@@ -265,3 +265,45 @@ class TestConfigHealthSingleSourceOfTruth:
     def test_active_config_is_healthy(self, seeded_db: Session):
         cfg = _make_config(seeded_db, ProviderType.ANTHROPIC, "claude-3-5-sonnet", priority=1)
         assert api_key_manager.is_config_healthy(cfg.id, db=seeded_db) is True
+
+
+@pytest.mark.integration
+def test_provider_metrics_broadcast(celery_eager, seeded_db):
+    """
+    Task 18: broadcast_provider_metrics() must emit a 'provider_metrics_update'
+    event whose 'metrics' field is a list (one entry per active config). The
+    dashboard subscribes to this event for live per-provider resilience numbers.
+    """
+    import os
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from sqlalchemy.pool import NullPool
+
+    # The task opens its OWN top-level DB connection, so the config must be
+    # committed at the top level — not merely flushed/committed inside the
+    # test's savepoint-wrapped session, whose writes other connections cannot
+    # see until the outer transaction commits.
+    database_url = os.getenv(
+        "DATABASE_URL",
+        "postgresql://agentium:agentium@postgres:5432/agentium_test",
+    )
+    eng = create_engine(database_url, poolclass=NullPool, pool_pre_ping=True)
+    s = sessionmaker(bind=eng)()
+    _make_config(s, ProviderType.OPENAI, "gpt-4o", priority=1)
+    s.commit()
+    s.close()
+    eng.dispose()
+
+    from backend.celery_app import broadcast_provider_metrics
+
+    broadcasts = []
+    with patch(
+        "backend.api.routes.websocket.manager.broadcast",
+        side_effect=lambda msg: broadcasts.append(msg),
+    ):
+        broadcast_provider_metrics()
+
+    updates = [m for m in broadcasts if m.get("type") == "provider_metrics_update"]
+    assert updates, "no provider_metrics_update broadcast emitted"
+    assert isinstance(updates[0]["metrics"], list)
+    assert updates[0]["metrics"], "expected at least one config in metrics"
