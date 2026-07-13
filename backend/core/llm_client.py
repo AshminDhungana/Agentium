@@ -273,17 +273,25 @@ class LLMClient:
                 except Exception as exc:
                     last_error = exc
                     effective_config_id = attempt_config_id or "default"
-                    cb = self._get_cb(effective_config_id)
                     tier = self.classify_error(exc)
                     is_rl = tier is ErrorTier.RATE_LIMITED
-                    if is_rl:
-                        logger.warning(
-                            "LLMClient.generate: Rate limit on config %s (attempt %d/%d)",
-                            attempt_config_id, attempt + 1, _max_retries + 1,
-                        )
+                    logger.warning(
+                        "LLMClient.generate: %s on config %s (attempt %d/%d): %s",
+                        tier.value, attempt_config_id, attempt + 1, _max_retries + 1, exc,
+                    )
+                    # Permanent key failure: never retry a dead key — rotate now.
+                    if tier is ErrorTier.PERMANENT_KEY_FAILURE:
+                        try:
+                            api_key_manager.mark_key_failed(
+                                effective_config_id, str(exc), is_permanent=True, db=self.db)
+                        except Exception:
+                            pass
+                        cb = self._get_cb(effective_config_id)
+                        cb.record_failure()
+                        break  # immediate rotation to next config, no delay
+                    cb = self._get_cb(effective_config_id)
                     cb.record_failure()
-                    is_retryable = tier in (ErrorTier.RATE_LIMITED, ErrorTier.TRANSIENT)
-                    if attempt < _max_retries and is_retryable:
+                    if attempt < _max_retries and (is_rl or tier is ErrorTier.TRANSIENT):
                         await self._delay(attempt)
                         continue
                     else:
@@ -361,18 +369,25 @@ class LLMClient:
                 except Exception as exc:
                     last_error = exc
                     effective_config_id = attempt_config_id or "default"
-                    cb = self._get_cb(effective_config_id)
                     tier = self.classify_error(exc)
                     is_rl = tier is ErrorTier.RATE_LIMITED
-                    if is_rl:
-                        logger.warning(
-                            "LLMClient.generate_with_tools: Rate limit on config %s "
-                            "(attempt %d/%d)",
-                            attempt_config_id, attempt + 1, _max_retries + 1,
-                        )
+                    logger.warning(
+                        "LLMClient.generate_with_tools: %s on config %s (attempt %d/%d): %s",
+                        tier.value, attempt_config_id, attempt + 1, _max_retries + 1, exc,
+                    )
+                    # Permanent key failure: never retry a dead key — rotate now.
+                    if tier is ErrorTier.PERMANENT_KEY_FAILURE:
+                        try:
+                            api_key_manager.mark_key_failed(
+                                effective_config_id, str(exc), is_permanent=True, db=self.db)
+                        except Exception:
+                            pass
+                        cb = self._get_cb(effective_config_id)
+                        cb.record_failure()
+                        break  # immediate rotation to next config, no delay
+                    cb = self._get_cb(effective_config_id)
                     cb.record_failure()
-                    is_retryable = tier in (ErrorTier.RATE_LIMITED, ErrorTier.TRANSIENT)
-                    if attempt < _max_retries and is_retryable:
+                    if attempt < _max_retries and (is_rl or tier is ErrorTier.TRANSIENT):
                         await self._delay(attempt)
                         continue
                     else:

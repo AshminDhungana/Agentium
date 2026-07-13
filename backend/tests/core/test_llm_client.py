@@ -154,6 +154,29 @@ class TestLLMClientGenerate:
             assert result["provider_config_id"] == "fallback-config-id"
 
     @pytest.mark.asyncio
+    async def test_permanent_failure_rotates_immediately(self, llm_client):
+        calls = []
+        auth_resp = MagicMock()
+        auth_resp.status_code = 401
+
+        async def fake_generate(agent, user_message, **kwargs):
+            cfg = kwargs.get("config_id")
+            calls.append(cfg)
+            if cfg == "cfg-A":
+                # openai 2.24.0 requires response=/body= on APIStatusError subclasses
+                raise openai.AuthenticationError(
+                    "401 invalid key", response=auth_resp, body=None)
+            return {"content": "ok", "tokens_used": 1, "model": "m"}
+
+        with patch("backend.core.llm_client.ModelService.generate_with_agent", fake_generate):
+            result = await llm_client.generate(
+                agent=object(), user_message="hi",
+                config_id="cfg-A", fallback_configs=["cfg-B"])
+        assert result["content"] == "ok"
+        # cfg-A must NOT be retried (only 1 call), then cfg-B called once
+        assert calls == ["cfg-A", "cfg-B"], calls
+
+    @pytest.mark.asyncio
     async def test_circuit_breaker_blocks_after_failures(self, llm_client):
         with patch("backend.core.llm_client.ModelService.generate_with_agent", new_callable=AsyncMock) as mock_generate:
             mock_generate.side_effect = Exception("always fails")
