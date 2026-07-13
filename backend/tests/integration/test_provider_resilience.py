@@ -501,6 +501,59 @@ class Test429Burst:
 
 
 @pytest.mark.integration
+class TestInvalidKey:
+    """
+    Task 22: a permanently-failed key (always 401) must NOT be retried. The
+    resilience layer classifies 401 as PERMANENT_KEY_FAILURE and rotates
+    immediately to the fallback (no backoff, no retry against the dead key),
+    marks the key unhealthy, and the task still completes via the fallback.
+    """
+
+    async def test_invalid_key_rotates_immediately(self, seeded_db: Session, monkeypatch):
+        import openai as _openai
+
+        _orig = _openai.AsyncOpenAI
+
+        def _zero_retry(*a, **k):
+            k.setdefault("max_retries", 0)
+            return _orig(*a, **k)
+
+        monkeypatch.setattr(_openai, "AsyncOpenAI", _zero_retry)
+
+        always_401 = FakeProviderServer(default_status=401)
+        always_200 = FakeProviderServer(default_status=200)
+        created_ids = []
+        try:
+            primary = make_fake_config(always_401.base_url)
+            created_ids.append(str(primary.id))
+            fb = make_fake_config(always_200.base_url)
+            created_ids.append(str(fb.id))
+            agent = types.SimpleNamespace(ethos=None, agentium_id="task-22")
+
+            # A single task: the 401 primary must be hit exactly once (no retry),
+            # then rotate to the 200 fallback (hit exactly once) and complete.
+            result = await LLMClient().generate(
+                agent=agent, user_message="hi",
+                config_id=str(primary.id),
+                fallback_configs=[str(fb.id)],
+            )
+
+            assert isinstance(result, dict)
+            assert result.get("content") == "ok"
+            # Permanent key failure → no retry, immediate rotation.
+            assert always_401.hits() == 1, always_401.status_counts()
+            assert always_200.hits() == 1, always_200.status_counts()
+
+            # The dead key is marked permanently unhealthy (Task 16 merged
+            # source of truth), so it is excluded from future failover chains.
+            assert api_key_manager.is_config_healthy(str(primary.id), db=seeded_db) is False
+        finally:
+            always_401.shutdown()
+            always_200.shutdown()
+            _delete_fake_configs(created_ids)
+
+
+@pytest.mark.integration
 class TestLocalFallbackChain:
     """
     Task 13: get_fallback_config_ids must build an ordered failover chain that
