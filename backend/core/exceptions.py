@@ -70,3 +70,19 @@ class InternalServerError(AgentiumError):
 
 class ServiceUnavailableError(AgentiumError):
     status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+
+
+class LocalSTTError(Exception):
+    """Local whisper.cpp STT failed (binary/model missing, crash, timeout).
+
+    Internal — not an HTTP error. The caller's fallback chain converts it
+    into a user-facing signal.
+    """
+
+
+class ServerSTTUnavailable(ServiceUnavailableError):
+    """No server-side STT engine (whisper.cpp nor OpenAI) is available.
+
+    The frontend should fall back to the browser-native Web Speech API.
+    Rendered by the global handler as HTTP 503 with code STT_UNAVAILABLE.
+    """
