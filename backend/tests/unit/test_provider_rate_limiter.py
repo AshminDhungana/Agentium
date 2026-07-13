@@ -1,0 +1,90 @@
+"""Unit tests for ProviderRateLimiter token bucket (Task 8)."""
+
+import asyncio
+import time
+
+from backend.services.provider_rate_limiter import ProviderRateLimiter
+
+
+class _FakeRedis:
+    """Minimal async dict-backed fake of the Redis calls we use.
+
+    ``evalsha`` is forced to raise so ``acquire`` exercises the native
+    ``_fallback_acquire`` path (same math, just non-atomic).
+    """
+
+    def __init__(self):
+        self.store: dict = {}
+        self.expire_at: dict = {}
+
+    async def hmget(self, key, *fields):
+        d = self.store.get(key, {})
+        return [d.get(f) for f in fields]
+
+    async def hset(self, key, mapping=None, **kwargs):
+        d = self.store.setdefault(key, {})
+        if mapping:
+            d.update(mapping)
+        d.update(kwargs)
+
+    async def expire(self, key, t):
+        self.expire_at[key] = t
+
+    async def script_load(self, script):
+        return "fake-sha"
+
+    async def evalsha(self, *a, **k):
+        raise RuntimeError("no script — force fallback")
+
+
+async def test_token_bucket_spaces_calls(monkeypatch):
+    rl = ProviderRateLimiter()
+    rl._redis = _FakeRedis()
+    rl._sha = "fake-sha"  # acquire tries evalsha -> raises -> fallback
+
+    # Deterministic fake clock: sleep advances the clock instantly.
+    clock = {"t": 0.0}
+
+    def fake_time():
+        return clock["t"]
+
+    sleeps = []
+
+    async def fake_sleep(d):
+        sleeps.append(d)
+        clock["t"] += d
+
+    monkeypatch.setattr(time, "time", fake_time)
+    monkeypatch.setattr(asyncio, "sleep", fake_sleep)
+
+    for _ in range(4):
+        await rl.acquire("cfg-30", requests_per_minute=30)
+
+    # capacity=1, refill 0.5/s -> ~2s between successive acquires (after first)
+    gaps = [t for t in sleeps if isinstance(t, (int, float)) and t > 1.0]
+    assert gaps, "calls not spaced — token bucket not throttling"
+    assert all(1.5 < g < 2.5 for g in gaps), gaps
+
+
+async def test_acquire_fails_open_when_redis_down(monkeypatch):
+    rl = ProviderRateLimiter()
+    # Redis unreachable -> acquire must return immediately (never block forever).
+    async def boom():
+        raise ConnectionError("redis down")
+
+    monkeypatch.setattr(rl, "_get_redis", boom)
+
+    # If it blocked, this would hang; the fail-open path returns fast.
+    await rl.acquire("cfg-x", requests_per_minute=60)
+
+
+async def test_fallback_acquire_allows_first_consume():
+    rl = ProviderRateLimiter()
+    r = _FakeRedis()
+    # First call: empty bucket -> seeded to 1 token -> consumed, allowed.
+    res = await rl._fallback_acquire(r, "k", now=100.0, rate=0.5)
+    assert res[0] == 1  # allowed
+    # Second call at same instant: bucket empty -> denied with a wait.
+    res2 = await rl._fallback_acquire(r, "k", now=100.0, rate=0.5)
+    assert res2[0] == 0  # denied
+    assert res2[1] > 0  # positive wait in ms

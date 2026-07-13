@@ -20,6 +20,8 @@ try:
 except ImportError:
     settings = None  # type: ignore
 
+from backend.services.provider_rate_limiter import provider_rate_limiter
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Per-model pricing table
 # Prices are USD per 1 M tokens (input_rate, output_rate).
@@ -345,6 +347,8 @@ class OpenAICompatibleProvider(BaseModelProvider):
 
         start_time = time.time()
         try:
+            rpm = getattr(self.config, "requests_per_minute", 60) or 60
+            await provider_rate_limiter.acquire(self.config.id, rpm)
             response = await client.chat.completions.create(
                 model=kwargs.get('model', self.config.default_model),
                 messages=[
@@ -408,6 +412,8 @@ class OpenAICompatibleProvider(BaseModelProvider):
             timeout=self.config.timeout_seconds
         )
 
+        rpm = getattr(self.config, "requests_per_minute", 60) or 60
+        await provider_rate_limiter.acquire(self.config.id, rpm)
         stream = await client.chat.completions.create(
             model=kwargs.get('model', self.config.default_model),
             messages=[
@@ -489,6 +495,8 @@ class OpenAICompatibleProvider(BaseModelProvider):
                     create_kwargs["tools"] = tools
                     create_kwargs["tool_choice"] = "auto"
 
+                rpm = getattr(self.config, "requests_per_minute", 60) or 60
+                await provider_rate_limiter.acquire(self.config.id, rpm)
                 response = await client.chat.completions.create(**create_kwargs)
                 msg = response.choices[0].message
 
@@ -595,6 +603,8 @@ class AnthropicProvider(BaseModelProvider):
         client = anthropic.AsyncAnthropic(api_key=self.api_key)
 
         start_time = time.time()
+        rpm = getattr(self.config, "requests_per_minute", 60) or 60
+        await provider_rate_limiter.acquire(self.config.id, rpm)
         response = await client.messages.create(
             model=kwargs.get('model', self.config.default_model),
             max_tokens=kwargs.get('max_tokens', self.config.max_tokens),
@@ -638,6 +648,8 @@ class AnthropicProvider(BaseModelProvider):
 
         client = anthropic.AsyncAnthropic(api_key=self.api_key)
 
+        rpm = getattr(self.config, "requests_per_minute", 60) or 60
+        await provider_rate_limiter.acquire(self.config.id, rpm)
         async with client.messages.stream(
             model=kwargs.get('model', self.config.default_model),
             max_tokens=kwargs.get('max_tokens', self.config.max_tokens),
@@ -697,6 +709,8 @@ class AnthropicProvider(BaseModelProvider):
                 if tools:
                     create_kwargs["tools"] = tools
 
+                rpm = getattr(self.config, "requests_per_minute", 60) or 60
+                await provider_rate_limiter.acquire(self.config.id, rpm)
                 response = await client.messages.create(**create_kwargs)
 
                 if response.usage:
@@ -801,6 +815,8 @@ class LocalProvider(OpenAICompatibleProvider):
 
         start_time = time.time()
         try:
+            rpm = getattr(self.config, "requests_per_minute", 60) or 60
+            await provider_rate_limiter.acquire(self.config.id, rpm)
             response = await client.chat.completions.create(
                 model=self.config.default_model,
                 messages=[{"role": "user", "content": combined_prompt}],
