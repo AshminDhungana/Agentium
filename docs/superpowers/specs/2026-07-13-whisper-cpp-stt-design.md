@@ -49,15 +49,21 @@ Key facts established during exploration:
 2. **Fallback ownership:** the **backend owns the server-side chain**
    (whisper.cpp → OpenAI). The frontend only steps in with browser-native when
    the backend returns `STT_UNAVAILABLE`.
-3. **Build / GPU:** CPU build by default; optional CUDA build via build-arg
-   `WHISPER_BACKEND=cuda`. Runtime GPU probe selects CUDA vs CPU inside
-   whisper.cpp. Privileged container + `--gpus all` mounts `libcuda` so the GPU
-   path activates automatically.
-4. **Model:** default **`base.en`** (~140 MB, fast, good accuracy). Configurable
-   via `WHISPER_MODEL`.
+3. **Build / GPU:** CPU build by default (runs anywhere). Optional CUDA build
+   via build-arg `WHISPER_BACKEND=cuda`, which requires a GPU host run with
+   `--gpus all` (privileged). A CUDA-compiled binary cannot fall back to CPU,
+   so the variant must match the host; the startup GPU probe logs the active
+   backend. whisper.cpp builds with **CMake** (`-DGGML_CUDA=1`), not the old
+   `make WHISPER_CUDA=1` flag.
+4. **Model:** default **`base.en`** (~142 MB, fast, good accuracy). Configurable
+   via `WHISPER_MODEL`. Downloaded via `models/download-ggml-model.sh` (still
+   produces `ggml-base.en.bin`).
 5. **Invocation:** backend calls the compiled `whisper-cli` binary via
    **subprocess**, parsing stdout. No Python bindings, no sidecar — simplest
-   and most isolated (a crash cannot take down the app).
+   and most isolated (a crash cannot take down the app). *Note:* meetily
+   (the referenced project) uses in-process **whisper-rs** Rust bindings
+   inside its Tauri backend rather than a subprocess; we chose the subprocess
+   route for isolation and because it needs no extra language runtime.
 6. **Host voice-bridge:** kept as the desktop voice companion; relays mic audio
    to the backend for transcription; Vosk retained as an offline safety net.
 
@@ -70,6 +76,8 @@ A new stage clones whisper.cpp and builds the CPU binary:
 
 ```dockerfile
 # ── whisper.cpp (CPU) ───────────────────────────────────────────────
+# whisper.cpp now builds with CMake (the Makefile only has demo targets;
+# "CUDA needs CMake"). CPU build runs anywhere, no GPU required.
 FROM python:3.11-slim-bookworm AS whisper-cpp
 RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential cmake git \
@@ -77,7 +85,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 ARG WHISPER_MODEL=base.en
 RUN git clone --depth 1 https://github.com/ggerganov/whisper.cpp.git /whisper.cpp \
     && cd /whisper.cpp \
-    && make -j$(nproc) \
+    && cmake -B build \
+    && cmake --build build -j --config Release \
     && bash ./models/download-ggml-model.sh ${WHISPER_MODEL} \
     && mkdir -p /opt/whisper/models \
     && cp models/ggml-${WHISPER_MODEL}.bin /opt/whisper/models/ \
@@ -92,11 +101,8 @@ COPY --from=whisper-cpp /opt/whisper /opt/whisper
 ```
 
 ### Optional GPU (`WHISPER_BACKEND=cuda`)
-A separate CUDA builder compiles with `WHISPER_CUDA=1`; the binary + CUDA
-runtime `.so` files are copied into the lean runtime. At runtime, if the
-container is privileged and run with `--gpus all`, nvidia-container-toolkit
-mounts the driver's `libcuda` and whisper.cpp uses the GPU; otherwise it falls
-back to CPU.
+A separate CUDA builder compiles with CMake `-DGGML_CUDA=1`; the binary + CUDA
+runtime `.so` files are copied into the lean runtime.
 
 ```dockerfile
 ARG WHISPER_BACKEND=cpu
@@ -108,7 +114,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 ARG WHISPER_MODEL=base.en
 RUN git clone --depth 1 https://github.com/ggerganov/whisper.cpp.git /whisper.cpp \
     && cd /whisper.cpp \
-    && make -j$(nproc) WHISPER_CUDA=1 \
+    && cmake -B build -DGGML_CUDA=1 \
+    && cmake --build build -j --config Release \
     && bash ./models/download-ggml-model.sh ${WHISPER_MODEL}
 # copy whisper-cli + required CUDA runtime libs into the slim runtime
 ```
@@ -116,6 +123,21 @@ RUN git clone --depth 1 https://github.com/ggerganov/whisper.cpp.git /whisper.cp
 The `WHISPER_BACKEND` build-arg selects which stage feeds the runtime. (Exact
 CUDA `.so` set copied: `libcudart.so*`, `libcublas*`, `libcufft*`,
 `libcurand*`, `libcublasLt*` — resolved at implementation time.)
+
+> **Important — a CUDA-compiled binary does NOT auto-fall-back to CPU.** When
+> whisper.cpp is built with `-DGGML_CUDA=1`, the resulting `whisper-cli`
+> requires a usable GPU + `libcuda` at runtime; on a host with no GPU it errors
+> rather than silently running on CPU. Therefore:
+> - The **default image is the CPU build**, which runs on any host (with or
+>   without a GPU). This is the portable, always-works path.
+> - The **CUDA image (`WHISPER_BACKEND=cuda`) is opt-in** and must be run on a
+>   GPU host with `--gpus all` (privileged). It is not a "runs everywhere"
+>   image.
+> - If the CUDA binary ever fails at runtime (no GPU mounted), the failure is
+>   caught as `LocalSTTError` and the chain falls back to OpenAI/browser — so
+>   the user is never blocked, but the operator should match the image variant
+>   to the host. The startup GPU probe (§2) logs which backend is active so a
+>   misconfiguration is visible immediately.
 
 ### Config (env, with defaults)
 - `WHISPER_MODEL` — model name, default `base.en`.
