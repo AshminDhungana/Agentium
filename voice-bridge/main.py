@@ -109,6 +109,15 @@ WAKE_WORD_LISTEN_TIMEOUT:  float = float(_conf.get("WAKE_WORD_LISTEN_TIMEOUT",  
 # today's behavior. This is additive, not a replacement.
 VOSK_MODEL_PATH: str = _conf.get("VOSK_MODEL_PATH", os.getenv("VOSK_MODEL_PATH", str(Path.home() / ".agentium" / "vosk-model")))
 
+# ── Backend STT relay (whisper.cpp) ────────────────────────────────────────────
+# The host bridge captures mic audio and relays it to the backend, which now
+# runs whisper.cpp locally. Falls back to the offline Vosk model only if the
+# backend STT call fails (backend unreachable / whisper.cpp missing).
+STT_BACKEND_URL: str = _conf.get(
+    "STT_BACKEND_URL", os.getenv("STT_BACKEND_URL", f"{BACKEND_URL}/api/v1/audio/transcribe")
+)
+WHISPER_RELAY_TIMEOUT: float = float(_conf.get("WHISPER_RELAY_TIMEOUT", os.getenv("WHISPER_RELAY_TIMEOUT", "30.0")))
+
 # ── Backend call resilience config (B4/R1) ─────────────────────────────────────
 BACKEND_QUERY_RETRIES:    int   = int(_conf.get("BACKEND_QUERY_RETRIES",    os.getenv("BACKEND_QUERY_RETRIES",    "2")))
 BACKEND_QUERY_RETRY_WAIT: float = float(_conf.get("BACKEND_QUERY_RETRY_WAIT", os.getenv("BACKEND_QUERY_RETRY_WAIT", "1.5")))
@@ -158,7 +167,7 @@ try:
     VOSK_AVAILABLE = True
     logger.info("[bridge] vosk library available")
 except ImportError:
-    logger.info("[bridge] vosk not installed — offline STT fallback disabled (Google-only)")
+    logger.info("[bridge] vosk not installed — offline STT fallback disabled (backend whisper.cpp only)")
 
 import urllib.request
 import urllib.error
@@ -235,6 +244,39 @@ def _recognize_with_vosk(audio: "sr.AudioData") -> Optional[str]:
         return text or None
     except Exception as exc:
         logger.warning("[WARN] Vosk transcription failed: %s", exc)
+        return None
+
+
+def _transcribe_via_backend(audio_wav: bytes) -> Optional[str]:
+    """
+    Relay WAV audio bytes to the backend's whisper.cpp STT endpoint.
+
+    Returns the transcript string, or None if the backend call fails (in
+    which case the caller falls back to the offline Vosk model). The backend
+    requires an authenticated user; the bridge sends its VOICE_TOKEN.
+    """
+    import urllib.request
+    import urllib.error
+
+    if not VOICE_TOKEN:
+        logger.debug("[bridge] No VOICE_TOKEN — cannot call backend STT")
+        return None
+    try:
+        req = urllib.request.Request(
+            STT_BACKEND_URL,
+            data=audio_wav,
+            headers={
+                "Content-Type": "audio/wav",
+                "Authorization": f"Bearer {VOICE_TOKEN}",
+            },
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=WHISPER_RELAY_TIMEOUT) as resp:
+            body = json.loads(resp.read().decode())
+            text = (body.get("text") or "").strip()
+            return text or None
+    except Exception as exc:
+        logger.warning("[WARN] Backend STT relay failed: %s — using Vosk", exc)
         return None
 
 
@@ -354,27 +396,20 @@ def _listen_sync(
     # Microphone worked this time — clear any prior backoff state.
     _last_mic_error_at = None
 
-    logger.debug("[bridge] Audio captured, sending to STT…")
-
-    try:
-        text = recognizer.recognize_google(audio)
-        logger.info("[bridge] STT result (Google): '%s'", text)
+    logger.debug("[bridge] Audio captured, sending to backend STT (whisper.cpp)…")
+    audio_wav = audio.get_wav_data()
+    text = _transcribe_via_backend(audio_wav)
+    if text:
+        logger.info("[bridge] STT result (backend whisper.cpp): '%s'", text)
         return text
-    except sr.UnknownValueError:
-        logger.debug("[bridge] STT: could not understand audio")
-        return None
-    except sr.RequestError as exc:
-        # B1/B2: Google's free Web Speech API is unauthenticated, rate-limited,
-        # and not intended for commercial/production use — it WILL throttle or
-        # error intermittently. Try the local Vosk model (if available) before
-        # giving up on this utterance entirely.
-        logger.warning("[WARN] Google STT request failed: %s — trying offline fallback", exc)
-        fallback_text = _recognize_with_vosk(audio)
-        if fallback_text:
-            logger.info("[bridge] STT result (Vosk fallback): '%s'", fallback_text)
-            return fallback_text
-        logger.warning("[WARN] Offline fallback unavailable or produced no result for this utterance")
-        return None
+    # Backend STT unreachable — fall back to the offline Vosk model.
+    logger.warning("[WARN] Backend STT unavailable — trying offline Vosk")
+    fallback_text = _recognize_with_vosk(audio)
+    if fallback_text:
+        logger.info("[bridge] STT result (Vosk fallback): '%s'", fallback_text)
+        return fallback_text
+    logger.warning("[WARN] Offline fallback unavailable or produced no result")
+    return None
 
 
 async def listen_once(
@@ -722,8 +757,8 @@ async def _main() -> None:
     logger.info("  Chat API  : %s", _RESOLVED_CHAT_ENDPOINT)
     logger.info("  WS port   : %d", WS_PORT)
     logger.info("  Wake word : '%s' (required=%s)", WAKE_WORD, REQUIRE_WAKE_WORD)
-    logger.info("  STT       : %s", "SpeechRecognition+Google" if SR_AVAILABLE else "DISABLED")
-    logger.info("  STT fallback (offline): %s", "vosk (model path configured)" if VOSK_AVAILABLE else "unavailable")
+    logger.info("  STT       : whisper.cpp (backend relay) + Vosk fallback" if SR_AVAILABLE else "DISABLED")
+    logger.info("  STT backend: %s", STT_BACKEND_URL)
     logger.info("  TTS       : %s", "pyttsx3" if TTS_AVAILABLE else "DISABLED")
     logger.info("  Platform  : %s", platform.system())
     logger.info("  Session   : no_speech=%.1fs  max=%.0fs  pause=%.1fs",
