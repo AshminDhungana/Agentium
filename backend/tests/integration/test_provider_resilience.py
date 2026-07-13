@@ -134,6 +134,55 @@ class TestExhaustionFailsCleanly:
         )
 
 
+@pytest.mark.integration
+class TestExhaustionBroadcastsDegradation:
+    """
+    Task 15: on total provider exhaustion the worker must surface a friendly
+    degradation message to connected dashboards (never a stack trace). It does
+    this via a `task_degraded` WebSocket broadcast carrying the friendly text.
+    """
+
+    def _run_exhausted(self, db_session: Session, exc_message: str, broadcasts):
+        @contextmanager
+        def _fake_get_task_db():
+            yield db_session
+
+        task = _make_task()
+        db_session.add(task)
+        db_session.flush()
+
+        with patch(
+            "backend.core.llm_client.LLMClient"
+        ) as MockLLM, patch(
+            "backend.services.tasks.task_executor.get_task_db", _fake_get_task_db
+        ), patch(
+            "backend.api.routes.websocket.manager.broadcast",
+            side_effect=lambda msg: broadcasts.append(msg),
+        ):
+            inst = MockLLM.return_value
+            inst.generate = AsyncMock(side_effect=RuntimeError(exc_message))
+            execute_task_async.run(task.agentium_id, "10003")
+
+        db_session.refresh(task)
+        return task
+
+    def test_degradation_broadcast_sent(self, seeded_db: Session):
+        broadcasts = []
+        self._run_exhausted(
+            seeded_db,
+            "LLMClient.generate exhausted all 1 provider(s) and 2 retries. "
+            "Last error: openai.RateLimitError: 429 Too Many Requests",
+            broadcasts,
+        )
+        degraded = [m for m in broadcasts if m.get("type") == "task_degraded"]
+        assert degraded, "no task_degraded broadcast emitted on exhaustion"
+        msg = degraded[0]
+        assert msg["reason"] == "rate_limited"
+        # Friendly text, not a stack trace.
+        assert "temporarily unavailable" in msg["message"]
+        assert "rate-limited" in msg["message"]
+
+
 def _make_config(db: Session, provider, model: str, priority: int = 1) -> UserModelConfig:
     """Create an unsaved, ACTIVE UserModelConfig for fallback-chain tests."""
     cfg = UserModelConfig(

@@ -211,6 +211,26 @@ def execute_task_async(self, task_id: str, agent_id: str):
                     exc_info=True,
                 )
             db.commit()
+
+            # Phase 19.3 (Task 15): surface a friendly degradation message to the
+            # user instead of a stack trace. The task is already terminal; this
+            # just tells any connected dashboard that the provider is exhausted.
+            try:
+                import asyncio
+                from backend.api.routes.websocket import manager
+                friendly = (
+                    "The AI provider is temporarily unavailable or rate-limited; "
+                    "this task has been queued for retry"
+                )
+                asyncio.run(manager.broadcast({
+                    "type": "task_degraded",
+                    "task_id": task_id,
+                    "reason": reason,
+                    "message": friendly,
+                }))
+            except Exception as ws_exc:
+                logger.error(f"task_degraded broadcast failed for {task_id}: {ws_exc}")
+
             return {"status": "failed", "task_id": task_id, "reason": reason}
 
         except Exception as exc:

@@ -13,7 +13,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Literal, Optional
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, status, HTTPException
 from backend.core.exceptions import BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, TooLargeError, RateLimitError, InternalServerError, ServiceUnavailableError
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -492,6 +492,17 @@ async def voice_command(
             "response": response.get("reply", "") if isinstance(response, dict) else str(response),
             "source": "voice_command"
         }
+    except RuntimeError as exc:
+        # Phase 19.3 (Task 15): provider exhaustion must surface a friendly
+        # 503, never a stack trace / raw exception string.
+        msg = str(exc).lower()
+        if "exhausted" in msg or "all providers" in msg or "all configs" in msg:
+            raise ServiceUnavailableError(
+                error="The AI provider is temporarily unavailable or rate-limited; "
+                       "this task has been queued for retry",
+                code="PROVIDER_EXHAUSTED",
+            )
+        raise
     except Exception as e:
         logger.error(f"Voice command error: {e}")
         return {
