@@ -168,6 +168,16 @@ class ProviderRateLimiter:
                 allowed = int(res[0]) == 1
                 if allowed:
                     await self._record_request(config_id)
+                    # Task 19: pre-exhaustion warning. The check does sync
+                    # Redis/DB reads, so run it off the event loop; never let a
+                    # warn-check failure block or break an allowed request.
+                    try:
+                        from backend.services.api_key_manager import api_key_manager
+                        await asyncio.to_thread(
+                            api_key_manager.check_rate_budget_warning, config_id
+                        )
+                    except Exception:
+                        pass
                     return
                 wait = max(0.05, float(res[1]) / 1000.0)
                 await asyncio.sleep(wait)

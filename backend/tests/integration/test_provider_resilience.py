@@ -307,3 +307,102 @@ def test_provider_metrics_broadcast(celery_eager, seeded_db):
     assert updates, "no provider_metrics_update broadcast emitted"
     assert isinstance(updates[0]["metrics"], list)
     assert updates[0]["metrics"], "expected at least one config in metrics"
+
+
+@pytest.mark.integration
+class TestPreExhaustionWarning:
+    """
+    Task 19: check_rate_budget_warning must fire a WebSocket alert *before* a
+    provider is actually exhausted, once its rolling 60s request count reaches
+    WARNING_THRESHOLD (80%) of its configured requests_per_minute. The warning
+    is debounced per-config so it fires once per 60s window, not per request.
+    """
+
+    def test_warning_at_80_percent(self, seeded_db: Session):
+        import os
+        import time
+
+        import redis
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        from sqlalchemy.pool import NullPool
+
+        # The warn check reads via its own top-level session (get_db_context),
+        # so the config must be committed at the top level — not merely flushed
+        # inside the savepoint-wrapped seeded_db session.
+        database_url = os.getenv(
+            "DATABASE_URL",
+            "postgresql://agentium:agentium@postgres:5432/agentium_test",
+        )
+        eng = create_engine(database_url, poolclass=NullPool, pool_pre_ping=True)
+        s = sessionmaker(bind=eng)()
+        cfg = _make_config(s, ProviderType.OPENAI, "gpt-4o", priority=1)
+        # requests_per_minute = 10 → 8 requests == 80% boundary (8 >= 0.8*10).
+        cfg.requests_per_minute = 10
+        s.commit()
+
+        # Seed the rolling 60s window with 8 requests.
+        r = redis.Redis.from_url(
+            os.getenv("REDIS_URL", "redis://redis:6379/1"), decode_responses=True
+        )
+        win_key = f"agentium:provider:metrics:{cfg.id}:window"
+        now = time.time()
+        for i in range(8):
+            r.zadd(win_key, {f"req:{i}": now - (8 - i)})
+        r.expire(win_key, 120)
+
+        alerts = []
+        with patch.object(
+            api_key_manager,
+            "_broadcast_websocket_alert",
+            side_effect=lambda provider, message: alerts.append(message),
+        ):
+            api_key_manager.check_rate_budget_warning(str(cfg.id))
+
+        s.close()
+        eng.dispose()
+
+        assert alerts, "expected a pre-exhaustion warning alert at 80% of rate"
+        assert any("80%" in a or "warning" in a.lower() for a in alerts)
+
+    def test_no_warning_well_below_threshold(self, seeded_db: Session):
+        import os
+        import time
+
+        import redis
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        from sqlalchemy.pool import NullPool
+
+        database_url = os.getenv(
+            "DATABASE_URL",
+            "postgresql://agentium:agentium@postgres:5432/agentium_test",
+        )
+        eng = create_engine(database_url, poolclass=NullPool, pool_pre_ping=True)
+        s = sessionmaker(bind=eng)()
+        cfg = _make_config(s, ProviderType.OPENAI, "gpt-4o", priority=1)
+        cfg.requests_per_minute = 10
+        s.commit()
+
+        # Only 2 requests → 20%, far below the 80% threshold.
+        r = redis.Redis.from_url(
+            os.getenv("REDIS_URL", "redis://redis:6379/1"), decode_responses=True
+        )
+        win_key = f"agentium:provider:metrics:{cfg.id}:window"
+        now = time.time()
+        for i in range(2):
+            r.zadd(win_key, {f"req:{i}": now - (2 - i)})
+        r.expire(win_key, 120)
+
+        alerts = []
+        with patch.object(
+            api_key_manager,
+            "_broadcast_websocket_alert",
+            side_effect=lambda provider, message: alerts.append(message),
+        ):
+            api_key_manager.check_rate_budget_warning(str(cfg.id))
+
+        s.close()
+        eng.dispose()
+
+        assert not alerts, "no warning should fire well below the 80% threshold"

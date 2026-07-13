@@ -22,6 +22,9 @@ Failover Architecture:
 
 import logging
 import asyncio
+import os
+import time
+import redis
 from typing import Optional, Dict, List, Callable, Any, Tuple
 from datetime import datetime, timedelta
 from functools import wraps
@@ -68,6 +71,7 @@ class APIKeyManager:
     MAX_FAILURES_BEFORE_COOLDOWN = 3
     DEFAULT_COOLDOWN_MINUTES = 5
     NOTIFICATION_DEBOUNCE_SECONDS = 300  # 5 minutes between "all down" alerts
+    WARNING_THRESHOLD = 0.8  # fire pre-exhaustion warning at 80% of configured rate
     
     def __new__(cls):
         """New."""
@@ -88,8 +92,21 @@ class APIKeyManager:
         self._initialized = True
         self._notification_cache: Dict[str, datetime] = {}  # provider -> last_notification_time
         self._local_fallback_config: Optional[Dict[str, Any]] = None
-        
+        self._sync_redis = None  # lazy shared sync Redis client (used for rate-budget warnings)
+
         logger.info("🔐 API Key Manager initialized")
+
+    def _get_sync_redis(self):
+        """Lazily construct and cache a blocking Redis client for short read-only
+        metrics lookups (e.g. the rolling 60s request window for warn checks).
+
+        The provider rate limiter owns the async client; this is a small sync
+        companion used inside the synchronous check_rate_budget_warning path.
+        """
+        if self._sync_redis is None:
+            url = os.getenv("REDIS_URL", "redis://redis:6379/0")
+            self._sync_redis = redis.Redis.from_url(url, decode_responses=True)
+        return self._sync_redis
     
     # =====================================================================
     # Core Failover Logic
@@ -909,6 +926,52 @@ class APIKeyManager:
         
         logger.critical(f"🚨 ALL KEYS DOWN for {provider} - notifications sent")
     
+    def check_rate_budget_warning(self, config_id: str, db: Optional[Session] = None):
+        """Task 19: fire a pre-exhaustion warning when a provider config's rolling
+        60s request count reaches WARNING_THRESHOLD (80%) of its configured
+        requests_per_minute. The warning is debounced once per 60s per config and
+        surfaced as a frontend WebSocket alert *before* any provider actually
+        starts failing.
+
+        Best-effort: every external lookup is wrapped so a Redis/DB hiccup can
+        never turn a warn-check into a request failure.
+        """
+        def fn(db: Session):
+            cfg = db.query(UserModelConfig).filter_by(id=config_id).first()
+            if not cfg:
+                return
+            rpm = cfg.requests_per_minute or 60
+            try:
+                r = self._get_sync_redis()
+                key = f"agentium:provider:metrics:{config_id}:window"
+                now = time.time()
+                r.zremrangebyscore(key, 0, now - 60)
+                used = r.zcard(key)
+            except Exception:
+                return
+            if not used or used < self.WARNING_THRESHOLD * rpm:
+                return
+            warn_key = f"agentium:provider:warn:{config_id}"
+            try:
+                if r.get(warn_key):
+                    return
+                r.set(warn_key, "1", ex=60)
+            except Exception:
+                return
+            pct = int(100 * used / rpm)
+            self._broadcast_websocket_alert(
+                cfg.provider.value,
+                f"⚠️ Provider {cfg.provider.value} at {pct}% of its rate limit "
+                f"({used}/{rpm} req/min). Approaching exhaustion.",
+            )
+
+        if db is not None:
+            fn(db)
+        else:
+            from backend.models.database import get_db_context
+            with get_db_context() as db:
+                fn(db)
+
     def _broadcast_websocket_alert(self, provider: str, message: str):
         """Broadcast alert to all connected WebSocket clients."""
         try:
