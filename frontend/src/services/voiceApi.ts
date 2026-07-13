@@ -21,7 +21,7 @@ const STATUS_CACHE_TTL = 60_000; // 60 s
 export interface VoiceStatus {
   available: boolean;
   message: string;
-  provider: 'openai' | 'local' | null;
+  provider: 'openai' | 'whisper_cpp' | 'local' | null;
   action_required?: string;
 }
 
@@ -45,6 +45,7 @@ export interface TranscribeResponse {
   text: string;
   language: string | null;
   duration_seconds: number | null;
+  provider?: 'openai' | 'whisper_cpp' | 'local';
 }
 
 export interface SynthesizeRequest {
@@ -75,6 +76,22 @@ function normaliseLang(lang: string): string {
 let cachedStatus: VoiceStatus | null = null;
 let statusCacheTime = 0;
 
+/**
+ * Wrap the browser-native localVoice callback API in a Promise so the
+ * transcribe() fallback can await a single transcript string.
+ */
+function _transcribeWithLocalVoice(language?: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    localVoice.transcribe(
+      (result) => {
+        if (result.isFinal) resolve(result.text);
+      },
+      (error) => reject(new Error(error)),
+      language ?? 'en-US',
+    );
+  });
+}
+
 // ─── Service ──────────────────────────────────────────────────────────────────
 
 export const voiceApi = {
@@ -100,8 +117,8 @@ export const voiceApi = {
     // Step 1: Ask the backend
     try {
       const response = await api.get<VoiceStatus>(`${API_BASE}/status`);
-      if (response.data.available && response.data.provider === 'openai') {
-        cachedStatus = { ...response.data, provider: 'openai' };
+      if (response.data.available && (response.data.provider === 'openai' || response.data.provider === 'whisper_cpp')) {
+        cachedStatus = { ...response.data, provider: response.data.provider };
         statusCacheTime = now;
         return cachedStatus;
       }
@@ -149,7 +166,7 @@ export const voiceApi = {
     statusCacheTime = 0;
   },
 
-  getCurrentProvider: (): 'openai' | 'local' | null => cachedStatus?.provider ?? null,
+  getCurrentProvider: (): 'openai' | 'whisper_cpp' | 'local' | null => cachedStatus?.provider ?? null,
 
   requireVoice: async (): Promise<boolean> => {
     const status = await voiceApi.checkStatus();
@@ -168,12 +185,23 @@ export const voiceApi = {
       formData.append('language', normaliseLang(language));
     }
 
-    const response = await api.post<TranscribeResponse>(
-      `${API_BASE}/transcribe`,
-      formData,
-      { headers: { 'Content-Type': 'multipart/form-data' } },
-    );
-    return response.data;
+    try {
+      const response = await api.post<TranscribeResponse>(
+        `${API_BASE}/transcribe`,
+        formData,
+        { headers: { 'Content-Type': 'multipart/form-data' } },
+      );
+      return response.data;
+    } catch (err: any) {
+      // Backend signals no server STT (whisper.cpp + OpenAI both down):
+      // fall back to the browser-native Web Speech API.
+      const code = err?.response?.data?.code;
+      if (code === 'STT_UNAVAILABLE') {
+        const text = await _transcribeWithLocalVoice(language);
+        return { text, language: null, duration_seconds: null, provider: 'local' } as TranscribeResponse;
+      }
+      throw err;
+    }
   },
 
   // ── Text-to-Speech ─────────────────────────────────────────────────────────

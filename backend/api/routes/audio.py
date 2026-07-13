@@ -13,7 +13,7 @@ from fastapi import (
     UploadFile, WebSocket, WebSocketDisconnect,
 )
 
-from backend.core.exceptions import BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, TooLargeError, RateLimitError, InternalServerError, ServiceUnavailableError
+from backend.core.exceptions import BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, TooLargeError, RateLimitError, InternalServerError, ServiceUnavailableError, ServerSTTUnavailable
 from sqlalchemy.orm import Session
 
 from backend.api.routes.auth import get_current_active_user
@@ -81,6 +81,8 @@ async def transcribe_audio(
         }
     except ValueError as exc:
         raise BadRequestError(error=str(exc), code="STREXC")
+    except ServerSTTUnavailable:
+        raise  # let the global handler return 503 + STT_UNAVAILABLE
     except Exception as exc:
         logger.error("Transcription failed: %s", exc)
         raise InternalServerError(error="Transcription failed", code="TRANSCRIPTION_FAILED")

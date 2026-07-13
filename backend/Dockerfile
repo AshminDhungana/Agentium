@@ -3,6 +3,9 @@
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ARG PYTHON_DIGEST=sha256:f5cf0344c9886ff24d34797578d5d7dd6e8911ae0fe5962bb55d0f89603ec361
+# Global ARG so it is in scope for the `FROM whisper-cpp-${WHISPER_BACKEND}` stage
+# selector below. ARGs declared between stages are NOT visible to FROM instructions.
+ARG WHISPER_BACKEND=cpu
 FROM python:3.11-slim-bookworm@${PYTHON_DIGEST} AS builder
 
 # Install build dependencies
@@ -39,9 +42,47 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --default-timeout=300 -r requirements.txt
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# whisper.cpp (CPU) ─────────────────────────────────────────────────────
+# whisper.cpp builds with CMake (2026). The Makefile only has demo targets;
+# "CUDA needs CMake". CPU build runs on any host (no GPU required).
+FROM python:3.11-slim-bookworm AS whisper-cpp-cpu
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential cmake git \
+    && rm -rf /var/lib/apt/lists/*
+ARG WHISPER_MODEL=base.en
+RUN git clone --depth 1 https://github.com/ggerganov/whisper.cpp.git /whisper.cpp \
+    && cd /whisper.cpp \
+    && cmake -B build \
+    && cmake --build build -j --config Release \
+    && bash ./models/download-ggml-model.sh ${WHISPER_MODEL} \
+    && mkdir -p /opt/whisper/models \
+    && cp models/ggml-${WHISPER_MODEL}.bin /opt/whisper/models/ \
+    && cp ./build/bin/whisper-cli /usr/local/bin/whisper-cli
+
+# Ensure the CUDA-lib path exists so the runtime COPY from the selected src
+# stage succeeds for the CPU variant (copies an empty dir — no bloat, no failure).
+RUN mkdir -p /usr/local/cuda/lib64
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# whisper.cpp (CUDA, opt-in) ──────────────────────────────────────────
+# Only used when WHISPER_BACKEND=cuda. Requires a GPU host run with
+# --gpus all. A CUDA-compiled binary does NOT fall back to CPU.
+FROM nvidia/cuda:12.4.0-devel-ubuntu22.04 AS whisper-cpp-cuda
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential cmake git \
+    && rm -rf /var/lib/apt/lists/*
+ARG WHISPER_MODEL=base.en
+RUN git clone --depth 1 https://github.com/ggerganov/whisper.cpp.git /whisper.cpp \
+    && cd /whisper.cpp \
+    && cmake -B build -DGGML_CUDA=1 \
+    && cmake --build build -j --config Release \
+    && bash ./models/download-ggml-model.sh ${WHISPER_MODEL}
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Production Stage
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+FROM whisper-cpp-${WHISPER_BACKEND} AS whisper-cpp-src
 FROM python:3.11-slim-bookworm@${PYTHON_DIGEST}
 
 # Install runtime dependencies
@@ -55,6 +96,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 ENV PYTHONPATH="/app"
+
+# whisper.cpp runtime: whisper-cli + model (CPU default; CUDA uses same path but built differently)
+COPY --from=whisper-cpp-src /usr/local/bin/whisper-cli /usr/local/bin/whisper-cli
+COPY --from=whisper-cpp-src /opt/whisper/models/ /opt/whisper/models/
+
+# CUDA runtime .so files (real libs when WHISPER_BACKEND=cuda, empty dir when cpu)
+COPY --from=whisper-cpp-src /usr/local/cuda/lib64/ /usr/local/cuda/lib64/
 
 # Set working directory
 WORKDIR /app
