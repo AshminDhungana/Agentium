@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 
 import openai
 import anthropic
+from backend.services.api_key_manager import api_key_manager
 from backend.core.llm_client import (
     LLMClient,
     ProviderCircuitBreaker,
@@ -112,6 +113,21 @@ def test_fallback_list_is_capped():
     # Replicate the truncation the generate() loop applies.
     truncated = (["primary"] + big)[:1 + LLMClient.MAX_FALLBACK_CONFIGS]
     assert len(truncated) == 4
+
+
+def test_cb_delegates_to_keymanager(monkeypatch):
+    """Task 16: ProviderCircuitBreaker.can_execute() is now a thin delegate over
+    api_key_manager.is_config_healthy (the single source of truth). When the
+    manager reports a config unhealthy, can_execute() must return False; when
+    healthy, True. Patched here so no DB session is required."""
+    client = LLMClient()
+    cb = client._get_cb("cfg-delegate")
+
+    monkeypatch.setattr(api_key_manager, "is_config_healthy", lambda cfg_id: False)
+    assert cb.can_execute() is False
+
+    monkeypatch.setattr(api_key_manager, "is_config_healthy", lambda cfg_id: True)
+    assert cb.can_execute() is True
 
 
 class TestLLMClientGenerate:

@@ -190,8 +190,22 @@ class APIKeyManager:
             remaining = key.monthly_budget_usd - key.current_spend_usd
             if remaining < estimated_cost:
                 return False
-        
+
         return True
+
+    @with_db_session
+    def is_config_healthy(self, config_id: str, db: Optional[Session] = None) -> bool:
+        """Phase 19.3 (Task 16): single source of truth for a config's health.
+
+        The in-process ``ProviderCircuitBreaker`` (``llm_client``) now
+        delegates here instead of keeping its own duplicate state — both layers
+        report the same health for the same ``config_id`` because there is
+        only one backing store (the ``UserModelConfig`` row: status / cooldown).
+        """
+        key = db.query(UserModelConfig).filter_by(id=config_id).first()
+        if not key:
+            return False
+        return self._is_key_healthy(key)
     
     def _reset_monthly_spend_if_needed(self, key: UserModelConfig):
         """
@@ -295,28 +309,52 @@ class APIKeyManager:
     
     @with_db_session
     def mark_key_failed(
-        self, 
-        key_id: str, 
+        self,
+        key_id: str,
         error: Optional[str] = None,
         is_rate_limit: bool = False,
+        is_permanent: bool = False,
         db: Optional[Session] = None
     ) -> Dict[str, Any]:
         """
         Mark a key as failed, increment failure count, potentially trigger cooldown.
-        
+
         Args:
             key_id: UUID of the key config
             error: Error message for logging
             is_rate_limit: If True, use longer cooldown (15 min vs 5 min)
+            is_permanent: If True (e.g. 401/403/invalid key) skip the failure
+                threshold and immediately mark the key ERROR + cooldown — a dead
+                key must never be retried. (Phase 19.3 Task 16)
             db: Database session
-            
+
         Returns:
-            Dict with status: 'cooldown', 'error', or 'disabled'
+            Dict with status: 'cooldown', 'error', 'permanent_failure', or 'disabled'
         """
         key = db.query(UserModelConfig).filter_by(id=key_id).first()
         if not key:
             logger.error(f"Key {key_id} not found for failure marking")
             return {"status": "not_found"}
+
+        # Permanent key failure: do NOT wait for the 3-strike threshold. A 401/
+        # 403/invalid-key/quota-exhausted key can never succeed, so take it out
+        # of the healthy pool immediately (mirrors the circuit breaker OPENing).
+        if is_permanent:
+            key.status = ConnectionStatus.ERROR
+            key.cooldown_until = datetime.utcnow() + timedelta(
+                minutes=self.DEFAULT_COOLDOWN_MINUTES
+            )
+            key.failure_count += 1
+            key.last_failure_at = datetime.utcnow()
+            logger.warning(
+                f"🔒 Key {key_id} ({key.provider.value}) permanently failed "
+                f"({error or 'auth/quota'}); removed from healthy pool"
+            )
+            return {
+                "status": "permanent_failure",
+                "cooldown_until": key.cooldown_until.isoformat(),
+                "failure_count": key.failure_count,
+            }
 
         key.failure_count += 1
         key.last_failure_at = datetime.utcnow()

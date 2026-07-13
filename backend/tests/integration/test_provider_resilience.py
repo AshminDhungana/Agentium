@@ -239,3 +239,29 @@ class TestLocalFallbackChain:
         # primary never listed; capped at MAX_FALLBACK_CONFIGS + 1 = 4
         assert remote.id not in fb
         assert len(fb) <= api_key_manager.MAX_FALLBACK_CONFIGS + 1
+
+
+@pytest.mark.integration
+class TestConfigHealthSingleSourceOfTruth:
+    """
+    Task 16: api_key_manager.is_config_healthy is the merged single source of
+    truth for a config's health. A config whose key was permanently failed must
+    read unhealthy; an ACTIVE config reads healthy. Verified on the same session
+    (committed writes are visible to the same identity-mapped session).
+    """
+
+    def test_permanent_failure_renders_unhealthy(self, seeded_db: Session):
+        cfg = _make_config(seeded_db, ProviderType.OPENAI, "gpt-4o", priority=1)
+        assert api_key_manager.is_config_healthy(cfg.id, db=seeded_db) is True
+
+        api_key_manager.mark_key_failed(
+            cfg.id, "401 auth", is_permanent=True, db=seeded_db
+        )
+        seeded_db.commit()
+
+        # The merged source of truth now reports the config unhealthy.
+        assert api_key_manager.is_config_healthy(cfg.id, db=seeded_db) is False
+
+    def test_active_config_is_healthy(self, seeded_db: Session):
+        cfg = _make_config(seeded_db, ProviderType.ANTHROPIC, "claude-3-5-sonnet", priority=1)
+        assert api_key_manager.is_config_healthy(cfg.id, db=seeded_db) is True

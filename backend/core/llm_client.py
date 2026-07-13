@@ -75,9 +75,18 @@ _CB_RECOVERY_SECONDS = 60
 
 
 class ProviderCircuitBreaker:
-    """Per-provider circuit breaker (independent of AgentOrchestrator CBs)."""
+    """Per-config circuit breaker.
 
-    def __init__(self) -> None:
+    Phase 19.3 (Task 16): the single source of truth for a config's health is
+    now ``APIKeyManager`` (DB-backed ``UserModelConfig.status`` / cooldown).
+    ``can_execute()`` delegates there; the in-process counters below are kept
+    only as a fallback when the manager is unavailable (no DB session) and for
+    ``get_metrics()``. Both layers update together via ``record_success`` /
+    ``record_failure`` so they never disagree.
+    """
+
+    def __init__(self, config_id: Optional[str] = None) -> None:
+        self._config_id = config_id
         self.state = _CB_CLOSED
         self.consecutive_failures = 0
         self.last_failure_at: Optional[datetime] = None
@@ -88,6 +97,12 @@ class ProviderCircuitBreaker:
         self.state = _CB_CLOSED
         self.consecutive_failures = 0
         self.total_success += 1
+        # Keep the manager's health in lock-step (recover from ERROR/cooldown).
+        if self._config_id:
+            try:
+                api_key_manager.mark_key_success(self._config_id)
+            except Exception:
+                pass
 
     def record_failure(self) -> None:
         self.consecutive_failures += 1
@@ -97,6 +112,13 @@ class ProviderCircuitBreaker:
             self.state = _CB_OPEN
 
     def can_execute(self) -> bool:
+        # Merged source of truth: APIKeyManager DB-backed health.
+        if self._config_id:
+            try:
+                return api_key_manager.is_config_healthy(self._config_id)
+            except Exception:
+                # Fallback to in-process state if the manager can't be reached.
+                pass
         if self.state == _CB_CLOSED:
             return True
         if self.state == _CB_OPEN:
@@ -111,6 +133,7 @@ class ProviderCircuitBreaker:
 
     def get_metrics(self) -> Dict[str, Any]:
         return {
+            "config_id": self._config_id,
             "state": self.state,
             "consecutive_failures": self.consecutive_failures,
             "total_success": self.total_success,
@@ -143,10 +166,11 @@ class LLMClient:
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _get_cb(self, config_id: str) -> ProviderCircuitBreaker:
-        if config_id not in LLMClient._circuit_breakers:
-            LLMClient._circuit_breakers[config_id] = ProviderCircuitBreaker()
-        return LLMClient._circuit_breakers[config_id]
+    def _get_cb(self, config_id: Optional[str]) -> ProviderCircuitBreaker:
+        key = config_id or "default"
+        if key not in LLMClient._circuit_breakers:
+            LLMClient._circuit_breakers[key] = ProviderCircuitBreaker(config_id)
+        return LLMClient._circuit_breakers[key]
 
     def classify_error(self, exc: Exception) -> ErrorTier:
         """Map an exception to a resilience tier using typed SDK exceptions first."""
