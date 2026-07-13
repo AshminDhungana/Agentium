@@ -4,7 +4,15 @@ import random
 from unittest.mock import AsyncMock, patch, MagicMock
 from datetime import datetime, timedelta
 
-from backend.core.llm_client import LLMClient, ProviderCircuitBreaker, _CB_FAILURE_THRESHOLD, _CB_RECOVERY_SECONDS
+import openai
+import anthropic
+from backend.core.llm_client import (
+    LLMClient,
+    ProviderCircuitBreaker,
+    ErrorTier,
+    _CB_FAILURE_THRESHOLD,
+    _CB_RECOVERY_SECONDS,
+)
 
 
 class MockAgent:
@@ -60,6 +68,42 @@ class TestProviderCircuitBreaker:
         assert m["consecutive_failures"] == 1
         assert m["total_success"] == 1
         assert m["total_failure"] == 1
+
+
+class TestClassifyError:
+    """3-tier error classification via typed SDK exceptions.
+
+    NOTE: openai/anthropic APIStatusError subclasses require response= and
+    body= kwargs (2.24.0), so we build a minimal mock response rather than the
+    positional construction the plan brief assumed.
+    """
+
+    @staticmethod
+    def _status_err(sdk, name, status, message):
+        resp = MagicMock()
+        resp.status_code = status
+        return getattr(sdk, name)(message, response=resp, body=None)
+
+    def test_classify_tiers(self):
+        client = LLMClient()
+        assert client.classify_error(
+            self._status_err(openai, "RateLimitError", 429, "429")
+        ) is ErrorTier.RATE_LIMITED
+        assert client.classify_error(
+            self._status_err(openai, "AuthenticationError", 401, "401")
+        ) is ErrorTier.PERMANENT_KEY_FAILURE
+        assert client.classify_error(
+            self._status_err(anthropic, "RateLimitError", 429, "429")
+        ) is ErrorTier.RATE_LIMITED
+        assert client.classify_error(
+            self._status_err(anthropic, "AuthenticationError", 401, "401")
+        ) is ErrorTier.PERMANENT_KEY_FAILURE
+        assert client.classify_error(openai.APITimeoutError("timeout")) is ErrorTier.TRANSIENT
+        assert client.classify_error(
+            self._status_err(openai, "InternalServerError", 503, "503")
+        ) is ErrorTier.TRANSIENT
+        assert client.classify_error(RuntimeError("invalid api key")) is ErrorTier.PERMANENT_KEY_FAILURE
+        assert client.classify_error(RuntimeError("random boom")) is ErrorTier.UNKNOWN
 
 
 class TestLLMClientGenerate:

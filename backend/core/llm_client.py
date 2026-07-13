@@ -15,6 +15,7 @@ import asyncio
 import logging
 import random
 from datetime import datetime, timedelta
+from enum import Enum
 from typing import Dict, Any, Optional, List
 
 from sqlalchemy.orm import Session
@@ -23,6 +24,46 @@ from backend.services.model_provider import ModelService
 from backend.services.api_key_manager import api_key_manager
 
 logger = logging.getLogger(__name__)
+
+
+class ErrorTier(str, Enum):
+    TRANSIENT = "transient"
+    RATE_LIMITED = "rate_limited"
+    PERMANENT_KEY_FAILURE = "permanent_key_failure"
+    UNKNOWN = "unknown"
+
+
+# Typed SDK exceptions (hard deps, but guarded for test environments)
+try:
+    from openai import (
+        RateLimitError as OpenAIRateLimitError,
+        AuthenticationError as OpenAIAuthenticationError,
+        APIConnectionError as OpenAIConnectionError,
+        APITimeoutError as OpenAITimeoutError,
+        InternalServerError as OpenAIInternalError,
+        APIStatusError as OpenAIStatusError,
+    )
+except Exception:  # pragma: no cover
+    OpenAIRateLimitError = OpenAIAuthenticationError = OpenAIConnectionError = \
+        OpenAITimeoutError = OpenAIInternalError = OpenAIStatusError = Exception
+
+try:
+    from anthropic import (
+        RateLimitError as AnthropicRateLimitError,
+        AuthenticationError as AnthropicAuthenticationError,
+        PermissionDeniedError as AnthropicPermissionDeniedError,
+        APIConnectionError as AnthropicConnectionError,
+        APITimeoutError as AnthropicTimeoutError,
+        InternalServerError as AnthropicInternalError,
+    )
+except Exception:  # pragma: no cover
+    AnthropicRateLimitError = AnthropicAuthenticationError = AnthropicPermissionDeniedError = \
+        AnthropicConnectionError = AnthropicTimeoutError = AnthropicInternalError = Exception
+
+try:
+    from google.api_core import exceptions as gexc
+except Exception:  # pragma: no cover
+    gexc = None
 
 
 # Circuit breaker constants
@@ -100,19 +141,44 @@ class LLMClient:
             LLMClient._circuit_breakers[config_id] = ProviderCircuitBreaker()
         return LLMClient._circuit_breakers[config_id]
 
-    def _is_rate_limit(self, error: Exception) -> bool:
-        msg = str(error).lower()
-        return "rate limit" in msg or "429" in msg
+    def classify_error(self, exc: Exception) -> ErrorTier:
+        """Map an exception to a resilience tier using typed SDK exceptions first."""
+        # --- Permanent key failure: 401/403/402, bad key, quota ---
+        permanent_types = (
+            OpenAIAuthenticationError, AnthropicAuthenticationError,
+            AnthropicPermissionDeniedError,
+        )
+        if gexc is not None:
+            permanent_types = permanent_types + (gexc.Unauthenticated, gexc.PermissionDenied)
+        if isinstance(exc, permanent_types):
+            return ErrorTier.PERMANENT_KEY_FAILURE
+        msg = str(exc).lower()
+        if any(s in msg for s in ("invalid api key", "incorrect api key", "insufficient_quota",
+                                  "authentication", "401", "403", "402")):
+            return ErrorTier.PERMANENT_KEY_FAILURE
 
-    def _is_retryable(self, error: Exception) -> bool:
-        msg = str(error).lower()
-        if self._is_rate_limit(error):
-            return True
-        retryable_keywords = [
-            "timeout", "connection", "temporarily",
-            "server error", "503", "502", "504"
-        ]
-        return any(kw in msg for kw in retryable_keywords)
+        # --- Rate limited: 429 ---
+        if isinstance(exc, (OpenAIRateLimitError, AnthropicRateLimitError)) or \
+           (gexc is not None and isinstance(exc, gexc.ResourceExhausted)):
+            return ErrorTier.RATE_LIMITED
+        if "rate limit" in msg or "429" in msg or "too many requests" in msg:
+            return ErrorTier.RATE_LIMITED
+
+        # --- Transient: timeouts / 5xx / connection ---
+        transient_types = (
+            OpenAIConnectionError, OpenAITimeoutError, OpenAIInternalError,
+            AnthropicConnectionError, AnthropicTimeoutError, AnthropicInternalError,
+        )
+        if gexc is not None:
+            transient_types = transient_types + (gexc.DeadlineExceeded, gexc.ServiceUnavailable,
+                                                 gexc.InternalServerError)
+        if isinstance(exc, transient_types):
+            return ErrorTier.TRANSIENT
+        if any(s in msg for s in ("timeout", "connection", "temporarily",
+                                  "server error", "503", "502", "504")):
+            return ErrorTier.TRANSIENT
+
+        return ErrorTier.UNKNOWN
 
     async def _delay(self, attempt: int) -> None:
         """Full-jitter backoff: random in [0, min(max_delay, base*2**attempt)]."""
@@ -208,14 +274,16 @@ class LLMClient:
                     last_error = exc
                     effective_config_id = attempt_config_id or "default"
                     cb = self._get_cb(effective_config_id)
-                    is_rl = self._is_rate_limit(exc)
+                    tier = self.classify_error(exc)
+                    is_rl = tier is ErrorTier.RATE_LIMITED
                     if is_rl:
                         logger.warning(
                             "LLMClient.generate: Rate limit on config %s (attempt %d/%d)",
                             attempt_config_id, attempt + 1, _max_retries + 1,
                         )
                     cb.record_failure()
-                    if attempt < _max_retries and (is_rl or self._is_retryable(exc)):
+                    is_retryable = tier in (ErrorTier.RATE_LIMITED, ErrorTier.TRANSIENT)
+                    if attempt < _max_retries and is_retryable:
                         await self._delay(attempt)
                         continue
                     else:
@@ -294,7 +362,8 @@ class LLMClient:
                     last_error = exc
                     effective_config_id = attempt_config_id or "default"
                     cb = self._get_cb(effective_config_id)
-                    is_rl = self._is_rate_limit(exc)
+                    tier = self.classify_error(exc)
+                    is_rl = tier is ErrorTier.RATE_LIMITED
                     if is_rl:
                         logger.warning(
                             "LLMClient.generate_with_tools: Rate limit on config %s "
@@ -302,7 +371,8 @@ class LLMClient:
                             attempt_config_id, attempt + 1, _max_retries + 1,
                         )
                     cb.record_failure()
-                    if attempt < _max_retries and (is_rl or self._is_retryable(exc)):
+                    is_retryable = tier in (ErrorTier.RATE_LIMITED, ErrorTier.TRANSIENT)
+                    if attempt < _max_retries and is_retryable:
                         await self._delay(attempt)
                         continue
                     else:
