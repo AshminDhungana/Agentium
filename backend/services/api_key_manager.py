@@ -212,7 +212,45 @@ class APIKeyManager:
             key.last_spend_reset.year != now.year):
             key.current_spend_usd = 0.0
             key.last_spend_reset = now
-    
+
+    @with_db_session
+    def get_fallback_config_ids(
+        self, config_id: str, db: Optional[Session] = None
+    ) -> List[str]:
+        """
+        Phase 19.3 (base): return fallback UserModelConfig ids to try when the
+        given config is exhausted. Order:
+          1. other ACTIVE configs of the SAME provider (priority failover)
+          2. ACTIVE configs of OTHER providers (cross-provider failover)
+        The local Ollama fallback is prepended/appended by Task 13's wiring;
+        Task 14 ensures every call site passes a real list from here.
+        Returns [] if the config is unknown.
+        """
+        primary = db.query(UserModelConfig).filter_by(id=config_id).first()
+        if not primary:
+            return []
+        provider = primary.provider
+        same_provider = (
+            db.query(UserModelConfig)
+            .filter(
+                UserModelConfig.provider == provider,
+                UserModelConfig.is_active == True,
+                UserModelConfig.id != config_id,
+            )
+            .order_by(UserModelConfig.priority.asc())
+            .all()
+        )
+        other_providers = (
+            db.query(UserModelConfig)
+            .filter(
+                UserModelConfig.provider != provider,
+                UserModelConfig.is_active == True,
+            )
+            .order_by(UserModelConfig.priority.asc())
+            .all()
+        )
+        return [c.id for c in same_provider] + [c.id for c in other_providers]
+
     # =====================================================================
     # Failure Handling & Recovery
     # =====================================================================

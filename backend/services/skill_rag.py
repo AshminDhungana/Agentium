@@ -74,11 +74,22 @@ class SkillRAG:
         # Step 2: Build RAG prompt with context budget enforcement
         rag_context = self._build_rag_context(skills, task_description)
 
-        # Step 3: Generate with context
-        result = await ModelService.generate_with_agent(
+        # Step 3: Generate with context — route through LLMClient so provider
+        # exhaustion (all keys invalid / rate-limited / unreachable) is handled
+        # via failover to fallback configs, raising a clean RuntimeError that the
+        # executor catches (Task 12). Fallback order comes from APIKeyManager.
+        from backend.core.llm_client import LLMClient
+        from backend.services.api_key_manager import api_key_manager
+        fallback = (
+            api_key_manager.get_fallback_config_ids(model_config_id)
+            if model_config_id else None
+        )
+        llm = LLMClient(db=db)
+        result = await llm.generate(
             agent=agent,
             user_message=rag_context["augmented_prompt"],
-            config_id=model_config_id
+            config_id=model_config_id,
+            fallback_configs=fallback,
         )
 
         # Step 4: Record skill usage (optimistic — critics may revise later)

@@ -173,7 +173,46 @@ def execute_task_async(self, task_id: str, agent_id: str):
                 "task_id": task_id,
                 "skills_used": len(result.get("skills_used", []))
             }
-            
+
+        except RuntimeError as exc:
+            # Total provider exhaustion (all keys invalid / rate-limited /
+            # unreachable) — fail cleanly. Do NOT re-queue forever via Celery
+            # retry; the worker must move on to the next task.
+            reason = "provider_unreachable"
+            msg = str(exc).lower()
+            if ("all_keys_invalid" in msg or "401" in msg or "403" in msg
+                    or "invalid api key" in msg or "authentication" in msg
+                    or "insufficient_quota" in msg):
+                reason = "all_keys_invalid"
+            elif ("429" in msg or "ratelimit" in msg or "too many requests" in msg
+                  or "rate_limit" in msg):
+                reason = "rate_limited"
+
+            try:
+                task.mark_failed(reason=reason, error_message=str(exc))
+            except Exception as mark_exc:
+                logger.error(f"mark_failed failed for {task_id}: {mark_exc}")
+            try:
+                # AuditLog.log is a factory (does NOT persist) — add + commit.
+                entry = AuditLog.log(
+                    level=AuditLevel.CRITICAL,
+                    category=AuditCategory.SYSTEM,
+                    actor_type="system",
+                    actor_id="SYSTEM",
+                    action="task_failed_exhaustion",
+                    description=f"Task {task_id} failed: {reason}",
+                    after_state={"reason": reason},
+                )
+                db.add(entry)
+            except Exception as audit_exc:
+                logger.error(
+                    f"AuditLog for failed task {task_id} failed: "
+                    f"{type(audit_exc).__name__}: {audit_exc}",
+                    exc_info=True,
+                )
+            db.commit()
+            return {"status": "failed", "task_id": task_id, "reason": reason}
+
         except Exception as exc:
             logger.error(f"Task execution failed: {exc}")
             

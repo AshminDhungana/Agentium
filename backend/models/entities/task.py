@@ -5,6 +5,7 @@ Updated for Task Execution Architecture: Governance Alignment
 """
 
 from datetime import datetime
+import json
 from typing import List, Dict, Any
 from sqlalchemy import Column, String, Text, DateTime, ForeignKey, Integer, Enum, Boolean, JSON
 from sqlalchemy.dialects.postgresql import JSONB
@@ -152,6 +153,9 @@ class Task(BaseEntity):
     
     error_count = Column(Integer, default=0)
     last_error = Column(Text, nullable=True)
+    # Phase 19.3: structured provider-exhaustion failure reason
+    # (rate_limited | all_keys_invalid | provider_unreachable)
+    failure_reason = Column(String(50), nullable=True, index=True)
     retry_count = Column(Integer, default=0)
     max_retries = Column(Integer, default=5)  # UPDATED: from 3 to 5
 
@@ -501,6 +505,49 @@ class Task(BaseEntity):
             # UPDATED: Escalate to Council after max retries
             self.set_status(TaskStatus.ESCALATED, "System", f"Max retries ({self.max_retries}) exceeded: {error_message}")
     
+    def mark_failed(
+        self,
+        reason: str = "provider_unreachable",
+        error_message: str = None,
+    ):
+        """
+        Phase 19.3: mark the task FAILED due to TOTAL provider exhaustion
+        (all keys invalid, rate-limited, or provider unreachable).
+
+        This is a TERMINAL transition — unlike self.fail() it does NOT feed the
+        self-healing retry/escalate loop. The exhaustion RuntimeError is caught
+        upstream (task_executor.execute_task_async) and the worker moves on.
+
+        Stores a structured `failure_reason` so downstream dashboards and the
+        user-facing degradation message (Task 15) can explain *why*.
+        """
+        self.failure_reason = reason
+
+        if error_message:
+            try:
+                self.last_error = json.dumps({
+                    "message": error_message,
+                    "reason": reason,
+                    "timestamp": datetime.utcnow().isoformat(),
+                })
+            except Exception:
+                self.last_error = str(error_message)
+
+        # Bypass the state machine: exhaustion can be raised from ANY live
+        # state (ASSIGNED, IN_PROGRESS, RETRYING, ...). We MUST reach FAILED
+        # without re-raising, so fall back to a direct terminal set.
+        try:
+            self.set_status(
+                TaskStatus.FAILED, "SYSTEM",
+                f"Provider exhaustion: {reason}",
+            )
+        except Exception:
+            self.status = TaskStatus.FAILED
+            self._log_status_change(
+                TaskStatus.FAILED.value, "SYSTEM",
+                f"Provider exhaustion: {reason}",
+            )
+
     def escalate_to_council(self, reason: str, escalated_by: str = "system"):
         """
         Manually escalate task to Council for deliberation.
