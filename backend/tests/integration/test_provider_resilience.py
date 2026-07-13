@@ -13,12 +13,17 @@ so exhaustion is forced deterministically.
 """
 
 import uuid
+import threading
+import json
+import time
 from contextlib import contextmanager
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from unittest.mock import patch, AsyncMock
 
 import pytest
 from sqlalchemy.orm import Session
 
+from backend.core.security import encrypt_api_key
 from backend.models.entities.task import Task, TaskStatus, TaskType, TaskPriority
 from backend.models.entities.agents import Agent, AgentStatus
 from backend.models.entities.audit import AuditLog
@@ -198,6 +203,192 @@ def _make_config(db: Session, provider, model: str, priority: int = 1) -> UserMo
     db.add(cfg)
     db.flush()
     return cfg
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Task 20 — Mock provider test harness
+#
+# A real, threaded OpenAI-compatible HTTP server we can point a UserModelConfig
+# at. Driving the REAL SDK → ProviderRateLimiter → classify_error path against
+# it (rather than monkeypatching ModelService) is what actually exercises the
+# resilience code for Tasks 21–25.
+# ─────────────────────────────────────────────────────────────────────────────
+
+OPENAI_COMPLETION = {
+    "id": "chatcmplt-test",
+    "object": "chat.completion",
+    "created": 1,
+    "model": "fake",
+    "choices": [
+        {
+            "index": 0,
+            "message": {"role": "assistant", "content": "ok"},
+            "finish_reason": "stop",
+        }
+    ],
+    "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
+}
+
+
+class FakeProviderServer:
+    """A threaded OpenAI-compatible HTTP server returning configurable responses.
+
+    ``default_*`` is what to return when the per-call queue is empty. For
+    failover tests spin up TWO servers (one always-429, one always-200) so the
+    primary and fallback configs differ (they share no URL). ``set_next()``
+    overrides the default for the next call. ``status_counts`` lets a test
+    assert e.g. that no 429 escaped to the provider.
+    """
+
+    def __init__(self, default_status=200, default_headers=None, default_body=None):
+        self._default = {
+            "status": default_status,
+            "headers": default_headers or {},
+            "body": default_body or OPENAI_COMPLETION,
+        }
+        self._queue = []  # list of {"status","headers","body"}
+        self._lock = threading.Lock()
+        self._hits = 0
+        self._status_counts = {}  # status_code -> hit count
+        self._started = threading.Event()
+        handler = self._make_handler()
+        self._httpd = HTTPServer(("127.0.0.1", 0), handler)
+        self.port = self._httpd.server_address[1]
+        self.base_url = f"http://127.0.0.1:{self.port}/v1"
+        t = threading.Thread(target=self._httpd.serve_forever, daemon=True)
+        t.start()
+        self._started.set()
+
+    def _make_handler(self):
+        server = self
+
+        class _H(BaseHTTPRequestHandler):
+            def log_message(self, *a):
+                pass
+
+            def do_POST(self):
+                # Drain the request body so keep-alive connections stay aligned
+                # when the client (httpx) reuses the socket across calls.
+                length = int(self.headers.get("Content-Length", 0) or 0)
+                if length:
+                    self.rfile.read(length)
+                with server._lock:
+                    server._hits += 1
+                    spec = server._queue.pop(0) if server._queue else server._default
+                    server._status_counts[spec["status"]] = (
+                        server._status_counts.get(spec["status"], 0) + 1
+                    )
+                status = spec.get("status", 200)
+                headers = spec.get("headers", {})
+                body = spec.get("body", OPENAI_COMPLETION)
+                payload = json.dumps(body).encode()
+                self.send_response(status)
+                for k, v in headers.items():
+                    self.send_header(k, str(v))
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(payload)))
+                self.end_headers()
+                self.wfile.write(payload)
+
+        return _H
+
+    def set_next(self, status=200, headers=None, body=None):
+        with self._lock:
+            self._queue.append(
+                {
+                    "status": status,
+                    "headers": headers or {},
+                    "body": body or OPENAI_COMPLETION,
+                }
+            )
+
+    def hits(self):
+        with self._lock:
+            return self._hits
+
+    def status_counts(self):
+        with self._lock:
+            return dict(self._status_counts)
+
+    def shutdown(self):
+        self._httpd.shutdown()
+        self._httpd.server_close()
+
+
+def make_fake_config(
+    base_url: str,
+    *,
+    rpm: int = 100000,
+    max_concurrent: int = 10,
+    status: ConnectionStatus = ConnectionStatus.ACTIVE,
+):
+    """Create + TOP-LEVEL commit a UserModelConfig pointing at a FakeProviderServer.
+
+    Commits via its own NullPool engine because ModelService.get_provider()
+    opens its OWN db session (get_db_context) — a savepoint commit on the
+    test's db_session is invisible to it until the outer transaction commits
+    (same visibility gotcha as Tasks 18/19). rpm defaults very high so the
+    token bucket is effectively pass-through and error-path tests assert
+    failover timing, not throttle spacing.
+
+    NOTE: the column is ``api_base_url`` (not ``base_url``); get_effective_base_url
+    returns api_base_url for non-LOCAL providers. The key is stored pre-encrypted
+    via encrypt_api_key("sk-test") so the real decrypt_api_key path yields a
+    valid non-empty key (the OpenAI SDK refuses an empty key).
+    """
+    import os
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from sqlalchemy.pool import NullPool
+
+    database_url = os.getenv(
+        "DATABASE_URL",
+        "postgresql://agentium:agentium@postgres:5432/agentium_test",
+    )
+    eng = create_engine(database_url, poolclass=NullPool, pool_pre_ping=True)
+    s = sessionmaker(bind=eng)()
+    cfg = UserModelConfig(
+        user_id="sovereign",
+        provider=ProviderType.OPENAI,
+        config_name=f"fake-{uuid.uuid4().hex[:8]}",
+        api_key_encrypted=encrypt_api_key("sk-test"),
+        api_key_masked="sk-test",
+        default_model="fake",
+        status=status,
+        api_base_url=base_url,
+        requests_per_minute=rpm,
+        max_concurrent_requests=max_concurrent,
+        is_active=True,
+        priority=1,
+    )
+    s.add(cfg)
+    s.commit()
+    s.refresh(cfg)
+    s.close()
+    eng.dispose()
+    return cfg
+
+
+@pytest.mark.integration
+class TestMockProviderHarness:
+    """Task 20 sanity: a 200 fake server returns 'ok' through the real SDK path."""
+
+    def test_fake_provider_returns_ok(self, seeded_db: Session):
+        srv = FakeProviderServer(default_status=200)
+        cfg = make_fake_config(srv.base_url, rpm=100000)
+
+        agent = seeded_db.query(Agent).filter_by(agentium_id="10003").first()
+        assert agent is not None
+
+        import asyncio
+
+        from backend.core.llm_client import LLMClient
+
+        client = LLMClient()
+        result = asyncio.run(client.generate(agent, "hello", config_id=str(cfg.id)))
+
+        srv.shutdown()
+        assert result["content"] == "ok"
 
 
 @pytest.mark.integration
