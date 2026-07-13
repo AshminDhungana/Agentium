@@ -13,6 +13,7 @@ ModelService directly.
 
 import asyncio
 import logging
+import random
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, List
 
@@ -114,7 +115,10 @@ class LLMClient:
         return any(kw in msg for kw in retryable_keywords)
 
     async def _delay(self, attempt: int) -> None:
-        delay = min(self.base_retry_delay * (2 ** attempt), self.max_retry_delay)
+        """Full-jitter backoff: random in [0, min(max_delay, base*2**attempt)]."""
+        upper = min(self.max_retry_delay, self.base_retry_delay * (2 ** attempt))
+        delay = random.uniform(0, upper)
+        logger.debug("LLMClient backoff: attempt=%d sleep=%.2fs (jitter)", attempt, delay)
         await asyncio.sleep(delay)
 
     async def _track_tokens_and_cost(

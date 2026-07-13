@@ -1,5 +1,6 @@
 """Tests for backend.core.llm_client.LLMClient."""
 import pytest
+import random
 from unittest.mock import AsyncMock, patch, MagicMock
 from datetime import datetime, timedelta
 
@@ -135,6 +136,59 @@ class TestLLMClientGenerate:
             agent = MockAgent()
             await llm_client.generate(agent, "test")
             assert mock_akm.record_spend.called or mock_akm.record_spend.call_count > 0
+
+
+class TestLLMClientDelayJitter:
+    """Tests for LLMClient._delay full-jitter exponential backoff."""
+
+    @pytest.fixture
+    def llm_client(self):
+        return LLMClient(db=None, max_retries=5, base_retry_delay=0.1, max_retry_delay=1.0)
+
+    @pytest.mark.asyncio
+    @patch("backend.core.llm_client.random.uniform")
+    async def test_delay_calls_uniform_with_full_jitter_range(self, mock_uniform, llm_client):
+        """_delay calls random.uniform(0, min(max_retry_delay, base_retry_delay * 2**attempt))."""
+        mock_uniform.return_value = 0.0  # return fixed value to make sleep instant
+        await llm_client._delay(0)
+        mock_uniform.assert_called_once_with(0, 0.1)  # 0.1 * 2**0 = 0.1, min(1.0, 0.1) = 0.1
+
+        mock_uniform.reset_mock()
+        await llm_client._delay(1)
+        mock_uniform.assert_called_once_with(0, 0.2)  # 0.1 * 2**1 = 0.2
+
+        mock_uniform.reset_mock()
+        await llm_client._delay(2)
+        mock_uniform.assert_called_once_with(0, 0.4)  # 0.1 * 2**2 = 0.4
+
+        mock_uniform.reset_mock()
+        await llm_client._delay(10)  # large attempt -> capped at max_retry_delay
+        mock_uniform.assert_called_once_with(0, 1.0)  # capped at max_retry_delay=1.0
+
+    @pytest.mark.asyncio
+    @patch("backend.core.llm_client.random.uniform")
+    @patch("backend.core.llm_client.asyncio.sleep", new_callable=AsyncMock)
+    async def test_delay_jitter_produces_varied_delays(self, mock_sleep, mock_uniform, llm_client):
+        """Repeated _delay calls with same attempt produce varied delays (jitter works)."""
+        # Make random.uniform return different values each call
+        call_count = 0
+        def varied_uniform(a, b):
+            nonlocal call_count
+            call_count += 1
+            return call_count * 0.01  # deterministic but varying
+        mock_uniform.side_effect = varied_uniform
+
+        delays = []
+        for _ in range(5):
+            await llm_client._delay(1)
+            # capture the delay passed to asyncio.sleep
+            _, kwargs = mock_sleep.call_args
+            delays.append(kwargs.get('delay', mock_sleep.call_args[0][0]))
+
+        # All delays should be different (jitter working)
+        assert len(set(delays)) == len(delays), "Jitter should produce varied delays"
+        # All delays should be within [0, 0.2] for attempt=1 (base=0.1 * 2**1 = 0.2)
+        assert all(0 <= d <= 0.2 for d in delays), "All delays within full-jitter bounds"
 
 
 class TestLLMClientGenerateWithTools:
