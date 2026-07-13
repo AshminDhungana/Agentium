@@ -112,7 +112,13 @@ class UserModelConfig(BaseEntity):
     is_default = Column(Boolean, default=False)
     total_requests = Column(Integer, default=0)
     total_tokens = Column(Integer, default=0)
-    rate_limit = Column(Integer, default=60, nullable=True)
+    # requests_per_minute replaces the old `rate_limit` column (default 60).
+    requests_per_minute = Column(Integer, default=60, nullable=False,
+                                 comment="Max outbound requests/minute for this key (whole integer)")
+    tokens_per_minute = Column(Integer, nullable=True,
+                               comment="Optional token budget per minute")
+    max_concurrent_requests = Column(Integer, default=10, nullable=False,
+                                     comment="Max concurrent outbound requests for this key")
 
     # Cost tracking (in USD)
     estimated_cost_usd = Column(Float, default=0.0)

@@ -122,7 +122,7 @@ class APIManager:
                 config_id=config.id,
                 cost_per_1k_tokens=cost_per_1k,
                 max_context_length=config.max_tokens or 4000,
-                rate_limit_per_minute=config.rate_limit or 60,
+                rate_limit_per_minute=config.requests_per_minute or 60,
                 capability=capability,
                 is_available=config.is_key_healthy(),
             )
@@ -308,7 +308,7 @@ def init_api_manager(db: Session) -> APIManager:
                 is_default=False,     # Don't auto-mark as default — real configs should take precedence
                 is_active=True,
                 status=ConnectionStatus.ACTIVE,
-                rate_limit=60,
+                requests_per_minute=60,
             )
             db.add(default_config)
             db.commit()

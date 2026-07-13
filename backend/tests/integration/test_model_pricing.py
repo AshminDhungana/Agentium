@@ -165,7 +165,7 @@ async def test_api_manager_dynamic_cost(db_session):
         is_default=True,
         is_active=True,
         status=ConnectionStatus.ACTIVE,
-        rate_limit=100,
+        requests_per_minute=100,
         max_tokens=4000
     )
     db_session.add(config)
