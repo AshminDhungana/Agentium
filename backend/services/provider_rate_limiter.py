@@ -66,6 +66,24 @@ end
 
 # Redis keyspace prefixes.
 _RATELIMIT_KEY = "agentium:provider:ratelimit:{config_id}"
+_CONCURRENCY_KEY = "agentium:provider:concurrency:{config_id}"
+
+# Cross-worker concurrency cap: INCR the counter, reject if over the limit.
+#   KEYS[1] = concurrency counter key
+#   ARGV[1] = max concurrent
+#   ARGV[2] = now (unused except for EXPIRE bookkeeping)
+# Returns {1, cur} on allow, {0, cur} when over the limit (caller releases + retries).
+_CONCURRENCY_LUA = """
+local key = KEYS[1]
+local maxc = tonumber(ARGV[1])
+local cur = redis.call('INCR', key)
+redis.call('EXPIRE', key, 10)
+if cur > maxc then
+  redis.call('DECR', key)
+  return {0, cur}
+end
+return {1, cur}
+"""
 
 
 class ProviderRateLimiter:
@@ -75,6 +93,9 @@ class ProviderRateLimiter:
         self._redis: Any = None
         self._sha: Optional[str] = None
         self._sha_lock = asyncio.Lock()
+        # In-process semaphore cache (per config) for same-worker concurrency.
+        self._local_sems: Dict[str, "asyncio.Semaphore"] = {}
+        self._sem_lock = asyncio.Lock()
 
     # ── Redis plumbing ────────────────────────────────────────────────────────
 
@@ -167,6 +188,62 @@ class ProviderRateLimiter:
         no-op today; it exists for interface stability and future quota models.
         """
         return
+
+    # ── Concurrency cap ───────────────────────────────────────────────────────
+
+    async def _sem(self, config_id: str, max_concurrent_requests: int) -> "asyncio.Semaphore":
+        """Return (creating if needed) the in-process semaphore for ``config_id``.
+
+        The semaphore only bounds concurrency *within this worker*. The Redis
+        counter (below) bounds it across workers/replicas on the same config.
+        """
+        maxc = max(1, int(max_concurrent_requests or 10))
+        async with self._sem_lock:
+            sem = self._local_sems.get(config_id)
+            if sem is None:
+                sem = asyncio.Semaphore(maxc)
+                self._local_sems[config_id] = sem
+            return sem
+
+    async def acquire_concurrency(
+        self, config_id: str, max_concurrent_requests: int
+    ) -> None:
+        """Block until a concurrency slot is free for ``config_id``.
+
+        Combines the in-process semaphore (same-worker) with a Redis INCR
+        counter (cross-worker). If Redis reports over-limit we release the
+        local slot and retry after a brief backoff (another worker freed one).
+        Fails open if Redis is unreachable.
+        """
+        maxc = max(1, int(max_concurrent_requests or 10))
+        sem = await self._sem(config_id, maxc)
+        await sem.acquire()
+        try:
+            r = await self._get_redis()
+            key = _CONCURRENCY_KEY.format(config_id=config_id)
+            res = await r.eval(_CONCURRENCY_LUA, 1, key, maxc, time.time())
+            if int(res[0]) == 0:
+                # Cross-worker limit hit — give the slot back and retry.
+                sem.release()
+                await asyncio.sleep(0.05)
+                return await self.acquire_concurrency(config_id, maxc)
+        except Exception as exc:  # Redis down → still serve (fail-open)
+            logger.warning(
+                "ProviderRateLimiter concurrency: fail-open: %s", exc
+            )
+
+    async def release_concurrency(self, config_id: str) -> None:
+        """Release the in-process slot and decrement the Redis counter."""
+        sem = self._local_sems.get(config_id)
+        if sem is not None:
+            sem.release()
+        try:
+            r = await self._get_redis()
+            key = _CONCURRENCY_KEY.format(config_id=config_id)
+            await r.decr(key)
+        except Exception:
+            # Counter drift on a dead Redis is harmless — fail-open already served.
+            pass
 
 
 # Module-level singleton — imported by model_provider.py and the test harness.

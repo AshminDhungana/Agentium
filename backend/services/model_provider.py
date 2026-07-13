@@ -346,6 +346,8 @@ class OpenAICompatibleProvider(BaseModelProvider):
         )
 
         start_time = time.time()
+        maxc = getattr(self.config, "max_concurrent_requests", 10) or 10
+        await provider_rate_limiter.acquire_concurrency(self.config.id, maxc)
         try:
             rpm = getattr(self.config, "requests_per_minute", 60) or 60
             await provider_rate_limiter.acquire(self.config.id, rpm)
@@ -400,6 +402,8 @@ class OpenAICompatibleProvider(BaseModelProvider):
                 agentium_id=kwargs.get('agentium_id') or 'system',
             )
             raise
+        finally:
+            await provider_rate_limiter.release_concurrency(self.config.id)
 
     async def stream_generate(self, system_prompt: str, user_message: str, **kwargs):
         """Stream generate."""
@@ -412,22 +416,27 @@ class OpenAICompatibleProvider(BaseModelProvider):
             timeout=self.config.timeout_seconds
         )
 
-        rpm = getattr(self.config, "requests_per_minute", 60) or 60
-        await provider_rate_limiter.acquire(self.config.id, rpm)
-        stream = await client.chat.completions.create(
-            model=kwargs.get('model', self.config.default_model),
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_message}
-            ],
-            stream=True,
-            max_tokens=kwargs.get('max_tokens', self.config.max_tokens),
-            temperature=kwargs.get('temperature', self.config.temperature),
-        )
+        maxc = getattr(self.config, "max_concurrent_requests", 10) or 10
+        await provider_rate_limiter.acquire_concurrency(self.config.id, maxc)
+        try:
+            rpm = getattr(self.config, "requests_per_minute", 60) or 60
+            await provider_rate_limiter.acquire(self.config.id, rpm)
+            stream = await client.chat.completions.create(
+                model=kwargs.get('model', self.config.default_model),
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_message}
+                ],
+                stream=True,
+                max_tokens=kwargs.get('max_tokens', self.config.max_tokens),
+                temperature=kwargs.get('temperature', self.config.temperature),
+            )
 
-        async for chunk in stream:
-            if chunk.choices[0].delta.content:
-                yield chunk.choices[0].delta.content
+            async for chunk in stream:
+                if chunk.choices[0].delta.content:
+                    yield chunk.choices[0].delta.content
+        finally:
+            await provider_rate_limiter.release_concurrency(self.config.id)
 
     async def generate_with_tools(
         self,
@@ -482,6 +491,8 @@ class OpenAICompatibleProvider(BaseModelProvider):
         total_completion_tokens = 0
         content = ""
         start_time = time.time()
+        maxc = getattr(self.config, "max_concurrent_requests", 10) or 10
+        await provider_rate_limiter.acquire_concurrency(self.config.id, maxc)
 
         try:
             for _ in range(max_iterations):
@@ -565,6 +576,8 @@ class OpenAICompatibleProvider(BaseModelProvider):
                 agentium_id=kwargs.get("agentium_id") or "system",
             )
             raise
+        finally:
+            await provider_rate_limiter.release_concurrency(self.config.id)
 
         latency = int((time.time() - start_time) * 1000)
         total_tokens = total_prompt_tokens + total_completion_tokens
@@ -603,43 +616,48 @@ class AnthropicProvider(BaseModelProvider):
         client = anthropic.AsyncAnthropic(api_key=self.api_key)
 
         start_time = time.time()
-        rpm = getattr(self.config, "requests_per_minute", 60) or 60
-        await provider_rate_limiter.acquire(self.config.id, rpm)
-        response = await client.messages.create(
-            model=kwargs.get('model', self.config.default_model),
-            max_tokens=kwargs.get('max_tokens', self.config.max_tokens),
-            temperature=kwargs.get('temperature', self.config.temperature),
-            system=system_prompt,
-            messages=[{"role": "user", "content": user_message}]
-        )
+        maxc = getattr(self.config, "max_concurrent_requests", 10) or 10
+        await provider_rate_limiter.acquire_concurrency(self.config.id, maxc)
+        try:
+            rpm = getattr(self.config, "requests_per_minute", 60) or 60
+            await provider_rate_limiter.acquire(self.config.id, rpm)
+            response = await client.messages.create(
+                model=kwargs.get('model', self.config.default_model),
+                max_tokens=kwargs.get('max_tokens', self.config.max_tokens),
+                temperature=kwargs.get('temperature', self.config.temperature),
+                system=system_prompt,
+                messages=[{"role": "user", "content": user_message}]
+            )
 
-        latency = int((time.time() - start_time) * 1000)
-        content = response.content[0].text if response.content else ""
-        actual_model      = response.model or kwargs.get('model', self.config.default_model)
-        prompt_tokens     = response.usage.input_tokens  if response.usage else 0
-        completion_tokens = response.usage.output_tokens if response.usage else 0
+            latency = int((time.time() - start_time) * 1000)
+            content = response.content[0].text if response.content else ""
+            actual_model      = response.model or kwargs.get('model', self.config.default_model)
+            prompt_tokens     = response.usage.input_tokens  if response.usage else 0
+            completion_tokens = response.usage.output_tokens if response.usage else 0
 
-        await self._log_usage(
-            model_used=actual_model,
-            prompt_tokens=prompt_tokens,
-            completion_tokens=completion_tokens,
-            latency_ms=latency,
-            success=True,
-            agentium_id=kwargs.get('agentium_id') or 'system',
-        )
+            await self._log_usage(
+                model_used=actual_model,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                latency_ms=latency,
+                success=True,
+                agentium_id=kwargs.get('agentium_id') or 'system',
+            )
 
-        return {
-            "content":           content,
-            "tokens_used":       prompt_tokens + completion_tokens,
-            "prompt_tokens":     prompt_tokens,
-            "completion_tokens": completion_tokens,
-            "latency_ms":        latency,
-            "model":             actual_model,
-            "cost_usd":          calculate_cost(
-                actual_model, self.config.provider,
-                prompt_tokens, completion_tokens
-            ),
-        }
+            return {
+                "content":           content,
+                "tokens_used":       prompt_tokens + completion_tokens,
+                "prompt_tokens":     prompt_tokens,
+                "completion_tokens": completion_tokens,
+                "latency_ms":        latency,
+                "model":             actual_model,
+                "cost_usd":          calculate_cost(
+                    actual_model, self.config.provider,
+                    prompt_tokens, completion_tokens
+                ),
+            }
+        finally:
+            await provider_rate_limiter.release_concurrency(self.config.id)
 
     async def stream_generate(self, system_prompt: str, user_message: str, **kwargs):
         """Stream generate."""
@@ -648,17 +666,22 @@ class AnthropicProvider(BaseModelProvider):
 
         client = anthropic.AsyncAnthropic(api_key=self.api_key)
 
-        rpm = getattr(self.config, "requests_per_minute", 60) or 60
-        await provider_rate_limiter.acquire(self.config.id, rpm)
-        async with client.messages.stream(
-            model=kwargs.get('model', self.config.default_model),
-            max_tokens=kwargs.get('max_tokens', self.config.max_tokens),
-            temperature=kwargs.get('temperature', self.config.temperature),
-            system=system_prompt,
-            messages=[{"role": "user", "content": user_message}]
-        ) as stream:
-            async for text in stream.text_stream:
-                yield text
+        maxc = getattr(self.config, "max_concurrent_requests", 10) or 10
+        await provider_rate_limiter.acquire_concurrency(self.config.id, maxc)
+        try:
+            rpm = getattr(self.config, "requests_per_minute", 60) or 60
+            await provider_rate_limiter.acquire(self.config.id, rpm)
+            async with client.messages.stream(
+                model=kwargs.get('model', self.config.default_model),
+                max_tokens=kwargs.get('max_tokens', self.config.max_tokens),
+                temperature=kwargs.get('temperature', self.config.temperature),
+                system=system_prompt,
+                messages=[{"role": "user", "content": user_message}]
+            ) as stream:
+                async for text in stream.text_stream:
+                    yield text
+        finally:
+            await provider_rate_limiter.release_concurrency(self.config.id)
 
     async def generate_with_tools(
         self,
@@ -697,6 +720,8 @@ class AnthropicProvider(BaseModelProvider):
         total_completion_tokens = 0
         content = ""
         start_time = time.time()
+        maxc = getattr(self.config, "max_concurrent_requests", 10) or 10
+        await provider_rate_limiter.acquire_concurrency(self.config.id, maxc)
 
         try:
             for _ in range(max_iterations):
@@ -771,6 +796,8 @@ class AnthropicProvider(BaseModelProvider):
                 agentium_id=kwargs.get("agentium_id") or "system",
             )
             raise
+        finally:
+            await provider_rate_limiter.release_concurrency(self.config.id)
 
         latency = int((time.time() - start_time) * 1000)
         total_tokens = total_prompt_tokens + total_completion_tokens
@@ -814,6 +841,8 @@ class LocalProvider(OpenAICompatibleProvider):
         )
 
         start_time = time.time()
+        maxc = getattr(self.config, "max_concurrent_requests", 10) or 10
+        await provider_rate_limiter.acquire_concurrency(self.config.id, maxc)
         try:
             rpm = getattr(self.config, "requests_per_minute", 60) or 60
             await provider_rate_limiter.acquire(self.config.id, rpm)
@@ -834,6 +863,8 @@ class LocalProvider(OpenAICompatibleProvider):
             }
         except Exception as e:
             return await self._fallback_local_generate(system_prompt, user_message, kwargs)
+        finally:
+            await provider_rate_limiter.release_concurrency(self.config.id)
 
     async def _fallback_local_generate(self, system_prompt, user_message, kwargs):
         """Fallback for raw HTTP local servers."""

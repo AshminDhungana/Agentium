@@ -88,3 +88,53 @@ async def test_fallback_acquire_allows_first_consume():
     res2 = await rl._fallback_acquire(r, "k", now=100.0, rate=0.5)
     assert res2[0] == 0  # denied
     assert res2[1] > 0  # positive wait in ms
+
+
+class _InMemoryRedis:
+    """Minimal async dict-backed fake supporting the concurrency-counter ops."""
+
+    def __init__(self):
+        self.counters: dict = {}
+
+    async def incr(self, key):
+        self.counters[key] = self.counters.get(key, 0) + 1
+        return self.counters[key]
+
+    async def decr(self, key):
+        self.counters[key] = self.counters.get(key, 0) - 1
+        return self.counters[key]
+
+    async def expire(self, key, t):
+        return True
+
+    async def eval(self, script, numkeys, key, *args):
+        # Concurrency Lua: args == (maxc, now)
+        maxc = int(args[0])
+        cur = await self.incr(key)
+        await self.expire(key, 10)
+        if cur > maxc:
+            await self.decr(key)
+            return [0, cur]
+        return [1, cur]
+
+
+async def test_concurrency_cap(monkeypatch):
+    rl = ProviderRateLimiter()
+    rl._redis = _InMemoryRedis()
+    current = 0
+    peak = 0
+    lock = asyncio.Lock()
+
+    async def work():
+        nonlocal current, peak
+        await rl.acquire_concurrency("cfg", max_concurrent_requests=2)
+        async with lock:
+            current += 1
+            peak = max(peak, current)
+        await asyncio.sleep(0.01)
+        async with lock:
+            current -= 1
+        await rl.release_concurrency("cfg")
+
+    await asyncio.gather(*[work() for _ in range(10)])
+    assert peak <= 2, peak
