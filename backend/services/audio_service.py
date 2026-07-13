@@ -16,6 +16,12 @@ from typing import Any, Dict, List, Optional
 
 from sqlalchemy.orm import Session
 
+from backend.services.whisper_cpp_service import (
+    get_whisper_cpp_service,
+    LocalSTTError,
+)
+from backend.core.exceptions import ServerSTTUnavailable
+
 logger = logging.getLogger(__name__)
 
 
@@ -84,16 +90,21 @@ class AudioService:
     # ── Availability ─────────────────────────────────────────────────────
 
     def is_available(self, db: Session, user_id: str) -> bool:
-        """Check if voice features are available (i.e. OpenAI key configured)."""
+        """Server STT available if whisper.cpp OR an OpenAI key is present."""
+        if get_whisper_cpp_service().is_available():
+            return True
         return self._get_openai_api_key(db, user_id) is not None
 
     def get_status(self, db: Session, user_id: str) -> Dict[str, Any]:
         """Detailed availability status."""
+        whisper_available = get_whisper_cpp_service().is_available()
         key = self._get_openai_api_key(db, user_id)
+        provider = "whisper_cpp" if whisper_available else ("openai" if key else None)
         return {
-            "available": key is not None,
-            "provider": "openai",
-            "stt_model": "whisper-1",
+            "available": provider is not None,
+            "provider": provider,
+            "whisper_cpp_available": whisper_available,
+            "stt_model": "ggml-base.en" if whisper_available else "whisper-1",
             "tts_model": "tts-1",
             "voices": AVAILABLE_TTS_VOICES,
             "max_audio_size_mb": MAX_AUDIO_SIZE // (1024 * 1024),
@@ -110,21 +121,45 @@ class AudioService:
         filename: str = "audio.wav",
     ) -> str:
         """
-        Transcribe audio bytes to text using OpenAI Whisper.
+        Transcribe audio bytes to text.
 
-        Args:
-            db: Database session (for key lookup)
-            user_id: User requesting transcription
-            audio_bytes: Raw audio data
-            language: Optional ISO-639-1 language code
-            filename: Filename hint for format detection
-
-        Returns:
-            The transcribed text.
+        Server-side chain (backend-owned):
+          1. Local whisper.cpp (PRIMARY, no API key needed)
+          2. OpenAI Whisper (if an API key is configured)
+          3. raise ServerSTTUnavailable -> frontend falls back to browser
 
         Raises:
-            ValueError: If no API key is configured or audio is too large.
+            ServerSTTUnavailable: No server STT engine is available.
         """
+        # 1. Local whisper.cpp (PRIMARY)
+        whisper = get_whisper_cpp_service()
+        if whisper.is_available():
+            try:
+                return await whisper.transcribe(audio_bytes, language)
+            except LocalSTTError as exc:
+                logger.warning("[STT] local whisper.cpp failed: %s — falling back", exc)
+
+        # 2. OpenAI Whisper (if a key is configured)
+        api_key = self._get_openai_api_key(db, user_id)
+        if api_key:
+            return await self._transcribe_openai(db, user_id, audio_bytes, language, filename)
+
+        # 3. Nothing server-side available
+        raise ServerSTTUnavailable(
+            "No server STT engine available",
+            code="STT_UNAVAILABLE",
+            detail={"fallback": "browser"},
+        )
+
+    async def _transcribe_openai(
+        self,
+        db: Session,
+        user_id: str,
+        audio_bytes: bytes,
+        language: Optional[str] = None,
+        filename: str = "audio.wav",
+    ) -> str:
+        """Transcribe via OpenAI Whisper (requires an API key)."""
         api_key = self._get_openai_api_key(db, user_id)
         if not api_key:
             raise ValueError("No OpenAI API key configured for voice features")
@@ -137,7 +172,6 @@ class AudioService:
 
         client = self._get_openai_client(api_key)
 
-        # Write to temp file (Whisper requires a file-like object)
         suffix = Path(filename).suffix or ".wav"
         with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
             tmp.write(audio_bytes)
@@ -151,7 +185,6 @@ class AudioService:
                 }
                 if language:
                     kwargs["language"] = language
-
                 transcript = client.audio.transcriptions.create(**kwargs)
                 return transcript.text
         finally:
