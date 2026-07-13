@@ -16,6 +16,8 @@ import uuid
 import threading
 import json
 import time
+import asyncio
+import types
 from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from unittest.mock import patch, AsyncMock
@@ -34,6 +36,7 @@ from backend.models.entities.user_config import (
 )
 from backend.services.api_key_manager import api_key_manager
 from backend.services.tasks.task_executor import execute_task_async
+from backend.core.llm_client import LLMClient
 
 
 def _make_task(
@@ -369,6 +372,38 @@ def make_fake_config(
     return cfg
 
 
+def _delete_fake_configs(ids):
+    """Soft-deactivate configs committed by make_fake_config.
+
+    make_fake_config commits via its own engine (bypassing the test's
+    transaction rollback), so these rows persist in agentium_test across the
+    whole session and would pollute later tests (e.g. the fallback-chain test,
+    whose 4-slot cap overflows with stray configs). We can't hard-DELETE them
+    because the test logs ModelUsageLog rows that FK-reference the config;
+    instead flip is_active=False so get_provider / get_fallback_config_ids
+    (both of which filter is_active=True) ignore them.
+    """
+    if not ids:
+        return
+    import os
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from sqlalchemy.pool import NullPool
+
+    eng = create_engine(os.getenv("DATABASE_URL"), poolclass=NullPool, pool_pre_ping=True)
+    s = sessionmaker(bind=eng)()
+    s.query(UserModelConfig).filter(UserModelConfig.id.in_(ids)).update(
+        {
+            UserModelConfig.is_active: False,
+            UserModelConfig.status: ConnectionStatus.ERROR,
+        },
+        synchronize_session=False,
+    )
+    s.commit()
+    s.close()
+    eng.dispose()
+
+
 @pytest.mark.integration
 class TestMockProviderHarness:
     """Task 20 sanity: a 200 fake server returns 'ok' through the real SDK path."""
@@ -376,19 +411,93 @@ class TestMockProviderHarness:
     def test_fake_provider_returns_ok(self, seeded_db: Session):
         srv = FakeProviderServer(default_status=200)
         cfg = make_fake_config(srv.base_url, rpm=100000)
+        try:
+            agent = seeded_db.query(Agent).filter_by(agentium_id="10003").first()
+            assert agent is not None
 
-        agent = seeded_db.query(Agent).filter_by(agentium_id="10003").first()
-        assert agent is not None
+            import asyncio
 
-        import asyncio
+            from backend.core.llm_client import LLMClient
 
-        from backend.core.llm_client import LLMClient
+            client = LLMClient()
+            result = asyncio.run(client.generate(agent, "hello", config_id=str(cfg.id)))
 
-        client = LLMClient()
-        result = asyncio.run(client.generate(agent, "hello", config_id=str(cfg.id)))
+            assert result["content"] == "ok"
+        finally:
+            srv.shutdown()
+            _delete_fake_configs([str(cfg.id)])
 
-        srv.shutdown()
-        assert result["content"] == "ok"
+
+@pytest.mark.integration
+class Test429Burst:
+    """Task 21: a burst of concurrent tasks against an always-429 primary (with a
+    healthy 200 fallback) must rotate to the fallback and complete every task
+    after the primary is retried to exhaustion (max_retries=2 → 3 attempts)."""
+
+    async def test_429_burst_rotates_and_completes(self, db_engine, monkeypatch):
+        # We exercise OUR retry/rotation layer, not the SDK's built-in retries
+        # (openai.AsyncOpenAI defaults to max_retries=2). With those enabled each
+        # generate() would make 3 SDK HTTP hits per attempt and the primary's
+        # count would far exceed 3*N. Force max_retries=0 so the per-config hit
+        # count reflects only our resilience layer.
+        import openai as _openai
+
+        _orig = _openai.AsyncOpenAI
+
+        def _zero_retry(*a, **k):
+            k.setdefault("max_retries", 0)
+            return _orig(*a, **k)
+
+        monkeypatch.setattr(_openai, "AsyncOpenAI", _zero_retry)
+
+        always_429 = FakeProviderServer(default_status=429,
+                                         default_headers={"Retry-After": "1"})
+        always_200 = FakeProviderServer(default_status=200)
+        # One shared 200 fallback — it never fails, so a single shared config is
+        # safe. Each concurrent task gets its OWN primary(429) config: the
+        # 3-strike failure cooldown (MAX_FAILURES_BEFORE_COOLDOWN=3, Task 16)
+        # deactivates a primary only AFTER that task's own 3 retries, so the
+        # 429 server still receives exactly 3 hits per task. Sharing one primary
+        # across N concurrent tasks would trip the cooldown on the 3rd concurrent
+        # attempt and stop the remaining tasks from re-hitting the server.
+        created_ids = []
+        try:
+            fb = make_fake_config(always_200.base_url)
+            created_ids.append(str(fb.id))
+            N = 5
+            primaries = [make_fake_config(always_429.base_url) for _ in range(N)]
+            created_ids.extend(str(p.id) for p in primaries)
+            agents = [
+                types.SimpleNamespace(ethos=None, agentium_id=f"task-{i}")
+                for i in range(N)
+            ]
+
+            results = await asyncio.gather(*[
+                LLMClient().generate(
+                    agent=agents[i], user_message="hi",
+                    config_id=str(primaries[i].id),
+                    fallback_configs=[str(fb.id)],
+                )
+                for i in range(N)
+            ], return_exceptions=True)
+
+            # Every task completed via the fallback.
+            ok = [r for r in results if isinstance(r, dict)]
+            assert len(ok) == N, results
+            assert all(r.get("content") == "ok" for r in ok)
+
+            # Each primary is retried to exhaustion (max_retries=2 → 3 attempts)
+            # before rotating to the fallback, so the 429 server receives exactly
+            # 3 × N requests; the shared 200 fallback is hit once per task (N).
+            assert always_429.hits() == 3 * N, always_429.status_counts()
+            assert always_200.hits() == N, always_200.status_counts()
+        finally:
+            always_429.shutdown()
+            always_200.shutdown()
+            # make_fake_config commits via its own engine, bypassing the test's
+            # transaction rollback — delete explicitly so these rows don't
+            # pollute the fallback-chain test that runs later in this session.
+            _delete_fake_configs(created_ids)
 
 
 @pytest.mark.integration

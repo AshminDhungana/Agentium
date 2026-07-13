@@ -13,6 +13,8 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 import logging
 
+logger = logging.getLogger(__name__)
+
 from backend.models.database import get_db_context
 from backend.models.entities.user_config import UserModelConfig, ProviderType, ModelUsageLog, ConnectionStatus
 
