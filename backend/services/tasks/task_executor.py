@@ -27,7 +27,7 @@ from backend.celery_app import celery_app
 from backend.models.entities.channels import ExternalMessage, ExternalChannel, ChannelStatus, ChannelType
 from backend.models.entities.task import Task, TaskStatus, TaskType, TaskPriority
 from backend.models.entities.task_events import TaskEvent, TaskEventType
-from backend.models.entities.agents import Agent, CouncilMember, HeadOfCouncil, LeadAgent, AgentType
+from backend.models.entities.agents import Agent, AgentStatus, CouncilMember, HeadOfCouncil, LeadAgent, AgentType
 from backend.models.entities.audit import AuditLog, AuditCategory, AuditLevel
 from backend.services.reincarnation_service import ReincarnationService
 
@@ -455,6 +455,28 @@ def sovereign_data_retention():
 # Auto-Scaling Governance
 # ═══════════════════════════════════════════════════════════
 
+_SCALE_REDIS = None
+
+
+def _scale_redis():
+    """Lazily-constructed synchronous Redis client (Celery runs sync).
+
+    Returns ``None`` if Redis is unreachable so callers can degrade
+    gracefully (the cooldown gate simply won't fire).
+    """
+    global _SCALE_REDIS
+    if _SCALE_REDIS is None:
+        try:
+            import redis as redis_sync
+
+            url = os.getenv("REDIS_URL", "redis://redis:6379/0")
+            _SCALE_REDIS = redis_sync.from_url(url, decode_responses=True)
+        except Exception as exc:  # pragma: no cover - degraded path
+            logger.warning("auto_scale_check: Redis unavailable: %s", exc)
+            _SCALE_REDIS = None
+    return _SCALE_REDIS
+
+
 @celery_app.task(name="agentium.tasks.task_executor.auto_scale_check")
 def auto_scale_check():
     """Monitor queue depth and trigger auto-scaling if needed."""
@@ -470,59 +492,114 @@ def auto_scale_check():
                 Task.is_active == True
             ).count()
             
-            threshold = 10
-            
-            if pending_count > threshold:
-                logger.info(f"Queue depth {pending_count} exceeds threshold {threshold}, requesting scaling")
-                
-                head = db.query(HeadOfCouncil).filter_by(agentium_id="00001").first()
-                
-                if head:
-                    AuditLog.log(
-                        db=db,
-                        level=AuditLevel.INFO,
-                        category=AuditCategory.GOVERNANCE,
-                        actor_type="agent",
-                        actor_id="SYSTEM",
-                        action="auto_scale_triggered",
-                        description=f"Auto-scaling triggered: {pending_count} pending tasks",
-                        after_state={
+            threshold = int(os.getenv("AUTO_SCALE_THRESHOLD", "10"))
+            max_live = int(os.getenv("MAX_LIVE_AGENTS", "50"))
+            cooldown = int(os.getenv("AUTO_SCALE_COOLDOWN_SECONDS", "120"))
+
+            # Live agents = anything actively occupying compute/quota.
+            live_agents = db.query(Agent).filter(
+                Agent.status.in_([
+                    AgentStatus.ACTIVE,
+                    AgentStatus.WORKING,
+                    AgentStatus.IDLE_WORKING,
+                ]),
+                Agent.is_active == True,
+            ).count()
+
+            # No scaling needed, or already at the fleet ceiling.
+            if pending_count <= threshold or live_agents >= max_live:
+                return {
+                    "scaled": False,
+                    "pending_count": pending_count,
+                    "threshold": threshold,
+                    "live_agents": live_agents,
+                    "max_live_agents": max_live,
+                }
+
+            # Cooldown gate (cross-worker safe via Redis) — prevents a scaling
+            # storm from firing a new batch every beat tick.
+            r = _scale_redis()
+            cd_key = "agentium:autoscale:cooldown"
+            if r is not None:
+                try:
+                    if r.get(cd_key):
+                        return {
+                            "scaled": False,
                             "pending_count": pending_count,
-                            "threshold": threshold,
-                            "recommended_agents": 3
+                            "reason": "cooldown",
+                            "live_agents": live_agents,
                         }
+                    r.set(cd_key, "1", ex=cooldown)
+                except Exception as cd_exc:  # Redis hiccup → proceed without gate
+                    logger.warning("auto_scale_check: cooldown gate skipped: %s", cd_exc)
+
+            logger.info(
+                f"Queue depth {pending_count} exceeds threshold {threshold} "
+                f"(live={live_agents}/{max_live}), requesting scaling"
+            )
+
+            head = db.query(HeadOfCouncil).filter_by(agentium_id="00001").first()
+            if not head:
+                return {
+                    "scaled": False,
+                    "pending_count": pending_count,
+                    "reason": "no_head",
+                    "live_agents": live_agents,
+                }
+
+            # Only spawn up to the remaining headroom under the ceiling.
+            recommended_agents = min(3, max(0, max_live - live_agents))
+            if recommended_agents <= 0:
+                return {
+                    "scaled": False,
+                    "pending_count": pending_count,
+                    "reason": "at_ceiling",
+                    "live_agents": live_agents,
+                    "max_live_agents": max_live,
+                }
+
+            AuditLog.log(
+                db=db,
+                level=AuditLevel.INFO,
+                category=AuditCategory.GOVERNANCE,
+                actor_type="agent",
+                actor_id="SYSTEM",
+                action="auto_scale_triggered",
+                description=f"Auto-scaling triggered: {pending_count} pending tasks",
+                after_state={
+                    "pending_count": pending_count,
+                    "threshold": threshold,
+                    "live_agents": live_agents,
+                    "max_live_agents": max_live,
+                    "recommended_agents": recommended_agents,
+                },
+            )
+
+            spawned = 0
+            spawn_errors = []
+            for i in range(recommended_agents):
+                try:
+                    ReincarnationService.spawn_task_agent(
+                        parent=head,
+                        name=f"AutoScale-Agent-{datetime.utcnow().strftime('%H%M%S')}-{i}",
+                        description=f"Auto-spawned Task Agent for queue depth scaling (threshold: {threshold}, pending: {pending_count})",
+                        db=db,
                     )
-                    
-                    recommended_agents = 3
-                    spawned = 0
-                    spawn_errors = []
-                    for i in range(recommended_agents):
-                        try:
-                            ReincarnationService.spawn_task_agent(
-                                parent=head,
-                                name=f"AutoScale-Agent-{datetime.utcnow().strftime('%H%M%S')}-{i}",
-                                description=f"Auto-spawned Task Agent for queue depth scaling (threshold: {threshold}, pending: {pending_count})",
-                                db=db,
-                            )
-                            spawned += 1
-                        except Exception as spawn_exc:
-                            logger.error(f"auto_scale_check: spawn {i+1}/{recommended_agents} failed: {spawn_exc}")
-                            spawn_errors.append(str(spawn_exc))
-                    
-                    return {
-                        "scaled": True,
-                        "pending_count": pending_count,
-                        "threshold": threshold,
-                        "new_agents_requested": recommended_agents,
-                        "new_agents_spawned": spawned,
-                        "spawn_errors": spawn_errors,
-                        "timestamp": datetime.utcnow().isoformat()
-                    }
-            
+                    spawned += 1
+                except Exception as spawn_exc:
+                    logger.error(f"auto_scale_check: spawn {i+1}/{recommended_agents} failed: {spawn_exc}")
+                    spawn_errors.append(str(spawn_exc))
+
             return {
-                "scaled": False,
+                "scaled": True,
                 "pending_count": pending_count,
-                "threshold": threshold
+                "threshold": threshold,
+                "live_agents": live_agents,
+                "max_live_agents": max_live,
+                "new_agents_requested": recommended_agents,
+                "new_agents_spawned": spawned,
+                "spawn_errors": spawn_errors,
+                "timestamp": datetime.utcnow().isoformat(),
             }
             
         except Exception as e:
