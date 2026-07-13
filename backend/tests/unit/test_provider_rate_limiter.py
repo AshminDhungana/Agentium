@@ -138,3 +138,39 @@ async def test_concurrency_cap(monkeypatch):
 
     await asyncio.gather(*[work() for _ in range(10)])
     assert peak <= 2, peak
+
+
+def test_parse_headers_low_remaining():
+    rl = ProviderRateLimiter()
+    headers = {"anthropic-ratelimit-requests-remaining": "1",
+               "anthropic-ratelimit-requests-reset": "1700000000"}
+    rem, reset = rl.parse_rate_limit_headers("anthropic", headers)
+    assert rem == 1 and reset == 1700000000
+    headers2 = {"x-ratelimit-remaining-requests": "0",
+                "x-ratelimit-reset-requests": "100"}
+    rem2, reset2 = rl.parse_rate_limit_headers("openai", headers2)
+    assert rem2 == 0 and reset2 == 100
+
+
+async def test_record_header_insight_pauses(monkeypatch):
+    rl = ProviderRateLimiter()
+    captured = {}
+
+    class _FakeRedis:
+        async def set(self, key, val, ex=None):
+            captured[key] = (val, ex)
+
+        async def get(self, key):
+            return captured.get(key, (None, None))[0]
+
+        async def evalsha(self, *a, **k):
+            raise RuntimeError("force fallback")
+
+    rl._redis = _FakeRedis()
+    headers = {"x-ratelimit-remaining-requests": "1",
+               "x-ratelimit-reset-requests": "5"}  # 5s delta
+
+    await rl.record_header_insight("cfg", "openai", headers)
+    await rl._check_pause("cfg")
+    # pause key set; reset normalised to now+5
+    assert any("pause" in k for k in captured), captured

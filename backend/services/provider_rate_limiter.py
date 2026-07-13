@@ -67,6 +67,7 @@ end
 # Redis keyspace prefixes.
 _RATELIMIT_KEY = "agentium:provider:ratelimit:{config_id}"
 _CONCURRENCY_KEY = "agentium:provider:concurrency:{config_id}"
+_PAUSE_KEY = "agentium:provider:pause:{config_id}"
 
 # Cross-worker concurrency cap: INCR the counter, reject if over the limit.
 #   KEYS[1] = concurrency counter key
@@ -96,6 +97,13 @@ class ProviderRateLimiter:
         # In-process semaphore cache (per config) for same-worker concurrency.
         self._local_sems: Dict[str, "asyncio.Semaphore"] = {}
         self._sem_lock = asyncio.Lock()
+        # Best-effort capture of the LAST response headers per config, populated
+        # by the httpx event hook attached to each shared SDK client (see Task 17).
+        # Keyed by config_id; read + cleared right after each successful SDK call.
+        self._last_headers: Dict[str, Dict[str, str]] = {}
+        # Threshold for header-based pause: pause when provider reports this or
+        # fewer requests remaining. Only TIGHTENS the effective rate.
+        self._pause_threshold = int(os.getenv("RATE_LIMIT_PAUSE_THRESHOLD", "2"))
 
     # ── Redis plumbing ────────────────────────────────────────────────────────
 
@@ -125,8 +133,11 @@ class ProviderRateLimiter:
         Block until a token is available for ``config_id``.
 
         ``requests_per_minute`` is converted to a smooth per-second refill
-        (rpm / 60) so spacing is even. Fails open if Redis is unreachable.
+        (rpm / 60) so spacing is even. If a provider's rate-limit headers put
+        this config into a temporary pause (see ``record_header_insight``), we
+        wait that out first. Fails open if Redis is unreachable.
         """
+        await self._check_pause(config_id)
         rpm = max(1, int(requests_per_minute or 60))
         rate = rpm / 60.0
         try:
@@ -188,6 +199,91 @@ class ProviderRateLimiter:
         no-op today; it exists for interface stability and future quota models.
         """
         return
+
+    # ── Rate-limit header correction ───────────────────────────────────────────
+
+    def parse_rate_limit_headers(
+        self, provider: str, headers
+    ) -> Tuple[Optional[int], Optional[float]]:
+        """Return ``(remaining, reset_epoch)`` from provider rate-limit headers.
+
+        Supports Anthropic (``anthropic-ratelimit-requests-*``) and OpenAI /
+        OpenAI-compatible (``x-ratelimit-remaining-requests`` /
+        ``x-ratelimit-reset-requests``). ``reset`` for OpenAI-style headers is a
+        delta in seconds; for Anthropic it is an absolute epoch — both are
+        returned verbatim and interpreted downstream.
+        """
+        h = {str(k).lower(): v for k, v in dict(headers).items()}
+        if provider == "anthropic":
+            rem = h.get("anthropic-ratelimit-requests-remaining")
+            reset = h.get("anthropic-ratelimit-requests-reset")
+        else:
+            rem = h.get("x-ratelimit-remaining-requests")
+            reset = h.get("x-ratelimit-reset-requests")
+        try:
+            return (
+                int(rem) if rem is not None else None,
+                float(reset) if reset is not None else None,
+            )
+        except (TypeError, ValueError):
+            return (None, None)
+
+    def record_raw_headers(self, config_id: str, headers) -> None:
+        """Best-effort capture of the raw response headers for ``config_id``.
+
+        Populated by the httpx event hook on each shared SDK client (Task 17).
+        """
+        try:
+            self._last_headers[config_id] = {
+                str(k).lower(): str(v) for k, v in dict(headers).items()
+            }
+        except Exception:
+            pass
+
+    def pop_raw_headers(self, config_id: str):
+        """Read and clear the captured headers for ``config_id``."""
+        return self._last_headers.pop(config_id, None)
+
+    async def record_header_insight(
+        self, config_id: str, provider: str, headers
+    ) -> None:
+        """If the provider reports remaining ≤ threshold, pause new calls until reset.
+
+        Only TIGHTENS the effective rate — never loosens past
+        ``requests_per_minute``. OpenAI's ``reset`` is a seconds-delta; Anthropic's
+        is an absolute epoch. We normalise both to an absolute ``pause_until``.
+        """
+        try:
+            remaining, reset = self.parse_rate_limit_headers(provider, headers)
+            if remaining is None or reset is None:
+                return
+            if remaining > self._pause_threshold:
+                return
+            r = await self._get_redis()
+            key = _PAUSE_KEY.format(config_id=config_id)
+            now = time.time()
+            # OpenAI reset is a delta (seconds); Anthropic is an absolute epoch.
+            reset_epoch = now + float(reset) if provider != "anthropic" else float(reset)
+            pause_until = max(now, reset_epoch)
+            ttl = max(1, int(pause_until - now) + 5)
+            await r.set(key, pause_until, ex=ttl)
+        except Exception as exc:
+            logger.debug("record_header_insight skipped: %s", exc)
+
+    async def _check_pause(self, config_id: str) -> None:
+        """If this config is paused by ``record_header_insight``, wait it out."""
+        try:
+            r = await self._get_redis()
+            key = _PAUSE_KEY.format(config_id=config_id)
+            val = await r.get(key)
+            if val:
+                pause_until = float(val)
+                wait = pause_until - time.time()
+                if wait > 0:
+                    await asyncio.sleep(min(wait, 60))
+        except Exception:
+            # Redis down → no pause enforced (fail-open already serves).
+            pass
 
     # ── Concurrency cap ───────────────────────────────────────────────────────
 

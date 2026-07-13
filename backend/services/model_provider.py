@@ -22,6 +22,18 @@ except ImportError:
 
 from backend.services.provider_rate_limiter import provider_rate_limiter
 
+
+async def _record_provider_headers(config) -> None:
+    """Read + clear the headers captured by the SDK httpx hook (Task 17).
+
+    No-op until Task 17 attaches the event hook; afterwards it feeds provider
+    rate-limit headers into the limiter so it can tighten effective rate.
+    """
+    headers = provider_rate_limiter.pop_raw_headers(config.id)
+    if headers:
+        provider = getattr(config.provider, "value", config.provider)
+        await provider_rate_limiter.record_header_insight(config.id, provider, headers)
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Per-model pricing table
 # Prices are USD per 1 M tokens (input_rate, output_rate).
@@ -362,6 +374,8 @@ class OpenAICompatibleProvider(BaseModelProvider):
                 top_p=kwargs.get('top_p', self.config.top_p),
             )
 
+            await _record_provider_headers(self.config)
+
             latency = int((time.time() - start_time) * 1000)
             content = response.choices[0].message.content
             actual_model      = response.model or kwargs.get('model', self.config.default_model)
@@ -431,6 +445,8 @@ class OpenAICompatibleProvider(BaseModelProvider):
                 max_tokens=kwargs.get('max_tokens', self.config.max_tokens),
                 temperature=kwargs.get('temperature', self.config.temperature),
             )
+
+            await _record_provider_headers(self.config)
 
             async for chunk in stream:
                 if chunk.choices[0].delta.content:
@@ -509,6 +525,7 @@ class OpenAICompatibleProvider(BaseModelProvider):
                 rpm = getattr(self.config, "requests_per_minute", 60) or 60
                 await provider_rate_limiter.acquire(self.config.id, rpm)
                 response = await client.chat.completions.create(**create_kwargs)
+                await _record_provider_headers(self.config)
                 msg = response.choices[0].message
 
                 if response.usage:
@@ -629,6 +646,8 @@ class AnthropicProvider(BaseModelProvider):
                 messages=[{"role": "user", "content": user_message}]
             )
 
+            await _record_provider_headers(self.config)
+
             latency = int((time.time() - start_time) * 1000)
             content = response.content[0].text if response.content else ""
             actual_model      = response.model or kwargs.get('model', self.config.default_model)
@@ -678,6 +697,7 @@ class AnthropicProvider(BaseModelProvider):
                 system=system_prompt,
                 messages=[{"role": "user", "content": user_message}]
             ) as stream:
+                await _record_provider_headers(self.config)
                 async for text in stream.text_stream:
                     yield text
         finally:
@@ -737,6 +757,7 @@ class AnthropicProvider(BaseModelProvider):
                 rpm = getattr(self.config, "requests_per_minute", 60) or 60
                 await provider_rate_limiter.acquire(self.config.id, rpm)
                 response = await client.messages.create(**create_kwargs)
+                await _record_provider_headers(self.config)
 
                 if response.usage:
                     total_prompt_tokens     += response.usage.input_tokens  or 0
@@ -852,6 +873,8 @@ class LocalProvider(OpenAICompatibleProvider):
                 max_tokens=kwargs.get('max_tokens', self.config.max_tokens),
                 temperature=kwargs.get('temperature', self.config.temperature),
             )
+
+            await _record_provider_headers(self.config)
 
             latency = int((time.time() - start_time) * 1000)
 
