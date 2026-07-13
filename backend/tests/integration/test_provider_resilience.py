@@ -143,6 +143,51 @@ class TestExhaustionFailsCleanly:
 
 
 @pytest.mark.integration
+class TestTotalExhaustion:
+    """
+    Task 23: when EVERY configured key/provider fails, the worker must not
+    crash. The task is marked FAILED with a structured reason, an AuditLog row
+    is written, and execute_task_async returns cleanly (no Celery Retry re-queue,
+    so the worker moves on to the next queued task).
+
+    The execute_task_async -> Agent.execute_with_skill_rag ->
+    skill_rag.execute_with_skills -> LLMClient.generate chain is driven for real;
+    `generate` is stubbed to raise the same RuntimeError the real classify ->
+    retry -> failover -> exhaust path produces, so the exhaustion -> clean-fail
+    handler is exercised without execute_with_skills' heavy RAG machinery
+    (which has a known session-identity limitation under a patched get_task_db).
+    """
+
+    def test_total_exhaustion_clean_fail(self, seeded_db: Session):
+        @contextmanager
+        def _fake_get_task_db():
+            yield seeded_db
+
+        task = _make_task(status=TaskStatus.IN_PROGRESS)
+        seeded_db.add(task)
+        seeded_db.flush()
+
+        with patch.object(
+            LLMClient, "generate",
+            AsyncMock(side_effect=RuntimeError("exhausted all providers")),
+        ), patch(
+            "backend.services.tasks.task_executor.get_task_db", _fake_get_task_db
+        ):
+            result = execute_task_async.run(task.agentium_id, "10003")
+
+        seeded_db.refresh(task)
+        assert result["status"] == "failed"
+        assert task.status == "failed"
+        assert task.failure_reason in (
+            "provider_unreachable", "all_keys_invalid", "rate_limited")
+        assert (
+            seeded_db.query(AuditLog)
+            .filter_by(action="task_failed_exhaustion")
+            .count() >= 1
+        )
+
+
+@pytest.mark.integration
 class TestExhaustionBroadcastsDegradation:
     """
     Task 15: on total provider exhaustion the worker must surface a friendly
