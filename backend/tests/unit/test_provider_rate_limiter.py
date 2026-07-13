@@ -174,3 +174,63 @@ async def test_record_header_insight_pauses(monkeypatch):
     await rl._check_pause("cfg")
     # pause key set; reset normalised to now+5
     assert any("pause" in k for k in captured), captured
+
+
+async def test_header_correction_pauses_until_reset(monkeypatch):
+    """Task 25: a low-remaining *success* header must pause the config's next
+    call until the provider's reported reset time — without any actual 429.
+
+    Drives the real Redis-backed limiter (REDIS_URL). At a high rpm the token
+    bucket never throttles, so any wait on ``acquire`` is purely the header
+    pause. We prove that: instant before the low-remaining header, ~reset
+    seconds after it.
+    """
+    import uuid
+
+    from backend.services import provider_rate_limiter as _prl_mod
+    from backend.services.api_key_manager import api_key_manager as akm
+
+    # Isolate from Task 19's DB-backed warning (its own test); out of scope here.
+    monkeypatch.setattr(akm, "check_rate_budget_warning", lambda *a, **k: None)
+
+    rl = ProviderRateLimiter()  # real Redis via REDIS_URL
+    cfg = f"task25-{uuid.uuid4().hex}"
+    r = await rl._get_redis()
+    try:
+        # High rpm -> token bucket never blocks on its own.
+        t0 = time.monotonic()
+        await rl.acquire(cfg, requests_per_minute=100000)
+        baseline = time.monotonic() - t0
+        assert baseline < 0.5, baseline  # instant when nothing is paused
+
+        # A healthy header (remaining well above the threshold) must NOT pause.
+        await rl.record_header_insight(
+            cfg, "openai",
+            {"x-ratelimit-remaining-requests": "10",
+             "x-ratelimit-reset-requests": "100"},
+        )
+        t1 = time.monotonic()
+        await rl.acquire(cfg, requests_per_minute=100000)
+        assert (time.monotonic() - t1) < 0.5  # still instant
+
+        # Now the provider reports near-exhaustion on a *success* response:
+        # remaining=1 (<= threshold 2), reset is a 2s delta.
+        await rl.record_header_insight(
+            cfg, "openai",
+            {"x-ratelimit-remaining-requests": "1",
+             "x-ratelimit-reset-requests": "2"},
+        )
+        t2 = time.monotonic()
+        await rl.acquire(cfg, requests_per_minute=100000)
+        waited = time.monotonic() - t2
+
+        # The pause was honoured: we waited ~2s (the reported reset delta) and
+        # did NOT just pass straight through.
+        assert 1.2 <= waited <= 4.0, waited
+    finally:
+        # Best-effort cleanup of the keys we touched (they auto-expire anyway).
+        for k in (_prl_mod._PAUSE_KEY, _prl_mod._RATELIMIT_KEY):
+            try:
+                await r.delete(k.format(config_id=cfg))
+            except Exception:
+                pass
