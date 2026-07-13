@@ -29,6 +29,7 @@ import { modelsApi } from '@/services/models';
 import { getProviderFormGradient, ProviderFormIcon } from '@/constants/providerMeta';
 import type { ModelConfig, ProviderInfo, ProviderType } from '@/types';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { RateLimitField } from './RateLimitField';
 
 // ─── Error helper ─────────────────────────────────────────────────────────────
 //
@@ -119,6 +120,7 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
         top_p: 0.9,
         timeout: 60,
         is_default: false,
+        requests_per_minute: 60,
     });
 
     const [isLoading, setIsLoading] = useState(false);
@@ -175,6 +177,7 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
                 top_p: initialConfig.settings?.top_p ?? 0.9,
                 timeout: initialConfig.settings?.timeout ?? 60,
                 is_default: initialConfig.is_default,
+                requests_per_minute: initialConfig.requests_per_minute || 60,
             });
         }
     }, [initialConfig, providers]);
@@ -318,6 +321,7 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
                 // to be saved.
                 top_p: formData.top_p,
                 timeout_seconds: formData.timeout,
+                requests_per_minute: formData.requests_per_minute,
                 ...(formData.provider === 'local'
                     ? { local_server_url: formData.local_server_url }
                     : formData.api_base_url
@@ -376,6 +380,7 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
                 top_p: formData.top_p,
                 timeout_seconds: formData.timeout,
                 is_default: formData.is_default,
+                requests_per_minute: formData.requests_per_minute,
                 ...(formData.api_key ? { api_key: formData.api_key } : {}),
                 ...(formData.provider === 'local'
                     ? { local_server_url: formData.local_server_url }
@@ -715,6 +720,12 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
                                 </p>
                             </div>
                         )}
+
+                        {/* Rate limit (requests per minute) */}
+                        <RateLimitField
+                            value={formData.requests_per_minute}
+                            onChange={(v) => setFormData(prev => ({ ...prev, requests_per_minute: v }))}
+                        />
 
                         {/* Model Selection */}
                         <div>

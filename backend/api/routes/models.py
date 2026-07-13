@@ -49,6 +49,12 @@ class ModelConfigCreate(BaseModel):
     temperature: float = Field(default=0.7, ge=0.0, le=2.0)
     top_p: Optional[float] = Field(default=1.0, ge=0.0, le=1.0)
     timeout_seconds: int = Field(default=60, ge=5, le=300)
+    requests_per_minute: int = Field(default=60, ge=1, le=1000000,
+                                            description="Max outbound requests/minute (whole integer)")
+    tokens_per_minute: Optional[int] = Field(default=None, ge=1,
+                                          description="Optional token budget per minute")
+    max_concurrent_requests: Optional[int] = Field(default=10, ge=1,
+                                              description="Max concurrent outbound requests for this key")
 
     @field_validator('api_base_url', 'local_server_url')
     @classmethod
@@ -70,6 +76,9 @@ class ModelConfigUpdate(BaseModel):
     temperature: Optional[float] = None
     top_p: Optional[float] = None
     status: Optional[str] = None
+    requests_per_minute: Optional[int] = Field(default=None, ge=1, le=1000000)
+    tokens_per_minute: Optional[int] = Field(default=None, ge=1)
+    max_concurrent_requests: Optional[int] = Field(default=None, ge=1)
 
 
 class ModelConfigResponse(BaseModel):
@@ -84,6 +93,9 @@ class ModelConfigResponse(BaseModel):
     is_default: bool
     # api_key_masked was missing from original — frontend ModelConfig type expects it
     api_key_masked: Optional[str] = None
+    requests_per_minute: int
+    tokens_per_minute: Optional[int] = None
+    max_concurrent_requests: Optional[int] = None
     settings: Dict[str, Any] = Field(default_factory=dict)
     last_tested: Optional[str] = None
     total_usage: Dict[str, Any] = Field(default_factory=dict)
@@ -160,6 +172,9 @@ def _serialize_config(config: UserModelConfig) -> Dict[str, Any]:
         'is_default':     config.is_default,
         # Previously missing — frontend expects this field to show masked key on cards
         'api_key_masked': config.api_key_masked,
+        'requests_per_minute': config.requests_per_minute,
+        'tokens_per_minute': config.tokens_per_minute,
+        'max_concurrent_requests': config.max_concurrent_requests,
         'settings': {
             'max_tokens':  config.max_tokens,
             'temperature': config.temperature,
@@ -363,6 +378,9 @@ async def create_config(
         temperature       = config.temperature,
         top_p             = config.top_p,
         timeout_seconds   = config.timeout_seconds,
+        requests_per_minute = config.requests_per_minute,
+        tokens_per_minute   = config.tokens_per_minute,
+        max_concurrent_requests = config.max_concurrent_requests,
         status            = ConnectionStatus.ACTIVE,
     )
 

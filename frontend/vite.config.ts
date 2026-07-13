@@ -50,6 +50,7 @@ export default defineConfig({
         include: [
           'src/components/chat/**/*.test.{ts,tsx}',
           'src/components/tasks/**/*.test.{ts,tsx}',
+          'src/components/models/**/*.test.{ts,tsx}',
         ],
       },
     }, {

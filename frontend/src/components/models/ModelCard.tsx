@@ -198,6 +198,12 @@ export const ModelCard: React.FC<ModelCardProps> = React.memo(({
                             </span>
                         </div>
                     )}
+                    <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-600 dark:text-gray-400">Rate limit</span>
+                        <span className="font-mono text-xs text-gray-600 dark:text-gray-500">
+                            {config.requests_per_minute} requests/minute
+                        </span>
+                    </div>
                 </div>
 
                 {/* ── Available model tags ────────────────────────────────── */}

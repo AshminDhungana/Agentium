@@ -240,6 +240,12 @@ export interface ModelConfig {
     };
     last_tested?: string;
     api_key_masked?: string;
+    /** Max outbound requests/minute for this key (whole integer, default 60). */
+    requests_per_minute: number;
+    /** Optional token budget per minute. */
+    tokens_per_minute?: number;
+    /** Max concurrent outbound requests for this key (default 10). */
+    max_concurrent_requests?: number;
 }
 
 export interface TestResult {
