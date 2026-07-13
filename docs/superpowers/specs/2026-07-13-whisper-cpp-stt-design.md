@@ -128,6 +128,8 @@ CUDA `.so` set copied: `libcudart.so*`, `libcublas*`, `libcufft*`,
 
 ### New module: `backend/services/whisper_cpp_service.py`
 Owns the local engine. Responsibilities:
+- Exposed via a singleton accessor `get_whisper_cpp_service()` (sibling of the
+  existing `get_audio_service()`), mirroring the module's lazy-init pattern.
 - `is_available() -> bool` — binary exists **and** model file exists.
 - `transcribe(audio_bytes: bytes, language: str | None) -> str` —
   1. write `audio_bytes` to a temp `.wav`,
@@ -203,6 +205,12 @@ engine changes:
   Vosk — the current Google→Vosk shape, just backend-whisper.cpp→Vosk.
 - New config `STT_BACKEND_URL` (derives from `BACKEND_URL` when unset).
 - `_recognize_with_vosk()` is retained as-is for the offline path.
+- **Auth note:** `audio/transcribe` requires a user JWT
+  (`get_current_active_user`). The bridge currently sends `VOICE_TOKEN`. The
+  implementer must reconcile this — either have the bridge send the user's
+  session token (read from the same place `voiceBridge.ts` does:
+  `localStorage['access_token']`), or accept the voice token at this endpoint.
+  This is an implementation detail, not a design change.
 
 This is the minimal change that makes whisper.cpp the unified primary engine
 for the bridge without rewriting its session/wake-word logic.
