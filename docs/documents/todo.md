@@ -36,7 +36,11 @@ Build a self-governing AI ecosystem where agents operate under constitutional la
 | 15    | Platform Hardening & Admin     | ✅ Complete    |
 | 16    | Database & Advanced AI Logic   | ✅ Complete    |
 | 17    | DevSecOps & Polish             | ✅ Complete    |
-| 18    | Complete System Testing        | 🚧 In Progress |
+| 18    | Complete System Testing        | ✅ Complete    |
+| 19    | Additional Features            | 🚧 In Progress |
+| 20    | Migrate Embedding Model        | Not Done        |
+| End   | Summery_todo.md                | Not Done        |
+| New   | Final Checklist todo.md        | Not Done        |
 
 ---
 
@@ -841,9 +845,13 @@ Whisper    — Speech-to-Text
 OpenAI TTS — Text-to-Speech
 ```
 
+
+
 ---
 
-## Known Issues & Technical Debt
+## Additional Features (To be Added Later)
+
+### 19.0 Known Issues & Technical Debt
 
 **High Priority (actively blocking)**
 
@@ -866,10 +874,6 @@ OpenAI TTS — Text-to-Speech
 - [ ] PostgreSQL slow query logging not enabled
 - [ ] Connection pool sizes set to defaults — not tuned for production load
 - [ ] Config files not version-controlled via Git
-
----
-
-## Additional Features (To be Added Later)
 
 ### 19.1 Multi-Select Checkbox Card (Chat-Window Only)
 
@@ -946,8 +950,10 @@ The card uses the existing Tailwind dark-mode design system with a rounded conta
 The backend triggers the card with a structured payload containing the question text, a required flag, and an array of options each with an ID, display label, and internal value. An optional expiration timer can be included after which the card enters an expired state if left unanswered.
 
 
-## 19.3 Outbound Rate-Limit Resilience & Graceful API-Key-Failure Handling
- 
+## 19.3 Outbound Rate-Limit Resilience & Graceful API-Key-Failure Handling ✅ DONE (2026-07-13)
+
+> **Status:** All 26 steps complete and merged to `main` (fast-forward `2e1c36d..d709155`). Integration suite `test_provider_resilience.py` (16 passed) and unit `test_provider_rate_limiter.py` (7 passed) green; sustained load report at `backend/tests/load/PROVIDER_LOAD_REPORT.md`.
+
 **Goal:** Agentium never crashes, stalls, or silently drops a task when a provider throttles (429), rejects a key (401/403), or goes down. A bad key or a burst of 429s must never take down a worker or the queue — the task fails over to another key/provider, or is marked `FAILED` with a clear reason, while every other task keeps running.
  
 Work through the steps below **in order** — each one is a single, self-contained task, and later steps assume earlier ones are done.
@@ -1091,17 +1097,134 @@ Work through the steps below **in order** — each one is a single, self-contain
  
 ## Definition of done
  
-- [ ] All 26 steps above checked off.
-- [ ] A 429 burst produces zero failed tasks.
-- [ ] An invalid key rotates immediately with no wasted retries.
-- [ ] A total provider outage marks the task `FAILED` cleanly — worker keeps processing everything else.
-- [ ] A key with no configured rate limit never exceeds 60 requests/minute; a key configured for 30/minute never gets a 429 under load.
-- [ ] Low-remaining headers pause calls before a 429 happens.
-- [ ] Circuit breaker and key-health state never disagree.
-- [ ] Per-provider requests/minute, concurrency, 429-rate, and health are visible on the dashboard, and match what's shown on the model page.
+- [x] All 26 steps above checked off.
+- [x] A 429 burst produces zero failed tasks.
+- [x] An invalid key rotates immediately with no wasted retries.
+- [x] A total provider outage marks the task `FAILED` cleanly — worker keeps processing everything else.
+- [x] A key with no configured rate limit never exceeds 60 requests/minute; a key configured for 30/minute never gets a 429 under load.
+- [x] Low-remaining headers pause calls before a 429 happens.
+- [x] Circuit breaker and key-health state never disagree.
+- [x] Per-provider requests/minute, concurrency, 429-rate, and health are visible on the dashboard, and match what's shown on the model page.
 
+---
 
+## 20. Migrate Embedding Model — `all-MiniLM-L6-v2` → `BAAI/bge-base-en-v1.5`
+
+**Goal:** Move the RAG/ChromaDB pipeline from `all-MiniLM-L6-v2` (384-dim) to `BAAI/bge-base-en-v1.5` (768-dim) with zero downtime, zero data loss, and no silent retrieval-quality regression. The two models are not interchangeable at the vector level — a 384-dim and a 768-dim vector can't be compared — so this is a re-embed-and-cutover, not a config flip.
+
+Work through the steps below **in order** — each one is a single, self-contained task, and later steps assume earlier ones are done.
+
+---
+
+### Step 1 — Locate every embedding touchpoint
+- Files: repo-wide
+- Run `grep -rn "all-MiniLM-L6-v2\|SentenceTransformer\|384" backend/ frontend/ docker-compose*.yml` to build a fixed inventory of every place the model name or dimension is hardcoded — client init, config, `.env.example`, tests, migrations, docs.
+- ✅ Done when: a complete file/line list exists; every later step operates against this list, not memory.
+
+### Step 2 — Decide the collection strategy: parallel collections vs in-place rebuild
+- A 384-dim and a 768-dim vector are incompatible at the index level — ChromaDB can't mix them in one collection. Choose: (a) create parallel `*_v2` collections and cut over per-collection with zero downtime, or (b) wipe and rebuild in place during a maintenance window. Given "Zero data loss on container restart" is already a hard requirement elsewhere in this roadmap, (a) is the safer default.
+- ✅ Done when: the choice is written down (a short ADR note is fine) before any code changes start.
+
+### Step 3 — Make the embedding model a config value, not a literal
+- File: wherever the ChromaDB/embedding client reads its model name (per Step 1's inventory) + `.env.example`
+- Add `EMBEDDING_MODEL` and `EMBEDDING_DIM` env vars, defaulting to the current values. The client reads these instead of a hardcoded string — this is what makes Step 11's per-collection flag and any rollback possible without a redeploy.
+- ✅ Done when: changing the env var (not the code) changes which model the client loads.
+
+### Step 4 — Update dependencies and bake the model into the image
+- File: `requirements.txt`, `Dockerfile`
+- Confirm the pinned `sentence-transformers` version supports `BAAI/bge-base-en-v1.5` (bump if not). Add a build-time step (`RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('BAAI/bge-base-en-v1.5')"`) so the ~440MB model is baked into the image rather than downloaded on first request inside a running container.
+- ✅ Done when: a container started with no network access serves an embedding request successfully on the first call.
+
+### Step 5 — Share the model cache across containers
+- File: `docker-compose.yml`
+- Add a named volume for the HuggingFace cache (`HF_HOME`) mounted into every container that loads the model (backend, worker), so it isn't independently re-downloaded per container in this multi-container setup.
+- ✅ Done when: `docker-compose up` on a clean host downloads the model once total, not once per service; a restart triggers no re-download.
+
+### Step 6 — Apply the query-vs-passage prefix correctly
+- Files: wherever `query_similar()` builds a query embedding, and wherever `store_knowledge()` builds a document embedding
+- Unlike MiniLM's symmetric encoding, `bge-base-en-v1.5` is instruction-tuned asymmetrically: prefix **queries** with `"Represent this sentence for searching relevant passages: "` before embedding; leave stored **passages/documents** unprefixed. Getting this backwards silently degrades retrieval quality even though the model itself is stronger — it won't error, it'll just retrieve worse.
+- ✅ Done when: a unit test asserts the prefix is applied on the query path and absent on the storage path.
+
+### Step 7 — Create parallel v2 collections
+- Following Step 2: add creation logic for `constitution_articles_v2`, `agent_ethos_v2`, `task_learnings_v2`, `domain_knowledge_v2` at 768-dim, alongside the existing v1 collections.
+- ✅ Done when: the app can create, read, and write both v1 and v2 collections side by side without error.
+
+### Step 8 — Backfill: re-embed all existing documents into v2
+- New file: `backend/scripts/reembed_knowledge.py`
+- Iterate every document in each v1 collection, re-embed its content with the new model (correct prefixing per Step 6), write it into the matching v2 collection, preserving all metadata (`agent_id`, `knowledge_type`, `timestamp`, `decay_score`).
+- ✅ Done when: a staging dry run shows matching document counts between each v1/v2 pair, with metadata intact.
+
+### Step 9 — Re-tune the dedup similarity threshold
+- File: the knowledge dedup check (cosine similarity > 0.95 → skip)
+- Similarity score distributions differ between models — a threshold tuned for MiniLM doesn't automatically transfer. Run a small labeled set of known-duplicate and known-distinct pairs through `bge-base-en-v1.5` and pick a new threshold from actual scores, not the old number.
+- ✅ Done when: the new threshold is documented and backed by that evaluation set.
+
+### Step 10 — Re-tune the top-K relevance threshold
+- File: RAG retrieval config (currently 0.7 minimum relevance)
+- Same reasoning as Step 9: validate against a labeled relevant/irrelevant sample before trusting the old cutoff under the new model's score distribution.
+- ✅ Done when: a new minimum-relevance value is set and documented.
+
+### Step 11 — Feature-flag the active version per collection
+- Add an `EMBEDDING_ACTIVE_VERSION` setting (v1/v2), read at query time by `query_similar()`, so each collection can be cut over — or rolled back — independently without a redeploy.
+- ✅ Done when: toggling the flag for one collection changes which version is queried, with no other collection affected.
+
+### Step 12 — Cut over in order of increasing blast radius
+- Recommended order: `task_learnings` → `domain_knowledge` → `agent_ethos` → `constitution_articles` last, since the Constitutional Guard depends on it. Give each a soak period before moving to the next.
+- ✅ Done when: this order is written into the rollout plan — not "flip everything at once."
+
+### Step 13 — Re-verify the Constitutional Guard against v2
+- File: wherever the Tier 2 semantic check queries `constitution_articles` for context
+- Confirm it respects Step 11's active-version flag, then re-run the existing constitutional test cases against the v2 collection and confirm verdicts (ALLOW/BLOCK/VOTE_REQUIRED) are unchanged.
+- ✅ Done when: all existing constitutional test cases pass against v2 with the same verdicts as v1.
+
+### Step 14 — Point the weekly reindex job at v2
+- File: the Celery beat task that performs the weekly Vector DB reindex
+- Update it to target v2 collections once cut over, and make sure it doesn't keep reindexing a v1 collection that's scheduled for deletion.
+- ✅ Done when: the reindex job runs cleanly against v2 only, post-cutover, for every migrated collection.
+
+### Step 15 — Re-baseline the latency benchmark
+- File: `benchmarks/` (the Phase 18 `pytest-benchmark` baseline: `query_similar()` at 10,000 seeded docs, p95 < 200ms)
+- A larger 768-dim model is slower to encode and index; don't assume the old threshold still holds. Re-run and commit a new baseline. If it regresses meaningfully, evaluate ONNX-quantized inference (`optimum[onnxruntime]`) for the encode step before accepting a slower p95.
+- ✅ Done when: a new committed baseline exists with an explicit pass/fail threshold for CI going forward.
+
+### Step 16 — Recompute storage and memory sizing
+- 768-dim float32 vectors are 2x the size of the old 384-dim ones. Recompute expected ChromaDB disk/memory footprint at current + projected document counts, and update resource requests/limits in `docker-compose.yml` accordingly.
+- ✅ Done when: updated resource limits are committed and sized for the new footprint, not left at old defaults.
+
+### Step 17 — Update CI and the test fixture factory
+- Files: `docker-compose.test.yml`, `conftest.py`, the `integration-tests` GitHub Actions job
+- Make sure the CI ChromaDB instance and fixtures default to `EMBEDDING_MODEL=BAAI/bge-base-en-v1.5`, so the test suite exercises the real migration path rather than the old model.
+- ✅ Done when: the integration suite is green using `bge-base-en-v1.5` as the CI default.
+
+### Step 18 — Retire v1 once soak is complete
+- After a full soak period on v2 with no rollback triggered: drop the v1 collections, remove the `all-MiniLM-L6-v2` code path and any 384-dim-specific logic, and archive or delete `reembed_knowledge.py`.
+- ✅ Done when: `grep -rn "all-MiniLM-L6-v2\|384-dim" backend/` returns zero hits outside the changelog/ADR history.
+
+### Step 19 — Update the docs
+- Files: `docs/adr/` (add a new ADR for the model choice and migration approach from Step 2), `ARCHITECTURE.md`, root `README.md`, `CONTRIBUTING.md`'s env var table
+- Update every place that names the embedding model or vector dimension so nothing still documents `all-MiniLM-L6-v2` / 384-dim as current state.
+- ✅ Done when: a repo-wide doc search shows only the new model/dimension as current.
+
+### Step 20 — Rehearse the rollback
+- Before declaring this done: deliberately flip one v2 collection back to v1 mid-soak using Step 11's flag, confirm queries keep working correctly, then flip it forward again.
+- ✅ Done when: a rollback has actually been exercised once in staging — not just theoretically possible.
+
+---
+
+## 20. Definition of done
+
+- [ ] All 20 steps above checked off.
+- [ ] Every collection (`constitution_articles`, `agent_ethos`, `task_learnings`, `domain_knowledge`) is fully re-embedded in v2 with matching document counts and intact metadata.
+- [ ] Query embeddings use the `bge` search-query prefix; stored document embeddings do not.
+- [ ] Dedup (cosine > threshold) and top-K relevance thresholds are re-validated for the new model, not inherited from MiniLM unchanged.
+- [ ] Constitutional Guard verdicts on the existing test set are unchanged after cutover to v2.
+- [ ] p95 `query_similar()` latency has a new committed benchmark baseline at 10,000 docs.
+- [ ] Resource limits (memory/disk) are sized for 768-dim vectors, not left at 384-dim defaults.
+- [ ] A rollback was actually rehearsed in staging, not just designed.
+- [ ] No remaining references to `all-MiniLM-L6-v2` or 384-dim outside historical docs/changelog.
+
+---
 
 ## Changelog
 
-### v0.12.0-alpha \_(in progress)
+### v0.19.0-alpha \_(in progress)

@@ -65,9 +65,7 @@ Agents auto-spawn when load increases, auto-terminate when tasks complete, and c
 
 ---
 
-## 🔮 Phase 13–18 — Autonomous Orchestration & Production Hardening
-
-The v1.2.0-alpha release extends Agentium from a governance scaffold into a **self-healing, self-scaling, and self-improving operational platform**.
+## 🔮 Autonomous Orchestration & Production Hardening
 
 ### 🤖 Automatic Task Delegation Engine
 
