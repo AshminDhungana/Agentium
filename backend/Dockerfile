@@ -39,9 +39,44 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --default-timeout=300 -r requirements.txt
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# whisper.cpp (CPU) ─────────────────────────────────────────────────────
+# whisper.cpp builds with CMake (2026). The Makefile only has demo targets;
+# "CUDA needs CMake". CPU build runs on any host (no GPU required).
+FROM python:3.11-slim-bookworm AS whisper-cpp
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential cmake git \
+    && rm -rf /var/lib/apt/lists/*
+ARG WHISPER_MODEL=base.en
+RUN git clone --depth 1 https://github.com/ggerganov/whisper.cpp.git /whisper.cpp \
+    && cd /whisper.cpp \
+    && cmake -B build \
+    && cmake --build build -j --config Release \
+    && bash ./models/download-ggml-model.sh ${WHISPER_MODEL} \
+    && mkdir -p /opt/whisper/models \
+    && cp models/ggml-${WHISPER_MODEL}.bin /opt/whisper/models/ \
+    && cp ./build/bin/whisper-cli /usr/local/bin/whisper-cli
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# whisper.cpp (CUDA, opt-in) ──────────────────────────────────────────
+# Only used when WHISPER_BACKEND=cuda. Requires a GPU host run with
+# --gpus all. A CUDA-compiled binary does NOT fall back to CPU.
+FROM nvidia/cuda:12.4.0-devel-ubuntu22.04 AS whisper-cpp-cuda
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential cmake git \
+    && rm -rf /var/lib/apt/lists/*
+ARG WHISPER_MODEL=base.en
+RUN git clone --depth 1 https://github.com/ggerganov/whisper.cpp.git /whisper.cpp \
+    && cd /whisper.cpp \
+    && cmake -B build -DGGML_CUDA=1 \
+    && cmake --build build -j --config Release \
+    && bash ./models/download-ggml-model.sh ${WHISPER_MODEL}
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Production Stage
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+ARG WHISPER_BACKEND=cpu
+FROM whisper-cpp AS whisper-cpp-src
 FROM python:3.11-slim-bookworm@${PYTHON_DIGEST}
 
 # Install runtime dependencies
@@ -55,6 +90,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 ENV PYTHONPATH="/app"
+
+# whisper.cpp runtime: whisper-cli + model (CPU default; CUDA uses same path but built differently)
+COPY --from=whisper-cpp-src /usr/local/bin/whisper-cli /usr/local/bin/whisper-cli
+COPY --from=whisper-cpp-src /opt/whisper/models/ /opt/whisper/models/
+
+# CUDA runtime .so files (only present in CUDA build; harmless no-op for CPU builds)
+COPY --from=whisper-cpp-cuda /usr/local/cuda/lib64/ /usr/local/cuda/lib64/
 
 # Set working directory
 WORKDIR /app
