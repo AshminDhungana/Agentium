@@ -106,7 +106,17 @@ Knowledge decay scoring automatically sinks stale entries; cross-document citati
 
 ### 🎤 Voice Interface
 
-OpenAI Whisper STT + OpenAI TTS with WebSocket real-time streaming. Speaker identification and enrolment for multi-user voice sessions. Phone (Twilio) and Discord voice channel support.
+Local **whisper.cpp** (built into the backend image) is the **primary** speech-to-text engine — no API key required. OpenAI Whisper is the keyed fallback, with browser-native Web Speech as the final net. OpenAI TTS handles text-to-speech with WebSocket real-time streaming. Speaker identification and enrolment for multi-user voice sessions. Phone (Twilio) and Discord voice channel support.
+
+### Local Speech-to-Text (whisper.cpp)
+
+Agentium builds [whisper.cpp](https://github.com/ggerganov/whisper.cpp) into the
+backend image and uses it as the **primary** STT engine — no API key required.
+Fallback chain: `whisper.cpp → OpenAI Whisper (if a key is set) → browser-native`.
+Configurable env vars: `WHISPER_MODEL` (default `base.en`), `WHISPER_CPP_BIN`,
+`WHISPER_MODEL_DIR`, `WHISPER_TIMEOUT` (default 60s), `WHISPER_MAX_CONCURRENCY`
+(default 1). For GPU: build with `--build-arg WHISPER_BACKEND=cuda` and run
+the backend with `--gpus all`.
 
 ### 🔄 Git Versioning for Config
 
@@ -384,7 +394,7 @@ Results aggregated → Head → You (2–3 line response only)
 | **Containerization** | Docker, Compose, Healthchecks                          | Cross-platform deployment                             |
 | **Security**         | JWT, Role-based capabilities                           | Per-agent authentication and authorization            |
 | **Browser Control**  | Playwright (headless Chromium)                         | Web scraping, screenshots, search — sandboxed         |
-| **Voice**            | OpenAI Whisper (STT), OpenAI TTS                       | Speech-to-text, text-to-speech, WebSocket streaming   |
+| **Voice**            | whisper.cpp (primary STT), OpenAI Whisper (fallback), OpenAI TTS | Local speech-to-text, text-to-speech, WebSocket streaming |
 
 ---
 
