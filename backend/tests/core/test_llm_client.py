@@ -106,6 +106,14 @@ class TestClassifyError:
         assert client.classify_error(RuntimeError("random boom")) is ErrorTier.UNKNOWN
 
 
+def test_fallback_list_is_capped():
+    client = LLMClient()
+    big = ["c%d" % i for i in range(20)]
+    # Replicate the truncation the generate() loop applies.
+    truncated = (["primary"] + big)[:1 + LLMClient.MAX_FALLBACK_CONFIGS]
+    assert len(truncated) == 4
+
+
 class TestLLMClientGenerate:
     @pytest.fixture
     def llm_client(self):

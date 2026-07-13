@@ -118,13 +118,20 @@ class ProviderCircuitBreaker:
         }
 
 
+# Bound the combined retry budget across layers: 1 primary + up to this many
+# fallbacks, each retried max_retries+1 times => (1+MAX_FALLBACK_CONFIGS)*(
+# max_retries+1) provider calls per generate() call (4*3 = 12).
+MAX_FALLBACK_CONFIGS = 3
+
+
 class LLMClient:
     """Unified client for all LLM interactions."""
 
     _circuit_breakers: Dict[str, ProviderCircuitBreaker] = {}
+    MAX_FALLBACK_CONFIGS = MAX_FALLBACK_CONFIGS
 
     def __init__(self, db: Optional[Session] = None, *,
-                 max_retries: int = 3,
+                 max_retries: int = 2,
                  base_retry_delay: float = 1.0,
                  max_retry_delay: float = 30.0):
         self.db = db
@@ -240,6 +247,9 @@ class LLMClient:
             else:
                 configs_to_try = [None]
 
+        # Bound the combined budget: 1 primary + up to MAX_FALLBACK_CONFIGS.
+        configs_to_try = configs_to_try[:1 + LLMClient.MAX_FALLBACK_CONFIGS]
+
         last_error: Optional[Exception] = None
         agentium_id = getattr(agent, "agentium_id", "system")
 
@@ -332,6 +342,9 @@ class LLMClient:
                 configs_to_try = [agent.preferred_config_id]
             else:
                 configs_to_try = [None]
+
+        # Bound the combined budget: 1 primary + up to MAX_FALLBACK_CONFIGS.
+        configs_to_try = configs_to_try[:1 + LLMClient.MAX_FALLBACK_CONFIGS]
 
         last_error: Optional[Exception] = None
         agentium_id = getattr(agent, "agentium_id", "system")

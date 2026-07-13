@@ -93,7 +93,7 @@ def get_task_db():
 # Core Task Execution
 # ═══════════════════════════════════════════════════════════
 
-@celery_app.task(name="agentium.tasks.task_executor.execute_task_async", bind=True, max_retries=3)
+@celery_app.task(name="agentium.tasks.task_executor.execute_task_async", bind=True, max_retries=1)
 def execute_task_async(self, task_id: str, agent_id: str):
     """
     Execute task with skill-augmented RAG.
