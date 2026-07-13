@@ -7,6 +7,7 @@ import asyncio
 import os
 import time
 import json
+import httpx
 from typing import Optional, Dict, Any, AsyncGenerator, List, Callable, Tuple
 from abc import ABC, abstractmethod
 from datetime import datetime
@@ -33,6 +34,93 @@ async def _record_provider_headers(config) -> None:
     if headers:
         provider = getattr(config.provider, "value", config.provider)
         await provider_rate_limiter.record_header_insight(config.id, provider, headers)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Task 17 — Reuse a single SDK client per provider config.
+#
+# Previously every generate()/stream_generate()/generate_with_tools() call
+# built a brand-new openai.AsyncOpenAI / anthropic.AsyncAnthropic instance.
+# Building a client per request is wasteful (connection pools, retry transport
+# and auth setup are recreated each time) and prevents any shared transport
+# state. We now construct ONE client per (config_id, api_key) and reuse it for
+# the lifetime of the process. The client is also the attachment point for the
+# httpx event hook that feeds raw rate-limit headers into the limiter (Task 10).
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Cache of SDK clients keyed by (config_id, api_key, base_url, is_anthropic).
+# api_key is part of the key so a rotated key transparently yields a fresh
+# client on the next request for that same config.
+_CLIENT_CACHE: Dict[Tuple, Any] = {}
+
+
+def _header_capture_hook(config_id: str):
+    """Return an httpx response hook that records raw rate-limit headers.
+
+    Appended to each shared SDK client's internal httpx client so that, on
+    every provider response, the raw headers are captured for Task 10's
+    header-correction logic. The parsed SDK response object carries no headers,
+    so the hook is the only reliable capture point.
+    """
+    async def _hook(response: "httpx.Response") -> None:
+        try:
+            provider_rate_limiter.record_raw_headers(config_id, dict(response.headers))
+        except Exception:
+            pass
+    return _hook
+
+
+def _attach_header_hook(client: Any, config_id: str) -> None:
+    """Append the rate-limit header capture hook to an SDK client.
+
+    Appends (never replaces) to the SDK's own internal httpx client so the
+    built-in retry/event machinery is preserved. The SDK stores its httpx
+    client at ``client._client`` (an ``AsyncHttpxClientWrapper``).
+    """
+    try:
+        internal = getattr(client, "_client", None)
+        if internal is not None and hasattr(internal, "_event_hooks"):
+            internal._event_hooks.setdefault("response", []).append(
+                _header_capture_hook(config_id)
+            )
+    except Exception:
+        pass
+
+
+def _get_cached_sdk_client(
+    config,
+    *,
+    api_key: Optional[str],
+    base_url: Optional[str],
+    timeout: Optional[float],
+    is_anthropic: bool,
+) -> Any:
+    """Return a reused SDK client for one provider config.
+
+    Builds the client once per (config_id, api_key, base_url) and caches it.
+    Subsequent calls for the same config reuse the same instance, satisfying
+    Task 17 ("client construction happens once per config, not once per
+    request").
+    """
+    cache_key = (str(config.id), api_key, base_url, is_anthropic)
+    cached = _CLIENT_CACHE.get(cache_key)
+    if cached is not None:
+        return cached
+
+    if is_anthropic:
+        import anthropic
+        client = anthropic.AsyncAnthropic(api_key=api_key)
+    else:
+        import openai
+        client = openai.AsyncOpenAI(
+            api_key=api_key,
+            base_url=base_url,
+            timeout=timeout,
+        )
+    # Attach the hook before caching so it is registered exactly once.
+    _attach_header_hook(client, config.id)
+    _CLIENT_CACHE[cache_key] = client
+    return client
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Per-model pricing table
@@ -349,12 +437,12 @@ class OpenAICompatibleProvider(BaseModelProvider):
     async def generate(self, system_prompt: str, user_message: str, **kwargs) -> Dict[str, Any]:
         """Generate."""
 
-        import openai
-
-        client = openai.AsyncOpenAI(
+        client = _get_cached_sdk_client(
+            self.config,
             api_key=self.api_key or "not-needed",
             base_url=self.base_url,
-            timeout=self.config.timeout_seconds
+            timeout=self.config.timeout_seconds,
+            is_anthropic=False,
         )
 
         start_time = time.time()
@@ -422,12 +510,12 @@ class OpenAICompatibleProvider(BaseModelProvider):
     async def stream_generate(self, system_prompt: str, user_message: str, **kwargs):
         """Stream generate."""
 
-        import openai
-
-        client = openai.AsyncOpenAI(
+        client = _get_cached_sdk_client(
+            self.config,
             api_key=self.api_key or "not-needed",
             base_url=self.base_url,
-            timeout=self.config.timeout_seconds
+            timeout=self.config.timeout_seconds,
+            is_anthropic=False,
         )
 
         maxc = getattr(self.config, "max_concurrent_requests", 10) or 10
@@ -493,13 +581,13 @@ class OpenAICompatibleProvider(BaseModelProvider):
                 "messages":          full conversation history including tool turns,
             }
         """
-        import openai
-
         actual_model = kwargs.get("model", self.config.default_model)
-        client = openai.AsyncOpenAI(
+        client = _get_cached_sdk_client(
+            self.config,
             api_key=self.api_key or "not-needed",
             base_url=self.base_url,
             timeout=self.config.timeout_seconds,
+            is_anthropic=False,
         )
 
         conversation = list(messages)
@@ -628,9 +716,13 @@ class AnthropicProvider(BaseModelProvider):
     async def generate(self, system_prompt: str, user_message: str, **kwargs) -> Dict[str, Any]:
         """Generate."""
 
-        import anthropic
-
-        client = anthropic.AsyncAnthropic(api_key=self.api_key)
+        client = _get_cached_sdk_client(
+            self.config,
+            api_key=self.api_key,
+            base_url=None,
+            timeout=None,
+            is_anthropic=True,
+        )
 
         start_time = time.time()
         maxc = getattr(self.config, "max_concurrent_requests", 10) or 10
@@ -681,9 +773,13 @@ class AnthropicProvider(BaseModelProvider):
     async def stream_generate(self, system_prompt: str, user_message: str, **kwargs):
         """Stream generate."""
 
-        import anthropic
-
-        client = anthropic.AsyncAnthropic(api_key=self.api_key)
+        client = _get_cached_sdk_client(
+            self.config,
+            api_key=self.api_key,
+            base_url=None,
+            timeout=None,
+            is_anthropic=True,
+        )
 
         maxc = getattr(self.config, "max_concurrent_requests", 10) or 10
         await provider_rate_limiter.acquire_concurrency(self.config.id, maxc)
@@ -731,10 +827,14 @@ class AnthropicProvider(BaseModelProvider):
         Returns:
             Same shape as OpenAICompatibleProvider.generate_with_tools().
         """
-        import anthropic
-
         actual_model = kwargs.get("model", self.config.default_model)
-        client = anthropic.AsyncAnthropic(api_key=self.api_key)
+        client = _get_cached_sdk_client(
+            self.config,
+            api_key=self.api_key,
+            base_url=None,
+            timeout=None,
+            is_anthropic=True,
+        )
         conversation = list(messages)
         total_prompt_tokens = 0
         total_completion_tokens = 0
@@ -854,11 +954,12 @@ class LocalProvider(OpenAICompatibleProvider):
 
         combined_prompt = f"{system_prompt}\n\nUser: {user_message}"
 
-        import openai
-
-        client = openai.AsyncOpenAI(
+        client = _get_cached_sdk_client(
+            self.config,
+            api_key="ollama",
             base_url=self.base_url or settings.OLLAMA_BASE_URL,
-            api_key="ollama"
+            timeout=self.config.timeout_seconds,
+            is_anthropic=False,
         )
 
         start_time = time.time()
