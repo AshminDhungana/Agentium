@@ -46,7 +46,21 @@ class Settings(BaseSettings):
     CHROMA_HOST: Optional[str] = None  # For server mode, default None = embedded
     CHROMA_PORT: int = 8000
     EMBEDDING_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"
-    
+
+    # Speaker Identification (Phase 10.3 / 15.4)
+    SPEAKER_ID_ENABLED: bool = Field(default=True, env="SPEAKER_ID_ENABLED")
+    SPEAKER_ID_MODEL_SOURCE: str = Field(
+        default="speechbrain/spkrec-ecapa-voxceleb", env="SPEAKER_ID_MODEL_SOURCE"
+    )
+    SPEAKER_ID_THRESHOLD: float = Field(default=0.70, env="SPEAKER_ID_THRESHOLD")
+    SPEAKER_ID_MIN_DURATION_S: float = Field(default=1.0, env="SPEAKER_ID_MIN_DURATION_S")
+    SPEAKER_ID_CACHE_DIR: str = Field(
+        default="./models/speechbrain", env="SPEAKER_ID_CACHE_DIR"
+    )
+    SPEAKER_ID_REQUIRE_LIVENESS: bool = Field(
+        default=False, env="SPEAKER_ID_REQUIRE_LIVENESS"
+    )
+
     # Message Bus (Phase 1)
     MESSAGE_BUS_ENABLED: bool = True
     MESSAGE_STREAM_MAXLEN: int = 1000  # Max messages per agent inbox
