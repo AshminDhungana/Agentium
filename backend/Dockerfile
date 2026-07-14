@@ -30,7 +30,7 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel
 RUN pip install --no-cache-dir numpy==1.26.4
 
 # Install PyTorch with CPU support (SEPARATE - heavy package)
-RUN pip install --no-cache-dir torch==2.5.1 --index-url https://download.pytorch.org/whl/cpu
+RUN pip install --no-cache-dir torch==2.5.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cpu
 
 # Install heavy ML packages next (better layer caching)
 RUN pip install --no-cache-dir sentence-transformers==3.3.1
