@@ -16,6 +16,7 @@ docs/superpowers/
 .claude
 .agents
 skills-lock.json
+.codex
 
 # Node
 node_modules/

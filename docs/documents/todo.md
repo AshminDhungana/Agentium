@@ -868,8 +868,8 @@ OpenAI TTS — Text-to-Speech
 
 **Low Priority**
 
-- [ ] UI dark mode inconsistencies on newer pages (Workflows, Events pages not yet built)
-- [ ] Mobile responsiveness gaps on complex pages (Tasks, Voting, Monitoring)
+- [x] UI dark mode inconsistencies on newer pages (Workflows, Events pages not yet built)
+- [x] Mobile responsiveness gaps on complex pages (Tasks, Voting, Monitoring)
 - [ ] Accessibility audit not done (ARIA labels, keyboard navigation, color contrast)
 - [ ] PostgreSQL slow query logging not enabled
 - [ ] Connection pool sizes set to defaults — not tuned for production load
