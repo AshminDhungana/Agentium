@@ -103,7 +103,7 @@ export const VotingPage: React.FC = () => {
     return (
         // CountdownTickProvider wraps the entire page so all cards share one timer
         <CountdownTickProvider>
-            <div className="min-h-screen bg-gray-50 dark:bg-[#0f1117] p-6 transition-colors duration-200">
+            <div className="min-h-screen bg-gray-50 dark:bg-[#0f1117] p-4 sm:p-6 lg:p-8 transition-colors duration-200">
                 <div className="max-w-7xl mx-auto">
 
                     {/* ── Header ─────────────────────────────────────────────── */}

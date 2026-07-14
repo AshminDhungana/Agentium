@@ -933,7 +933,7 @@ const MainTaskCard: React.FC<{ task: Task; onUpdated?: (updated: Task) => void; 
                     </div>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-2 flex-shrink-0 w-full md:w-auto pl-13 md:pl-0">
+                    <div className="flex flex-wrap items-center gap-2 flex-shrink-0 w-full md:w-auto pl-12 md:pl-0">
                         {isEditing ? (
                             <>
                                 <button
@@ -2156,10 +2156,10 @@ export const TasksPage: React.FC = () => {
     ];
 
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-[#0f1117] p-6 transition-colors duration-200">
+        <div className="min-h-screen bg-gray-50 dark:bg-[#0f1117] p-4 sm:p-6 lg:p-8 transition-colors duration-200">
 
             {/* ── Page Header ──────────────────────────────────────────────── */}
-            <div className="mb-8 flex items-start justify-between">
+            <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-1">Tasks</h1>
                     <p className="text-gray-600 dark:text-gray-400 text-sm">Monitor and manage agent operations.</p>

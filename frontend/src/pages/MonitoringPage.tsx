@@ -809,7 +809,8 @@ function SlowQueriesTab() {
                     </div>
                 ) : (
                     !error && (
-                        <div className="overflow-x-auto">
+                        <>
+                        <div className="overflow-x-auto hidden md:block">
                             <table className="w-full text-left border-collapse">
                                 <thead>
                                     <tr className="border-b border-gray-200 dark:border-[#1e2535] text-xs text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-[#161b27]/50">
@@ -841,6 +842,34 @@ function SlowQueriesTab() {
                                 </tbody>
                             </table>
                         </div>
+                        <div className="md:hidden space-y-3">
+                            {queries.map((q, idx) => (
+                                <div key={idx} className="bg-white dark:bg-[#161b27] border border-gray-200 dark:border-[#1e2535] rounded-lg p-3 space-y-1">
+                                    <p className="font-mono text-xs text-gray-800 dark:text-gray-200 break-all">{q.query_preview}</p>
+                                    <div className="flex items-center justify-between text-sm">
+                                        <span className="text-gray-600 dark:text-gray-400">Avg (ms)</span>
+                                        <span className={`font-semibold ${q.avg_duration_ms > 1000 ? 'text-red-600' : 'text-yellow-600 dark:text-yellow-500'}`}>
+                                            {Number(q.avg_duration_ms).toFixed(2)}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center justify-between text-sm">
+                                        <span className="text-gray-600 dark:text-gray-400">Calls</span>
+                                        <span className="text-gray-600 dark:text-gray-300">{q.call_count}</span>
+                                    </div>
+                                    <div className="flex items-center justify-between text-sm">
+                                        <span className="text-gray-600 dark:text-gray-400">Rows/Call</span>
+                                        <span className="text-gray-600 dark:text-gray-300">{Number(q.rows_per_call).toFixed(1)}</span>
+                                    </div>
+                                    <div className="flex items-center justify-between text-xs">
+                                        <span className="text-gray-600 dark:text-gray-400">Last Seen</span>
+                                        <span className="text-gray-600 dark:text-gray-400">
+                                            {q.last_seen ? new Date(q.last_seen).toLocaleString() : '—'}
+                                        </span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        </>
                     )
                 )}
             </div>
@@ -962,7 +991,7 @@ export const MonitoringPage: React.FC = () => {
                              'text-red-600 dark:text-red-400';
 
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-950 p-6 transition-colors duration-200">
+        <div className="min-h-screen bg-gray-50 dark:bg-[#0f1117] p-4 sm:p-6 lg:p-8 transition-colors duration-200">
             <div className="max-w-7xl mx-auto">
 
                 {/* ── Header ─────────────────────────────────────────────── */}
