@@ -23,10 +23,23 @@ class MockAgent:
 
 @pytest.fixture(autouse=True)
 def reset_circuit_breakers():
-    """Reset shared circuit breaker state between tests."""
+    """Reset shared circuit breaker state between tests.
+
+    Phase 19.3 (Task 16) made ``ProviderCircuitBreaker.can_execute()`` delegate
+    to ``api_key_manager.is_config_healthy()`` as the single source of truth.
+    That query hits the DB and returns False for any config id that isn't a
+    real, healthy row — which the mock config ids used here ("test-config-id",
+    "cfg-A", …) never are. For these unit tests we only want to exercise the
+    LLMClient retry/failover logic, so we stub the health check to report every
+    config as healthy and keep the in-process breaker driving ``can_execute``.
+    Tests that specifically assert the delegation (``test_cb_delegates_to_keymanager``)
+    override this locally via ``monkeypatch``.
+    """
     from backend.core.llm_client import LLMClient
+    from backend.services.api_key_manager import api_key_manager
     LLMClient._circuit_breakers.clear()
-    yield
+    with patch.object(api_key_manager, "is_config_healthy", return_value=True):
+        yield
     LLMClient._circuit_breakers.clear()
 
 

@@ -156,7 +156,8 @@ def make_fake_config(
     Uses its own NullPool engine because ModelService.get_provider() opens its
     OWN db session (get_db_context) — a savepoint commit on the test's
     db_session is invisible to it until the outer transaction commits.
-    rpm is stored in the `rate_limit` column (the model uses `rate_limit`).
+    rpm is stored in the `requests_per_minute` column (renamed away from the
+    old `rate_limit` column — see user_config.py and migration 003).
     """
     database_url = os.getenv(
         "DATABASE_URL",
@@ -173,7 +174,7 @@ def make_fake_config(
         default_model="fake",
         status=status,
         api_base_url=base_url,
-        rate_limit=rpm,  # column is 'rate_limit', not 'requests_per_minute'
+        requests_per_minute=rpm,  # column is `requests_per_minute` (was `rate_limit`)
         is_active=True,
         priority=1,
     )
