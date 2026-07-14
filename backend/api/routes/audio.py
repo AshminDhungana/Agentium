@@ -71,7 +71,11 @@ async def transcribe_audio(
             language=language,
             filename=audio.filename or "audio.wav",
         )
-        speaker_info = identifier.identify(db, audio_bytes)
+        speaker_info = (
+            identifier.identify(db, audio_bytes)
+            if identifier.is_available() else
+            {"speaker_id": None, "name": "Unknown Speaker", "confidence": 0.0}
+        )
         return {
             "text": text,
             "language": language,
@@ -136,6 +140,8 @@ async def register_speaker(
 ):
     """Enroll a new speaker by uploading a voice sample and an associated name."""
     identifier = get_speaker_identifier()
+    if not identifier._config.enabled:
+        raise BadRequestError(error="Speaker identification is disabled.", code="SPEAKER_ID_DISABLED")
     try:
         audio_bytes = await audio.read()
         profile = identifier.enroll(db, str(current_user.id), name, audio_bytes)
@@ -241,7 +247,11 @@ async def audio_stream(websocket: WebSocket):
                         )
 
                         identifier = get_speaker_identifier()
-                        speaker_info = identifier.identify(db, audio_b)
+                        speaker_info = (
+                            identifier.identify(db, audio_b)
+                            if identifier.is_available() else
+                            {"speaker_id": None, "name": "Unknown Speaker", "confidence": 0.0}
+                        )
 
                         await websocket.send_json({
                             "type": "transcript",

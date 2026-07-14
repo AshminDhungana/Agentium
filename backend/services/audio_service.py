@@ -278,6 +278,11 @@ class AudioService:
         return identifier.identify(db, audio_bytes)
 
 
+def get_audio_service() -> "AudioService":
+    """Return a fresh AudioService instance (lazy factory used by the API routes)."""
+    return AudioService()
+
+
 # ---------------------------------------------------------------------------
 # Speaker Identification (Phase 10.3 / 15.4)
 # ---------------------------------------------------------------------------
