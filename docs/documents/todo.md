@@ -180,7 +180,7 @@ Build a self-governing AI ecosystem where agents operate under constitutional la
 - [x] WebSocket streaming (real-time voice → agent → voice)
 - [x] Voice bridge (`voice-bridge/`) — local STT/TTS support
 - [x] Voice channels: phone (Twilio), Discord voice
-- [ ] Speaker identification for multi-user voice sessions (not production-ready)
+- [x] Speaker identification for multi-user voice sessions
 
 ### 10.4 Autonomous Learning
 
@@ -864,7 +864,7 @@ OpenAI TTS — Text-to-Speech
 - [x] Browser task live screenshot stream UI (route + CDP capture + View Live gating + browserApi types all complete; see Phase 14.1)
 - [x] Checkpoint diff view (branch comparison) — root cause: `GET /checkpoints/compare` was shadowed by the path-param `GET /{checkpoint_id}` route (declared after it), so it 404'd; fixed by declaring `/compare` first. Also added recursive nested diffs + Monaco side-by-side/inline toggle & copy. Frontend `BranchDiffView.tsx` consumes `/compare`; `CheckpointDiffViewer.tsx` uses `/{id}/diff`. Removed the dead `compare_branches()` service method (route diffs inline).
 - [x] Channel health monitoring, logs, and settings UI incomplete
-- [ ] Speaker identification not production-ready (framework in place, model not integrated)
+- [x] Speaker identification integrated (ECAPA-TDNN via SpeechBrain, injectable backend, liveness seam, min-duration guard)
 
 **Low Priority**
 
