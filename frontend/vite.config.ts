@@ -73,6 +73,26 @@ export default defineConfig({
           }]
         }
       }
+    }, {
+      // Accessibility audit project: runs axe-core against a REAL Chromium
+      // layout so the `color-contrast` rule (which needs layout/getComputedStyle)
+      // is meaningful. Structural rules (names, roles, labels) are also covered
+      // here in both light and dark themes.
+      extends: true,
+      test: {
+        name: 'a11y',
+        include: ['src/**/*.a11y.browser.test.{ts,tsx}'],
+        globals: true,
+        setupFiles: ['./src/test/setup.a11y.ts'],
+        browser: {
+          enabled: true,
+          headless: true,
+          provider: playwright({}),
+          instances: [{
+            browser: 'chromium'
+          }]
+        }
+      }
     }]
   }
 });
