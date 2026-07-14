@@ -6,7 +6,11 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "test": "vitest run --project unit",
+    "test:a11y": "vitest run --project a11y",
+    "test:all": "vitest run",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0 && npm run lint:dark-guard",
+    "lint:a11y": "eslint . --ext ts,tsx -c eslint.config.js",
     "lint:dark-guard": "bash -c '! grep -rn \"text--600\" src --include=\"*.tsx\"'",
     "preview": "vite preview",
     "storybook": "storybook dev -p 6006",
@@ -55,8 +59,10 @@
     "@vitejs/plugin-react": "^4.2.1",
     "@vitest/browser-playwright": "^4.1.9",
     "@vitest/coverage-v8": "^4.1.9",
+    "axe-core": "^4.12.1",
     "babel-plugin-react-compiler": "latest",
     "eslint": "^9.39.2",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
     "eslint-plugin-react-compiler": "latest",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.5",
@@ -66,6 +72,7 @@
     "storybook": "^10.4.6",
     "ts-prune": "^0.10.3",
     "typescript": "^5.2.2",
+    "typescript-eslint": "^8.64.0",
     "vite": "^7.3.1",
     "vitest": "^4.1.9"
   }
