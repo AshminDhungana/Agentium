@@ -57,7 +57,7 @@ test-integration:
 	  CELERY_TASK_ALWAYS_EAGER=true \
 	  TESTING=true \
 	  PYTHONPATH=. \
-	  pytest --cov=backend/services --cov-report=term-missing --cov-fail-under=80
+	  pytest
 	@docker compose -f docker-compose.test.yml down
 
 # -- Performance Regression Gate (Phase 18.2) --

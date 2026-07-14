@@ -38,6 +38,12 @@ jobs:
             fi
             echo "Waiting for services ($healthy_count/3 healthy) — attempt $i/60"
           done
+          if [ "$healthy_count" -ne 3 ]; then
+            echo "ERROR: Services did not become healthy within the timeout."
+            docker compose -f docker-compose.test.yml ps
+            docker compose -f docker-compose.test.yml logs
+            exit 1
+          fi
           echo "=== Final service status ==="
           docker compose -f docker-compose.test.yml ps
           # Verify PostgreSQL is accepting connections from the host
@@ -170,6 +176,12 @@ jobs:
             fi
             echo "Waiting for services ($healthy_count/3 healthy) — attempt $i/60"
           done
+          if [ "$healthy_count" -ne 3 ]; then
+            echo "ERROR: Services did not become healthy within the timeout."
+            docker compose -f docker-compose.test.yml ps
+            docker compose -f docker-compose.test.yml logs
+            exit 1
+          fi
           echo "=== Final service status ==="
           docker compose -f docker-compose.test.yml ps
 
