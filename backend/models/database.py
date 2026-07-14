@@ -4,6 +4,8 @@ PostgreSQL-backed with connection pooling and async support.
 """
 
 import os
+import sqlite3
+import logging
 from typing import Generator, Optional
 from contextlib import contextmanager
 from datetime import datetime
@@ -14,6 +16,8 @@ from sqlalchemy.orm import sessionmaker, Session, scoped_session
 from sqlalchemy.pool import QueuePool
 
 from backend.models.entities.base import Base
+
+logger = logging.getLogger(__name__)
 
 # Configuration
 DATABASE_URL = os.getenv(
@@ -46,11 +50,27 @@ db_session = scoped_session(SessionLocal)
 
 @event.listens_for(Engine, "connect")
 def set_connection_params(dbapi_conn, connection_record):
-    """Set UTC timezone and UTF-8 encoding for all connections."""
-    cursor = dbapi_conn.cursor()
-    cursor.execute("SET timezone TO 'UTC'")
-    cursor.execute("SET CLIENT_ENCODING TO 'UTF8'")
-    cursor.close()
+    """Set UTC timezone and UTF-8 encoding for Postgres connections only."""
+    # Skip DBAPI-level commands for SQLite connections used in tests
+    try:
+        if isinstance(dbapi_conn, sqlite3.Connection):
+            return
+    except Exception:
+        # if we can't determine, fall through and attempt safe execution
+        pass
+
+    try:
+        cursor = dbapi_conn.cursor()
+        cursor.execute("SET timezone TO 'UTC'")
+        cursor.execute("SET CLIENT_ENCODING TO 'UTF8'")
+        cursor.close()
+    except Exception as e:
+        # Not a Postgres connection / driver doesn't support these commands — ignore
+        try:
+            cursor.close()
+        except Exception:
+            pass
+        logger.debug("Skipping connection SET commands (not a Postgres connection): %s", e)
 
 
 def get_db() -> Generator[Session, None, None]:
@@ -150,12 +170,14 @@ def get_next_agentium_id(db: Session, prefix: str) -> str:
     """
     from backend.models.entities.agents import Agent
 
+    for_update = " FOR UPDATE" if db.get_bind().dialect.name == "postgresql" else ""
+
     result = db.execute(
-        text("""
+        text(f"""
             SELECT agentium_id FROM agents
             WHERE agentium_id LIKE :pattern
             ORDER BY agentium_id DESC
-            FOR UPDATE
+            {for_update}
         """),
         {"pattern": f"{prefix}%"}
     ).fetchone()
@@ -190,6 +212,26 @@ def check_health() -> dict:
 
 
 def _ensure_system_settings(db: Session):
+    dialect = db.get_bind().dialect.name
+    if dialect != "postgresql":
+        # SQLite / other DB: create a compatible table and insert defaults portably
+        db.execute(text("""
+            CREATE TABLE IF NOT EXISTS system_settings (
+                key         VARCHAR(128) PRIMARY KEY,
+                value       TEXT         NOT NULL,
+                description TEXT,
+                updated_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+        """))
+        db.execute(text("""
+            INSERT OR IGNORE INTO system_settings (key, value, description, updated_at)
+            VALUES
+              ('daily_token_limit', '100000', 'Maximum tokens per day across all API providers', CURRENT_TIMESTAMP),
+              ('daily_cost_limit',  '100.0',   'Maximum USD cost per day across all API providers', CURRENT_TIMESTAMP)
+        """))
+        db.commit()
+        return
+
     db.execute(text("""
         CREATE TABLE IF NOT EXISTS system_settings (
             key         VARCHAR(128) PRIMARY KEY,

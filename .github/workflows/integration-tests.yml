@@ -96,6 +96,12 @@ jobs:
         working-directory: ./backend
         run: python -m interrogate services/ --fail-under=90
 
+      - name: Install Playwright & browsers
+        working-directory: ./backend
+        run: |
+          python -m pip install -U playwright
+          python -m playwright install --with-deps
+
       - name: Run integration tests with coverage
         working-directory: ./backend
         run: pytest
