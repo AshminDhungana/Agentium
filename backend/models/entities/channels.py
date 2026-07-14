@@ -92,9 +92,15 @@ class ExternalChannel(BaseEntity):
                 'webhook_url':     self.config.get('webhook_url_display'),
                 'provider':        self.config.get('provider', 'cloud_api'),
                 'allowed_senders': self.config.get('allowed_senders', []),
+                # Phase 15.3 — per-channel settings persisted in config
+                'rate_limit_per_minute': self.config.get('rate_limit_per_minute'),
+                'rate_limit_per_hour':   self.config.get('rate_limit_per_hour'),
+                'content_filters':       self.config.get('content_filters', []),
             },
             'routing': {
-                'default_agent':   self.default_agent.agentium_id if self.default_agent else None,
+                # Return the internal agent UUID (FK target) so it matches the
+                # agent dropdown values sourced from GET /api/v1/agents/.
+                'default_agent':   self.default_agent_id,
                 'auto_create_tasks': self.auto_create_tasks,
                 'require_approval':  self.require_approval,
             },

@@ -129,8 +129,8 @@ Build a self-governing AI ecosystem where agents operate under constitutional la
 - [x] Agent Tree, Voting Interface, Constitution Editor, Critic Dashboard, Checkpoint Timeline, Financial Burn Dashboard, Voice Indicator, Unified Inbox
 - [ ] Drag-and-drop agent reassignment
 - [x] Checkpoint diff view (compare branches)
-- [ ] Channel health monitoring and message logs
-- [ ] Channel-specific settings (rate limits, filters)
+- [x] Channel health monitoring and message logs
+- [x] Channel-specific settings (rate limits, filters)
 
 ---
 
