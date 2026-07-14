@@ -407,10 +407,13 @@ class SpeakerIdentifier:
         self.IDENTIFICATION_THRESHOLD = self._config.threshold
 
     def _get_classifier(self) -> Optional[SpeakerEncoder]:
-        if self._classifier is None:
-            self._classifier = SpeechBrainEncoder(
-                self._config.model_source, self._config.cache_dir
-            )
+        if self._classifier is not None:
+            return self._classifier
+        if not self._backend_importable():
+            return None
+        self._classifier = SpeechBrainEncoder(
+            self._config.model_source, self._config.cache_dir
+        )
         return self._classifier
 
     def _backend_importable(self) -> bool:
@@ -453,7 +456,11 @@ class SpeakerIdentifier:
             logger.warning("Enrollment skipped: audio too short")
             return None
 
-        embedding = self._get_classifier().embed(audio_bytes)
+        classifier = self._get_classifier()
+        if not classifier:
+            logger.warning("Enrollment skipped: speaker model unavailable")
+            return None
+        embedding = classifier.embed(audio_bytes)
         if not embedding:
             logger.warning("Enrollment failed: could not extract embedding.")
             return None
