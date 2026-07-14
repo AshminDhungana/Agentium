@@ -216,7 +216,7 @@ export const CheckpointImportModal: React.FC<CheckpointImportModalProps> = ({
                     <button
                         onClick={onClose}
                         aria-label="Close"
-                        className="p-2 text--600 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#1e2535] rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="p-2 text-gray-600 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#1e2535] rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                         <X className="w-5 h-5" />
                     </button>
@@ -240,7 +240,7 @@ export const CheckpointImportModal: React.FC<CheckpointImportModalProps> = ({
                                 `}
                             >
                                 <div className="w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto mb-4">
-                                    <FileJson className="w-8 h-8 text--600" />
+                                    <FileJson className="w-8 h-8 text-gray-600" />
                                 </div>
                                 <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                                     Drop checkpoint JSON file here
@@ -282,7 +282,7 @@ export const CheckpointImportModal: React.FC<CheckpointImportModalProps> = ({
                         <div className="space-y-4">
                             {/* File info */}
                             <div className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
-                                <FileCheck className="w-5 h-5 text--600" />
+                                <FileCheck className="w-5 h-5 text-gray-600" />
                                 <div className="flex-1 min-w-0">
                                     <p className="text-sm font-medium text-slate-700 dark:text-slate-300 truncate">
                                         {file?.name}
@@ -374,7 +374,7 @@ export const CheckpointImportModal: React.FC<CheckpointImportModalProps> = ({
                                         Target Branch (optional)
                                     </label>
                                     <div className="flex items-center gap-2">
-                                        <GitBranch className="w-4 h-4 text--600" />
+                                        <GitBranch className="w-4 h-4 text-gray-600" />
                                         <input
                                             type="text"
                                             value={options.targetBranch}

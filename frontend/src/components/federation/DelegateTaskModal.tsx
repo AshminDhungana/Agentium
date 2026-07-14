@@ -187,7 +187,7 @@ export function DelegateTaskModal({ peers, isSubmitting, onClose, onSubmit }: De
                             className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5"
                         >
                             Payload{' '}
-                            <span className="text--600 dark:text-gray-500 font-normal">(JSON object)</span>
+                            <span className="text-gray-600 dark:text-gray-500 font-normal">(JSON object)</span>
                         </label>
                         <textarea
                             id="delegate-payload"

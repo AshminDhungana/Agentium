@@ -494,8 +494,8 @@ export default function APIKeyHealth() {
                                             </div>
 
                                             {isExpanded
-                                                ? <ChevronUp className="w-4 h-4 text--600 dark:text-gray-500" />
-                                                : <ChevronDown className="w-4 h-4 text--600 dark:text-gray-500" />
+                                                ? <ChevronUp className="w-4 h-4 text-gray-600 dark:text-gray-500" />
+                                                : <ChevronDown className="w-4 h-4 text-gray-600 dark:text-gray-500" />
                                             }
                                         </div>
                                     </button>

@@ -104,13 +104,13 @@ export function RecentTasks({ tasks, isLoading, isError, onRetry }: RecentTasksP
                                         {task.title}
                                     </p>
                                     <div className="flex items-center gap-1.5 mt-0.5">
-                                        <span className="text-xs text--600 dark:text-gray-500 capitalize">
+                                        <span className="text-xs text-gray-600 dark:text-gray-500 capitalize">
                                             {task.priority}
                                         </span>
                                         {dateStr && (
                                             <>
                                                 <span className="text-xs text-gray-300 dark:text-gray-600">·</span>
-                                                <span className="text-xs text--600 dark:text-gray-500">
+                                                <span className="text-xs text-gray-600 dark:text-gray-500">
                                                     {dateStr}
                                                 </span>
                                             </>

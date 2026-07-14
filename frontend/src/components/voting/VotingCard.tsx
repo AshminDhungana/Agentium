@@ -96,7 +96,7 @@ export function VotingCard({ item, isSelected, onClick, isAmendment }: VotingCar
                 </div>
 
                 <ChevronRight
-                    className={`w-4 h-4 text--600 flex-shrink-0 mt-0.5 transition-transform ${
+                    className={`w-4 h-4 text-gray-600 flex-shrink-0 mt-0.5 transition-transform ${
                         isSelected ? 'rotate-90' : 'group-hover:translate-x-0.5'
                     }`}
                 />
@@ -121,7 +121,7 @@ export function VotingCard({ item, isSelected, onClick, isAmendment }: VotingCar
                     </div>
                 </div>
                 {/* flex-wrap prevents this row from clipping on narrow screens */}
-                <div className="flex flex-wrap justify-between gap-x-2 text-xs text--600 dark:text-gray-500 mt-1">
+                <div className="flex flex-wrap justify-between gap-x-2 text-xs text-gray-600 dark:text-gray-500 mt-1">
                     <span>{totalVotes} votes cast</span>
                     <span>
                         {totalEligible > 0 ? Math.round((totalVotes / totalEligible) * 100) : 0}% turnout

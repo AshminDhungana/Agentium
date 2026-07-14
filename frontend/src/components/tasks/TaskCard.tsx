@@ -216,11 +216,11 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, onClick, onViewLive })
             <div className="pl-3">
                 <h3 className="
                     text-gray-900 dark:text-gray-100 font-semibold text-sm leading-snug line-clamp-2 mb-1
-                    group-hover:text-blue-600 dark:group-hover:text--600
+                    group-hover:text-blue-600 dark:group-hover:text-gray-600
                     transition-colors duration-200
                 ">
                     {task.governance?.hierarchical_id && (
-                        <span className="text-xs font-mono text--600 dark:text-gray-500 mr-2">
+                        <span className="text-xs font-mono text-gray-600 dark:text-gray-500 mr-2">
                             [{task.governance.hierarchical_id}]
                         </span>
                     )}
@@ -275,7 +275,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, onClick, onViewLive })
             <div className="
                 flex items-center justify-between pt-2 border-t border-gray-100 dark:border-[#1e2535] mt-auto pl-3
             ">
-                <div className="flex items-center gap-1 text-xs text--600 dark:text-gray-500">
+                <div className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-500">
                     <Clock className="w-3 h-3" />
                     {formattedDate}
                 </div>
@@ -329,7 +329,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, onClick, onViewLive })
                     </div>
                 ) : (
                     <div className="
-                        flex items-center gap-1 text-xs text--600 dark:text-gray-500
+                        flex items-center gap-1 text-xs text-gray-600 dark:text-gray-500
                         bg-gray-50 dark:bg-[#0f1117] px-2 py-0.5 rounded-full
                         border border-gray-200 dark:border-[#1e2535]
                     ">

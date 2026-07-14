@@ -34,7 +34,7 @@ export function Toggle({ checked, onChange, label, description, disabled = false
     return (
         <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-[#0f1117] rounded-lg">
             <div>
-                <p className={`text-sm font-medium ${disabled ? 'text--600 dark:text-gray-600' : 'text-gray-900 dark:text-white'}`}>
+                <p className={`text-sm font-medium ${disabled ? 'text-gray-600 dark:text-gray-600' : 'text-gray-900 dark:text-white'}`}>
                     {label}
                 </p>
                 {description && (

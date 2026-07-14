@@ -332,7 +332,7 @@ export function FederationPage() {
                         {/* Toolbar */}
                         <div className="flex flex-col sm:flex-row gap-4 mb-6">
                             <div className="relative flex-1">
-                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text--600 dark:text-gray-500" aria-hidden="true" />
+                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600 dark:text-gray-500" aria-hidden="true" />
                                 <input
                                     type="search"
                                     placeholder="Search peers by name or URL…"
@@ -441,7 +441,7 @@ export function FederationPage() {
                             ) : tasks.length === 0 ? (
                                 <div className="p-16 text-center">
                                     <div className="w-14 h-14 rounded-xl bg-gray-100 dark:bg-[#1e2535] border border-gray-200 dark:border-[#2a3347] flex items-center justify-center mx-auto mb-4">
-                                        <Activity className="w-6 h-6 text--600 dark:text-gray-500" aria-hidden="true" />
+                                        <Activity className="w-6 h-6 text-gray-600 dark:text-gray-500" aria-hidden="true" />
                                     </div>
                                     <p className="text-gray-900 dark:text-white font-medium mb-1">
                                         No Delegated Tasks

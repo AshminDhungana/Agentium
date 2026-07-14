@@ -683,7 +683,7 @@ export function ChannelsPage() {
                                                 onClick={() => setSelectedChannel(channel)}
                                                 title="Health, logs & settings"
                                                 aria-label="Health, logs & settings"
-                                                className="p-2 text--600 dark:text-gray-500 hover:text-indigo-600 dark:hover:text--600 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 rounded-lg transition-all duration-150"
+                                                className="p-2 text-gray-600 dark:text-gray-500 hover:text-indigo-600 dark:hover:text-gray-600 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 rounded-lg transition-all duration-150"
                                             >
                                                 <SlidersHorizontal className="w-4 h-4" />
                                             </button>
@@ -691,7 +691,7 @@ export function ChannelsPage() {
                                                 onClick={() => handleViewLog(channel.id)}
                                                 title="View message log"
                                                 aria-label="View message log"
-                                                className="p-2 text--600 dark:text-gray-500 hover:text-blue-600 dark:hover:text--600 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition-all duration-150"
+                                                className="p-2 text-gray-600 dark:text-gray-500 hover:text-blue-600 dark:hover:text-gray-600 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition-all duration-150"
                                             >
                                                 <Inbox className="w-4 h-4" />
                                             </button>
@@ -700,7 +700,7 @@ export function ChannelsPage() {
                                                     onClick={() => setShowProviderSwitch(channel.id)}
                                                     title="Switch provider"
                                                     aria-label="Switch provider"
-                                                    className="p-2 text--600 dark:text-gray-500 hover:text-purple-600 dark:hover:text--600 hover:bg-purple-50 dark:hover:bg-purple-500/10 rounded-lg transition-all duration-150"
+                                                    className="p-2 text-gray-600 dark:text-gray-500 hover:text-purple-600 dark:hover:text-gray-600 hover:bg-purple-50 dark:hover:bg-purple-500/10 rounded-lg transition-all duration-150"
                                                 >
                                                     <Server className="w-4 h-4" />
                                                 </button>
@@ -711,7 +711,7 @@ export function ChannelsPage() {
                                                 disabled={testingChannelId === channel.id}
                                                 title="Test connection"
                                                 aria-label="Test connection"
-                                                className="p-2 text--600 dark:text-gray-500 hover:text-blue-600 dark:hover:text--600 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition-all duration-150"
+                                                className="p-2 text-gray-600 dark:text-gray-500 hover:text-blue-600 dark:hover:text-gray-600 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition-all duration-150"
                                             >
                                                 {testingChannelId === channel.id ? <LoadingSpinner size="sm" /> : <RefreshCw className="w-4 h-4" />}
                                             </button>
@@ -722,7 +722,7 @@ export function ChannelsPage() {
                                                 }}
                                                 title="Delete channel"
                                                 aria-label="Delete channel"
-                                                className="p-2 text--600 dark:text-gray-500 hover:text-red-600 dark:hover:text--600 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-all duration-150"
+                                                className="p-2 text-gray-600 dark:text-gray-500 hover:text-red-600 dark:hover:text-gray-600 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-all duration-150"
                                             >
                                                 <Trash2 className="w-4 h-4" />
                                             </button>
@@ -775,7 +775,7 @@ export function ChannelsPage() {
                                     {/* Webhook URL */}
                                     {channel.config?.webhook_url && (
                                         <div>
-                                            <label className="block text-xs font-semibold text--600 dark:text-gray-500 uppercase tracking-wider mb-2">
+                                            <label className="block text-xs font-semibold text-gray-600 dark:text-gray-500 uppercase tracking-wider mb-2">
                                                 Webhook URL
                                             </label>
                                             <div className="flex gap-2">
@@ -808,7 +808,7 @@ export function ChannelsPage() {
                                     {channel.type === 'imessage' && (
                                         <p className="text-xs text-gray-600 dark:text-gray-500">
                                             Backend: <span className="font-mono text-gray-700 dark:text-gray-300">{channel.config?.backend ?? 'applescript'}</span>
-                                            {channel.config?.bb_url && <span className="text--600 dark:text-gray-600"> · {channel.config.bb_url}</span>}
+                                            {channel.config?.bb_url && <span className="text-gray-600 dark:text-gray-600"> · {channel.config.bb_url}</span>}
                                         </p>
                                     )}
 
@@ -877,7 +877,7 @@ export function ChannelsPage() {
                                                             Save
                                                         </button>
                                                     </div>
-                                                    <p className="text-xs text--600 dark:text-gray-500">
+                                                    <p className="text-xs text-gray-600 dark:text-gray-500">
                                                         Leave empty to accept messages from everyone.
                                                     </p>
                                                 </div>
@@ -898,15 +898,15 @@ export function ChannelsPage() {
                                     {/* Stats row */}
                                     <div className="flex items-center gap-5 pt-3 border-t border-gray-100 dark:border-[#1e2535]">
                                         <div className="text-sm">
-                                            <span className="text--600 dark:text-gray-500 text-xs uppercase tracking-wide font-medium">Received </span>
+                                            <span className="text-gray-600 dark:text-gray-500 text-xs uppercase tracking-wide font-medium">Received </span>
                                             <span className="font-semibold text-gray-900 dark:text-gray-100">{channel.stats?.received ?? 0}</span>
                                         </div>
                                         <div className="text-sm">
-                                            <span className="text--600 dark:text-gray-500 text-xs uppercase tracking-wide font-medium">Sent </span>
+                                            <span className="text-gray-600 dark:text-gray-500 text-xs uppercase tracking-wide font-medium">Sent </span>
                                             <span className="font-semibold text-gray-900 dark:text-gray-100">{channel.stats?.sent ?? 0}</span>
                                         </div>
                                         {channel.stats?.last_message && (
-                                            <div className="text-xs text--600 dark:text-gray-500 ml-auto">
+                                            <div className="text-xs text-gray-600 dark:text-gray-500 ml-auto">
                                                 {format(new Date(channel.stats.last_message), 'MMM d, h:mm a')}
                                             </div>
                                         )}
@@ -1012,7 +1012,7 @@ export function ChannelsPage() {
                                                 </div>
                                                 <div className="min-w-0">
                                                     <h3 className="font-semibold text-gray-900 dark:text-gray-100 text-sm truncate">{type.name}</h3>
-                                                    <p className="text-xs text--600 dark:text-gray-500 truncate">{type.description}</p>
+                                                    <p className="text-xs text-gray-600 dark:text-gray-500 truncate">{type.description}</p>
                                                 </div>
                                             </button>
                                         );
@@ -1200,7 +1200,7 @@ export function ChannelsPage() {
                                 className="w-full p-4 border-2 border-blue-200 dark:border-blue-500/30 hover:border-blue-500 dark:hover:border-blue-400 rounded-xl text-left transition-all group"
                             >
                                 <div className="flex items-center justify-between mb-2">
-                                    <span className="font-semibold text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text--600">Switch to Cloud API</span>
+                                    <span className="font-semibold text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-gray-600">Switch to Cloud API</span>
                                     <Server className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                                 </div>
                                 <p className="text-xs text-gray-600 dark:text-gray-400">Official Meta Business API. Best for production use.</p>
@@ -1212,7 +1212,7 @@ export function ChannelsPage() {
                                 className="w-full p-4 border-2 border-orange-200 dark:border-orange-500/30 hover:border-orange-500 dark:hover:border-orange-400 rounded-xl text-left transition-all group"
                             >
                                 <div className="flex items-center justify-between mb-2">
-                                    <span className="font-semibold text-gray-900 dark:text-white group-hover:text-orange-600 dark:group-hover:text--600">Switch to Web Bridge</span>
+                                    <span className="font-semibold text-gray-900 dark:text-white group-hover:text-orange-600 dark:group-hover:text-gray-600">Switch to Web Bridge</span>
                                     <QrCode className="w-5 h-5 text-orange-600 dark:text-orange-400" />
                                 </div>
                                 <p className="text-xs text-gray-600 dark:text-gray-400">QR-based authentication. For personal/development use.</p>

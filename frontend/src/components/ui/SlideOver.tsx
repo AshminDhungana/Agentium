@@ -109,7 +109,7 @@ export const SlideOver: React.FC<SlideOverProps> = ({
                     </div>
                     <button 
                         onClick={onClose}
-                        className="p-2 ml-4 flex-shrink-0 rounded-lg text--600 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#1e2535] transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                        className="p-2 ml-4 flex-shrink-0 rounded-lg text-gray-600 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#1e2535] transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                         aria-label="Close panel"
                     >
                         <X className="w-5 h-5" />

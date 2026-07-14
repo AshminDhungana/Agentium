@@ -141,7 +141,7 @@ export const AutoDelegationPanel: React.FC<AutoDelegationPanelProps> = ({ task, 
                                 {meta.assigned_to}
                             </span>
                             {meta.agent_score !== undefined && (
-                                <span className="text--600 dark:text-gray-500">
+                                <span className="text-gray-600 dark:text-gray-500">
                                     (score: {meta.agent_score})
                                 </span>
                             )}
@@ -190,7 +190,7 @@ export const AutoDelegationPanel: React.FC<AutoDelegationPanelProps> = ({ task, 
 
                     {/* Delegation time */}
                     {meta.delegated_at && (
-                        <p className="text-[10px] text--600 dark:text-gray-600">
+                        <p className="text-[10px] text-gray-600 dark:text-gray-600">
                             Delegated at {new Date(meta.delegated_at).toLocaleString()}
                         </p>
                     )}
@@ -198,7 +198,7 @@ export const AutoDelegationPanel: React.FC<AutoDelegationPanelProps> = ({ task, 
             )}
 
             {!meta && !error && (
-                <p className="text-xs text--600 dark:text-gray-600 italic">
+                <p className="text-xs text-gray-600 dark:text-gray-600 italic">
                     No delegation data yet. Click "Re-delegate" to auto-assign this task.
                 </p>
             )}

@@ -366,7 +366,7 @@ function RBACManagementInner() {
                     <>
                         <div className="flex flex-col sm:flex-row gap-4 mb-6">
                             <div className="relative flex-1">
-                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text--600 dark:text-gray-500" />
+                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600 dark:text-gray-500" />
                                 <input
                                     type="text"
                                     placeholder="Search users..."
@@ -395,7 +395,7 @@ function RBACManagementInner() {
                             ) : filteredUsers.length === 0 ? (
                                 <div className="p-16 text-center">
                                     <div className="w-14 h-14 rounded-xl bg-gray-100 dark:bg-[#1e2535] border border-gray-200 dark:border-[#2a3347] flex items-center justify-center mx-auto mb-4">
-                                        <Users className="w-6 h-6 text--600 dark:text-gray-500" />
+                                        <Users className="w-6 h-6 text-gray-600 dark:text-gray-500" />
                                     </div>
                                     <p className="text-gray-900 dark:text-white font-medium mb-1">
                                         No Users Found
@@ -441,7 +441,7 @@ function RBACManagementInner() {
                                                                     {userItem.username}
                                                                 </span>
                                                                 {userItem.email && (
-                                                                    <p className="text-xs text--600 dark:text-gray-500 mt-0.5">
+                                                                    <p className="text-xs text-gray-600 dark:text-gray-500 mt-0.5">
                                                                         {userItem.email}
                                                                     </p>
                                                                 )}
@@ -506,7 +506,7 @@ function RBACManagementInner() {
                             {delegations.length === 0 ? (
                                 <div className="p-16 text-center">
                                     <div className="w-14 h-14 rounded-xl bg-gray-100 dark:bg-[#1e2535] border border-gray-200 dark:border-[#2a3347] flex items-center justify-center mx-auto mb-4">
-                                        <HandMetal className="w-6 h-6 text--600 dark:text-gray-500" />
+                                        <HandMetal className="w-6 h-6 text-gray-600 dark:text-gray-500" />
                                     </div>
                                     <p className="text-gray-900 dark:text-white font-medium mb-1">
                                         No Active Delegations
@@ -604,12 +604,12 @@ function RBACManagementInner() {
                                                 ))}
                                             </div>
                                             {delegation.reason && (
-                                                <p className="mt-2 text-xs text--600 dark:text-gray-500 italic">
+                                                <p className="mt-2 text-xs text-gray-600 dark:text-gray-500 italic">
                                                     Reason: {delegation.reason}
                                                 </p>
                                             )}
                                             {delegation.granted_at && (
-                                                <p className="mt-1 text-xs text--600 dark:text-gray-500">
+                                                <p className="mt-1 text-xs text-gray-600 dark:text-gray-500">
                                                     Granted: {formatDate(delegation.granted_at)}
                                                 </p>
                                             )}
@@ -749,7 +749,7 @@ function RBACManagementInner() {
                                                 <span className="text-sm text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white transition-colors">
                                                     {cap.name}
                                                 </span>
-                                                <span className="text-xs text--600 dark:text-gray-500 ml-2">
+                                                <span className="text-xs text-gray-600 dark:text-gray-500 ml-2">
                                                     {cap.description}
                                                 </span>
                                             </div>
@@ -761,7 +761,7 @@ function RBACManagementInner() {
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                                     Reason
-                                    <span className="text--600 dark:text-gray-500 font-normal ml-1">
+                                    <span className="text-gray-600 dark:text-gray-500 font-normal ml-1">
                                         (Optional)
                                     </span>
                                 </label>
@@ -777,7 +777,7 @@ function RBACManagementInner() {
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                                     Expires
-                                    <span className="text--600 dark:text-gray-500 font-normal ml-1">
+                                    <span className="text-gray-600 dark:text-gray-500 font-normal ml-1">
                                         (Optional)
                                     </span>
                                 </label>

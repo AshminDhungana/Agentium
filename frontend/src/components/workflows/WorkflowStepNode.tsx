@@ -150,7 +150,7 @@ function WorkflowStepNodeInner({ data, selected }: NodeProps) {
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5">
-              <span className="text-[10px] font-mono text--600 dark:text-gray-500">
+              <span className="text-[10px] font-mono text-gray-600 dark:text-gray-500">
                 #{nodeData.step_index}
               </span>
               <span className={`text-xs font-bold uppercase tracking-wider ${cfg.accent} ${cfg.accentDark}`}>
@@ -197,10 +197,10 @@ export const WorkflowStepNode = memo(WorkflowStepNodeInner);
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 const EXECUTION_DOT: Record<string, string> = {
-  pending: 'bg-gray-400',
-  running: 'bg-blue-400 animate-pulse',
-  completed: 'bg-green-400',
-  failed: 'bg-red-400',
+  pending: 'bg-gray-400 dark:bg-gray-500',
+  running: 'bg-blue-400 dark:bg-blue-400 animate-pulse',
+  completed: 'bg-green-400 dark:bg-green-400',
+  failed: 'bg-red-400 dark:bg-red-400',
 };
 
 function getConfigPreview(type: string, config: Record<string, unknown>): string {

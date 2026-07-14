@@ -133,7 +133,7 @@ export const BrowserTaskViewer: React.FC<BrowserTaskViewerProps> = ({ taskId, on
                                 {latestFrame?.title || 'Browser Session'}
                             </h3>
                             <div className="flex items-center gap-2 mt-0.5">
-                                <span className="text-[10px] text--600 font-mono truncate max-w-md">
+                                <span className="text-[10px] text-gray-600 font-mono truncate max-w-md">
                                     {latestFrame?.url || 'Waiting for URL...'}
                                 </span>
                             </div>
@@ -204,7 +204,7 @@ export const BrowserTaskViewer: React.FC<BrowserTaskViewerProps> = ({ taskId, on
                         </div>
                         <div className="flex-1 overflow-y-auto p-3 space-y-3">
                             {(!latestFrame?.action_log || latestFrame.action_log.length === 0) ? (
-                                <p className="text--600 italic text-center text-[11px] mt-4 font-sans">
+                                <p className="text-gray-600 italic text-center text-[11px] mt-4 font-sans">
                                     Waiting for actions...
                                     <br/><br/>
                                     Browser interactions performed by the agent will appear here.
@@ -212,7 +212,7 @@ export const BrowserTaskViewer: React.FC<BrowserTaskViewerProps> = ({ taskId, on
                             ) : (
                                 [...latestFrame.action_log].reverse().map((entry, i) => (
                                     <div key={i} className="flex flex-col border-l-2 border-violet-400 dark:border-violet-500 pl-2">
-                                        <span className="text-[9px] text--600 mb-0.5">
+                                        <span className="text-[9px] text-gray-600 mb-0.5">
                                             {new Date(entry.timestamp).toLocaleTimeString()}
                                         </span>
                                         <span className="text-gray-800 dark:text-gray-300 leading-snug break-words">

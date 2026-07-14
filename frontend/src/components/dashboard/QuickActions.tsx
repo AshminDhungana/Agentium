@@ -72,7 +72,7 @@ export function QuickActions() {
                                 {action.description}
                             </p>
                         </div>
-                        <ChevronRight className="w-4 h-4 text--600 dark:text-gray-600 group-hover:text-gray-600 dark:group-hover:text--600 transition-colors duration-150 flex-shrink-0" />
+                        <ChevronRight className="w-4 h-4 text-gray-600 dark:text-gray-600 group-hover:text-gray-600 dark:group-hover:text-gray-600 transition-colors duration-150 flex-shrink-0" />
                     </Link>
                 ))}
             </div>

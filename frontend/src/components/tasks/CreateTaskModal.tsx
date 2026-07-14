@@ -122,7 +122,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ onConfirm, onC
                     </div>
                     <button aria-label="Close" 
                         onClick={onClose}
-                        className="p-2 rounded-lg text--600 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#1e2535] transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="p-2 rounded-lg text-gray-600 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#1e2535] transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                         <X className="w-5 h-5" />
                     </button>

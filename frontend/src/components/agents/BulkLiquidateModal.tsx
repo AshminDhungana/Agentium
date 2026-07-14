@@ -90,7 +90,7 @@ export const BulkLiquidateModal: React.FC<BulkLiquidateModalProps> = ({
                     <button
                         aria-label="Close"
                         onClick={onClose}
-                        className="w-8 h-8 rounded-lg flex items-center justify-center text--600 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#1e2535] transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-600 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#1e2535] transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                         <X className="w-4 h-4" />
                     </button>
@@ -120,7 +120,7 @@ export const BulkLiquidateModal: React.FC<BulkLiquidateModalProps> = ({
                                     onChange={e => setThreshold(Math.max(1, Number(e.target.value)))}
                                     className="w-full px-4 py-2.5 text-sm bg-white dark:bg-[#0f1117] border border-gray-200 dark:border-[#1e2535] rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-rose-500/40 focus:border-rose-500 transition-colors"
                                 />
-                                <p className="text-xs text--600 dark:text-gray-500 mt-1">
+                                <p className="text-xs text-gray-600 dark:text-gray-500 mt-1">
                                     Agents inactive for ≥ {threshold} day{threshold !== 1 ? 's' : ''} will be flagged.
                                 </p>
                             </div>
@@ -152,7 +152,7 @@ export const BulkLiquidateModal: React.FC<BulkLiquidateModalProps> = ({
                                 <div className="flex flex-col items-center gap-2 py-4 text-emerald-700 dark:text-emerald-400">
                                     <CheckCircle2 className="w-8 h-8" />
                                     <p className="text-sm font-medium">No idle agents found.</p>
-                                    <p className="text-xs text--600 dark:text-gray-500">
+                                    <p className="text-xs text-gray-600 dark:text-gray-500">
                                         No agents have been idle for ≥ {threshold} days.
                                     </p>
                                 </div>
@@ -172,7 +172,7 @@ export const BulkLiquidateModal: React.FC<BulkLiquidateModalProps> = ({
                                                 className="flex justify-between items-center text-xs text-gray-700 dark:text-gray-300"
                                             >
                                                 <span className="font-medium truncate">{a.name}</span>
-                                                <span className="ml-2 shrink-0 font-mono text--600 dark:text-gray-500">
+                                                <span className="ml-2 shrink-0 font-mono text-gray-600 dark:text-gray-500">
                                                     {a.agentium_id} · {a.idle_days}d idle
                                                 </span>
                                             </li>

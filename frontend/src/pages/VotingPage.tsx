@@ -337,7 +337,7 @@ export const VotingPage: React.FC = () => {
                                             onVoteSuccess={() => loadData(true)}
                                         />
                                     ) : (
-                                        <div className="flex flex-col items-center justify-center py-24 bg-white dark:bg-[#161b27] rounded-xl border border-gray-200 dark:border-[#1e2535] border-dashed text--600 dark:text-gray-500">
+                                        <div className="flex flex-col items-center justify-center py-24 bg-white dark:bg-[#161b27] rounded-xl border border-gray-200 dark:border-[#1e2535] border-dashed text-gray-600 dark:text-gray-500">
                                             <BarChart2 className="w-12 h-12 mb-3" />
                                             <p className="text-sm font-medium">Select an item to view details</p>
                                             <p className="text-xs mt-1">Click any card to see the diff, tally, and vote</p>

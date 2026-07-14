@@ -229,7 +229,7 @@ export default function UserManagement({
                 <div className="bg-white dark:bg-[#161b27] rounded-xl border border-gray-200 dark:border-[#1e2535] shadow-sm dark:shadow-[0_2px_16px_rgba(0,0,0,0.25)] overflow-hidden">
                     {pendingUsers.length === 0 ? (
                         <EmptyState
-                            icon={<Clock className="w-6 h-6 text--600 dark:text-gray-500" />}
+                            icon={<Clock className="w-6 h-6 text-gray-600 dark:text-gray-500" />}
                             title="No Pending Approvals"
                             description="All signup requests have been processed."
                         />
@@ -291,7 +291,7 @@ export default function UserManagement({
                     {/* Search bar with clear button */}
                     <div className="mb-5">
                         <div className="relative">
-                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text--600 dark:text-gray-500 pointer-events-none" />
+                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600 dark:text-gray-500 pointer-events-none" />
                             <input
                                 type="text"
                                 aria-label="Search users"
@@ -303,7 +303,7 @@ export default function UserManagement({
                             {rawSearch && (
                                 <button
                                     onClick={clearSearch}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text--600 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
                                     aria-label="Clear search"
                                 >
                                     <XCircle className="w-4 h-4" />
@@ -315,7 +315,7 @@ export default function UserManagement({
                     <div className="bg-white dark:bg-[#161b27] rounded-xl border border-gray-200 dark:border-[#1e2535] shadow-sm dark:shadow-[0_2px_16px_rgba(0,0,0,0.25)] overflow-hidden">
                         {filteredApprovedUsers.length === 0 ? (
                             <EmptyState
-                                icon={<Users className="w-6 h-6 text--600 dark:text-gray-500" />}
+                                icon={<Users className="w-6 h-6 text-gray-600 dark:text-gray-500" />}
                                 title={searchQuery ? 'No Users Found' : 'No Approved Users'}
                                 description={
                                     searchQuery
@@ -369,7 +369,7 @@ export default function UserManagement({
                                                         {changingRole === user.id ? (
                                                             <LoadingSpinner size="xs" />
                                                         ) : (
-                                                            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text--600 pointer-events-none" />
+                                                            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-600 pointer-events-none" />
                                                         )}
                                                     </div>
                                                     {/* 2 s success checkmark after role change */}
@@ -680,7 +680,7 @@ function PasswordModal({
                         {/* Explicit close button with aria-label for screen readers */}
                         <button
                             onClick={onClose}
-                            className="text--600 hover:text-gray-600 dark:hover:text-gray-300 transition-colors rounded-lg p-1 hover:bg-gray-100 dark:hover:bg-[#1e2535]"
+                            className="text-gray-600 hover:text-gray-600 dark:hover:text-gray-300 transition-colors rounded-lg p-1 hover:bg-gray-100 dark:hover:bg-[#1e2535]"
                             aria-label="Close password change dialog"
                         >
                             <XCircle className="w-5 h-5" />
@@ -704,7 +704,7 @@ function PasswordModal({
                             placeholder="Enter new password"
                             minLength={8}
                         />
-                        <p className="text-xs text--600 dark:text-gray-500 mt-1.5">
+                        <p className="text-xs text-gray-600 dark:text-gray-500 mt-1.5">
                             Minimum 8 characters
                         </p>
                     </div>

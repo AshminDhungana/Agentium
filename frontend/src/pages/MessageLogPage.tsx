@@ -321,7 +321,7 @@ const MessageRow = memo(function MessageRow({ msg, onReplay, replayingId }: Mess
             )}
           </div>
           <p className="text-sm text-slate-600 dark:text-slate-400 truncate mt-0.5">
-            {msg.content || <em className="text--600 dark:text-slate-600">no content</em>}
+            {msg.content || <em className="text-gray-600 dark:text-slate-600">no content</em>}
           </p>
           {msg.last_error && (
             <p className="text-xs text-red-600 dark:text-red-400 truncate mt-0.5 flex items-center gap-1">
@@ -351,7 +351,7 @@ const MessageRow = memo(function MessageRow({ msg, onReplay, replayingId }: Mess
             </button>
           )}
 
-          <ChevronDown className={`w-4 h-4 text--600 dark:text-slate-500 transition-transform ${expanded ? 'rotate-180' : ''}`} />
+          <ChevronDown className={`w-4 h-4 text-gray-600 dark:text-slate-500 transition-transform ${expanded ? 'rotate-180' : ''}`} />
         </div>
       </div>
 
@@ -481,7 +481,7 @@ export function MessageLogPage() {
         <div className="flex items-center gap-2 mt-3 flex-wrap">
           {/* Search */}
           <div className="relative flex-1 min-w-52">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text--600 dark:text-slate-500" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600 dark:text-slate-500" />
             <input
               type="text"
               placeholder="Search messages, senders…"
@@ -566,7 +566,7 @@ export function MessageLogPage() {
       {/* Message list */}
       <div className="flex-1 overflow-y-auto px-6 py-4 space-y-2 bg-slate-50 dark:bg-[#0f1117] transition-colors duration-200">
         {loading && messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text--600 dark:text-slate-500">
+          <div className="flex flex-col items-center justify-center py-20 text-gray-600 dark:text-slate-500">
             <LoadingSpinner size="lg" />
             <p className="text-sm">Loading messages…</p>
           </div>

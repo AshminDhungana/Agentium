@@ -887,7 +887,7 @@ export function ChatPage() {
                                             isConnected ? (
                                                 <span className="text-green-600 dark:text-green-400 font-medium">Active now</span>
                                             ) : genesisInProgress ? 'Initializing…' : isConnecting ? 'Connecting…' : (
-                                                <span className="text--600 dark:text-gray-500">Offline</span>
+                                                <span className="text-gray-600 dark:text-gray-500">Offline</span>
                                             )
                                         ) : activeTab === 'inbox' ? (
                                             <span className="text-emerald-600 dark:text-emerald-400 font-medium">
@@ -919,7 +919,7 @@ export function ChatPage() {
                                     </button>
                                 )}
                                 {activeTab === 'ai' && isConnecting && (
-                                    <div className="flex items-center gap-2 text-sm text--600 dark:text-gray-500">
+                                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-500">
                                         <LoadingSpinner size="sm" /> Connecting…
                                     </div>
                                 )}
@@ -930,7 +930,7 @@ export function ChatPage() {
                                             ? 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-500/10 border-green-200 dark:border-green-500/20'
                                             : bridgeStatus === 'connecting'
                                                 ? 'text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-500/10 border-yellow-200 dark:border-yellow-500/20'
-                                                : 'text--600 dark:text-gray-500 bg-gray-50 dark:bg-[#1e2535] border-gray-200 dark:border-[#1e2535]'
+                                                : 'text-gray-600 dark:text-gray-500 bg-gray-50 dark:bg-[#1e2535] border-gray-200 dark:border-[#1e2535]'
                                         }`} title={`Voice bridge: ${bridgeStatus}`}>
                                         {bridgeStatus === 'connecting' ? <LoadingSpinner size="xs" />
                                             : bridgeStatus === 'connected' ? <Mic className="w-3 h-3" />
@@ -1026,18 +1026,18 @@ export function ChatPage() {
                                                     </div>
                                                 )}
                                                 <div className={`flex items-center gap-2 mt-1.5 px-1 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
-                                                    <span className="text-xs text--600 dark:text-gray-500">
+                                                    <span className="text-xs text-gray-600 dark:text-gray-500">
                                                         {formatTimestamp(message.timestamp)}
                                                     </span>
                                                     {!message.metadata?.card && (
                                                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                                             <button onClick={() => copyMessage(message.content)}
-                                                                className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-[#1e2535] text--600 dark:text-gray-500 transition-colors" title="Copy">
+                                                                className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-[#1e2535] text-gray-600 dark:text-gray-500 transition-colors" title="Copy">
                                                                 <Copy className="w-3 h-3" />
                                                             </button>
                                                             {!isUser && voiceAvailable && (
                                                                 <button onClick={() => handleSpeakMessage(message.id, message.content)}
-                                                                    className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-[#1e2535] text--600 dark:text-gray-500 transition-colors" title="Read aloud">
+                                                                    className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-[#1e2535] text-gray-600 dark:text-gray-500 transition-colors" title="Read aloud">
                                                                     {isSpeaking === message.id ? <VolumeX className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
                                                                 </button>
                                                             )}
@@ -1077,7 +1077,7 @@ export function ChatPage() {
                                                     </span>
                                                 )}
                                                 <button onClick={() => removeFile(uf.id)}
-                                                    className="ml-1 p-0.5 rounded-full hover:bg-gray-200 dark:hover:bg-[#2a3347] text--600">
+                                                    className="ml-1 p-0.5 rounded-full hover:bg-gray-200 dark:hover:bg-[#2a3347] text-gray-600">
                                                     <X className="w-3 h-3" />
                                                 </button>
                                             </div>
@@ -1108,11 +1108,11 @@ export function ChatPage() {
                                         <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100 dark:border-[#1e2535]">
                                             <div className="flex items-center gap-1">
                                                 <button type="button" onClick={() => setShowFileMenu(!showFileMenu)} title="Attach file"
-                                                    className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-[#1e2535] text--600 dark:text-gray-500 transition-colors">
+                                                    className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-[#1e2535] text-gray-600 dark:text-gray-500 transition-colors">
                                                     <Paperclip className="w-4 h-4" />
                                                 </button>
                                                 <button type="button" onClick={() => fileInputRef.current?.click()} title="Upload image"
-                                                    className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-[#1e2535] text--600 dark:text-gray-500 transition-colors">
+                                                    className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-[#1e2535] text-gray-600 dark:text-gray-500 transition-colors">
                                                     <ImageIcon className="w-4 h-4" />
                                                 </button>
                                                 {voiceAvailable && (
@@ -1120,12 +1120,12 @@ export function ChatPage() {
                                                         <button type="button" onClick={handleVoiceButtonClick}
                                                             className={`p-1.5 rounded-lg transition-colors ${isRecording
                                                                     ? 'bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400'
-                                                                    : 'hover:bg-gray-200 dark:hover:bg-[#1e2535] text--600 dark:text-gray-500'
+                                                                    : 'hover:bg-gray-200 dark:hover:bg-[#1e2535] text-gray-600 dark:text-gray-500'
                                                                 }`} title={isRecording ? 'Stop recording' : 'Start voice input'}>
                                                             {isRecording ? <Pause className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
                                                         </button>
                                                         <button type="button" onClick={() => setShowVoiceSettings(true)}
-                                                            className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-[#1e2535] text--600 dark:text-gray-500 transition-colors" title="Voice Settings">
+                                                            className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-[#1e2535] text-gray-600 dark:text-gray-500 transition-colors" title="Voice Settings">
                                                             <Settings2 className="w-4 h-4" />
                                                         </button>
                                                     </>
@@ -1136,12 +1136,12 @@ export function ChatPage() {
                                                     </span>
                                                 )}
                                             </div>
-                                            <span className="text-xs text--600 dark:text-gray-500">Enter to send · Shift+Enter for new line</span>
+                                            <span className="text-xs text-gray-600 dark:text-gray-500">Enter to send · Shift+Enter for new line</span>
                                         </div>
                                     </div>
                                     <button type="submit"
                                         disabled={(!input.trim() && uploadedFiles.length === 0) || !isConnected}
-                                        className="p-3.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-200 dark:disabled:bg-[#1e2535] disabled:cursor-not-allowed text-white disabled:text--600 dark:disabled:text-gray-600 rounded-2xl transition-all duration-150 shadow-lg shadow-blue-500/25 dark:shadow-blue-900/40 disabled:shadow-none flex-shrink-0">
+                                        className="p-3.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-200 dark:disabled:bg-[#1e2535] disabled:cursor-not-allowed text-white disabled:text-gray-600 dark:disabled:text-gray-600 rounded-2xl transition-all duration-150 shadow-lg shadow-blue-500/25 dark:shadow-blue-900/40 disabled:shadow-none flex-shrink-0">
                                         <Send className="w-5 h-5" />
                                     </button>
                                 </form>
@@ -1161,7 +1161,7 @@ export function ChatPage() {
                         <div className="w-80 flex-shrink-0 bg-white dark:bg-[#161b27] border-r border-gray-200 dark:border-[#1e2535] flex flex-col">
                             <div className="p-4 border-b border-gray-200 dark:border-[#1e2535] flex items-center justify-between">
                                 <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Active Conversations</h2>
-                                {inboxLoading && <LoadingSpinner size="sm" className="text--600" />}
+                                {inboxLoading && <LoadingSpinner size="sm" className="text-gray-600" />}
                             </div>
                             <div className="flex-1 overflow-y-auto divide-y divide-gray-100 dark:divide-[#1e2535]">
                                 {conversations.length === 0 && !inboxLoading ? (
@@ -1195,7 +1195,7 @@ export function ChatPage() {
                                                         {conv.title || 'Conversation'}
                                                     </span>
                                                     {latestMsg && (
-                                                        <span className="text-xs text--600 dark:text-gray-500 flex-shrink-0 ml-2">
+                                                        <span className="text-xs text-gray-600 dark:text-gray-500 flex-shrink-0 ml-2">
                                                             {formatTimestamp(new Date((latestMsg as any).created_at || (latestMsg as any).timestamp))}
                                                         </span>
                                                     )}
@@ -1246,11 +1246,11 @@ export function ChatPage() {
                                             </div>
                                             <button onClick={handleSendReply}
                                                 disabled={!replyContent.trim() || isSending}
-                                                className="p-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-200 dark:disabled:bg-[#1e2535] disabled:cursor-not-allowed text-white disabled:text--600 dark:disabled:text-gray-600 rounded-xl transition-all duration-150">
+                                                className="p-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-200 dark:disabled:bg-[#1e2535] disabled:cursor-not-allowed text-white disabled:text-gray-600 dark:disabled:text-gray-600 rounded-xl transition-all duration-150">
                                                 {isSending ? <LoadingSpinner size="md" /> : <Send className="w-5 h-5" />}
                                             </button>
                                         </div>
-                                        <p className="text-xs text--600 dark:text-gray-500 mt-2">Reply will be routed to the user's original channel.</p>
+                                        <p className="text-xs text-gray-600 dark:text-gray-500 mt-2">Reply will be routed to the user's original channel.</p>
                                     </div>
                                 </>
                             ) : (
@@ -1273,7 +1273,7 @@ export function ChatPage() {
                         {/* Toolbar */}
                         <div className="flex-shrink-0 bg-white dark:bg-[#161b27] border-b border-gray-200 dark:border-[#1e2535] px-6 py-3 flex items-center gap-3">
                             <div className="flex-1 relative">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text--600" />
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600" />
                                 <input value={browserSearch} onChange={(e) => setBrowserSearch(e.target.value)}
                                     placeholder="Search files…"
                                     className="w-full pl-9 pr-4 py-2 bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-[#1e2535] rounded-xl text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:border-violet-400 dark:focus:border-violet-500" />
@@ -1339,13 +1339,13 @@ export function ChatPage() {
                                                 {f.url && (f.filename.match(/\.(jpg|jpeg|png|gif|webp)$/i)) ? (
                                                     <img src={f.url} alt={f.filename} className="w-full h-full object-cover" />
                                                 ) : (
-                                                    <div className="text--600 dark:text-gray-500 scale-150">
+                                                    <div className="text-gray-600 dark:text-gray-500 scale-150">
                                                         {getFileIcon(f.category || '')}
                                                     </div>
                                                 )}
                                             </div>
                                             <p className="text-xs font-medium text-gray-700 dark:text-gray-300 truncate" title={f.filename}>{f.filename}</p>
-                                            <p className="text-[10px] text--600 dark:text-gray-500 mt-0.5">{formatFileSize(f.size)}</p>
+                                            <p className="text-[10px] text-gray-600 dark:text-gray-500 mt-0.5">{formatFileSize(f.size)}</p>
 
                                             {/* Actions overlay */}
                                             <div className="absolute inset-0 bg-black/40 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">

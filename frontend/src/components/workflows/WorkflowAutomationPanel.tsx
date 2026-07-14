@@ -131,7 +131,7 @@ export const WorkflowAutomationPanel: React.FC = () => {
             </Button>
             <h2 className="text-xl font-bold text-gray-900 dark:text-white">
               Live Execution:{' '}
-              <span className="text--600 font-mono text-lg">
+              <span className="text-gray-600 dark:text-gray-400 font-mono text-lg">
                 {executionId?.split('-')[0]}
               </span>
             </h2>
@@ -139,10 +139,10 @@ export const WorkflowAutomationPanel: React.FC = () => {
 
           <div className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
             executionStatus.status === 'COMPLETED'
-              ? 'bg-green-500/20 text--600'
+              ? 'bg-green-500/20 text-green-700 dark:text-green-400'
               : executionStatus.status === 'FAILED'
-              ? 'bg-red-500/20 text--600'
-              : 'bg-indigo-500/20 text--600'
+              ? 'bg-red-500/20 text-red-700 dark:text-red-400'
+              : 'bg-indigo-500/20 text-indigo-700 dark:text-indigo-300'
           }`}>
             {executionStatus.status}
           </div>
@@ -173,7 +173,7 @@ export const WorkflowAutomationPanel: React.FC = () => {
             <h3 className="text-2xl font-semibold mt-6 text-gray-900 dark:text-white">
               {isDone ? `Execution ${executionStatus.status}` : 'Processing Workflow…'}
             </h3>
-            <p className="text-gray-600 mt-2 font-mono text-sm max-w-sm text-center">
+            <p className="text-gray-600 dark:text-gray-300 mt-2 font-mono text-sm max-w-sm text-center">
               {isDone
                 ? 'Workflow run has concluded.'
                 : `Currently executing step index ${executionStatus.current_step_index}. The engine is actively orchestrating tasks.`}
@@ -181,7 +181,7 @@ export const WorkflowAutomationPanel: React.FC = () => {
           </div>
 
           <div className="mt-8 border-t border-gray-200 dark:border-[#1e2535] pt-6">
-            <h4 className="text-sm font-semibold text-gray-600 mb-4 uppercase tracking-wider">
+            <h4 className="text-sm font-semibold text-gray-600 dark:text-gray-400 mb-4 uppercase tracking-wider">
               Execution Context
             </h4>
             <pre className="
@@ -256,11 +256,11 @@ export const WorkflowAutomationPanel: React.FC = () => {
                 <p className="text-xs text-gray-600 dark:text-gray-400 mb-4 line-clamp-2">
                   {wf.description || 'No description provided.'}
                 </p>
-                <div className="flex items-center gap-4 text-xs text--600 mb-4">
+                <div className="flex items-center gap-4 text-xs text-gray-600 dark:text-gray-400 mb-4">
                   <div className="flex items-center gap-1">
                     <Clock className="w-3 h-3" /> {wf.schedule_cron || 'Manual'}
                   </div>
-                  <div className="flex items-center gap-1 bg-green-500/10 text--600 px-1.5 rounded">
+                  <div className="flex items-center gap-1 bg-green-500/10 text-gray-600 dark:text-gray-400 px-1.5 rounded">
                     Active
                   </div>
                 </div>

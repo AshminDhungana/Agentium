@@ -67,7 +67,7 @@ function StatusIcon({ status }: { status: string }) {
         case 'responded':  return <CheckCircle  className="w-3.5 h-3.5 text-green-700 shrink-0"  />;
         case 'failed':     return <XCircle      className="w-3.5 h-3.5 text-red-600 shrink-0"    />;
         case 'processing': return <span className="text-yellow-800"><LoadingSpinner size="sm" /></span>;
-        default:           return <AlertTriangle className="w-3.5 h-3.5 text--600 shrink-0"  />;
+        default:           return <AlertTriangle className="w-3.5 h-3.5 text-gray-600 shrink-0"  />;
     }
 }
 
@@ -212,7 +212,7 @@ function HealthTab({ channel }: { channel: Channel }) {
                             style={{ width: `${Math.min(rateLimits.utilization_pct, 100)}%` }}
                         />
                     </div>
-                    <div className="flex justify-between mt-1 text-[11px] text--600 dark:text-gray-500">
+                    <div className="flex justify-between mt-1 text-[11px] text-gray-600 dark:text-gray-500">
                         <span>{rateLimits.platform_limits.requests_per_minute}/min</span>
                         <span>{rateLimits.platform_limits.requests_per_hour}/hr</span>
                     </div>
@@ -222,13 +222,13 @@ function HealthTab({ channel }: { channel: Channel }) {
             {/* Total traffic */}
             <div className="flex gap-4 text-sm border-t border-gray-100 dark:border-[#1e2535] pt-4">
                 <div>
-                    <span className="text--600 dark:text-gray-500 text-xs uppercase tracking-wide">Received </span>
+                    <span className="text-gray-600 dark:text-gray-500 text-xs uppercase tracking-wide">Received </span>
                     <span className="font-semibold text-gray-900 dark:text-gray-100">
                         {stats?.total_messages_received ?? channel.stats?.received ?? 0}
                     </span>
                 </div>
                 <div>
-                    <span className="text--600 dark:text-gray-500 text-xs uppercase tracking-wide">Sent </span>
+                    <span className="text-gray-600 dark:text-gray-500 text-xs uppercase tracking-wide">Sent </span>
                     <span className="font-semibold text-gray-900 dark:text-gray-100">
                         {stats?.total_messages_sent ?? channel.stats?.sent ?? 0}
                     </span>
@@ -321,7 +321,7 @@ function LogsTab({ channel }: { channel: Channel }) {
                         <LoadingSpinner size="md" />
                     </div>
                 ) : messages.length === 0 ? (
-                    <div className="py-8 text-center text-sm text--600 dark:text-gray-500">
+                    <div className="py-8 text-center text-sm text-gray-600 dark:text-gray-500">
                         No messages match the current filters
                     </div>
                 ) : (
@@ -335,7 +335,7 @@ function LogsTab({ channel }: { channel: Channel }) {
                                             <span className="text-xs font-medium text-gray-900 dark:text-gray-100 truncate">
                                                 {msg.sender_name || msg.sender_id}
                                             </span>
-                                            <span className="text-[11px] text--600 dark:text-gray-500 shrink-0">
+                                            <span className="text-[11px] text-gray-600 dark:text-gray-500 shrink-0">
                                                 {format(new Date(msg.created_at), 'MMM d, HH:mm')}
                                             </span>
                                         </div>
@@ -447,7 +447,7 @@ function SettingsTab({ channel }: { channel: Channel }) {
                             onChange={e => setLocal(s => ({ ...s, rate_limit_per_minute: Number(e.target.value) }))}
                             className="w-full accent-blue-600"
                         />
-                        <div className="flex justify-between text-[11px] text--600 mt-0.5">
+                        <div className="flex justify-between text-[11px] text-gray-600 mt-0.5">
                             <span>1</span><span>600</span>
                         </div>
                     </div>
@@ -466,7 +466,7 @@ function SettingsTab({ channel }: { channel: Channel }) {
                             onChange={e => setLocal(s => ({ ...s, rate_limit_per_hour: Number(e.target.value) }))}
                             className="w-full accent-blue-600"
                         />
-                        <div className="flex justify-between text-[11px] text--600 mt-0.5">
+                        <div className="flex justify-between text-[11px] text-gray-600 mt-0.5">
                             <span>1</span><span>10,000</span>
                         </div>
                     </div>
@@ -551,7 +551,7 @@ function SettingsTab({ channel }: { channel: Channel }) {
                 <h4 className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider mb-1">
                     Content filters
                 </h4>
-                <p className="text-xs text--600 dark:text-gray-500 mb-3">
+                <p className="text-xs text-gray-600 dark:text-gray-500 mb-3">
                     Messages containing these keywords will be dropped
                 </p>
 
@@ -573,7 +573,7 @@ function SettingsTab({ channel }: { channel: Channel }) {
                         </span>
                     ))}
                     {(local.content_filters ?? []).length === 0 && (
-                        <span className="text-xs text--600 dark:text-gray-500">No filters set</span>
+                        <span className="text-xs text-gray-600 dark:text-gray-500">No filters set</span>
                     )}
                 </div>
 

@@ -69,7 +69,7 @@ export const CriticStatsPanel: React.FC = () => {
 
     if (loading) {
         return (
-            <div className="flex items-center gap-2 text--600 dark:text-slate-500 py-4">
+            <div className="flex items-center gap-2 text-gray-600 dark:text-slate-500 py-4">
                 <LoadingSpinner size="sm" />
                 <span className="text-xs">Loading critic stats…</span>
             </div>
@@ -78,7 +78,7 @@ export const CriticStatsPanel: React.FC = () => {
 
     if (error || !stats) {
         return (
-            <p className="text-xs text--600 dark:text-slate-500 py-2">{error ?? 'No data'}</p>
+            <p className="text-xs text-gray-600 dark:text-slate-500 py-2">{error ?? 'No data'}</p>
         );
     }
 
@@ -88,13 +88,13 @@ export const CriticStatsPanel: React.FC = () => {
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                     <ShieldAlert className="w-4 h-4 text-rose-600 dark:text-rose-400" />
-                    <span className="text-xs font-semibold tracking-widest uppercase text--600 dark:text-slate-500">
+                    <span className="text-xs font-semibold tracking-widest uppercase text-gray-600 dark:text-slate-500">
                         Critics
                     </span>
                 </div>
                 <button
                     onClick={() => load(true)}
-                    className="p-1 rounded text--600 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+                    className="p-1 rounded text-gray-600 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
                     title="Refresh"
                 >
                     <RefreshCw className="w-3 h-3" />
@@ -104,13 +104,13 @@ export const CriticStatsPanel: React.FC = () => {
             {/* Overall summary */}
             <div className="grid grid-cols-2 gap-2">
                 <div className="rounded-lg border border-slate-200 dark:border-[#1e2535] bg-white dark:bg-[#0f1117] px-3 py-2">
-                    <p className="text-xs text--600 dark:text-slate-500">Total reviews</p>
+                    <p className="text-xs text-gray-600 dark:text-slate-500">Total reviews</p>
                     <p className="text-base font-semibold text-slate-900 dark:text-white">
                         {stats.total_reviews.toLocaleString()}
                     </p>
                 </div>
                 <div className="rounded-lg border border-slate-200 dark:border-[#1e2535] bg-white dark:bg-[#0f1117] px-3 py-2">
-                    <p className="text-xs text--600 dark:text-slate-500">Approval rate</p>
+                    <p className="text-xs text-gray-600 dark:text-slate-500">Approval rate</p>
                     <p className={`text-base font-semibold ${
                         stats.overall_approval_rate >= 80
                             ? 'text-emerald-600 dark:text-emerald-400'
@@ -137,7 +137,7 @@ export const CriticStatsPanel: React.FC = () => {
                                 <span className={`text-xs font-medium ${TYPE_COLORS[type]}`}>
                                     {TYPE_LABELS[type]}
                                 </span>
-                                <span className="text-xs text--600 dark:text-slate-500 ml-1">
+                                <span className="text-xs text-gray-600 dark:text-slate-500 ml-1">
                                     {t.reviews.toLocaleString()} reviews
                                 </span>
                             </div>
@@ -156,7 +156,7 @@ export const CriticStatsPanel: React.FC = () => {
                 })}
             </div>
 
-            <p className="text-xs text--600 dark:text-slate-500 leading-relaxed">
+            <p className="text-xs text-gray-600 dark:text-slate-500 leading-relaxed">
                 Critics spawn per-task and terminate on completion. Instances are not shown in the agent list.
             </p>
         </div>

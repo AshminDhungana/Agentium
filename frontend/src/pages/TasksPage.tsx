@@ -252,7 +252,7 @@ const TASK_PRIORITY_COLOR: Record<string, string> = {
     high:      'text-orange-600 dark:text-orange-400',
     urgent:    'text-orange-600 dark:text-orange-400',
     normal:    'text-gray-600 dark:text-gray-400',
-    low:       'text--600 dark:text-gray-500',
+    low:       'text-gray-600 dark:text-gray-500',
 };
 
 /** VerdictBadge config map (was recreated inside VerdictBadge on every render). */
@@ -325,10 +325,10 @@ const MiniBar: React.FC<{ value: number; color: string }> = ({ value, color }) =
 );
 
 const DeltaChip: React.FC<{ value: number }> = ({ value }) => {
-    if (value === 0) return <span className="text-xs text--600 flex items-center gap-0.5"><Minus className="w-3 h-3" />—</span>;
+    if (value === 0) return <span className="text-xs text-gray-600 flex items-center gap-0.5"><Minus className="w-3 h-3" />—</span>;
     const up = value > 0;
     return (
-        <span className={`text-xs flex items-center gap-0.5 font-medium ${up ? 'text-green-700' : 'text--600'}`}>
+        <span className={`text-xs flex items-center gap-0.5 font-medium ${up ? 'text-green-700' : 'text-gray-600'}`}>
             {up ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
             {Math.abs(value).toFixed(1)}%
         </span>
@@ -378,7 +378,7 @@ const CriticReviewPanel: React.FC<{
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center py-6 gap-2 text--600">
+            <div className="flex items-center justify-center py-6 gap-2 text-gray-600">
                 <LoadingSpinner size="sm" />
                 <span className="text-xs">Loading critic reviews…</span>
             </div>
@@ -387,7 +387,7 @@ const CriticReviewPanel: React.FC<{
 
     if (reviews.length === 0) {
         return (
-            <div className="flex items-center justify-center py-6 gap-2 text--600 dark:text-gray-500">
+            <div className="flex items-center justify-center py-6 gap-2 text-gray-600 dark:text-gray-500">
                 <ShieldCheck className="w-4 h-4" />
                 <span className="text-xs">No critic reviews yet for this subtask.</span>
             </div>
@@ -413,7 +413,7 @@ const CriticReviewPanel: React.FC<{
                 </div>
                 <div>
                     <p className="text-sm font-medium text-green-700 dark:text-green-400">All checks passed</p>
-                    <p className="text-xs text--600 dark:text-gray-500 mt-0.5">
+                    <p className="text-xs text-gray-600 dark:text-gray-500 mt-0.5">
                         {Object.keys(grouped).length} critic{Object.keys(grouped).length !== 1 ? 's' : ''} approved this output
                     </p>
                 </div>
@@ -453,7 +453,7 @@ const CriticReviewPanel: React.FC<{
                                 <div className="flex items-center gap-2 flex-wrap">
                                     <span className="text-sm font-semibold text-gray-900 dark:text-white">{meta.label}</span>
                                     <VerdictBadge verdict={latest.verdict} />
-                                    <span className="text-xs text--600 dark:text-gray-500 font-mono">
+                                    <span className="text-xs text-gray-600 dark:text-gray-500 font-mono">
                                         retry {latest.retry_count}/{latest.max_retries}
                                     </span>
                                     {latest.model_used && (
@@ -461,14 +461,14 @@ const CriticReviewPanel: React.FC<{
                                             {latest.model_used.split(':')[1] ?? latest.model_used}
                                         </span>
                                     )}
-                                    <span className="text-xs text--600 dark:text-gray-500 ml-auto whitespace-nowrap">
+                                    <span className="text-xs text-gray-600 dark:text-gray-500 ml-auto whitespace-nowrap">
                                         {fmtDate(latest.reviewed_at)} · {fmtMs(latest.review_duration_ms)}
                                     </span>
                                 </div>
 
                                 {latest.rejection_reason && (
                                     <div className="mt-2 flex items-start gap-2">
-                                        <AlertCircle className="w-3.5 h-3.5 text--600 dark:text-red-500 flex-shrink-0 mt-0.5" />
+                                        <AlertCircle className="w-3.5 h-3.5 text-gray-600 dark:text-red-500 flex-shrink-0 mt-0.5" />
                                         <p className="text-xs text-red-700 dark:text-red-400 leading-relaxed">
                                             {latest.rejection_reason}
                                         </p>
@@ -501,7 +501,7 @@ const CriticReviewPanel: React.FC<{
                                 )}
 
                                 {typeReviews.length > 1 && (
-                                    <p className="mt-1.5 text-[10px] text--600 dark:text-gray-500 font-mono">
+                                    <p className="mt-1.5 text-[10px] text-gray-600 dark:text-gray-500 font-mono">
                                         + {typeReviews.length - 1} earlier review{typeReviews.length - 1 !== 1 ? 's' : ''}
                                     </p>
                                 )}
@@ -566,17 +566,17 @@ const SubtaskRow: React.FC<{
                     {cfg.label}
                 </span>
                 {hasProblem && (
-                    <AlertCircle className="w-3.5 h-3.5 text--600 dark:text-red-500 flex-shrink-0" />
+                    <AlertCircle className="w-3.5 h-3.5 text-gray-600 dark:text-red-500 flex-shrink-0" />
                 )}
                 <ChevronDown
-                    className={`w-4 h-4 text--600 flex-shrink-0 transition-transform duration-200 group-hover:text-gray-600 dark:group-hover:text-gray-300 ${isExpanded ? 'rotate-180' : ''}`}
+                    className={`w-4 h-4 text-gray-600 flex-shrink-0 transition-transform duration-200 group-hover:text-gray-600 dark:group-hover:text-gray-300 ${isExpanded ? 'rotate-180' : ''}`}
                 />
             </button>
 
             {isExpanded && (
                 <div className="border-t border-gray-100 dark:border-[#1e2535] bg-gray-50/50 dark:bg-[#0f1117]/50">
                     <div className="px-5 pt-3 pb-2 flex items-center gap-4 flex-wrap border-b border-gray-100 dark:border-[#1e2535]">
-                        <span className="text-xs text--600 dark:text-gray-500 font-medium uppercase tracking-wide">
+                        <span className="text-xs text-gray-600 dark:text-gray-500 font-medium uppercase tracking-wide">
                             Critic Reviews
                         </span>
                         {subtask.error_info && subtask.error_info.error_count > 0 && (
@@ -589,7 +589,7 @@ const SubtaskRow: React.FC<{
                         )}
                         {subtask.progress !== undefined && (
                             <div className="flex items-center gap-1.5">
-                                <Timer className="w-3 h-3 text--600" />
+                                <Timer className="w-3 h-3 text-gray-600" />
                                 <span className="text-xs text-gray-600 dark:text-gray-400">
                                     {subtask.progress}% complete
                                 </span>
@@ -687,7 +687,7 @@ const TaskSubtaskAccordion: React.FC<{ task: Task }> = ({ task }) => {
 
     if (loading) {
         return (
-            <div className="flex items-center gap-2 px-5 py-4 text--600 dark:text-gray-500">
+            <div className="flex items-center gap-2 px-5 py-4 text-gray-600 dark:text-gray-500">
                 <LoadingSpinner size="sm" />
                 <span className="text-xs">Loading subtasks…</span>
             </div>
@@ -696,7 +696,7 @@ const TaskSubtaskAccordion: React.FC<{ task: Task }> = ({ task }) => {
 
     if (subtasks.length === 0) {
         return (
-            <div className="flex items-center gap-2 px-5 py-4 text--600 dark:text-gray-500">
+            <div className="flex items-center gap-2 px-5 py-4 text-gray-600 dark:text-gray-500">
                 <CornerDownRight className="w-3.5 h-3.5" />
                 <span className="text-xs italic">No subtasks have been generated yet.</span>
             </div>
@@ -713,7 +713,7 @@ const TaskSubtaskAccordion: React.FC<{ task: Task }> = ({ task }) => {
                     <span className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">
                         Subtasks
                     </span>
-                    <span className="text-xs text--600 dark:text-gray-500 font-mono">
+                    <span className="text-xs text-gray-600 dark:text-gray-500 font-mono">
                         {subtasks.length} total
                     </span>
                     {passCount > 0 && (
@@ -732,14 +732,14 @@ const TaskSubtaskAccordion: React.FC<{ task: Task }> = ({ task }) => {
                 <div className="flex items-center gap-2">
                     <button
                         onClick={() => setExpanded(new Set(subtasks.map(s => s.id)))}
-                        className="text-[10px] text--600 hover:text-gray-600 dark:hover:text-gray-200 transition-colors px-2 py-0.5 rounded hover:bg-gray-100 dark:hover:bg-[#1e2535]"
+                        className="text-[10px] text-gray-600 hover:text-gray-600 dark:hover:text-gray-200 transition-colors px-2 py-0.5 rounded hover:bg-gray-100 dark:hover:bg-[#1e2535]"
                     >
                         Expand all
                     </button>
                     <span className="text-gray-200 dark:text-gray-700">·</span>
                     <button
                         onClick={() => setExpanded(new Set())}
-                        className="text-[10px] text--600 hover:text-gray-600 dark:hover:text-gray-200 transition-colors px-2 py-0.5 rounded hover:bg-gray-100 dark:hover:bg-[#1e2535]"
+                        className="text-[10px] text-gray-600 hover:text-gray-600 dark:hover:text-gray-200 transition-colors px-2 py-0.5 rounded hover:bg-gray-100 dark:hover:bg-[#1e2535]"
                     >
                         Collapse all
                     </button>
@@ -866,7 +866,7 @@ const MainTaskCard: React.FC<{ task: Task; onUpdated?: (updated: Task) => void; 
                         <div className="flex items-center gap-2 flex-wrap mb-1">
                             {/* FIX 8: task.agentium_id is optional string — no as any */}
                             {task.agentium_id && (
-                                <span className="text-xs font-mono text--600 dark:text-gray-500">
+                                <span className="text-xs font-mono text-gray-600 dark:text-gray-500">
                                     {task.agentium_id}
                                 </span>
                             )}
@@ -1014,7 +1014,7 @@ const MainTaskCard: React.FC<{ task: Task; onUpdated?: (updated: Task) => void; 
                 {progress > 0 && (
                     <div className="mt-4">
                         <div className="flex items-center justify-between mb-1.5">
-                            <span className="text-xs text--600 dark:text-gray-500">Overall progress</span>
+                            <span className="text-xs text-gray-600 dark:text-gray-500">Overall progress</span>
                             <span className="text-xs font-semibold text-gray-600 dark:text-gray-300">{progress}%</span>
                         </div>
                         <div className="h-1.5 rounded-full bg-gray-100 dark:bg-[#1e2535] overflow-hidden">
@@ -1028,7 +1028,7 @@ const MainTaskCard: React.FC<{ task: Task; onUpdated?: (updated: Task) => void; 
 
                 {agents && (
                     <div className="mt-4 flex items-center gap-3 flex-wrap">
-                        <Users className="w-3.5 h-3.5 text--600 flex-shrink-0" />
+                        <Users className="w-3.5 h-3.5 text-gray-600 flex-shrink-0" />
                         {agents.head && (
                             <span className="inline-flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400">
                                 <span className="font-medium text-gray-700 dark:text-gray-300">Head:</span>
@@ -1069,7 +1069,7 @@ const MainTaskCard: React.FC<{ task: Task; onUpdated?: (updated: Task) => void; 
 
             {/* ── Footer meta ──────────────────────────────────────────── */}
             <div className="px-6 py-3 bg-gray-50 dark:bg-[#0f1117] border-t border-gray-100 dark:border-[#1e2535] flex items-center justify-between">
-                <div className="flex items-center gap-3 text-xs text--600 dark:text-gray-500">
+                <div className="flex items-center gap-3 text-xs text-gray-600 dark:text-gray-500">
                     {/* FIX 8: task.created_at is string | null — guard null before passing to fmtDate */}
                     {task.created_at && (
                         <span className="flex items-center gap-1">
@@ -1166,7 +1166,7 @@ const PreferenceValueEditor: React.FC<{
                 </button>
                 <button aria-label="Cancel"
                     onClick={onCancel}
-                    className="p-1.5 rounded-lg text--600 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                    className="p-1.5 rounded-lg text-gray-600 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                 >
                     <X className="w-4 h-4" />
                 </button>
@@ -1199,7 +1199,7 @@ const PreferenceValueEditor: React.FC<{
             <button
                 onClick={onCancel}
                 aria-label="Cancel"
-                className="p-1.5 rounded-lg text--600 hover:text-gray-600 dark:hover:text-gray-300
+                className="p-1.5 rounded-lg text-gray-600 hover:text-gray-600 dark:hover:text-gray-300
                     hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                 title="Cancel"
             >
@@ -1287,7 +1287,7 @@ const PreferenceCard: React.FC<{
                         className={`p-1.5 rounded-lg transition-colors ${
                             showHistory
                                 ? 'bg-blue-100 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400'
-                                : 'text--600 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                : 'text-gray-600 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                         }`}
                         title="View history"
                     >
@@ -1301,7 +1301,7 @@ const PreferenceCard: React.FC<{
                                 className={`p-1.5 rounded-lg transition-colors ${
                                     isEditing
                                         ? 'bg-amber-100 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400'
-                                        : 'text--600 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                        : 'text-gray-600 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                                 }`}
                                 title="Edit"
                             >
@@ -1327,7 +1327,7 @@ const PreferenceCard: React.FC<{
                                 <button
                                     onClick={() => setConfirmingDelete(true)}
                                     aria-label="Delete"
-                                    className="p-1.5 rounded-lg text--600 hover:text-red-600 dark:hover:text--600
+                                    className="p-1.5 rounded-lg text-gray-600 hover:text-red-600 dark:hover:text-gray-600
                                         hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
                                     title="Delete"
                                 >
@@ -1364,7 +1364,7 @@ const PreferenceCard: React.FC<{
                             </span>
                         </div>
                         {preference.last_modified_by_agent && (
-                            <span className="text-[10px] text--600 dark:text-gray-500">
+                            <span className="text-[10px] text-gray-600 dark:text-gray-500">
                                 Modified by {preference.last_modified_by_agent}
                             </span>
                         )}
@@ -1385,7 +1385,7 @@ const PreferenceCard: React.FC<{
                             ))}
                         </div>
                     ) : history.length === 0 ? (
-                        <p className="text-xs text--600 dark:text-gray-500 italic">No history available</p>
+                        <p className="text-xs text-gray-600 dark:text-gray-500 italic">No history available</p>
                     ) : (
                         <div className="space-y-2 max-h-32 overflow-y-auto">
                             {history.slice(0, 5).map((entry, idx) => (
@@ -1401,7 +1401,7 @@ const PreferenceCard: React.FC<{
                                     <code className="text-green-600 dark:text-green-400">
                                         {formatPreferenceValue(entry.new_value, preference.data_type)}
                                     </code>
-                                    <span className="text--600 dark:text-gray-500 ml-auto">
+                                    <span className="text-gray-600 dark:text-gray-500 ml-auto">
                                         {new Date(entry.timestamp).toLocaleDateString()}
                                     </span>
                                 </div>
@@ -1641,14 +1641,14 @@ const PreferencesTab: React.FC = () => {
                         {Object.entries(defaults).slice(0, 12).map(([key, value]) => (
                             <div key={key} className="flex items-center gap-2 p-2 bg-white dark:bg-[#1e2535] rounded">
                                 <code className="text-gray-600 dark:text-gray-400 truncate">{key}</code>
-                                <span className="text--600">=</span>
+                                <span className="text-gray-600">=</span>
                                 <code className="text-blue-600 dark:text-blue-400 truncate">
                                     {typeof value === 'object' ? JSON.stringify(value) : String(value)}
                                 </code>
                             </div>
                         ))}
                         {Object.keys(defaults).length > 12 && (
-                            <div className="text-center text--600 dark:text-gray-500 py-2">
+                            <div className="text-center text-gray-600 dark:text-gray-500 py-2">
                                 +{Object.keys(defaults).length - 12} more
                             </div>
                         )}
@@ -1868,7 +1868,7 @@ const CriticCard: React.FC<{ critic: CriticAgentStats }> = React.memo(({ critic 
                     </div>
                     <div>
                         <p className="text-sm font-semibold text-gray-900 dark:text-white leading-tight">{meta.label}</p>
-                        <p className="text-xs text--600 dark:text-gray-500 font-mono">{meta.id}</p>
+                        <p className="text-xs text-gray-600 dark:text-gray-500 font-mono">{meta.id}</p>
                     </div>
                 </div>
                 <div className="flex flex-col items-end gap-1.5">
@@ -1899,13 +1899,13 @@ const CriticCard: React.FC<{ critic: CriticAgentStats }> = React.memo(({ critic 
                 ].map(({ label, value }) => (
                     <div key={label} className="text-center">
                         <p className="text-base font-bold text-gray-900 dark:text-white">{value}</p>
-                        <p className="text-[10px] text--600 dark:text-gray-500 mt-0.5">{label}</p>
+                        <p className="text-[10px] text-gray-600 dark:text-gray-500 mt-0.5">{label}</p>
                     </div>
                 ))}
             </div>
 
             <div className="mt-3 pt-3 border-t border-gray-100 dark:border-[#1e2535] flex items-center justify-between">
-                <span className="text-xs text--600 dark:text-gray-500">Avg review</span>
+                <span className="text-xs text-gray-600 dark:text-gray-500">Avg review</span>
                 <span className="text-xs font-medium text-gray-600 dark:text-gray-300 font-mono">
                     {fmtMs(critic.avg_review_time_ms)}
                 </span>
@@ -2001,14 +2001,14 @@ const CriticsTab: React.FC<{ onStatsLoaded?: (count: number) => void }> = ({ onS
                 <div className="flex items-center justify-between mb-3">
                     <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
                         Critic Agents
-                        <span className="ml-2 text-xs font-normal text--600 dark:text-gray-500">
+                        <span className="ml-2 text-xs font-normal text-gray-600 dark:text-gray-500">
                             operate outside democratic chain · absolute veto authority
                         </span>
                     </h3>
                     <button aria-label="Refresh stats"
                         onClick={() => loadStats(true)}
                         disabled={refreshing}
-                        className="p-1.5 rounded-lg border border-gray-200 dark:border-[#1e2535] bg-white dark:bg-[#161b27] text--600 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-[#1e2535] transition-all duration-150 disabled:opacity-50"
+                        className="p-1.5 rounded-lg border border-gray-200 dark:border-[#1e2535] bg-white dark:bg-[#161b27] text-gray-600 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-[#1e2535] transition-all duration-150 disabled:opacity-50"
                     >
                         {refreshing ? <LoadingSpinner size="sm" /> : <RefreshCw className="w-3.5 h-3.5" />}
                     </button>
@@ -2035,7 +2035,7 @@ const CriticsTab: React.FC<{ onStatsLoaded?: (count: number) => void }> = ({ onS
             <div className="bg-white dark:bg-[#161b27] rounded-xl border border-gray-200 dark:border-[#1e2535]">
                 <div className="px-5 py-4 border-b border-gray-100 dark:border-[#1e2535]">
                     <p className="text-sm font-semibold text-gray-900 dark:text-white mb-1">Inspect Reviews by Task</p>
-                    <p className="text-xs text--600 dark:text-gray-500">
+                    <p className="text-xs text-gray-600 dark:text-gray-500">
                         Paste a task or subtask ID to see its full critic review history
                     </p>
                 </div>
@@ -2062,11 +2062,11 @@ const CriticsTab: React.FC<{ onStatsLoaded?: (count: number) => void }> = ({ onS
                         <div className="rounded-xl border border-gray-200 dark:border-[#1e2535] overflow-hidden">
                             <div className="px-4 py-3 bg-gray-50 dark:bg-[#0f1117] border-b border-gray-100 dark:border-[#1e2535] flex items-center justify-between">
                                 <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
-                                    Reviews for <span className="font-mono text--600 dark:text-gray-500">{inspectTask.slice(0, 8)}…</span>
+                                    Reviews for <span className="font-mono text-gray-600 dark:text-gray-500">{inspectTask.slice(0, 8)}…</span>
                                 </span>
                                 <button
                                     onClick={() => setShowInspect(false)}
-                                    className="text-xs text--600 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+                                    className="text-xs text-gray-600 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
                                 >
                                     Close
                                 </button>
@@ -2257,7 +2257,7 @@ export const TasksPage: React.FC = () => {
                     <>
                         {/* Filter bar */}
                         <div className="px-6 py-4 border-b border-gray-100 dark:border-[#1e2535] flex flex-wrap items-center gap-3">
-                            <div className="flex items-center gap-2 text--600 dark:text-gray-500">
+                            <div className="flex items-center gap-2 text-gray-600 dark:text-gray-500">
                                 <Filter className="w-4 h-4" />
                                 <span className="text-sm font-medium">Filter:</span>
                             </div>
@@ -2310,7 +2310,7 @@ export const TasksPage: React.FC = () => {
                                 </button>
                             </div>
                             {!isLoading && (
-                                <span className="ml-auto text-xs text--600 dark:text-gray-500">
+                                <span className="ml-auto text-xs text-gray-600 dark:text-gray-500">
                                     {tasks.length} {tasks.length === 1 ? 'task' : 'tasks'}
                                 </span>
                             )}
@@ -2535,19 +2535,19 @@ export const TasksPage: React.FC = () => {
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                         {selectedTaskDetails.governance.constitutional_basis && (
                                             <div>
-                                                <p className="text-[10px] uppercase tracking-wide text--600 dark:text-gray-500 mb-1">Constitutional basis</p>
+                                                <p className="text-[10px] uppercase tracking-wide text-gray-600 dark:text-gray-500 mb-1">Constitutional basis</p>
                                                 <p className="text-xs text-gray-700 dark:text-gray-300">{selectedTaskDetails.governance.constitutional_basis}</p>
                                             </div>
                                         )}
                                         {selectedTaskDetails.governance.hierarchical_id && (
                                             <div>
-                                                <p className="text-[10px] uppercase tracking-wide text--600 dark:text-gray-500 mb-1">Hierarchical ID</p>
+                                                <p className="text-[10px] uppercase tracking-wide text-gray-600 dark:text-gray-500 mb-1">Hierarchical ID</p>
                                                 <p className="text-xs font-mono text-gray-700 dark:text-gray-300">{selectedTaskDetails.governance.hierarchical_id}</p>
                                             </div>
                                         )}
                                         {selectedTaskDetails.governance.parent_task_id && (
                                             <div>
-                                                <p className="text-[10px] uppercase tracking-wide text--600 dark:text-gray-500 mb-1">Parent task</p>
+                                                <p className="text-[10px] uppercase tracking-wide text-gray-600 dark:text-gray-500 mb-1">Parent task</p>
                                                 <p className="text-xs font-mono text-gray-700 dark:text-gray-300">{selectedTaskDetails.governance.parent_task_id}</p>
                                             </div>
                                         )}

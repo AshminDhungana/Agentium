@@ -206,7 +206,7 @@ export const CitationGraph: React.FC = () => {
       <div className="bg-white dark:bg-[#161b27] rounded-xl border border-gray-200 dark:border-[#1e2535] p-4 shadow-sm dark:shadow-[0_2px_16px_rgba(0,0,0,0.25)]">
         <div className="flex gap-2">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text--600 dark:text-gray-500" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600 dark:text-gray-500" />
             <input
               type="text"
               value={searchQuery}
@@ -292,12 +292,12 @@ export const CitationGraph: React.FC = () => {
             style={{ height: HEIGHT }}
           >
             {nodes.length === 0 && !loading ? (
-              <div className="absolute inset-0 flex flex-col items-center justify-center text--600 dark:text-gray-500 gap-3">
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-600 dark:text-gray-500 gap-3">
                 <Network className="w-12 h-12 opacity-40" />
                 <p className="text-sm">Enter a document ID above or click a top-cited document</p>
               </div>
             ) : loading ? (
-              <div className="absolute inset-0 flex items-center justify-center text--600 dark:text-gray-500 gap-2">
+              <div className="absolute inset-0 flex items-center justify-center text-gray-600 dark:text-gray-500 gap-2">
                 <LoadingSpinner size="md" />
                 <span className="text-sm">Loading graph…</span>
               </div>
@@ -497,12 +497,12 @@ export const CitationGraph: React.FC = () => {
             </div>
             <div className="max-h-[360px] overflow-y-auto">
               {statsLoading ? (
-                <div className="flex items-center justify-center py-8 text--600 dark:text-gray-500 gap-2">
+                <div className="flex items-center justify-center py-8 text-gray-600 dark:text-gray-500 gap-2">
                   <LoadingSpinner size="sm" />
                   <span className="text-sm">Loading…</span>
                 </div>
               ) : topCited.length === 0 ? (
-                <div className="text-center py-8 text--600 dark:text-gray-500">
+                <div className="text-center py-8 text-gray-600 dark:text-gray-500">
                   <BarChart3 className="w-8 h-8 mx-auto mb-2 opacity-40" />
                   <p className="text-sm">No citation data yet</p>
                   <p className="text-xs mt-1">Citations are recorded during RAG retrieval</p>

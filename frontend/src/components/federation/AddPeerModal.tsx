@@ -196,7 +196,7 @@ export function AddPeerModal({ isSubmitting, onClose, onSubmit }: AddPeerModalPr
                             className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5"
                         >
                             Capabilities{' '}
-                            <span className="text--600 dark:text-gray-500 font-normal">(comma-separated, optional)</span>
+                            <span className="text-gray-600 dark:text-gray-500 font-normal">(comma-separated, optional)</span>
                         </label>
                         <input
                             id="peer-capabilities"

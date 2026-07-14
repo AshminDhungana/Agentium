@@ -137,7 +137,7 @@ function InstallNotification({ info, onClose }: InstallNotificationProps) {
         </div>
         <button
           onClick={onClose}
-          className="ml-2 mt-0.5 text--600 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors flex-shrink-0"
+          className="ml-2 mt-0.5 text-gray-600 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors flex-shrink-0"
           aria-label="Dismiss"
         >
           <X className="h-4 w-4" />
@@ -154,7 +154,7 @@ function InstallNotification({ info, onClose }: InstallNotificationProps) {
 
         {info.commands.map((item, idx) => (
           <div key={idx} className="mb-2 last:mb-0">
-            <p className="text-[10px] text--600 dark:text-gray-500 mb-1 uppercase tracking-wide">
+            <p className="text-[10px] text-gray-600 dark:text-gray-500 mb-1 uppercase tracking-wide">
               {item.caption}
             </p>
             <div className="group flex items-center gap-2 bg-gray-50 dark:bg-black/50 border border-gray-200 dark:border-[#1e2535] rounded-lg px-3 py-2">
@@ -163,7 +163,7 @@ function InstallNotification({ info, onClose }: InstallNotificationProps) {
               </code>
               <button
                 onClick={() => handleCopy(item.cmd, idx)}
-                className="flex-shrink-0 text--600 hover:text-gray-600 dark:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                className="flex-shrink-0 text-gray-600 hover:text-gray-600 dark:text-gray-600 dark:hover:text-gray-300 transition-colors"
                 aria-label="Copy command"
               >
                 {copied === idx
@@ -178,7 +178,7 @@ function InstallNotification({ info, onClose }: InstallNotificationProps) {
 
       {/* Footer */}
       <div className="px-4 py-3 border-t border-gray-100 dark:border-[#1e2535] flex items-center justify-between">
-        <p className="text-[10px] text--600 dark:text-gray-600">
+        <p className="text-[10px] text-gray-600 dark:text-gray-600">
           After running, click the mic icon to reconnect.
         </p>
         <button
@@ -266,7 +266,7 @@ export function VoiceIndicator({ iconOnly = false }: VoiceIndicatorProps) {
   const effectiveStatus: BridgeStatus = isDisabled ? 'offline' : status;
 
   const cfg: Record<BridgeStatus, { label: string; color: string; ring: string }> = {
-    offline:    { label: 'Voice offline',  color: 'text--600 dark:text-gray-500',     ring: 'focus:ring-gray-500/30' },
+    offline:    { label: 'Voice offline',  color: 'text-gray-600 dark:text-gray-500',     ring: 'focus:ring-gray-500/30' },
     connecting: { label: 'Connecting…',    color: 'text-amber-700 dark:text-amber-400',   ring: 'focus:ring-amber-500/30' },
     connected:  { label: 'Voice ready',    color: 'text-emerald-700 dark:text-emerald-400', ring: 'focus:ring-emerald-500/30' },
     error:      { label: 'Voice error',    color: 'text-red-600 dark:text-red-400',       ring: 'focus:ring-red-500/30' },

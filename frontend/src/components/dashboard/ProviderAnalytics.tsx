@@ -73,7 +73,7 @@ const ChartTooltip = ({ active, payload, label, prefix = '', suffix = '' }: any)
     if (!active || !payload?.length) return null;
     return (
         <div className="bg-[#1a2035] border border-[#2a3347] rounded-lg px-3 py-2 text-xs shadow-xl">
-            <p className="text--600 mb-1">{label}</p>
+            <p className="text-gray-600 mb-1">{label}</p>
             {payload.map((p: any) => (
                 <p key={p.dataKey} style={{ color: p.color ?? p.fill }} className="font-semibold">
                     {p.name}: {prefix}{typeof p.value === 'number' ? p.value.toFixed(p.value < 1 ? 6 : 1) : p.value}{suffix}
@@ -98,11 +98,11 @@ function KpiPill({ icon: Icon, label, value, color }: { icon: any; label: string
 }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
-    return <p className="text-[11px] font-semibold text--600 uppercase tracking-wider mb-3">{children}</p>;
+    return <p className="text-[11px] font-semibold text-gray-600 uppercase tracking-wider mb-3">{children}</p>;
 }
 
 function EmptyChart({ message = 'No data yet' }: { message?: string }) {
-    return <div className="h-40 flex items-center justify-center text-xs text--600">{message}</div>;
+    return <div className="h-40 flex items-center justify-center text-xs text-gray-600">{message}</div>;
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
@@ -171,7 +171,7 @@ export function ProviderAnalytics() {
                     </div>
                     <div>
                         <h2 className="text-base font-semibold text-gray-900 dark:text-white leading-none">Provider Analytics</h2>
-                        {lastUpdated && <p className="text-[10px] text--600 mt-0.5">Updated {lastUpdated.toLocaleTimeString()}</p>}
+                        {lastUpdated && <p className="text-[10px] text-gray-600 mt-0.5">Updated {lastUpdated.toLocaleTimeString()}</p>}
                     </div>
                 </div>
 
@@ -187,10 +187,10 @@ export function ProviderAnalytics() {
                         <option value={90}>Last 90 days</option>
                     </select>
 
-                    <button onClick={fetchAll} disabled={loading} className="p-1.5 rounded-lg text--600 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#1e2535] transition-colors" title="Refresh">
+                    <button onClick={fetchAll} disabled={loading} className="p-1.5 rounded-lg text-gray-600 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#1e2535] transition-colors" title="Refresh">
                         {loading ? <LoadingSpinner size="sm" /> : <RefreshCw className="w-3.5 h-3.5" />}
                     </button>
-                    <button onClick={() => setExpanded(v => !v)} className="p-1.5 rounded-lg text--600 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#1e2535] transition-colors">
+                    <button onClick={() => setExpanded(v => !v)} className="p-1.5 rounded-lg text-gray-600 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#1e2535] transition-colors">
                         {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                     </button>
                 </div>
@@ -208,7 +208,7 @@ export function ProviderAnalytics() {
             {loading && (
                 <div className="px-6 py-10 flex items-center justify-center gap-2">
                     <LoadingSpinner size="md" />
-                    <span className="text-sm text--600">Loading analytics…</span>
+                    <span className="text-sm text-gray-600">Loading analytics…</span>
                 </div>
             )}
 
@@ -216,7 +216,7 @@ export function ProviderAnalytics() {
             {!loading && !error && summary.length === 0 && (
                 <div className="px-6 py-10 text-center">
                     <p className="text-sm text-gray-600 dark:text-gray-400">No usage data for this period.</p>
-                    <p className="text-xs text--600 mt-1">Data appears once agents start making API calls.</p>
+                    <p className="text-xs text-gray-600 mt-1">Data appears once agents start making API calls.</p>
                 </div>
             )}
 
@@ -311,7 +311,7 @@ export function ProviderAnalytics() {
                         <div className="overflow-x-auto rounded-lg border border-gray-100 dark:border-[#1e2535]">
                             <table className="w-full text-xs">
                                 <thead>
-                                    <tr className="bg-gray-50 dark:bg-[#0f1117] text--600">
+                                    <tr className="bg-gray-50 dark:bg-[#0f1117] text-gray-600">
                                         <th className="text-left px-4 py-2.5 font-semibold">Provider</th>
                                         <th className="text-left px-4 py-2.5 font-semibold">Model</th>
                                         <th className="text-right px-4 py-2.5 font-semibold">Requests</th>

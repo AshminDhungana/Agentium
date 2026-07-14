@@ -223,7 +223,7 @@ export default function BudgetControl() {
                                     step="1000"
                                     className="w-full px-3 py-2 text-sm bg-white dark:bg-[#0f1117] border border-gray-200 dark:border-[#1e2535] rounded-lg text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition-colors duration-150"
                                 />
-                                <p className="text-xs text--600 dark:text-gray-500">Minimum: 1,000 tokens</p>
+                                <p className="text-xs text-gray-600 dark:text-gray-500">Minimum: 1,000 tokens</p>
                             </div>
 
                             <div className="space-y-1.5">
@@ -239,7 +239,7 @@ export default function BudgetControl() {
                                     step="0.1"
                                     className="w-full px-3 py-2 text-sm bg-white dark:bg-[#0f1117] border border-gray-200 dark:border-[#1e2535] rounded-lg text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition-colors duration-150"
                                 />
-                                <p className="text-xs text--600 dark:text-gray-500">Maximum: $ as much as you want/day</p>
+                                <p className="text-xs text-gray-600 dark:text-gray-500">Maximum: $ as much as you want/day</p>
                             </div>
                         </div>
 

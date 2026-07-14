@@ -81,7 +81,7 @@ export function GovernanceTab() {
 
     if (isLoading) {
         return (
-            <div className="flex items-center justify-center py-24 text--600 dark:text-gray-500">
+            <div className="flex items-center justify-center py-24 text-gray-600 dark:text-gray-500">
                 <LoadingSpinner size="md" label="Loading governance status…" />
             </div>
         );

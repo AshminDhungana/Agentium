@@ -181,7 +181,7 @@ export const StepPalette: React.FC<StepPaletteProps> = ({ onAddNode, variant }) 
       `}
     >
       {isSidebar && (
-        <h3 className="text-xs font-bold text--600 dark:text-gray-500 uppercase tracking-widest mb-3 px-1">
+        <h3 className="text-xs font-bold text-gray-600 dark:text-gray-500 uppercase tracking-widest mb-3 px-1">
           Step Types
         </h3>
       )}

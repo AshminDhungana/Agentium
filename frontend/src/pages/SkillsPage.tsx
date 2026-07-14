@@ -339,7 +339,7 @@ export const SkillsPage: React.FC = () => {
           <div className="bg-white dark:bg-[#161b27] rounded-xl border border-gray-200 dark:border-[#1e2535] p-4 mb-6 shadow-sm dark:shadow-[0_2px_16px_rgba(0,0,0,0.25)]">
             <div className="flex gap-2">
               <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text--600 dark:text-gray-500" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600 dark:text-gray-500" />
                 <input
                   type="text"
                   value={query}
@@ -474,7 +474,7 @@ export const SkillsPage: React.FC = () => {
                   <div className="flex items-center gap-2 mt-3">
                     <button
                       onClick={() => openEditModal(skill)}
-                      className="flex items-center gap-1 px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text--600 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition-colors"
+                      className="flex items-center gap-1 px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-gray-600 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition-colors"
                     >
                       <Edit3 className="w-3.5 h-3.5" />
                       Edit
@@ -521,7 +521,7 @@ export const SkillsPage: React.FC = () => {
                   setEditingSkill(null);
                   setFormData(INITIAL_FORM_DATA);
                 }}
-                className="p-2 text--600 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#1e2535] rounded-lg transition-colors"
+                className="p-2 text-gray-600 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#1e2535] rounded-lg transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -661,7 +661,7 @@ export const SkillsPage: React.FC = () => {
                   Code Template
                 </label>
                 <div className="relative">
-                  <Code2 className="absolute left-3 top-3 w-4 h-4 text--600 dark:text-gray-500" />
+                  <Code2 className="absolute left-3 top-3 w-4 h-4 text-gray-600 dark:text-gray-500" />
                   <textarea
                     value={formData.code_template}
                     onChange={(e) => setFormData({ ...formData, code_template: e.target.value })}
@@ -934,7 +934,7 @@ const SkillCard: React.FC<{
     <div className="p-5">
       <div className="flex justify-between items-start mb-3">
         <div className="flex items-center gap-3">
-          <h3 className="font-semibold text-gray-900 dark:text-white text-base cursor-pointer hover:text-blue-600 dark:hover:text--600 transition-colors" onClick={onToggle}>
+          <h3 className="font-semibold text-gray-900 dark:text-white text-base cursor-pointer hover:text-blue-600 dark:hover:text-gray-600 transition-colors" onClick={onToggle}>
             {result.metadata.display_name}
           </h3>
           <span className={`px-2 py-0.5 text-xs font-medium rounded-full border ${result.metadata.verification_status === 'verified' ? 'bg-green-100 dark:bg-green-500/10 text-green-700 dark:text-green-400 border-green-200 dark:border-green-500/20' : result.metadata.verification_status === 'pending' ? 'bg-yellow-100 dark:bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-200 dark:border-yellow-500/20' : 'bg-red-100 dark:bg-red-500/10 text-red-700 dark:text-red-400 border-red-200 dark:border-red-500/20'}`}>
@@ -945,7 +945,7 @@ const SkillCard: React.FC<{
           <span className="px-2 py-1 bg-blue-100 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 text-xs font-semibold rounded-full border border-blue-200 dark:border-blue-500/20">
             {(result.relevance_score * 100).toFixed(0)}% match
           </span>
-          <button onClick={onToggle} className="p-1 text--600 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
+          <button onClick={onToggle} className="p-1 text-gray-600 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
             {expanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
           </button>
         </div>
@@ -982,14 +982,14 @@ const SkillCard: React.FC<{
           <div className="flex items-center gap-1">
             <button
               onClick={() => onEdit(result.metadata)}
-              className="p-2 text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text--600 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition-colors"
+              className="p-2 text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-gray-600 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition-colors"
               title="Edit skill"
             >
               <Edit3 className="w-4 h-4" />
             </button>
             <button
               onClick={() => onDelete(result.skill_id)}
-              className="p-2 text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text--600 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors"
+              className="p-2 text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-gray-600 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors"
               title="Delete skill"
             >
               <Trash2 className="w-4 h-4" />
@@ -1020,11 +1020,11 @@ const SkillCard: React.FC<{
 const PopularSkillCard: React.FC<{ skill: Skill }> = ({ skill }) => (
   <div className="bg-white dark:bg-[#161b27] rounded-xl border border-gray-200 dark:border-[#1e2535] p-4 hover:border-gray-300 dark:hover:border-[#2a3347] hover:shadow-md dark:hover:shadow-[0_4px_20px_rgba(0,0,0,0.35)] transition-all duration-150 cursor-pointer group">
     <div className="flex items-start justify-between mb-2">
-      <h4 className="font-semibold text-gray-900 dark:text-white text-sm group-hover:text-blue-600 dark:group-hover:text--600 transition-colors">
+      <h4 className="font-semibold text-gray-900 dark:text-white text-sm group-hover:text-blue-600 dark:group-hover:text-gray-600 transition-colors">
         {skill.display_name}
       </h4>
       <div className="w-6 h-6 rounded-md bg-gray-100 dark:bg-[#1e2535] flex items-center justify-center group-hover:bg-blue-100 dark:group-hover:bg-blue-500/10 transition-colors">
-        <BookOpen className="w-3.5 h-3.5 text--600 dark:text-gray-500 group-hover:text-blue-600 dark:group-hover:text--600" />
+        <BookOpen className="w-3.5 h-3.5 text-gray-600 dark:text-gray-500 group-hover:text-blue-600 dark:group-hover:text-gray-600" />
       </div>
     </div>
     

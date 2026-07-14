@@ -139,7 +139,7 @@ export function AuditTrailTab() {
                     </div>
 
                     <div className="relative w-full sm:w-80">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text--600 dark:text-gray-500" />
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600 dark:text-gray-500" />
                         <input
                             type="text"
                             placeholder="Search actor, target, or description…"
@@ -159,7 +159,7 @@ export function AuditTrailTab() {
             ) : logs.length === 0 ? (
                 <div className="p-16 text-center">
                     <div className="w-14 h-14 rounded-xl bg-gray-100 dark:bg-[#1e2535] border border-gray-200 dark:border-[#2a3347] flex items-center justify-center mx-auto mb-4">
-                        <Shield className="w-6 h-6 text--600 dark:text-gray-500" />
+                        <Shield className="w-6 h-6 text-gray-600 dark:text-gray-500" />
                     </div>
                     <p className="text-gray-900 dark:text-white font-medium mb-1">
                         No Escalation Events
@@ -215,7 +215,7 @@ export function AuditTrailTab() {
                                                         <p className="text-xs font-medium text-gray-900 dark:text-white font-mono">
                                                             {truncateId(log.actor.id)}
                                                         </p>
-                                                        <p className="text-xs text--600 dark:text-gray-500">
+                                                        <p className="text-xs text-gray-600 dark:text-gray-500">
                                                             {log.actor.type}
                                                         </p>
                                                     </div>
@@ -238,12 +238,12 @@ export function AuditTrailTab() {
                                                         <p className="text-xs font-medium text-gray-900 dark:text-white font-mono">
                                                             {truncateId(log.target.id)}
                                                         </p>
-                                                        <p className="text-xs text--600 dark:text-gray-500">
+                                                        <p className="text-xs text-gray-600 dark:text-gray-500">
                                                             {log.target.type}
                                                         </p>
                                                     </div>
                                                 ) : (
-                                                    <span className="text--600 dark:text-gray-500 text-xs">—</span>
+                                                    <span className="text-gray-600 dark:text-gray-500 text-xs">—</span>
                                                 )}
                                             </td>
 
@@ -341,7 +341,7 @@ export function AuditTrailTab() {
 
                                                                 {/* Delegation ID */}
                                                                 {log.metadata?.delegation_id && (
-                                                                    <p className="text-xs font-mono text--600 dark:text-gray-500">
+                                                                    <p className="text-xs font-mono text-gray-600 dark:text-gray-500">
                                                                         Delegation ID: {log.metadata.delegation_id}
                                                                     </p>
                                                                 )}
@@ -349,7 +349,7 @@ export function AuditTrailTab() {
                                                         )}
 
                                                         {/* Event ID */}
-                                                        <p className="text-xs font-mono text--600 dark:text-gray-500 pt-1 border-t border-gray-200 dark:border-[#2a3347]">
+                                                        <p className="text-xs font-mono text-gray-600 dark:text-gray-500 pt-1 border-t border-gray-200 dark:border-[#2a3347]">
                                                             Event ID: {log.id}
                                                         </p>
                                                     </div>

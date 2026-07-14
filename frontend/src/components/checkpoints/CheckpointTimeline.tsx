@@ -226,7 +226,7 @@ const CheckpointRow: React.FC<CheckpointRowProps> = ({
                         </div>
 
                         {/* Expand chevron */}
-                        <div className="flex-shrink-0 mt-0.5 text--600 dark:text-slate-500">
+                        <div className="flex-shrink-0 mt-0.5 text-gray-600 dark:text-slate-500">
                             {isExpanded
                                 ? <ChevronDown className="w-4 h-4" />
                                 : <ChevronRight className="w-4 h-4" />
@@ -366,7 +366,7 @@ const CheckpointRow: React.FC<CheckpointRowProps> = ({
                             </div>
                             <button
                                 onClick={(e) => { e.stopPropagation(); setIsInspectorOpen(false); }}
-                                className="p-2 -mr-2 text--600 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-[#1e2535] dark:hover:text-slate-300 rounded-lg transition-colors"
+                                className="p-2 -mr-2 text-gray-600 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-[#1e2535] dark:hover:text-slate-300 rounded-lg transition-colors"
                             >
                                 <X className="w-5 h-5" />
                             </button>
@@ -494,7 +494,7 @@ export const CheckpointTimeline: React.FC<CheckpointTimelineProps> = ({
     // ── Loading state ─────────────────────────────────────────────────────────
     if (isLoading) {
         return (
-            <div className="flex flex-col items-center justify-center py-12 gap-3 text--600 dark:text-slate-500">
+            <div className="flex flex-col items-center justify-center py-12 gap-3 text-gray-600 dark:text-slate-500">
                 <LoadingSpinner size="md" />
                 <span className="text-sm">Loading checkpoints…</span>
             </div>
@@ -505,7 +505,7 @@ export const CheckpointTimeline: React.FC<CheckpointTimelineProps> = ({
     if (error) {
         return (
             <div className="flex flex-col items-center justify-center py-12 gap-3">
-                <AlertCircle className="w-8 h-8 text--600 dark:text-red-500 opacity-60" />
+                <AlertCircle className="w-8 h-8 text-gray-600 dark:text-red-500 opacity-60" />
                 <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
                 <button
                     onClick={() => load()}
@@ -520,10 +520,10 @@ export const CheckpointTimeline: React.FC<CheckpointTimelineProps> = ({
     // ── Empty state ───────────────────────────────────────────────────────────
     if (checkpoints.length === 0) {
         return (
-            <div className="flex flex-col items-center justify-center py-12 gap-3 text--600 dark:text-slate-500">
+            <div className="flex flex-col items-center justify-center py-12 gap-3 text-gray-600 dark:text-slate-500">
                 <Milestone className="w-8 h-8 opacity-40" />
                 <p className="text-sm">No checkpoints recorded yet.</p>
-                <p className="text-xs text--600 dark:text-slate-600">
+                <p className="text-xs text-gray-600 dark:text-slate-600">
                     Checkpoints are created automatically at plan, execution, and critique phases.
                 </p>
                 <button
@@ -622,7 +622,7 @@ export const CheckpointTimeline: React.FC<CheckpointTimelineProps> = ({
                                 </select>
                             </div>
 
-                            <div className="flex justify-center text--600">
+                            <div className="flex justify-center text-gray-600">
                                 <ArrowRightLeft className="w-4 h-4" />
                             </div>
 

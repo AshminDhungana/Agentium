@@ -130,7 +130,7 @@ export const FinancialBurnDashboard: React.FC = () => {
 
     if (isLoading) {
         return (
-            <div className="flex flex-col items-center justify-center py-20 gap-3 text--600 dark:text-slate-500">
+            <div className="flex flex-col items-center justify-center py-20 gap-3 text-gray-600 dark:text-slate-500">
                 <LoadingSpinner size="lg" />
                 <span>Loading financial metrics...</span>
             </div>
@@ -190,7 +190,7 @@ export const FinancialBurnDashboard: React.FC = () => {
                             style={{ width: `${Math.min(usage.cost_percentage_used ?? 0, 100)}%` }}
                         />
                     </div>
-                    <p className="text-xs text--600 dark:text-slate-500 mt-2 flex justify-between">
+                    <p className="text-xs text-gray-600 dark:text-slate-500 mt-2 flex justify-between">
                         <span>{(usage.cost_percentage_used ?? 0).toFixed(1)}% of limit</span>
                         <span>Max ${current_limits.daily_cost_limit}</span>
                     </p>
@@ -213,7 +213,7 @@ export const FinancialBurnDashboard: React.FC = () => {
                             style={{ width: `${Math.min(usage.cost_percentage_tokens ?? 0, 100)}%` }}
                         />
                     </div>
-                    <p className="text-xs text--600 dark:text-slate-500 mt-2 flex justify-between">
+                    <p className="text-xs text-gray-600 dark:text-slate-500 mt-2 flex justify-between">
                         <span>{(usage.cost_percentage_tokens ?? 0).toFixed(1)}% of limit</span>
                         <span>Max {((current_limits.daily_token_limit ?? 0) / 1000).toFixed(0)}k</span>
                     </p>
@@ -230,7 +230,7 @@ export const FinancialBurnDashboard: React.FC = () => {
                         </span>
                     </div>
                     <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-2">7-Day Total Spend</p>
-                    <p className="text-xs text--600 dark:text-slate-500">
+                    <p className="text-xs text-gray-600 dark:text-slate-500">
                         Avg ${((history.total_cost_usd ?? 0) / (history.period_days || 1)).toFixed(2)} / day
                     </p>
                 </div>
@@ -246,7 +246,7 @@ export const FinancialBurnDashboard: React.FC = () => {
                         </span>
                     </div>
                     <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-2">7-Day Total Requests</p>
-                    <p className="text-xs text--600 dark:text-slate-500">
+                    <p className="text-xs text-gray-600 dark:text-slate-500">
                         {(history.total_requests ? (history.total_tokens / history.total_requests) : 0).toFixed(0)} avg tokens per req
                     </p>
                 </div>

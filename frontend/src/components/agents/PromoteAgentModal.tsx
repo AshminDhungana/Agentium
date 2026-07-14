@@ -78,7 +78,7 @@ export const PromoteAgentModal: React.FC<PromoteAgentModalProps> = ({
                         aria-label="Close"
                         onClick={onClose}
                         disabled={isLoading}
-                        className="w-8 h-8 rounded-lg flex items-center justify-center text--600 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#1e2535] transition-colors duration-150 disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-600 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#1e2535] transition-colors duration-150 disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                         <X className="w-4 h-4" />
                     </button>
@@ -132,7 +132,7 @@ export const PromoteAgentModal: React.FC<PromoteAgentModalProps> = ({
                     <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                             Justification
-                            <span className="ml-1.5 text-xs text--600 dark:text-gray-500 font-normal">
+                            <span className="ml-1.5 text-xs text-gray-600 dark:text-gray-500 font-normal">
                                 ({reason.length}/{AGENT_REASON_MAX_LENGTH} · min {AGENT_REASON_MIN_LENGTH})
                             </span>
                         </label>

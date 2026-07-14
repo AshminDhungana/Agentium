@@ -246,7 +246,7 @@ const DeveloperPortalPage: React.FC = () => {
                 <div className="flex items-center gap-3 bg-gray-50 dark:bg-[#0f1117] p-1.5 rounded-lg border border-gray-200 dark:border-[#1e2535]">
                     <code className="text-sm text-gray-700 dark:text-gray-300 font-mono px-3 whitespace-nowrap">pip install agentium-sdk</code>
                     <button 
-                        className="p-1.5 text-gray-600 hover:text-blue-600 dark:text-gray-400 dark:hover:text--600 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded transition-colors"
+                        className="p-1.5 text-gray-600 hover:text-blue-600 dark:text-gray-400 dark:hover:text-gray-600 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded transition-colors"
                         onClick={() => copyToClipboard('pip install agentium-sdk', 'py-install')}
                         title="Copy install command"
                     >
@@ -257,7 +257,7 @@ const DeveloperPortalPage: React.FC = () => {
               <div className="relative group rounded-xl overflow-hidden border border-gray-200 dark:border-[#1e2535] bg-[#0d1117]">
                   <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button 
-                          className="p-2 bg-[#161b27] border border-[#2a3347] text--600 hover:text-white rounded-lg shadow-sm transition-colors"
+                          className="p-2 bg-[#161b27] border border-[#2a3347] text-gray-600 hover:text-white rounded-lg shadow-sm transition-colors"
                           onClick={() => copyToClipboard(PYTHON_SAMPLE, 'py-code')}
                           title="Copy Code"
                       >
@@ -281,7 +281,7 @@ const DeveloperPortalPage: React.FC = () => {
                 <div className="flex items-center gap-3 bg-gray-50 dark:bg-[#0f1117] p-1.5 rounded-lg border border-gray-200 dark:border-[#1e2535]">
                     <code className="text-sm text-gray-700 dark:text-gray-300 font-mono px-3 whitespace-nowrap">npm install @agentium/sdk</code>
                     <button 
-                        className="p-1.5 text-gray-600 hover:text-blue-600 dark:text-gray-400 dark:hover:text--600 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded transition-colors"
+                        className="p-1.5 text-gray-600 hover:text-blue-600 dark:text-gray-400 dark:hover:text-gray-600 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded transition-colors"
                         onClick={() => copyToClipboard('npm install @agentium/sdk', 'ts-install')}
                         title="Copy install command"
                     >
@@ -292,7 +292,7 @@ const DeveloperPortalPage: React.FC = () => {
               <div className="relative group rounded-xl overflow-hidden border border-gray-200 dark:border-[#1e2535] bg-[#0d1117]">
                   <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button 
-                          className="p-2 bg-[#161b27] border border-[#2a3347] text--600 hover:text-white rounded-lg shadow-sm transition-colors"
+                          className="p-2 bg-[#161b27] border border-[#2a3347] text-gray-600 hover:text-white rounded-lg shadow-sm transition-colors"
                           onClick={() => copyToClipboard(TS_SAMPLE, 'ts-code')}
                           title="Copy Code"
                       >
@@ -315,7 +315,7 @@ const DeveloperPortalPage: React.FC = () => {
               <div className="relative group rounded-xl overflow-hidden border border-gray-200 dark:border-[#1e2535] bg-[#0d1117]">
                   <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button 
-                          className="p-2 bg-[#161b27] border border-[#2a3347] text--600 hover:text-white rounded-lg shadow-sm transition-colors"
+                          className="p-2 bg-[#161b27] border border-[#2a3347] text-gray-600 hover:text-white rounded-lg shadow-sm transition-colors"
                           onClick={() => copyToClipboard(CURL_SAMPLE, 'curl-code')}
                           title="Copy Code"
                       >
@@ -364,7 +364,7 @@ const DeveloperPortalPage: React.FC = () => {
                 <div className="relative group rounded-xl overflow-hidden border border-gray-200 dark:border-[#1e2535] bg-[#0d1117]">
                   <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button 
-                          className="p-2 bg-[#161b27] border border-[#2a3347] text--600 hover:text-white rounded-lg shadow-sm transition-colors"
+                          className="p-2 bg-[#161b27] border border-[#2a3347] text-gray-600 hover:text-white rounded-lg shadow-sm transition-colors"
                           onClick={() => copyToClipboard(`import hmac, hashlib
 
 def verify_signature(secret: str, body: bytes, signature: str) -> bool:

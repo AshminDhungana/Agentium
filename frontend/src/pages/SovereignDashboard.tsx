@@ -280,7 +280,7 @@ export function SovereignDashboard() {
                         })}
                     </div>
                 </div>
-                <p className="mt-2 ml-1 text-xs text--600 dark:text-gray-500">
+                <p className="mt-2 ml-1 text-xs text-gray-600 dark:text-gray-500">
                     {TABS.find((t) => t.id === activeTab)?.description}
                 </p>
             </div>

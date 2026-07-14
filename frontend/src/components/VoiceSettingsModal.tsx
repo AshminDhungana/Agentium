@@ -141,7 +141,7 @@ export function VoiceSettingsModal({ onClose }: VoiceSettingsModalProps) {
                         </div>
                         <h2 className="text-lg font-bold text-gray-900 dark:text-white">Voice Settings</h2>
                     </div>
-                    <button onClick={onClose} aria-label="Close settings" title="Close" className="p-2 text--600 hover:bg-gray-100 dark:hover:bg-[#1e2535] rounded-xl transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <button onClick={onClose} aria-label="Close settings" title="Close" className="p-2 text-gray-600 hover:bg-gray-100 dark:hover:bg-[#1e2535] rounded-xl transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500">
                         <X className="w-5 h-5" />
                     </button>
                 </div>
@@ -210,7 +210,7 @@ export function VoiceSettingsModal({ onClose }: VoiceSettingsModalProps) {
                                             onClick={() => handleDelete(speaker.id)}
                                             aria-label={`Delete ${speaker.name}`}
                                             title="Delete"
-                                            className="p-2 text--600 hover:bg-red-50 dark:hover:bg-red-500/10 hover:text-red-600 dark:hover:text--600 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            className="p-2 text-gray-600 hover:bg-red-50 dark:hover:bg-red-500/10 hover:text-red-600 dark:hover:text-gray-600 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
                                         >
                                             <Trash2 className="w-4 h-4" />
                                         </button>

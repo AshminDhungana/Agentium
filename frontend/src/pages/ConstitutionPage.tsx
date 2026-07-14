@@ -115,8 +115,8 @@ function Section({
                     </div>
                     {collapsible && (
                         open
-                            ? <ChevronUp className="h-4 w-4 text--600 dark:text-gray-500" />
-                            : <ChevronDown className="h-4 w-4 text--600 dark:text-gray-500" />
+                            ? <ChevronUp className="h-4 w-4 text-gray-600 dark:text-gray-500" />
+                            : <ChevronDown className="h-4 w-4 text-gray-600 dark:text-gray-500" />
                     )}
                 </button>
 
@@ -213,7 +213,7 @@ function ArticleCard({
                             <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
                                 {displayContent
                                     ? highlightText(displayContent, searchQuery)
-                                    : <span className="italic text--600 dark:text-gray-600">No content defined.</span>
+                                    : <span className="italic text-gray-600 dark:text-gray-600">No content defined.</span>
                                 }
                             </p>
                         )}
@@ -661,7 +661,7 @@ export function ConstitutionPage() {
                 {/* ── Search Bar ───────────────────────────────────────────── */}
                 {!isEditing && (
                     <div className="relative">
-                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text--600 dark:text-gray-500 pointer-events-none" />
+                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-600 dark:text-gray-500 pointer-events-none" />
                         <input
                             type="text"
                             placeholder="Search articles by title or content…"
@@ -677,7 +677,7 @@ export function ConstitutionPage() {
                             <button
                                 aria-label="Clear search"
                                 onClick={() => setSearchQuery('')}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text--600 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
                             >
                                 <XCircle className="h-4 w-4" />
                             </button>
@@ -752,7 +752,7 @@ export function ConstitutionPage() {
                                     Amendment History
                                 </h2>
                                 {!amendmentsLoading && (
-                                    <span className="text-xs text--600 dark:text-gray-500">
+                                    <span className="text-xs text-gray-600 dark:text-gray-500">
                                         {amendments.length} concluded
                                     </span>
                                 )}
@@ -776,7 +776,7 @@ export function ConstitutionPage() {
                             </div>
 
                             {amendmentsLoading ? (
-                                <div className="flex items-center justify-center py-10 gap-2 text--600 dark:text-gray-500">
+                                <div className="flex items-center justify-center py-10 gap-2 text-gray-600 dark:text-gray-500">
                                     <LoadingSpinner size="md" />
                                     <span className="text-sm">Loading history…</span>
                                 </div>
@@ -846,12 +846,12 @@ export function ConstitutionPage() {
                                                                             ✓ {amendment.votes_for}
                                                                         </span>
                                                                         <span className="text-red-600 dark:text-red-400 font-medium">✗ {amendment.votes_against}</span>
-                                                                        <span className="text--600 dark:text-gray-500">— {amendment.votes_abstain}</span>
+                                                                        <span className="text-gray-600 dark:text-gray-500">— {amendment.votes_abstain}</span>
                                                                     </div>
                                                                 )}
                                                             </div>
                                                             <div className="flex-shrink-0 text-right">
-                                                                <p className="text-xs text--600 dark:text-gray-500 flex items-center gap-1 justify-end">
+                                                                <p className="text-xs text-gray-600 dark:text-gray-500 flex items-center gap-1 justify-end">
                                                                     <Clock className="w-3 h-3" />
                                                                     {date ? new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
                                                                 </p>
@@ -912,7 +912,7 @@ export function ConstitutionPage() {
                             />
                         ))}
                         {!isEditing && Object.keys(filteredArticles).length === 0 && searchQuery && (
-                            <div className="py-8 text-center text-sm text--600 dark:text-gray-500 italic">
+                            <div className="py-8 text-center text-sm text-gray-600 dark:text-gray-500 italic">
                                 No articles match "{searchQuery}"
                             </div>
                         )}
@@ -935,7 +935,7 @@ export function ConstitutionPage() {
                                 className="w-full h-32 p-4 rounded-xl border border-gray-300 dark:border-[#1e2535] bg-white dark:bg-[#0f1117] text-sm font-mono text-gray-700 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-red-500/40 dark:focus:ring-red-500/25 focus:border-red-500 dark:focus:border-red-500/50 resize-none transition duration-150"
                                 placeholder="One prohibited action per line…"
                             />
-                            <p className="text-xs text--600 dark:text-gray-500">Enter one prohibited action per line.</p>
+                            <p className="text-xs text-gray-600 dark:text-gray-500">Enter one prohibited action per line.</p>
                         </div>
                     ) : (
                         <div className="space-y-2">
@@ -953,7 +953,7 @@ export function ConstitutionPage() {
                                 ))
                             ) : (
                                 <div className="px-4 py-6 text-center rounded-xl border border-dashed border-gray-200 dark:border-[#1e2535]">
-                                    <p className="text-sm text--600 dark:text-gray-500 italic">No prohibited actions defined.</p>
+                                    <p className="text-sm text-gray-600 dark:text-gray-500 italic">No prohibited actions defined.</p>
                                 </div>
                             )}
                         </div>
@@ -1023,7 +1023,7 @@ export function ConstitutionPage() {
                             </h2>
                             <button
                                 onClick={() => { setShowProposalModal(false); setProposalForm(EMPTY_PROPOSAL); }}
-                                className="w-8 h-8 rounded-lg flex items-center justify-center text--600 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#1e2535] transition-colors"
+                                className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-600 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#1e2535] transition-colors"
                                 aria-label="Close proposal modal"
                             >
                                 <X className="w-4 h-4" />

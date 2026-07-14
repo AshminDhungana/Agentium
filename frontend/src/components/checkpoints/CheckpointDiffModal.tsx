@@ -169,10 +169,10 @@ export const CheckpointDiffModal: React.FC<CheckpointDiffModalProps> = ({
                                 <GitBranch className="w-5 h-5 text-violet-600" />
                                 Branch Comparison
                             </h2>
-                            <span className="text--600 dark:text-slate-500 mx-1">/</span>
+                            <span className="text-gray-600 dark:text-slate-500 mx-1">/</span>
                             <div className="flex items-center gap-2 font-mono text-sm">
                                 <span className="px-2 py-0.5 rounded bg-rose-100 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400 border border-rose-200 dark:border-rose-500/20">{leftBranch}</span>
-                                <ChevronRight className="w-4 h-4 text--600" />
+                                <ChevronRight className="w-4 h-4 text-gray-600" />
                                 <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20">{rightBranch}</span>
                             </div>
                         </div>
@@ -187,7 +187,7 @@ export const CheckpointDiffModal: React.FC<CheckpointDiffModalProps> = ({
                     <button 
                         onClick={onClose}
                         aria-label="Close"
-                        className="p-2 text--600 hover:text-slate-600 hover:bg-slate-100 dark:hover:text-slate-300 dark:hover:bg-[#1e2535] rounded-xl transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="p-2 text-gray-600 hover:text-slate-600 hover:bg-slate-100 dark:hover:text-slate-300 dark:hover:bg-[#1e2535] rounded-xl transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                         <X className="w-5 h-5" />
                     </button>
@@ -195,7 +195,7 @@ export const CheckpointDiffModal: React.FC<CheckpointDiffModalProps> = ({
 
                 {/* Body elements */}
                 {isLoading ? (
-                    <div className="flex-1 flex flex-col items-center justify-center p-12 text--600">
+                    <div className="flex-1 flex flex-col items-center justify-center p-12 text-gray-600">
                         <LoadingSpinner size="lg" />
                         <p>Computing diffs...</p>
                     </div>
@@ -296,7 +296,7 @@ export const CheckpointDiffModal: React.FC<CheckpointDiffModalProps> = ({
                                         changedArtifacts.map((artDiff, i) => (
                                             <div key={i} className="bg-white dark:bg-[#161b27] border border-slate-200 dark:border-[#1e2535] rounded-xl overflow-hidden shadow-sm">
                                                 <div className="px-5 py-3 border-b border-slate-100 dark:border-[#1e2535] bg-slate-50/80 dark:bg-[#1e2535]/30 flex items-center gap-3">
-                                                    <FileText className="w-4 h-4 text--600" />
+                                                    <FileText className="w-4 h-4 text-gray-600" />
                                                     <h3 className="font-mono text-sm font-bold text-slate-800 dark:text-slate-200 flex-1">
                                                         Artifact: {artDiff.key}
                                                     </h3>

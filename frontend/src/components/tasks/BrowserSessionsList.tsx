@@ -75,7 +75,7 @@ export const BrowserSessionsList: React.FC<BrowserSessionsListProps> = ({ tasks,
                 <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Active Browser Sessions</h3>
                 <button 
                     onClick={loadSessions}
-                    className="p-1.5 rounded-lg border border-gray-200 dark:border-[#1e2535] bg-white dark:bg-[#161b27] text--600 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+                    className="p-1.5 rounded-lg border border-gray-200 dark:border-[#1e2535] bg-white dark:bg-[#161b27] text-gray-600 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
                 >
                     {loading ? <LoadingSpinner size="sm" /> : <RefreshCw className="w-3.5 h-3.5" />}
                 </button>
@@ -105,7 +105,7 @@ export const BrowserSessionsList: React.FC<BrowserSessionsListProps> = ({ tasks,
                             <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-1 mb-3 font-mono">
                                 {session.url || 'No URL loaded'}
                             </p>
-                            <div className="flex justify-between items-center text-[10px] text--600 dark:text-gray-500">
+                            <div className="flex justify-between items-center text-[10px] text-gray-600 dark:text-gray-500">
                                 <span>{session.fps} FPS Capture</span>
                                 <span>
                                     {session.started_at ? new Date(session.started_at).toLocaleTimeString() : ''}

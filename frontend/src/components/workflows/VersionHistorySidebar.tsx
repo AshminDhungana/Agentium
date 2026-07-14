@@ -123,7 +123,7 @@ export const VersionHistorySidebar: React.FC<VersionHistorySidebarProps> = ({
         </div>
         <button
           onClick={onToggle}
-          className="p-1 rounded-md text--600 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-[#1e2535] transition-colors"
+          className="p-1 rounded-md text-gray-600 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-[#1e2535] transition-colors"
           title="Close version history"
           aria-label="Close version history"
         >
@@ -138,7 +138,7 @@ export const VersionHistorySidebar: React.FC<VersionHistorySidebarProps> = ({
             <LoadingSpinner size="sm" />
           </div>
         ) : versions.length === 0 ? (
-          <div className="px-4 py-8 text-center text-xs text--600 dark:text-gray-500">
+          <div className="px-4 py-8 text-center text-xs text-gray-600 dark:text-gray-500">
             No version history available.
           </div>
         ) : (
@@ -154,11 +154,11 @@ export const VersionHistorySidebar: React.FC<VersionHistorySidebarProps> = ({
                     className="w-full flex items-center gap-2 px-4 py-3 text-left hover:bg-gray-100 dark:hover:bg-[#1e2535]/50 transition-colors"
                   >
                     <ChevronDown
-                      className={`w-3 h-3 text--600 flex-shrink-0 transition-transform ${isOpen ? '' : '-rotate-90'}`}
+                      className={`w-3 h-3 text-gray-600 flex-shrink-0 transition-transform ${isOpen ? '' : '-rotate-90'}`}
                     />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5">
-                        <Hash className="w-3 h-3 text--600" />
+                        <Hash className="w-3 h-3 text-gray-600" />
                         <span className="text-sm font-semibold text-gray-900 dark:text-white">
                           v{v.version}
                         </span>
@@ -169,8 +169,8 @@ export const VersionHistorySidebar: React.FC<VersionHistorySidebarProps> = ({
                         )}
                       </div>
                       <div className="flex items-center gap-1 mt-0.5">
-                        <Clock className="w-3 h-3 text--600" />
-                        <span className="text-[10px] text--600 dark:text-gray-500">
+                        <Clock className="w-3 h-3 text-gray-600" />
+                        <span className="text-[10px] text-gray-600 dark:text-gray-500">
                           {fmtDate(v.created_at)}
                         </span>
                       </div>

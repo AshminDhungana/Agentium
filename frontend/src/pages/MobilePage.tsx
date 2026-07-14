@@ -513,7 +513,7 @@ export function MobilePage() {
                         ) : (
                             <div className="p-16 text-center">
                                 <div className="w-14 h-14 rounded-xl bg-gray-100 dark:bg-[#1e2535] border border-gray-200 dark:border-[#2a3347] flex items-center justify-center mx-auto mb-4">
-                                    <AlertTriangle className="w-6 h-6 text--600 dark:text-gray-500" />
+                                    <AlertTriangle className="w-6 h-6 text-gray-600 dark:text-gray-500" />
                                 </div>
                                 <p className="text-gray-900 dark:text-white font-medium mb-1">
                                     No Data Available
@@ -558,7 +558,7 @@ export function MobilePage() {
                                     </div>
                                     <button
                                         onClick={fetchDevices}
-                                        className="p-2 text--600 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#1e2535] rounded-lg transition-colors duration-150"
+                                        className="p-2 text-gray-600 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#1e2535] rounded-lg transition-colors duration-150"
                                         title="Refresh"
                                         aria-label="Refresh device list"
                                     >
@@ -575,7 +575,7 @@ export function MobilePage() {
                             ) : devices.length === 0 ? (
                                 <div className="p-16 text-center">
                                     <div className="w-14 h-14 rounded-xl bg-gray-100 dark:bg-[#1e2535] border border-gray-200 dark:border-[#2a3347] flex items-center justify-center mx-auto mb-4">
-                                        <Smartphone className="w-6 h-6 text--600 dark:text-gray-500" />
+                                        <Smartphone className="w-6 h-6 text-gray-600 dark:text-gray-500" />
                                     </div>
                                     <p className="text-gray-900 dark:text-white font-medium mb-1">
                                         No Devices Registered
@@ -607,7 +607,7 @@ export function MobilePage() {
                                                         <p className="text-xs font-mono text-gray-600 dark:text-gray-400 mt-1 truncate max-w-xs">
                                                             {device.token.substring(0, 32)}…
                                                         </p>
-                                                        <p className="text-xs text--600 dark:text-gray-500 mt-0.5">
+                                                        <p className="text-xs text-gray-600 dark:text-gray-500 mt-0.5">
                                                             Registered {formatDate(device.registered_at)}
                                                         </p>
                                                     </div>
@@ -706,7 +706,7 @@ export function MobilePage() {
                                 <div className="pt-2">
                                     <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
                                         Quiet Hours
-                                        <span className="text-xs font-normal text--600 dark:text-gray-500 ml-1">
+                                        <span className="text-xs font-normal text-gray-600 dark:text-gray-500 ml-1">
                                             (suppress notifications during these hours)
                                         </span>
                                     </p>
@@ -905,7 +905,7 @@ export function MobilePage() {
                                     placeholder="Paste device push token here"
                                     required
                                 />
-                                <p className="text-xs text--600 dark:text-gray-500 mt-1.5">
+                                <p className="text-xs text-gray-600 dark:text-gray-500 mt-1.5">
                                     Obtain this from the mobile app's device registration flow.
                                 </p>
                             </div>

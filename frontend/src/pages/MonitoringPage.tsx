@@ -202,7 +202,7 @@ function ViolationsTab({ initialViolations }: ViolationsTabProps) {
                 {(filterStatus || filterSeverity) && (
                     <button
                         onClick={() => { setFilterStatus(''); setFilterSeverity(''); }}
-                        className="flex items-center gap-1 text-xs text--600 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                        className="flex items-center gap-1 text-xs text-gray-600 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
                     >
                         <XCircle className="w-3.5 h-3.5" /> Clear
                     </button>
@@ -237,10 +237,10 @@ function ViolationsTab({ initialViolations }: ViolationsTabProps) {
                                     <div className="flex flex-wrap items-center gap-2 mb-2">
                                         <SeverityBadge severity={v.severity} />
                                         <StatusBadge   status={v.status}   />
-                                        <span className="text-xs text--600 dark:text-gray-500 font-mono">{v.type}</span>
+                                        <span className="text-xs text-gray-600 dark:text-gray-500 font-mono">{v.type}</span>
                                     </div>
                                     <p className="text-sm text-gray-900 dark:text-gray-100 mb-2">{v.description}</p>
-                                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text--600 dark:text-gray-500">
+                                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-600 dark:text-gray-500">
                                         <span>Reporter: <span className="font-mono text-gray-600 dark:text-gray-300">{v.reporter}</span></span>
                                         <span>Violator: <span className="font-mono text-gray-600 dark:text-gray-300">{v.violator}</span></span>
                                         {v.created_at && <span>{new Date(v.created_at).toLocaleString()}</span>}
@@ -406,7 +406,7 @@ function RecoveryTab() {
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-3 mb-1">
                                             <span className="text-sm font-bold text-gray-900 dark:text-white">{ev.action}</span>
-                                            <span className="text-xs font-medium text--600 dark:text-gray-500">{new Date(ev.created_at).toLocaleString()}</span>
+                                            <span className="text-xs font-medium text-gray-600 dark:text-gray-500">{new Date(ev.created_at).toLocaleString()}</span>
                                             {ev.level === 'critical' || ev.level === 'error' ? (
                                                 <span className="bg-red-100 text-red-700 text-[10px] px-2 py-0.5 rounded-full uppercase font-bold dark:bg-red-900/30 dark:text-red-400 border border-red-200 dark:border-red-800/40">Error</span>
                                             ) : null}
@@ -545,7 +545,7 @@ function OperationsTab() {
                             </div>
                         ) : (
                             <div className="text-center py-6">
-                                <CheckCircle className="w-12 h-12 text--600 mx-auto mb-3" />
+                                <CheckCircle className="w-12 h-12 text-gray-600 mx-auto mb-3" />
                                 <p className="text-gray-900 dark:text-white font-medium">No Anomalies Detected</p>
                                 <p className="text-sm text-gray-600 dark:text-gray-400">System operating within historical baseline limits.</p>
                             </div>
@@ -662,7 +662,7 @@ function IncidentsTab() {
             <div className="p-6">
                 {logs.length === 0 ? (
                     <div className="text-center py-12">
-                        <CheckCircle className="w-12 h-12 text--600 mx-auto mb-3" />
+                        <CheckCircle className="w-12 h-12 text-gray-600 mx-auto mb-3" />
                         <p className="text-gray-900 dark:text-white font-medium">No Auto-Remediations</p>
                         <p className="text-sm text-gray-600 dark:text-gray-400">The zero-touch ops engine has not needed to intervene.</p>
                     </div>
@@ -803,7 +803,7 @@ function SlowQueriesTab() {
                 
                 {!error && queries.length === 0 ? (
                     <div className="text-center py-12">
-                        <CheckCircle className="w-12 h-12 text--600 mx-auto mb-3" />
+                        <CheckCircle className="w-12 h-12 text-gray-600 mx-auto mb-3" />
                         <p className="text-gray-900 dark:text-white font-medium">No Slow Queries</p>
                         <p className="text-sm text-gray-600 dark:text-gray-400">All database queries are running efficiently.</p>
                     </div>
@@ -996,12 +996,12 @@ export const MonitoringPage: React.FC = () => {
                                         <option key={id} value={id}>#{id}</option>
                                     ))}
                                 </select>
-                                <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text--600" />
+                                <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-600" />
                             </div>
                         </div>
 
                         {lastUpdated && (
-                            <span className="hidden sm:flex items-center gap-1 text-xs text--600 dark:text-gray-500">
+                            <span className="hidden sm:flex items-center gap-1 text-xs text-gray-600 dark:text-gray-500">
                                 <Clock className="w-3 h-3" />
                                 Updated {lastUpdated.toLocaleTimeString()}
                             </span>
@@ -1108,7 +1108,7 @@ export const MonitoringPage: React.FC = () => {
                                         </p>
                                     </div>
                                     <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${activeAlerts > 0 ? 'bg-red-100 dark:bg-red-900/30' : 'bg-gray-100 dark:bg-[#161b27]'}`}>
-                                        <AlertTriangle className={`w-6 h-6 ${activeAlerts > 0 ? 'text-red-600 dark:text-red-400' : 'text--600 dark:text-gray-500'}`} />
+                                        <AlertTriangle className={`w-6 h-6 ${activeAlerts > 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-600 dark:text-gray-500'}`} />
                                     </div>
                                 </div>
                             </div>
@@ -1198,7 +1198,7 @@ export const MonitoringPage: React.FC = () => {
                                                                 <StatusBadge   status={v.status}   />
                                                             </div>
                                                             <p className="text-sm text-gray-900 dark:text-gray-100">{v.description}</p>
-                                                            <p className="text-xs text--600 dark:text-gray-500 mt-1">
+                                                            <p className="text-xs text-gray-600 dark:text-gray-500 mt-1">
                                                                 {v.created_at ? new Date(v.created_at).toLocaleString() : '—'}
                                                             </p>
                                                         </div>
@@ -1275,7 +1275,7 @@ export const MonitoringPage: React.FC = () => {
                                     ) : (
                                         <div className="text-center py-10">
                                             <div className="w-14 h-14 rounded-full bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center mx-auto mb-3 border border-blue-100 dark:border-blue-800/40">
-                                                <CheckCircle className="w-7 h-7 text--600 dark:text-blue-500" />
+                                                <CheckCircle className="w-7 h-7 text-gray-600 dark:text-blue-500" />
                                             </div>
                                             <p className="text-gray-900 dark:text-white font-medium mb-1">No Health Reports</p>
                                             <p className="text-sm text-gray-600 dark:text-gray-400">Agent monitoring will appear here</p>

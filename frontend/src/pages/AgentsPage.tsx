@@ -548,8 +548,8 @@ export const AgentsPage: React.FC = () => {
             <div className="flex justify-between items-start mb-6">
                 <div>
                     <div className="flex items-center gap-2 mb-1">
-                        <Users className="w-4 h-4 text--600 dark:text-slate-500" />
-                        <span className="text-xs font-semibold tracking-widest uppercase text--600 dark:text-slate-500">
+                        <Users className="w-4 h-4 text-gray-600 dark:text-slate-500" />
+                        <span className="text-xs font-semibold tracking-widest uppercase text-gray-600 dark:text-slate-500">
                             Workforce
                         </span>
                     </div>
@@ -641,7 +641,7 @@ export const AgentsPage: React.FC = () => {
                 <div className="flex-1 overflow-hidden rounded-xl border border-slate-200 dark:border-[#1e2535] bg-white dark:bg-[#161b27] shadow-sm dark:shadow-[0_2px_20px_rgba(0,0,0,0.3)] transition-colors duration-200">
 
                     {isLoading ? (
-                        <div className="flex flex-col items-center justify-center h-40 gap-3 text--600 dark:text-slate-500">
+                        <div className="flex flex-col items-center justify-center h-40 gap-3 text-gray-600 dark:text-slate-500">
                             <LoadingSpinner size="md" label="Loading agents…" />
                         </div>
 

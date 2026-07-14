@@ -90,7 +90,7 @@ export function ProposeAmendmentModal({ onClose, onSuccess }: ProposeAmendmentMo
                         </div>
                         <button
                             aria-label="close"
-                            className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-[#1e2535] text--600 hover:text-gray-600 dark:hover:text-gray-200 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-[#1e2535] text-gray-600 hover:text-gray-600 dark:hover:text-gray-200 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
                             onClick={onClose}
                         >
                             <X className="w-5 h-5" />
@@ -144,7 +144,7 @@ export function ProposeAmendmentModal({ onClose, onSuccess }: ProposeAmendmentMo
                             {errors.diff_markdown ? (
                                 <p className="text-xs text-red-600 dark:text-red-400 mt-1">{errors.diff_markdown}</p>
                             ) : (
-                                <p className="text-xs text--600 dark:text-gray-500 mt-1">
+                                <p className="text-xs text-gray-600 dark:text-gray-500 mt-1">
                                     Use <code className="bg-gray-100 dark:bg-[#1e2535] px-1 rounded">+</code> to add and{' '}
                                     <code className="bg-gray-100 dark:bg-[#1e2535] px-1 rounded">-</code> to remove content
                                 </p>

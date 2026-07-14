@@ -41,7 +41,7 @@ function getStatusIcon(status: string) {
         case 'responded':  return <CheckCircle  className="w-4 h-4 text-green-700" />;
         case 'failed':     return <XCircle      className="w-4 h-4 text-red-600"   />;
         case 'processing': return <Clock        className="w-4 h-4 text-yellow-800 animate-spin" />;
-        default:           return <AlertTriangle className="w-4 h-4 text--600" />;
+        default:           return <AlertTriangle className="w-4 h-4 text-gray-600" />;
     }
 }
 
@@ -86,7 +86,7 @@ export function MessageLogViewer({ channelId, limit = 50 }: MessageLogViewerProp
                                     <td className="px-4 py-2 text-gray-600 dark:text-gray-400 truncate max-w-xs">
                                         {msg.content}
                                     </td>
-                                    <td className="px-4 py-2 text-xs text--600">
+                                    <td className="px-4 py-2 text-xs text-gray-600">
                                         {format(new Date(msg.created_at), 'MMM d, HH:mm')}
                                     </td>
                                 </tr>

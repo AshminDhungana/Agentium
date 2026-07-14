@@ -205,7 +205,7 @@ export function SignupPage() {
                             <button
                                 type="button"
                                 onClick={() => setShowPassword((v) => !v)}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text--600 hover:text-gray-600 dark:hover:text-gray-300 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 rounded"
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600 hover:text-gray-600 dark:hover:text-gray-300 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 rounded"
                                 aria-label={showPassword ? 'Hide password' : 'Show password'}
                             >
                                 {showPassword
@@ -255,7 +255,7 @@ export function SignupPage() {
                             <button
                                 type="button"
                                 onClick={() => setShowConfirmPassword((v) => !v)}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text--600 hover:text-gray-600 dark:hover:text-gray-300 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 rounded"
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600 hover:text-gray-600 dark:hover:text-gray-300 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 rounded"
                                 aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
                             >
                                 {showConfirmPassword

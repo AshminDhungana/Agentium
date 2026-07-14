@@ -117,7 +117,7 @@ export function PeerTable({
             <div className="bg-white dark:bg-[#161b27] rounded-xl border border-gray-200 dark:border-[#1e2535] shadow-sm dark:shadow-[0_2px_16px_rgba(0,0,0,0.25)] overflow-hidden transition-colors duration-200">
                 <div className="p-16 text-center">
                     <div className="w-14 h-14 rounded-xl bg-gray-100 dark:bg-[#1e2535] border border-gray-200 dark:border-[#2a3347] flex items-center justify-center mx-auto mb-4">
-                        <Globe className="w-6 h-6 text--600 dark:text-gray-500" aria-hidden="true" />
+                        <Globe className="w-6 h-6 text-gray-600 dark:text-gray-500" aria-hidden="true" />
                     </div>
                     <p className="text-gray-900 dark:text-white font-medium mb-1">
                         {hasSearch ? 'No Peers Found' : 'No Peer Instances'}
@@ -171,7 +171,7 @@ export function PeerTable({
                                                         {peer.name}
                                                     </span>
                                                     {peer.capabilities_shared && peer.capabilities_shared.length > 0 && (
-                                                        <p className="text-xs text--600 dark:text-gray-500 mt-0.5 truncate max-w-[160px]">
+                                                        <p className="text-xs text-gray-600 dark:text-gray-500 mt-0.5 truncate max-w-[160px]">
                                                             {peer.capabilities_shared.join(', ')}
                                                         </p>
                                                     )}
@@ -190,7 +190,7 @@ export function PeerTable({
                                                     target="_blank"
                                                     rel="noopener noreferrer"
                                                     aria-label={`Open ${peer.name} in new tab`}
-                                                    className="text--600 hover:text-indigo-600 dark:hover:text--600 flex-shrink-0 transition-colors duration-150"
+                                                    className="text-gray-600 hover:text-indigo-600 dark:hover:text-gray-600 flex-shrink-0 transition-colors duration-150"
                                                 >
                                                     <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
                                                 </a>
