@@ -16,6 +16,7 @@ from typing import Any, Dict, List, Optional
 
 from sqlalchemy.orm import Session
 
+from backend.models.entities.speaker_profile import SpeakerProfile
 from backend.services.whisper_cpp_service import (
     get_whisper_cpp_service,
     LocalSTTError,
@@ -100,6 +101,7 @@ class AudioService:
         whisper_available = get_whisper_cpp_service().is_available()
         key = self._get_openai_api_key(db, user_id)
         provider = "whisper_cpp" if whisper_available else ("openai" if key else None)
+        si = get_speaker_identifier()
         return {
             "available": provider is not None,
             "provider": provider,
@@ -108,6 +110,8 @@ class AudioService:
             "tts_model": "tts-1",
             "voices": AVAILABLE_TTS_VOICES,
             "max_audio_size_mb": MAX_AUDIO_SIZE // (1024 * 1024),
+            "speaker_id_enabled": si._config.enabled,
+            "speaker_id_available": si.is_available(),
         }
 
     # ── Speech-to-Text ───────────────────────────────────────────────────
@@ -275,116 +279,199 @@ class AudioService:
 
 
 # ---------------------------------------------------------------------------
-# Speaker Identification (Phase 10.3)
+# Speaker Identification (Phase 10.3 / 15.4)
 # ---------------------------------------------------------------------------
 
-from backend.models.entities.speaker_profile import SpeakerProfile
+from dataclasses import dataclass
+from typing import Callable, Protocol
 import uuid
 import tempfile
 import numpy as np
 
-class SpeakerIdentifier:
+
+@dataclass
+class SpeakerIDConfig:
+    """Runtime configuration for speaker identification."""
+    enabled: bool = True
+    model_source: str = "speechbrain/spkrec-ecapa-voxceleb"
+    threshold: float = 0.70
+    min_duration_s: float = 1.0
+    cache_dir: str = "./models/speechbrain"
+    require_liveness: bool = False
+
+
+def load_speaker_id_config() -> SpeakerIDConfig:
+    """Build a SpeakerIDConfig from application Settings."""
+    from backend.core.config import settings
+    return SpeakerIDConfig(
+        enabled=settings.SPEAKER_ID_ENABLED,
+        model_source=settings.SPEAKER_ID_MODEL_SOURCE,
+        threshold=settings.SPEAKER_ID_THRESHOLD,
+        min_duration_s=settings.SPEAKER_ID_MIN_DURATION_S,
+        cache_dir=settings.SPEAKER_ID_CACHE_DIR,
+        require_liveness=settings.SPEAKER_ID_REQUIRE_LIVENESS,
+    )
+
+
+class SpeakerEncoder(Protocol):
+    """Embedding backend contract. Implementations turn audio bytes into a vector."""
+    def embed(self, audio_bytes: bytes) -> List[float]: ...
+
+
+class SpeechBrainEncoder:
     """
-    Identifies speakers using voice embedding fingerprints.
+    SpeechBrain ECAPA-TDNN embedding backend (lazy, optional dependency).
 
-    Computes a voice embedding from audio using SpeechBrain ECAPA-TDNN.
-    Persists enrolled profiles to the database via SQLAlchemy.
-
-    Usage::
-
-        si = SpeakerIdentifier()
-        si.enroll(db, "user-1", "alice", audio_bytes)
-        result = si.identify(db, new_audio_bytes)
+    NOTE (SpeechBrain 1.1.0 API): the class is ``EncoderClassifier`` and it is
+    imported from ``speechbrain.inference.classifiers`` (not ``.speaker``).
+    It is built with ``EncoderClassifier.from_hparams(...)`` and used via
+    ``encode_batch(signal)``.
     """
-
-    # Cosine similarity threshold for positive identification
-    IDENTIFICATION_THRESHOLD = 0.70
-
-    def __init__(self):
-        """Init."""
-
+    def __init__(self, model_source: str, cache_dir: str):
+        self._model_source = model_source
+        self._cache_dir = cache_dir
         self._classifier = None
 
-    def _get_classifier(self):
-        """Lazy-load the ECAPA-TDNN classifier from SpeechBrain."""
+    def _ensure(self):
         if self._classifier is None:
             try:
-                from speechbrain.inference.speaker import EncoderClassifier
+                from speechbrain.inference.classifiers import EncoderClassifier
                 import os
-                # By default, downloads to a local cache directory
                 run_opts = {}
-                if os.environ.get("CUDA_VISIBLE_DEVICES") and os.environ.get("CUDA_VISIBLE_DEVICES") != "-1":
+                cuda = os.environ.get("CUDA_VISIBLE_DEVICES")
+                if cuda not in (None, "", "-1"):
                     run_opts["device"] = "cuda"
+                os.makedirs(self._cache_dir, exist_ok=True)
                 self._classifier = EncoderClassifier.from_hparams(
-                    source="speechbrain/spkrec-ecapa-voxceleb",
-                    savedir="tmp_speechbrain_model",
-                    run_opts=run_opts
+                    source=self._model_source,
+                    savedir=self._cache_dir,
+                    run_opts=run_opts,
                 )
             except ImportError:
                 logger.warning("speechbrain or torchaudio not installed; speaker ID unavailable")
+                raise
             except Exception as e:
                 logger.error(f"Failed to load SpeechBrain model: {e}")
+                raise
         return self._classifier
 
-    def _extract_embedding(self, audio_bytes: bytes) -> List[float]:
-        """Extract a 1D float array embedding from audio bytes."""
-        classifier = self._get_classifier()
-        if not classifier:
-            return []
-
+    def embed(self, audio_bytes: bytes) -> List[float]:
+        import os
         import torchaudio
-        
-        # Write bytes to a temp file, as torchaudio needs a filepath
+        classifier = self._ensure()
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
             f.write(audio_bytes)
             f.flush()
             tmp_path = f.name
-            
         try:
             signal, fs = torchaudio.load(tmp_path)
-            # Resample to 16kHz if needed
+            if signal.shape[0] > 1:
+                signal = signal.mean(0, keepdim=True)
             if fs != 16000:
                 resampler = torchaudio.transforms.Resample(orig_freq=fs, new_freq=16000)
                 signal = resampler(signal)
-            
-            # Predict
             embeddings = classifier.encode_batch(signal)
-            # embeddings shape is usually [batch, 1, dims] -> squeeze to 1D
-            emd_1d = embeddings.squeeze(0).squeeze(0).detach().cpu().numpy()
-            return emd_1d.tolist()
+            emb_1d = embeddings.squeeze(0).squeeze(0).detach().cpu().numpy()
+            return emb_1d.tolist()
         except Exception as e:
             logger.error(f"Embedding extraction failed: {e}")
             return []
         finally:
             os.remove(tmp_path)
 
+
+class SpeakerIdentifier:
+    """
+    Identifies speakers using voice embedding fingerprints.
+
+    The embedding backend is injectable (``classifier``) so tests and
+    environments without SpeechBrain/torchaudio can run. Configuration is
+    sourced from application Settings unless overridden. An optional
+    ``liveness_check`` provides a (default-off) anti-spoofing seam.
+    """
+
+    def __init__(
+        self,
+        classifier: Optional[SpeakerEncoder] = None,
+        config: Optional[SpeakerIDConfig] = None,
+        liveness_check: Optional[Callable[[bytes], bool]] = None,
+    ):
+        self._classifier = classifier
+        self._config = config or load_speaker_id_config()
+        self._liveness_check = liveness_check
+        self.IDENTIFICATION_THRESHOLD = self._config.threshold
+
+    def _get_classifier(self) -> Optional[SpeakerEncoder]:
+        if self._classifier is None:
+            self._classifier = SpeechBrainEncoder(
+                self._config.model_source, self._config.cache_dir
+            )
+        return self._classifier
+
+    def _backend_importable(self) -> bool:
+        try:
+            import speechbrain  # noqa: F401
+            import torchaudio  # noqa: F401
+            return True
+        except Exception:
+            logger.warning("Speaker ID unavailable: speechbrain/torchaudio not installed")
+            return False
+
+    def is_available(self) -> bool:
+        if not self._config.enabled:
+            return False
+        if self._classifier is not None:
+            return True
+        return self._backend_importable()
+
+    def _validate_min_duration(self, audio_bytes: bytes) -> bool:
+        try:
+            import wave as _wave
+            with _wave.open(io.BytesIO(audio_bytes), "rb") as wf:
+                nframes = wf.getnframes()
+                framerate = wf.getframerate()
+                if framerate <= 0:
+                    return True
+                return (nframes / framerate) >= self._config.min_duration_s
+        except Exception:
+            return True
+
     def enroll(self, db: Session, user_id: Optional[str], username: str, audio_bytes: bytes) -> Optional[SpeakerProfile]:
-        """
-        Enroll a speaker by storing their voice embedding into the database.
-        """
-        embedding = self._extract_embedding(audio_bytes)
+        if not self._config.enabled:
+            logger.warning("Speaker enrollment skipped: speaker ID disabled")
+            return None
+        if self._config.require_liveness and self._liveness_check is not None:
+            if not self._liveness_check(audio_bytes):
+                logger.warning("Speaker enrollment rejected: liveness check failed (possible spoof)")
+                return None
+        if not self._validate_min_duration(audio_bytes):
+            logger.warning("Enrollment skipped: audio too short")
+            return None
+
+        embedding = self._get_classifier().embed(audio_bytes)
         if not embedding:
             logger.warning("Enrollment failed: could not extract embedding.")
             return None
 
-        # Check if user already has a profile 
         existing = None
         if user_id:
-            existing = db.query(SpeakerProfile).filter(SpeakerProfile.user_id == user_id, SpeakerProfile.is_deleted == False).first()
+            existing = db.query(SpeakerProfile).filter(
+                SpeakerProfile.user_id == user_id, SpeakerProfile.is_deleted == False
+            ).first()
             if not existing:
-                # Fallback to name if user_id matching missed
-                existing = db.query(SpeakerProfile).filter(SpeakerProfile.name == username, SpeakerProfile.is_deleted == False).first()
+                existing = db.query(SpeakerProfile).filter(
+                    SpeakerProfile.name == username, SpeakerProfile.is_deleted == False
+                ).first()
         else:
-            existing = db.query(SpeakerProfile).filter(SpeakerProfile.name == username, SpeakerProfile.is_deleted == False).first()
+            existing = db.query(SpeakerProfile).filter(
+                SpeakerProfile.name == username, SpeakerProfile.is_deleted == False
+            ).first()
 
         if existing:
-            # We can average embeddings or simply overwrite. For robust updates, keep the new one.
-            # Realistically, exponential moving average is better:
             old_emb = np.array(existing.embedding)
             new_emb = np.array(embedding)
             n = existing.sample_count
             updated_emb = ((old_emb * n) + new_emb) / (n + 1)
-            
             existing.embedding = updated_emb.tolist()
             existing.sample_count += 1
             existing.name = username
@@ -393,14 +480,13 @@ class SpeakerIdentifier:
             logger.info(f"Speaker profile updated for {username}")
             return existing
 
-        # Create new 
         profile = SpeakerProfile(
             id=str(uuid.uuid4()),
             user_id=user_id,
             name=username,
             embedding=embedding,
             sample_count=1,
-            is_deleted=False
+            is_deleted=False,
         )
         db.add(profile)
         db.commit()
@@ -409,25 +495,37 @@ class SpeakerIdentifier:
         return profile
 
     def identify(self, db: Session, audio_bytes: bytes) -> Dict[str, Any]:
-        """
-        Identify the speaker from audio bytes using cosine similarity against DB.
-        """
+        unknown = {
+            "speaker_id": "unknown",
+            "name": "Unknown Speaker",
+            "confidence": 0.0,
+            "is_known": False,
+        }
+        if not self._config.enabled:
+            return unknown
+
         profiles = db.query(SpeakerProfile).filter(SpeakerProfile.is_deleted == False).all()
         if not profiles:
-            return {"speaker_id": "unknown", "confidence": 0.0, "is_known": False, "name": "Unknown Speaker"}
+            return unknown
+        if not self._validate_min_duration(audio_bytes):
+            return unknown
+        if self._config.require_liveness and self._liveness_check is not None:
+            if not self._liveness_check(audio_bytes):
+                logger.warning("Speaker identification rejected: liveness check failed (possible spoof)")
+                return unknown
 
         classifier = self._get_classifier()
         if not classifier:
-            return {"speaker_id": "unknown", "confidence": 0.0, "is_known": False, "name": "Unknown Speaker"}
+            return unknown
 
-        query_emb_list = self._extract_embedding(audio_bytes)
+        query_emb_list = classifier.embed(audio_bytes)
         if not query_emb_list:
-            return {"speaker_id": "unknown", "confidence": 0.0, "is_known": False, "name": "Unknown Speaker"}
+            return unknown
 
         query_emb = np.array(query_emb_list)
         query_norm = np.linalg.norm(query_emb)
         if query_norm == 0:
-            return {"speaker_id": "unknown", "confidence": 0.0, "is_known": False, "name": "Unknown Speaker"}
+            return unknown
 
         best_match = "unknown"
         best_name = "Unknown Speaker"
@@ -440,7 +538,6 @@ class SpeakerIdentifier:
             profile_norm = np.linalg.norm(profile_emb)
             if profile_norm == 0:
                 continue
-                
             similarity = float(np.dot(query_emb, profile_emb) / (query_norm * profile_norm))
             if similarity > best_score:
                 best_score = similarity
@@ -456,35 +553,19 @@ class SpeakerIdentifier:
         }
 
     def list_profiles(self, db: Session) -> List[Dict[str, Any]]:
-        """Return summary of all enrolled speaker profiles."""
-        profiles = db.query(SpeakerProfile).filter(SpeakerProfile.is_deleted == False).order_by(SpeakerProfile.created_at.desc()).all()
+        profiles = db.query(SpeakerProfile).filter(
+            SpeakerProfile.is_deleted == False
+        ).order_by(SpeakerProfile.created_at.desc()).all()
         return [p.to_dict() for p in profiles]
 
 
 # ---------------------------------------------------------------------------
-# Singletons
-# ---------------------------------------------------------------------------
-
-import os
-from dataclasses import dataclass, field
-from datetime import datetime
-
-_audio_service: Optional[AudioService] = None
-
-
-def get_audio_service() -> AudioService:
-    """Return the singleton AudioService."""
-    global _audio_service
-    if _audio_service is None:
-        _audio_service = AudioService()
-    return _audio_service
-
 
 _speaker_identifier: Optional[SpeakerIdentifier] = None
 
 
 def get_speaker_identifier() -> SpeakerIdentifier:
-    """Return the singleton SpeakerIdentifier."""
+    """Return the process-wide SpeakerIdentifier singleton (lazy)."""
     global _speaker_identifier
     if _speaker_identifier is None:
         _speaker_identifier = SpeakerIdentifier()
