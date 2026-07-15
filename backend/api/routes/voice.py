@@ -11,6 +11,7 @@ from typing import Optional
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, UploadFile, File, Depends, status, Form
+from pydantic import BaseModel, Field
 from backend.core.exceptions import BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, TooLargeError, RateLimitError, InternalServerError, ServiceUnavailableError, ServerSTTUnavailable
 from fastapi.responses import FileResponse, RedirectResponse
 from sqlalchemy.orm import Session
@@ -588,3 +589,79 @@ async def list_voice_channels(
             },
         ]
     }
+
+
+# ── Voice Bridge (host-side) engine config (Jarvis upgrade, Phase H) ──────────
+# Per-user persistence of the bridge's engine settings (wake word, TTS voice,
+# proactive announcements). Stored as JSON under the agentium data dir so no
+# DB migration is required. The host bridge reads its own env.conf; this route
+# is the backend-side source of truth the frontend writes through.
+
+_DEFAULT_VOICE_CONFIG = {
+    "requireWakeWord": True,
+    "ttsVoice": "af_bella",
+    "proactiveEnabled": False,
+}
+
+
+class VoiceConfigRequest(BaseModel):
+    requireWakeWord: Optional[bool] = Field(default=None)
+    ttsVoice: Optional[str] = Field(default=None)
+    proactiveEnabled: Optional[bool] = Field(default=None)
+
+
+def _voice_config_path(user_id: str) -> Path:
+    base = Path.home() / ".agentium" / "voice_config"
+    base.mkdir(parents=True, exist_ok=True)
+    return base / f"{user_id}.json"
+
+
+def _load_voice_config(user_id: str) -> dict:
+    path = _voice_config_path(user_id)
+    if path.is_file():
+        try:
+            stored = json.loads(path.read_text())
+            return {**_DEFAULT_VOICE_CONFIG, **stored}
+        except Exception:
+            return dict(_DEFAULT_VOICE_CONFIG)
+    return dict(_DEFAULT_VOICE_CONFIG)
+
+
+@router.get(
+    "/config",
+    summary="Get Voice Bridge Config",
+    description="Return the current voice-bridge engine config for the authenticated user.",
+    responses=build_responses(None),
+)
+async def get_voice_config(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Return the current voice-bridge engine config for this user."""
+    return _load_voice_config(str(current_user.id))
+
+
+@router.put(
+    "/config",
+    summary="Update Voice Bridge Config",
+    description="Persist voice-bridge engine config (wake word, TTS voice, proactive mode) for the authenticated user.",
+    responses=build_responses(None),
+)
+async def update_voice_config(
+    config: VoiceConfigRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Persist voice-bridge engine config for this user (merged over defaults)."""
+    current = _load_voice_config(str(current_user.id))
+    if config.requireWakeWord is not None:
+        current["requireWakeWord"] = config.requireWakeWord
+    if config.ttsVoice is not None:
+        current["ttsVoice"] = config.ttsVoice
+    if config.proactiveEnabled is not None:
+        current["proactiveEnabled"] = config.proactiveEnabled
+    try:
+        _voice_config_path(str(current_user.id)).write_text(json.dumps(current, indent=2))
+    except Exception as exc:
+        raise InternalServerError(error=f"Failed to persist voice config: {exc}", code="VOICE_CONFIG_WRITE_FAILED")
+    return current

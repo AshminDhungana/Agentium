@@ -9,6 +9,23 @@
 
 ---
 
+## 0. Observation and Checks:
+
+- [ ] Voice bridge disconnected notification with the command should only show once after login but if shows quite often.
+
+- [ ] Improve scripts for voice bridge, in windows it is not working.
+the step should be voice-bridge contaner runs installs scripts in the host system and then voice bridge will run. 
+
+- [ ] Users should be able to upload their profile picture.
+
+- [ ] Actual genisys as per todo naming the country is not running after adding api key .
+
+- [ ] Agent page : list shows 3 agents but graph shows only one. 
+
+- [ ]  Chat message send no reply head of council is getting disconnected see logs. 
+
+
+
 ## 1. Roadmap Consistency & Incomplete Items
 
 Items marked `[ ]` in `docs/documents/todo.md` while their parent phase is marked ✅ — verify each is actually done or close it out.
