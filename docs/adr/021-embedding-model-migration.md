@@ -123,6 +123,36 @@ collection, whether reads/writes go to the v1 (`*`) or v2 (`*_v2`) Chroma name.
 - The skills pipeline (`skill_manager.py`, `agent_skills` /
   `best_practices` / `constitutional_skills`) is unaffected and out of scope.
 
+## Revalidation Findings (Task 13, 2026-07-15)
+
+During Constitutional Guard v2 verification a pre-existing bug in the v1 guard was
+discovered and must be recorded:
+
+- **v1 Tier-2 was a no-op.** `all-MiniLM-L6-v2` vectors in ChromaDB use the
+  default **L2** space, while the guard computed `similarity = 1 - distance`.
+  MiniLM vectors are not unit-normalised, so L2 distances exceed 1 and every
+  `(1 - distance)` value is **negative** — the guard's Tier-2 therefore returned
+  ALLOW for *every* action under v1. The semantic tier was effectively disabled
+  in production before this migration.
+- **Consequence for the migration test.** The original plan asserted "v2 verdict
+  == v1 verdict". Because the only stable v1 baseline was "all ALLOW", that
+  assertion would force v2 thresholds above bge's entire distribution and
+  *re-disable* detection — a governance regression. The Task 13 test was
+  rewritten to assert the guard is **functional and safe** instead: benign
+  actions stay ALLOW (no false blocks), the privacy grey-area action escalates to
+  VOTE_REQUIRED (sim ~0.63 ≥ 0.60), and a clearly-prohibited action BLOCKs.
+- **v2 thresholds (cosine space).** Initial `GREY_AREA_THRESHOLD = 0.60` and
+  `BLOCK_THRESHOLD = 0.78` were set in `constitutional_guard.py`. These sit above
+  the benign cluster (~0.50) and below the grey action, so they discriminate
+  without false blocks on current data. **They are SAFE INITIAL values and must
+  be re-tuned against the REAL constitution articles and a labelled
+  prohibited/benign action set during the `constitution` soak window**, because
+  bge's high baseline means BLOCK must clear the benign cluster by a wide margin.
+- **Critical production bug fixed.** ChromaDB 1.5.1 calls
+  `BgeEmbeddingFunction.embed_query` with a **list** of query texts; the original
+  implementation accepted only a single string and would crash every v2 query.
+  `embed_query` now accepts `str | list` and returns `list[list[float]]`.
+
 ## Alternatives Considered
 
 | Alternative | Rejected Because |
