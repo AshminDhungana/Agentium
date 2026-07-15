@@ -568,6 +568,49 @@ async def query_backend(text: str) -> Optional[str]:
     return await loop.run_in_executor(_executor, _query_backend_sync, text)
 
 
+async def _stream_chat(text: str, persona: Optional[str] = None,
+                       speaker_id: Optional[str] = None) -> "asyncio.AsyncIterator[str]":
+    """POST to the chat endpoint with stream:true and parse SSE deltas.
+
+    Reuses _RESOLVED_CHAT_ENDPOINT + _auth_headers. Yields text content as it
+    arrives so TTS can start on the first sentence (Phase E). Accepts an
+    optional persona (Phase F) and speaker_id (Phase G) threaded into the body.
+    """
+    payload = {"message": text, "stream": True}
+    if persona:
+        payload["voice_persona"] = persona
+    if speaker_id:
+        payload["speaker_id"] = speaker_id
+    data = json.dumps(payload).encode()
+    req = urllib.request.Request(
+        _RESOLVED_CHAT_ENDPOINT, data=data, headers=_auth_headers(), method="POST"
+    )
+    loop = asyncio.get_event_loop()
+    raw = await loop.run_in_executor(_executor, lambda: urllib.request.urlopen(req, timeout=30))
+    try:
+        for line in raw:
+            line = line.decode() if isinstance(line, (bytes, bytearray)) else line
+            line = line.strip()
+            if not line or not line.startswith("data:"):
+                continue
+            payload_str = line[len("data:"):].strip()
+            if not payload_str:
+                continue
+            try:
+                evt = json.loads(payload_str)
+            except json.JSONDecodeError:
+                continue
+            if evt.get("type") == "content" and evt.get("content"):
+                yield evt["content"]
+            elif evt.get("type") in ("done", "complete"):
+                break
+    finally:
+        try:
+            raw.close()
+        except Exception:
+            pass
+
+
 # ── WebSocket broadcast server ─────────────────────────────────────────────────
 
 _connected_browsers: set = set()
@@ -823,33 +866,68 @@ class VoiceSession:
                 return  # no-speech timeout ends the session
             self.phase = "THINKING"
             await self._broadcast_state("thinking")
-            reply = await query_backend(text)
-            if not reply:
-                reply = "I'm having trouble reaching the backend right now."
             self.phase = "SPEAKING"
             await self._broadcast_state("speaking")
-            await self._speak_reply(reply)
+            full_reply = await self._speak_reply_stream(text)
             if self._abort.is_set():
                 self._abort.clear()
                 self.phase = "INTERRUPTED"
                 await self._broadcast_state("interrupted")
                 continue  # loop back to LISTENING
             await _broadcast({
-                "type": "voice_interaction", "user": text, "reply": reply, "ts": time.time(),
-                "speaker_id": self.speaker_id,
+                "type": "voice_interaction", "user": text, "reply": full_reply,
+                "ts": time.time(), "speaker_id": self.speaker_id,
             })
 
-    async def _speak_reply(self, reply: str):
+    async def _speak_reply_stream(self, text: str) -> str:
+        """Consume the streaming chat response, flushing complete sentences to
+        TTS as they form (Phase D). Falls back to the non-streaming call if the
+        SSE stream errors. Returns the full assembled reply for broadcast."""
         loop = asyncio.get_event_loop()
-        for chunk in _split_sentences(reply):
-            if self.barge_in and await self._check_barge_in(loop):
-                return
-            audio = self.tts.synth(chunk) if self.tts.available else b""
+        buffer = ""
+        full: list[str] = []
+        try:
+            async for delta in _stream_chat(text, self.persona, self.speaker_id):
+                buffer += delta
+                full.append(delta)
+                while "." in buffer or "?" in buffer or "!" in buffer:
+                    idx = max(buffer.find("."), buffer.find("?"), buffer.find("!"))
+                    if idx < 0:
+                        break
+                    sentence = buffer[:idx + 1].strip()
+                    buffer = buffer[idx + 1:]
+                    if not sentence:
+                        continue
+                    if self.barge_in and await self._check_barge_in(loop):
+                        return "".join(full)
+                    audio = self.tts.synth(sentence) if self.tts.available else b""
+                    if audio:
+                        self.mic.feed_playback(audio)
+                        self.tts.play(audio)
+                    else:
+                        await speak(sentence)
+        except Exception as exc:
+            logger.warning("[WARN] streamed chat failed: %s — using non-streaming", exc)
+            fb = await query_backend(text)
+            if fb:
+                full.append(fb)
+                for sentence in _split_sentences(fb):
+                    audio = self.tts.synth(sentence) if self.tts.available else b""
+                    if audio:
+                        self.mic.feed_playback(audio)
+                        self.tts.play(audio)
+                    else:
+                        await speak(sentence)
+        remainder = buffer.strip()
+        if remainder:
+            audio = self.tts.synth(remainder) if self.tts.available else b""
             if audio:
                 self.mic.feed_playback(audio)
                 self.tts.play(audio)
             else:
-                await speak(chunk)
+                await speak(remainder)
+            full.append(remainder)
+        return "".join(full)
 
     async def _check_barge_in(self, loop) -> bool:
         """Return True if sustained user speech was detected (barge-in)."""
