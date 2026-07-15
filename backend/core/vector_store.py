@@ -27,6 +27,15 @@ BGE_QUERY_PREFIX = "Represent this sentence for searching relevant passages: "
 CHROMA_HOST: Optional[str] = os.getenv("CHROMA_HOST")  # None → local mode
 CHROMA_PORT: int = int(os.getenv("CHROMA_PORT", "8000"))
 
+V2_SUFFIX = "_v2"
+
+COLLECTIONS_V2: Dict[str, str] = {
+    "constitution": "supreme_law_v2",
+    "ethos": "agent_ethos_v2",
+    "task_patterns": "execution_patterns_v2",
+    "domain_knowledge": "domain_knowledge_v2",
+}
+
 
 class AgentiumEmbeddingFunction(EmbeddingFunction):
     """
@@ -124,7 +133,9 @@ class VectorStore:
         self._port: int = port if port is not None else CHROMA_PORT
         self._client: Optional[chromadb.ClientAPI] = None
         self._embedding_fn = AgentiumEmbeddingFunction()
+        self._v2_embedding_fn = BgeEmbeddingFunction()
         self._collections: Dict[str, chromadb.Collection] = {}
+        self._collections_by_name: Dict[str, chromadb.Collection] = {}
 
     # ------------------------------------------------------------------
     # Initialisation
@@ -186,9 +197,22 @@ class VectorStore:
     # Collection access
     # ------------------------------------------------------------------
 
-    def get_collection(self, collection_key: str) -> chromadb.Collection:
+    def _active_version(self, key: str) -> str:
+        return _settings.EMBEDDING_ACTIVE_VERSIONS.get(key, _settings.EMBEDDING_ACTIVE_VERSION)
+
+    def _collection_name(self, key: str, version: Optional[str] = None) -> str:
+        version = version or self._active_version(key)
+        if version == "v2":
+            return COLLECTIONS_V2.get(key, f"{self.COLLECTIONS.get(key, key)}{V2_SUFFIX}")
+        return self.COLLECTIONS.get(key, key)
+
+    def get_collection(self, collection_key: str, version: Optional[str] = None):
         """
-        Return a collection by its logical key.
+        Return a collection by its logical key (optionally pinned to a version).
+
+        When ``version`` is omitted the active version for the key is used
+        (``EMBEDDING_ACTIVE_VERSIONS`` falling back to ``EMBEDDING_ACTIVE_VERSION``),
+        so existing callers continue to work unchanged.
 
         Raises ``ValueError`` for unknown keys so callers get an explicit
         error rather than a confusing ``KeyError``.
@@ -199,16 +223,26 @@ class VectorStore:
                 f"Valid keys: {list(self.COLLECTIONS)}"
             )
 
-        if collection_key not in self._collections:
-            name = self.COLLECTIONS[collection_key]
-            self._collections[collection_key] = (
-                self.client.get_or_create_collection(
-                    name=name,
-                    embedding_function=self._embedding_fn,
+        version = version or self._active_version(collection_key)
+        name = self._collection_name(collection_key, version)
+        ef = self._v2_embedding_fn if version == "v2" else self._embedding_fn
+        if name not in self._collections_by_name:
+            cfg = {"hnsw": {"space": "cosine"}} if version == "v2" else None
+            try:
+                self._collections_by_name[name] = self.client.get_or_create_collection(
+                    name=name, embedding_function=ef, configuration=cfg,
                 )
-            )
+            except TypeError:
+                # Older chromadb: space passed via metadata instead of configuration=
+                self._collections_by_name[name] = self.client.get_or_create_collection(
+                    name=name, embedding_function=ef,
+                    metadata={"hnsw:space": "cosine"} if version == "v2" else None,
+                )
+            # Keep the legacy per-key cache warm for v1 callers.
+            if version != "v2":
+                self._collections[collection_key] = self._collections_by_name[name]
 
-        return self._collections[collection_key]
+        return self._collections_by_name[name]
 
     # ------------------------------------------------------------------
     # Write helpers
