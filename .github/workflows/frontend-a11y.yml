@@ -1,0 +1,43 @@
+name: Frontend Accessibility
+
+on:
+  push:
+    branches: ["main", "master", "develop"]
+    paths:
+      - "frontend/**"
+      - ".github/workflows/frontend-a11y.yml"
+  pull_request:
+    branches: ["main", "master", "develop"]
+    paths:
+      - "frontend/**"
+      - ".github/workflows/frontend-a11y.yml"
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: "22"
+
+jobs:
+  a11y:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        working-directory: ./frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Run accessibility audit (axe-core, browser + color-contrast)
+        working-directory: ./frontend
+        run: npm run test:a11y

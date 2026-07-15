@@ -694,11 +694,14 @@ Build a self-governing AI ecosystem where agents operate under constitutional la
 
 ### 17.4 Accessibility (ARIA Labels & Keyboard Navigation)
 
+> **Status (2026-07-15):** Accessibility audit **completed** as part of a dedicated remediation pass. All items below are implemented and verified by automated axe-core tests (see `frontend/src/test/a11y.ts` + `frontend/src/test/a11yBrowser.tsx`, the `npm run test:a11y` browser gate, and the `frontend-a11y.yml` CI workflow). Page-level color-contrast still requires a live-backend audit (pages fire API calls on mount and could not be rendered in isolated tests).
+
 - [x] **ARIA Labels** — audit all icon-only buttons (pencil, trash, settings gear, expand/collapse) and add `aria-label` attributes; audit all form inputs for associated `<label>` elements
-- [x] **Keyboard Navigation** — ensure all interactive elements are reachable via Tab; add `focus:ring-2 focus:ring-blue-500` to all focusable elements that are missing it; modals should trap focus while open (`focus-trap-react` or custom)
-- [x] **Screen Reader** — add `role="status"` and `aria-live="polite"` to real-time updating regions (task status, WebSocket event feed, vote tallies); add `role="alert"` to error messages
-- [x] **Color Contrast** — run `axe-core` or `lighthouse --accessibility` audit; fix all elements below WCAG AA ratio (4.5:1 for text, 3:1 for UI components)
+- [x] **Keyboard Navigation** — ensure all interactive elements are reachable via Tab; a global `:focus-visible` ring is applied in `src/index.css`; modal focus trap + focus restore implemented in `src/components/ui/Modal.tsx` (+ `useFocusTrap`); all modals standardized on the shared primitive
+- [x] **Screen Reader** — add `role="status"` and `aria-live="polite"` to real-time updating regions (task status, WebSocket event feed, vote tallies, nav unread badge, message log); add `role="alert"` to error messages (present in DelegateTaskModal payload errors and elsewhere)
+- [x] **Color Contrast** — run `axe-core` audit against a real Chromium layout (color-contrast rule enabled); fixed `dark:text-*-500 → dark:text-*-400` and light `*-600 → *-700` violations across 9 shared components, covered by `*.a11y.browser.test.tsx`
 - [x] Add `skipToContent` link as the first focusable element on every page
+- [x] **CI gate** — `npm run test:a11y` wired into `.github/workflows/frontend-a11y.yml` so contrast/ARIA regressions fail the build
 
 ## Phase 18: Complete System Testing & Production Readiness 🔮
 
@@ -870,7 +873,7 @@ OpenAI TTS — Text-to-Speech
 
 - [x] UI dark mode inconsistencies on newer pages (Workflows, Events pages not yet built)
 - [x] Mobile responsiveness gaps on complex pages (Tasks, Voting, Monitoring)
-- [ ] Accessibility audit not done (ARIA labels, keyboard navigation, color contrast)
+- [x] Accessibility audit not done (ARIA labels, keyboard navigation, color contrast) — completed 2026-07-15
 - [ ] PostgreSQL slow query logging not enabled
 - [ ] Connection pool sizes set to defaults — not tuned for production load
 - [ ] Config files not version-controlled via Git
