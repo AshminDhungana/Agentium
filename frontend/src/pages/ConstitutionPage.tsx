@@ -203,6 +203,7 @@ function ArticleCard({
                         </div>
                         {isEditing ? (
                             <textarea
+                                aria-label="Article content"
                                 value={displayContent}
                                 onChange={e => onContentChange(articleKey, e.target.value)}
                                 className="w-full mt-1 p-3 text-sm rounded-xl border border-gray-300 dark:border-[#1e2535] bg-white dark:bg-[#0f1117] text-gray-700 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500/40 dark:focus:ring-blue-500/30 focus:border-blue-500 dark:focus:border-blue-500/50 resize-none transition duration-150"
@@ -664,6 +665,7 @@ export function ConstitutionPage() {
                         <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-600 dark:text-gray-500 pointer-events-none" />
                         <input
                             type="text"
+                            aria-label="Search articles"
                             placeholder="Search articles by title or content…"
                             value={searchQuery}
                             onChange={e => setSearchQuery(e.target.value)}
@@ -872,6 +874,7 @@ export function ConstitutionPage() {
                 <Section icon={BookOpen} title="Preamble" accent="blue">
                     {isEditing ? (
                         <textarea
+                            aria-label="Preamble"
                             value={data.preamble ?? ''}
                             onChange={e => setEditedConstitution({ ...editedConstitution, preamble: e.target.value })}
                             className="w-full h-36 p-4 rounded-xl border border-gray-300 dark:border-[#1e2535] bg-white dark:bg-[#0f1117] text-sm text-gray-700 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500/40 dark:focus:ring-blue-500/30 focus:border-blue-500 dark:focus:border-blue-500/50 resize-none font-serif leading-relaxed transition duration-150"
@@ -924,6 +927,7 @@ export function ConstitutionPage() {
                     {isEditing ? (
                         <div className="space-y-2">
                             <textarea
+                                aria-label="Prohibited actions"
                                 value={Array.isArray(data.prohibited_actions) ? data.prohibited_actions.join('\n') : ''}
                                 onChange={e => setEditedConstitution({
                                     ...editedConstitution,

@@ -10,6 +10,19 @@
   body {
     @apply antialiased;
   }
+
+  /* Global, theme-aware focus indicator. Only shows for keyboard users
+     (`:focus-visible`), so mouse clicks stay clean while keyboard/AT users
+     always get a clearly visible 2px ring in both light and dark themes. */
+  :focus-visible {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  .dark :focus-visible {
+    outline-color: #60a5fa;
+  }
 }
 
 /* Dark mode support */

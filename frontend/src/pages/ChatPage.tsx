@@ -1096,6 +1096,7 @@ export function ChatPage() {
                                     <div className="flex-1 bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-[#1e2535] rounded-2xl px-4 py-3 focus-within:border-blue-400 dark:focus-within:border-blue-500 transition-colors">
                                         <textarea
                                             ref={textareaRef}
+                                            aria-label="Message"
                                             value={input}
                                             onChange={(e) => setInput(e.target.value)}
                                             onKeyDown={handleKeyDown}
@@ -1236,6 +1237,7 @@ export function ChatPage() {
                                         <div className="flex items-end gap-3">
                                             <div className="flex-1 bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-[#1e2535] rounded-2xl px-4 py-3">
                                                 <textarea
+                                                    aria-label="Reply message"
                                                     value={replyContent}
                                                     onChange={(e) => setReplyContent(e.target.value)}
                                                     placeholder="Type a reply…"
@@ -1275,10 +1277,12 @@ export function ChatPage() {
                             <div className="flex-1 relative">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600" />
                                 <input value={browserSearch} onChange={(e) => setBrowserSearch(e.target.value)}
+                                    aria-label="Search files"
                                     placeholder="Search files…"
                                     className="w-full pl-9 pr-4 py-2 bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-[#1e2535] rounded-xl text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:border-violet-400 dark:focus:border-violet-500" />
                             </div>
                             <select value={browserCategory} onChange={(e) => setBrowserCategory(e.target.value)}
+                                aria-label="Filter by file type"
                                 className="px-3 py-2 bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-[#1e2535] rounded-xl text-sm text-gray-700 dark:text-gray-300 focus:outline-none">
                                 <option value="all">All types</option>
                                 <option value="image">Images</option>

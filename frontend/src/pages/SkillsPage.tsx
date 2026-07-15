@@ -342,6 +342,7 @@ export const SkillsPage: React.FC = () => {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600 dark:text-gray-500" />
                 <input
                   type="text"
+                  aria-label="Search skills"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="Search skills (e.g., 'React form validation')..."

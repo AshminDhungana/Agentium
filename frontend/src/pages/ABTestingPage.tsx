@@ -925,6 +925,7 @@ function RecommendationsPanel() {
         </div>
         <div className="flex items-center gap-2">
           <input
+            aria-label="Filter by category"
             value={taskFilter}
             onChange={e => setTaskFilter(e.target.value)}
             placeholder="Filter by category…"

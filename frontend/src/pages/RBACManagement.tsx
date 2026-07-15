@@ -369,6 +369,7 @@ function RBACManagementInner() {
                                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600 dark:text-gray-500" />
                                 <input
                                     type="text"
+                                    aria-label="Search users"
                                     placeholder="Search users..."
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}

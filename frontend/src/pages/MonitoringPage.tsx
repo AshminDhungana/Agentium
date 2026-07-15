@@ -275,6 +275,7 @@ function ViolationsTab({ initialViolations }: ViolationsTabProps) {
                             Provide resolution notes before marking this violation as resolved.
                         </p>
                         <textarea
+                            aria-label="Resolution notes"
                             value={resolutionNotes}
                             onChange={e => { setResolutionNotes(e.target.value); setResolveError(null); }}
                             placeholder="Describe how the violation was addressed..."

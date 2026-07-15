@@ -859,6 +859,7 @@ export function ChannelsPage() {
                                                     </div>
                                                     <div className="flex gap-2">
                                                         <input
+                                                            aria-label="Add allowed sender"
                                                             value={senderInput}
                                                             onChange={e => setSenderInput(e.target.value)}
                                                             onKeyDown={e => {

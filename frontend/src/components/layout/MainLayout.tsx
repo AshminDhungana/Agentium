@@ -424,6 +424,40 @@ export function MainLayout() {
         adminOnly?: boolean;
     };
 
+    const NavItemLink = ({ item }: { item: NavItem }) => {
+        const location = useLocation();
+        const isActive = item.path === '/'
+            ? location.pathname === '/'
+            : location.pathname.startsWith(item.path);
+        return (
+            <NavLink
+                to={item.path}
+                end={item.path === '/'}
+                aria-current={isActive ? 'page' : undefined}
+                onMouseEnter={() => prefetch(item.path)}
+                className={({ isActive: active }) =>
+                    `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                        item.variant === 'danger'
+                            ? active
+                                ? 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300 border border-red-200 dark:border-red-500/20'
+                                : 'text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 bg-red-50/50 dark:bg-red-500/5'
+                            : active
+                                ? 'bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300'
+                                : 'text-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5'
+                    }`
+                }
+            >
+                <item.icon className={`w-[18px] h-[18px] flex-shrink-0 ${item.variant === 'danger' ? 'text-red-600' : ''}`} />
+                <span className="flex-1">{item.label}</span>
+                {item.badge !== undefined && (
+                    <span className="bg-red-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                        {item.badge > 9 ? '9+' : item.badge}
+                    </span>
+                )}
+            </NavLink>
+        );
+    };
+
     const navItems: NavItem[] = [
         { path: '/',             label: 'Dashboard',         icon: LayoutDashboard },
         { path: '/chat',         label: 'Command Interface', icon: Crown,
@@ -473,30 +507,7 @@ export function MainLayout() {
                             {item.variant === 'danger' && (
                                 <div className="my-1.5 border-t border-gray-200 dark:border-[#1e2535]" />
                             )}
-                            <NavLink
-                                to={item.path}
-                                end={item.path === '/'}
-                                onMouseEnter={() => prefetch(item.path)}
-                                className={({ isActive }) =>
-                                    `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                                        item.variant === 'danger'
-                                            ? isActive
-                                                ? 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300 border border-red-200 dark:border-red-500/20'
-                                                : 'text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 bg-red-50/50 dark:bg-red-500/5'
-                                            : isActive
-                                                ? 'bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300'
-                                                : 'text-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5'
-                                    }`
-                                }
-                            >
-                                <item.icon className={`w-[18px] h-[18px] flex-shrink-0 ${item.variant === 'danger' ? 'text-red-600' : ''}`} />
-                                <span className="flex-1">{item.label}</span>
-                                {item.badge !== undefined && (
-                                    <span className="bg-red-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
-                                        {item.badge > 9 ? '9+' : item.badge}
-                                    </span>
-                                )}
-                            </NavLink>
+                            <NavItemLink item={item} />
                         </div>
                     ))}
                 </nav>

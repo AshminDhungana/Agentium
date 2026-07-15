@@ -872,6 +872,7 @@ const MainTaskCard: React.FC<{ task: Task; onUpdated?: (updated: Task) => void; 
                             )}
                             {isEditing ? (
                                 <select
+                                    aria-label="Task status"
                                     value={editStatus}
                                     onChange={e => setEditStatus(e.target.value)}
                                     disabled={transitionsLoading}
@@ -888,6 +889,7 @@ const MainTaskCard: React.FC<{ task: Task; onUpdated?: (updated: Task) => void; 
                             )}
                             {isEditing ? (
                                 <select
+                                    aria-label="Task priority"
                                     value={editPriority}
                                     onChange={e => setEditPriority(e.target.value)}
                                     className="text-xs font-semibold uppercase rounded px-2 py-0.5 border border-gray-300 dark:border-[#2a3347] bg-white dark:bg-[#1e2535] text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-400"
@@ -907,6 +909,7 @@ const MainTaskCard: React.FC<{ task: Task; onUpdated?: (updated: Task) => void; 
                         {isEditing ? (
                             <input
                                 type="text"
+                                aria-label="Task title"
                                 value={editTitle}
                                 onChange={e => setEditTitle(e.target.value)}
                                 className="w-full text-base font-semibold text-gray-900 dark:text-white bg-gray-50 dark:bg-[#1e2535] border border-blue-300 dark:border-blue-600 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-400 mb-2"
@@ -918,6 +921,7 @@ const MainTaskCard: React.FC<{ task: Task; onUpdated?: (updated: Task) => void; 
                         )}
                         {isEditing ? (
                             <textarea
+                                aria-label="Task description"
                                 value={editDescription}
                                 onChange={e => setEditDescription(e.target.value)}
                                 rows={2}
@@ -1178,6 +1182,7 @@ const PreferenceValueEditor: React.FC<{
         <div className="flex items-center gap-2">
             <input
                 type={dataType === 'integer' || dataType === 'float' ? 'number' : 'text'}
+                aria-label="Value"
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={handleKeyDown}
@@ -2042,6 +2047,7 @@ const CriticsTab: React.FC<{ onStatsLoaded?: (count: number) => void }> = ({ onS
                 <div className="px-5 py-4 flex gap-3">
                     <input
                         type="text"
+                        aria-label="Task or subtask ID"
                         placeholder="task-uuid-here…"
                         value={inspectTask}
                         onChange={e => { setInspectTask(e.target.value); setShowInspect(false); }}
