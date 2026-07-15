@@ -17,6 +17,7 @@ docs/superpowers/
 .agents
 skills-lock.json
 .codex
+.opencode
 
 # Node
 node_modules/
