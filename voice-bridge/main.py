@@ -775,6 +775,102 @@ async def _process_direct(text: str) -> None:
     await _broadcast({"type": "voice_interaction", "user": text, "reply": reply, "ts": time.time()})
 
 
+def _split_sentences(text: str):
+    """Split a reply into sentence chunks for incremental TTS."""
+    parts = []
+    buf = ""
+    for ch in text:
+        buf += ch
+        if ch in ".?!" and buf.strip():
+            parts.append(buf.strip())
+            buf = ""
+    if buf.strip():
+        parts.append(buf.strip())
+    return parts or [text]
+
+
+class VoiceSession:
+    """Asyncio state machine: LISTENING -> THINKING -> SPEAKING -> (INTERRUPTED) -> LISTENING.
+
+    SPEAKING runs a continuous VAD (driven by the mic frames interleaved with
+    playback) so the user can barge in: sustained speech (>=250 ms) flushes the
+    TTS queue and returns to LISTENING. A false-barge-in guard ignores short
+    backchannel noises.
+    """
+
+    BARGE_IN_SPEECH_MS = 250.0
+    FRAME_MS = 80.0
+
+    def __init__(self, mic, vad, tts, barge_in: bool = True, persona: Optional[str] = None,
+                 speaker_id: Optional[str] = None):
+        self.mic = mic
+        self.vad = vad
+        self.tts = tts
+        self.barge_in = barge_in
+        self.persona = persona
+        self.speaker_id = speaker_id
+        self.phase = "IDLE"
+        self._speech_ms = 0.0
+        self._abort = asyncio.Event()
+
+    async def run(self):
+        loop = asyncio.get_event_loop()
+        while True:
+            self.phase = "LISTENING"
+            await self._broadcast_state("listening")
+            text = await _capture_utterance(self.mic, self.vad)
+            if not text:
+                return  # no-speech timeout ends the session
+            self.phase = "THINKING"
+            await self._broadcast_state("thinking")
+            reply = await query_backend(text)
+            if not reply:
+                reply = "I'm having trouble reaching the backend right now."
+            self.phase = "SPEAKING"
+            await self._broadcast_state("speaking")
+            await self._speak_reply(reply)
+            if self._abort.is_set():
+                self._abort.clear()
+                self.phase = "INTERRUPTED"
+                await self._broadcast_state("interrupted")
+                continue  # loop back to LISTENING
+            await _broadcast({
+                "type": "voice_interaction", "user": text, "reply": reply, "ts": time.time(),
+                "speaker_id": self.speaker_id,
+            })
+
+    async def _speak_reply(self, reply: str):
+        loop = asyncio.get_event_loop()
+        for chunk in _split_sentences(reply):
+            if self.barge_in and await self._check_barge_in(loop):
+                return
+            audio = self.tts.synth(chunk) if self.tts.available else b""
+            if audio:
+                self.mic.feed_playback(audio)
+                self.tts.play(audio)
+            else:
+                await speak(chunk)
+
+    async def _check_barge_in(self, loop) -> bool:
+        """Return True if sustained user speech was detected (barge-in)."""
+        frame_bytes = await loop.run_in_executor(_executor, self.mic.read_frame)
+        if not frame_bytes:
+            return False
+        score = self.vad.push_frame(frame_bytes)
+        if self.vad.is_speech(score):
+            self._speech_ms += self.FRAME_MS
+            if self._speech_ms >= self.BARGE_IN_SPEECH_MS:
+                self._abort.set()
+                self.tts.flush()
+                return True
+        else:
+            self._speech_ms = 0.0
+        return False
+
+    async def _broadcast_state(self, state: str):
+        await _broadcast({"type": "voice_state", "state": state, "ts": time.time()})
+
+
 async def _run_voice_loop_once() -> None:
     """
     Single pass of the voice loop's outer try/except wrapper. Rewritten for the
