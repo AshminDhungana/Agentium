@@ -51,6 +51,7 @@ class Settings(BaseSettings):
     EMBEDDING_DIM: int = 384
     EMBEDDING_ACTIVE_VERSION: str = "v1"          # global default
     EMBEDDING_ACTIVE_VERSIONS: dict = {}          # e.g. {"task_patterns": "v2"}
+    EMBEDDING_MIN_RELEVANCE: float = 0.0  # RAG min-relevance filter; 0.0 = off
 
     # Speaker Identification (Phase 10.3 / 15.4)
     SPEAKER_ID_ENABLED: bool = Field(default=True, env="SPEAKER_ID_ENABLED")

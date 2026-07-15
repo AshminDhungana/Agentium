@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Optional
 
 from sqlalchemy.orm import Session
 
+from backend.core.config import settings
 from backend.core.vector_store import VectorStore, get_vector_store
 from backend.models.entities.agents import Agent, AgentType
 from backend.models.entities.constitution import Constitution, Ethos
@@ -28,6 +29,13 @@ _DEFAULT_SIMILARITY_THRESHOLD: float = 0.15
 # <= ~0.116, while genuinely distinct pairs sit at >= ~0.517. 0.2 captures
 # all observed duplicates with a large safety margin below the distinct floor.
 _V2_SIMILARITY_THRESHOLD: float = 0.2
+
+
+def _passes_min_relevance(relevance: float, threshold: float) -> bool:
+    """Drop segments below the configured min-relevance (cosine space)."""
+    if threshold <= 0.0:
+        return True
+    return relevance >= threshold
 
 
 class KnowledgeService:
@@ -139,18 +147,20 @@ class KnowledgeService:
                         if const_results.get("distances")
                         else 0.5
                     )
-                    context["knowledge_segments"].append(
-                        {
-                            "type": "constitution",
-                            "content": doc,
-                            "relevance": max(0.0, 1.0 - distance),
-                            "source": (
-                                const_results["metadatas"][0][i]
-                                if const_results.get("metadatas")
-                                else {}
-                            ),
-                        }
-                    )
+                    relevance = max(0.0, 1.0 - distance)
+                    if _passes_min_relevance(relevance, settings.EMBEDDING_MIN_RELEVANCE):
+                        context["knowledge_segments"].append(
+                            {
+                                "type": "constitution",
+                                "content": doc,
+                                "relevance": relevance,
+                                "source": (
+                                    const_results["metadatas"][0][i]
+                                    if const_results.get("metadatas")
+                                    else {}
+                                ),
+                            }
+                        )
 
         # 2. Agent's own Ethos (from DB object — avoids redundant vector query)
         if agent.ethos:
@@ -245,19 +255,21 @@ class KnowledgeService:
                 for i, doc in enumerate(case_law["documents"][0]):
                     distance = case_law["distances"][0][i] if case_law.get("distances") else 0.5
                     # Only include highly relevant case law to avoid polluting context
-                    if distance < 0.4:  
-                        context["knowledge_segments"].append(
-                            {
-                                "type": "case_law_warning",
-                                "content": doc,
-                                "relevance": max(0.0, 1.0 - distance),
-                                "metadata": (
-                                    case_law["metadatas"][0][i]
-                                    if case_law.get("metadatas")
-                                    else {}
-                                ),
-                            }
-                        )
+                    if distance < 0.4:
+                        relevance = max(0.0, 1.0 - distance)
+                        if _passes_min_relevance(relevance, settings.EMBEDDING_MIN_RELEVANCE):
+                            context["knowledge_segments"].append(
+                                {
+                                    "type": "case_law_warning",
+                                    "content": doc,
+                                    "relevance": relevance,
+                                    "metadata": (
+                                        case_law["metadatas"][0][i]
+                                        if case_law.get("metadatas")
+                                        else {}
+                                    ),
+                                }
+                            )
         except ValueError:
             # Collection may not exist yet on fresh deploy
             pass
