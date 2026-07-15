@@ -398,6 +398,17 @@ def init_db():
     # Create all tables that don't exist yet
     Base.metadata.create_all(bind=engine)
 
+    # Phase 19 Known Issue: enable pg_stat_statements so slow-query analytics
+    # (GET /admin/slow-queries + the daily Celery summary task) return data
+    # instead of silently empty. Defensive: never block startup on optional
+    # analytics if the module is not preloaded.
+    try:
+        from backend.services.slow_query_service import ensure_pg_stat_statements
+        with get_db_context() as db:
+            ensure_pg_stat_statements(db)
+    except Exception as exc:  # pragma: no cover - optional, non-fatal
+        logger.warning("[init_db] pg_stat_statements enable skipped: %s", exc)
+
     # Seed initial/system data
     with get_db_context() as db:
         create_initial_data(db)

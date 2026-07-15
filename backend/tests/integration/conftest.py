@@ -77,6 +77,13 @@ def db_engine():
 
     Base.metadata.create_all(bind=engine_test)
 
+    # Phase 19: enable pg_stat_statements extension so slow-query tests have
+    # real data. Requires shared_preload_libraries=pg_stat_statements in
+    # docker-compose.test.yml postgres (added in this task).
+    with engine_test.connect() as conn:
+        conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_stat_statements"))
+        conn.commit()
+
     # Ensure waitstrategy enum has 'execution' value (Phase 19.2)
     with engine_test.connect() as conn:
         conn.execute(text("ALTER TYPE waitstrategy ADD VALUE IF NOT EXISTS 'execution'"))

@@ -51,13 +51,44 @@ def _extension_available(db: Session) -> bool:
                 exc,
             )
             _SUPPORTED_WARNING_LOGGED = True
+        db.rollback()
         return False
+
+
+def ensure_pg_stat_statements(db: Session) -> bool:
+    """
+    Idempotently create the pg_stat_statements extension so slow-query
+    analytics (GET /admin/slow-queries + the daily Celery summary) return
+    real data. Returns True only if the view is queryable afterwards.
+
+    Never raises: a missing/contrib module must not crash app startup.
+    """
+    try:
+        db.execute(text("CREATE EXTENSION IF NOT EXISTS pg_stat_statements"))
+        db.commit()
+    except Exception as exc:
+        logger.warning("[SlowQueryService] CREATE EXTENSION failed: %s", exc)
+        db.rollback()
+        return False
+    available = _extension_available(db)
+    if available:
+        logger.info("[SlowQueryService] pg_stat_statements extension ready.")
+    else:
+        logger.warning(
+            "[SlowQueryService] pg_stat_statements module not preloaded; "
+            "set shared_preload_libraries=pg_stat_statements in postgres config."
+        )
+    return available
 
 
 def _has_stats_info_column(db: Session) -> bool:
     """
     pg_stat_statements.stats_since was added in PG 14.
     Older versions have no per-statement timestamp.
+
+    Must roll back on failure: a raised probe leaves the session
+    transaction aborted, which would break any later query in the
+    same session.
     """
     try:
         db.execute(
@@ -65,6 +96,7 @@ def _has_stats_info_column(db: Session) -> bool:
         )
         return True
     except Exception:
+        db.rollback()
         return False
 
 

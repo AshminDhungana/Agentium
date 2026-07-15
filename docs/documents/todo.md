@@ -874,7 +874,7 @@ OpenAI TTS — Text-to-Speech
 - [x] UI dark mode inconsistencies on newer pages (Workflows, Events pages not yet built)
 - [x] Mobile responsiveness gaps on complex pages (Tasks, Voting, Monitoring)
 - [x] Accessibility audit not done (ARIA labels, keyboard navigation, color contrast) — completed 2026-07-15
-- [ ] PostgreSQL slow query logging not enabled
+- [x] PostgreSQL slow query logging enabled (pg_stat_statements extension created at startup + in test DB; shared_preload_libraries set in dev & test compose)
 - [ ] Connection pool sizes set to defaults — not tuned for production load
 - [ ] Config files not version-controlled via Git
 
