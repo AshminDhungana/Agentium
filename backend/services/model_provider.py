@@ -1307,12 +1307,20 @@ class ModelService:
                 if not api_key:
                     return ModelService._get_default_models(provider)
                 import openai
-                client = openai.AsyncOpenAI(api_key=api_key)
+                # Respect a custom base_url (OpenAI-compatible endpoints such as
+                # OpenRouter, Together, local vLLM, etc.). Without this the SDK
+                # always hits api.openai.com and ignores the user's endpoint.
+                client = openai.AsyncOpenAI(api_key=api_key, base_url=base_url) if base_url \
+                    else openai.AsyncOpenAI(api_key=api_key)
                 models = await client.models.list()
-                return sorted([
-                    m.id for m in models.data
-                    if any(x in m.id.lower() for x in ['gpt-4o', 'gpt-4', 'gpt-3.5', 'o1', 'o3'])
-                ])
+                ids = [m.id for m in models.data]
+                # For the native OpenAI API, filter to the common chat models to
+                # cut clutter. For a custom/base_url endpoint, return everything
+                # the provider reports (e.g. OpenRouter exposes hundreds of models).
+                if not base_url:
+                    ids = [m for m in ids
+                           if any(x in m.lower() for x in ['gpt-4o', 'gpt-4', 'gpt-3.5', 'o1', 'o3'])]
+                return sorted(ids)
 
             # ── ANTHROPIC ────────────────────────────────────────────────────────
             # Anthropic now exposes a public GET /v1/models endpoint (added after

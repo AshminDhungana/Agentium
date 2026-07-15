@@ -56,6 +56,15 @@ class ModelConfigCreate(BaseModel):
     max_concurrent_requests: Optional[int] = Field(default=10, ge=1,
                                               description="Max concurrent outbound requests for this key")
 
+    @field_validator('provider', mode='before')
+    @classmethod
+    def _normalize_provider(cls, v):
+        # Frontend sends lowercase provider ids (e.g. 'custom'); the ProviderType
+        # enum is uppercase. Normalize so the request validates instead of 422.
+        if isinstance(v, str):
+            return v.upper()
+        return v
+
     @field_validator('api_base_url', 'local_server_url')
     @classmethod
     def validate_url(cls, v: Optional[str]) -> Optional[str]:
@@ -138,6 +147,16 @@ class FetchModelsRequest(BaseModel):
     api_key: Optional[str] = None
     api_base_url: Optional[str] = None
     local_server_url: Optional[str] = None
+
+    @field_validator('provider', mode='before')
+    @classmethod
+    def _normalize_provider(cls, v):
+        # Frontend sends lowercase provider ids (e.g. 'openai', 'custom'); the
+        # ProviderType enum is uppercase. Normalize so the request validates
+        # instead of returning 422 (which previously crashed the React tree).
+        if isinstance(v, str):
+            return v.upper()
+        return v
 
 
 class FetchModelsResponse(BaseModel):
