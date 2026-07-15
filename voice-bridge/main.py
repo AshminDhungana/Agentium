@@ -699,7 +699,33 @@ async def _stream_chat(text: str, persona: Optional[str] = None,
             pass
 
 
-# ── WebSocket broadcast server ─────────────────────────────────────────────────
+SPEAKER_ID_URL = f"{BACKEND_URL}/api/v1/audio/speakers/identify"
+
+
+def _identify_speaker(wav: bytes) -> Optional[dict]:
+    """Identify the speaker of an utterance via the backend ECAPA-TDNN service.
+
+    Returns the speaker profile dict (with `speaker_id`/`name`) or None on any
+    failure (no token, missing model, decode error). The bridge then degrades
+    gracefully to a generic greeting.
+    """
+    if not VOICE_TOKEN:
+        return None
+    try:
+        req = urllib.request.Request(
+            SPEAKER_ID_URL,
+            data=wav,
+            headers={
+                "Content-Type": "audio/wav",
+                "Authorization": f"Bearer {VOICE_TOKEN}",
+            },
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            return json.loads(resp.read().decode())
+    except Exception as exc:
+        logger.debug("[bridge] speaker id failed: %s", exc)
+        return None
 
 _connected_browsers: set = set()
 
@@ -842,18 +868,21 @@ async def _run_session() -> None:
 # ── Main voice loop ────────────────────────────────────────────────────────────
 
 async def _capture_utterance(
-    mic: "MicrophoneSource", vad: "Optional[VAD]" = None, timeout: float = SESSION_NO_SPEECH_TIMEOUT
-) -> Optional[str]:
+    mic: "MicrophoneSource", vad: "Optional[VAD]" = None, timeout: float = SESSION_NO_SPEECH_TIMEOUT,
+    return_wav: bool = False,
+):
     """Capture one VAD-bounded utterance and transcribe it.
 
     Until the VAD stage (Phase B) is live, falls back to the existing blocking
-    energy-gated listener. Returns the transcript string or None on timeout.
+    energy-gated listener. Returns the transcript string (or (text, wav) tuple
+    when return_wav=True) or None on timeout.
     """
     loop = asyncio.get_event_loop()
     if vad is None or not vad.available:
-        return await loop.run_in_executor(
+        text = await loop.run_in_executor(
             _executor, _listen_sync, timeout, 15.0, SESSION_PAUSE_THRESHOLD
         )
+        return (text, b"") if return_wav else text
     chunks: list[bytes] = []
     silence_ms = 0.0
     frame_ms = 80.0
@@ -870,13 +899,13 @@ async def _capture_utterance(
                 break
         elapsed += frame_ms
     if not chunks:
-        return None
+        return (None, b"") if return_wav else None
     wav = _frames_to_wav(b"".join(chunks))
     text = await loop.run_in_executor(_executor, _transcribe_via_backend, wav)
     if not text:
         # Vosk needs AudioData; reuse the blocking listener for the fallback.
-        return await loop.run_in_executor(_executor, _listen_sync, 1.0, 15.0, SESSION_PAUSE_THRESHOLD)
-    return text
+        text = await loop.run_in_executor(_executor, _listen_sync, 1.0, 15.0, SESSION_PAUSE_THRESHOLD)
+    return (text, wav) if return_wav else text
 
 
 def _frames_to_wav(pcm: bytes) -> bytes:
@@ -943,15 +972,30 @@ class VoiceSession:
         self.phase = "IDLE"
         self._speech_ms = 0.0
         self._abort = asyncio.Event()
+        self._greeting = ""
+        self._greeted = False
 
     async def run(self):
         loop = asyncio.get_event_loop()
         while True:
             self.phase = "LISTENING"
             await self._broadcast_state("listening")
-            text = await _capture_utterance(self.mic, self.vad)
+            result = await _capture_utterance(self.mic, self.vad, return_wav=True)
+            if isinstance(result, tuple):
+                text, wav = result
+            else:
+                text, wav = result, None
             if not text:
                 return  # no-speech timeout ends the session
+            # Identify speaker (Phase G) and personalize the greeting.
+            if wav and self.speaker_id is None:
+                info = _identify_speaker(wav)
+                if info and info.get("speaker_id"):
+                    self.speaker_id = info.get("speaker_id")
+                    name = info.get("name")
+                    if name and not self._greeted:
+                        self._greeting = f"Good morning, {name}."
+                        self._greeted = True
             self.phase = "THINKING"
             await self._broadcast_state("thinking")
             self.phase = "SPEAKING"
@@ -972,6 +1016,16 @@ class VoiceSession:
         TTS as they form (Phase D). Falls back to the non-streaming call if the
         SSE stream errors. Returns the full assembled reply for broadcast."""
         loop = asyncio.get_event_loop()
+        # Speak the personalized greeting first, if any (Phase G).
+        if self._greeting:
+            greeting = self._greeting
+            self._greeting = ""
+            audio = self.tts.synth(greeting) if self.tts.available else b""
+            if audio:
+                self.mic.feed_playback(audio)
+                self.tts.play(audio)
+            else:
+                await _speak_fallback(greeting)
         buffer = ""
         full: list[str] = []
         try:

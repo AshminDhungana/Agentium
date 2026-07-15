@@ -381,3 +381,41 @@ def test_proactive_announces_when_enabled(monkeypatch):
     assert line is not None
     # second call within cooldown is suppressed
     assert ann.maybe_announce("agent_crashed") is None
+
+
+def test_identify_speaker_returns_name(monkeypatch):
+    import json
+
+    def _fake(req, timeout=None):
+        r = type("R", (), {"read": lambda self: json.dumps(
+            {"speaker_id": "s1", "name": "Ashmin", "confidence": 0.9}).encode()})()
+        r.__enter__ = lambda: r
+        r.__exit__ = lambda *a: None
+        return r
+
+    monkeypatch.setattr("urllib.request.urlopen", _fake)
+    monkeypatch.setattr(bridge, "VOICE_TOKEN", "t")
+    sp = bridge._identify_speaker(b"WAVDATA")
+    assert sp.get("name") == "Ashmin"
+
+
+def test_stream_chat_includes_speaker_id(monkeypatch):
+    import asyncio, json
+
+    captured = {}
+
+    def _fake(req, timeout=None):
+        captured["body"] = json.loads(req.data.decode())
+        r = type("R", (), {"read": lambda self: b'data: {"type":"done"}\n\n'})()
+        r.__enter__ = lambda: r
+        r.__exit__ = lambda *a: None
+        return r
+
+    monkeypatch.setattr("urllib.request.urlopen", _fake)
+    monkeypatch.setattr(bridge, "VOICE_TOKEN", "t")
+
+    async def go():
+        out = [c async for c in bridge._stream_chat("hi", persona=None, speaker_id="s1")]
+
+    asyncio.run(go())
+    assert captured["body"].get("speaker_id") == "s1"
