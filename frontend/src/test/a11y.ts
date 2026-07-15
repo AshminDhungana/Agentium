@@ -6,6 +6,16 @@ import type React from 'react';
 // Custom `toHaveNoViolations` matcher backed by axe-core directly (avoids the
 // vitest-axe peer-dependency on a specific Vitest major). Registered globally
 // via this module, which is imported by src/test/setup.ts.
+declare module 'vitest' {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  interface Assertion<T = any> {
+    toHaveNoViolations(): T;
+  }
+  interface AsymmetricMatchersContaining {
+    toHaveNoViolations(): void;
+  }
+}
+
 expect.extend({
   toHaveNoViolations(received: AxeResults) {
     const violations = received.violations ?? [];

@@ -795,7 +795,7 @@ export function ChatPage() {
                         className="max-w-xs max-h-48 rounded-lg object-cover cursor-pointer"
                         onClick={() => setImagePreview({ url: src, name: attachment.name })}
                     />
-                    <button onClick={() => downloadFile(attachment)}
+                    <button onClick={() => downloadFile(attachment)} aria-label="Download File"
                         className="absolute top-2 right-2 p-1.5 bg-black/50 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity text-white">
                         <Download className="w-3.5 h-3.5" />
                     </button>
@@ -1032,12 +1032,12 @@ export function ChatPage() {
                                                     {!message.metadata?.card && (
                                                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                                             <button onClick={() => copyMessage(message.content)}
-                                                                className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-[#1e2535] text-gray-600 dark:text-gray-500 transition-colors" title="Copy">
+                                                                className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-[#1e2535] text-gray-600 dark:text-gray-500 transition-colors" title="Copy" aria-label="Copy">
                                                                 <Copy className="w-3 h-3" />
                                                             </button>
                                                             {!isUser && voiceAvailable && (
                                                                 <button onClick={() => handleSpeakMessage(message.id, message.content)}
-                                                                    className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-[#1e2535] text-gray-600 dark:text-gray-500 transition-colors" title="Read aloud">
+                                                                    className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-[#1e2535] text-gray-600 dark:text-gray-500 transition-colors" title="Read aloud" aria-label="Read aloud">
                                                                     {isSpeaking === message.id ? <VolumeX className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
                                                                 </button>
                                                             )}
@@ -1076,7 +1076,7 @@ export function ChatPage() {
                                                         <CheckCircle className={`w-3.5 h-3.5 ${uf.apiFile?.extracted_text ? 'text-blue-600' : 'text-green-700'}`} />
                                                     </span>
                                                 )}
-                                                <button onClick={() => removeFile(uf.id)}
+                                                <button onClick={() => removeFile(uf.id)} aria-label="Remove file"
                                                     className="ml-1 p-0.5 rounded-full hover:bg-gray-200 dark:hover:bg-[#2a3347] text-gray-600">
                                                     <X className="w-3 h-3" />
                                                 </button>
@@ -1107,11 +1107,11 @@ export function ChatPage() {
                                         />
                                         <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100 dark:border-[#1e2535]">
                                             <div className="flex items-center gap-1">
-                                                <button type="button" onClick={() => setShowFileMenu(!showFileMenu)} title="Attach file"
+                                                <button type="button" onClick={() => setShowFileMenu(!showFileMenu)} title="Attach file" aria-label="Attach file"
                                                     className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-[#1e2535] text-gray-600 dark:text-gray-500 transition-colors">
                                                     <Paperclip className="w-4 h-4" />
                                                 </button>
-                                                <button type="button" onClick={() => fileInputRef.current?.click()} title="Upload image"
+                                                <button type="button" onClick={() => fileInputRef.current?.click()} title="Upload image" aria-label="Upload image"
                                                     className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-[#1e2535] text-gray-600 dark:text-gray-500 transition-colors">
                                                     <ImageIcon className="w-4 h-4" />
                                                 </button>
@@ -1121,11 +1121,11 @@ export function ChatPage() {
                                                             className={`p-1.5 rounded-lg transition-colors ${isRecording
                                                                     ? 'bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400'
                                                                     : 'hover:bg-gray-200 dark:hover:bg-[#1e2535] text-gray-600 dark:text-gray-500'
-                                                                }`} title={isRecording ? 'Stop recording' : 'Start voice input'}>
+                                                                    }`} title={isRecording ? 'Stop recording' : 'Start voice input'} aria-label={isRecording ? 'Stop recording' : 'Start voice input'}>
                                                             {isRecording ? <Pause className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
                                                         </button>
                                                         <button type="button" onClick={() => setShowVoiceSettings(true)}
-                                                            className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-[#1e2535] text-gray-600 dark:text-gray-500 transition-colors" title="Voice Settings">
+                                                            className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-[#1e2535] text-gray-600 dark:text-gray-500 transition-colors" title="Voice Settings" aria-label="Voice Settings">
                                                             <Settings2 className="w-4 h-4" />
                                                         </button>
                                                     </>
@@ -1139,7 +1139,7 @@ export function ChatPage() {
                                             <span className="text-xs text-gray-600 dark:text-gray-500">Enter to send · Shift+Enter for new line</span>
                                         </div>
                                     </div>
-                                    <button type="submit"
+                                    <button type="submit" aria-label="Send message"
                                         disabled={(!input.trim() && uploadedFiles.length === 0) || !isConnected}
                                         className="p-3.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-200 dark:disabled:bg-[#1e2535] disabled:cursor-not-allowed text-white disabled:text-gray-600 dark:disabled:text-gray-600 rounded-2xl transition-all duration-150 shadow-lg shadow-blue-500/25 dark:shadow-blue-900/40 disabled:shadow-none flex-shrink-0">
                                         <Send className="w-5 h-5" />
@@ -1244,7 +1244,7 @@ export function ChatPage() {
                                                     style={{ maxHeight: '150px' }}
                                                 />
                                             </div>
-                                            <button onClick={handleSendReply}
+                                            <button onClick={handleSendReply} aria-label="Send reply"
                                                 disabled={!replyContent.trim() || isSending}
                                                 className="p-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-200 dark:disabled:bg-[#1e2535] disabled:cursor-not-allowed text-white disabled:text-gray-600 dark:disabled:text-gray-600 rounded-xl transition-all duration-150">
                                                 {isSending ? <LoadingSpinner size="md" /> : <Send className="w-5 h-5" />}
@@ -1357,7 +1357,7 @@ export function ChatPage() {
                                                 )}
                                                 <button onClick={() => handleDeleteFile(f.stored_name)}
                                                     disabled={deletingFile === f.stored_name}
-                                                    className="p-2 bg-red-500/80 hover:bg-red-500 rounded-lg text-white transition-colors" title="Delete">
+                                                    className="p-2 bg-red-500/80 hover:bg-red-500 rounded-lg text-white transition-colors" title="Delete" aria-label="Delete">
                                                     {deletingFile === f.stored_name ? <LoadingSpinner size="sm" /> : <Trash2 className="w-4 h-4" />}
                                                 </button>
                                             </div>
@@ -1374,7 +1374,7 @@ export function ChatPage() {
                     <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4" onClick={() => setImagePreview(null)}>
                         <div className="relative max-w-4xl max-h-full" onClick={(e) => e.stopPropagation()}>
                             <img src={imagePreview.url} alt={imagePreview.name} className="max-h-[85vh] max-w-full rounded-2xl object-contain" />
-                            <button onClick={() => setImagePreview(null)}
+                            <button onClick={() => setImagePreview(null)} aria-label="Close preview"
                                 className="absolute top-3 right-3 p-2 bg-black/50 rounded-xl text-white hover:bg-black/70 transition-colors">
                                 <X className="w-5 h-5" />
                             </button>

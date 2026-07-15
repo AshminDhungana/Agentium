@@ -248,7 +248,7 @@ const DeveloperPortalPage: React.FC = () => {
                     <button 
                         className="p-1.5 text-gray-600 hover:text-blue-600 dark:text-gray-400 dark:hover:text-gray-600 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded transition-colors"
                         onClick={() => copyToClipboard('pip install agentium-sdk', 'py-install')}
-                        title="Copy install command"
+                        title="Copy install command" aria-label="Copy install command"
                     >
                         {copiedStates['py-install'] ? <Check className="w-4 h-4 text-green-700" /> : <Copy className="w-4 h-4" />}
                     </button>
@@ -259,7 +259,7 @@ const DeveloperPortalPage: React.FC = () => {
                       <button 
                           className="p-2 bg-[#161b27] border border-[#2a3347] text-gray-600 hover:text-white rounded-lg shadow-sm transition-colors"
                           onClick={() => copyToClipboard(PYTHON_SAMPLE, 'py-code')}
-                          title="Copy Code"
+                          title="Copy Code" aria-label="Copy Code"
                       >
                           {copiedStates['py-code'] ? <Check className="w-4 h-4 text-green-700" /> : <Copy className="w-4 h-4" />}
                       </button>
@@ -283,7 +283,7 @@ const DeveloperPortalPage: React.FC = () => {
                     <button 
                         className="p-1.5 text-gray-600 hover:text-blue-600 dark:text-gray-400 dark:hover:text-gray-600 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded transition-colors"
                         onClick={() => copyToClipboard('npm install @agentium/sdk', 'ts-install')}
-                        title="Copy install command"
+                        title="Copy install command" aria-label="Copy install command"
                     >
                         {copiedStates['ts-install'] ? <Check className="w-4 h-4 text-green-700" /> : <Copy className="w-4 h-4" />}
                     </button>
@@ -294,7 +294,7 @@ const DeveloperPortalPage: React.FC = () => {
                       <button 
                           className="p-2 bg-[#161b27] border border-[#2a3347] text-gray-600 hover:text-white rounded-lg shadow-sm transition-colors"
                           onClick={() => copyToClipboard(TS_SAMPLE, 'ts-code')}
-                          title="Copy Code"
+                          title="Copy Code" aria-label="Copy Code"
                       >
                           {copiedStates['ts-code'] ? <Check className="w-4 h-4 text-green-700" /> : <Copy className="w-4 h-4" />}
                       </button>
@@ -317,7 +317,7 @@ const DeveloperPortalPage: React.FC = () => {
                       <button 
                           className="p-2 bg-[#161b27] border border-[#2a3347] text-gray-600 hover:text-white rounded-lg shadow-sm transition-colors"
                           onClick={() => copyToClipboard(CURL_SAMPLE, 'curl-code')}
-                          title="Copy Code"
+                          title="Copy Code" aria-label="Copy Code"
                       >
                           {copiedStates['curl-code'] ? <Check className="w-4 h-4 text-green-700" /> : <Copy className="w-4 h-4" />}
                       </button>
@@ -373,7 +373,7 @@ def verify_signature(secret: str, body: bytes, signature: str) -> bool:
         secret.encode(), body, hashlib.sha256
     ).hexdigest()
     return hmac.compare_digest(f"sha256={expected}", signature)`, 'verify-code')}
-                          title="Copy Code"
+                          title="Copy Code" aria-label="Copy Code"
                       >
                           {copiedStates['verify-code'] ? <Check className="w-4 h-4 text-green-700" /> : <Copy className="w-4 h-4" />}
                       </button>

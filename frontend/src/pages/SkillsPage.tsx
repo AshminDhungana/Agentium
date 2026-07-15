@@ -433,7 +433,7 @@ export const SkillsPage: React.FC = () => {
               Your Skill Submissions
             </h3>
             <button
-              onClick={loadMySubmissions}
+              onClick={loadMySubmissions} aria-label="Refresh submissions"
               className="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#1e2535] rounded-lg transition-colors"
             >
               <RefreshCw className="w-4 h-4" />
@@ -520,7 +520,7 @@ export const SkillsPage: React.FC = () => {
                   setIsCreateModalOpen(false);
                   setEditingSkill(null);
                   setFormData(INITIAL_FORM_DATA);
-                }}
+                }} aria-label="Close"
                 className="p-2 text-gray-600 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#1e2535] rounded-lg transition-colors"
               >
                 <X className="w-5 h-5" />
@@ -637,7 +637,7 @@ export const SkillsPage: React.FC = () => {
                       />
                       {formData.steps.length > 1 && (
                         <button
-                          onClick={() => removeArrayField('steps', idx)}
+                          onClick={() => removeArrayField('steps', idx)} aria-label="Remove step"
                           className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors"
                         >
                           <X className="w-4 h-4" />
@@ -689,7 +689,7 @@ export const SkillsPage: React.FC = () => {
                       />
                       {formData.prerequisites.length > 1 && (
                         <button
-                          onClick={() => removeArrayField('prerequisites', idx)}
+                          onClick={() => removeArrayField('prerequisites', idx)} aria-label="Remove prerequisite"
                           className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors"
                         >
                           <X className="w-4 h-4" />
@@ -719,7 +719,7 @@ export const SkillsPage: React.FC = () => {
                         <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Example {idx + 1}</span>
                         {formData.examples.length > 1 && (
                           <button
-                            onClick={() => removeExample(idx)}
+                            onClick={() => removeExample(idx)} aria-label="Remove example"
                             className="p-1 text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 rounded transition-colors"
                           >
                             <X className="w-4 h-4" />
@@ -776,7 +776,7 @@ export const SkillsPage: React.FC = () => {
                       />
                       {formData.common_pitfalls.length > 1 && (
                         <button
-                          onClick={() => removeArrayField('common_pitfalls', idx)}
+                          onClick={() => removeArrayField('common_pitfalls', idx)} aria-label="Remove pitfall"
                           className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors"
                         >
                           <X className="w-4 h-4" />
@@ -812,7 +812,7 @@ export const SkillsPage: React.FC = () => {
                       />
                       {formData.validation_criteria.length > 1 && (
                         <button
-                          onClick={() => removeArrayField('validation_criteria', idx)}
+                          onClick={() => removeArrayField('validation_criteria', idx)} aria-label="Remove validation criterion"
                           className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors"
                         >
                           <X className="w-4 h-4" />
@@ -983,14 +983,14 @@ const SkillCard: React.FC<{
             <button
               onClick={() => onEdit(result.metadata)}
               className="p-2 text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-gray-600 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition-colors"
-              title="Edit skill"
+              title="Edit skill" aria-label="Edit skill"
             >
               <Edit3 className="w-4 h-4" />
             </button>
             <button
               onClick={() => onDelete(result.skill_id)}
               className="p-2 text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-gray-600 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors"
-              title="Delete skill"
+              title="Delete skill" aria-label="Delete skill"
             >
               <Trash2 className="w-4 h-4" />
             </button>

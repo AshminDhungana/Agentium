@@ -583,6 +583,7 @@ export const AgentsPage: React.FC = () => {
                     <button
                         onClick={() => dispatch({ type: 'TOGGLE_SIDEBAR' })}
                         title={sidebarOpen ? 'Hide lifecycle panel' : 'Show lifecycle panel'}
+                        aria-label={sidebarOpen ? 'Hide lifecycle panel' : 'Show lifecycle panel'}
                         className={[
                             'p-2 rounded-lg border text-slate-600 dark:text-slate-400 transition-colors shadow-sm',
                             sidebarOpen
@@ -597,6 +598,7 @@ export const AgentsPage: React.FC = () => {
                         onClick={() => loadAgents(true)}
                         disabled={isRefreshing}
                         title="Refresh"
+                        aria-label="Refresh"
                         className="p-2 rounded-lg border border-slate-200 dark:border-[#1e2535] bg-white dark:bg-[#161b27] text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-[#1e2535] disabled:opacity-50 transition-colors shadow-sm"
                     >
                         {isRefreshing ? <LoadingSpinner size="sm" /> : <RefreshCw className="w-4 h-4" />}

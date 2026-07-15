@@ -847,12 +847,13 @@ export function ChannelsPage() {
                                                             <span key={num} className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300 rounded-full text-xs font-mono">
                                                                 {num}
                                                                 <button
-                                                                    onClick={() => {
-                                                                        const updated = (channel.config?.allowed_senders || []).filter(s => s !== num);
-                                                                        updateSendersMutation.mutate({ id: channel.id, senders: updated });
-                                                                    }}
-                                                                    className="hover:text-red-600 ml-0.5"
-                                                                >×</button>
+                                                    onClick={() => {
+                                                        const updated = (channel.config?.allowed_senders || []).filter(s => s !== num);
+                                                        updateSendersMutation.mutate({ id: channel.id, senders: updated });
+                                                    }}
+                                                    aria-label="Remove sender"
+                                                    className="hover:text-red-600 ml-0.5"
+                                                >×</button>
                                                             </span>
                                                         ))}
                                                     </div>

@@ -584,7 +584,7 @@ function RBACManagementInner() {
                                                                 onClick={() => requestRevoke(delegation.id)}
                                                                 disabled={revokingId === delegation.id}
                                                                 className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors duration-150 disabled:opacity-50"
-                                                                title="Revoke delegation"
+                                                                title="Revoke delegation" aria-label="Revoke delegation"
                                                             >
                                                                 <Trash2 className="w-4 h-4" />
                                                             </button>

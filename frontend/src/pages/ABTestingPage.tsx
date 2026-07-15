@@ -162,6 +162,7 @@ function ExperimentCard({
             <button
               onClick={e => { e.stopPropagation(); setConfirmDelete(true); }}
               className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all"
+              aria-label="Delete experiment"
             >
               <Trash2 className="w-3.5 h-3.5 text-gray-600" />
             </button>
@@ -290,7 +291,7 @@ function CreateExperimentModal({
               <p className="text-xs text-gray-600 dark:text-slate-500">Compare models side-by-side</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-slate-100 dark:hover:bg-[#1e2535] rounded-lg transition-colors">
+          <button onClick={onClose} aria-label="Close" className="p-2 hover:bg-slate-100 dark:hover:bg-[#1e2535] rounded-lg transition-colors">
             <X className="w-4 h-4 text-gray-600" />
           </button>
         </div>
@@ -489,7 +490,7 @@ function QuickTestModal({ onClose }: { onClose: () => void }) {
               <p className="text-xs text-gray-600 dark:text-slate-500">Fires in background — results shown when ready</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-slate-100 dark:hover:bg-[#1e2535] rounded-lg transition-colors">
+          <button onClick={onClose} aria-label="Close" className="p-2 hover:bg-slate-100 dark:hover:bg-[#1e2535] rounded-lg transition-colors">
             <X className="w-4 h-4 text-gray-600" />
           </button>
         </div>
@@ -711,7 +712,7 @@ function ExperimentDetailPanel({
                 Cancel
               </button>
             )}
-            <button onClick={onClose} className="p-2 hover:bg-slate-100 dark:hover:bg-[#1e2535] rounded-lg transition-colors">
+            <button onClick={onClose} aria-label="Close" className="p-2 hover:bg-slate-100 dark:hover:bg-[#1e2535] rounded-lg transition-colors">
               <X className="w-4 h-4 text-gray-600" />
             </button>
           </div>
@@ -929,7 +930,7 @@ function RecommendationsPanel() {
             placeholder="Filter by category…"
             className="px-3 py-1.5 text-xs bg-slate-50 dark:bg-[#0f1117] border border-slate-200 dark:border-[#1e2535] rounded-lg text-slate-700 dark:text-slate-300 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 w-40"
           />
-          <button onClick={() => refetch()} className="p-1.5 hover:bg-slate-100 dark:hover:bg-[#1e2535] rounded-lg transition-colors">
+          <button onClick={() => refetch()} aria-label="Refresh recommendations" className="p-1.5 hover:bg-slate-100 dark:hover:bg-[#1e2535] rounded-lg transition-colors">
             <RefreshCw className="w-3.5 h-3.5 text-gray-600" />
           </button>
         </div>
@@ -1159,10 +1160,11 @@ export function ABTestingPage() {
                   {f || 'All'}
                 </button>
               ))}
-              <button
-                onClick={() => refetch()}
-                className="ml-auto p-2 hover:bg-white dark:hover:bg-[#161b27] rounded-lg border border-transparent hover:border-slate-200 dark:hover:border-[#1e2535] transition-all"
-              >
+          <button
+            onClick={() => refetch()}
+            aria-label="Refresh experiments"
+            className="ml-auto p-2 hover:bg-white dark:hover:bg-[#161b27] rounded-lg border border-transparent hover:border-slate-200 dark:hover:border-[#1e2535] transition-all"
+          >
                 <RefreshCw className="w-4 h-4 text-gray-600 dark:text-slate-500" />
               </button>
             </div>
