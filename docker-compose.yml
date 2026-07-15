@@ -54,6 +54,14 @@ services:
       timeout: 10s
       retries: 5
       start_period: 30s
+    # Sized for 768-dim bge vectors (2x the prior 384-dim MiniLM footprint):
+    # vector storage + in-memory HNSW index roughly double per document.
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+        reservations:
+          memory: 1g
 
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   # Redis (Celery Task Queue)
@@ -182,6 +190,13 @@ services:
   # Backend API (FastAPI) - PRIVILEGED
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   backend:
+    # bge-base-en-v1.5 loads ~1.3GB in memory (vs ~80MB for MiniLM); reserve headroom.
+    deploy:
+      resources:
+        limits:
+          memory: 3g
+        reservations:
+          memory: 1.5g
     build:
       context: ./backend
       dockerfile: Dockerfile.privileged
@@ -284,6 +299,13 @@ services:
   # Celery Worker - PRIVILEGED
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   celery-worker:
+    # bge-base-en-v1.5 loads ~1.3GB in memory (vs ~80MB for MiniLM); reserve headroom.
+    deploy:
+      resources:
+        limits:
+          memory: 3g
+        reservations:
+          memory: 1.5g
     build:
       context: ./backend
       dockerfile: Dockerfile.privileged
