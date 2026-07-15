@@ -44,3 +44,22 @@ def test_app_engine_honors_settings():
         os.environ.pop(k, None)
     config_mod.get_settings.cache_clear()
     importlib.reload(config_mod)
+
+
+from sqlalchemy.pool import NullPool
+from sqlalchemy import Engine
+
+
+def test_celery_beat_engine_is_shared_and_nullpool():
+    from backend.celery_app import beat_engine
+    assert isinstance(beat_engine, Engine)
+    assert isinstance(beat_engine.pool, NullPool)
+    from backend.celery_app import beat_engine as beat_engine2
+    assert beat_engine is beat_engine2
+
+
+def test_workflow_tasks_reuse_worker_session():
+    from backend.services.tasks import workflow_tasks
+    session = workflow_tasks._make_session()
+    assert session is not None
+    session.close()

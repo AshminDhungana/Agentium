@@ -9,11 +9,6 @@ the Celery worker process, independent of FastAPI's request-scoped sessions.
 """
 import asyncio
 import logging
-import os
-
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import NullPool
 
 from backend.celery_app import celery_app
 
@@ -24,14 +19,13 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 def _make_session():
-    """Make session."""
+    """Make session.
 
-    url = os.getenv(
-        "DATABASE_URL",
-        "postgresql://agentium:agentium@postgres:5432/agentium",
-    )
-    engine = create_engine(url, poolclass=NullPool, pool_pre_ping=True)
-    return sessionmaker(bind=engine)()
+    Reuses the worker's shared Celery session factory (NullPool) instead of
+    building a throwaway engine on every task call.
+    """
+    from backend.services.tasks.task_executor import CelerySessionLocal
+    return CelerySessionLocal()
 
 
 # ---------------------------------------------------------------------------

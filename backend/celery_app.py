@@ -44,6 +44,21 @@ celery_app.conf.update(
     broker_connection_retry_on_startup=True,
 )
 
+# ── Shared DB engine for Celery beat tasks ─────────────────────────────────────
+# NullPool is intentional: each beat invocation runs in the (forked) beat process
+# and must not share connections across forks. Created ONCE here, not per task tick.
+from backend.core.config import settings as _celery_settings  # noqa: E402
+from sqlalchemy import create_engine as _create_engine         # noqa: E402
+from sqlalchemy.orm import sessionmaker as _sessionmaker       # noqa: E402
+from sqlalchemy.pool import NullPool as _NullPool              # noqa: E402
+
+beat_engine = _create_engine(
+    _celery_settings.DATABASE_URL,
+    poolclass=_NullPool,
+    pool_pre_ping=True,
+)
+BeatSessionLocal = _sessionmaker(bind=beat_engine)
+
 # ── Beat schedule ─────────────────────────────────────────────────────────────
 celery_app.conf.beat_schedule = {
     # ── Channel health ────────────────────────────────────────────────────────
@@ -316,17 +331,8 @@ def broadcast_channel_health():
     """
     import asyncio
     from datetime import datetime
-    from sqlalchemy import create_engine
-    from sqlalchemy.orm import sessionmaker
-    from sqlalchemy.pool import NullPool
 
-    DATABASE_URL = os.getenv(
-        "DATABASE_URL",
-        "postgresql://postgres:postgres@postgres:5432/agentium"
-    )
-    engine = create_engine(DATABASE_URL, poolclass=NullPool, pool_pre_ping=True)
-    Session = sessionmaker(bind=engine)
-    db = Session()
+    db = BeatSessionLocal()
 
     try:
         from backend.models.entities.channels import ExternalChannel, ChannelStatus
@@ -413,17 +419,8 @@ def broadcast_provider_metrics():
     """
     import asyncio
     from datetime import datetime
-    from sqlalchemy import create_engine
-    from sqlalchemy.orm import sessionmaker
-    from sqlalchemy.pool import NullPool
 
-    DATABASE_URL = os.getenv(
-        "DATABASE_URL",
-        "postgresql://postgres:postgres@postgres:5432/agentium"
-    )
-    engine = create_engine(DATABASE_URL, poolclass=NullPool, pool_pre_ping=True)
-    Session = sessionmaker(bind=engine)
-    db = Session()
+    db = BeatSessionLocal()
 
     try:
         from backend.models.entities.user_config import (
@@ -549,13 +546,6 @@ def deliver_federated_task(
 ):
     """Deliver a delegated task to a peer instance via HMAC-signed HTTP POST."""
     import httpx
-    from sqlalchemy import create_engine
-    from sqlalchemy.orm import sessionmaker
-    from sqlalchemy.pool import NullPool
-
-    DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@postgres:5432/agentium")
-    engine  = create_engine(DATABASE_URL, poolclass=NullPool, pool_pre_ping=True)
-    Session = sessionmaker(bind=engine)
 
     body_bytes = json.dumps(payload, sort_keys=True).encode()
     headers    = _signed_headers(peer_url, signing_key, body_bytes)
@@ -565,7 +555,7 @@ def deliver_federated_task(
             resp = client.post(target_url, content=body_bytes, headers=headers)
             resp.raise_for_status()
 
-        db = Session()
+        db = BeatSessionLocal()
         try:
             from backend.models.entities.federation import FederatedTask
             ft = db.query(FederatedTask).filter_by(id=fed_task_id).first()
@@ -587,7 +577,7 @@ def deliver_federated_task(
         )
 
         if self.request.retries >= self.max_retries:
-            db = Session()
+            db = BeatSessionLocal()
             try:
                 from backend.models.entities.federation import FederatedTask
                 ft = db.query(FederatedTask).filter_by(id=fed_task_id).first()
@@ -609,14 +599,8 @@ def federation_heartbeat():
         return {"skipped": "federation disabled"}
 
     import httpx
-    from sqlalchemy import create_engine
-    from sqlalchemy.orm import sessionmaker
-    from sqlalchemy.pool import NullPool
 
-    DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@postgres:5432/agentium")
-    engine  = create_engine(DATABASE_URL, poolclass=NullPool, pool_pre_ping=True)
-    Session = sessionmaker(bind=engine)
-    db      = Session()
+    db = BeatSessionLocal()
 
     my_base_url = os.getenv("FEDERATION_INSTANCE_URL", "").rstrip("/")
     my_secret   = os.getenv("FEDERATION_SHARED_SECRET", "")
@@ -675,14 +659,7 @@ def federation_cleanup_stale():
     if not os.getenv("FEDERATION_ENABLED", "false").lower() == "true":
         return {"skipped": "federation disabled"}
 
-    from sqlalchemy import create_engine
-    from sqlalchemy.orm import sessionmaker
-    from sqlalchemy.pool import NullPool
-
-    DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@postgres:5432/agentium")
-    engine  = create_engine(DATABASE_URL, poolclass=NullPool, pool_pre_ping=True)
-    Session = sessionmaker(bind=engine)
-    db      = Session()
+    db = BeatSessionLocal()
 
     try:
         from backend.services.federation_service import FederationService
