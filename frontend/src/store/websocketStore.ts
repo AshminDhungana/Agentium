@@ -8,6 +8,10 @@ import { showToast } from '@/hooks/useToast';
 import { websocketReplayApi } from '@/services/websocketReplay';
 import { logger } from '@/utils/logger';
 import type { StructuredInputAnswer } from '../types/structuredInput';
+import {
+  ConnectionPhase, PhaseEvent, nextPhase,
+  isActive, isConnectingPhase, canReconnect, isGenesisProgress, phaseFromGenesisStatus,
+} from './connectionPhase';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -61,6 +65,9 @@ export interface WebSocketMessage {
 
 interface WebSocketState {
     // Public state
+    /** Single source of truth for connection/genesis status. */
+    connectionPhase: ConnectionPhase;
+    /** Derived from connectionPhase (getters in the store body). */
     isConnected: boolean;
     isConnecting: boolean;
     error: string | null;
@@ -94,23 +101,14 @@ interface WebSocketState {
      * momentarily null between close and reconnect.
      */
     _lastConnectTime: number;
+    /** Consecutive not_started poll responses while genesis_running (P5 grace). */
+    _genesisGraceCount: number;
     /**
-     * True when the server returned system_not_ready with genesis_triggered=false
-     * (i.e. no API key saved yet). While this is true the store stays completely
-     * silent — no banner, no retry loop. It is cleared as soon as the user calls
-     * notifyApiKeyAdded(), which immediately re-attempts connection.
-     */
-    _genesisWaitingForApiKey: boolean;
-    /**
-     * Handle for the active genesis-status poll timer (GET /ws/genesis-status).
-     * Replaces the old blind 10s WS-reconnect loop with a fast, cheap HTTP
      * poll while genesis runs in the background. Cleared on disconnect/unmount
      * so polling never outlives the component.
      */
     _genesisPollTimeout: ReturnType<typeof setTimeout> | null;
-    /** True from the moment a poll loop starts until it stops; closes the race
-     *  where onmessage and onclose(1013) could otherwise both start a loop. */
-    _genesisPollActive: boolean;
+    /** Consecutive not_started poll responses while genesis_running (P5 grace). */
     /**
      * BUG 2 FIX: true after the first successful ping→pong round-trip,
      * which is when we consider the connection genuinely stable and safe to
@@ -137,8 +135,9 @@ interface WebSocketState {
     notifyApiKeyAdded: () => void;
 
     // Internal actions
-    _setConnected: (connected: boolean) => void;
-    _setConnecting: (connecting: boolean) => void;
+    _transition: (event: PhaseEvent) => void;
+    _connectNow: () => void;
+    _genesisWatchdog: () => void;
     _setError: (error: string | null) => void;
     _updateStats: (stats: Partial<WebSocketState['connectionStats']>) => void;
     _setLastMessage: (message: WebSocketMessage) => void;
@@ -152,6 +151,7 @@ interface WebSocketState {
     _fetchReplay: () => Promise<void>;
     _pollGenesisStatus: (attempt?: number) => void;
     _stopGenesisPoll: () => void;
+    _openSocket: () => void;
 }
 
 // ── Config ────────────────────────────────────────────────────────────────────
@@ -186,8 +186,7 @@ const WS_CONFIG = {
 
 export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
     // ── Initial state ──────────────────────────────────────────────────────
-    isConnected: false,
-    isConnecting: false,
+    connectionPhase: 'offline',
     error: null,
     connectionStats: {
         reconnectAttempts: 0,
@@ -210,15 +209,36 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
     _processedIds: new Set<string>(),
     _activeToastId: null,
     _lastConnectTime: 0,       // BUG 3 FIX
-    _genesisWaitingForApiKey: false,
     _genesisPollTimeout: null,
-    _genesisPollActive: false,
+    _genesisGraceCount: 0,
     _connectionStable: false,   // BUG 2 FIX
     _lastMessageTimestamp: null,
 
-    // ── Internal setters ───────────────────────────────────────────────────
-    _setConnected: (connected) => set({ isConnected: connected }),
-    _setConnecting: (connecting) => set({ isConnecting: connecting }),
+    // ── Internal setters / derived getters ────────────────────────────────
+    // isConnected / isConnecting are DERIVED from connectionPhase (Spec §1).
+    get isConnected() { return get().connectionPhase === 'active'; },
+    get isConnecting() { return get().connectionPhase === 'connecting'; },
+
+    _transition: (event) => {
+        const cur = get().connectionPhase;
+        const next = nextPhase(cur, event, { graceCount: get()._genesisGraceCount });
+        if (next === cur) {
+            // Staying in genesis_running: accumulate grace only on not_started.
+            if (cur === 'genesis_running' && event.type === 'poll' && event.status === 'not_started') {
+                set({ _genesisGraceCount: get()._genesisGraceCount + 1 });
+            }
+            return; // keep existing graceCount for 'running'
+        }
+        set({ connectionPhase: next, _genesisGraceCount: 0 });
+    },
+
+    _connectNow: () => {
+        // P1: bypass the MIN_CONNECT_INTERVAL_MS debounce used by public connect().
+        const s = get();
+        if (s._ws?.readyState === WebSocket.CONNECTING || s._ws?.readyState === WebSocket.OPEN) return;
+        set({ connectionPhase: 'connecting', _isManualDisconnect: false, _connectionStable: false });
+        get()._openSocket();
+    },
     _setError: (error) => set({ error }),
     _updateStats: (stats) => set(s => ({ connectionStats: { ...s.connectionStats, ...stats } })),
     _setLastMessage: (message) => set({ lastMessage: message }),
@@ -227,13 +247,15 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
     clearError: () => set({ error: null }),
 
     notifyApiKeyAdded: () => {
-        // Clear the "waiting for API key" flag and immediately try to connect.
+        // Leave the silent "waiting_for_key" state and immediately try to connect.
         // This is called by the Models page after a successful API key save,
         // which ensures chat becomes active without requiring a page reload.
         logger.debug('[WebSocket] API key added — re-attempting connection');
-        set({ _genesisWaitingForApiKey: false });
         get().disconnect(true);
-        setTimeout(() => get().connect(), 100);
+        setTimeout(() => {
+            get()._transition({ type: 'notify_key_added' });
+            get().connect();
+        }, 100);
     },
 
     /** Keep the dedup set bounded to MAX_PROCESSED_IDS */
@@ -261,19 +283,11 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
         if (s._pingInterval) { clearInterval(s._pingInterval); set({ _pingInterval: null }); }
         if (s._pongTimeout) { clearTimeout(s._pongTimeout); set({ _pongTimeout: null }); }
         if (s._connectionTimeout) { clearTimeout(s._connectionTimeout); set({ _connectionTimeout: null }); }
-        // NOTE: genesis-poll timer/flag are intentionally NOT cleared here.
-        // The genesis poll is meant to outlive a closed socket (that's the
-        // whole point — see _pollGenesisStatus). _clearAllTimers() used to
-        // wipe _genesisPollActive too, which raced with onclose's 1013
-        // handler: onmessage(system_not_ready) starts the poll and sets
-        // _genesisPollActive=true, then onclose fires, calls this function
-        // (wiping the flag back to false), then its own 1013 branch sees
-        // _genesisPollActive=false and starts a SECOND, independent poll
-        // loop — doubling requests to /ws/genesis-status every cycle, since
-        // both events fire on every gated connection attempt, not just an
-        // edge case. Use _stopGenesisPoll() explicitly wherever the genesis
-        // wait should actually be cancelled (manual disconnect, a fresh
-        // socket opening, or non-1013 closes).
+        // NOTE: the genesis-status poll timer is intentionally NOT cleared here.
+        // The poll is meant to outlive a closed socket (that's the whole point —
+        // see _pollGenesisStatus). Use _stopGenesisPoll() explicitly wherever the
+        // genesis wait should actually be cancelled (manual disconnect or
+        // non-1013 closes).
     },
 
     /** Explicitly cancel any in-flight genesis-status poll loop. Kept
@@ -282,7 +296,6 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
     _stopGenesisPoll: () => {
         const s = get();
         if (s._genesisPollTimeout) { clearTimeout(s._genesisPollTimeout); set({ _genesisPollTimeout: null }); }
-        if (s._genesisPollActive) { set({ _genesisPollActive: false }); }
     },
 
     _stopHeartbeat: () => {
@@ -338,9 +351,7 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
                         ws.close(1000, 'Pong timeout');
                     }
                 }
-                set({ _ws: null, _connectionStable: false });
-                get()._setConnected(false);
-                get()._setConnecting(false);
+                set({ _ws: null, _connectionStable: false, connectionPhase: 'offline' });
                 get()._scheduleReconnect();
             }, WS_CONFIG.PONG_TIMEOUT_MS);
             set({ _pongTimeout: pongTimeout });
@@ -396,52 +407,50 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
     // reports "complete" — typically saves up to ~8s of dead waiting per
     // cycle, and removes the false impression that chat is "stuck".
     _pollGenesisStatus: (attempt: number = 0) => {
-        // Avoid double-starting: onmessage (system_not_ready) and onclose
-        // (code 1013) both call this as a safety net for each other in case
-        // one of the two events doesn't fire. The flag is set synchronously
-        // below, before any async work, so this check is race-free even
-        // though the timer handle itself is only set later.
-        if (attempt === 0) {
-            if (get()._genesisPollActive) return;
-            set({ _genesisPollActive: true });
-        }
-
         if (attempt >= WS_CONFIG.GENESIS_POLL_MAX_ATTEMPTS) {
             logger.error('[WebSocket] Genesis poll exceeded max attempts — giving up');
-            set({ _genesisPollActive: false });
-            // Without this, isConnecting stays true forever (it's deliberately
-            // kept true through the whole 1013 polling window — see onclose),
-            // which hides the "Reconnect" button (gated on !isConnecting) and
-            // leaves the user stuck on "Connecting…" with no way to retry short
-            // of a full page refresh — the exact symptom this fix was meant to
-            // eliminate, just for the genesis-stalled-or-failed case instead.
-            get()._setConnecting(false);
+            // No escape via the poll loop anymore — surface a real error and
+            // move to a reconnectable terminal phase so the user can retry.
             get()._setError(
                 'System initialization is taking longer than expected. ' +
                 'Please refresh or contact support if this persists.'
             );
+            set({ _genesisPollTimeout: null, connectionPhase: 'genesis_failed', _genesisGraceCount: 0 });
             return;
         }
 
         const poll = async () => {
             try {
                 const data = await websocketReplayApi.pollGenesisStatus();
-                if (data.status === 'complete') {
-                    logger.debug('[WebSocket] Genesis complete — reconnecting now');
+                const nextPhase = phaseFromGenesisStatus(data.status);
+                set({ _genesisPollTimeout: null });
+
+                if (nextPhase === 'connecting') {
+                    set({ _genesisGraceCount: 0 });
+                    logger.debug('[WebSocket] Genesis complete — reconnecting now (debounce-exempt)');
                     get()._setError(null);
-                    set({ _genesisPollTimeout: null, _genesisPollActive: false });
-                    get().connect();
+                    // P1: use _connectNow so a 1s debounce can't swallow the only reconnect.
+                    get()._connectNow();
+                    // P7: watchdog — if we're still not active shortly, retry.
+                    get()._genesisWatchdog();
                     return;
                 }
-                if (data.status === 'not_started') {
-                    // API key was removed/genesis hasn't started — stop polling
-                    // and fall back to the silent waiting state.
-                    set({ _genesisWaitingForApiKey: true, _genesisPollTimeout: null, _genesisPollActive: false });
-                    get()._setError(null);
+                if (nextPhase === 'genesis_failed') {
+                    set({ _genesisGraceCount: 0 });
+                    // P9: backend reported failure — surface it instead of polling forever.
+                    const reason = (data as any).reason as string | undefined;
+                    logger.error('[WebSocket] Genesis failed:', reason);
+                    get()._transition({ type: 'poll', status: 'failed' });
+                    get()._setError(reason
+                        ? `Genesis failed: ${reason}`
+                        : 'Genesis failed. Please check your API key and try again.');
                     return;
                 }
+                // running or not_started (grace handled inside _transition)
+                get()._transition({ type: 'poll', status: data.status });
             } catch (err) {
                 logger.warn('[WebSocket] Genesis status poll failed, will retry:', err);
+                get()._transition({ type: 'poll', status: 'running' });
             }
 
             // Still running (or transient fetch error) — poll again.
@@ -452,19 +461,30 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
         poll();
     },
 
+    _genesisWatchdog: () => {
+        // P7: if the poll-complete reconnect didn't reach 'active' within 5s,
+        // retry once. Prevents a single swallowed connect() from dead-ending.
+        setTimeout(() => {
+            const phase = get().connectionPhase;
+            if (phase === 'genesis_running' || phase === 'connecting') {
+                logger.warn('[WebSocket] Genesis watchdog — reconnect did not settle, retrying');
+                get()._connectNow();
+                get()._genesisWatchdog();
+            }
+        }, 5000);
+    },
+
     // ── Connect ────────────────────────────────────────────────────────────
     connect: () => {
         const token = localStorage.getItem('access_token');
         if (!token) {
             get()._setError('No access token — please login');
+            set({ connectionPhase: 'genesis_failed' });
             return;
         }
 
-        // If the server told us there is no API key yet, stay silent until the
-        // user saves one and calls notifyApiKeyAdded(). Without this guard the
-        // reconnect timer / effect re-runs would keep re-connecting and the
-        // "System Initializing" banner would flash on every attempt.
-        if (get()._genesisWaitingForApiKey) {
+        // Silent wait: stay put until notifyApiKeyAdded() (Spec §1, P3 escape).
+        if (get().connectionPhase === 'waiting_for_key') {
             logger.debug('[WebSocket] connect() suppressed — waiting for API key');
             return;
         }
@@ -483,10 +503,17 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
             return;
         }
         set({ _lastConnectTime: now });
+        set({ connectionPhase: 'connecting', _isManualDisconnect: false, _connectionStable: false });
+        get()._openSocket();
+    },
 
-        get()._setConnecting(true);
-        get()._setError(null);
-        set({ _isManualDisconnect: false, _connectionStable: false });
+    _openSocket: () => {
+        const token = localStorage.getItem('access_token');
+        if (!token) {
+            get()._setError('No access token — please login');
+            set({ connectionPhase: 'genesis_failed' });
+            return;
+        }
 
         // NO token in URL — connect cleanly, send auth as first message
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -524,13 +551,12 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
 
                     // Auth confirmed — system welcome message
                     if (data.type === 'system') {
-                        get()._setConnected(true);
-                        get()._setConnecting(false);
                         // BUG 2 FIX: do NOT reset _reconnectAttempts here.
                         // We only reset it after the first successful pong
                         // round-trip (in _handlePong), which confirms the
                         // connection is genuinely stable. Resetting here caused
                         // the backoff to restart from 2 s on every reconnect.
+                        get()._transition({ type: 'system' });
                         get()._startHeartbeat();
 
                         // Flush queued messages
@@ -557,34 +583,17 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
 
                     // genesis_triggered=false  → no API key saved yet, stay silent.
                     // genesis_triggered=true   → API key exists, genesis is running,
-                    //                            show banner and poll genesis-status every 2s.
+                    //                            poll genesis-status every 2s (P8: no
+                    //                            red error — progress is its own state).
                     if (data.type === 'system_not_ready') {
                         const triggered = data.genesis_triggered as boolean | undefined;
-                        // We are definitively not connected, but keep isConnecting true
-                        // so the reconnect / initialization banner stays visible while
-                        // the client polls for genesis completion.
-                        get()._setConnected(false);
-
                         if (triggered) {
-                            // API key saved, genesis running — surface status and poll
-                            // the lightweight HTTP status endpoint every 2s instead of
-                            // blindly retrying the full WS handshake every 10s. This
-                            // reconnects within ~2s of genesis actually finishing instead
-                            // of however much of the old 10s window was left.
                             logger.warn('[WebSocket] system_not_ready — genesis in progress, polling status every 2s');
-                            set({ _genesisWaitingForApiKey: false });
-                            get()._setError(
-                                (data.content as string | undefined) ??
-                                'System is initializing — this usually takes under a minute.'
-                            );
+                            get()._transition({ type: 'system_not_ready', genesisTriggered: true });
                             get()._pollGenesisStatus();
                         } else {
-                            // No API key yet — user hasn't triggered genesis.
-                            // Set the waiting flag so connect() is a no-op until
-                            // notifyApiKeyAdded() is called. Clear any error so
-                            // no banner appears and no retry loop starts.
                             logger.warn('[WebSocket] system_not_ready — no API key configured yet, staying silent');
-                            set({ _genesisWaitingForApiKey: true });
+                            get()._transition({ type: 'system_not_ready', genesisTriggered: false });
                             get()._setError(null);
                         }
                         return;
@@ -619,63 +628,35 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
 
             ws.onclose = (event) => {
                 get()._clearAllTimers();
-                get()._setConnected(false);
                 set({ _ws: null, _connectionStable: false });
 
                 let errorMsg: string | null = null;
-                switch (event.code) {
-                    case 4001:
-                        errorMsg = 'Authentication failed — please log in again';
-                        get()._setConnecting(false);
-                        get()._stopGenesisPoll();
-                        break;
-                    case 1000:
-                        get()._setConnecting(false);
-                        get()._stopGenesisPoll();
-                        break; // clean close
-                    case 1006:
-                        errorMsg = 'Connection lost unexpectedly';
-                        get()._setConnecting(false);
-                        get()._stopGenesisPoll();
-                        break;
-                    case 1013:
-                        // onmessage normally already started polling via
-                        // _pollGenesisStatus() (which sets _genesisPollActive=true
-                        // synchronously). _clearAllTimers() above no longer touches
-                        // that flag/timer — it used to, which raced with this branch:
-                        // onmessage starts the poll, _clearAllTimers() here wiped the
-                        // flag back to false, and this branch then started a SECOND
-                        // independent poll loop every single cycle (both events fire
-                        // on every gated attempt, not just an edge case), doubling
-                        // requests to /ws/genesis-status. Now the guard inside
-                        // _pollGenesisStatus() correctly no-ops here when onmessage
-                        // already started it, and only takes over if onmessage never
-                        // ran (e.g. the message was lost before delivery).
-                        if (!get()._genesisWaitingForApiKey) {
-                            if (!get().error) {
-                                get()._setError('System is initializing — this usually takes under a minute.');
-                            }
-                            get()._pollGenesisStatus();
-                        } else {
-                            get()._stopGenesisPoll();
-                        }
-                        // Keep isConnecting true so the reconnect/init banner
-                        // stays visible while we poll genesis-status every 2s.
-                        break;
-                    default:
-                        errorMsg = `Connection closed (${event.code})`;
-                        get()._setConnecting(false);
-                        get()._stopGenesisPoll();
-                        break;
+                const code = event.code;
+                if (code === 4001) {
+                    errorMsg = 'Authentication failed — please log in again';
+                    get()._transition({ type: 'socket_close', code });
+                    get()._stopGenesisPoll();
+                } else if (code === 1000 || code === 1006) {
+                    if (code === 1006) errorMsg = 'Connection lost unexpectedly';
+                    get()._transition({ type: 'socket_close', code });
+                    get()._stopGenesisPoll();
+                } else if (code === 1013) {
+                    // Genesis poll owns reconnect; keep genesis_running.
+                    get()._transition({ type: 'socket_close', code });
+                    if (get().connectionPhase === 'genesis_running') {
+                        get()._pollGenesisStatus();
+                    }
+                } else {
+                    errorMsg = `Connection closed (${event.code})`;
+                    get()._transition({ type: 'socket_close', code });
+                    get()._stopGenesisPoll();
                 }
                 if (errorMsg) get()._setError(errorMsg);
 
                 const isManual = get()._isManualDisconnect;
-                if (!isManual && event.code !== 4001 && event.code !== 1013) {
+                if (!isManual && code !== 4001 && code !== 1013) {
                     // BUG 1 FIX: use the shared _scheduleReconnect() which
-                    // applies exponential backoff. Previously this path had
-                    // its own inline backoff while the pong timeout bypassed
-                    // it entirely — now both code paths behave consistently.
+                    // applies exponential backoff.
                     get()._scheduleReconnect();
                 }
             };
@@ -683,7 +664,7 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
         } catch (err) {
             logger.error('[WebSocket] Failed to create connection:', err);
             get()._setError('Failed to create WebSocket connection');
-            get()._setConnecting(false);
+            set({ connectionPhase: 'offline' });
         }
     },
 
@@ -705,8 +686,7 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
             set({ _ws: null });
         }
 
-        get()._setConnected(false);
-        get()._setConnecting(false);
+        set({ connectionPhase: 'offline' });
         if (isManual) {
             set({ _reconnectAttempts: 0 });
             get()._updateStats({ reconnectAttempts: 0 });

@@ -197,14 +197,14 @@ export function ChatPage() {
     // Issue 9: useShallow prevents re-renders caused by internal store fields
     // (_pingInterval, _pongTimeout, _messageQueue, etc.) that ChatPage doesn't use.
     const {
-        isConnected, isConnecting, error,
+        connectionPhase, isConnected, isConnecting, error,
         sendMessage: sendWsMessage,
         reconnect, connectionStats,
         unreadCount, markAsRead,
         messageHistory, lastMessage,
-        genesisInProgress,
     } = useWebSocketStore(
         useShallow((s) => ({
+            connectionPhase: s.connectionPhase,
             isConnected: s.isConnected,
             isConnecting: s.isConnecting,
             error: s.error,
@@ -215,10 +215,6 @@ export function ChatPage() {
             markAsRead: s.markAsRead,
             messageHistory: s.messageHistory,
             lastMessage: s.lastMessage,
-            // True while polling GET /ws/genesis-status — lets the header show
-            // "Initializing…" instead of a generic "Connecting…" so it's clear
-            // this isn't a dropped-connection retry.
-            genesisInProgress: s._genesisPollActive,
         }))
     );
 
@@ -886,7 +882,11 @@ export function ChatPage() {
                                         {activeTab === 'ai' ? (
                                             isConnected ? (
                                                 <span className="text-green-600 dark:text-green-400 font-medium">Active now</span>
-                                            ) : genesisInProgress ? 'Initializing…' : isConnecting ? 'Connecting…' : (
+                                            ) : connectionPhase === 'genesis_running' ? (
+                                                <span className="text-blue-600 dark:text-blue-400 font-medium">Initializing…</span>
+                                            ) : isConnecting ? (
+                                                <span className="text-gray-600 dark:text-gray-500">Connecting…</span>
+                                            ) : (
                                                 <span className="text-gray-600 dark:text-gray-500">Offline</span>
                                             )
                                         ) : activeTab === 'inbox' ? (

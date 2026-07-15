@@ -157,9 +157,8 @@ const ModelsPageInner: React.FC = () => {
     const handleSaveAndClose = useCallback(async (config: import('@/types').ModelConfig) => {
         await handleSave(config);
         // Wake the WebSocket out of the "waiting for API key" silent state.
-        // notifyApiKeyAdded() is idempotent — it is safe to call on every save,
-        // not only on the very first one (subsequent calls are a no-op because
-        // _genesisWaitingForApiKey is already false after the initial connect).
+        // notifyApiKeyAdded() is idempotent — safe to call on every save; if
+        // the store is already past the waiting_for_key phase it is a no-op.
         notifyApiKeyAdded();
         setShowForm(false);
         setEditingConfig(null);
