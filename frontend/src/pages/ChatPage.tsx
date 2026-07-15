@@ -6,6 +6,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAuthStore } from '@/store/authStore';
 import { useWebSocketStore } from '@/store/websocketStore';
+import { canReconnect } from '@/store/connectionPhase';
 import { useChatStore } from '@/store/chatStore';
 import { submitCardAnswer } from '@/store/websocketStore';
 import type { Message, MessageMetadata, MessageAttachment as Attachment } from '@/store/chatStore';
@@ -880,12 +881,18 @@ export function ChatPage() {
                                     </h1>
                                     <p className="text-xs text-gray-600 dark:text-gray-400 flex items-center gap-1.5">
                                         {activeTab === 'ai' ? (
-                                            isConnected ? (
+                                            connectionPhase === 'active' ? (
                                                 <span className="text-green-600 dark:text-green-400 font-medium">Active now</span>
                                             ) : connectionPhase === 'genesis_running' ? (
-                                                <span className="text-blue-600 dark:text-blue-400 font-medium">Initializing…</span>
-                                            ) : isConnecting ? (
-                                                <span className="text-gray-600 dark:text-gray-500">Connecting…</span>
+                                                <span className="text-blue-600 dark:text-blue-400 font-medium flex items-center gap-1.5">
+                                                    <LoadingSpinner size="sm" /> Initializing…
+                                                </span>
+                                            ) : connectionPhase === 'genesis_failed' ? (
+                                                <span className="text-red-600 dark:text-red-400 font-medium">Initialization failed</span>
+                                            ) : connectionPhase === 'connecting' ? (
+                                                <span className="text-gray-600 dark:text-gray-500 flex items-center gap-1.5">
+                                                    <LoadingSpinner size="sm" /> Connecting…
+                                                </span>
                                             ) : (
                                                 <span className="text-gray-600 dark:text-gray-500">Offline</span>
                                             )
@@ -900,7 +907,7 @@ export function ChatPage() {
                                                     : `${browserFiles.length} files`}
                                             </span>
                                         )}
-                                        {activeTab === 'ai' && connectionStats.latencyMs && isConnected && (
+                                        {activeTab === 'ai' && connectionStats.latencyMs && connectionPhase === 'active' && (
                                             <span className="text-green-600 dark:text-green-500">· {connectionStats.latencyMs}ms</span>
                                         )}
                                     </p>
@@ -909,19 +916,14 @@ export function ChatPage() {
 
                             {/* Right: voice status + reconnect + tabs */}
                             <div className="flex items-center gap-3">
-                                {activeTab === 'ai' && error && (
+                                {activeTab === 'ai' && connectionPhase === 'genesis_failed' && error && (
                                     <span className="text-sm text-red-600 dark:text-red-400 max-w-xs truncate hidden sm:block">{error}</span>
                                 )}
-                                {activeTab === 'ai' && !isConnected && !isConnecting && (
+                                {activeTab === 'ai' && canReconnect(connectionPhase) && (
                                     <button onClick={reconnect}
                                         className="px-4 py-2 bg-blue-600 hover:bg-blue-700 dark:hover:bg-blue-500 text-white text-sm font-medium rounded-xl transition-all duration-150 flex items-center gap-2 shadow-sm">
                                         <RefreshCw className="w-4 h-4" /> Reconnect
                                     </button>
-                                )}
-                                {activeTab === 'ai' && isConnecting && (
-                                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-500">
-                                        <LoadingSpinner size="sm" /> Connecting…
-                                    </div>
                                 )}
 
                                 {/* Voice Bridge status pill */}
