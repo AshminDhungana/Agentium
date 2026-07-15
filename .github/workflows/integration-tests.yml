@@ -92,6 +92,11 @@ jobs:
           detect-secrets scan --baseline .secrets.baseline --all-files
         # Exit code is non-zero if new secrets are found, failing the build.
 
+      # ── Secret Config Git-Guard (todo.md:879) ───────────────────────────────
+      - name: Run secret-config regression tests
+        working-directory: ./backend
+        run: pytest tests/security/ -v -o addopts=""
+
       - name: Install dependencies
         working-directory: ./backend
         run: |
