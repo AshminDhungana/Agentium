@@ -371,6 +371,12 @@ def _get_tts_engine() -> "TTSEngine":
     return _tts_engine_instance
 
 
+async def _speak_fallback(text: str) -> None:
+    """Used when Kokoro is unavailable: pyttsx3 TTS + text-only WS broadcast."""
+    await speak(text)
+    await _broadcast({"type": "voice_tts_broadcast", "text": text, "ts": time.time()})
+
+
 # ── STT ────────────────────────────────────────────────────────────────────────
 
 # R2: tracks whether the last listen attempt failed due to missing/unusable
@@ -814,7 +820,7 @@ async def _process_direct(text: str) -> None:
         if audio:
             tts.play(audio)
     else:
-        await speak(reply)
+        await _speak_fallback(reply)
     await _broadcast({"type": "voice_interaction", "user": text, "reply": reply, "ts": time.time()})
 
 
@@ -905,7 +911,7 @@ class VoiceSession:
                         self.mic.feed_playback(audio)
                         self.tts.play(audio)
                     else:
-                        await speak(sentence)
+                        await _speak_fallback(sentence)
         except Exception as exc:
             logger.warning("[WARN] streamed chat failed: %s — using non-streaming", exc)
             fb = await query_backend(text)
@@ -917,7 +923,7 @@ class VoiceSession:
                         self.mic.feed_playback(audio)
                         self.tts.play(audio)
                     else:
-                        await speak(sentence)
+                        await _speak_fallback(sentence)
         remainder = buffer.strip()
         if remainder:
             audio = self.tts.synth(remainder) if self.tts.available else b""
@@ -925,7 +931,7 @@ class VoiceSession:
                 self.mic.feed_playback(audio)
                 self.tts.play(audio)
             else:
-                await speak(remainder)
+                await _speak_fallback(remainder)
             full.append(remainder)
         return "".join(full)
 
