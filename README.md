@@ -30,7 +30,7 @@ A living document stored in dual storage that all agents access before acting. A
 
 - **Dual-Storage Architecture**: PostgreSQL for structured data, ChromaDB for semantic knowledge
 - **Shared Memory**: Task agents share learnings; Council curates institutional knowledge
-- **RAG-Powered**: World knowledge retrieved via semantic search using `all-MiniLM-L6-v2` embeddings
+- **RAG-Powered**: World knowledge retrieved via semantic search using `BAAI/bge-base-en-v1.5` embeddings (768-dim)
 - **Revision-Aware**: No knowledge is stored blindly — all entries are deduplication-checked and revision-aware
 
 ### 🔐 Brains vs. Hands (Remote Code Execution)
@@ -386,7 +386,7 @@ Results aggregated → Head → You (2–3 line response only)
 | **API Gateway**      | FastAPI, WebSocket, Pydantic                           | REST + real-time communication                        |
 | **Message Bus**      | Redis, Celery                                          | Inter-agent routing, background tasks                 |
 | **Structured Data**  | PostgreSQL, SQLAlchemy, Alembic                        | Entity state, voting records, audit, conversations    |
-| **Vector Knowledge** | ChromaDB, Sentence-Transformers (all-MiniLM-L6-v2)     | RAG, constitution, learnings                        |
+| **Vector Knowledge** | ChromaDB, Sentence-Transformers (BAAI/bge-base-en-v1.5, 768-dim, cosine) | RAG, constitution, learnings                        |
 | **AI Models**        | OpenAI, Anthropic, Groq, Ollama, any OpenAI-compatible | Agent intelligence, multi-provider failover           |
 | **Code Execution**   | Docker sandbox (Remote Executor)                       | Isolated code execution, PII containment              |
 | **Tool Governance**  | MCP SDK + Constitutional Guard                         | Tiered external tool access                           |

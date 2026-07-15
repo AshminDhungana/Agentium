@@ -136,7 +136,7 @@ Agentium utilizes a **Dual-Storage Architecture** to separate _"Structured Truth
 
 **PostgreSQL** acts as the immutable source of truth for agent entities, voting records, and audit logs.
 
-**ChromaDB** uses the `all-MiniLM-L6-v2` embedding model to store the _spirit_ of the Constitution and task-specific learnings for Retrieval-Augmented Generation (RAG).
+**ChromaDB** uses the `BAAI/bge-base-en-v1.5` embedding model (768-dim, cosine) to store the _spirit_ of the Constitution and task-specific learnings for Retrieval-Augmented Generation (RAG).
 
 > By performing **"Dual Queries"** against both databases, an agent ensures its actions are both _legally authorized_ and _contextually informed_.
 

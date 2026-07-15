@@ -277,8 +277,8 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-    Query["User Query"] --> Embed["Embedding Model<br/>(all-MiniLM-L6-v2)"]
-    Embed -->|"384-dim vector"| Chroma[("ChromaDB<br/>Similarity Search")]
+    Query["User Query"] --> Embed["Embedding Model<br/>(BAAI/bge-base-en-v1.5)"]
+    Embed -->|"768-dim vector (cosine)"| Chroma[("ChromaDB<br/>Similarity Search")]
     Chroma -->|"Top-K with decay_score"| Context["Context Window<br/>Construction"]
     Context -->|"Inject Constitution"| Constitution[("constitution_articles<br/>collection")]
     Context -->|"Inject Ethos"| Ethos[("agent_ethos<br/>collection")]
@@ -294,7 +294,7 @@ flowchart LR
 | Step | Component | Action |
 |------|-----------|--------|
 | 1 | **User Query** → | Input text arrives at API |
-| 2 | **Embedding** | `all-MiniLM-L6-v2` (384-dim) |
+| 2 | **Embedding** | `BAAI/bge-base-en-v1.5` (768-dim, cosine) |
 | 3 | **ChromaDB** | `query_similar()` with `cosine_similarity × decay_score × citation_boost` |
 | 4 | **Deduplication** | Skip if cosine ≥ 0.95 |
 | 5 | **Context Window** | Top-K (K=5-7), relevance threshold ≥ 0.7 |

@@ -56,7 +56,7 @@ Tier 1 must finish in under 50 ms. If it blocks, Tier 2 is skipped entirely — 
 
 Tier 2 runs only if Tier 1 passes. It answers: *"Does the *spirit* of this action violate the constitution?"*
 
-- The action description is embedded using the same `all-MiniLM-L6-v2` model used for knowledge.
+- The action description is embedded using the same `BAAI/bge-base-en-v1.5` model (768-dim, cosine) used for knowledge.
 - It is compared against the `supreme_law` collection (constitution articles) via ChromaDB's cosine similarity.
 - **Thresholds**:
   - ≥ 0.70 (very similar) → `BLOCK` (`Verdict.BLOCK`)

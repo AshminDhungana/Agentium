@@ -143,7 +143,7 @@ The rigid source of record for all administrative data.
 
 A vector database used for **Retrieval-Augmented Generation (RAG)**:
 
-- Uses `all-MiniLM-L6-v2` embeddings to understand the _meaning_ of the Constitution and task learnings
+- Uses `BAAI/bge-base-en-v1.5` embeddings (768-dim) to understand the _meaning_ of the Constitution and task learnings
 - **Revision-Aware**: uses deduplication-checking to ensure no knowledge is stored blindly
 
 ### Why Both?
