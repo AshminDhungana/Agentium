@@ -10,13 +10,6 @@
  *  - per-card async action tracking via a typed Map (replaces 3 separate useState)
  *  - inline delete confirmation state
  *  - all CRUD + test + fetch-models handlers
- *
- * Genesis integration:
- *  After any config is successfully saved, the sessionStorage genesis guard
- *  ('genesis_check_done') is cleared.  This ensures that useGenesisCheck
- *  re-evaluates on the next navigation — if genesis is now able to run
- *  (status transitions from 'no_api_key' → 'pending'), the hook will
- *  trigger POST /genesis/initialize automatically.
  */
 
 import { useState, useCallback, useEffect } from 'react';
@@ -24,9 +17,6 @@ import { showToast } from '@/hooks/useToast';
 import { modelsApi } from '@/services/models';
 import type { ModelConfig } from '@/types';
 import { getErrorMessage } from '@/utils/errors';
-
-// Session key shared with useGenesisCheck — cleared here after a key is saved.
-const GENESIS_SESSION_KEY = 'genesis_check_done';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -155,18 +145,11 @@ export function useModelConfigs() {
     /**
      * Called after any config is successfully created or updated.
      *
-     * Crucially, we clear the genesis session guard here so that
-     * useGenesisCheck re-evaluates on the next render cycle. If the newly
-     * saved config provides a working API key, the backend status will
-     * transition from "no_api_key" → "pending", and the hook will
-     * automatically call POST /genesis/initialize.
+     * The backend auto-triggers Genesis (trigger_genesis_if_needed) on key save,
+     * so the frontend needs no extra guard here.
      */
     const handleSave = useCallback(async (config: ModelConfig) => {
         await loadConfigs();
-
-        // Clear genesis guard so useGenesisCheck re-runs and can trigger
-        // the Genesis Protocol now that an API key may be available.
-        sessionStorage.removeItem(GENESIS_SESSION_KEY);
 
         // Side-effect: clear OpenAI voice status cache when an OpenAI config is saved
         if (config.provider === 'openai') {
