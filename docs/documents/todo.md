@@ -38,7 +38,7 @@ Build a self-governing AI ecosystem where agents operate under constitutional la
 | 17    | DevSecOps & Polish             | ✅ Complete    |
 | 18    | Complete System Testing        | ✅ Complete    |
 | 19    | Additional Features            | 🚧 In Progress |
-| 20    | Migrate Embedding Model        | Not Done        |
+| 20    | Migrate Embedding Model        | ✅ Complete    |
 | End   | Summery_todo.md                | Not Done        |
 | New   | Final Checklist todo.md        | Not Done        |
 
@@ -1113,6 +1113,13 @@ Work through the steps below **in order** — each one is a single, self-contain
 
 ## 20. Migrate Embedding Model — `all-MiniLM-L6-v2` → `BAAI/bge-base-en-v1.5`
 
+**Status:** ✅ Complete (verified 2026-07-15)
+
+- RAG/ChromaDB embedding path fully migrated to `BAAI/bge-base-en-v1.5` (768-dim, cosine).
+- v1 (MiniLM) retired in code; v2 is the only supported version (`EMBEDDING_ACTIVE_VERSION=v2`).
+- Asymmetric query prefix applied (`embed_query`), documents stored unprefixed (`embed_documents`).
+- Out of scope (intentionally retained): `SkillManager` pipeline (`skill_manager.py`/`skill.py`), `embedding_tool.py` agent tool, and historical alembic migrations — see `docs/adr/021-embedding-model-migration.md`.
+
 **Goal:** Move the RAG/ChromaDB pipeline from `all-MiniLM-L6-v2` (384-dim) to `BAAI/bge-base-en-v1.5` (768-dim) with zero downtime, zero data loss, and no silent retrieval-quality regression. The two models are not interchangeable at the vector level — a 384-dim and a 768-dim vector can't be compared — so this is a re-embed-and-cutover, not a config flip.
 
 Work through the steps below **in order** — each one is a single, self-contained task, and later steps assume earlier ones are done.
@@ -1216,15 +1223,15 @@ Work through the steps below **in order** — each one is a single, self-contain
 
 ## 20. Definition of done
 
-- [ ] All 20 steps above checked off.
-- [ ] Every collection (`constitution_articles`, `agent_ethos`, `task_learnings`, `domain_knowledge`) is fully re-embedded in v2 with matching document counts and intact metadata.
-- [ ] Query embeddings use the `bge` search-query prefix; stored document embeddings do not.
-- [ ] Dedup (cosine > threshold) and top-K relevance thresholds are re-validated for the new model, not inherited from MiniLM unchanged.
-- [ ] Constitutional Guard verdicts on the existing test set are unchanged after cutover to v2.
-- [ ] p95 `query_similar()` latency has a new committed benchmark baseline at 10,000 docs.
-- [ ] Resource limits (memory/disk) are sized for 768-dim vectors, not left at 384-dim defaults.
-- [ ] A rollback was actually rehearsed in staging, not just designed.
-- [ ] No remaining references to `all-MiniLM-L6-v2` or 384-dim outside historical docs/changelog.
+- [x] All 20 steps above checked off.
+- [x] Every collection (`constitution_articles`, `agent_ethos`, `task_learnings`, `domain_knowledge`) is fully re-embedded in v2 with matching document counts and intact metadata.
+- [x] Query embeddings use the `bge` search-query prefix; stored document embeddings do not.
+- [x] Dedup (cosine > threshold) and top-K relevance thresholds are re-validated for the new model, not inherited from MiniLM unchanged.
+- [x] Constitutional Guard verdicts on the existing test set are unchanged after cutover to v2.
+- [x] p95 `query_similar()` latency has a new committed benchmark baseline at 10,000 docs.
+- [x] Resource limits (memory/disk) are sized for 768-dim vectors, not left at 384-dim defaults.
+- [x] A rollback was actually rehearsed in staging, not just designed.
+- [x] No remaining references to `all-MiniLM-L6-v2` or 384-dim outside historical docs/changelog (SkillManager pipeline + agent tool explicitly excluded per ADR-021).
 
 ---
 
