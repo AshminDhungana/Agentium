@@ -187,10 +187,10 @@ export function ProviderAnalytics() {
                         <option value={90}>Last 90 days</option>
                     </select>
 
-                    <button onClick={fetchAll} disabled={loading} className="p-1.5 rounded-lg text-gray-600 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#1e2535] transition-colors" title="Refresh">
+                    <button onClick={fetchAll} disabled={loading} aria-label="Refresh analytics" className="p-1.5 rounded-lg text-gray-600 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#1e2535] transition-colors" title="Refresh">
                         {loading ? <LoadingSpinner size="sm" /> : <RefreshCw className="w-3.5 h-3.5" />}
                     </button>
-                    <button onClick={() => setExpanded(v => !v)} className="p-1.5 rounded-lg text-gray-600 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#1e2535] transition-colors">
+                    <button onClick={() => setExpanded(v => !v)} aria-label={expanded ? 'Collapse analytics' : 'Expand analytics'} aria-expanded={expanded} className="p-1.5 rounded-lg text-gray-600 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#1e2535] transition-colors">
                         {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                     </button>
                 </div>

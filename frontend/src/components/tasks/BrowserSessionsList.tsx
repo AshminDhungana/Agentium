@@ -75,6 +75,8 @@ export const BrowserSessionsList: React.FC<BrowserSessionsListProps> = ({ tasks,
                 <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Active Browser Sessions</h3>
                 <button 
                     onClick={loadSessions}
+                    aria-label="Refresh browser sessions"
+                    title="Refresh"
                     className="p-1.5 rounded-lg border border-gray-200 dark:border-[#1e2535] bg-white dark:bg-[#161b27] text-gray-600 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
                 >
                     {loading ? <LoadingSpinner size="sm" /> : <RefreshCw className="w-3.5 h-3.5" />}

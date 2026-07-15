@@ -505,6 +505,7 @@ function ToolCard({ tool, stats, onRefresh, currentUser }: ToolCardProps) {
                             <button
                                 onClick={pingHealth}
                                 disabled={healthLoading}
+                                aria-label="Check health"
                                 title="Check health"
                                 className="p-2 text-gray-600 hover:text-blue-600 dark:hover:text-gray-600 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition-colors disabled:opacity-40"
                             >
@@ -515,6 +516,7 @@ function ToolCard({ tool, stats, onRefresh, currentUser }: ToolCardProps) {
                             </button>
                             <button
                                 onClick={() => setShowAudit(true)}
+                                aria-label="View audit log"
                                 title="View audit log"
                                 className="p-2 text-gray-600 hover:text-purple-600 dark:hover:text-gray-600 hover:bg-purple-50 dark:hover:bg-purple-500/10 rounded-lg transition-colors"
                             >
@@ -863,9 +865,10 @@ export function MCPToolRegistry() {
 
                     <div className="ml-auto flex items-center gap-2">
                         <button
-                            onClick={() => { fetchTools(); fetchStats(); }}
-                            className="p-2 text-gray-600 hover:text-blue-600 dark:hover:text-gray-600 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition-colors"
-                            title="Refresh"
+                                onClick={() => { fetchTools(); fetchStats(); }}
+                                className="p-2 text-gray-600 hover:text-blue-600 dark:hover:text-gray-600 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition-colors"
+                                aria-label="Refresh tools"
+                                title="Refresh"
                         >
                             {loading ? <LoadingSpinner size="sm" /> : <RefreshCw className="w-4 h-4" />}
                         </button>

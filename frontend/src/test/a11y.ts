@@ -1,6 +1,7 @@
 import axe, { type AxeResults } from 'axe-core';
-import { render, type RenderResult } from '@testing-library/react';
+import { render } from '@testing-library/react';
 import { expect } from 'vitest';
+import type React from 'react';
 
 // Custom `toHaveNoViolations` matcher backed by axe-core directly (avoids the
 // vitest-axe peer-dependency on a specific Vitest major). Registered globally
@@ -25,11 +26,18 @@ expect.extend({
 // Run axe in jsdom. The color-contrast rule needs layout/getComputedStyle and
 // is unreliable under jsdom, so it is disabled here; the browser `a11y` project
 // (Task 2) enables it against a real Chromium layout.
-export async function checkA11y(ui: React.ReactElement): Promise<RenderResult> {
-  const result = render(ui);
-  const results = (await axe.run(result.container, {
+//
+// Accepts either:
+//   • an already-rendered `HTMLElement` (RTL `container`) — axe runs once; or
+//   • a `React.ReactElement` — it is rendered once, then audited.
+// Do NOT render the element yourself AND pass it here; that double-mounts into
+// the same container and throws "Objects are not valid as a React child".
+export async function checkA11y(target: HTMLElement | React.ReactElement): Promise<void> {
+  const container = 'props' in (target as object)
+    ? render(target as React.ReactElement).container
+    : (target as HTMLElement);
+  const results = (await axe.run(container, {
     rules: { 'color-contrast': { enabled: false } },
   })) as AxeResults;
   expect(results).toHaveNoViolations();
-  return result;
 }

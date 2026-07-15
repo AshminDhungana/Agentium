@@ -228,6 +228,7 @@ export const CitationGraph: React.FC = () => {
             onClick={loadStats}
             disabled={statsLoading}
             className="px-3 py-2.5 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/5 rounded-lg text-sm transition-colors duration-150"
+            aria-label="Refresh stats"
             title="Refresh stats"
           >
             {statsLoading ? <LoadingSpinner size="sm" /> : <RefreshCw className="w-4 h-4" />}
@@ -264,6 +265,7 @@ export const CitationGraph: React.FC = () => {
               <button
                 onClick={() => setZoom(z => Math.min(2, z + 0.2))}
                 className="p-1.5 text-gray-600 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#1e2535] rounded-lg transition-colors"
+                aria-label="Zoom in"
                 title="Zoom in"
               >
                 <ZoomIn className="w-4 h-4" />
@@ -271,6 +273,7 @@ export const CitationGraph: React.FC = () => {
               <button
                 onClick={() => setZoom(z => Math.max(0.3, z - 0.2))}
                 className="p-1.5 text-gray-600 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#1e2535] rounded-lg transition-colors"
+                aria-label="Zoom out"
                 title="Zoom out"
               >
                 <ZoomOut className="w-4 h-4" />
@@ -278,6 +281,7 @@ export const CitationGraph: React.FC = () => {
               <button
                 onClick={() => setZoom(1)}
                 className="p-1.5 text-gray-600 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#1e2535] rounded-lg transition-colors"
+                aria-label="Reset zoom"
                 title="Reset zoom"
               >
                 <Maximize2 className="w-4 h-4" />

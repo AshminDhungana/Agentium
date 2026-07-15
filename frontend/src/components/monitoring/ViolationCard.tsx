@@ -193,6 +193,7 @@ export const ViolationCard: React.FC<ViolationCardProps> = ({
                             <button
                                 onClick={() => onResolve(violation.id)}
                                 className="p-1.5 rounded-md text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 transition-colors"
+                                aria-label="Resolve violation"
                                 title="Resolve"
                             >
                                 <CheckCircle2 className="w-4 h-4" />
@@ -202,6 +203,7 @@ export const ViolationCard: React.FC<ViolationCardProps> = ({
                             <button
                                 onClick={() => onDismiss(violation.id)}
                                 className="p-1.5 rounded-md text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-500/10 transition-colors"
+                                aria-label="Dismiss violation"
                                 title="Dismiss"
                             >
                                 <XCircle className="w-4 h-4" />

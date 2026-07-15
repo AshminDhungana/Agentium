@@ -159,6 +159,7 @@ export const AgentListView: React.FC<AgentListViewProps> = React.memo(({
                                         {!isTerminated && !isTask && (
                                             <button
                                                 onClick={() => onSpawn(agent)}
+                                                aria-label="Spawn subordinate"
                                                 title="Spawn subordinate"
                                                 className="p-1.5 rounded-lg text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-colors"
                                             >
@@ -168,6 +169,7 @@ export const AgentListView: React.FC<AgentListViewProps> = React.memo(({
                                         {!isTerminated && isTask && onPromote && (
                                             <button
                                                 onClick={() => onPromote(agent)}
+                                                aria-label="Promote to Lead"
                                                 title="Promote to Lead"
                                                 className="p-1.5 rounded-lg text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 transition-colors"
                                             >
@@ -177,6 +179,7 @@ export const AgentListView: React.FC<AgentListViewProps> = React.memo(({
                                         {!isTerminated && !isHead && (
                                             <button
                                                 onClick={() => onTerminate(agent)}
+                                                aria-label="Terminate agent"
                                                 title="Terminate"
                                                 className="p-1.5 rounded-lg text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors"
                                             >

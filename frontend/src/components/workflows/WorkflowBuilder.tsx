@@ -154,6 +154,7 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ initialTemplat
             <Button
               variant="ghost"
               size="icon"
+              aria-label={`Remove step ${idx + 1}`}
               className="absolute top-2 right-2 text-gray-600 dark:text-gray-400 hover:text-red-300 dark:hover:text-red-300 hover:bg-red-400/10"
               onClick={() => removeStep(idx)}
             >

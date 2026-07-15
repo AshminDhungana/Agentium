@@ -298,6 +298,7 @@ export function SystemTab() {
                                                 onClick={() => handleContainerAction(container.id, 'start')}
                                                 disabled={isLoading || container.status.toLowerCase() === 'running'}
                                                 className="p-2 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-500/10 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-colors duration-150"
+                                                aria-label={`Start ${container.name}`}
                                                 title="Start"
                                             >
                                                 <Play className="w-3.5 h-3.5" />
@@ -306,6 +307,7 @@ export function SystemTab() {
                                                 onClick={() => handleContainerAction(container.id, 'stop')}
                                                 disabled={isLoading || container.status.toLowerCase() !== 'running'}
                                                 className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-colors duration-150"
+                                                aria-label={`Stop ${container.name}`}
                                                 title="Stop"
                                             >
                                                 <Square className="w-3.5 h-3.5" />
@@ -314,6 +316,7 @@ export function SystemTab() {
                                                 onClick={() => handleContainerAction(container.id, 'restart')}
                                                 disabled={isLoading}
                                                 className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-colors duration-150"
+                                                aria-label={`Restart ${container.name}`}
                                                 title="Restart"
                                             >
                                                 <RotateCw className="w-3.5 h-3.5" />
@@ -322,6 +325,7 @@ export function SystemTab() {
                                                 onClick={() => handleContainerAction(container.id, 'remove')}
                                                 disabled={isLoading}
                                                 className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-colors duration-150"
+                                                aria-label={`Remove ${container.name}`}
                                                 title="Remove"
                                             >
                                                 <Trash2 className="w-3.5 h-3.5" />
