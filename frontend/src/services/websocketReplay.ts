@@ -10,7 +10,8 @@ export interface ReplayResponse {
 }
 
 export interface GenesisStatusResponse {
-    status: 'complete' | 'not_started' | 'running';
+    status: 'complete' | 'not_started' | 'running' | 'failed';
+    reason?: string;
 }
 
 export const websocketReplayApi = {
