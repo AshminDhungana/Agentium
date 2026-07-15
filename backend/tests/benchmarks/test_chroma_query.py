@@ -1,10 +1,11 @@
 """ChromaDB Vector-Query Benchmark - Phase 18.2 Performance Regression Gate.
 
-Asserts: p95 < 200 ms for ``query_knowledge()`` with 10,000 seeded documents.
+Asserts: p95 < ``_THRESHOLD_MS`` for ``query_knowledge()`` with 10,000 seeded
+documents against the **v2** collection (BAAI/bge-base-en-v1.5, 768-dim, cosine).
 
 Usage::
 
-    pytest tests/benchmarks/test_chroma_query.py -m benchmark --benchmark-only
+    EMBEDDING_MODEL=BAAI/bge-base-en-v1.5 pytest tests/benchmarks/test_chroma_query.py -m benchmark --benchmark-only
 
 Dependencies
 ------------
@@ -13,12 +14,22 @@ pytest-benchmark (installed via ``pip install -r requirements-dev.txt``)
 
 from __future__ import annotations
 
+import os
 import time
 import statistics
 import pytest
 
-# Target threshold (ms) – Phase 8 baseline
-_THRESHOLD_MS = 200
+# Default the benchmark to the bge v2 embedding path (768-dim, cosine).
+os.environ.setdefault("EMBEDDING_MODEL", "BAAI/bge-base-en-v1.5")
+os.environ.setdefault("EMBEDDING_DIM", "768")
+os.environ.setdefault("EMBEDDING_ACTIVE_VERSION", "v2")
+
+# Target threshold (ms). The Phase 8 baseline of 200 ms was measured for the
+# 384-dim MiniLM path. bge-base is 768-dim and runs a heavier encode + larger
+# HNSW index, so this is a PROVISIONAL gate pending a real CI measurement on
+# the target hardware. If p95 regresses beyond this, evaluate
+# optimum[onnxruntime] quantized inference (see ADR-021) before accepting.
+_THRESHOLD_MS = 400
 
 # Number of documents to seed
 _SEED_COUNT = 10000
@@ -33,7 +44,7 @@ pytestmark = [
 
 
 def _seed_collection(vector_store):
-    """Seed 10,000 synthetic documents in batches."""
+    """Seed 10,000 synthetic documents into the v2 (bge) collection in batches."""
     collection_key = "task_patterns"
     batch_size = 500
     for batch_start in range(0, _SEED_COUNT, batch_size):
@@ -49,7 +60,7 @@ def _seed_collection(vector_store):
             for i in range(batch_start, batch_end)
         ]
         ids = [f"bench-{i}" for i in range(batch_start, batch_end)]
-        collection = vector_store.get_collection(collection_key)
+        collection = vector_store.get_collection(collection_key, version="v2")
         collection.add(
             documents=texts,
             metadatas=metadatas,
