@@ -102,6 +102,18 @@ SESSION_NO_SPEECH_TIMEOUT: float = float(_conf.get("SESSION_NO_SPEECH_TIMEOUT", 
 SESSION_MAX_DURATION:      float = float(_conf.get("SESSION_MAX_DURATION",      os.getenv("SESSION_MAX_DURATION",      "120.0")))
 WAKE_WORD_LISTEN_TIMEOUT:  float = float(_conf.get("WAKE_WORD_LISTEN_TIMEOUT",  os.getenv("WAKE_WORD_LISTEN_TIMEOUT",  "8.0")))
 
+# ── Jarvis-upgrade config (Phases A–H) ──────────────────────────────────────
+WAKE_CHIME_PATH:      str   = _conf.get("WAKE_CHIME_PATH",      os.getenv("WAKE_CHIME_PATH",      str(Path(__file__).parent / "assets" / "wake_chime.wav")))
+WAKE_WORD_MODEL:      str   = _conf.get("WAKE_WORD_MODEL",      os.getenv("WAKE_WORD_MODEL",      ""))
+WAKE_WORD_THRESHOLD:  float = float(_conf.get("WAKE_WORD_THRESHOLD", os.getenv("WAKE_WORD_THRESHOLD", "0.5")))
+VAD_SILENCE_MS:       float = float(_conf.get("VAD_SILENCE_MS",       os.getenv("VAD_SILENCE_MS",       "700")))
+VOICE_TTS_VOICE:      str   = _conf.get("VOICE_TTS_VOICE",      os.getenv("VOICE_TTS_VOICE",      "af_bella"))
+VOICE_PERSONA:        str   = _conf.get("VOICE_PERSONA",        os.getenv("VOICE_PERSONA",        ""))
+VOICE_PROACTIVE_ENABLED: bool = _conf.get("VOICE_PROACTIVE_ENABLED", os.getenv("VOICE_PROACTIVE_ENABLED", "false")).lower() == "true"
+VOICE_PROACTIVE_COOLDOWN_S: float = float(_conf.get("VOICE_PROACTIVE_COOLDOWN_S", os.getenv("VOICE_PROACTIVE_COOLDOWN_S", "300")))
+VOICE_NS_ENABLED:     bool  = _conf.get("VOICE_NS_ENABLED",     os.getenv("VOICE_NS_ENABLED",     "true")).lower() == "true"
+BACKEND_WS_URL:       str   = _conf.get("BACKEND_WS_URL",       os.getenv("BACKEND_WS_URL",       f"ws://{BACKEND_URL.split('://')[-1].split(':')[0]}:8000/ws"))
+
 # ── Vosk offline-fallback config (B1/B2) ───────────────────────────────────────
 # Only used when recognize_google() fails with a RequestError (network/quota/
 # 5xx from Google) AND a model directory is present. If no model is found,
@@ -315,6 +327,28 @@ async def speak(text: str) -> None:
     """Non-blocking async wrapper around _speak_sync."""
     loop = asyncio.get_event_loop()
     await loop.run_in_executor(_executor, _speak_sync, text)
+
+
+def _play_wake_chime() -> None:
+    """Instant, non-LLM acknowledgment that the wake word was heard."""
+    path = WAKE_CHIME_PATH
+    if not os.path.isfile(path):
+        logger.debug("[bridge] wake chime asset missing at %s", path)
+        return
+    try:
+        import wave
+        with wave.open(path, "rb") as w:
+            data = w.readframes(w.getnframes())
+        try:
+            import sounddevice as sd  # type: ignore
+            import numpy as np
+            arr = np.frombuffer(data, dtype=np.int16).astype(np.float32) / 32768.0
+            sd.play(arr, w.getframerate())
+            sd.wait()
+        except Exception:
+            logger.debug("[bridge] sounddevice unavailable for chime")
+    except Exception as exc:
+        logger.debug("[bridge] wake chime play failed: %s", exc)
 
 
 # ── STT ────────────────────────────────────────────────────────────────────────
