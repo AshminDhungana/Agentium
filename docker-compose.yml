@@ -97,8 +97,8 @@ services:
     command: server /data --console-address ":9001"
     environment:
       MINIO_CI_CD: 1
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-4a98cf79ada70d471771d7c1b5f0f014c}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-e94607c6d227c6496100fba01a0}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
     ports:
       - "9000:9000"   # S3 API
       - "9001:9001"   # Web console
@@ -231,8 +231,8 @@ services:
       - HF_HOME=/app/.cache/huggingface
       # ── Storage (MinIO primary / local fallback) ──────────────────────────
       # MinIO credentials — must match MINIO_ROOT_USER / MINIO_ROOT_PASSWORD above.
-      - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER:-4a98cf79ada70d471771d7c1b5f0f014c}
-      - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD:-e94607c6d227c6496100fba01a0}
+      - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER}
+      - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD}
       - S3_ENDPOINT=http://minio:9000
       - S3_BUCKET_NAME=${S3_BUCKET_NAME:-agentium-media}
       - S3_FORCE_PATH_STYLE=true
@@ -284,8 +284,6 @@ services:
         condition: service_healthy
       whatsapp-bridge:
         condition: service_started   # service_healthy would block boot if bridge fails QR scan or is slow
-      minio:
-        condition: service_healthy
     networks:
       - agentium-network
     healthcheck:
@@ -336,8 +334,8 @@ services:
       - HF_HUB_OFFLINE=1
       - HF_HOME=/app/.cache/huggingface
       # ── Storage (MinIO primary / local fallback) ──────────────────────────
-      - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER:-4a98cf79ada70d471771d7c1b5f0f014c}
-      - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD:-e94607c6d227c6496100fba01a0}
+      - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER}
+      - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD}
       - S3_ENDPOINT=http://minio:9000
       - S3_BUCKET_NAME=${S3_BUCKET_NAME:-agentium-media}
       - S3_FORCE_PATH_STYLE=true
@@ -432,8 +430,8 @@ services:
       # These were missing from celery-beat, causing "AWS credentials not set"
       # warnings on every startup and silent failures in any beat task that
       # touches file storage (e.g. sovereign_data_retention).
-      - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER:-4a98cf79ada70d471771d7c1b5f0f014c}
-      - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD:-e94607c6d227c6496100fba01a0}
+      - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER}
+      - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD}
       - S3_ENDPOINT=http://minio:9000
       - S3_BUCKET_NAME=${S3_BUCKET_NAME:-agentium-media}
       - S3_FORCE_PATH_STYLE=true
