@@ -48,6 +48,9 @@ class Settings(BaseSettings):
     CHROMA_HOST: Optional[str] = None  # For server mode, default None = embedded
     CHROMA_PORT: int = 8000
     EMBEDDING_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"
+    EMBEDDING_DIM: int = 384
+    EMBEDDING_ACTIVE_VERSION: str = "v1"          # global default
+    EMBEDDING_ACTIVE_VERSIONS: dict = {}          # e.g. {"task_patterns": "v2"}
 
     # Speaker Identification (Phase 10.3 / 15.4)
     SPEAKER_ID_ENABLED: bool = Field(default=True, env="SPEAKER_ID_ENABLED")

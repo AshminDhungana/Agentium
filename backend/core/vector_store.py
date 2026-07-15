@@ -13,16 +13,16 @@ import chromadb
 from chromadb.api.types import EmbeddingFunction, QueryResult
 from sentence_transformers import SentenceTransformer
 
+from backend.core.config import settings as _settings
+
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Configuration — read from environment, no hardcoded fallbacks for server
 # ---------------------------------------------------------------------------
 CHROMA_PERSIST_DIR: str = os.getenv("CHROMA_PERSIST_DIR", "./chroma_data")
-EMBEDDING_MODEL: str = os.getenv(
-    "EMBEDDING_MODEL",
-    "sentence-transformers/all-MiniLM-L6-v2",
-)
+V2_EMBEDDING_MODEL = "BAAI/bge-base-en-v1.5"
+V2_EMBEDDING_DIM = 768
 CHROMA_HOST: Optional[str] = os.getenv("CHROMA_HOST")  # None → local mode
 CHROMA_PORT: int = int(os.getenv("CHROMA_PORT", "8000"))
 
@@ -36,7 +36,7 @@ class AgentiumEmbeddingFunction(EmbeddingFunction):
     """
 
     def __init__(self, model_name: Optional[str] = None) -> None:
-        self.model_name = model_name or EMBEDDING_MODEL
+        self.model_name = model_name or _settings.EMBEDDING_MODEL
         self._model: Optional[SentenceTransformer] = None
 
     @property
