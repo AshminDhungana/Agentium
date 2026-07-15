@@ -117,10 +117,11 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ initialTemplat
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="text-sm text-gray-600 dark:text-slate-400 mb-1 block">
+              <label className="text-sm text-gray-600 dark:text-slate-400 mb-1 block" htmlFor="workflow-name">
                 Workflow Name
               </label>
               <input
+                id="workflow-name"
                 type="text"
                 className={inputCls}
                 placeholder="e.g. Daily Data Scraper"
@@ -129,10 +130,11 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ initialTemplat
               />
             </div>
             <div>
-              <label className="text-sm text-gray-600 dark:text-slate-400 mb-1 block">
+              <label className="text-sm text-gray-600 dark:text-slate-400 mb-1 block" htmlFor="workflow-cron">
                 Cron Schedule (Optional)
               </label>
               <input
+                id="workflow-cron"
                 type="text"
                 className={inputCls}
                 placeholder="e.g. 0 0 * * *"
@@ -170,6 +172,7 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ initialTemplat
                     Step {step.step_index}
                   </div>
                   <select
+                    aria-label={`Step ${step.step_index} type`}
                     className={selectCls}
                     value={step.type}
                     onChange={(e) => updateStep(idx, { type: e.target.value })}
@@ -187,10 +190,11 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ initialTemplat
                   {step.type === 'TASK' && (
                     <>
                       <div>
-                        <label className="text-xs text-gray-600 dark:text-slate-500 mb-1 block">
+                        <label className="text-xs text-gray-600 dark:text-slate-500 mb-1 block" htmlFor={`step-${idx}-task-title`}>
                           Task Title
                         </label>
                         <input
+                          id={`step-${idx}-task-title`}
                           type="text"
                           className={inputSmCls}
                           value={step.config.task_title || ''}
@@ -200,10 +204,11 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ initialTemplat
                         />
                       </div>
                       <div>
-                        <label className="text-xs text-gray-600 dark:text-slate-500 mb-1 block">
+                        <label className="text-xs text-gray-600 dark:text-slate-500 mb-1 block" htmlFor={`step-${idx}-prompt`}>
                           Prompt
                         </label>
                         <textarea
+                          id={`step-${idx}-prompt`}
                           rows={2}
                           className={inputSmCls}
                           value={step.config.prompt || ''}
@@ -216,10 +221,11 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ initialTemplat
                   )}
                   {step.type === 'DELAY' && (
                     <div>
-                      <label className="text-xs text-gray-600 dark:text-slate-500 mb-1 block">
+                      <label className="text-xs text-gray-600 dark:text-slate-500 mb-1 block" htmlFor={`step-${idx}-delay-seconds`}>
                         Delay Seconds
                       </label>
                       <input
+                        id={`step-${idx}-delay-seconds`}
                         type="number"
                         className={inputSmCls}
                         value={step.config.delay_seconds || 60}
@@ -236,26 +242,28 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ initialTemplat
                 {/* Routing */}
                 <div className="col-span-1 md:col-span-4 space-y-3 md:border-l md:border-gray-200 md:dark:border-[#1e2535] md:pl-4">
                   <div>
-                    <label className="text-xs text-gray-600 dark:text-slate-500 mb-1 block">
-                      On Success Step Index
-                    </label>
-                    <input
-                      type="number"
-                      className={inputSmCls}
-                      value={step.on_success_step ?? ''}
-                      onChange={(e) =>
-                        updateStep(idx, {
-                          on_success_step: e.target.value ? parseInt(e.target.value) : undefined,
-                        })
-                      }
-                    />
+                      <label className="text-xs text-gray-600 dark:text-slate-500 mb-1 block" htmlFor={`step-${idx}-on-success-step`}>
+                        On Success Step Index
+                      </label>
+                      <input
+                        id={`step-${idx}-on-success-step`}
+                        type="number"
+                        className={inputSmCls}
+                        value={step.on_success_step ?? ''}
+                        onChange={(e) =>
+                          updateStep(idx, {
+                            on_success_step: e.target.value ? parseInt(e.target.value) : undefined,
+                          })
+                        }
+                      />
                   </div>
                   {(step.type === 'TASK' || step.type === 'CONDITION') && (
                     <div>
-                      <label className="text-xs text-gray-600 dark:text-slate-500 mb-1 block">
+                      <label className="text-xs text-gray-600 dark:text-slate-500 mb-1 block" htmlFor={`step-${idx}-on-failure-step`}>
                         On Failure Step Index
                       </label>
                       <input
+                        id={`step-${idx}-on-failure-step`}
                         type="number"
                         className={inputSmCls}
                         value={step.on_failure_step ?? ''}

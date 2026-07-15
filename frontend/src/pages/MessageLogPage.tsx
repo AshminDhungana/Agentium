@@ -143,8 +143,9 @@ function FilterBar({ filters, channels, onChange, onReset }: FilterBarProps) {
         >
           {/* Channel */}
           <div>
-            <label className="text-xs text-slate-600 dark:text-slate-400 font-medium mb-1 block">Channel</label>
+            <label className="text-xs text-slate-600 dark:text-slate-400 font-medium mb-1 block" htmlFor="log-filter-channel">Channel</label>
             <select
+              id="log-filter-channel"
               value={filters.channel_id ?? ''}
               onChange={e => onChange({ channel_id: e.target.value || undefined })}
               className="w-full bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600/50 rounded-lg px-3 py-1.5 text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -160,8 +161,9 @@ function FilterBar({ filters, channels, onChange, onReset }: FilterBarProps) {
 
           {/* Channel type */}
           <div>
-            <label className="text-xs text-slate-600 dark:text-slate-400 font-medium mb-1 block">Channel Type</label>
+            <label className="text-xs text-slate-600 dark:text-slate-400 font-medium mb-1 block" htmlFor="log-filter-channel-type">Channel Type</label>
             <select
+              id="log-filter-channel-type"
               value={filters.channel_type ?? ''}
               onChange={e => onChange({ channel_type: e.target.value || undefined })}
               className="w-full bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600/50 rounded-lg px-3 py-1.5 text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -220,8 +222,9 @@ function FilterBar({ filters, channels, onChange, onReset }: FilterBarProps) {
           {/* Date range */}
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="text-xs text-slate-600 dark:text-slate-400 font-medium mb-1 block">From</label>
+              <label className="text-xs text-slate-600 dark:text-slate-400 font-medium mb-1 block" htmlFor="log-filter-date-from">From</label>
               <input
+                id="log-filter-date-from"
                 type="datetime-local"
                 value={filters.date_from?.slice(0, 16) ?? ''}
                 onChange={e => onChange({ date_from: e.target.value ? e.target.value + ':00' : undefined })}
@@ -229,8 +232,9 @@ function FilterBar({ filters, channels, onChange, onReset }: FilterBarProps) {
               />
             </div>
             <div>
-              <label className="text-xs text-slate-600 dark:text-slate-400 font-medium mb-1 block">To</label>
+              <label className="text-xs text-slate-600 dark:text-slate-400 font-medium mb-1 block" htmlFor="log-filter-date-to">To</label>
               <input
+                id="log-filter-date-to"
                 type="datetime-local"
                 value={filters.date_to?.slice(0, 16) ?? ''}
                 onChange={e => onChange({ date_to: e.target.value ? e.target.value + ':00' : undefined })}
@@ -241,8 +245,9 @@ function FilterBar({ filters, channels, onChange, onReset }: FilterBarProps) {
 
           {/* Agent ID */}
           <div>
-            <label className="text-xs text-slate-600 dark:text-slate-400 font-medium mb-1 block">Agent ID</label>
+            <label className="text-xs text-slate-600 dark:text-slate-400 font-medium mb-1 block" htmlFor="log-filter-agent-id">Agent ID</label>
             <input
+              id="log-filter-agent-id"
               type="text"
               placeholder="e.g. 10001"
               value={filters.agent_id ?? ''}
@@ -483,7 +488,9 @@ export function MessageLogPage() {
           <div className="relative flex-1 min-w-52">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600 dark:text-slate-500" />
             <input
+              id="log-search"
               type="text"
+              aria-label="Search messages and senders"
               placeholder="Search messages, senders…"
               value={search}
               onChange={e => handleSearchChange(e.target.value)}

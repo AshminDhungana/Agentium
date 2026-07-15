@@ -123,8 +123,8 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
       <div className="p-6 space-y-6">
         {/* Step Type */}
         <div>
-          <label className={labelCls}>Step Type</label>
-          <select className={selectCls} value={type} onChange={(e) => setType(e.target.value)}>
+          <label className={labelCls} htmlFor="node-config-step-type">Step Type</label>
+          <select id="node-config-step-type" className={selectCls} value={type} onChange={(e) => setType(e.target.value)}>
             <option value="TASK">AI Task</option>
             <option value="CONDITION">Condition</option>
             <option value="PARALLEL">Parallel</option>
@@ -145,8 +145,9 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
           {type === 'TASK' && (
             <>
               <div>
-                <label className={labelCls}>Task Title</label>
+                <label className={labelCls} htmlFor="node-config-task-title">Task Title</label>
                 <input
+                  id="node-config-task-title"
                   type="text"
                   className={inputCls}
                   placeholder="e.g. Analyze customer data"
@@ -155,8 +156,9 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
                 />
               </div>
               <div>
-                <label className={labelCls}>Prompt</label>
+                <label className={labelCls} htmlFor="node-config-prompt">Prompt</label>
                 <textarea
+                  id="node-config-prompt"
                   rows={4}
                   className={inputCls}
                   placeholder="Instructions for the agent…"
@@ -170,8 +172,9 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
           {type === 'CONDITION' && (
             <>
               <div>
-                <label className={labelCls}>Field Path</label>
+                <label className={labelCls} htmlFor="node-config-field-path">Field Path</label>
                 <input
+                  id="node-config-field-path"
                   type="text"
                   className={inputCls}
                   placeholder="e.g. last_task_output.status"
@@ -181,8 +184,9 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className={labelCls}>Operator</label>
+                  <label className={labelCls} htmlFor="node-config-operator">Operator</label>
                   <select
+                    id="node-config-operator"
                     className={selectCls}
                     value={(config.operator as string) ?? 'eq'}
                     onChange={(e) => updateConfig('operator', e.target.value)}
@@ -195,8 +199,9 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
                   </select>
                 </div>
                 <div>
-                  <label className={labelCls}>Value</label>
+                  <label className={labelCls} htmlFor="node-config-value">Value</label>
                   <input
+                    id="node-config-value"
                     type="text"
                     className={inputCls}
                     placeholder="e.g. success"
@@ -210,22 +215,24 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
 
           {type === 'DELAY' && (
             <div>
-              <label className={labelCls}>Delay (seconds)</label>
-              <input
-                type="number"
-                className={inputCls}
-                min={1}
-                value={(config.delay_seconds as number) ?? 60}
-                onChange={(e) => updateConfig('delay_seconds', parseInt(e.target.value) || 60)}
-              />
+                <label className={labelCls} htmlFor="node-config-delay-seconds">Delay (seconds)</label>
+                <input
+                  id="node-config-delay-seconds"
+                  type="number"
+                  className={inputCls}
+                  min={1}
+                  value={(config.delay_seconds as number) ?? 60}
+                  onChange={(e) => updateConfig('delay_seconds', parseInt(e.target.value) || 60)}
+                />
             </div>
           )}
 
           {type === 'HUMAN_APPROVAL' && (
             <>
               <div>
-                <label className={labelCls}>Approval Message</label>
+                <label className={labelCls} htmlFor="node-config-approval-message">Approval Message</label>
                 <textarea
+                  id="node-config-approval-message"
                   rows={3}
                   className={inputCls}
                   placeholder="Message shown to the approver…"
@@ -234,8 +241,9 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
                 />
               </div>
               <div>
-                <label className={labelCls}>Timeout (seconds)</label>
+                <label className={labelCls} htmlFor="node-config-timeout-seconds">Timeout (seconds)</label>
                 <input
+                  id="node-config-timeout-seconds"
                   type="number"
                   className={inputCls}
                   min={60}
@@ -262,8 +270,9 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
             Routing
           </h4>
           <div>
-            <label className={labelCls}>On Success → Step</label>
+            <label className={labelCls} htmlFor="node-config-on-success-step">On Success → Step</label>
             <select
+              id="node-config-on-success-step"
               className={selectCls}
               value={onSuccessStep ?? ''}
               onChange={(e) => setOnSuccessStep(e.target.value ? parseInt(e.target.value) : undefined)}
@@ -280,8 +289,9 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
 
           {(type === 'TASK' || type === 'CONDITION') && (
             <div>
-              <label className={labelCls}>On Failure → Step</label>
+              <label className={labelCls} htmlFor="node-config-on-failure-step">On Failure → Step</label>
               <select
+                id="node-config-on-failure-step"
                 className={selectCls}
                 value={onFailureStep ?? ''}
                 onChange={(e) => setOnFailureStep(e.target.value ? parseInt(e.target.value) : undefined)}

@@ -18,11 +18,11 @@
  * @param {() => void} props.onClose - Callback to close the modal.
  * @param {(data: DelegateTaskRequest) => Promise<void>} props.onSubmit - Called with validated form data.
  */
-import { useState, useRef } from 'react';
-import { useFocusTrap } from '../../hooks/useFocusTrap';
+import { useState } from 'react';
 import { Send, AlertCircle } from 'lucide-react';
 import type { PeerInstance, DelegateTaskRequest } from '@/services/federation';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { Modal } from '@/components/ui/Modal';
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 
@@ -52,9 +52,6 @@ const DEFAULT_FORM = {
 
 export function DelegateTaskModal({ peers, isSubmitting, onClose, onSubmit }: DelegateTaskModalProps) {
     const [form, setForm] = useState(DEFAULT_FORM);
-    const containerRef = useRef<HTMLDivElement>(null);
-
-    useFocusTrap(containerRef, true);
     /** Inline JSON parse error shown under the payload textarea. */
     const [payloadError, setPayloadError] = useState<string | null>(null);
 
@@ -96,37 +93,9 @@ export function DelegateTaskModal({ peers, isSubmitting, onClose, onSubmit }: De
     };
 
     return (
-        <div
-            className="fixed inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="delegate-task-modal-title"
-            ref={containerRef}
-        >
-            <div className="bg-white dark:bg-[#161b27] rounded-2xl shadow-2xl dark:shadow-[0_24px_80px_rgba(0,0,0,0.7)] max-w-lg w-full border border-gray-200 dark:border-[#1e2535]">
-
-                {/* Header */}
-                <div className="border-b border-gray-100 dark:border-[#1e2535] px-6 py-5">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 flex items-center justify-center">
-                            <Send className="w-5 h-5 text-blue-600 dark:text-blue-400" aria-hidden="true" />
-                        </div>
-                        <div>
-                            <h3
-                                id="delegate-task-modal-title"
-                                className="text-base font-semibold text-gray-900 dark:text-white"
-                            >
-                                Delegate Task
-                            </h3>
-                            <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
-                                Send a task to a peer instance for execution
-                            </p>
-                        </div>
-                    </div>
-                </div>
-
+        <Modal open onClose={onClose} title="Delegate Task" description="Send a task to a peer instance for execution">
                 {/* Form */}
-                <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                <form onSubmit={handleSubmit} className="space-y-4">
 
                     {/* Target Peer */}
                     <div>
@@ -244,8 +213,7 @@ export function DelegateTaskModal({ peers, isSubmitting, onClose, onSubmit }: De
                         </button>
                     </div>
                 </form>
-            </div>
-        </div>
+        </Modal>
     );
 }
 
