@@ -37,31 +37,6 @@ COLLECTIONS_V2: Dict[str, str] = {
 }
 
 
-class AgentiumEmbeddingFunction(EmbeddingFunction):
-    """
-    Custom embedding function using sentence-transformers.
-
-    Lazy-loads the model on first use to avoid initialization overhead
-    during module import.
-    """
-
-    def __init__(self, model_name: Optional[str] = None) -> None:
-        self.model_name = model_name or _settings.EMBEDDING_MODEL
-        self._model: Optional[SentenceTransformer] = None
-
-    @property
-    def model(self) -> SentenceTransformer:
-        """Lazy-load the sentence-transformer model."""
-        if self._model is None:
-            self._model = SentenceTransformer(self.model_name)
-        return self._model
-
-    def __call__(self, input: List[str]) -> List[List[float]]:  # noqa: A002
-        """Generate embeddings for a list of texts."""
-        embeddings = self.model.encode(input, convert_to_numpy=True)
-        return embeddings.tolist()
-
-
 class BgeEmbeddingFunction(EmbeddingFunction):
     """bge-base-en-v1.5 — asymmetric: prefix queries, not documents; L2-normalized."""
 
@@ -136,7 +111,6 @@ class VectorStore:
         self._host: Optional[str] = host if host is not None else CHROMA_HOST
         self._port: int = port if port is not None else CHROMA_PORT
         self._client: Optional[chromadb.ClientAPI] = None
-        self._embedding_fn = AgentiumEmbeddingFunction()
         self._v2_embedding_fn = BgeEmbeddingFunction()
         self._collections: Dict[str, chromadb.Collection] = {}
         self._collections_by_name: Dict[str, chromadb.Collection] = {}
@@ -176,17 +150,12 @@ class VectorStore:
             )
             self._client = chromadb.PersistentClient(path=CHROMA_PERSIST_DIR)
 
-        # Pre-create / get all collections eagerly
-        for key, name in self.COLLECTIONS.items():
+        # Pre-create / get all v2 collections eagerly (v1 was retired).
+        for key in self.COLLECTIONS:
             try:
-                self._collections[key] = (
-                    self._client.get_or_create_collection(
-                        name=name,
-                        embedding_function=self._embedding_fn,
-                    )
-                )
+                self._collections[key] = self.get_collection(key)
             except Exception:  # noqa: BLE001
-                logger.exception("Could not initialise collection '%s'", name)
+                logger.exception("Could not initialise collection '%s'", key)
 
         return self._client
 
@@ -202,21 +171,23 @@ class VectorStore:
     # ------------------------------------------------------------------
 
     def _active_version(self, key: str) -> str:
-        return _settings.EMBEDDING_ACTIVE_VERSIONS.get(key, _settings.EMBEDDING_ACTIVE_VERSION)
+        # v1 (MiniLM) was retired; the only supported version is now v2 (bge).
+        # Kept for API compatibility — always returns "v2".
+        return "v2"
 
     def _collection_name(self, key: str, version: Optional[str] = None) -> str:
-        version = version or self._active_version(key)
-        if version == "v2":
-            return COLLECTIONS_V2.get(key, f"{self.COLLECTIONS.get(key, key)}{V2_SUFFIX}")
-        return self.COLLECTIONS.get(key, key)
+        # v1 collections were retired; every collection now resolves to its v2
+        # (bge, cosine) name regardless of the requested version.
+        return COLLECTIONS_V2.get(key, f"{self.COLLECTIONS.get(key, key)}{V2_SUFFIX}")
 
     def get_collection(self, collection_key: str, version: Optional[str] = None):
         """
-        Return a collection by its logical key (optionally pinned to a version).
+        Return a collection by its logical key.
 
-        When ``version`` is omitted the active version for the key is used
-        (``EMBEDDING_ACTIVE_VERSIONS`` falling back to ``EMBEDDING_ACTIVE_VERSION``),
-        so existing callers continue to work unchanged.
+        The v1 (MiniLM) embedding path was retired; all collections use the
+        bge-base-en-v1.5 embedding function and a cosine HNSW space. The
+        ``version`` argument is accepted for backwards compatibility but always
+        resolves to the v2 collection.
 
         Raises ``ValueError`` for unknown keys so callers get an explicit
         error rather than a confusing ``KeyError``.
@@ -227,11 +198,10 @@ class VectorStore:
                 f"Valid keys: {list(self.COLLECTIONS)}"
             )
 
-        version = version or self._active_version(collection_key)
         name = self._collection_name(collection_key, version)
-        ef = self._v2_embedding_fn if version == "v2" else self._embedding_fn
+        ef = self._v2_embedding_fn
         if name not in self._collections_by_name:
-            cfg = {"hnsw": {"space": "cosine"}} if version == "v2" else None
+            cfg = {"hnsw": {"space": "cosine"}}
             try:
                 self._collections_by_name[name] = self.client.get_or_create_collection(
                     name=name, embedding_function=ef, configuration=cfg,
@@ -240,11 +210,8 @@ class VectorStore:
                 # Older chromadb: space passed via metadata instead of configuration=
                 self._collections_by_name[name] = self.client.get_or_create_collection(
                     name=name, embedding_function=ef,
-                    metadata={"hnsw:space": "cosine"} if version == "v2" else None,
+                    metadata={"hnsw:space": "cosine"},
                 )
-            # Keep the legacy per-key cache warm for v1 callers.
-            if version != "v2":
-                self._collections[collection_key] = self._collections_by_name[name]
 
         return self._collections_by_name[name]
 

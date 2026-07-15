@@ -109,9 +109,9 @@ RUN pip install --upgrade pip setuptools wheel && \
 RUN pip install --no-cache-dir --default-timeout=600 --retries=5 -r requirements.txt && \
     pip install --no-cache-dir nodriver
 
-# Pre-download sentence-transformers model so runtime never hits HuggingFace
+# Pre-download the bge embedding model so runtime never hits HuggingFace
+# (v1/MiniLM was retired; HF_HUB_OFFLINE=1 means no runtime download).
 ENV HF_HOME=/app/.cache/huggingface
-RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')"
 RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('BAAI/bge-base-en-v1.5')"
 
 # Copy application code

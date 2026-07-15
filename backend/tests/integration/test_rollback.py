@@ -1,9 +1,9 @@
-"""Task 20 — rehearse rollback to v1 via the per-collection feature flag.
+"""Rollback / version-resolution test for the embedding collection.
 
-Uses a local persistent ChromaDB (no docker/postgres needed) to confirm the
-EMBEDDING_ACTIVE_VERSIONS flag flips the resolved collection name and that
-queries keep working after flipping forward to v2, back to v1, then forward
-again.
+v1 (MiniLM) was retired, so there is no v1 to roll back to. This test asserts
+the collection always resolves to the v2 (bge, cosine) name and that queries
+keep returning results — both for the default and an explicitly requested
+"v1" (which must resolve to v2 for backwards compatibility).
 """
 import os
 
@@ -35,21 +35,15 @@ def _seed_and_query(vs, version):
     return res["ids"][0] if res.get("ids") else []
 
 
-def test_rollback_to_v1_then_forward(vs, monkeypatch):
-    # Forward to v2.
+def test_collection_resolves_to_v2_and_queries_work(vs, monkeypatch):
+    # Default resolution is v2.
     monkeypatch.setattr(_settings, "EMBEDDING_ACTIVE_VERSIONS", {"ethos": "v2"})
     assert vs._collection_name("ethos") == "agent_ethos_v2"
     v2_hits = _seed_and_query(vs, "v2")
-    assert v2_hits, "v2 query must return results after cutover"
+    assert v2_hits, "v2 query must return results"
 
-    # Roll back to v1.
+    # A legacy "v1" request must resolve to the same v2 collection (no v1 path).
     monkeypatch.setattr(_settings, "EMBEDDING_ACTIVE_VERSIONS", {"ethos": "v1"})
-    assert vs._collection_name("ethos") == "agent_ethos"
-    v1_hits = _seed_and_query(vs, "v1")
-    assert v1_hits, "v1 query must still work after rollback"
-
-    # Flip forward to v2 again.
-    monkeypatch.setattr(_settings, "EMBEDDING_ACTIVE_VERSIONS", {"ethos": "v2"})
     assert vs._collection_name("ethos") == "agent_ethos_v2"
-    v2_again = _seed_and_query(vs, "v2")
-    assert v2_again, "v2 query must work again after re-cutover"
+    legacy_hits = _seed_and_query(vs, "v1")
+    assert legacy_hits, "v1 request resolves to v2 and must still query"

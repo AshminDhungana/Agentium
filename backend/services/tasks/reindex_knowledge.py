@@ -17,20 +17,16 @@ from backend.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
 
-# Versions to refresh on each weekly run. After the migration the active
-# version is "v2"; "v1" can be dropped from here once Task 18 retires it.
+# Version to refresh on each weekly run. v1 (MiniLM) was retired, so the only
+# supported version is now v2 (bge).
 REINDEX_VERSIONS: List[str] = ["v2"]
 
 # All logical RAG collections, including the ad-hoc domain_knowledge store
 # that lives outside the canonical COLLECTIONS registry.
 _REINDEX_KEYS: List[str] = list(COLLECTIONS.keys()) + ["domain_knowledge"]
 
-# Collections whose v1 is scheduled for deletion post-cutover — skip any
-# operation that would keep them alive.
-_RETIRE_V1 = {"constitution", "ethos", "task_patterns", "domain_knowledge"}
 
-
-def reindex_collection(key: str, version: str) -> Dict[str, Any]:
+def reindex_collection(key: str, version: str = "v2") -> Dict[str, Any]:
     """Re-embed a single collection at ``version`` in place.
 
     Reads the documents + metadata currently stored and upserts them back,
@@ -60,10 +56,6 @@ def weekly_reindex(versions: Optional[List[str]] = None) -> List[Dict[str, Any]]
     stats: List[Dict[str, Any]] = []
     for version in versions:
         for key in _REINDEX_KEYS:
-            # Skip v1 refreshes for collections whose v1 is being retired.
-            if version == "v1" and key in _RETIRE_V1:
-                logger.info("Skipping v1 reindex of %s (scheduled for deletion)", key)
-                continue
             stat = reindex_collection(key, version)
             stat["version"] = version
             stats.append(stat)

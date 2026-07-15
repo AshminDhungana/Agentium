@@ -20,8 +20,9 @@ These tests exercise the public service-layer API rather than mocking
 ChromaDB internals, giving us the strongest guarantee the actual pipeline
 works end-to-end.
 
-Embedding model used in tests: sentence-transformers/all-MiniLM-L6-v2
-(384-dim) so queries are deterministic depending on environment.
+Embedding model used in tests: BAAI/bge-base-en-v1.5 (768-dim, cosine).
+The model is baked into the image (HF_HUB_OFFLINE=1); queries run against the
+v2 collection.
 """
 
 import pytest

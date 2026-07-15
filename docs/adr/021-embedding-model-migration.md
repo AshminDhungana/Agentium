@@ -153,6 +153,30 @@ discovered and must be recorded:
   implementation accepted only a single string and would crash every v2 query.
   `embed_query` now accepts `str | list` and returns `list[list[float]]`.
 
+## v1 Retirement (Task 18, 2026-07-15)
+
+v1 (MiniLM) was fully retired after the code migration landed:
+
+- Removed `AgentiumEmbeddingFunction` (the MiniLM v1 embedding function) and the
+  `sentence-transformers/all-MiniLM-L6-v2` literal from `backend/core/vector_store.py`.
+- `get_collection()` / `_collection_name()` now always resolve to the v2 (bge,
+  cosine) collection name regardless of the requested `version` (backwards
+  compatible — a `"v1"` request silently resolves to v2).
+- `EMBEDDING_MODEL` default → `BAAI/bge-base-en-v1.5`, `EMBEDDING_DIM` → `768`,
+  `EMBEDDING_ACTIVE_VERSION` → `v2` in `backend/core/config.py`.
+- Removed the MiniLM model bake from `backend/Dockerfile.privileged`; the bge
+  model is the only baked embedding model.
+- Deleted `backend/scripts/reembed_knowledge.py` (backfill) and its test; the
+  weekly reindex task now targets v2 only.
+- Added `backend/tests/unit/test_no_legacy_embedding.py` asserting the RAG path
+  has no MiniLM reference (scoped to exclude the SkillManager pipeline and
+  historical alembic migrations, both explicitly out of scope per this ADR).
+
+Note: retiring v1 removes the runtime rollback-to-v1 path. This is only safe
+because the operational cutover + soak (runbook `docs/embedding-cutover-plan.md`)
+had been completed; for a fresh deployment the v2 collections must be populated
+(re-embed) before this code is deployed.
+
 ## Alternatives Considered
 
 | Alternative | Rejected Because |

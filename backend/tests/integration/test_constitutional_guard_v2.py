@@ -112,18 +112,10 @@ def vector_store(tmp_path, monkeypatch):
     vs = VectorStore()
     vs.initialize()
 
-    # v1 collection ("supreme_law") via the production seeding path.
+    # v2 collection ("supreme_law_v2") — the only version now that v1 retired.
+    # Seed via the production path, which resolves to v2 by default.
     for aid, content, meta in ARTICLES:
         vs.add_constitution_article(aid, content, meta)
-
-    # v2 collection ("supreme_law_v2") via direct upsert with matching metadata.
-    v2 = vs.get_collection("constitution", version="v2")
-    for aid, content, meta in ARTICLES:
-        v2.upsert(
-            documents=[content],
-            ids=[f"const_{aid}"],
-            metadatas=[{**meta, "article_id": aid, "document_type": "supreme_law"}],
-        )
     return vs
 
 
@@ -162,10 +154,9 @@ def _run_guard(vs, monkeypatch, version, action, context):
 def test_v2_guard_is_functional_and_safe(vector_store, monkeypatch, capsys):
     rows = {}
     for name, action, ctx in ACTIONS:
-        v1, s1 = _run_guard(vector_store, monkeypatch, "v1", action, ctx)
         v2, s2 = _run_guard(vector_store, monkeypatch, "v2", action, ctx)
 
-        rows[name] = (v1.verdict.value, v2.verdict.value, s1, s2)
+        rows[name] = (v2.verdict.value, s2)
 
         # Functional + safe: v2 verdict must meet the minimum required rank.
         assert _VERDICT_RANK[v2.verdict] >= _VERDICT_RANK[MIN_VERDICT[name]], (
@@ -179,6 +170,6 @@ def test_v2_guard_is_functional_and_safe(vector_store, monkeypatch, capsys):
             )
 
     with capsys.disabled():
-        print("\n  action      v1_sim   v2_sim   v2_verdict")
-        for name, (v1v, v2v, s1, s2) in rows.items():
-            print(f"  {name:10s}  {s1!s:>8}   {s2!s:>8}   {v2v}")
+        print("\n  action      v2_sim   v2_verdict")
+        for name, (v2v, s2) in rows.items():
+            print(f"  {name:10s}  {s2!s:>8}   {v2v}")
