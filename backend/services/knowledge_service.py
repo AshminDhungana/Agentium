@@ -17,8 +17,17 @@ from backend.models.entities.task import Task
 
 logger = logging.getLogger(__name__)
 
-# Similarity distance below which an entry is considered a duplicate
+# Similarity distance below which an entry is considered a duplicate.
+# Used for v1 collections, which live in ChromaDB L2 space.
 _DEFAULT_SIMILARITY_THRESHOLD: float = 0.15
+
+# Dedup threshold for v2 collections, which use ChromaDB COSINE space
+# (distance = 1 - cosine_similarity). The same numeric 0.15 L2 cutoff is
+# meaningless on cosine scale, so this is an independent, measured value.
+# Measured on BAAI/bge-base-en-v1.5: tight duplicates reach cosine distance
+# <= ~0.116, while genuinely distinct pairs sit at >= ~0.517. 0.2 captures
+# all observed duplicates with a large safety margin below the distinct floor.
+_V2_SIMILARITY_THRESHOLD: float = 0.2
 
 
 class KnowledgeService:
@@ -355,6 +364,20 @@ class KnowledgeService:
         # Step 1: search for semantically similar entries
         # FIX: exception is now logged instead of silently swallowed
         try:
+            # Pick the dedup threshold by the collection's distance space.
+            # v1 collections are L2 (default 0.15); v2 collections are cosine
+            # (measured 0.2) — a single global cutoff cannot serve both scales.
+            _meta = getattr(collection, "metadata", None) or {}
+            _conf = getattr(collection, "configuration", None) or {}
+            _space = _meta.get("hnsw:space") or (_conf.get("hnsw", {}) or {}).get(
+                "space"
+            )
+            _threshold = (
+                _V2_SIMILARITY_THRESHOLD
+                if _space == "cosine"
+                else _DEFAULT_SIMILARITY_THRESHOLD
+            )
+
             existing = collection.query(query_texts=[content], n_results=1)
 
             if (
@@ -362,7 +385,7 @@ class KnowledgeService:
                 and existing["ids"][0]
                 and existing.get("distances")
                 and existing["distances"][0]
-                and existing["distances"][0][0] < similarity_threshold
+                and existing["distances"][0][0] < _threshold
             ):
                 existing_id: str = existing["ids"][0][0]
                 existing_meta: Dict[str, Any] = (
