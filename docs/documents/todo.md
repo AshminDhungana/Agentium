@@ -1235,6 +1235,42 @@ Work through the steps below **in order** — each one is a single, self-contain
 
 ---
 
+## 19.4 Genesis Protocol & Chat-Initialization Fixes (P1–P10) ✅ Complete (2026-07-15)
+
+> **Status:** All 10 problems fixed, implemented, and verified by automated tests. Commits: `bb9a87e` (reducer) → `261452b` (phase machine) → `c4aeb2b` (store tests) → `f412ae7` (ws `failed` status) → `5590c84` (single indicator) → `99a41de` (drop dead `useGenesisCheck`) → `95113de` (Redis genesis lifecycle) → `830b9a9` (backend status tests) → `77cd73b` (a11y harness). Design: `docs/superpowers/specs/2026-07-15-genesis-protocol-chat-init-design.md`. Plan: `docs/superpowers/plans/2026-07-15-genesis-protocol-chat-init.md`.
+
+**Goal:** After an API key is added and Genesis runs, the chat page must flip to "Active" automatically (no manual refresh), show exactly one non-red "Initializing" indicator, and surface a *failed* genesis in seconds instead of polling forever. Root cause was twofold — the frontend had no single source of truth for connection state, and the backend reported genesis only as "running" (a crashed genesis read as "running" forever).
+
+### Problems fixed (P1–P10)
+- **P1** Chat stays "connecting…" until manual refresh — backend genesis completion wasn't observable by the WS client.
+- **P2** Duplicate / contradictory status lines ("Connecting…" + "System is initializing") shown at once.
+- **P3** Manual page reload needed to become "Active".
+- **P4** Dead `useGenesisCheck` React hook + `GENESIS_SESSION_KEY` sessionStorage guard removed (conflicting with the new flow).
+- **P5** No single state machine for connection phase; three components derived state independently.
+- **P6** Red "Initializing" indicator that should never be red.
+- **P7** Reconnect button appeared while already connected.
+- **P8** "System is initializing" banner could not be dismissed and overlapped the indicator.
+- **P9** Failed/never-finishing genesis read as "running" forever — no fail-fast.
+- **P10** No `failed` status type end-to-end (frontend, WS contract, backend).
+
+### What was done
+- [x] **Frontend — `connectionPhase` state machine** (`frontend/src/store/connectionPhase.ts`): pure `nextPhase(state, event)` reducer + `isConnected`/`isConnecting`/`canReconnect` predicates; 18 Vitest unit tests.
+- [x] **Frontend — `websocketStore.ts`** wired to the phase machine: events `ws_open`/`ws_authorized`/`ws_genesis_active`/`ws_genesis_inactive`/`ws_close`/`ws_error`/`ws_retry_state` drive `connectionPhase`; `isConnected()`/`isConnecting()` are derived helper **functions** (Zustand was merging getters into plain static props — fixed); `_connectNow` (gate on Head existing) + `_genesisWatchdog` (5-min timeout → `failed`).
+- [x] **Frontend — `ChatPage.tsx`**: single `switch(connectionPhase)` indicator; `Reconnect` button gated on `canReconnect`; removed the non-dismissible "System is initializing" overlay.
+- [x] **Frontend — `useModelConfigs.ts`**: removed dead `GENESIS_SESSION_KEY` / `useGenesisCheck` session-storage guard.
+- [x] **WS contract**: `GenesisStatusResponse.status` gains `'failed'` + optional `reason` (`frontend/src/services/websocketReplay.ts`).
+- [x] **Backend — `initialization_service.py`**: `_run_genesis` writes `genesis:state` (running/complete/failed, 1h TTL) to Redis; `trigger_genesis_if_needed` overwrites to `running` so a re-trigger is observable.
+- [x] **Backend — `api/routes/websocket.py`**: `GET /ws/genesis-status` returns `failed`+`reason`, with resolution precedence Head-exists → Redis `failed` → API-key-exists → `not_started`; fixed a real bug where `redis.asyncio` `.get()` (a coroutine) was called without `await`, so genesis always fell through to `running`.
+- [x] **Tests**: 5 backend unit tests (`tests/unit/test_genesis_status.py`) for the precedence; 22 frontend store/reducer unit tests; full `npm test` green (50 passed, 0 expected-fail).
+
+### Definition of done
+- [x] Adding an API key + Genesis completes → chat auto-flips to "Active" with no page refresh.
+- [x] Exactly one status indicator is shown, never red for "Initializing", and the Reconnect button is hidden while connected.
+- [x] A failed/never-finishing genesis surfaces as `failed` (with reason) within seconds, not "running" forever.
+- [x] All 10 problems (P1–P10) closed; covered by automated tests on both frontend and backend.
+
+---
+
 ## Changelog
 
 ### v0.19.0-alpha \_(in progress)
