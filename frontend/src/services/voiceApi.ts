@@ -246,4 +246,24 @@ export const voiceApi = {
   deleteSpeaker: async (id: string): Promise<void> => {
     await api.delete(`/api/v1/audio/speakers/${id}`);
   },
+
+  // ── Voice engine config (Jarvis upgrade, Phase H) ───────────────────────────
+  // Best-effort: the backend route is a fast-follow. The modal persists locally
+  // so the UI is functional even before the endpoint exists.
+  getVoiceConfig: async (): Promise<any> => {
+    try {
+      const response = await api.get('/api/v1/voice/config');
+      return response.data;
+    } catch {
+      return null;
+    }
+  },
+
+  setVoiceConfig: async (config: {
+    requireWakeWord: boolean;
+    ttsVoice: string;
+    proactiveEnabled: boolean;
+  }): Promise<void> => {
+    await api.put('/api/v1/voice/config', config);
+  },
 };

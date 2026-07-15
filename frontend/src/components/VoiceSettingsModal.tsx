@@ -37,6 +37,48 @@ export function VoiceSettingsModal({ onClose }: VoiceSettingsModalProps) {
     const [speakerName, setSpeakerName] = useState('');
     const [isRegistering, setIsRegistering] = useState(false);
 
+    // ── Voice engine config (Jarvis upgrade, Phase H) ──
+    const [requireWakeWord, setRequireWakeWord] = useState(true);
+    const [ttsVoice, setTtsVoice] = useState('af_bella');
+    const [proactiveEnabled, setProactiveEnabled] = useState(false);
+    const [isSavingConfig, setIsSavingConfig] = useState(false);
+
+    useEffect(() => {
+        const saved = localStorage.getItem('voice_engine_config');
+        if (saved) {
+            try {
+                const cfg = JSON.parse(saved);
+                setRequireWakeWord(cfg.requireWakeWord ?? true);
+                setTtsVoice(cfg.ttsVoice ?? 'af_bella');
+                setProactiveEnabled(cfg.proactiveEnabled ?? false);
+            } catch {
+                /* ignore malformed */
+            }
+        }
+        voiceApi.getVoiceConfig().then((cfg: any) => {
+            if (cfg) {
+                setRequireWakeWord(cfg.requireWakeWord ?? requireWakeWord);
+                setTtsVoice(cfg.ttsVoice ?? ttsVoice);
+                setProactiveEnabled(cfg.proactiveEnabled ?? proactiveEnabled);
+            }
+        }).catch(() => { /* best-effort */ });
+    }, []);
+
+    const saveConfig = async () => {
+        setIsSavingConfig(true);
+        const cfg = { requireWakeWord, ttsVoice, proactiveEnabled };
+        localStorage.setItem('voice_engine_config', JSON.stringify(cfg));
+        try {
+            await voiceApi.setVoiceConfig(cfg);
+            showToast.success('Voice engine settings saved');
+        } catch {
+            // Backend route may not exist yet; local persistence is enough.
+            showToast.success('Voice engine settings saved locally');
+        } finally {
+            setIsSavingConfig(false);
+        }
+    };
+
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const audioStreamRef = useRef<MediaStream | null>(null);
     const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -140,6 +182,48 @@ export function VoiceSettingsModal({ onClose }: VoiceSettingsModalProps) {
     return (
         <Modal open onClose={onClose} title={titleNode} size="md" className="!max-w-lg">
             <div className="p-6 overflow-y-auto flex-1 h-full">
+                    {/* ── Voice Engine (Jarvis upgrade, Phase H) ── */}
+                    <div className="mb-8">
+                        <h3 className="text-md font-semibold text-gray-900 dark:text-white mb-3">Voice Engine</h3>
+                        <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 mb-3">
+                            <input
+                                type="checkbox"
+                                checked={requireWakeWord}
+                                onChange={(e) => setRequireWakeWord(e.target.checked)}
+                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            />
+                            Require wake word
+                        </label>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            TTS Voice
+                        </label>
+                        <select
+                            value={ttsVoice}
+                            onChange={(e) => setTtsVoice(e.target.value)}
+                            className="w-full bg-white dark:bg-[#161b27] border border-gray-200 dark:border-[#1e2535] rounded-xl px-4 py-2.5 text-gray-900 dark:text-white focus:outline-none focus:border-blue-500 mb-3"
+                        >
+                            {['af_bella', 'am_adam', 'bf_emma', 'bm_george', 'af_nicole', 'af_sarah'].map((v) => (
+                                <option key={v} value={v}>{v}</option>
+                            ))}
+                        </select>
+                        <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 mb-4">
+                            <input
+                                type="checkbox"
+                                checked={proactiveEnabled}
+                                onChange={(e) => setProactiveEnabled(e.target.checked)}
+                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            />
+                            Proactive announcements
+                        </label>
+                        <button
+                            onClick={saveConfig}
+                            disabled={isSavingConfig}
+                            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                            {isSavingConfig ? <LoadingSpinner size="sm" /> : 'Save'}
+                        </button>
+                    </div>
+
                     <div className="mb-8">
                         <h3 className="text-md font-semibold text-gray-900 dark:text-white mb-1">Speaker Identification</h3>
                         <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
