@@ -47,6 +47,12 @@ class ChatMessage(BaseModel):
     attachments: Optional[List[dict]] = Field(default=None)
     # NEW: structured input card answer (mirrors the WebSocket card_response frame).
     card_response: Optional[dict] = None
+    # NEW (Jarvis upgrade): optional persona for the voice bridge. When set, it
+    # is prepended to the prompt so the Head of Council speaks in character.
+    voice_persona: Optional[str] = None
+    # NEW (Jarvis upgrade): optional speaker id from the voice bridge's speaker
+    # identification step, used to tag the resulting context.
+    speaker_id: Optional[str] = None
 
 
 class ChatResponse(BaseModel):
@@ -56,7 +62,18 @@ class ChatResponse(BaseModel):
     task_id: str = None
 
 
-def _build_enriched_message(message: str, attachments: Optional[List[dict]]) -> str:
+def _enrich_with_persona(message: str, persona: Optional[str]) -> str:
+    """Prepend an optional persona instruction to the user message."""
+    if not persona:
+        return message
+    return f"[Persona: {persona.strip()}]\n\n{message}"
+
+
+def _build_enriched_message(
+    message: str,
+    attachments: Optional[List[dict]],
+    persona: Optional[str] = None,
+) -> str:
     """
     Append extracted file content to the user message.
 
@@ -67,6 +84,9 @@ def _build_enriched_message(message: str, attachments: Optional[List[dict]]) -> 
     Returns the original message unchanged if attachments is None/empty
     or file_processor is unavailable.
     """
+    if persona:
+        message = _enrich_with_persona(message, persona)
+
     if not attachments:
         return message
 
@@ -350,7 +370,11 @@ async def send_message(
     if chat_msg.stream:
         return StreamingResponse(
             # FIX: pass attachments so the streaming path can inject file content
-            _stream_response(head.agentium_id, chat_msg.message, chat_msg.attachments),
+            _stream_response(
+                head.agentium_id,
+                _enrich_with_persona(chat_msg.message, chat_msg.voice_persona),
+                chat_msg.attachments,
+            ),
             media_type="text/event-stream",
             headers={
                 "Cache-Control": "no-cache",
@@ -360,7 +384,9 @@ async def send_message(
         )
 
     # FIX: non-streaming path also enriches the message with file content
-    enriched_message = _build_enriched_message(chat_msg.message, chat_msg.attachments)
+    enriched_message = _build_enriched_message(
+        chat_msg.message, chat_msg.attachments, chat_msg.voice_persona
+    )
     extra_metadata = {"card_response": chat_msg.card_response} if chat_msg.card_response else None
     response = await ChatService.process_message(head, enriched_message, db, extra_metadata=extra_metadata)
     return ChatResponse(
