@@ -1301,18 +1301,39 @@ class ModelService:
         Falls back to sensible defaults if API call fails.
         """
         try:
+            # Users often paste the full chat endpoint (…/v1/chat/completions).
+            # The OpenAI SDK appends /models and /chat/completions to the base
+            # itself, so the stored base must be the API root. Strip a trailing
+            # /chat/completions so listing (and any reuse of base_url) works.
+            if base_url:
+                base_url = base_url.rstrip('/')
+                if base_url.lower().endswith('/chat/completions'):
+                    base_url = base_url[: -len('/chat/completions')]
 
             # ── OPENAI ──────────────────────────────────────────────────────────
             if provider == ProviderType.OPENAI:
-                if not api_key:
+                # For a custom base_url (OpenAI-compatible, e.g. OpenRouter) the
+                # /models endpoint is frequently public and needs no key. Only
+                # fall back to the curated defaults when we have neither a key
+                # nor a custom endpoint to query — otherwise we silently hide the
+                # real provider's model list behind 8 hardcoded names.
+                if not api_key and not base_url:
                     return ModelService._get_default_models(provider)
                 import openai
-                # Respect a custom base_url (OpenAI-compatible endpoints such as
-                # OpenRouter, Together, local vLLM, etc.). Without this the SDK
-                # always hits api.openai.com and ignores the user's endpoint.
-                client = openai.AsyncOpenAI(api_key=api_key, base_url=base_url) if base_url \
+                # The SDK requires a non-empty key to construct the client. For a
+                # custom endpoint that doesn't need auth for listing, use a
+                # harmless placeholder so the public /models call still works.
+                client = openai.AsyncOpenAI(api_key=api_key or "not-needed", base_url=base_url) if base_url \
                     else openai.AsyncOpenAI(api_key=api_key)
-                models = await client.models.list()
+                try:
+                    models = await client.models.list()
+                except Exception:
+                    # Native OpenAI: keep the friendly fallback to defaults.
+                    # Custom endpoint: surface the real error so the user knows
+                    # the URL/key is wrong instead of seeing a stale list.
+                    if base_url:
+                        raise
+                    return ModelService._get_default_models(provider)
                 ids = [m.id for m in models.data]
                 # For the native OpenAI API, filter to the common chat models to
                 # cut clutter. For a custom/base_url endpoint, return everything
@@ -1528,10 +1549,12 @@ class ModelService:
 
             # ── CUSTOM / OPENAI_COMPATIBLE ────────────────────────────────────────
             elif provider in [ProviderType.CUSTOM, ProviderType.OPENAI_COMPATIBLE]:
-                if not base_url or not api_key:
+                if not base_url:
                     return ["custom-model-1", "custom-model-2"]
                 import openai
-                client = openai.AsyncOpenAI(api_key=api_key, base_url=base_url)
+                # Public /models endpoints (e.g. OpenRouter) need no key — use a
+                # placeholder so the SDK client constructs and the call succeeds.
+                client = openai.AsyncOpenAI(api_key=api_key or "not-needed", base_url=base_url)
                 models = await client.models.list()
                 return sorted([m.id for m in models.data])
 

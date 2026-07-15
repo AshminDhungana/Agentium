@@ -274,7 +274,15 @@ class UserModelConfig(BaseEntity):
             return self.local_server_url or self.api_base_url or settings.OLLAMA_BASE_URL
 
         if self.api_base_url:
-            return self.api_base_url
+            # Users often paste the full chat endpoint (…/v1/chat/completions).
+            # The OpenAI SDK appends /models and /chat/completions to the base
+            # itself, so the stored base must be the API root. Strip a trailing
+            # /chat/completions (or /chat/completions/) so the URL is valid for
+            # both listing and generation, and for retroactively fixing configs.
+            url = self.api_base_url.rstrip('/')
+            if url.lower().endswith('/chat/completions'):
+                url = url[: -len('/chat/completions')]
+            return url
 
         if self.provider in self._REQUIRES_EXPLICIT_BASE_URL:
             return None

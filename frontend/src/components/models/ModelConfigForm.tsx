@@ -405,6 +405,14 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
         }
     };
 
+    // A real API key is required to actually generate (chat) for every provider
+    // except LOCAL. Custom/OpenAI-compatible endpoints in particular fail later
+    // with a confusing 401 if saved without a key, so block Create/Save up front.
+    const apiKeyRequired = isUniversal ||
+        formData.provider === 'custom' ||
+        (selectedProvider?.requires_api_key ?? false);
+    const apiKeyMissing = apiKeyRequired && !formData.api_key?.trim();
+
     /* ── Shared input class ───────────────────────────────────────────────── */
     const inputCls = 'w-full px-4 py-2.5 text-sm bg-white dark:bg-[#0f1117] border border-gray-200 dark:border-[#1e2535] rounded-lg text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition-colors duration-150';
 
@@ -877,7 +885,7 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
                         <button
                             type="button"
                             onClick={handleTestConnection}
-                            disabled={testing || !formData.default_model}
+                            disabled={testing || !formData.default_model || apiKeyMissing}
                             aria-label="Test connection with current settings"
                             className="w-full py-2.5 bg-gray-100 dark:bg-[#1e2535] hover:bg-gray-200 dark:hover:bg-[#2a3347] text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-[#2a3347] rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed"
                         >
@@ -900,7 +908,7 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
                             </button>
                             <button
                                 type="submit"
-                                disabled={isLoading}
+                                disabled={isLoading || apiKeyMissing}
                                 aria-label={initialConfig ? 'Update configuration' : 'Create configuration'}
                                 className="flex-1 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 dark:hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors duration-150 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm"
                             >
@@ -908,6 +916,12 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
                                 {initialConfig ? 'Update Configuration' : 'Create Configuration'}
                             </button>
                         </div>
+
+                        {apiKeyMissing && (
+                            <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
+                                An API key is required to create this configuration. Enter it above.
+                            </p>
+                        )}
                     </form>
                 </div>
             </div>
