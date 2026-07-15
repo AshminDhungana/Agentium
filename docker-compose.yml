@@ -255,6 +255,8 @@ services:
       # Persistent local file storage (fallback when MinIO is unavailable)
       - uploads_data:/app/data/uploads
       - config_repo:/data/config-repo
+      # Shared HuggingFace cache so the ~440MB bge model downloads once, not per service
+      - hf_cache:/app/.cache/huggingface
     restart: unless-stopped
     command: >
       sh -c "mkdir -p /data/config-repo && uvicorn backend.main:app --host 0.0.0.0 --port 8000"
@@ -349,6 +351,8 @@ services:
       # Same persistent uploads volume as the backend
       - uploads_data:/app/data/uploads
       - config_repo:/data/config-repo
+      # Shared HuggingFace cache so the ~440MB bge model downloads once, not per service
+      - hf_cache:/app/.cache/huggingface
     depends_on:
       backend:
         condition: service_healthy
@@ -482,6 +486,9 @@ volumes:
     driver: local
   # Config repo volume for git versioning backups
   config_repo:
+    driver: local
+  # Shared HuggingFace cache (bge embedding model) across backend + celery-worker
+  hf_cache:
     driver: local
 
 networks:
