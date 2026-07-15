@@ -115,7 +115,7 @@ export const ViolationCard: React.FC<ViolationCardProps> = ({
         switch (status) {
             case 'resolved': return { icon: CheckCircle2, class: 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10' };
             case 'dismissed': return { icon: XCircle, class: 'text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-500/10' };
-            default: return { icon: Clock, class: 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10' };
+            default: return { icon: Clock, class: 'text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10' };
         }
     };
 

@@ -63,7 +63,7 @@ export const AgentListView: React.FC<AgentListViewProps> = React.memo(({
 
     if (displayAgents.length === 0) {
         return (
-            <p className="text-sm text-gray-600 dark:text-slate-500 text-center py-8">
+            <p className="text-sm text-gray-600 dark:text-slate-400 text-center py-8">
                 No agents to display.
             </p>
         );
@@ -112,7 +112,7 @@ export const AgentListView: React.FC<AgentListViewProps> = React.memo(({
                                             <p className="font-medium text-slate-900 dark:text-slate-100 leading-none">
                                                 {agent.name}
                                             </p>
-                                            <p className="text-xs text-gray-600 dark:text-slate-500 font-mono mt-0.5">
+                                            <p className="text-xs text-gray-600 dark:text-slate-400 font-mono mt-0.5">
                                                 {agent.agentium_id}
                                             </p>
                                         </div>

@@ -54,7 +54,7 @@ export interface ProviderMeta {
 const PROVIDER_META: Record<string, ProviderMeta> = {
     openai: {
         label: 'OpenAI',
-        color: 'text-emerald-600 dark:text-emerald-400',
+        color: 'text-emerald-700 dark:text-emerald-400',
         bg: 'bg-emerald-100 dark:bg-emerald-500/10',
         border: 'dark:border-emerald-500/15',
         gradient: 'from-emerald-500 to-teal-600',
@@ -63,7 +63,7 @@ const PROVIDER_META: Record<string, ProviderMeta> = {
     },
     anthropic: {
         label: 'Anthropic',
-        color: 'text-orange-600 dark:text-orange-400',
+        color: 'text-orange-700 dark:text-orange-400',
         bg: 'bg-orange-100 dark:bg-orange-500/10',
         border: 'dark:border-orange-500/15',
         gradient: 'from-orange-500 to-amber-600',
@@ -72,7 +72,7 @@ const PROVIDER_META: Record<string, ProviderMeta> = {
     },
     gemini: {
         label: 'Gemini',
-        color: 'text-blue-600 dark:text-blue-400',
+        color: 'text-blue-700 dark:text-blue-400',
         bg: 'bg-blue-100 dark:bg-blue-500/10',
         border: 'dark:border-blue-500/15',
         gradient: 'from-blue-500 to-indigo-600',
@@ -81,7 +81,7 @@ const PROVIDER_META: Record<string, ProviderMeta> = {
     },
     groq: {
         label: 'Groq',
-        color: 'text-purple-600 dark:text-purple-400',
+        color: 'text-purple-700 dark:text-purple-400',
         bg: 'bg-purple-100 dark:bg-purple-500/10',
         border: 'dark:border-purple-500/15',
         gradient: 'from-purple-500 to-fuchsia-600',
@@ -90,7 +90,7 @@ const PROVIDER_META: Record<string, ProviderMeta> = {
     },
     mistral: {
         label: 'Mistral',
-        color: 'text-rose-600 dark:text-rose-400',
+        color: 'text-rose-700 dark:text-rose-400',
         bg: 'bg-rose-100 dark:bg-rose-500/10',
         border: 'dark:border-rose-500/15',
         gradient: 'from-rose-500 to-pink-600',
@@ -99,7 +99,7 @@ const PROVIDER_META: Record<string, ProviderMeta> = {
     },
     together: {
         label: 'Together',
-        color: 'text-cyan-600 dark:text-cyan-400',
+        color: 'text-cyan-700 dark:text-cyan-400',
         bg: 'bg-cyan-100 dark:bg-cyan-500/10',
         border: 'dark:border-cyan-500/15',
         gradient: 'from-cyan-500 to-sky-600',
@@ -108,7 +108,7 @@ const PROVIDER_META: Record<string, ProviderMeta> = {
     },
     cohere: {
         label: 'Cohere',
-        color: 'text-teal-600 dark:text-teal-400',
+        color: 'text-teal-700 dark:text-teal-400',
         bg: 'bg-teal-100 dark:bg-teal-500/10',
         border: 'dark:border-teal-500/15',
         gradient: 'from-teal-500 to-cyan-600',
@@ -117,7 +117,7 @@ const PROVIDER_META: Record<string, ProviderMeta> = {
     },
     moonshot: {
         label: 'Moonshot',
-        color: 'text-violet-600 dark:text-violet-400',
+        color: 'text-violet-700 dark:text-violet-400',
         bg: 'bg-violet-100 dark:bg-violet-500/10',
         border: 'dark:border-violet-500/15',
         gradient: 'from-violet-500 to-purple-600',
@@ -126,7 +126,7 @@ const PROVIDER_META: Record<string, ProviderMeta> = {
     },
     deepseek: {
         label: 'DeepSeek',
-        color: 'text-red-600 dark:text-red-400',
+        color: 'text-red-700 dark:text-red-400',
         bg: 'bg-red-100 dark:bg-red-500/10',
         border: 'dark:border-red-500/15',
         gradient: 'from-red-500 to-rose-600',
@@ -135,7 +135,7 @@ const PROVIDER_META: Record<string, ProviderMeta> = {
     },
     azureopenai: {
         label: 'Azure OpenAI',
-        color: 'text-sky-600 dark:text-sky-400',
+        color: 'text-sky-700 dark:text-sky-400',
         bg: 'bg-sky-100 dark:bg-sky-500/10',
         border: 'dark:border-sky-500/15',
         gradient: 'from-sky-500 to-blue-600',
@@ -144,7 +144,7 @@ const PROVIDER_META: Record<string, ProviderMeta> = {
     },
     local: {
         label: 'Local',
-        color: 'text-slate-600 dark:text-slate-400',
+        color: 'text-slate-700 dark:text-slate-400',
         bg: 'bg-slate-100 dark:bg-slate-500/10',
         border: 'dark:border-slate-500/15',
         gradient: 'from-slate-500 to-gray-600',
@@ -153,7 +153,7 @@ const PROVIDER_META: Record<string, ProviderMeta> = {
     },
     custom: {
         label: 'Custom',
-        color: 'text-yellow-600 dark:text-yellow-400',
+        color: 'text-yellow-700 dark:text-yellow-400',
         bg: 'bg-yellow-100 dark:bg-yellow-500/10',
         border: 'dark:border-yellow-500/15',
         gradient: 'from-yellow-500 to-orange-600',
@@ -165,7 +165,7 @@ const PROVIDER_META: Record<string, ProviderMeta> = {
 /** Fallback metadata for any provider not in the table above. */
 const FALLBACK_META: ProviderMeta = {
     label: 'Unknown',
-    color: 'text-blue-600 dark:text-blue-400',
+    color: 'text-blue-700 dark:text-blue-400',
     bg: 'bg-blue-100 dark:bg-blue-500/10',
     border: 'dark:border-blue-500/15',
     gradient: 'from-blue-500 to-indigo-600',

@@ -193,14 +193,14 @@ export const ModelCard: React.FC<ModelCardProps> = React.memo(({
                                 <Key className="w-3 h-3" aria-hidden="true" />
                                 API Key
                             </span>
-                            <span className="font-mono text-xs text-gray-600 dark:text-gray-500">
+                            <span className="font-mono text-xs text-gray-600 dark:text-gray-400">
                                 {config.api_key_masked}
                             </span>
                         </div>
                     )}
                     <div className="flex items-center justify-between text-sm">
                         <span className="text-gray-600 dark:text-gray-400">Rate limit</span>
-                        <span className="font-mono text-xs text-gray-600 dark:text-gray-500">
+                        <span className="font-mono text-xs text-gray-600 dark:text-gray-400">
                             {config.requests_per_minute} requests/minute
                         </span>
                     </div>
@@ -228,7 +228,7 @@ export const ModelCard: React.FC<ModelCardProps> = React.memo(({
                                 <span
                                     role="listitem"
                                     aria-label={`${config.available_models.length - 4} more models`}
-                                    className="text-xs text-gray-600 dark:text-gray-500 px-2 py-0.5 bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-[#1e2535] rounded-md"
+                                    className="text-xs text-gray-600 dark:text-gray-400 px-2 py-0.5 bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-[#1e2535] rounded-md"
                                 >
                                     +{config.available_models.length - 4}
                                 </span>
@@ -257,7 +257,7 @@ export const ModelCard: React.FC<ModelCardProps> = React.memo(({
                     </div>
                     <div className="text-center px-3 py-2.5">
                         <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">Cost</div>
-                        <div className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                        <div className="text-sm font-bold text-emerald-700 dark:text-emerald-400">
                             ${(config.total_usage?.cost_usd ?? 0).toFixed(2)}
                         </div>
                     </div>
