@@ -832,6 +832,11 @@ class VectorStore:
 # ---------------------------------------------------------------------------
 # Module-level singleton — use get_vector_store() everywhere
 # ---------------------------------------------------------------------------
+
+# Module-level alias for the collection registry defined on VectorStore, so
+# callers (e.g. reembed tooling) can import it without reaching into the class.
+COLLECTIONS: Dict[str, str] = VectorStore.COLLECTIONS
+
 _vector_store: Optional[VectorStore] = None
 
 
