@@ -231,8 +231,8 @@ services:
       - HF_HOME=/app/.cache/huggingface
       # ── Storage (MinIO primary / local fallback) ──────────────────────────
       # MinIO credentials — must match MINIO_ROOT_USER / MINIO_ROOT_PASSWORD above.
-      - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER}
-      - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD}
+      - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER:-minioadmin}
+      - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD:-minioadmin}
       - S3_ENDPOINT=http://minio:9000
       - S3_BUCKET_NAME=${S3_BUCKET_NAME:-agentium-media}
       - S3_FORCE_PATH_STYLE=true
@@ -334,8 +334,8 @@ services:
       - HF_HUB_OFFLINE=1
       - HF_HOME=/app/.cache/huggingface
       # ── Storage (MinIO primary / local fallback) ──────────────────────────
-      - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER}
-      - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD}
+      - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER:-minioadmin}
+      - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD:-minioadmin}
       - S3_ENDPOINT=http://minio:9000
       - S3_BUCKET_NAME=${S3_BUCKET_NAME:-agentium-media}
       - S3_FORCE_PATH_STYLE=true
@@ -430,8 +430,8 @@ services:
       # These were missing from celery-beat, causing "AWS credentials not set"
       # warnings on every startup and silent failures in any beat task that
       # touches file storage (e.g. sovereign_data_retention).
-      - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER}
-      - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD}
+      - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER:-minioadmin}
+      - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD:-minioadmin}
       - S3_ENDPOINT=http://minio:9000
       - S3_BUCKET_NAME=${S3_BUCKET_NAME:-agentium-media}
       - S3_FORCE_PATH_STYLE=true
