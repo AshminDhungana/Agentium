@@ -14,6 +14,10 @@ import { api } from './api';
 
 export type BridgeStatus = 'offline' | 'connecting' | 'connected' | 'error';
 
+// Live agent state broadcast by the bridge (Jarvis upgrade, Phase H): the tab
+// can show a live indicator instead of only the after-the-fact transcript.
+export type VoiceState = 'listening' | 'thinking' | 'speaking' | 'interrupted';
+
 export interface VoiceInteractionEvent {
   user:  string;   // what the user said
   reply: string;   // what the Head of Council replied
@@ -21,6 +25,7 @@ export interface VoiceInteractionEvent {
 }
 
 type InteractionHandler = (event: VoiceInteractionEvent) => void;
+type StateHandler = (s: VoiceState) => void;
 
 // ── Config ─────────────────────────────────────────────────────────────────────
 
@@ -45,6 +50,7 @@ class VoiceBridgeService {
   private retryTimer:   ReturnType<typeof setTimeout> | null = null;
   private handlers      = new Set<InteractionHandler>();
   private statusListeners = new Set<(s: BridgeStatus) => void>();
+  private stateListeners = new Set<StateHandler>();
 
   status: BridgeStatus = 'offline';
 
@@ -104,6 +110,11 @@ class VoiceBridgeService {
     return () => this.statusListeners.delete(listener);
   }
 
+  onStateChange(listener: (s: VoiceState) => void): () => void {
+    this.stateListeners.add(listener);
+    return () => this.stateListeners.delete(listener);
+  }
+
   // ── Private ─────────────────────────────────────────────────────────────────
 
   private async _fetchVoiceToken(): Promise<string> {
@@ -156,6 +167,12 @@ class VoiceBridgeService {
           };
           this.handlers.forEach((h) => {
             try { h(event); } catch (e) { console.warn('[voiceBridge] handler error:', e); }
+          });
+        } else if (msg?.type === 'voice_state' && msg.state) {
+          // Live indicator: listening / thinking / speaking / interrupted.
+          const state = msg.state as VoiceState;
+          this.stateListeners.forEach((h) => {
+            try { h(state); } catch (e) { console.warn('[voiceBridge] state handler error:', e); }
           });
         }
       } catch (e) {
