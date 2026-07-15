@@ -597,6 +597,10 @@ All backend configuration is managed through environment variables in `backend/.
 | `SECRET_KEY` | Secret key for JWT signing (generate new for production) | *(required)* |
 | `ENCRYPTION_KEY` | Encryption key for sensitive data (generate new for production) | *(required)* |
 | `DATABASE_URL` | PostgreSQL connection string | `postgresql://agentium:agentium@postgres:5432/agentium` |
+| `DATABASE_POOL_SIZE` | SQLAlchemy pool size (checked-out connections kept open) | `20` |
+| `DATABASE_MAX_OVERFLOW` | Extra connections allowed beyond `DATABASE_POOL_SIZE` | `10` |
+| `DATABASE_POOL_TIMEOUT` | Seconds to wait for a free connection before erroring | `30` |
+| `DATABASE_POOL_RECYCLE` | Seconds before an idle connection is recycled | `1800` |
 | `CHROMA_HOST` | ChromaDB hostname | `chromadb` |
 | `CHROMA_PORT` | ChromaDB port | `8000` |
 | `REDIS_URL` | Redis connection string | `redis://redis:6379/0` |
