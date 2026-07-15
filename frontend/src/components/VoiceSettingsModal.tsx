@@ -10,11 +10,11 @@
  * @param {() => void} props.onClose - Callback to close the modal.
  */
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Mic, Trash2, Play, Square, Settings2 } from 'lucide-react';
+import { Mic, Trash2, Play, Square, Settings2 } from 'lucide-react';
 import { voiceApi } from '@/services/voiceApi';
 import { showToast } from '@/hooks/useToast';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import { useFocusTrap } from '@/hooks/useFocusTrap';
+import { Modal } from '@/components/ui/Modal';
 
 interface SpeakerProfile {
     id: string;
@@ -41,9 +41,6 @@ export function VoiceSettingsModal({ onClose }: VoiceSettingsModalProps) {
     const audioStreamRef = useRef<MediaStream | null>(null);
     const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
     const chunksRef = useRef<Blob[]>([]);
-    const containerRef = useRef<HTMLDivElement>(null);
-
-    useFocusTrap(containerRef, true);
 
     useEffect(() => {
         loadSpeakers();
@@ -131,22 +128,18 @@ export function VoiceSettingsModal({ onClose }: VoiceSettingsModalProps) {
         }
     };
 
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-            <div className="bg-white dark:bg-[#161b27] rounded-3xl w-full max-w-lg shadow-2xl flex flex-col max-h-[90vh]" ref={containerRef}>
-                <div className="p-6 border-b border-gray-100 dark:border-[#1e2535] flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-500/20 flex items-center justify-center">
-                            <Settings2 className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                        </div>
-                        <h2 className="text-lg font-bold text-gray-900 dark:text-white">Voice Settings</h2>
-                    </div>
-                    <button onClick={onClose} aria-label="Close settings" title="Close" className="p-2 text-gray-600 hover:bg-gray-100 dark:hover:bg-[#1e2535] rounded-xl transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <X className="w-5 h-5" />
-                    </button>
-                </div>
+    const titleNode = (
+        <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-500/20 flex items-center justify-center">
+                <Settings2 className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+            </div>
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white">Voice Settings</h2>
+        </div>
+    );
 
-                <div className="p-6 overflow-y-auto flex-1 h-full">
+    return (
+        <Modal open onClose={onClose} title={titleNode} size="md" className="!max-w-lg">
+            <div className="p-6 overflow-y-auto flex-1 h-full">
                     <div className="mb-8">
                         <h3 className="text-md font-semibold text-gray-900 dark:text-white mb-1">Speaker Identification</h3>
                         <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
@@ -221,7 +214,6 @@ export function VoiceSettingsModal({ onClose }: VoiceSettingsModalProps) {
                     </div>
 
                 </div>
-            </div>
-        </div>
+        </Modal>
     );
 }

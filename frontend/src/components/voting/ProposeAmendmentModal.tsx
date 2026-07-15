@@ -11,12 +11,12 @@
  * @param {() => void} props.onSuccess - Callback after successful proposal submission.
  */
 
-import React, { useState, useRef } from 'react';
-import { AlertCircle, Shield, X } from 'lucide-react';
+import React, { useState } from 'react';
+import { AlertCircle, Shield } from 'lucide-react';
 import { votingService, AmendmentProposal } from '../../services/voting';
 import { showToast } from '@/hooks/useToast';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import { useFocusTrap } from '../../hooks/useFocusTrap';
+import { Modal } from '@/components/ui/Modal';
 
 interface ProposeAmendmentModalProps {
     onClose: () => void;
@@ -34,9 +34,6 @@ export function ProposeAmendmentModal({ onClose, onSuccess }: ProposeAmendmentMo
     const [form, setForm] = useState<AmendmentProposal>(EMPTY_FORM);
     const [errors, setErrors] = useState<Partial<Record<keyof AmendmentProposal, string>>>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const containerRef = useRef<HTMLDivElement>(null);
-
-    useFocusTrap(containerRef, true);
 
     // Validate all fields; return true if valid
     const validate = (): boolean => {
@@ -76,28 +73,18 @@ export function ProposeAmendmentModal({ onClose, onSuccess }: ProposeAmendmentMo
         }
     };
 
-    return (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white dark:bg-[#161b27] rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-gray-200 dark:border-[#1e2535]" ref={containerRef}>
-                <div className="p-6">
-                    {/* Header */}
-                    <div className="flex justify-between items-center mb-6">
-                        <div className="flex items-center gap-2">
-                            <Shield className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                                Propose Amendment
-                            </h2>
-                        </div>
-                        <button
-                            aria-label="close"
-                            className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-[#1e2535] text-gray-600 hover:text-gray-600 dark:hover:text-gray-200 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            onClick={onClose}
-                        >
-                            <X className="w-5 h-5" />
-                        </button>
-                    </div>
+    const titleNode = (
+        <div className="flex items-center gap-2">
+            <Shield className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                Propose Amendment
+            </h2>
+        </div>
+    );
 
-                    <div className="space-y-4">
+    return (
+        <Modal open onClose={onClose} title={titleNode} size="lg">
+            <div className="space-y-4">
                         {/* Title */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -220,8 +207,6 @@ export function ProposeAmendmentModal({ onClose, onSuccess }: ProposeAmendmentMo
                             </button>
                         </div>
                     </div>
-                </div>
-            </div>
-        </div>
+        </Modal>
     );
 }

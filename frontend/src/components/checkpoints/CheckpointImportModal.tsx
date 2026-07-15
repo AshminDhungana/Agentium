@@ -10,9 +10,9 @@
  * @param {(data: object) => Promise<void>} props.onImport - Callback with the validated import data.
  */
 
-import React, { useState, useCallback, useRef } from 'react';
-import { useFocusTrap } from '../../hooks/useFocusTrap';
+import React, { useState, useCallback } from 'react';
 import { showToast } from '@/hooks/useToast';
+import { Modal } from '@/components/ui/Modal';
 import {
     Upload,
     FileJson,
@@ -89,9 +89,6 @@ export const CheckpointImportModal: React.FC<CheckpointImportModalProps> = ({
         conflictResolution: 'rename',
     });
     const [step, setStep] = useState<'upload' | 'validate' | 'resolve' | 'complete'>('upload');
-    const containerRef = useRef<HTMLDivElement>(null);
-
-    useFocusTrap(containerRef, isOpen);
 
     // ─── File Handling ───────────────────────────────────────────────────────
 
@@ -193,37 +190,96 @@ export const CheckpointImportModal: React.FC<CheckpointImportModalProps> = ({
 
     // ─── Render ──────────────────────────────────────────────────────────────
 
-    if (!isOpen) return null;
+    const titleNode = (
+        <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-500/10 flex items-center justify-center">
+                <Upload className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+            </div>
+            <div>
+                <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100">
+                    Import Checkpoint
+                </h3>
+                <p className="text-sm text-slate-600 dark:text-slate-400">
+                    Restore from backup or shared checkpoint
+                </p>
+            </div>
+        </div>
+    );
 
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" ref={containerRef}>
-            <div className="bg-white dark:bg-[#161b27] rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
-                {/* Header */}
-                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-[#1e2535]">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-500/10 flex items-center justify-center">
-                            <Upload className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                        </div>
-                        <div>
-                            <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100">
-                                Import Checkpoint
-                            </h3>
-                            <p className="text-sm text-slate-600 dark:text-slate-400">
-                                Restore from backup or shared checkpoint
-                            </p>
-                        </div>
-                    </div>
+    const footerNode = (
+        <div className="flex items-center justify-between w-full">
+            <div className="flex items-center gap-2">
+                {isValidating && (
+                    <>
+                        <LoadingSpinner size="sm" />
+                        <span className="text-xs text-slate-600">Validating...</span>
+                    </>
+                )}
+                {isImporting && (
+                    <>
+                        <LoadingSpinner size="sm" />
+                        <span className="text-xs text-slate-600">Importing...</span>
+                    </>
+                )}
+            </div>
+            <div className="flex items-center gap-3">
+                {step === 'upload' && (
                     <button
                         onClick={onClose}
-                        aria-label="Close"
-                        className="p-2 text-gray-600 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#1e2535] rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-lg"
                     >
-                        <X className="w-5 h-5" />
+                        Cancel
                     </button>
-                </div>
+                )}
+                {(step === 'validate' || step === 'resolve') && (
+                    <>
+                        <button
+                            onClick={handleReset}
+                            className="px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-lg"
+                        >
+                            Back
+                        </button>
+                        <button
+                            onClick={handleImport}
+                            disabled={isImporting || (!validation?.valid && !options.skipValidation)}
+                            className={`
+                                px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-blue-500
+                                ${(!validation?.valid && !options.skipValidation) || isImporting
+                                    ? 'bg-slate-300 dark:bg-slate-600 cursor-not-allowed'
+                                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                                }
+                            `}
+                        >
+                            {isImporting ? (
+                                <>
+                                    <LoadingSpinner size="sm" />
+                                    Importing...
+                                </>
+                            ) : (
+                                <>
+                                    <Download className="w-4 h-4" />
+                                    Import Checkpoint
+                                </>
+                            )}
+                        </button>
+                    </>
+                )}
+                {step === 'complete' && (
+                    <button
+                        onClick={onClose}
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                        Done
+                    </button>
+                )}
+            </div>
+        </div>
+    );
 
-                {/* Content */}
-                <div className="flex-1 overflow-auto p-6">
+    return (
+        <Modal open={isOpen} onClose={onClose} title={titleNode} size="lg" footer={footerNode}>
+            {/* Content */}
+            <div className="flex-1 overflow-auto p-6">
                     {/* Step 1: Upload */}
                     {step === 'upload' && (
                         <div className="space-y-4">
@@ -483,77 +539,7 @@ export const CheckpointImportModal: React.FC<CheckpointImportModalProps> = ({
                         </div>
                     )}
                 </div>
-
-                {/* Footer */}
-                <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100 dark:border-[#1e2535] bg-slate-50 dark:bg-slate-800/30">
-                    <div className="flex items-center gap-2">
-                        {isValidating && (
-                            <>
-                                <LoadingSpinner size="sm" />
-                                <span className="text-xs text-slate-600">Validating...</span>
-                            </>
-                        )}
-                        {isImporting && (
-                            <>
-                                <LoadingSpinner size="sm" />
-                                <span className="text-xs text-slate-600">Importing...</span>
-                            </>
-                        )}
-                    </div>
-                    <div className="flex items-center gap-3">
-                        {step === 'upload' && (
-                            <button
-                                onClick={onClose}
-                                className="px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-lg"
-                            >
-                                Cancel
-                            </button>
-                        )}
-                        {(step === 'validate' || step === 'resolve') && (
-                            <>
-                                <button
-                                    onClick={handleReset}
-                                    className="px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-lg"
-                                >
-                                    Back
-                                </button>
-                                <button
-                                    onClick={handleImport}
-                                    disabled={isImporting || (!validation?.valid && !options.skipValidation)}
-                                    className={`
-                                        px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-blue-500
-                                        ${(!validation?.valid && !options.skipValidation) || isImporting
-                                            ? 'bg-slate-300 dark:bg-slate-600 cursor-not-allowed'
-                                            : 'bg-blue-600 hover:bg-blue-700 text-white'
-                                        }
-                                    `}
-                                >
-                                    {isImporting ? (
-                                        <>
-                                            <LoadingSpinner size="sm" />
-                                            Importing...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Download className="w-4 h-4" />
-                                            Import Checkpoint
-                                        </>
-                                    )}
-                                </button>
-                            </>
-                        )}
-                        {step === 'complete' && (
-                            <button
-                                onClick={onClose}
-                                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            >
-                                Done
-                            </button>
-                        )}
-                    </div>
-                </div>
-            </div>
-        </div>
+        </Modal>
     );
 };
 

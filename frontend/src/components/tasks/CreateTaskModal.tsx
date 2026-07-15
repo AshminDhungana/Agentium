@@ -10,10 +10,10 @@
  * @param {(data: object) => Promise<void>} props.onConfirm - Callback with validated task data.
  * @param {() => void} props.onClose - Callback to close the modal.
  */
-import React, { useState, useRef } from 'react';
-import { X, FileText, AlertCircle, Sparkles } from 'lucide-react';
+import React, { useState } from 'react';
+import { FileText, AlertCircle, Sparkles } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import { useFocusTrap } from '../../hooks/useFocusTrap';
+import { Modal } from '@/components/ui/Modal';
 
 interface CreateTaskModalProps {
     onConfirm: (data: { 
@@ -54,9 +54,6 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ onConfirm, onC
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [focusedField, setFocusedField] = useState<string | null>(null);
-    const containerRef = useRef<HTMLDivElement>(null);
-
-    useFocusTrap(containerRef, true);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -95,40 +92,25 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ onConfirm, onC
     const selectedPriority = PRIORITY_OPTIONS.find(p => p.value === priority);
     const selectedType = TYPE_OPTIONS.find(t => t.value === taskType);
 
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            {/* Backdrop with blur */}
-            <div 
-                className="absolute inset-0 bg-black/60 dark:bg-black/70 backdrop-blur-sm transition-opacity duration-200"
-                onClick={onClose}
-            />
-            
-            <div className="relative w-full max-w-lg max-h-[90vh] overflow-hidden rounded-2xl border border-gray-200 dark:border-[#1e2535] bg-white dark:bg-[#161b27] shadow-2xl dark:shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] transition-colors duration-200" ref={containerRef}>
-                
-                {/* Header */}
-                <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 dark:border-[#1e2535] bg-gray-50/50 dark:bg-[#0f1117]/50">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-xl bg-blue-100 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400">
-                            <FileText className="w-5 h-5" />
-                        </div>
-                        <div>
-                            <h2 className="text-lg font-bold text-gray-900 dark:text-white">
-                                Create New Task
-                            </h2>
-                            <p className="text-xs text-gray-600 dark:text-gray-400">
-                                Assign work to your AI workforce
-                            </p>
-                        </div>
-                    </div>
-                    <button aria-label="Close" 
-                        onClick={onClose}
-                        className="p-2 rounded-lg text-gray-600 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#1e2535] transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                        <X className="w-5 h-5" />
-                    </button>
-                </div>
+    const titleNode = (
+        <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-blue-100 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                <FileText className="w-5 h-5" />
+            </div>
+            <div>
+                <h2 className="text-lg font-bold text-gray-900 dark:text-white">
+                    Create New Task
+                </h2>
+                <p className="text-xs text-gray-600 dark:text-gray-400">
+                    Assign work to your AI workforce
+                </p>
+            </div>
+        </div>
+    );
 
-                <form onSubmit={handleSubmit} className="p-6 space-y-5 overflow-y-auto max-h-[calc(90vh-80px)]">
+    return (
+        <Modal open onClose={onClose} title={titleNode} size="md" className="!max-w-lg">
+            <form onSubmit={handleSubmit} className="p-6 space-y-5 overflow-y-auto max-h-[calc(90vh-80px)]">
                     
                     {/* Title Field */}
                     <div className="space-y-1.5">
@@ -368,7 +350,6 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ onConfirm, onC
                         </button>
                     </div>
                 </form>
-            </div>
-        </div>
+        </Modal>
     );
 };

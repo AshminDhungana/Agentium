@@ -13,10 +13,10 @@
  * @param {() => void} props.onClose - Callback to close the modal.
  */
 import { showToast } from '@/hooks/useToast';
-import React, { useState, useEffect, useRef } from 'react';
-import { useFocusTrap } from '../../hooks/useFocusTrap';
-import { AlertCircle, X, ChevronRight, ChevronDown, Plus, Minus, FileText, GitBranch } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { AlertCircle, ChevronRight, ChevronDown, Plus, Minus, FileText, GitBranch } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { Modal } from '@/components/ui/Modal';
 import { checkpointsService, BranchCompareResult, FieldDiff, AgentStateDiff, ArtifactDiff } from '../../services/checkpoints';
 
 interface CheckpointDiffModalProps {
@@ -122,9 +122,32 @@ export const CheckpointDiffModal: React.FC<CheckpointDiffModalProps> = ({
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<'task' | 'agents' | 'artifacts'>('task');
-    const containerRef = useRef<HTMLDivElement>(null);
 
-    useFocusTrap(containerRef, true);
+    // Derived counts
+    const hasTaskDiffs = result?.task_state_diffs.some(d => d.status !== 'unchanged');
+    const changedAgents = result?.agent_state_diffs.filter(a => a.status !== 'unchanged') || [];
+    const changedArtifacts = result?.artifact_diffs.filter(a => a.status !== 'unchanged') || [];
+
+    const titleNode = (
+        <div>
+            <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <GitBranch className="w-5 h-5 text-violet-600" />
+                Branch Comparison
+            </h2>
+            <div className="mt-1 flex items-center gap-2 font-mono text-sm">
+                <span className="px-2 py-0.5 rounded bg-rose-100 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400 border border-rose-200 dark:border-rose-500/20">{leftBranch}</span>
+                <ChevronRight className="w-4 h-4 text-gray-600" />
+                <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20">{rightBranch}</span>
+            </div>
+            {result && (
+                <div className="mt-2 flex items-center gap-2">
+                    <DiffBadge type="added" count={result.summary.added} />
+                    <DiffBadge type="removed" count={result.summary.removed} />
+                    <DiffBadge type="changed" count={result.summary.changed} />
+                </div>
+            )}
+        </div>
+    );
 
     useEffect(() => {
         let isMounted = true;
@@ -146,54 +169,9 @@ export const CheckpointDiffModal: React.FC<CheckpointDiffModalProps> = ({
         return () => { isMounted = false; };
     }, [taskId, leftBranch, rightBranch]);
 
-    // Derived counts
-    const hasTaskDiffs = result?.task_state_diffs.some(d => d.status !== 'unchanged');
-    const changedAgents = result?.agent_state_diffs.filter(a => a.status !== 'unchanged') || [];
-    const changedArtifacts = result?.artifact_diffs.filter(a => a.status !== 'unchanged') || [];
-
     return (
-        <div 
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
-            onClick={onClose}
-            ref={containerRef}
-        >
-            <div 
-                className="bg-white dark:bg-[#161b27] border border-slate-200 dark:border-[#1e2535] rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col"
-                onClick={e => e.stopPropagation()}
-            >
-                {/* Header */}
-                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-[#1e2535] bg-slate-50/50 dark:bg-[#1e2535]/20 rounded-t-2xl">
-                    <div className="flex-1">
-                        <div className="flex items-center gap-3">
-                            <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                                <GitBranch className="w-5 h-5 text-violet-600" />
-                                Branch Comparison
-                            </h2>
-                            <span className="text-gray-600 dark:text-slate-500 mx-1">/</span>
-                            <div className="flex items-center gap-2 font-mono text-sm">
-                                <span className="px-2 py-0.5 rounded bg-rose-100 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400 border border-rose-200 dark:border-rose-500/20">{leftBranch}</span>
-                                <ChevronRight className="w-4 h-4 text-gray-600" />
-                                <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20">{rightBranch}</span>
-                            </div>
-                        </div>
-                        {result && (
-                            <div className="flex items-center gap-2 mt-2">
-                                <DiffBadge type="added" count={result.summary.added} />
-                                <DiffBadge type="removed" count={result.summary.removed} />
-                                <DiffBadge type="changed" count={result.summary.changed} />
-                            </div>
-                        )}
-                    </div>
-                    <button 
-                        onClick={onClose}
-                        aria-label="Close"
-                        className="p-2 text-gray-600 hover:text-slate-600 hover:bg-slate-100 dark:hover:text-slate-300 dark:hover:bg-[#1e2535] rounded-xl transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                        <X className="w-5 h-5" />
-                    </button>
-                </div>
-
-                {/* Body elements */}
+        <Modal open onClose={onClose} title={titleNode} size="xl">
+            {/* Body elements */}
                 {isLoading ? (
                     <div className="flex-1 flex flex-col items-center justify-center p-12 text-gray-600">
                         <LoadingSpinner size="lg" />
@@ -319,7 +297,6 @@ export const CheckpointDiffModal: React.FC<CheckpointDiffModalProps> = ({
                         </div>
                     </div>
                 )}
-            </div>
-        </div>
+        </Modal>
     );
 };

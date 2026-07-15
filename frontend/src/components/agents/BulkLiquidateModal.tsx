@@ -1,8 +1,8 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { lifecycleService, BulkLiquidateDryRunResult, BulkLiquidateResult } from '../../services/agents';
-import { X, Trash2, AlertCircle, Eye, CheckCircle2, SkipForward } from 'lucide-react';
+import { Trash2, AlertCircle, Eye, CheckCircle2, SkipForward } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import { useFocusTrap } from '../../hooks/useFocusTrap';
+import { Modal } from '@/components/ui/Modal';
 
 interface BulkLiquidateModalProps {
     onClose:   () => void;
@@ -33,9 +33,6 @@ export const BulkLiquidateModal: React.FC<BulkLiquidateModalProps> = ({
     const [error,         setError]         = useState<string | null>(null);
     const [previewResult, setPreviewResult] = useState<BulkLiquidateDryRunResult | null>(null);
     const [execResult,    setExecResult]    = useState<BulkLiquidateResult | null>(null);
-    const containerRef = useRef<HTMLDivElement>(null);
-
-    useFocusTrap(containerRef, true);
 
     // ── Step 1 → Step 2: dry-run preview ─────────────────────────────────────
     const runDryRun = async () => {
@@ -76,27 +73,8 @@ export const BulkLiquidateModal: React.FC<BulkLiquidateModalProps> = ({
     };
 
     return (
-        <div className="fixed inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4" ref={containerRef}>
-            <div className="bg-white dark:bg-[#161b27] rounded-2xl shadow-2xl dark:shadow-[0_24px_80px_rgba(0,0,0,0.7)] w-full max-w-md border border-gray-200 dark:border-[#1e2535]">
-
-                {/* ── Header ─────────────────────────────────────────────── */}
-                <div className="flex justify-between items-center px-6 py-5 border-b border-gray-100 dark:border-[#1e2535]">
-                    <h2 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg bg-rose-100 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/20 flex items-center justify-center">
-                            <Trash2 className="w-4 h-4 text-rose-600 dark:text-rose-400" />
-                        </div>
-                        {titleMap[step]}
-                    </h2>
-                    <button
-                        aria-label="Close"
-                        onClick={onClose}
-                        className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-600 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#1e2535] transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                        <X className="w-4 h-4" />
-                    </button>
-                </div>
-
-                <div className="p-6 space-y-4">
+        <Modal open onClose={onClose} title={titleMap[step]} size="md">
+            <div className="p-6 space-y-4">
 
                     {/* ═══════════════════════════════════════════════════════
                         STEP 1 — Configure
@@ -279,9 +257,8 @@ export const BulkLiquidateModal: React.FC<BulkLiquidateModalProps> = ({
                             </button>
                         </>
                     )}
-                </div>
             </div>
-        </div>
+        </Modal>
     );
 };
 
