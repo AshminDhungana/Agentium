@@ -67,7 +67,7 @@ export function MessageLogViewer({ channelId, limit = 50 }: MessageLogViewerProp
                 {messages.length === 0 ? (
                     <div className="p-4 text-sm text-gray-600 text-center">No messages yet</div>
                 ) : (
-                    <table className="w-full text-sm">
+                    <table className="w-full text-sm" aria-live="polite">
                         <thead className="bg-gray-50 dark:bg-[#0f1117] text-xs text-gray-600">
                             <tr>
                                 <th className="px-4 py-2 text-left">Status</th>
@@ -76,7 +76,7 @@ export function MessageLogViewer({ channelId, limit = 50 }: MessageLogViewerProp
                                 <th className="px-4 py-2 text-left">Time</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-100 dark:divide-[#1e2535]" role="status" aria-live="polite">
+                        <tbody className="divide-y divide-gray-100 dark:divide-[#1e2535]">
                             {messages.map((msg) => (
                                 <tr key={msg.id} className="hover:bg-gray-50 dark:hover:bg-[#0f1117]">
                                     <td className="px-4 py-2">{getStatusIcon(msg.status)}</td>

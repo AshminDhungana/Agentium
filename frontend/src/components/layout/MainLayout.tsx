@@ -450,7 +450,10 @@ export function MainLayout() {
                 <item.icon className={`w-[18px] h-[18px] flex-shrink-0 ${item.variant === 'danger' ? 'text-red-600' : ''}`} />
                 <span className="flex-1">{item.label}</span>
                 {item.badge !== undefined && (
-                    <span className="bg-red-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                    <span
+                        aria-live="polite"
+                        className="bg-red-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center"
+                    >
                         {item.badge > 9 ? '9+' : item.badge}
                     </span>
                 )}
