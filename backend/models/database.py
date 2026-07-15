@@ -19,21 +19,19 @@ from backend.models.entities.base import Base
 
 logger = logging.getLogger(__name__)
 
-# Configuration
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql://agentium:agentium@postgres:5432/agentium"
-)
+# Configuration — all pool knobs are env-tunable via Settings.
+from backend.core.config import settings  # noqa: E402  (kept local to limit import cost)
 
-# Engine configuration with pooling
+# Engine configuration with pooling (production-tuned, overridable per deploy)
 engine = create_engine(
-    DATABASE_URL,
+    settings.DATABASE_URL,
     poolclass=QueuePool,
-    pool_size=20,
-    max_overflow=10,
+    pool_size=settings.DATABASE_POOL_SIZE,
+    max_overflow=settings.DATABASE_MAX_OVERFLOW,
+    pool_timeout=settings.DATABASE_POOL_TIMEOUT,
+    pool_recycle=settings.DATABASE_POOL_RECYCLE,
     pool_pre_ping=True,
-    pool_recycle=3600,
-    echo=os.getenv("SQL_ECHO", "false").lower() == "true"
+    echo=os.getenv("SQL_ECHO", "false").lower() == "true",
 )
 
 # Session factory
