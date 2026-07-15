@@ -22,6 +22,7 @@ celery_app = Celery(
     include=[
         'backend.services.tasks.task_executor',
         'backend.services.tasks.workflow_tasks',
+        'backend.services.tasks.reindex_knowledge',
         'backend.services.audit.audit_processor',
         'backend.services.monitoring.health_checks',
         'backend.services.workflow_engine',
@@ -84,6 +85,10 @@ celery_app.conf.beat_schedule = {
     'constitution-daily-review': {
         'task': 'agentium.tasks.task_executor.daily_constitution_review',
         'schedule': 86400.0,
+    },
+    'weekly-knowledge-reindex': {
+        'task': 'agentium.tasks.reindex_knowledge.weekly_reindex_task',
+        'schedule': 604800.0,
     },
     'idle-task-processor': {
         'task': 'agentium.tasks.task_executor.process_idle_tasks',
