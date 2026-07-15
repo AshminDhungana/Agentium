@@ -23,6 +23,7 @@ services:
         -c pg_stat_statements.max=10000
         -c log_min_duration_statement=500
         -c log_line_prefix='%t [%p]: [%l-1] db=%d,user=%u '
+        -c max_connections=200
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
