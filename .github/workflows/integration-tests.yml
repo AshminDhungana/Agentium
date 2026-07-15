@@ -124,6 +124,9 @@ jobs:
           CHROMA_HOST: localhost
           CHROMA_PORT: 8001
           CELERY_TASK_ALWAYS_EAGER: true
+          EMBEDDING_MODEL: BAAI/bge-base-en-v1.5
+          EMBEDDING_DIM: "768"
+          EMBEDDING_ACTIVE_VERSION: v2
           TESTING: true
           PYTHONPATH: ${{ github.workspace }}
 

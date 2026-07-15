@@ -27,6 +27,11 @@ os.environ.setdefault("REDIS_URL", "redis://redis:6379/1")
 os.environ.setdefault("CHROMA_HOST", "chromadb")
 os.environ.setdefault("CHROMA_PORT", "8001")
 os.environ.setdefault("CELERY_TASK_ALWAYS_EAGER", "true")
+# Default the integration suite to the bge embedding model (768-dim, cosine).
+# The test image bakes BAAI/bge-base-en-v1.5 at build time (HF_HUB_OFFLINE=1).
+os.environ.setdefault("EMBEDDING_MODEL", "BAAI/bge-base-en-v1.5")
+os.environ.setdefault("EMBEDDING_DIM", "768")
+os.environ.setdefault("EMBEDDING_ACTIVE_VERSION", "v2")
 os.environ["TESTING"] = "true"
 
 
