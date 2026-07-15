@@ -205,8 +205,8 @@ export function ChatPage() {
     } = useWebSocketStore(
         useShallow((s) => ({
             connectionPhase: s.connectionPhase,
-            isConnected: s.isConnected,
-            isConnecting: s.isConnecting,
+            isConnected: s.connectionPhase === 'active',
+            isConnecting: s.connectionPhase === 'connecting',
             error: s.error,
             sendMessage: s.sendMessage,
             reconnect: s.reconnect,

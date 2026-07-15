@@ -67,9 +67,9 @@ interface WebSocketState {
     // Public state
     /** Single source of truth for connection/genesis status. */
     connectionPhase: ConnectionPhase;
-    /** Derived from connectionPhase (getters in the store body). */
-    isConnected: boolean;
-    isConnecting: boolean;
+    /** Derived from connectionPhase (functions in the store body). */
+    isConnected: () => boolean;
+    isConnecting: () => boolean;
     error: string | null;
     connectionStats: {
         reconnectAttempts: number;
@@ -214,10 +214,9 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
     _connectionStable: false,   // BUG 2 FIX
     _lastMessageTimestamp: null,
 
-    // ── Internal setters / derived getters ────────────────────────────────
-    // isConnected / isConnecting are DERIVED from connectionPhase (Spec §1).
-    get isConnected() { return get().connectionPhase === 'active'; },
-    get isConnecting() { return get().connectionPhase === 'connecting'; },
+    // ── Derived helpers (Spec §1: status derives from connectionPhase) ─────
+    isConnected: () => get().connectionPhase === 'active',
+    isConnecting: () => get().connectionPhase === 'connecting',
 
     _transition: (event) => {
         const cur = get().connectionPhase;
