@@ -53,6 +53,14 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Optional, Tuple
 
+# ── Jarvis-upgrade module imports (Phases A–H) ──────────────────────────────
+# These modules guard their heavy deps internally, so importing them is safe
+# even when openWakeWord/Silero/Kokoro are not installed on the host. vad and
+# tts_engine are imported lazily inside _run_voice_loop_once so the bridge can
+# be imported (and wake-word mode exercised) before those modules land.
+from audio_source import MicrophoneSource
+from wake_word import WakeWordDetector
+
 # ── Logging ────────────────────────────────────────────────────────────────────
 
 logging.basicConfig(
@@ -349,6 +357,18 @@ def _play_wake_chime() -> None:
             logger.debug("[bridge] sounddevice unavailable for chime")
     except Exception as exc:
         logger.debug("[bridge] wake chime play failed: %s", exc)
+
+
+_tts_engine_instance = None
+
+
+def _get_tts_engine() -> "TTSEngine":
+    """Lazily construct and cache the Kokoro-backed TTS engine."""
+    global _tts_engine_instance
+    if _tts_engine_instance is None:
+        from tts_engine import TTSEngine
+        _tts_engine_instance = TTSEngine(VOICE_TTS_VOICE)
+    return _tts_engine_instance
 
 
 # ── STT ────────────────────────────────────────────────────────────────────────
@@ -690,13 +710,81 @@ async def _run_session() -> None:
 
 # ── Main voice loop ────────────────────────────────────────────────────────────
 
+async def _capture_utterance(
+    mic: "MicrophoneSource", vad: "Optional[VAD]" = None, timeout: float = SESSION_NO_SPEECH_TIMEOUT
+) -> Optional[str]:
+    """Capture one VAD-bounded utterance and transcribe it.
+
+    Until the VAD stage (Phase B) is live, falls back to the existing blocking
+    energy-gated listener. Returns the transcript string or None on timeout.
+    """
+    loop = asyncio.get_event_loop()
+    if vad is None or not vad.available:
+        return await loop.run_in_executor(
+            _executor, _listen_sync, timeout, 15.0, SESSION_PAUSE_THRESHOLD
+        )
+    chunks: list[bytes] = []
+    silence_ms = 0.0
+    frame_ms = 80.0
+    elapsed = 0.0
+    while elapsed < timeout * 1000:
+        frame = await loop.run_in_executor(_executor, mic.read_frame)
+        chunks.append(frame)
+        score = await loop.run_in_executor(_executor, vad.push_frame, frame)
+        if vad.is_speech(score):
+            silence_ms = 0.0
+        else:
+            silence_ms += frame_ms
+            if vad.should_endpoint("", silence_ms, vad.silence_base_ms):
+                break
+        elapsed += frame_ms
+    if not chunks:
+        return None
+    wav = _frames_to_wav(b"".join(chunks))
+    text = await loop.run_in_executor(_executor, _transcribe_via_backend, wav)
+    if not text:
+        # Vosk needs AudioData; reuse the blocking listener for the fallback.
+        return await loop.run_in_executor(_executor, _listen_sync, 1.0, 15.0, SESSION_PAUSE_THRESHOLD)
+    return text
+
+
+def _frames_to_wav(pcm: bytes) -> bytes:
+    import wave as _wave
+    import io
+    buf = io.BytesIO()
+    with _wave.open(buf, "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(16000)
+        w.writeframes(pcm)
+    return buf.getvalue()
+
+
+async def _process_direct(text: str) -> None:
+    """Handle a single utterance in direct (no wake word) mode."""
+    reply = await query_backend(text)
+    if not reply:
+        reply = "I'm having trouble reaching the backend right now."
+    tts = _get_tts_engine()
+    if tts.available:
+        audio = tts.synth(text)
+        if audio:
+            tts.play(audio)
+    else:
+        await speak(reply)
+    await _broadcast({"type": "voice_interaction", "user": text, "reply": reply, "ts": time.time()})
+
+
 async def _run_voice_loop_once() -> None:
     """
-    Single pass of the voice loop's outer try/except wrapper, extracted from
-    the old _voice_loop() so the supervisor (B5) can wrap it with independent
-    restart logic. Behavior identical to before except that an unhandled
-    exception now propagates to the supervisor instead of being swallowed by
-    an inner `except Exception: sleep(1)` that masked recurring failures.
+    Single pass of the voice loop's outer try/except wrapper. Rewritten for the
+    Jarvis upgrade: streams 80 ms mic frames through a continuous wake-word
+    detector (instead of recording a full utterance and substring-matching the
+    transcript), plays an instant local chime on trigger, then enters the
+    session state machine. Direct mode (REQUIRE_WAKE_WORD=false) is preserved.
+
+    An unhandled exception propagates to the supervisor (_supervise) instead of
+    being swallowed, so recurring failures stay visible.
     """
     logger.info("[bridge] Voice loop started")
 
@@ -705,51 +793,50 @@ async def _run_voice_loop_once() -> None:
         await asyncio.Future()
         return
 
+    mic = MicrophoneSource()
+    if not mic.available:
+        logger.warning("[WARN] Microphone unavailable — voice loop idle")
+        await asyncio.Future()
+        return
+    mic.open()
+
+    from vad import VAD
+    from tts_engine import TTSEngine
+    detector = WakeWordDetector(WAKE_WORD_MODEL) if REQUIRE_WAKE_WORD else None
+    vad = VAD()
+    tts = _get_tts_engine()
+    loop = asyncio.get_event_loop()
+
     if REQUIRE_WAKE_WORD:
         logger.info("[bridge] Wake word mode ON — say '%s' to start a session", WAKE_WORD)
     else:
         logger.info("[bridge] Wake word mode OFF — speaking directly starts a session")
 
-    while True:
-        # ── Passive scan: listen for the wake word ─────────────────────────
-        # Use a tighter pause_threshold (0.8s) here — we only need to catch
-        # the two-word trigger, not a full sentence.
-        raw = await listen_once(
-            timeout=WAKE_WORD_LISTEN_TIMEOUT,
-            phrase_time_limit=5.0,
-            pause_threshold=0.8,
-        )
-
-        if not raw:
-            continue
-
-        logger.info("[bridge] Heard: '%s'", raw)
-
-        if REQUIRE_WAKE_WORD:
-            if WAKE_WORD not in raw.lower():
-                logger.debug("[bridge] No wake word in '%s' — ignoring", raw)
-                continue
-
-            logger.info("[bridge] Wake word detected — starting session")
-            await speak("Yes, how can I help?")
-        else:
-            # No wake word required — anything heard kicks off a session
-            # with the first utterance already captured.
-            logger.info("[bridge] Direct mode — processing immediately")
-            reply = await query_backend(raw)
-            if not reply:
-                reply = "I'm having trouble reaching the backend right now."
-            await speak(reply)
-            await _broadcast({
-                "type":  "voice_interaction",
-                "user":  raw,
-                "reply": reply,
-                "ts":    time.time(),
-            })
-
-        # ── Enter session mode ─────────────────────────────────────────────
-        if REQUIRE_WAKE_WORD:
-            await _run_session()
+    try:
+        while True:
+            frame = await loop.run_in_executor(_executor, mic.read_frame)
+            if REQUIRE_WAKE_WORD and detector is not None:
+                if detector.available:
+                    score = await loop.run_in_executor(_executor, detector.push_frame, frame)
+                    if detector.is_triggered(score):
+                        logger.info("[bridge] Wake word detected — starting session")
+                        _play_wake_chime()
+                        session = VoiceSession(mic, vad, tts)
+                        await session.run()
+                        continue
+                else:
+                    # Model missing -> graceful fallback: behave as direct mode.
+                    logger.warning("[WARN] Wake-word model unavailable — direct mode")
+                    cmd = await _capture_utterance(mic, vad)
+                    if cmd:
+                        await _process_direct(cmd)
+                    continue
+            else:
+                cmd = await _capture_utterance(mic, vad)
+                if cmd:
+                    await _process_direct(cmd)
+    finally:
+        mic.close()
 
 
 # ── Subsystem supervisor (B5) ───────────────────────────────────────────────────
