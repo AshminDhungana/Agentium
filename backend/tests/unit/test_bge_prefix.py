@@ -36,3 +36,21 @@ def test_query_path_encodes_prefixed():
         called_text = fake.encode.call_args[0][0]
         assert called_text[0].startswith(PREFIX)
         assert fake.encode.call_args.kwargs.get("normalize_embeddings") is True
+
+
+def test_embed_query_accepts_list_like_chromadb():
+    # ChromaDB 1.5.1 calls embed_query with a list of query texts.
+    fake = MagicMock()
+
+    def _multi(texts, **kwargs):
+        arr = MagicMock()
+        arr.tolist.return_value = [[0.1] * 768 for _ in texts]
+        return arr
+
+    fake.encode.side_effect = _multi
+    with patch("backend.core.vector_store.SentenceTransformer", return_value=fake):
+        fn = BgeEmbeddingFunction()
+        out = fn.embed_query(["q1", "q2"])
+        assert isinstance(out, list) and len(out) == 2
+        called = fake.encode.call_args[0][0]
+        assert called[0].startswith(PREFIX) and called[1].startswith(PREFIX)

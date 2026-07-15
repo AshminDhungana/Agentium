@@ -161,18 +161,19 @@ class ConstitutionalGuard:
             # trigger council vote
     """
 
-    # Semantic similarity thresholds
-    # Re-tuned 2026-07-15 for the bge-v1.5 cosine ("supreme_law_v2") space.
-    # v1 (MiniLM, unnormalised / L2) produced negative `(1 - distance)`
-    # similarities for every action, so its Tier-2 was effectively ALLOW for
-    # all actions. bge-v1.5 runs HIGH (measured max ~0.68 on representative
-    # actions), so the original 0.40/0.70 values flagged everything as a grey
-    # area. To preserve v1's verdict baseline (all ALLOW) these are raised
-    # above the observed v2 distribution.
-    # CAVEAT: this disables v2 semantic detection; re-tune against a v2
-    # baseline (and more discriminative articles) before production cutover.
-    BLOCK_THRESHOLD = 0.85       # Above this → definitely violates
-    GREY_AREA_THRESHOLD = 0.70   # Between this and BLOCK → grey area
+    # Semantic similarity thresholds (bge-v1.5, cosine "supreme_law_v2" space).
+    # IMPORTANT HISTORY: v1 (MiniLM, unnormalised L2) produced negative
+    # `(1 - distance)` similarities for every action, so its Tier-2 was
+    # effectively a NO-OP (always ALLOW). The migration to bge-v1.5 makes
+    # Tier-2 FUNCTIONAL: measured similarities on representative actions land
+    # in ~0.50 (benign) to ~0.64 (grey-area) range. These initial values are
+    # calibrated SAFELY so benign actions stay ALLOW and the guard discriminates
+    # the grey area (VOTE_REQUIRED) without false BLOCKs on current data.
+    # TODO(pre-cutover): re-tune against the REAL constitution articles and a
+    # labelled prohibited/benign action set during the soak window; bge runs
+    # HIGH, so BLOCK_THRESHOLD must sit clearly above the benign cluster.
+    BLOCK_THRESHOLD = 0.78       # Above this → definitely violates (BLOCK)
+    GREY_AREA_THRESHOLD = 0.60   # Between this and BLOCK → grey area (VOTE_REQUIRED)
 
     # Redis cache TTLs (seconds)
     CONSTITUTION_CACHE_TTL = 300       # 5 minutes

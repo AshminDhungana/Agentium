@@ -7,7 +7,7 @@ import json
 import logging
 import os
 from contextlib import contextmanager
-from typing import Any, Dict, Generator, List, Optional
+from typing import Any, Dict, Generator, List, Optional, Union
 
 import chromadb
 from chromadb.api.types import EmbeddingFunction, QueryResult
@@ -81,8 +81,12 @@ class BgeEmbeddingFunction(EmbeddingFunction):
     def embed_documents(self, input: List[str]) -> List[List[float]]:
         return self.model.encode(input, convert_to_numpy=True, normalize_embeddings=True).tolist()
 
-    def embed_query(self, input: str) -> List[float]:
-        return self.model.encode([self._with_prefix(input)], convert_to_numpy=True, normalize_embeddings=True).tolist()[0]
+    def embed_query(self, input: Union[str, List[str]]) -> List[List[float]]:
+        # ChromaDB 1.5.1 calls embed_query with a list of query texts; accept
+        # both a single string and a list so v2 queries don't crash.
+        texts = input if isinstance(input, list) else [input]
+        prefixed = [self._with_prefix(t) for t in texts]
+        return self.model.encode(prefixed, convert_to_numpy=True, normalize_embeddings=True).tolist()
 
     def __call__(self, input: List[str]) -> List[List[float]]:
         # Default path (collection init / stored documents) = no prefix, normalized.
