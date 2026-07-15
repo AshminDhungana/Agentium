@@ -377,6 +377,88 @@ async def _speak_fallback(text: str) -> None:
     await _broadcast({"type": "voice_tts_broadcast", "text": text, "ts": time.time()})
 
 
+def _load_persona() -> Optional[str]:
+    """Default Jarvis persona, overridable by VOICE_PERSONA env / persona.md."""
+    if VOICE_PERSONA:
+        return VOICE_PERSONA
+    p = Path(__file__).parent / "persona.md"
+    if p.is_file():
+        return p.read_text().strip() or None
+    return None
+
+
+class ProactiveAnnouncer:
+    """Rate-limited, quiet-hours-aware proactive voice announcements.
+
+    Subscribes to a narrow slice of the backend WS event bus and speaks a
+    one-line summary for an allow-listed subset of event types. Off by default
+    (VOICE_PROACTIVE_ENABLED=false). Never announces during quiet hours and
+    never repeats the same event class within COOLDOWN_S seconds.
+    """
+
+    ALLOWED = {"agent_crashed", "budget_exceeded", "sla_breach", "task_escalated"}
+    SUMMARIES = {
+        "agent_crashed": "Heads up — an agent just crashed and is being recovered.",
+        "budget_exceeded": "Budget threshold reached on a model key.",
+        "sla_breach": "A service-level agreement was breached.",
+        "task_escalated": "A task was escalated to a higher tier.",
+    }
+    COOLDOWN_S = float(os.getenv("VOICE_PROACTIVE_COOLDOWN_S", "300"))
+
+    def __init__(self):
+        self.enabled = VOICE_PROACTIVE_ENABLED
+        self._last: dict = {}
+
+    def _in_quiet_hours(self) -> bool:
+        start = os.getenv("BUSINESS_HOURS_START")
+        end = os.getenv("BUSINESS_HOURS_END")
+        if not start or not end:
+            return False
+        try:
+            h = time.localtime().tm_hour
+            s, e = int(start), int(end)
+            return not (s <= h < e)
+        except Exception:
+            return False
+
+    def maybe_announce(self, event_type: str) -> Optional[str]:
+        if not self.enabled or event_type not in self.ALLOWED:
+            return None
+        if self._in_quiet_hours():
+            return None
+        now = time.monotonic()
+        if now - self._last.get(event_type, 0) < self.COOLDOWN_S:
+            return None
+        self._last[event_type] = now
+        return self.SUMMARIES.get(event_type)
+
+
+async def _run_backend_ws(announcer: "ProactiveAnnouncer") -> None:
+    """Connect to the backend WS event bus and announce allowed events.
+
+    Runs as a supervised coroutine alongside the voice loop. No-op if the
+    websockets library or backend WS is unavailable, or proactive mode is off.
+    """
+    if not WS_LIB_AVAILABLE or not announcer.enabled:
+        logger.info("[bridge] Proactive announcements disabled — backend WS client idle")
+        await asyncio.Future()
+        return
+    import json as _json
+    import websockets  # type: ignore
+
+    async with websockets.connect(BACKEND_WS_URL) as ws:  # type: ignore
+        logger.info("[bridge] Connected to backend WS event bus: %s", BACKEND_WS_URL)
+        async for raw in ws:
+            try:
+                msg = _json.loads(raw)
+            except (ValueError, TypeError):
+                continue
+            etype = msg.get("type") or msg.get("event")
+            line = announcer.maybe_announce(etype)
+            if line:
+                await _speak_fallback(line)
+
+
 # ── STT ────────────────────────────────────────────────────────────────────────
 
 # R2: tracks whether the last listen attempt failed due to missing/unusable
@@ -1001,7 +1083,7 @@ async def _run_voice_loop_once() -> None:
                     if detector.is_triggered(score):
                         logger.info("[bridge] Wake word detected — starting session")
                         _play_wake_chime()
-                        session = VoiceSession(mic, vad, tts)
+                        session = VoiceSession(mic, vad, tts, persona=_load_persona())
                         await session.run()
                         continue
                 else:
@@ -1064,13 +1146,17 @@ async def _main() -> None:
     logger.info("  Platform  : %s", platform.system())
     logger.info("  Session   : no_speech=%.1fs  max=%.0fs  pause=%.1fs",
                 SESSION_NO_SPEECH_TIMEOUT, SESSION_MAX_DURATION, SESSION_PAUSE_THRESHOLD)
+    logger.info("  Persona   : %s", "default" if _load_persona() else "none")
+    logger.info("  Proactive : %s", "enabled" if VOICE_PROACTIVE_ENABLED else "disabled")
     logger.info("=" * 60)
 
     # B5: each subsystem is supervised independently now instead of sharing
-    # a single asyncio.gather() that dies as one unit.
+    # a single asyncio.gather() that dies as one unit. The proactive WS client
+    # is supervised too (no-op unless VOICE_PROACTIVE_ENABLED).
     await asyncio.gather(
         _supervise("ws-server", _run_ws_server_once),
         _supervise("voice-loop", _run_voice_loop_once),
+        _supervise("backend-ws", lambda: _run_backend_ws(ProactiveAnnouncer())),
     )
 
 

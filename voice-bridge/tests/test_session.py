@@ -352,3 +352,32 @@ def test_first_sentence_spoken_before_last(monkeypatch):
     except Exception:
         pass
     assert tts.order and tts.order[0].startswith("First"), tts.order
+
+
+def test_load_persona_reads_env(monkeypatch):
+    monkeypatch.setattr(bridge, "VOICE_PERSONA", "You are Jarvis.")
+    assert bridge._load_persona() == "You are Jarvis."
+
+
+def test_load_persona_reads_file_when_no_env(monkeypatch, tmp_path):
+    monkeypatch.setattr(bridge, "VOICE_PERSONA", "")
+    fake = tmp_path / "persona.md"
+    fake.write_text("You are Jarvis.")
+    monkeypatch.setattr(bridge, "Path", lambda *a, **k: fake)
+    assert "Jarvis" in bridge._load_persona()
+
+
+def test_proactive_disabled_by_default(monkeypatch):
+    monkeypatch.setattr(bridge, "VOICE_PROACTIVE_ENABLED", False)
+    ann = bridge.ProactiveAnnouncer()
+    assert ann.enabled is False
+    assert ann.maybe_announce("agent_crashed") is None
+
+
+def test_proactive_announces_when_enabled(monkeypatch):
+    monkeypatch.setattr(bridge, "VOICE_PROACTIVE_ENABLED", True)
+    ann = bridge.ProactiveAnnouncer()
+    line = ann.maybe_announce("agent_crashed")
+    assert line is not None
+    # second call within cooldown is suppressed
+    assert ann.maybe_announce("agent_crashed") is None
