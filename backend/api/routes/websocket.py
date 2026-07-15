@@ -18,6 +18,7 @@ from backend.services.chat_service import ChatService
 from backend.core.config import settings
 from backend.models.entities.user import User
 from backend.api.dependencies.auth import get_current_user
+from backend.core.redis import get_redis_client
 import redis.asyncio as redis
 
 from backend.api.schemas.examples import ErrorResponseExample, SuccessResponseExample, build_responses
@@ -628,21 +629,31 @@ async def genesis_status(current_user=Depends(get_current_user)):
     """
     Lightweight HTTP status check for the genesis bootstrap process.
 
-    The chat WebSocket connection is gated on Head 00001 existing, but a
-    client that hits that gate is closed before it's ever added to
-    ConnectionManager — so it cannot receive a WebSocket broadcast telling
-    it genesis has finished. This endpoint gives the frontend something
-    cheap to poll instead of repeatedly retrying the full WS handshake.
+    Resolution precedence:
+      1. Head 00001 exists                     -> {"status": "complete"}
+      2. Redis genesis:state phase == "failed" -> {"status": "failed", "reason"}
+      3. API key (UserModelConfig) exists       -> {"status": "running"}
+      4. otherwise                              -> {"status": "not_started"}
 
-    Returns one of:
-      - "not_started": no API key configured yet, genesis hasn't been triggered
-      - "running":      API key exists, genesis is in progress
-      - "complete":     Head 00001 exists, chat is ready to connect
+    Returns one of: "not_started", "running", "complete", "failed".
     """
     with get_fresh_db() as db:
         head = db.query(HeadOfCouncil).filter_by(agentium_id="00001").first()
         if head:
             return {"status": "complete"}
+
+        # Failure is only knowable from Redis: a crashed genesis never creates
+        # Head and only logs. Without this, a failed genesis reads as "running"
+        # forever (see initialization_service._run_genesis).
+        try:
+            _redis = get_redis_client()
+            raw = await _redis.get("genesis:state")
+            if raw:
+                state = json.loads(raw)
+                if state.get("phase") == "failed":
+                    return {"status": "failed", "reason": state.get("reason", "Unknown genesis error")}
+        except Exception as rexc:
+            logger.warning(f"genesis-status redis read failed: {rexc}")
 
         genesis_triggered = False
         try:

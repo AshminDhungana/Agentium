@@ -1142,6 +1142,16 @@ def trigger_genesis_if_needed(db) -> bool:
     async def _run_genesis() -> None:
         """Run genesis."""
         from backend.models.database import get_db_context
+        from backend.core.redis import get_redis_client
+        _redis = get_redis_client()
+        try:
+            _redis.set(
+                "genesis:state",
+                json.dumps({"phase": "running", "started_at": datetime.utcnow().isoformat()}),
+                ex=3600,
+            )
+        except Exception as rexc:
+            logger.warning(f"genesis:state redis write failed: {rexc}")
         try:
             logger.info("🚀 Starting genesis protocol in background task...")
             with get_db_context() as genesis_db:
@@ -1151,6 +1161,10 @@ def trigger_genesis_if_needed(db) -> bool:
                     result.get("status"),
                     result.get("message"),
                 )
+            try:
+                _redis.set("genesis:state", json.dumps({"phase": "complete"}), ex=3600)
+            except Exception as rexc:
+                logger.warning(f"genesis:state redis write failed: {rexc}")
             # Note: this broadcast only reaches clients that are already
             # authenticated on the WebSocket (e.g. another tab/admin view).
             # A client stuck on the genesis gate isn't in
@@ -1169,6 +1183,18 @@ def trigger_genesis_if_needed(db) -> bool:
         except Exception as exc:
             logger.error("❌ Auto-genesis failed: %s", exc, exc_info=True)
             try:
+                _redis.set(
+                    "genesis:state",
+                    json.dumps({
+                        "phase": "failed",
+                        "reason": str(exc),
+                        "failed_at": datetime.utcnow().isoformat(),
+                    }),
+                    ex=3600,
+                )
+            except Exception as rexc:
+                logger.warning(f"genesis:state redis write failed: {rexc}")
+            try:
                 from backend.api.routes.websocket import manager as ws_manager
                 await ws_manager.broadcast({
                     "type":      "genesis_failed",
@@ -1178,6 +1204,14 @@ def trigger_genesis_if_needed(db) -> bool:
             except Exception as bexc:
                 logger.warning(f"genesis_failed broadcast failed: {bexc}")
 
+    try:
+        get_redis_client().set(
+            "genesis:state",
+            json.dumps({"phase": "running", "started_at": datetime.utcnow().isoformat()}),
+            ex=3600,
+        )
+    except Exception as rexc:
+        logger.warning(f"genesis:state redis write failed: {rexc}")
     asyncio.create_task(_run_genesis())
     logger.info("🚀 Genesis protocol triggered after API key configuration")
     return True
