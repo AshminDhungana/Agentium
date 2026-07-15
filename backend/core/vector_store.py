@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 CHROMA_PERSIST_DIR: str = os.getenv("CHROMA_PERSIST_DIR", "./chroma_data")
 V2_EMBEDDING_MODEL = "BAAI/bge-base-en-v1.5"
 V2_EMBEDDING_DIM = 768
+BGE_QUERY_PREFIX = "Represent this sentence for searching relevant passages: "
 CHROMA_HOST: Optional[str] = os.getenv("CHROMA_HOST")  # None → local mode
 CHROMA_PORT: int = int(os.getenv("CHROMA_PORT", "8000"))
 
@@ -50,6 +51,33 @@ class AgentiumEmbeddingFunction(EmbeddingFunction):
         """Generate embeddings for a list of texts."""
         embeddings = self.model.encode(input, convert_to_numpy=True)
         return embeddings.tolist()
+
+
+class BgeEmbeddingFunction(EmbeddingFunction):
+    """bge-base-en-v1.5 — asymmetric: prefix queries, not documents; L2-normalized."""
+
+    def __init__(self, model_name: str = V2_EMBEDDING_MODEL) -> None:
+        self.model_name = model_name
+        self._model = None
+
+    @property
+    def model(self) -> SentenceTransformer:
+        if self._model is None:
+            self._model = SentenceTransformer(self.model_name)
+        return self._model
+
+    def _with_prefix(self, text: str) -> str:
+        return f"{BGE_QUERY_PREFIX}{text}"
+
+    def embed_documents(self, input: List[str]) -> List[List[float]]:
+        return self.model.encode(input, convert_to_numpy=True, normalize_embeddings=True).tolist()
+
+    def embed_query(self, input: str) -> List[float]:
+        return self.model.encode([self._with_prefix(input)], convert_to_numpy=True, normalize_embeddings=True).tolist()[0]
+
+    def __call__(self, input: List[str]) -> List[List[float]]:
+        # Default path (collection init / stored documents) = no prefix, normalized.
+        return self.embed_documents(input)
 
 
 class VectorStore:
