@@ -661,7 +661,7 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
                         )}
 
                         {/* API Key */}
-                        {selectedProvider?.requires_api_key && (
+                        {(selectedProvider?.requires_api_key || isUniversal || formData.provider === 'custom') && (
                             <div>
                                 <label htmlFor="api_key" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 flex items-center gap-2">
                                     <Key className="w-4 h-4" aria-hidden="true" />
