@@ -34,6 +34,9 @@ RUN pip install --no-cache-dir torch==2.5.1 torchaudio==2.5.1 --index-url https:
 
 # Install heavy ML packages next (better layer caching)
 RUN pip install --no-cache-dir sentence-transformers==3.3.1
+# Bake the bge embedding model so it is NOT downloaded at runtime (HF_HUB_OFFLINE=1).
+# The v1 MiniLM model is still baked too (used by v1 collections during migration).
+RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('BAAI/bge-base-en-v1.5')"
 RUN pip install --no-cache-dir chromadb==0.5.23
 RUN pip install --no-cache-dir tiktoken==0.8.0
 
