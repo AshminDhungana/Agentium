@@ -875,7 +875,7 @@ OpenAI TTS — Text-to-Speech
 - [x] Mobile responsiveness gaps on complex pages (Tasks, Voting, Monitoring)
 - [x] Accessibility audit not done (ARIA labels, keyboard navigation, color contrast) — completed 2026-07-15
 - [x] PostgreSQL slow query logging enabled (pg_stat_statements extension created at startup + in test DB; shared_preload_libraries set in dev & test compose)
-- [ ] Connection pool sizes set to defaults — not tuned for production load
+- [x] Connection pool sizes set to defaults — not tuned for production load (env-tunable via DATABASE_POOL_SIZE/_MAX_OVERFLOW/_TIMEOUT/_RECYCLE; Celery engines shared)
 - [ ] Config files not version-controlled via Git
 
 ### 19.1 Multi-Select Checkbox Card (Chat-Window Only)
