@@ -20,6 +20,28 @@ vosk==0.3.45
 # TTS
 pyttsx3==2.99
 
+# ── Jarvis upgrade (Phases A–H) ──────────────────────────────────────────────
+# Wake-word detection (streaming, ~ms latency). Apache-licensed; free unlike
+# Porcupine. Optional: if the model isn't present the bridge falls back to
+# REQUIRE_WAKE_WORD=false behavior. Bundle a .onnx model and set WAKE_WORD_MODEL.
+openwakeword
+
+# Speech/silence detection (Silero VAD). MIT-licensed, ~2MB ONNX, sub-ms/frame.
+silero-vad
+onnxruntime
+
+# Local neural TTS (Kokoro-82M). Apache 2.0, ~327MB weights, real-time on CPU.
+# Pulls in torch. Plays via sounddevice; soundfile writes the WAV chunks.
+kokoro
+soundfile
+sounddevice
+
+# Acoustic echo cancellation for barge-in on open speakers (Phase C).
+webrtc-audio-processing
+
+# Optional noise suppression ahead of VAD for HVAC/appliance noise (Phase H).
+noisereduce
+
 # JWT verification (same library used by the backend)
 python-jose[cryptography]==3.5.0
 

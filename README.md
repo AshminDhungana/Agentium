@@ -105,7 +105,7 @@ Knowledge decay scoring automatically sinks stale entries; cross-document citati
 
 ### 🎤 Voice Interface
 
-Local **whisper.cpp** (built into the backend image) is the **primary** speech-to-text engine — no API key required. OpenAI Whisper is the keyed fallback, with browser-native Web Speech as the final net. OpenAI TTS handles text-to-speech with WebSocket real-time streaming. Speaker identification and enrolment for multi-user voice sessions. Phone (Twilio) and Discord voice channel support.
+ Local **whisper.cpp** (built into the backend image) is the **primary** speech-to-text engine — no API key required. OpenAI Whisper is the keyed fallback, with browser-native Web Speech as the final net. The host-side **Voice Bridge** (`voice-bridge/`) turns this into a "Jarvis"-style assistant: instant `openWakeWord` detection, Silero VAD end-of-speech, Kokoro-82M neural TTS, talk-over barge-in with echo cancellation, a configurable persona, and speaker-aware greetings. Phone (Twilio) and Discord voice channel support.
 
 ### Local Speech-to-Text (whisper.cpp)
 
@@ -115,7 +115,28 @@ Fallback chain: `whisper.cpp → OpenAI Whisper (if a key is set) → browser-na
 Configurable env vars: `WHISPER_MODEL` (default `base.en`), `WHISPER_CPP_BIN`,
 `WHISPER_MODEL_DIR`, `WHISPER_TIMEOUT` (default 60s), `WHISPER_MAX_CONCURRENCY`
 (default 1). For GPU: build with `--build-arg WHISPER_BACKEND=cuda` and run
-the backend with `--gpus all`.
+ the backend with `--gpus all`.
+
+### 🎙️ Voice Bridge (host-side) configuration
+
+The `voice-bridge/` process runs on the host (outside Docker) and streams
+mic audio to the backend. It degrades gracefully: missing models fall back to
+safer behavior, and every new setting defaults to the previous behavior.
+
+| Env var | Default | Purpose |
+|---|---|---|
+| `REQUIRE_WAKE_WORD` | `true` | `false` = direct mode (no wake word needed) |
+| `WAKE_WORD` | `agentium` | trigger phrase (informational; the openWakeWord model decides) |
+| `WAKE_WORD_MODEL` | _(empty)_ | path to an openWakeWord `.onnx`; empty = bundled default |
+| `WAKE_WORD_THRESHOLD` | `0.5` | detector trigger score |
+| `WAKE_CHIME_PATH` | `assets/wake_chime.wav` | instant "I heard you" chime |
+| `VAD_SILENCE_MS` | `700` | base end-of-speech silence |
+| `VOICE_TTS_VOICE` | `af_bella` | Kokoro voice id |
+| `VOICE_PERSONA` | _(empty)_ | override the default Jarvis persona (else `persona.md`) |
+| `VOICE_PROACTIVE_ENABLED` | `false` | opt-in proactive announcements |
+| `VOICE_PROACTIVE_COOLDOWN_S` | `300` | per-event-type cooldown |
+| `VOICE_NS_ENABLED` | `true` | noise suppression before VAD |
+| `BACKEND_WS_URL` | `ws://127.0.0.1:8000/ws` | backend event bus for proactive mode |
 
 ### 🔄 Git Versioning for Config
 
