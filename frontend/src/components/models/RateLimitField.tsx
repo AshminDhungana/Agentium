@@ -32,16 +32,15 @@ export function RateLimitField({ value, onChange }: RateLimitFieldProps) {
             <input
                 type="number"
                 min={1}
-                defaultValue={60}
                 value={value ?? 60}
                 onChange={(e) => onChange(parseInt(e.target.value, 10) || 60)}
-                className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-800"
+                className="mt-1 block w-full px-4 py-2.5 text-sm rounded-lg border border-gray-200 dark:border-[#1e2535] bg-white dark:bg-[#0f1117] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition-colors duration-150"
             />
-            <p className="mt-1 text-xs text-gray-500">
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                 check your provider's plan page — e.g. 1 request every 2 seconds = 30/min.
             </p>
             {perSecondLabel && (
-                <p className="mt-1 text-xs text-indigo-500">{perSecondLabel}</p>
+                <p className="mt-1 text-xs text-indigo-500 dark:text-indigo-400">{perSecondLabel}</p>
             )}
         </div>
     );
