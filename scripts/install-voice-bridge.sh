@@ -254,13 +254,18 @@ EOF
 </plist>
 EOF
 
-        # Unload any old version first, then load the new one
-        launchctl unload -w "$PLIST" >> "$LOG_FILE" 2>&1 || true
-        if launchctl load -w "$PLIST" >> "$LOG_FILE" 2>&1; then
-            log "  launchd service loaded and running."
-            log "  Check: launchctl list com.agentium.voice"
+        # launchd requires the plist to be owned by the user and not group/world writable.
+        chmod 644 "$PLIST"
+        chown "$USER" "$PLIST" 2>/dev/null || true
+
+        # Use the modern (non-deprecated) bootstrap/kickstart API.
+        launchctl bootout "gui/$(id -u)/com.agentium.voice" >> "$LOG_FILE" 2>&1 || true
+        if launchctl bootstrap "gui/$(id -u)" "$PLIST" >> "$LOG_FILE" 2>&1 && \
+           launchctl kickstart "gui/$(id -u)/com.agentium.voice" >> "$LOG_FILE" 2>&1; then
+            log "  launchd service bootstrapped and started."
+            log "  Check: launchctl print gui/$(id -u)/com.agentium.voice"
         else
-            warn "launchctl load failed -- falling back to nohup start"
+            warn "launchctl bootstrap failed -- falling back to nohup start"
             start_bridge_now
         fi
         ;;
