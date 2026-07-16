@@ -2,7 +2,7 @@
  * ChatPage.tsx
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, Fragment } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAuthStore } from '@/store/authStore';
 import { useWebSocketStore } from '@/store/websocketStore';
@@ -21,7 +21,7 @@ import {
     Slack, Mail, Inbox, Volume2, VolumeX, Settings2, ChevronDown, Globe,
     FolderOpen, Trash2, Eye, UploadCloud, HardDrive, Search, Filter,
 } from 'lucide-react';
-import { format, isToday, isYesterday } from 'date-fns';
+import { format, isToday, isYesterday, isSameDay } from 'date-fns';
 import { showToast } from '@/hooks/useToast';
 import { fileApi, UploadedFile as ApiUploadedFile } from '@/services/fileApi';
 import { voiceApi } from '@/services/voiceApi';
@@ -98,6 +98,18 @@ function formatTimestamp(date: Date): string {
     return format(date, 'MMM d, HH:mm');
 }
 
+function DateDivider({ date }: { date: Date }) {
+    return (
+        <div className="flex items-center gap-3 py-1">
+            <div className="flex-1 h-px bg-gray-200 dark:bg-[#1e2535]" />
+            <span className="text-xs font-medium text-gray-600 dark:text-gray-500 whitespace-nowrap">
+                {isToday(date) ? 'Today' : isYesterday(date) ? 'Yesterday' : format(date, 'MMMM d, yyyy')}
+            </span>
+            <div className="flex-1 h-px bg-gray-200 dark:bg-[#1e2535]" />
+        </div>
+    );
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function ChatPage() {
@@ -137,6 +149,9 @@ export function ChatPage() {
     const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const audioStreamRef = useRef<MediaStream | null>(null);
+    const messagesScrollRef = useRef<HTMLDivElement | null>(null);
+    const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+    const [isAwaitingReply, setIsAwaitingReply] = useState(false);
 
     /**
      * Dedup set lives in a ref (not React state) — no re-renders,
@@ -282,6 +297,8 @@ export function ChatPage() {
                 // with loadChatHistory. It is consumed and reset in the scroll
                 // useEffect below (Issue 3).
                 setMessages((prev) => [...prev, newMessage]);
+                // Any incoming message means the assistant is no longer "thinking"
+                setIsAwaitingReply(false);
                 // A structured input card arrived — register it as the active card
                 // (replacing any previously-unanswered one). See chatStore lifecycle.
                 if (newMessage.metadata?.card) {
@@ -463,6 +480,8 @@ export function ChatPage() {
         };
         isHistoryLoad.current = false;
         setMessages((prev) => [...prev, userMessage]);
+        // Show the "thinking" indicator until the Head replies (cleared in the WS subscriber)
+        setIsAwaitingReply(true);
 
         // FIX Issue 2: forward attachment metadata over WebSocket — previously only
         // text was sent and the backend never received the file URLs / names.
@@ -477,6 +496,25 @@ export function ChatPage() {
             e.preventDefault();
             handleSubmit(e as any);
         }
+    };
+
+    const prefersReducedMotion = () =>
+        typeof window !== 'undefined' &&
+        window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
+    // Floating "jump to latest" button appears only when the user has scrolled up.
+    const handleMessagesScroll = () => {
+        const el = messagesScrollRef.current;
+        if (!el) return;
+        const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+        setShowScrollToBottom(!nearBottom);
+    };
+
+    const scrollToBottom = () => {
+        const el = messagesScrollRef.current;
+        if (!el) return;
+        el.scrollTo({ top: el.scrollHeight, behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
+        setShowScrollToBottom(false);
     };
 
     // ── Voice ─────────────────────────────────────────────────────────────────
@@ -979,8 +1017,10 @@ export function ChatPage() {
                 {activeTab === 'ai' && (
                     <>
                         {/* Messages */}
-                        <div className="flex-1 overflow-y-auto px-4 py-6">
-                            <div className="max-w-3xl mx-auto space-y-6">
+                        <div className="relative flex-1 min-h-0">
+                            <div ref={messagesScrollRef} onScroll={handleMessagesScroll}
+                                className="h-full overflow-y-auto px-4 py-6">
+                                <div className="max-w-3xl mx-auto space-y-6">
                                 {messages.length === 0 && (
                                     <div className="h-64 flex items-center justify-center">
                                         <EmptyState
@@ -991,11 +1031,14 @@ export function ChatPage() {
                                     </div>
                                 )}
 
-                                {messages.map((message) => {
+                                {messages.map((message, idx) => {
                                     const isUser = message.role === 'sovereign';
                                     const isError = message.metadata?.error === true;
+                                    const showDivider = idx === 0 || !isSameDay(messages[idx - 1].timestamp, message.timestamp);
                                     return (
-                                        <div key={message.id} className={`flex gap-3 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
+                                        <Fragment key={message.id}>
+                                            {showDivider && <DateDivider date={message.timestamp} />}
+                                            <div className={`group flex gap-3 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
                                             {/* Avatar */}
                                             <div className={`flex-shrink-0 w-8 h-8 rounded-xl overflow-hidden flex items-center justify-center text-white text-xs font-semibold ${isUser ? 'bg-gradient-to-br from-blue-500 to-blue-600'
                                                     : isError ? 'bg-orange-500' : 'bg-gradient-to-br from-gray-700 to-gray-800'
@@ -1044,7 +1087,7 @@ export function ChatPage() {
                                                         {formatTimestamp(message.timestamp)}
                                                     </span>
                                                     {!message.metadata?.card && (
-                                                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
                                                             <button onClick={() => copyMessage(message.content)}
                                                                 className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-[#1e2535] text-gray-600 dark:text-gray-500 transition-colors" title="Copy" aria-label="Copy">
                                                                 <Copy className="w-3 h-3" />
@@ -1060,10 +1103,37 @@ export function ChatPage() {
                                                 </div>
                                             </div>
                                         </div>
+                                        </Fragment>
                                     );
                                 })}
+
+                                {/* Typing indicator while awaiting the Head's reply */}
+                                {isAwaitingReply && (
+                                    <div className="flex gap-3">
+                                        <div className="flex-shrink-0 w-8 h-8 rounded-xl bg-gradient-to-br from-gray-700 to-gray-800 flex items-center justify-center text-white">
+                                            <Bot className="w-4 h-4" />
+                                        </div>
+                                        <div className="px-4 py-3.5 rounded-2xl bg-white dark:bg-[#161b27] border border-gray-200 dark:border-[#1e2535]">
+                                            <div className="flex items-center gap-1.5">
+                                                <span className="w-2 h-2 rounded-full bg-gray-400 motion-safe:animate-bounce" style={{ animationDelay: '0ms' }} />
+                                                <span className="w-2 h-2 rounded-full bg-gray-400 motion-safe:animate-bounce" style={{ animationDelay: '150ms' }} />
+                                                <span className="w-2 h-2 rounded-full bg-gray-400 motion-safe:animate-bounce" style={{ animationDelay: '300ms' }} />
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
                                 <div ref={messagesEndRef} />
                             </div>
+
+                            {/* Floating jump-to-latest button (only when scrolled up) */}
+                            {showScrollToBottom && (
+                                <button onClick={scrollToBottom} aria-label="Scroll to latest messages"
+                                    className="absolute bottom-4 left-1/2 -translate-x-1/2 p-2.5 rounded-full bg-white dark:bg-[#161b27] border border-gray-200 dark:border-[#1e2535] text-gray-600 dark:text-gray-300 shadow-lg hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                                    <ChevronDown className="w-5 h-5" />
+                                </button>
+                            )}
+                        </div>
                         </div>
 
                         {/* Input bar */}
