@@ -40,6 +40,34 @@ class CountryNameTimeoutError(Exception):
     pass
 
 
+# Module-level handle to the running genesis instance so the country-name
+# submission endpoint can deliver the Sovereign's chosen nation name to the
+# in-progress background genesis task. Genesis runs in-process via
+# asyncio.create_task, so a plain module global is sufficient.
+_ACTIVE_GENESIS: Optional["InitializationService"] = None
+
+
+def get_active_genesis() -> Optional["InitializationService"]:
+    """Return the currently running genesis instance, or None."""
+    return _ACTIVE_GENESIS
+
+
+def submit_country_name(name: str) -> bool:
+    """
+    Deliver a user-submitted nation name to the running genesis task.
+
+    Returns True if a genesis task is currently waiting for a name (and the
+    name was accepted), False if there is no genesis task awaiting input
+    (e.g. genesis already finished, hasn't started, or isn't at the prompt
+    step yet).
+    """
+    svc = _ACTIVE_GENESIS
+    if svc is None or not svc.awaiting_country_name:
+        return False
+    svc.set_country_name(name)
+    return True
+
+
 class InitializationService:
     """
     Bootstraps Agentium from zero state.
@@ -69,6 +97,8 @@ class InitializationService:
         self.genesis_log: List[str] = []
         self._pending_country_name: Optional[str] = None
         self._country_name_event: Optional[asyncio.Event] = None
+        self.awaiting_country_name: bool = False
+        self.country_name_prompt: str = ""
 
     # ── API Key availability check ────────────────────────────────────────────
     def _has_any_active_api_key(self) -> bool:
@@ -209,17 +239,21 @@ class InitializationService:
             "**To respond:** Reply with `name: YourChosenName`"
         )
 
-        await self._broadcast_to_user(prompt_message, is_urgent=True)
-
+        self.awaiting_country_name = True
+        self.country_name_prompt = prompt_message
         try:
-            await asyncio.wait_for(
-                self._country_name_event.wait(),
-                timeout=timeout
-            )
-            return self._pending_country_name
-        except asyncio.TimeoutError:
-            return None
+            await self._broadcast_to_user(prompt_message, is_urgent=True)
+            try:
+                await asyncio.wait_for(
+                    self._country_name_event.wait(),
+                    timeout=timeout
+                )
+                return self._pending_country_name
+            except asyncio.TimeoutError:
+                return None
         finally:
+            self.awaiting_country_name = False
+            self.country_name_prompt = ""
             self._country_name_event = None
             self._pending_country_name = None
 
@@ -367,6 +401,9 @@ class InitializationService:
             self._log("WARNING", "Force re-initialization requested.")
             await self._clear_existing_data()
 
+        global _ACTIVE_GENESIS
+        _ACTIVE_GENESIS = self
+
         results = {
             "status": "initialized",
             "steps_completed": [],
@@ -480,6 +517,9 @@ class InitializationService:
             self.db.rollback()
             self._log("ERROR", f"Genesis failed: {str(e)}")
             raise InitializationError(f"Genesis failed: {str(e)}")
+        finally:
+            if _ACTIVE_GENESIS is self:
+                _ACTIVE_GENESIS = None
 
     async def _create_head_of_council(self) -> HeadOfCouncil:
         """Create the supreme authority - Head 00001."""
