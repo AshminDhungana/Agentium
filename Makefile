@@ -12,18 +12,23 @@ down:
 restart:
 	docker compose down && docker compose up -d
 
-# -- Force reinstall voice bridge (deletes the skip-marker then restarts) --
+# -- Force reinstall voice bridge --
 voice-reinstall:
-	@echo "Clearing voice install marker..."
-	@rm -f ~/.agentium/voice-installed.marker
-	@echo "Restarting voice-autoinstall service..."
-	docker compose up -d voice-autoinstall
-	docker compose logs -f voice-autoinstall
+	@if [ -d /run/desktop/mnt/host ] || uname -s | grep -qiE "MINGW|MSYS|CYGWIN"; then \
+	  powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/setup.ps1; \
+	else \
+	  rm -f ~/.agentium/voice-installed.marker; \
+	  docker compose up -d voice-autoinstall; \
+	  docker compose logs -f voice-autoinstall; \
+	fi
 
 # -- Uninstall voice bridge from host --
 uninstall-voice:
-	@bash scripts/uninstall-voice-bridge.sh
-	@rm -f ~/.agentium/voice-installed.marker
+	@if [ -d /run/desktop/mnt/host ] || uname -s | grep -qiE "MINGW|MSYS|CYGWIN"; then \
+	  powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/uninstall-voice-bridge.ps1; \
+	else \
+	  bash scripts/uninstall-voice-bridge.sh && rm -f ~/.agentium/voice-installed.marker; \
+	fi
 	@echo "Voice bridge uninstalled."
 
 # -- Tail voice bridge logs --
@@ -32,7 +37,7 @@ voice-logs:
 	case "$$SVC" in \
 	  systemd) journalctl --user -u agentium-voice -f ;; \
 	  launchd)  tail -f ~/.agentium/voice-bridge.log ;; \
-	  *)        tail -f ~/.agentium/voice-br将会是.log ;; \
+	  *)        tail -f ~/.agentium/voice-bridge.log ;; \
 	esac
 
 # -- Check voice bridge service status --
