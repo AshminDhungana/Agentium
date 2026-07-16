@@ -4,7 +4,7 @@
 **Status:** Proposed (awaiting review)
 **Scope:** A professional, reusable bash skill that the Head of Council (`00001`) and
 other Agentium agents can use to operate the Agentium codebase safely via the shell,
-plus a generic loader that makes any skill placed in `.agents/skills/` discoverable
+plus a generic loader that makes any skill placed in `backend/.agentium/skills/` discoverable
 and usable by the in-product agent fleet.
 
 ## Problem
@@ -28,16 +28,16 @@ and usable by the in-product agent fleet.
 
 ## Approach (selected)
 
-Author the bash skill as markdown under `.agents/skills/bash/` (matching the existing
+Author the bash skill as markdown under `backend/.agentium/skills/bash/` (matching the existing
 repo skill convention used by `systematic-debugging`, `test-driven-development`,
 `brainstorming`, etc.), and build a **generic markdown→skill-library loader** so any
-`SKILL.md` dropped into `.agents/skills/<name>/` is automatically registered,
+`SKILL.md` dropped into `backend/.agentium/skills/<name>/` is automatically registered,
 verified, and retrievable by agents. The folder becomes a trusted, version-controlled
 skill source; the loader is not bash-specific.
 
 ## Part 1 — The bash skill content
 
-Location: `.agents/skills/bash/`
+Location: `backend/.agentium/skills/bash/`
 
 ### `SKILL.md` (entry point)
 Frontmatter + body. Frontmatter follows the folder convention:
@@ -114,18 +114,30 @@ Concise, copy-pasteable recipes, each a one-liner or short `bash -lc` block:
 
 ## Part 2 — The generic loader (discovery bridge)
 
-A loader makes any `.agents/skills/<name>/SKILL.md` discoverable by agents. This is
+A loader makes any `backend/.agentium/skills/<name>/SKILL.md` discoverable by agents. This is
 what answers "how does the Head of Council know and use the skill?" — it registers
 the markdown into the PostgreSQL + ChromaDB skill library that `SkillRAG` already
-retrieves from.
+retrieves from. **Runtime discovery: the agent never reads the folder.** During task
+execution `task_executor.py` calls `Agent.execute_with_skill_rag` → `SkillRAG.execute_with_skills`
+→ `skill_manager.search_skills(query, agent_tier)`, which semantically searches the
+`agent_skills` ChromaDB collection and injects the matching skill's text into the
+agent prompt (filtered to verified + constitution_compliant + success_rate ≥ 0.7).
+Folder skills register with `success_rate=1.0` so they always clear that floor.
 
-### `scripts/seed_skills.py` (new)
-- Scans `.agents/skills/*/SKILL.md` (repo-root-relative; resolves correctly inside
-  the backend container and on the host).
+### `backend/scripts/seed_skills.py` (new)
+- Scans `backend/.agentium/skills/*/SKILL.md` (lives under `backend/`, so it is mounted
+  into the container at `/app/backend/.agentium/...` via `./backend:/app/backend` and
+  baked into the image via `COPY . .`).
+- **Scripts & datasets:** a skill folder MAY contain `scripts/` and `datasets/`
+  subdirs. Reference them in `SKILL.md` via the `__SKILL_DIR__` token; the loader
+  substitutes it with the skill's absolute container path
+  (`/app/backend/.agentium/skills/<name>`) before embedding, so the injected skill
+  text tells the agent exactly where bundled files live. No `SkillSchema` field change
+  is needed — the path rides in the document text.
 - Parses YAML frontmatter. Missing fields get safe defaults:
   - `skill_type` → `automation`, `domain` → `devops`, `complexity` → `intermediate`,
     `tags` → `["bash"]`, `creator_tier` → `head`, `verification_status` → `verified`,
-    `constitution_compliant` → `True`.
+    `constitution_compliant` → `True`, `success_rate` → `1.0`.
 - Maps markdown body → `SkillSchema` (`backend/models/entities/skill.py`):
   - `description` = frontmatter `description` (validated 50–300 chars; loader
     truncates/pads or errors loudly if outside range).
