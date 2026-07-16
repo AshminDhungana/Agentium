@@ -130,7 +130,7 @@ jobs:
       - name: Pre-download embedding model
         working-directory: ./backend
         run: |
-          python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('BAAI/bge-base-en-v1.5'); SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')"
+          python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('BAAI/bge-base-en-v1.5')"
 
       - name: Run integration tests with coverage
         working-directory: ./backend
