@@ -7,7 +7,9 @@ import { useLocation } from 'react-router-dom';
 import { useShallow } from 'zustand/react/shallow';
 import { useAuthStore } from '@/store/authStore';
 import { useWebSocketStore } from '@/store/websocketStore';
+import type { ConnectionPhase } from '@/store/connectionPhase';
 import { canReconnect } from '@/store/connectionPhase';
+import { shouldReloadChatOnActive } from '@/utils/chatHistoryReload';
 import { useChatStore } from '@/store/chatStore';
 import { submitCardAnswer } from '@/store/websocketStore';
 import type { Message, MessageMetadata, MessageAttachment as Attachment } from '@/store/chatStore';
@@ -15,7 +17,7 @@ import { StructuredInputCard } from '@/components/chat/StructuredInputCard';
 import { inboxApi, UnifiedConversation, UnifiedMessage } from '@/services/inboxApi';
 import { api } from '@/services/api';
 import {
-    Send, Crown, Bot, AlertCircle, Wifi, WifiOff, CheckCircle,
+    Send, Crown, Bot, User, AlertCircle, Wifi, WifiOff, CheckCircle,
     RefreshCw, Paperclip, Image as ImageIcon, File, X, Mic, MicOff, Pause,
     Download, Copy, Sparkles, Code, FileText, Video, Music, Archive,
     Maximize2, MoreHorizontal, Smile, Plus, MessageCircle, Smartphone,
@@ -782,6 +784,20 @@ export function ChatPage() {
         return () => controller.abort();
     }, [isAuthenticated, loadChatHistory]); // eslint-disable-line react-hooks/exhaustive-deps
 
+    // Issue: after Genesis completes, the persisted welcome message is in chat
+    // history but ChatPage's mount-time history load already ran (and returned
+    // empty). Reload once when the connection transitions to 'active' so the
+    // welcome message appears without the Sovereign sending a message first.
+    const prevPhaseRef = useRef<ConnectionPhase>(connectionPhase);
+    useEffect(() => {
+        const prevPhase = prevPhaseRef.current;
+        prevPhaseRef.current = connectionPhase;
+        if (!shouldReloadChatOnActive(prevPhase, connectionPhase, messages.length > 0)) return;
+        const controller = new AbortController();
+        loadChatHistory(controller.signal);
+        return () => controller.abort();
+    }, [connectionPhase, messages.length, loadChatHistory]); // eslint-disable-line react-hooks/exhaustive-deps
+
     // Inbox: load when tab switches — cancelled if the tab changes again quickly
     useEffect(() => {
         if (activeTab !== 'inbox' || conversations.length > 0) return;
@@ -1061,7 +1077,7 @@ export function ChatPage() {
                                                         (user?.username?.[0]?.toUpperCase() ?? 'S')
                                                     )
                                                 ) : (
-                                                    <Bot className="w-4 h-4" />
+                                                    <User className="w-4 h-4" />
                                                 )}
                                             </div>
 

@@ -58,6 +58,7 @@ export default defineConfig({
           'src/pages/**/*.test.{ts,tsx}',
           'src/store/**/*.test.{ts,tsx}',
           'src/services/**/*.test.{ts,tsx}',
+          'src/utils/**/*.test.{ts,tsx}',
           'src/**/*.a11y.test.{ts,tsx}',
         ],
       },
