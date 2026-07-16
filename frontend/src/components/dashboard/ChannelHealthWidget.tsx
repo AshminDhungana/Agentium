@@ -27,9 +27,7 @@ export function ChannelHealthWidget() {
     return () => clearInterval(id);
   }, [fetchChannelMetrics]);
 
-  const isEmpty = Array.isArray(channelMetrics)
-    ? channelMetrics.length === 0
-    : (channelMetrics?.channels.length ?? 0) === 0;
+  const isEmpty = (channelMetrics?.channels.length ?? 0) === 0;
 
   return (
     <WidgetCard
@@ -51,7 +49,7 @@ export function ChannelHealthWidget() {
             <div key={i} className="h-10 animate-pulse rounded-lg bg-subtle" />
           ))}
         </div>
-      ) : isEmpty ? (
+      ) : !channelMetrics || isEmpty ? (
         <EmptyState
           icon={Radio}
           title="No channels configured"

@@ -172,7 +172,7 @@ function AppWithRedirect() {
 // ── Lazy-loaded page components ───────────────────────────────────────────────
 // Each page chunk is fetched on first visit and cached by the browser thereafter.
 // Auth pages (Login/Signup) stay eager since they're needed before JS settles.
-const Dashboard        = lazy(() => import('@/pages/Dashboard').then(m => ({ default: m.Dashboard })));
+const Dashboard        = lazy(() => import('@/pages/Dashboard'));
 const SettingsPage     = lazy(() => import('@/pages/SettingsPage').then(m => ({ default: m.SettingsPage })));
 const ChatPage         = lazy(() => import('@/pages/ChatPage').then(m => ({ default: m.ChatPage })));
 const ChannelsPage     = lazy(() => import('@/pages/ChannelsPage').then(m => ({ default: m.ChannelsPage })));
