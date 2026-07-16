@@ -30,6 +30,7 @@ import { localVoice } from '@/services/localVoice';
 import { useVoiceBridge } from '@/hooks/useVoiceBridge';
 import { VoiceInteractionEvent } from '@/services/voiceBridge';
 import { VoiceSettingsModal } from '@/components/VoiceSettingsModal';
+import { GenesisNameModal } from '@/components/genesis/GenesisNameModal';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
@@ -1474,6 +1475,9 @@ export function ChatPage() {
                 {showVoiceSettings && (
                     <VoiceSettingsModal onClose={() => setShowVoiceSettings(false)} />
                 )}
+
+                {/* ── Genesis nation-name modal ──────────────────────────────── */}
+                <GenesisNameModal />
             </div>
         </div>
     );
