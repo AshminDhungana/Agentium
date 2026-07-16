@@ -482,7 +482,7 @@ class ToolRegistry:
             description="Create a new file with optional initial content.",
             function=desktop_file_tool.create_file,
             parameters={
-                "filepath": {"type": "string", "description": "Absolute path for new file"},
+                "filepath": {"type": "string", "description": "Path for new file. Use /host_home/... for the host user's home (e.g. /host_home/Desktop/file.txt) or /host/... for the host root. These mounts are writable."},
                 "content":  {"type": "string", "description": "Initial file content (optional)", "optional": True},
             },
             authorized_tiers=["0xxxx", "1xxxx", "2xxxx"],
@@ -492,7 +492,7 @@ class ToolRegistry:
             description="Read file contents with optional line offset and limit.",
             function=desktop_file_tool.read_file,
             parameters={
-                "filepath": {"type": "string",  "description": "Absolute path to file"},
+                "filepath": {"type": "string",  "description": "Path to file. Use /host_home/... (host home) or /host/... (host root); both are writable mounts."},
                 "offset":   {"type": "integer", "description": "Line offset to start reading from (default 0)", "optional": True},
                 "limit":    {"type": "integer", "description": "Max lines to return (default 500)", "optional": True},
             },
@@ -503,7 +503,7 @@ class ToolRegistry:
             description="Write content to a file, with optional .bak backup.",
             function=desktop_file_tool.save_file,
             parameters={
-                "filepath": {"type": "string",  "description": "Absolute path to file"},
+                "filepath": {"type": "string",  "description": "Path to file. Use /host_home/... (host home) or /host/... (host root); both are writable mounts."},
                 "content":  {"type": "string",  "description": "Content to write"},
                 "backup":   {"type": "boolean", "description": "Create .bak backup before overwriting (default true)", "optional": True},
             },
@@ -514,7 +514,7 @@ class ToolRegistry:
             description="Delete a file or directory. confirm must be true to proceed.",
             function=desktop_file_tool.delete_file,
             parameters={
-                "filepath": {"type": "string",  "description": "Absolute path to file or directory"},
+                "filepath": {"type": "string",  "description": "Path to file or directory. Use /host_home/... (host home) or /host/... (host root)."},
                 "confirm":  {"type": "boolean", "description": "Must be true to confirm deletion"},
             },
             authorized_tiers=["0xxxx", "1xxxx"],
@@ -524,8 +524,8 @@ class ToolRegistry:
             description="Copy a file or directory from src to dst.",
             function=desktop_file_tool.copy_file,
             parameters={
-                "src": {"type": "string", "description": "Source path"},
-                "dst": {"type": "string", "description": "Destination path"},
+                "src": {"type": "string", "description": "Source path. Use /host_home/... or /host/... (writable host mounts)."},
+                "dst": {"type": "string", "description": "Destination path. Use /host_home/... or /host/... (writable host mounts)."},
             },
             authorized_tiers=["0xxxx", "1xxxx", "2xxxx"],
         )
@@ -534,8 +534,8 @@ class ToolRegistry:
             description="Move or rename a file or directory.",
             function=desktop_file_tool.move_file,
             parameters={
-                "src": {"type": "string", "description": "Source path"},
-                "dst": {"type": "string", "description": "Destination path"},
+                "src": {"type": "string", "description": "Source path. Use /host_home/... or /host/... (writable host mounts)."},
+                "dst": {"type": "string", "description": "Destination path. Use /host_home/... or /host/... (writable host mounts)."},
             },
             authorized_tiers=["0xxxx", "1xxxx", "2xxxx"],
         )
@@ -544,7 +544,7 @@ class ToolRegistry:
             description="List directory contents with name, size, type, and modified date.",
             function=desktop_file_tool.list_directory,
             parameters={
-                "path":        {"type": "string",  "description": "Directory path"},
+                "path":        {"type": "string",  "description": "Directory path. Use /host_home/... (host home) or /host/... (host root); both are writable mounts."},
                 "show_hidden": {"type": "boolean", "description": "Include hidden files (default false)", "optional": True},
                 "recursive":   {"type": "boolean", "description": "List recursively (default false)", "optional": True},
             },
@@ -560,7 +560,7 @@ class ToolRegistry:
             ),
             function=desktop_doc_tool.read_document,
             parameters={
-                "filepath": {"type": "string", "description": "Absolute path to document"},
+                "filepath": {"type": "string", "description": "Path to document. Use /host_home/... (host home, e.g. /host_home/Desktop/x.md) or /host/... (host root)."},
             },
             authorized_tiers=["0xxxx", "1xxxx", "2xxxx"],
         )
@@ -569,7 +569,7 @@ class ToolRegistry:
             description="Create a new document. doc_type: txt | md | docx | xlsx | json | csv",
             function=desktop_doc_tool.create_document,
             parameters={
-                "filepath": {"type": "string", "description": "Path for new document"},
+                "filepath": {"type": "string", "description": "Path for new document. Use /host_home/... (host home, e.g. /host_home/Desktop/x.md) or /host/... (host root). Both are writable."},
                 "content":  {"type": "string", "description": "Initial content (optional, plain text types only)", "optional": True},
                 "doc_type": {"type": "string", "description": "txt | md | docx | xlsx | json | csv", "optional": True},
             },
@@ -586,7 +586,7 @@ class ToolRegistry:
             ),
             function=desktop_doc_tool.edit_document,
             parameters={
-                "filepath": {"type": "string", "description": "Absolute path to document"},
+                "filepath": {"type": "string", "description": "Path to document. Use /host_home/... (host home) or /host/... (host root)."},
                 "edits":    {"type": "array",  "description": "List of edit operation dicts"},
             },
             authorized_tiers=["0xxxx", "1xxxx", "2xxxx"],
@@ -599,7 +599,7 @@ class ToolRegistry:
             ),
             function=desktop_doc_tool.save_document,
             parameters={
-                "filepath": {"type": "string",  "description": "Absolute path to document"},
+                "filepath": {"type": "string",  "description": "Path to document. Use /host_home/... (host home) or /host/... (host root)."},
                 "content":  {"type": "string",  "description": "Content: string | dict | list"},
                 "backup":   {"type": "boolean", "description": "Create .bak backup (default true)", "optional": True},
             },
