@@ -101,6 +101,49 @@ def get_db_context():
         db.close()
 
 
+def _ensure_tool_usage_log_columns(db: Session):
+    """
+    Add BaseEntity columns (updated_at, is_active) to tool_usage_logs if absent.
+
+    The table was created by an older migration that predates these BaseEntity
+    columns, so Base.metadata.create_all() skips it (table already exists) and
+    the columns are never added. ToolAnalyticsService._write_log inserts rows
+    that include these columns, which would otherwise fail with an
+    UndefinedColumn error. Reconcile live, mirroring _ensure_api_key_resilience_columns.
+    """
+    inspector = inspect(db.get_bind())
+    try:
+        existing_columns = {
+            col['name'] for col in inspector.get_columns('tool_usage_logs')
+        }
+    except Exception:
+        return
+
+    columns_to_add = []
+    if 'updated_at' not in existing_columns:
+        columns_to_add.append("ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP")
+    if 'is_active' not in existing_columns:
+        columns_to_add.append(
+            "ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE NOT NULL"
+        )
+
+    if not columns_to_add:
+        return
+
+    for alter_stmt in columns_to_add:
+        try:
+            db.execute(text(f"ALTER TABLE tool_usage_logs {alter_stmt}"))
+            db.commit()
+        except Exception as e:
+            db.rollback()
+            if "already exists" not in str(e).lower() and "duplicate" not in str(e).lower():
+                raise
+
+    logger.info(
+        "✅ Reconciled tool_usage_logs columns (%d added)", len(columns_to_add)
+    )
+
+
 def _ensure_api_key_resilience_columns(db: Session):
     """
     Add Phase 5.4 columns to user_model_configs table if they don't exist.
@@ -274,6 +317,7 @@ def create_initial_data(db: Session):
     Constitution and Head of Council are created by PersistentCouncilService.
     """
     _ensure_system_settings(db)
+    _ensure_tool_usage_log_columns(db)
     _ensure_api_key_resilience_columns(db)
 
 

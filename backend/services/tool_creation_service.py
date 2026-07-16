@@ -13,6 +13,7 @@ Fixes (Phase 6.8):
 - persistent_council import removed from propose_tool (was imported but never called)
 """
 from sqlalchemy.orm import Session
+from backend.models.database import get_db_context
 from backend.models.schemas.tool_creation import ToolCreationRequest
 from backend.models.entities.tool_staging import ToolStaging
 from backend.models.entities.voting import AmendmentVoting, AmendmentStatus
@@ -286,14 +287,27 @@ class ToolCreationService:
         """
         Execute a registered tool with automatic analytics recording.
         Use this instead of calling tool_registry directly when analytics is needed.
+
+        NOTE: the ToolVersion lookup and the ToolUsageLog write each run on an
+        INDEPENDENT session. The caller (e.g. AgentOrchestrator) may hand us a
+        long-lived shared session that has already hit a failed transaction. If we
+        queried/committed on that session here, every tool call would blow up with a
+        SQLAlchemy "current transaction is aborted" rollback error — even for tools
+        that never touch the DB (e.g. desktop_screen_size) or tools that open their
+        own session (preference_*). Isolating these reads/writes keeps a poisoned
+        caller session from contaminating tool execution.
         """
-        # Resolve current version number
+        # Resolve current version number on a throwaway session.
         from backend.models.entities.tool_version import ToolVersion
-        active_version = (
-            self.db.query(ToolVersion)
-            .filter(ToolVersion.tool_name == tool_name, ToolVersion.is_active == True)
-            .first()
-        )
+        try:
+            with get_db_context() as vdb:
+                active_version = (
+                    vdb.query(ToolVersion)
+                    .filter(ToolVersion.tool_name == tool_name, ToolVersion.is_active == True)
+                    .first()
+                )
+        except Exception:
+            active_version = None
         version_number = active_version.version_number if active_version else 1
 
         result = {}

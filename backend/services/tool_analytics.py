@@ -23,9 +23,13 @@ from datetime import datetime, timedelta
 from contextlib import contextmanager
 import hashlib
 import json
+import logging
 import time
 
+from backend.models.database import get_db_context
 from backend.models.entities.tool_usage_log import ToolUsageLog
+
+logger = logging.getLogger(__name__)
 
 
 class _RecordingContext:
@@ -293,11 +297,19 @@ class ToolAnalyticsService:
             kwargs["called_by_agentium_id"] = kwargs.pop("called_by")
 
         log = ToolUsageLog(**kwargs, invoked_at=datetime.utcnow())
-        self.db.add(log)
+
+        # Use an INDEPENDENT session. The caller (e.g. AgentOrchestrator) may
+        # hand us a long-lived shared session that has already hit a failed
+        # transaction ("current transaction is aborted" / rollback state).
+        # Writing analytics on that session would make every tool call surface a
+        # SQLAlchemy rollback error, and a failed analytics write would in turn
+        # poison the caller's session. A dedicated session breaks that coupling.
         try:
-            self.db.commit()
-        except Exception:
-            self.db.rollback()  # Never let analytics writes break the main flow
+            with get_db_context() as db:
+                db.add(log)
+                db.commit()
+        except Exception as exc:
+            logger.warning("[tool_analytics] failed to write ToolUsageLog: %s", exc)
 
     def _hash_input(self, kwargs: dict) -> str:
         """Hash input."""
