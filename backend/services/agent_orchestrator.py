@@ -311,32 +311,38 @@ class AgentOrchestrator:
         # Explicit provisioning directives are executed by the *issuing* agent
         # according to its own authority. On no authority we fall through to
         # normal hierarchical routing so the message is not silently dropped.
-        from backend.services.governance_command_service import GovernanceCommandService
-        gov_command = GovernanceCommandService.detect_command(raw_input)
-        if gov_command:
-            source_agent = self._get_agent(source_id)
-            if source_agent is not None:
-                try:
-                    gov_result = GovernanceCommandService.execute(
-                        gov_command, source_agent, self.db
-                    )
-                    await self._log(
-                        actor=source_id,
-                        action=gov_result["action"],
-                        desc=f"Governance command executed: "
-                             f"{gov_result.get('agentium_id') or gov_result.get('task_id')}",
-                        level=AuditLevel.INFO,
-                    )
-                    return RouteResult(
-                        success=True,
-                        message_id=f"gov_{gov_result['action']}_{datetime.utcnow().timestamp()}",
-                        path_taken=[source_id],
-                        constitutional_basis=[f"Governance command by {source_id}"],
-                        metadata=gov_result,
-                    )
-                except PermissionError as pe:
-                    logger.warning("Governance command rejected (no authority): %s", pe)
-                    # Fall through to normal routing below.
+        # Critics (7/8/9) are infrastructure, not governance actors: never treat
+        # their review output as a directive. For other tiers the directive must
+        # START the message (require_prefix) so prose like "recommend we create a
+        # task ..." inside a task output / critic review is NOT mis-executed.
+        source_tier = source_id[0] if (source_id and source_id[0].isdigit()) else ""
+        if source_tier not in ("7", "8", "9"):
+            from backend.services.governance_command_service import GovernanceCommandService
+            gov_command = GovernanceCommandService.detect_command(raw_input, require_prefix=True)
+            if gov_command:
+                source_agent = self._get_agent(source_id)
+                if source_agent is not None:
+                    try:
+                        gov_result = GovernanceCommandService.execute(
+                            gov_command, source_agent, self.db
+                        )
+                        await self._log(
+                            actor=source_id,
+                            action=gov_result["action"],
+                            desc=f"Governance command executed: "
+                                 f"{gov_result.get('agentium_id') or gov_result.get('task_id')}",
+                            level=AuditLevel.INFO,
+                        )
+                        return RouteResult(
+                            success=True,
+                            message_id=f"gov_{gov_result['action']}_{datetime.utcnow().timestamp()}",
+                            path_taken=[source_id],
+                            constitutional_basis=[f"Governance command by {source_id}"],
+                            metadata=gov_result,
+                        )
+                    except PermissionError as pe:
+                        logger.warning("Governance command rejected (no authority): %s", pe)
+                        # Fall through to normal routing below.
 
         # Determine target
         direction = self._get_direction(source_id, recipient)

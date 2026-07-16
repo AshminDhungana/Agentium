@@ -76,16 +76,29 @@ class GovernanceCommandService:
     # Detection
     # ──────────────────────────────────────────────────────────────────
     @classmethod
-    def detect_command(cls, message: str) -> Optional[GovernanceCommand]:
-        """Parse a message into a GovernanceCommand, or None if no directive."""
+    def detect_command(cls, message: str, require_prefix: bool = False) -> Optional[GovernanceCommand]:
+        """Parse a message into a GovernanceCommand, or None if no directive.
+
+        Args:
+            message: raw text to inspect.
+            require_prefix: when True, the directive phrase must START the
+                (stripped, lowercased) message. Used for inter-agent routing
+                where messages are free-form prose (task outputs, critic
+                reviews) and a phrase appearing mid-sentence must NOT be
+                mistaken for a command. The Sovereign chat path passes False so
+                polite phrasings ("please spawn a task agent") still match.
+        """
         if not message or not message.strip():
             return None
 
-        lowered = message.lower()
+        lowered = message.lower().strip()
+
+        def _matches(phrase: str) -> bool:
+            return lowered.startswith(phrase) if require_prefix else phrase in lowered
 
         # Task/lead agent provisioning takes precedence over the more generic
         # "create a task" phrase (which is a substring of "create a task agent").
-        if any(phrase in lowered for phrase in cls.TASK_PHRASES):
+        if any(_matches(phrase) for phrase in cls.TASK_PHRASES):
             name, description = cls._extract_name_and_desc(message)
             return GovernanceCommand(
                 kind="spawn_task_agent",
@@ -93,7 +106,7 @@ class GovernanceCommandService:
                 description=description,
             )
 
-        if any(phrase in lowered for phrase in cls.LEAD_PHRASES):
+        if any(_matches(phrase) for phrase in cls.LEAD_PHRASES):
             name, description = cls._extract_name_and_desc(message)
             return GovernanceCommand(
                 kind="spawn_lead_agent",
@@ -101,7 +114,7 @@ class GovernanceCommandService:
                 description=description,
             )
 
-        if any(phrase in lowered for phrase in cls.CREATE_TASK_PHRASES):
+        if any(_matches(phrase) for phrase in cls.CREATE_TASK_PHRASES):
             return GovernanceCommand(
                 kind="create_task",
                 description=message.strip(),

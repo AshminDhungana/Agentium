@@ -204,3 +204,53 @@ async def test_genesis_seeds_a_default_lead(seeded_db):
     assert lead is not None
     assert lead.agentium_id.startswith("2")
     assert lead.parent_id == seeded_db.query(HeadOfCouncil).filter_by(agentium_id="00001").first().id
+
+
+# ── Regression: inter-agent false-positive hardening ──────────────────────────
+from backend.models.entities.critics import CriticAgent, CriticType
+from backend.models.entities.agents import AgentStatus
+
+
+@pytest.mark.asyncio
+async def test_process_intent_ignores_prose_with_create_task(seeded_db):
+    """A free-form message that merely *mentions* 'create a task' mid-sentence
+    must NOT be executed as a governance command (require_prefix)."""
+    head = seeded_db.query(HeadOfCouncil).filter_by(agentium_id="00001").first()
+    lead = reincarnation_service.spawn_lead_agent(parent=head, name="L", description="x", db=seeded_db)
+    seeded_db.commit()
+
+    tasks_before = seeded_db.query(Task).count()
+    orch = AgentOrchestrator(db=seeded_db)
+    result = await orch.process_intent(
+        raw_input="The output looks good. I recommend we create a task to add unit tests.",
+        source_id=lead.agentium_id,
+    )
+    # It fell through to normal routing; definitely not a governance create_task.
+    assert not (result.success and result.metadata.get("action") == "create_task")
+    assert seeded_db.query(Task).count() == tasks_before
+
+
+@pytest.mark.asyncio
+async def test_process_intent_skips_critic_tier(seeded_db):
+    """Critic tiers (7/8/9) are infrastructure; their messages must never be
+    treated as governance commands, even if they start with a directive phrase."""
+    critic = CriticAgent(
+        agentium_id="70001",
+        name="Code Critic 70001",
+        critic_specialty=CriticType.CODE,
+        status=AgentStatus.ACTIVE,
+        is_active=True,
+        constitution_version="v1.0.0",
+        current_task_id="TREG",
+    )
+    seeded_db.add(critic)
+    seeded_db.commit()
+    tasks_before = seeded_db.query(Task).count()
+
+    orch = AgentOrchestrator(db=seeded_db)
+    result = await orch.process_intent(
+        raw_input="create a task to verify the output",
+        source_id=critic.agentium_id,
+    )
+    assert not (result.success and result.metadata.get("action") == "create_task")
+    assert seeded_db.query(Task).count() == tasks_before
