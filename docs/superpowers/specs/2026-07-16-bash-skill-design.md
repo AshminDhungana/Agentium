@@ -138,10 +138,15 @@ retrieves from.
   (`agent_skills` collection) using the existing `skill_manager` API
   (`create_skill` / a new idempotent `upsert_skill_from_markdown`). Idempotent:
   re-running updates in place (bump `updated_at`, keep `usage_count`).
-- Hard-clip respect: ChromaDB embedding window is ~1800 chars
-  (`SkillSchema.to_chroma_document` already clips and warns); loader ensures the
-  high-value fields (description, steps, validation) come first so clipping never
-  drops them.
+- Embedding model must follow the project standard. The skills subsystem is the
+  **last remaining MiniLM holdout** and must move to `BAAI/bge-base-en-v1.5` (the
+  project-wide embedding model, already baked into the image). See the
+  "Embedding model migration" section below for every file that changes.
+- Clip limit: `SkillSchema.CHROMA_CHAR_LIMIT` is raised from `1_800` → `2_000` to
+  match `bge-base-en-v1.5`'s 512-token window (~2 000 chars), and the module-doc
+  comment referencing MiniLM is rewritten to reference bge. `to_chroma_document`
+  already clips and warns; loader keeps high-value fields (description, steps,
+  validation) first so clipping never drops them.
 
 ### Wiring
 - Add a `make seed-skills` target invoking
@@ -158,6 +163,53 @@ retrieves from.
 - Agent-created skills at runtime continue to follow the normal
   `pending → verified` Council review flow (`SkillSubmission`); the loader is only
   for the trusted, version-controlled folder.
+
+## Embedding model migration (MiniLM → bge-base-en-v1.5)
+
+The main RAG/vector store already uses `BAAI/bge-base-en-v1.5` (see ADR-021), but
+the **skills subsystem still uses `sentence-transformers/all-MiniLM-L6-v2`** (384-dim).
+Every MiniLM reference in active code must switch to bge-base. bge-base produces
+768-dim vectors, so existing skill ChromaDB collections must be rebuilt.
+
+Concrete changes:
+1. **`backend/models/entities/skill.py`**
+   - `SkillSchema.embedding_model` default → `"BAAI/bge-base-en-v1.5"`.
+   - `SkillDB.embedding_model` column `default` → `"BAAI/bge-base-en-v1.5"`.
+   - `CHROMA_CHAR_LIMIT` `1_800` → `2_000`; rewrite the module-doc comment that
+     references MiniLM's 512-token window to reference bge-base's 512-token window.
+2. **`backend/services/skill_manager.py`**
+   - `create_skill` (line ~146): replace `SentenceTransformer(skill.embedding_model)`
+     with the project embedder — load from `settings.EMBEDDING_MODEL`
+     (`BAAI/bge-base-en-v1.5`) so storage always uses bge, not the per-row default.
+   - `search_skills` (line ~247): replace the **hardcoded**
+     `SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")` with
+     `settings.EMBEDDING_MODEL`. This is a latent bug — the query was embedded with
+     MiniLM (384-dim) while the project's other collections are bge (768-dim).
+3. **`backend/tools/embedding_tool.py`** (line ~144): default
+   `model or "all-MiniLM-L6-v2"` → `model or settings.EMBEDDING_MODEL`.
+4. **`.github/workflows/integration-tests.yml`** (line ~133): remove the
+   `SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')` pre-download from
+   the model cache step (keep the bge-base pre-download).
+5. **Collection rebuild (required):** the `agent_skills`, `best_practices`, and
+   `constitutional_skills` ChromaDB collections currently hold 384-dim MiniLM
+   vectors. After switching to bge (768-dim), they must be dropped and re-embedded.
+   Add a reindex step (in `seed_skills.py` or `services/tasks/reindex_knowledge.py`):
+   iterate `SkillDB` rows, rebuild each skill's `SkillSchema`, recompute the bge
+   embedding, and `collection.add` into a freshly created collection. Guard against
+   dimension-mismatch errors on first run after the switch.
+6. **Alembic:** add a migration to change the `skills.embedding_model` column
+   `server_default` from `'sentence-transformers/all-MiniLM-L6-v2'` to
+   `'BAAI/bge-base-en-v1.5'` (cosmetic for new rows; the SQLAlchemy default in
+   `skill.py` covers app-level creation).
+7. **Comments only** (no behavior change): `docker-compose.yml`, `Dockerfile`,
+   `Dockerfile.privileged`, `constitutional_guard.py`, `reindex_knowledge.py`,
+   `vector_store.py` contain MiniLM mentions that are *historical notes* ("MiniLM was
+   retired"). These may stay as migration history, but any line that still implies
+   MiniLM is in use (vs. was retired) should be clarified. The `docs/adr/021-*`
+   history must NOT be rewritten.
+
+Note: `backend/tests/unit/test_no_legacy_embedding.py` scans for `all-MiniLM-L6-v2`
+markers — removing the strings above keeps it green.
 
 ## Testing / Verification
 
@@ -176,7 +228,8 @@ retrieves from.
 ## Out of scope
 
 - No new Python execution tool (the `ShellTool` already exists).
-- No changes to the `SkillSchema` or `SkillRAG` retrieval logic.
+- No change to the `SkillSchema` *shape* or `SkillRAG` retrieval logic — only the
+  `embedding_model` default and the `CHROMA_CHAR_LIMIT` constant change.
 - No UI changes; the frontend skill browser is unaffected (folder skills appear
   like any other verified skill).
 - Runtime agent skill *creation* (`suggest_skill_creation`) is unchanged.
