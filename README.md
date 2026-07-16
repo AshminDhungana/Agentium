@@ -16,6 +16,37 @@ Built for those who believe AI should be **transparent, accountable, and soverei
 
 ---
 
+## 🚀 Quick Start
+
+### Prerequisites
+
+- Docker Desktop (Windows/macOS) or Docker Engine + Compose (Linux)
+- 8 GB RAM minimum (16 GB recommended)
+- 10 GB free disk space
+
+### Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/AshminDhungana/Agentium.git
+cd Agentium
+
+# Launch the stack
+docker compose up -d
+# First build takes (20–40) minutes
+# Depends on your internet speed and your PC performance
+
+# Watch initialization logs
+docker compose logs -f
+
+# Access the dashboard
+open http://localhost:3000
+```
+
+**First Login**: You'll be guided through the **Genesis Protocol** — your AI Nation is named by democratic Council vote before any tasks are accepted.
+
+---
+
 ## ✨ What Makes Agentium Unique?
 
 ### 🏛️ Democratic AI Governance
@@ -289,35 +320,6 @@ All constitution, model, plugin, and channel configuration changes are automatic
 - Constitutional recalibration occurs between every task
 
 ---
-
-## 🚀 Quick Start
-
-### Prerequisites
-
-- Docker Desktop (Windows/macOS) or Docker Engine + Compose (Linux)
-- 8 GB RAM minimum (16 GB recommended)
-- 10 GB free disk space
-
-### Installation
-
-```bash
-# Clone the repository
-git clone https://github.com/AshminDhungana/Agentium.git
-cd Agentium
-
-# Launch the stack
-docker compose up -d
-# First build takes (20–40) minutes
-# Depends on your internet speed and your PC performance
-
-# Watch initialization logs
-docker compose logs -f
-
-# Access the dashboard
-open http://localhost:3000
-```
-
-**First Login**: You'll be guided through the **Genesis Protocol** — your AI Nation is named by democratic Council vote before any tasks are accepted.
 
 ### Accessing API Documentation
 

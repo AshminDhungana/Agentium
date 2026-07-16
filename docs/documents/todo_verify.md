@@ -34,6 +34,12 @@ the step should be voice-bridge contaner runs installs scripts in the host syste
 
 - [ ] The voice bridge and the chat persona should match . Calling the admin as sir is also fine. 
 
+
+- [ ] Current structure: Chat in Chatpage, when in other page, notification appears when message. then user has to go to chat page to view message, and when the browser is minimized or closed , user can communicate thorough voice bridge. 
+    Update the above to, when in chat screen user can chat and use voice, when user leaves chatpage and go to other page, a small messanger type chat circle appears in the right hand bottom of the page, and when any message comes user can click that box and can chat from there as well as use voice from there as well, minimizing the chat window will let user to run voice . and when user enters chatpage the chat popup will disapper. the chat popup acts as chatpage chatbox outside the chatpage. and when user closes the browser then he can use the voice bridge to communicate as well. 
+    The chat popu can be placed in the mainlayout above the other pages so it doesnt move while scrolling. it should be a small gree dot when hover then convert into a circular chat popup and when pressed chat window opens. it should not disturb the use of the other page inside main layout. 
+    
+
 ## 1. Roadmap Consistency & Incomplete Items
 
 Items marked `[ ]` in `docs/documents/todo.md` while their parent phase is marked ✅ — verify each is actually done or close it out.
