@@ -22,6 +22,7 @@ from backend.services.idle_governance import idle_budget, token_optimizer
 from backend.api.routes.websocket import manager
 from backend.core.constitutional_guard import ConstitutionalGuard, Verdict, ViolationSeverity
 from backend.services.tool_creation_service import ToolCreationService
+from backend.services.tool_factory import ToolFactory
 from backend.services.critic_agents import critic_service, CriticType
 from backend.services.api_manager import api_manager
 from backend.core.llm_client import LLMClient
@@ -526,36 +527,86 @@ class AgentOrchestrator:
         raw_name = tool_name_match.group(1).strip() if tool_name_match else "unnamed_tool"
         tool_name = re.sub(r'[^a-z0-9]+', '_', raw_name.lower()).strip('_') or "unnamed_tool"
 
+        # Ask the agent's own LLM to write the *implementation* of the tool.
+        # ToolFactory wraps the returned body inside `execute(self, **kwargs)`,
+        # so the model only needs to compute and assign `result`.
         try:
-            # Generate a basic Python function template from the tool name and content
-            safe_name = re.sub(r"[^a-z0-9_]", "", tool_name.lower()).strip("_") or "unnamed_tool"
-            generated_template = dedent(f'''
-def {safe_name}(input_data: dict) -> dict:
-    """
-    Auto-generated tool from agent request: {content[:200]}
-    """
-    # TODO: Implement the tool logic here based on the agent's requirements
-    raise NotImplementedError("This tool was auto-generated and needs implementation.")
-''').strip()
-
-            request = ToolCreationRequest(
-                tool_name=tool_name,
-                description=f"Agent-initiated tool proposal: {content[:200]}",
-                code_template=generated_template,
-                parameters=[],
-                authorized_tiers=[],
-                rationale=content,
-                created_by_agentium_id=agent_id,
+            agent = self._get_agent(agent_id)
+            if agent is None:
+                return await self.escalate_to_council(
+                    issue=f"Tool creation requested by unknown agent {agent_id}: {content}",
+                    reporter_id=agent_id,
+                )
+            llm_client = LLMClient(db=self.db)
+            system_prompt = (
+                "You are the code-generation engine of an autonomous AI agent system. "
+                "Write the BODY of a Python method `execute(self, **kwargs)` for a new tool.\n"
+                "Rules:\n"
+                "- Compute the tool's output and assign it to a variable named `result` "
+                "(a dict or JSON-serialisable value).\n"
+                "- You MAY call other already-registered tools via "
+                "`from backend.core.tool_registry import tool_registry` then "
+                "`tool_registry.get_tool_function('<name>')(**inputs)`.\n"
+                "- Only use these imports: os, sys, json, re, datetime, math, typing, "
+                "requests, pathlib, uuid, random, string, hashlib, time, collections, "
+                "itertools, backend.\n"
+                "- Do NOT use eval, exec, __import__, open, input, os.system, "
+                "subprocess shell calls, or file deletion.\n"
+                "Return ONLY Python code (the execute body). No markdown fences, no commentary."
             )
+            gen = await llm_client.generate(
+                agent=agent,
+                user_message=(
+                    f"The agent wants to create a tool named '{tool_name}'.\n"
+                    f"Request: {content}\n\n"
+                    "Return the execute() body that fulfills this request."
+                ),
+                system_prompt_override=system_prompt,
+            )
+            raw_code = (gen or {}).get("content", "") or ""
+            # Tolerate models that ignore the 'no fences' instruction.
+            raw_code = re.sub(r"^```[a-zA-Z0-9]*\n", "", raw_code.strip())
+            raw_code = re.sub(r"\n```$", "", raw_code.strip())
+            code_template = dedent(raw_code).strip()
         except Exception as exc:
             logger.warning(
-                "_handle_tool_creation_request: could not build ToolCreationRequest for %s: %s",
+                "_handle_tool_creation_request: LLM code-gen failed for %s: %s",
                 agent_id, exc
             )
             return await self.escalate_to_council(
-                issue=f"Tool creation request (parse failed) from {agent_id}: {content}",
+                issue=f"Tool creation code-generation failed for {agent_id} (tool '{tool_name}'): {content}",
                 reporter_id=agent_id,
             )
+
+        if not code_template:
+            return await self.escalate_to_council(
+                issue=f"Tool creation produced empty implementation for {agent_id} (tool '{tool_name}'): {content}",
+                reporter_id=agent_id,
+            )
+
+        # Validate the generated code before it is ever staged.
+        factory = ToolFactory()
+        validation = factory.validate_tool_code(code_template)
+        if not validation["valid"]:
+            logger.warning(
+                "_handle_tool_creation_request: generated code invalid for %s: %s",
+                agent_id, validation["error"]
+            )
+            return await self.escalate_to_council(
+                issue=f"Tool creation generated unsafe code for {agent_id} (tool '{tool_name}'): {validation['error']}",
+                reporter_id=agent_id,
+            )
+
+        creator_tier = f"{agent_id[0]}xxxx"
+        request = ToolCreationRequest(
+            tool_name=tool_name,
+            description=f"Agent-initiated tool: {content[:200]}",
+            code_template=code_template,
+            parameters=[],
+            authorized_tiers=[creator_tier, "0xxxx"],
+            rationale=content,
+            created_by_agentium_id=agent_id,
+        )
 
         tool_svc = ToolCreationService(self.db)
         result = tool_svc.propose_tool(request)

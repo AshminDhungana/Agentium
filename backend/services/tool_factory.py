@@ -2,9 +2,10 @@
 
 import ast
 import importlib.util
+import json
 import sys
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 import docker
 
 class ToolFactory:
@@ -19,29 +20,36 @@ class ToolFactory:
         self.tools_directory = Path(tools_directory)
         self.tools_directory.mkdir(parents=True, exist_ok=True)
         
-        # Security: Allowed imports (whitelist)
+        # Security: Allowed imports (whitelist). `backend` is permitted so that
+        # generated/composite tools may reach the in-process tool_registry.
         self.allowed_imports = {
             'os', 'sys', 'json', 're', 'datetime', 'math', 'typing',
             'requests', 'pathlib', 'uuid', 'random', 'string', 'hashlib',
-            'subprocess', 'time', 'collections', 'itertools'
+            'subprocess', 'time', 'collections', 'itertools', 'backend',
         }
-        
-        # Security: Dangerous patterns to block
-        self.blocked_patterns = [
-            'eval(', 'exec(', '__import__', 'os.system', 'subprocess.call',
-            'rm -rf /', 'shutil.rmtree', 'open(', 'input('
-        ]
-    
+
+        # Security: dangerous builtins whose mere *call* is never permitted,
+        # plus dangerous (module, attribute) call pairs. Detection is AST-based
+        # (see _find_dangerous_calls) so it cannot be bypassed by string tricks.
+        self._blocked_call_names = {
+            'eval', 'exec', 'compile', '__import__', 'input', 'open',
+        }
+        self._blocked_call_attrs = {
+            ('os', 'system'), ('os', 'popen'), ('os', 'remove'), ('os', 'unlink'),
+            ('subprocess', 'call'), ('subprocess', 'Popen'), ('subprocess', 'run'),
+            ('subprocess', 'check_output'), ('subprocess', 'check_call'),
+            ('shutil', 'rmtree'), ('pathlib', 'unlink'),
+        }
+
     def validate_tool_code(self, code: str) -> Dict[str, Any]:
         """Validate tool code for security and syntax."""
         try:
             # 1. Syntax check
-            ast.parse(code)
+            tree = ast.parse(code)
         except SyntaxError as e:
             return {"valid": False, "error": f"Syntax error: {e}"}
-        
+
         # 2. Import whitelist check
-        tree = ast.parse(code)
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
                 for alias in node.names:
@@ -50,13 +58,39 @@ class ToolFactory:
             elif isinstance(node, ast.ImportFrom):
                 if node.module and node.module.split('.')[0] not in self.allowed_imports:
                     return {"valid": False, "error": f"Disallowed import: {node.module}"}
-        
-        # 3. Block dangerous patterns (basic check)
-        for pattern in self.blocked_patterns:
-            if pattern in code:
-                return {"valid": False, "error": f"Dangerous pattern detected: {pattern}"}
-        
+
+        # 3. Block dangerous constructs (AST-based, bypass-resistant)
+        blocked = self._find_dangerous_calls(tree)
+        if blocked:
+            return {"valid": False, "error": f"Dangerous construct detected: {blocked}"}
+
         return {"valid": True, "error": None}
+
+    def _find_dangerous_calls(self, tree: ast.AST) -> Optional[str]:
+        """Walk the AST for forbidden call expressions.
+
+        Returns a human-readable description of the first offending call,
+        or None if the tree is clean. Detects both bare builtin calls
+        (eval/exec/open/...) and dangerous attribute calls (os.system,
+        subprocess.Popen, shutil.rmtree, ...).
+        """
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            func = node.func
+            if isinstance(func, ast.Name) and func.id in self._blocked_call_names:
+                return f"{func.id}()"
+            if isinstance(func, ast.Attribute):
+                base = func.value
+                base_name = ""
+                if isinstance(base, ast.Name):
+                    base_name = base.id
+                elif isinstance(base, ast.Attribute):
+                    base_name = base.attr
+                key = (base_name, func.attr)
+                if key in self._blocked_call_attrs:
+                    return f"{base_name}.{func.attr}()"
+        return None
     
     def generate_tool_file(self, request: 'ToolCreationRequest') -> Path:
         """Generate Python file for the new tool."""

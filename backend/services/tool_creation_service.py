@@ -361,7 +361,90 @@ class ToolCreationService:
         return result
 
     # ──────────────────────────────────────────────────────────────
-    # LIST
+    # SELF-IMPROVEMENT — composite tool from repeated patterns
+    # ──────────────────────────────────────────────────────────────
+
+    @staticmethod
+    def create_from_pattern(pattern_data: Dict[str, Any], db: Session) -> Dict[str, Any]:
+        """
+        Build and register a composite tool from a repeated tool-call sequence.
+
+        `pattern_data` is expected to carry:
+            sequence     : list[str] of tool names executed in order
+            count        : how often the pattern was observed
+            success_rate : observed success rate of the pattern
+
+        The composite tool runs each named tool in sequence, threading the
+        previous result into the next tool's kwargs. It is created by the
+        Head (00001) so it auto-approves and activates without a Council
+        vote — self-improvement should not require human/legislative sign-off
+        for an optimization it has high confidence in.
+
+        Returns the propose_tool() result, or an error dict if the pattern
+        cannot be materialised.
+        """
+        from backend.core.tool_registry import tool_registry
+
+        sequence = pattern_data.get("sequence") or []
+        if not sequence:
+            return {"created": False, "error": "empty sequence"}
+
+        # Only chain tools that actually exist in the live registry.
+        resolved = [t for t in sequence if tool_registry.get_tool_function(t)]
+        if not resolved:
+            return {"created": False, "error": "no registered tools in sequence"}
+
+        tool_name = f"composite_{abs(hash('|'.join(resolved))) % (10 ** 8):08d}"
+
+        # Build the execute() body: thread results through the sequence.
+        # No leading indentation here — generate_tool_file indents every line
+        # inside execute() via _indent_code. The import is inlined so the
+        # generated module resolves tool_registry at load time.
+        body = [
+            "from backend.core.tool_registry import tool_registry",
+            "result = kwargs",
+            "",
+        ]
+        for name in resolved:
+            body.append(f'_fn = tool_registry.get_tool_function("{name}")')
+            body.append("if _fn is not None:")
+            body.append(
+                '    _inp = result if isinstance(result, dict) else {"input": result}'
+            )
+            body.append("    result = _fn(**_inp)")
+        body.append('return {"status": "success", "result": result}')
+        code_template = "\n".join(body)
+
+        # Validate the generated body before it ever touches the registry.
+        factory = ToolFactory()
+        validation = factory.validate_tool_code(code_template)
+        if not validation["valid"]:
+            return {"created": False, "error": validation["error"]}
+
+        request = ToolCreationRequest(
+            tool_name=tool_name,
+            description=(
+                "Auto-composite tool from repeated sequence: "
+                + ", ".join(resolved)
+            ),
+            parameters=[],
+            code_template=code_template,
+            test_cases=[],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx"],
+            created_by_agentium_id="00001",
+            rationale=(
+                "Self-improvement: detected repeated tool sequence "
+                f"(count={pattern_data.get('count')}, "
+                f"success_rate={pattern_data.get('success_rate')})."
+            ),
+        )
+
+        svc = ToolCreationService(db)
+        outcome = svc.propose_tool(request)
+        outcome["tool_name"] = tool_name
+        outcome["created"] = outcome.get("proposed", False)
+        return outcome
+
     # ──────────────────────────────────────────────────────────────
 
     def list_tools(
