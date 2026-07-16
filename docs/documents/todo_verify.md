@@ -9,33 +9,57 @@
 
 ---
 
-## 0. Observations and Checks
+# Project TODO
+
+## ✅ Completed
 
 ### Voice Bridge
-- [x] The "voice bridge disconnected" notification (with the accompanying command) should only appear once after login. Currently it shows up too often — fix this.
-- [x] Improve the voice bridge setup scripts — currently broken on Windows. Intended flow: the voice-bridge container installs the required scripts on the host system, and only then does the voice bridge start.
+- [x] Voice bridge "disconnected" notification (with accompanying command) should only appear once per login, not repeatedly.
+- [x] Fix voice bridge setup scripts, currently broken on Windows. Intended flow: the voice-bridge container installs the required scripts on the host system, and only then does the voice bridge start.
+- [x] Fix the voice bridge notification in the main layout being cut off by the page — it should render above the page content. Also update the notification copy as needed, referencing `docs/documents/voice-bridge-setup.md`.
 
-- [x] The command Interface in main layout as well as the chat page logo shows no of messages from the ai agent, but after the messsage is viewed it still shows the number. it should only display the number when user is not in chatpage and after the message is read i.e user is in chatpage, the indicated should disapper.
+### Chat / Command Interface
+- [x] Message-count indicator (shown on the command interface and the chat page logo) should only display the unread count while the user is outside the chat page, and disappear once the message has been read (i.e., once the user is on the chat page).
 
-- [ ] - Genisis should run as per README.md, the steps are users logins for the first time, then adds the api key, then the genisis starts, the Ai greets the users and asks for the nation name and then the genisis proceeds, nation name is saved, if nation name is there then no need to run this again. 
+### Genesis Onboarding
+- [x] Genesis flow should follow `README.md`: user logs in for the first time → adds API key → Genesis starts → AI greets the user and asks for the nation name → nation name is saved. If a nation name already exists, skip this flow on subsequent runs.
 
-- [x1] The voice bridge notification that appears in the mainlayout, is being cut off bt the page, it should appear above the page. and also update the voicebridge content if necessary refer docs\documents\voice-bridge-setup.md
+### Dashboard
+- [x] Provider Analytics on the dashboard should refresh automatically once an API key is added, instead of requiring the user to click the refresh button.
 
-- [ ] Determine whether Voice Bridge communication from the desktop requires the user to be logged in via the frontend.
-- [ ] Voice bridge communication should also be visible in the chat. Confirm whether this currently happens, and if not, implement it.
-- [ ] Align the voice bridge persona with the chat persona so they behave consistently (addressing the admin as "sir" is acceptable for both).
+---
 
-- [ ] Check wishper.cpp is downloaded in docker and is running properly.
+## 🔲 In Progress / Pending
 
-- [ ] In chatpage hovering above the chat message, will display 2 small icone one for copy and another for forward, when copy icon is clicked it copy the message, and when forward is clicked it copy the message to the chat message where user can send it again. 
+### Voice Bridge
+- [ ] **Message-count indicator bug:** when a message arrives while the user is outside the chat page, the count increases on both the command interface and the Head of Council logo. Currently, arriving at the chat page doesn't clear it. Expected behavior: entering the chat page should clear the count, and the next new message should start the count again from 1.
+  *(Note: this looks closely related to the completed indicator fix above — worth confirming whether that fix already covers this case or if it's a separate regression.)*
+- [ ] Determine whether voice bridge communication from the desktop app requires the user to be logged in via the frontend.
+- [ ] Confirm whether voice bridge communication is currently visible in the chat; if not, implement it.
+- [ ] Align the voice bridge persona with the chat persona so behavior is consistent across both (e.g., addressing the admin as "sir" is acceptable for both).
+- [ ] Verify that whisper.cpp is downloaded in Docker and running correctly.
 
-- [ ] when adding ai module, the rate limit field should autoupdate after selecting the model, if the api provides that detail. and should update to the model config page for the user to view. The max token which is set to a default of 4000 should also follow the same procedure. 
-max token, rate limit - has default values - after adding api - recive from api, autoupdate and show in the ui, if not use the default. comm
+### Chat Page
+- [ ] Add hover icons on chat messages: a **copy** icon (copies the message text) and a **forward** icon (copies the message into the compose box so the user can send it again).
 
-[ ] - Verify and improve all tools and add tools if necessary.
-[ ] - Inject information to knowledge library, such as which tools to use for what, best practices and others to make the system work properly from the beginning. When agent starts the agent should know general best practices, we can do is insert basic things to ethos, or tell agent to read from chroma on ethos , or feed the information during creation . choose the best methord for the case. 
 
-[ ] - Provider Analytics in dashboard should automatically show data after key are added but, user need to click on the refresh button for that. 
+### Model Page
+ - [ ] Add a search function in the model selection section, when user presses the fetch button then a list of model appears and a small search appears at the top which will help user find the model he is looking for if their are many model. the search should filter but the text, example, if the model is openrouter/nvidia/xxx then serching for openrouter should only show the text that has openrouter. 
+
+### AI Module Configuration
+- [ ] When adding an AI module, the **rate limit** and **max tokens** fields should auto-populate from the provider's API after a model is selected (if the API exposes this data), and the same values should be reflected on the model config page. If the API doesn't provide this info, fall back to the current defaults (max tokens: 4000).
+
+### Tools & Knowledge Base
+- [ ] Review all existing tools, improve them, and add new tools where needed.
+- [ ] Seed the knowledge library with foundational operating info for the agent: which tools to use and when, general best practices, how to access the host system, basic CMD/PowerShell usage, and useful utilities (grep, curl, etc.), so the system behaves correctly from the start. Decide on the best delivery method — e.g., bake basics into the ethos/constitution, have the agent read from Chroma on startup, or seed it at creation time — and implement whichever fits best.
+
+### Agent Behavior
+- [ ] Persona and behavior for all AI agents — including the voice bridge — should be driven by the constitution, so that editing the constitution updates persona consistently everywhere. Update the ethos as well as system instruction if necessary to achive this. 
+
+- [ ] for models that can do deep thinking the ai should be able to do that. 
+
+- [ ] Verctor database should be queried and updated. example: after reciving a task quary, after completing the task quary and the update if necessary. and during a task can also do the quary and update. Before updating agent should web search and then with the knowledge update. if web search not avilable then can skip web search. 
+
 
 ### Chat Page — UX Improvements
 - [ ] Show a typing indicator (e.g., animated three dots) when a message is sent and the reply is taking time, similar to most modern chat apps.
