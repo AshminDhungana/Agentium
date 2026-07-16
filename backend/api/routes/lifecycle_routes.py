@@ -116,7 +116,7 @@ def _get_ws_manager():
     "/spawn/task",
     response_model=AgentSpawnResponse,
     summary="Spawn Task Agent",
-    description="Spawn a new Task Agent (3xxxx). Parent must be a Lead Agent or Council Member. Broadcasts agent_spawned WebSocket event on success.",
+    description="Spawn a new Task Agent (3xxxx). Parent must be a Head of Council, Council Member, or Lead Agent. Broadcasts agent_spawned WebSocket event on success.",
     responses=build_responses(None),
 )
 async def spawn_task_agent(
@@ -135,8 +135,11 @@ async def spawn_task_agent(
     if not parent:
         raise NotFoundError(error=f"Parent agent {request.parent_agentium_id} not found", code="PARENT_AGENT_NOT_FOUND")
 
-    if not request.parent_agentium_id.startswith(('1', '2')):
-        raise BadRequestError(error="Parent must be a Lead Agent (2xxxx) or Council Member (1xxxx)", code="PARENT_MUST_BE_A_LEAD")
+    if not request.parent_agentium_id.startswith(('0', '1', '2')):
+        raise BadRequestError(
+            error="Parent must be Head of Council (0xxxx), Council Member (1xxxx), or Lead Agent (2xxxx)",
+            code="PARENT_MUST_BE_AUTHORIZED",
+        )
 
     try:
         task_agent = reincarnation_service.spawn_task_agent(

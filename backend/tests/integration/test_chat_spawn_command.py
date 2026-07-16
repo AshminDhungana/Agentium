@@ -20,6 +20,7 @@ from backend.models.entities.task import Task
 from backend.services.reincarnation_service import reincarnation_service
 from backend.services.governance_command_service import GovernanceCommandService
 from backend.services.agent_orchestrator import AgentOrchestrator
+from backend.api.routes import lifecycle_routes
 
 pytestmark = pytest.mark.integration
 
@@ -187,3 +188,11 @@ async def test_process_intent_denies_task_agent_directive(seeded_db: Session):
     except Exception:
         pass
     assert seeded_db.query(Agent).count() == before
+
+
+def test_spawn_task_api_accepts_head_parent(seeded_db):
+    head = seeded_db.query(HeadOfCouncil).filter_by(agentium_id="00001").first()
+    agent = reincarnation_service.spawn_task_agent(
+        parent=head, name="API Task", description="via api", db=seeded_db)
+    seeded_db.commit()
+    assert agent.parent_id == head.id
