@@ -308,6 +308,103 @@ class SkillManager:
             logger.error("Skill search failed: %s", e)
             return []
 
+    def reindex_skill_collections(self, db: Optional[Session] = None) -> Dict[str, int]:
+        """Drop and recreate the skill ChromaDB collections at bge 768-dim.
+
+        Legacy collections were embedded with all-MiniLM-L6-v2 (384-dim). bge-base
+        produces 768-dim vectors, so the old collections cannot accept new
+        embeddings — they must be deleted and recreated. Documents are preserved
+        from the existing collection and re-embedded with BgeEmbeddingFunction.
+        """
+        ef = BgeEmbeddingFunction()
+        client = self.vector_store.client
+        skill_collections = ["agent_skills", "best_practices", "constitutional_skills"]
+        counts: Dict[str, int] = {}
+        for name in skill_collections:
+            physical_name = self.vector_store._collection_name(name)
+            try:
+                existing = client.get_collection(physical_name).get(
+                    include=["documents", "metadatas"]
+                )
+            except Exception:  # noqa: BLE001
+                existing = {"ids": [], "documents": [], "metadatas": []}
+            if physical_name in [c.name for c in client.list_collections()]:
+                client.delete_collection(physical_name)
+            # Clear the VectorStore's per-name cache so get_collection recreates
+            # a fresh (768-dim) collection rather than returning the deleted one.
+            self.vector_store._collections_by_name.pop(physical_name, None)
+            new_col = self.vector_store.get_collection(name)  # recreates with bge + 768-dim
+            ids = existing.get("ids") or []
+            docs = existing.get("documents") or []
+            metas = existing.get("metadatas") or []
+            if ids:
+                embs = ef.embed_documents(docs)
+                new_col.add(ids=ids, documents=docs, metadatas=metas, embeddings=embs)
+            counts[name] = len(ids)
+        logger.info("Reindexed skill collections: %s", counts)
+        return counts
+
+    def upsert_skill_from_markdown(self, schema: SkillSchema, db: Optional[Session] = None) -> SkillSchema:
+        """Idempotently register a folder-authored (repo-committed) skill.
+
+        Folder skills are human-vetted and repo-committed, so we force
+        constitutional compliance and a 1.0 success rate — guaranteeing they pass
+        the SkillRAG retrieval filter (constitution_compliant == True,
+        success_rate >= 0.7) and are injected at task time.
+
+        The skill is stored directly (ChromaDB + PostgreSQL) rather than through
+        ``create_skill`` because the loader already supplies a fully-formed
+        ``SkillSchema`` (with its own ``skill_id``), and ``create_skill`` would
+        regenerate the id and discard several fields.
+        """
+        schema.constitution_compliant = True
+        schema.success_rate = 1.0
+
+        chroma_doc = schema.to_chroma_document()
+        chroma_id = f"{schema.skill_id}_v{schema.version}"
+        collection = self.vector_store.get_collection(schema.chroma_collection)
+        ef = BgeEmbeddingFunction()
+        embedding = ef.embed_documents([chroma_doc])[0]
+
+        collection.upsert(
+            ids=[chroma_id],
+            embeddings=[embedding],
+            documents=[chroma_doc],
+            metadatas=[schema.to_chroma_metadata()],
+        )
+
+        if db is not None:
+            existing = db.query(SkillDB).filter_by(skill_id=schema.skill_id).first()
+            if existing:
+                existing.constitution_compliant = True
+                existing.success_rate = 1.0
+                existing.verification_status = schema.verification_status
+                existing.embedding_model = schema.embedding_model
+                db.commit()
+            else:
+                db.add(SkillDB(
+                    skill_id=schema.skill_id,
+                    skill_name=schema.skill_name,
+                    display_name=schema.display_name,
+                    description=schema.description,
+                    skill_type=schema.skill_type,
+                    domain=schema.domain,
+                    tags=schema.tags,
+                    complexity=schema.complexity,
+                    chroma_id=chroma_id,
+                    chroma_collection=schema.chroma_collection,
+                    embedding_model=schema.embedding_model,
+                    creator_tier=schema.creator_tier,
+                    creator_id=schema.creator_id,
+                    parent_skill_id=schema.parent_skill_id,
+                    success_rate=schema.success_rate,
+                    constitution_compliant=schema.constitution_compliant,
+                    verification_status=schema.verification_status,
+                    verified_by=schema.verified_by,
+                ))
+                db.commit()
+        return schema
+
     def _build_access_filter(self, agent_tier: str, min_success_rate: float) -> Dict:
         """Build ChromaDB where clause based on agent tier and quality threshold."""
         conditions = [

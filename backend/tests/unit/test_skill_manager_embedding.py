@@ -2,6 +2,7 @@ from unittest.mock import MagicMock, patch
 
 import backend.services.skill_manager as sm
 from backend.services.skill_manager import SkillManager
+from backend.core.vector_store import get_vector_store
 
 
 def test_create_skill_embeds_documents_with_bge(monkeypatch):
@@ -93,3 +94,26 @@ def test_embedding_tool_default_is_bge(monkeypatch):
     # model=None must resolve to the project bge model, never the retired MiniLM.
     assert captured["model_name"] == "BAAI/bge-base-en-v1.5"
     assert "MiniLM" not in captured["model_name"]
+
+
+def test_reindex_rebuilds_collections_at_768():
+    mgr = SkillManager()
+    vs = get_vector_store()
+    physical = vs._collection_name("agent_skills")
+    # Force a legacy 384-dim collection so the test is deterministic regardless
+    # of prior runs against the shared ChromaDB.
+    if physical in [c.name for c in vs.client.list_collections()]:
+        vs.client.delete_collection(physical)
+    vs._collections_by_name.pop(physical, None)
+    legacy = vs.client.get_or_create_collection(physical)
+    legacy.add(ids=["legacy_1"], embeddings=[[0.0] * 384], documents=["legacy doc"],
+               metadatas=[{"skill_id": "legacy_1"}])
+    mgr.reindex_skill_collections()
+    fresh = vs.get_collection("agent_skills")
+    fresh.add(ids=["probe_768"], embeddings=[[0.1] * 768], documents=["probe"],
+              metadatas=[{"skill_id": "probe_768"}])
+    got = fresh.get(ids=["probe_768"])
+    assert got["ids"] == ["probe_768"]
+    leg = fresh.get(ids=["legacy_1"], include=["embeddings"])
+    assert leg["ids"] == ["legacy_1"]
+    assert len(leg["embeddings"][0]) == 768
