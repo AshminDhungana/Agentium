@@ -1,6 +1,6 @@
 # Agentium Makefile
 
-.PHONY: up down restart voice-reinstall voice-logs voice-status uninstall-voice test hallmark test-integration load-test benchmark perf-gate test-staging audit audit-fix pin-digests docker-scout
+.PHONY: up down restart voice-reinstall voice-logs voice-status uninstall-voice test hallmark test-integration load-test benchmark perf-gate test-staging audit audit-fix pin-digests docker-scout seed-skills
 
 # -- Normal start -- voice bridge installs automatically --
 up:
@@ -152,3 +152,7 @@ docker-scout-build: pin-digests
 	@docker build -t agentium-whatsapp:latest -f bridges/whatsapp/Dockerfile bridges/whatsapp/
 	@echo "==> Built all images. Running docker scout..."
 	@bash scripts/docker-scout.sh high
+
+# -- Seed folder skills into the agent skill library --
+seed-skills:
+	@docker compose exec -T backend python backend/scripts/seed_skills.py --reindex

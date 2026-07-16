@@ -436,6 +436,16 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.error("❌ Knowledge base bootstrap failed: %s", e)
 
+    # ─────────────────────────────────────────────────────────────
+    # 9b. Optional folder-skill seeding (backend/.agentium/skills)
+    # ─────────────────────────────────────────────────────────────
+    if os.getenv("SEED_SKILLS_ON_BOOT", "false").lower() == "true":
+        try:
+            from backend.scripts.seed_skills import main as seed_main
+            seed_main()
+        except Exception as e:  # noqa: BLE001
+            logger.warning("⚠️ Skill seeding on boot failed: %s", e)
+
     logger.info("🎉 Agentium startup complete!")
     logger.info("   Phase 17.1: DDoS hardening active — unified RateLimitMiddleware + blocklist + payload limits")
 
@@ -517,34 +527,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ── Phase 17.1 — DDoS hardening middleware stack ─────────────────────────────
-# Starlette applies add_middleware() in REVERSE insertion order.
-# Execution order on every request:
-#   1. IPBlocklistMiddleware    — single EXISTS, 403 before body read
-#   2. PayloadSizeLimitMiddleware — Content-Length header check, 413
-#   3. ErrorCounterMiddleware   — post-response weighted 4xx counter
-#
-# The three Phase 9.4 middlewares run after these (they were registered first).
-#
-# IMPORTANT: IPBlocklistMiddleware and PayloadSizeLimitMiddleware need a Redis
-# client injected at startup. Import get_redis_client from your Redis module
-# and pass it here. Example:
-#
-#   from backend.core.redis import get_redis_client
-#   _redis = get_redis_client()
-#   app.add_middleware(ErrorCounterMiddleware, redis=_redis)
-#   app.add_middleware(PayloadSizeLimitMiddleware)
-#   app.add_middleware(IPBlocklistMiddleware, redis=_redis)
-#
-# If your project uses a different Redis import path, adjust accordingly.
-# The middleware classes are Redis-client-agnostic (sync or async redis-py).
 try:
     from backend.core.redis import get_redis_client as _get_redis
     _redis_client = _get_redis()
     app.add_middleware(ErrorCounterMiddleware, redis=_redis_client)
     app.add_middleware(PayloadSizeLimitMiddleware)
     app.add_middleware(IPBlocklistMiddleware, redis=_redis_client)
-    logger.info("✅ Phase 17.1 DDoS middleware stack registered")
+    logger.info("✅ DDoS middleware stack registered")
 except Exception as _mw_exc:
     logger.warning(
         "⚠️ Phase 17.1 middleware could not load Redis client (%s). "
