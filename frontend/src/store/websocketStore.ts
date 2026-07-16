@@ -13,6 +13,16 @@ import {
   isActive, isConnectingPhase, canReconnect, isGenesisProgress, phaseFromGenesisStatus,
 } from './connectionPhase';
 
+/**
+ * A Head of Council message should only bump the unread counter (and raise a
+ * toast) when the user is NOT on the chat page. The chat page clears the
+ * counter on entry and shows new messages inline, so counting them there would
+ * re-show a badge for a conversation the user is actively viewing.
+ */
+export function isHeadMessageUnreadEligible(pathname: string): boolean {
+    return pathname !== '/chat';
+}
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 /**
@@ -660,9 +670,12 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
 
                     // ── Toast deduplication for Head of Council messages ──
                     if (data.type === 'message' && data.role === 'head_of_council') {
-                        get()._incrementUnread();
-                        const currentPath = window.location.pathname;
-                        if (currentPath !== '/chat') {
+                        // Only count as unread / toast when the user is NOT on the
+                        // chat page — the chat page clears the counter on entry and
+                        // shows new messages inline, so counting them there would
+                        // re-show a badge for a conversation already being viewed.
+                        if (isHeadMessageUnreadEligible(window.location.pathname)) {
+                            get()._incrementUnread();
                             const existingToastId = get()._activeToastId;
                             if (existingToastId) showToast.dismiss(existingToastId);
                             const toastId = showToast.success('New message from Head of Council');

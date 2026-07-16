@@ -3,6 +3,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback, Fragment } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useShallow } from 'zustand/react/shallow';
 import { useAuthStore } from '@/store/authStore';
 import { useWebSocketStore } from '@/store/websocketStore';
@@ -258,8 +259,13 @@ export function ChatPage() {
 
     // ── Effects ───────────────────────────────────────────────────────────────
 
-    // Mark messages as read when on AI tab
-    useEffect(() => { markAsRead(); }, [markAsRead]);
+    // Mark messages as read when the chat route becomes active. ChatPage is kept
+    // mounted by KeepAliveOutlet, so a mount-time effect never re-fires on
+    // navigation — react to the route pathname instead.
+    const location = useLocation();
+    useEffect(() => {
+        if (location.pathname === '/chat') markAsRead();
+    }, [location.pathname, markAsRead]);
 
     // FIX #8: fetch voice options only once per connection, skip on reconnect
     useEffect(() => {
