@@ -64,7 +64,7 @@ Unchanged from current implementation:
 
 ## 4. Testing
 
-- Reuse existing a11y browser tests: `LoginPage`/`SignupPage` do not currently have dedicated a11y tests, but the shared component must not introduce regressions in `*.a11y.browser.test.tsx` suites that render the app shell. Add a lightweight smoke check if a dedicated auth a11y test does not exist.
+- Reuse existing a11y browser tests in `*.a11y.browser.test.tsx`. `LoginPage`/`SignupPage` do not currently have dedicated a11y tests; add one `AuthCard.a11y.browser.test.tsx` smoke test (renders `<AuthCard>` with sample children, audits light + dark via `auditRoute`) to lock in no-regression coverage for the new shared component.
 - Verify both light and dark themes pass axe (no new contrast violations from leading icons or the arrow).
 - Confirm no duplicate `id` attributes (e.g., `login-error` / `signup-error`) across the two pages.
 - Manual: toggle theme via shield; confirm card, inputs, button, and tagline render correctly in both themes; confirm reduced-motion disables scale transforms.
