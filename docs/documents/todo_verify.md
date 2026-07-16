@@ -32,8 +32,6 @@
 ## 🔲 In Progress / Pending
 
 ### Voice Bridge
-- [ ] **Message-count indicator bug:** when a message arrives while the user is outside the chat page, the count increases on both the command interface and the Head of Council logo. Currently, arriving at the chat page doesn't clear it. Expected behavior: entering the chat page should clear the count, and the next new message should start the count again from 1.
-  *(Note: this looks closely related to the completed indicator fix above — worth confirming whether that fix already covers this case or if it's a separate regression.)*
 - [ ] Determine whether voice bridge communication from the desktop app requires the user to be logged in via the frontend.
 - [ ] Confirm whether voice bridge communication is currently visible in the chat; if not, implement it.
 - [ ] Align the voice bridge persona with the chat persona so behavior is consistent across both (e.g., addressing the admin as "sir" is acceptable for both).
