@@ -30,6 +30,9 @@ the step should be voice-bridge contaner runs installs scripts in the host syste
 
 - [ ] Agent page : list shows 3 agents but graph shows only one. 
 
+- [ ] The head of council should only call th admin Sovereign in the chat , and for other user user their username or just call them sir.
+
+- [ ] The voice bridge and the chat persona should match . Calling the admin as sir is also fine. 
 
 ## 1. Roadmap Consistency & Incomplete Items
 
