@@ -2312,7 +2312,7 @@ def upgrade() -> None:
         DO $$ BEGIN
             IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'waitstrategy') THEN
                 CREATE TYPE waitstrategy AS ENUM
-                    ('http_poll','redis_key','timeout','webhook','manual');
+                    ('http_poll','redis_key','timeout','webhook','manual','execution');
             END IF;
         END $$;
     """)

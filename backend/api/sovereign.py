@@ -11,6 +11,7 @@ from functools import lru_cache
 import asyncio
 import json
 import os
+import logging
 import psutil  # FIX: added for reliable system metrics (replaces fragile sudo subprocess chain)
 
 from backend.models.database import get_db
@@ -24,6 +25,8 @@ from backend.core.exceptions import ForbiddenError, BadRequestError
 from backend.api.schemas.examples import build_responses
 
 router = APIRouter(prefix="/sovereign", tags=["sovereign"])
+
+logger = logging.getLogger(__name__)
 
 # ── Pydantic request models ───────────────────────────────────────────────────
 

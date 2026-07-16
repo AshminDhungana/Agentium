@@ -33,16 +33,24 @@ class ContextWindowManager:
     CRITICAL_THRESHOLD = 0.90  # 90% - must reincarnate
     ABSOLUTE_MAX = 0.95  # 95% - hard stop
     
-    # Token limits by model (approximate)
+    # Token limits by model (approximate). Unknown models fall back to a
+    # conservative large window; reincarnation then triggers only for genuinely
+    # long conversations rather than on the first message.
     MODEL_LIMITS = {
         "gpt-4": 8192,
         "gpt-4-turbo": 128000,
+        "gpt-4o": 128000,
         "gpt-3.5-turbo": 4096,
         "claude-3-opus": 200000,
-        "claude-3-sonnet": 20000,
+        "claude-3-sonnet": 200000,
+        "claude-2": 100000,
         "kimi-2.5-7b": 8192,
         "kimi-2.5": 32000,
-        "default": 4096
+        "deepseek-chat": 128000,
+        "deepseek-reasoner": 64000,
+        "llama-3": 8192,
+        "mistral": 32000,
+        "default": 128000
     }
     
     def __init__(self):
@@ -58,18 +66,27 @@ class ContextWindowManager:
             "model": model_name,
             "max_tokens": max_tokens,
             "current_tokens": initial_tokens,
+            "total_tokens_processed": 0,
             "message_count": 0,
             "incarnation": 1,  # Track reincarnations
             "accumulated_wisdom": []  # Summaries from past lives
         }
     
     def update_usage(self, agent_id: str, tokens_used: int, messages_added: int = 1):
-        """Record token usage from a conversation turn."""
+        """Record token usage from a conversation turn.
+
+        ``tokens_used`` from an LLM provider is the TOTAL tokens of that single
+        request (system prompt + history + reply) — i.e. the CURRENT size of the
+        agent's rolling context window, not a delta. We therefore set
+        ``current_tokens`` to this value (rather than accumulating it) so the
+        critical/warning thresholds reflect the actual live context fill.
+        """
         if agent_id not in self.agent_contexts:
             return None
         
         ctx = self.agent_contexts[agent_id]
-        ctx["current_tokens"] += tokens_used
+        ctx["current_tokens"] = tokens_used
+        ctx["total_tokens_processed"] = ctx.get("total_tokens_processed", 0) + tokens_used
         ctx["message_count"] += messages_added
         
         return self.check_status(agent_id)
@@ -115,7 +132,7 @@ class ContextWindowManager:
         
         return {
             "incarnation_number": ctx["incarnation"],
-            "total_tokens_processed": ctx["current_tokens"],
+            "total_tokens_processed": ctx["total_tokens_processed"],
             "total_messages": ctx["message_count"],
             "accumulated_wisdom": ctx["accumulated_wisdom"],
             "model": ctx["model"]

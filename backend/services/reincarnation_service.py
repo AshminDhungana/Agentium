@@ -830,7 +830,9 @@ class ReincarnationService:
     async def check_and_trigger_reincarnation(
         agent: Agent,
         db: Session,
-        conversation_context: str
+        conversation_context: str,
+        current_task_id: Optional[str] = None,
+        task_progress: Optional[str] = None
     ) -> Optional[Dict[str, Any]]:
         """
         Check if agent needs reincarnation and execute the cycle if needed.
@@ -849,14 +851,18 @@ class ReincarnationService:
         return await ReincarnationService.execute_reincarnation(
             agent=agent,
             db=db,
-            conversation_context=conversation_context
+            conversation_context=conversation_context,
+            current_task_id=current_task_id,
+            task_progress=task_progress
         )
     
     @staticmethod
     async def execute_reincarnation(
         agent: Agent,
         db: Session,
-        conversation_context: str
+        conversation_context: str,
+        current_task_id: Optional[str] = None,
+        task_progress: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Execute the full reincarnation cycle:
@@ -957,6 +963,17 @@ class ReincarnationService:
                 
                 # Transfer context tracking to successor
                 context_manager.transfer_to_successor(agent_id, successor.agentium_id)
+
+                # Preserve the active task by reassigning it to the successor
+                if current_task_id:
+                    task = db.query(Task).filter_by(id=current_task_id).first()
+                    if task:
+                        task.assigned_agent_id = successor.agentium_id
+                        successor.current_task_id = current_task_id
+                        db.add(task)
+                        db.flush()
+                        result["task_transferred"] = current_task_id
+                        logger.info(f"   📋 Task {current_task_id} transferred to successor {successor.agentium_id}")
                 
                 # Log the birth
                 birth_audit = AuditLog.log(

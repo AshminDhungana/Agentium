@@ -997,10 +997,22 @@ export function ChatPage() {
                                     return (
                                         <div key={message.id} className={`flex gap-3 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
                                             {/* Avatar */}
-                                            <div className={`flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center text-white text-xs font-semibold ${isUser ? 'bg-gradient-to-br from-blue-500 to-blue-600'
+                                            <div className={`flex-shrink-0 w-8 h-8 rounded-xl overflow-hidden flex items-center justify-center text-white text-xs font-semibold ${isUser ? 'bg-gradient-to-br from-blue-500 to-blue-600'
                                                     : isError ? 'bg-orange-500' : 'bg-gradient-to-br from-gray-700 to-gray-800'
                                                 }`}>
-                                                {isUser ? (user?.username?.[0]?.toUpperCase() ?? 'S') : <Bot className="w-4 h-4" />}
+                                                {isUser ? (
+                                                    user?.avatar_url ? (
+                                                        <img
+                                                            src={user.avatar_url}
+                                                            alt={user?.username ?? 'User'}
+                                                            className="w-full h-full object-cover"
+                                                        />
+                                                    ) : (
+                                                        (user?.username?.[0]?.toUpperCase() ?? 'S')
+                                                    )
+                                                ) : (
+                                                    <Bot className="w-4 h-4" />
+                                                )}
                                             </div>
 
                                             <div className={`flex flex-col max-w-[75%] ${isUser ? 'items-end' : 'items-start'}`}>
