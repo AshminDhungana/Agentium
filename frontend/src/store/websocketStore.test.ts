@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useWebSocketStore } from './websocketStore';
 import { canReconnect } from './connectionPhase';
+import { websocketReplayApi } from '@/services/websocketReplay';
 
 // jsdom has no real WebSocket; stub it so connect()/disconnect() don't throw.
 class FakeWS {
@@ -53,5 +54,36 @@ describe('websocketStore phase', () => {
     expect(useWebSocketStore.getState().connectionPhase).toBe('waiting_for_key');
     useWebSocketStore.getState()._transition({ type: 'notify_key_added' });
     expect(useWebSocketStore.getState().connectionPhase).toBe('connecting');
+  });
+});
+
+describe('genesis awaiting name', () => {
+  beforeEach(() => {
+    useWebSocketStore.setState({
+      genesisAwaitingName: false,
+      genesisNamePrompt: '',
+      genesisNameTimeout: 0,
+      connectionPhase: 'genesis_running',
+    });
+  });
+
+  it('submitCountryName clears the awaiting flag on success', async () => {
+    const spy = vi
+      .spyOn(websocketReplayApi, 'submitCountryName')
+      .mockResolvedValue({ accepted: true });
+    const ok = await useWebSocketStore.getState().submitCountryName('Veridia');
+    expect(ok).toBe(true);
+    expect(useWebSocketStore.getState().genesisAwaitingName).toBe(false);
+    spy.mockRestore();
+  });
+
+  it('submitCountryName returns false and keeps flag cleared on rejected', async () => {
+    const spy = vi
+      .spyOn(websocketReplayApi, 'submitCountryName')
+      .mockResolvedValue({ accepted: false });
+    const ok = await useWebSocketStore.getState().submitCountryName('Veridia');
+    expect(ok).toBe(false);
+    expect(useWebSocketStore.getState().genesisAwaitingName).toBe(false);
+    spy.mockRestore();
   });
 });

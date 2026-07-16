@@ -79,6 +79,12 @@ interface WebSocketState {
     lastMessage: WebSocketMessage | null;
     unreadCount: number;
     messageHistory: WebSocketMessage[];
+    /** True while genesis is paused waiting for the user to name their nation. */
+    genesisAwaitingName: boolean;
+    /** Prompt text surfaced with the awaiting-name request. */
+    genesisNamePrompt: string;
+    /** Seconds the user has to respond to the awaiting-name request. */
+    genesisNameTimeout: number;
     /**
      * Timestamp (ms) of the last API key save. Bumped by `notifyApiKeyAdded()`
      * so dashboard widgets (e.g. Provider Analytics) can auto-refresh without a
@@ -139,6 +145,13 @@ interface WebSocketState {
      * immediately attempts to reconnect — so chat activates without a page reload.
      */
     notifyApiKeyAdded: () => void;
+
+    /**
+     * Submit the user's chosen nation name while genesis is paused for it.
+     * Resolves true when the backend accepts the name (clearing the awaiting
+     * flag), false when rejected or on error.
+     */
+    submitCountryName: (name: string) => Promise<boolean>;
 
     // Internal actions
     _transition: (event: PhaseEvent) => void;
@@ -204,6 +217,10 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
     messageHistory: [],
     apiKeyAddedAt: null,
 
+    genesisAwaitingName: false,
+    genesisNamePrompt: '',
+    genesisNameTimeout: 0,
+
     _ws: null,
     _reconnectTimeout: null,
     _pingInterval: null,
@@ -265,6 +282,20 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
             get()._transition({ type: 'notify_key_added' });
             get().connect();
         }, 100);
+    },
+
+    submitCountryName: async (name: string): Promise<boolean> => {
+        try {
+            const res = await websocketReplayApi.submitCountryName(name);
+            if (res.accepted) {
+                set({ genesisAwaitingName: false, genesisNamePrompt: '', genesisNameTimeout: 0 });
+                return true;
+            }
+            return false;
+        } catch (err) {
+            logger.error('[WebSocket] submitCountryName failed:', err);
+            return false;
+        }
     },
 
     /** Keep the dedup set bounded to MAX_PROCESSED_IDS */
@@ -431,6 +462,18 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
         const poll = async () => {
             try {
                 const data = await websocketReplayApi.pollGenesisStatus();
+
+                // Surface the nation-name prompt while genesis is paused for it.
+                if (data.status === 'awaiting_name') {
+                    set({
+                        genesisAwaitingName: true,
+                        genesisNamePrompt: data.prompt ?? '',
+                        genesisNameTimeout: data.timeout_seconds ?? 60,
+                    });
+                } else if (get().genesisAwaitingName) {
+                    set({ genesisAwaitingName: false, genesisNamePrompt: '', genesisNameTimeout: 0 });
+                }
+
                 const nextPhase = phaseFromGenesisStatus(data.status);
                 set({ _genesisPollTimeout: null });
 
