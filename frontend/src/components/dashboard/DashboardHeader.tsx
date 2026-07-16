@@ -1,51 +1,27 @@
-/**
- * @description Welcome title + backend-disconnected warning banner
- * rendered at the top of the Dashboard page.
- * @example
- * ```tsx
- * import { DashboardHeader } from '@/components/dashboard/DashboardHeader';
- *
- * <DashboardHeader />
- * ```
- */
-
+import { useAuthStore } from '@/store/authStore';        // use the path you confirmed
+import { useBackendStore } from '@/store/backendStore';  // use the path you confirmed
 import { AlertTriangle } from 'lucide-react';
-import { useBackendStore } from '@/store/backendStore';
-import { useAuthStore }    from '@/store/authStore';
 
 export function DashboardHeader() {
-    const { user }   = useAuthStore();
-    const { status } = useBackendStore();
+  const user = useAuthStore((s) => s.user);
+  const status = useBackendStore((s) => s.status);
+  const disconnected = status.status !== 'connected';
 
-    return (
-        <>
-            {/* Welcome text */}
-            <div className="mb-8">
-                <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-1">
-                    Welcome, {user?.username}
-                </h1>
-                <p className="text-gray-600 dark:text-gray-400 text-sm">
-                    Oversee your AI governance system from this command center.
-                </p>
-            </div>
-
-            {/* Backend disconnected warning — identical to the original */}
-            {status.status !== 'connected' && (
-                <div className="mb-6 p-4 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-xl flex items-center gap-3">
-                    <AlertTriangle
-                        className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0"
-                        aria-hidden="true"
-                    />
-                    <div>
-                        <p className="font-medium text-red-900 dark:text-red-300 text-sm">
-                            Backend Disconnected
-                        </p>
-                        <p className="text-sm text-red-700 dark:text-red-400/80">
-                            Some features may be unavailable. Please check your backend connection.
-                        </p>
-                    </div>
-                </div>
-            )}
-        </>
-    );
+  return (
+    <header className="mb-6">
+      <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 sm:text-3xl">
+        Welcome, {user?.username ?? 'Sovereign'}
+      </h1>
+      {disconnected && (
+        <div
+          role="alert"
+          aria-label="Backend disconnected"
+          className="mt-4 flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300"
+        >
+          <AlertTriangle className="h-5 w-5 shrink-0" aria-hidden="true" />
+          <span>Backend disconnected — live data is paused. Reconnect to resume real-time updates.</span>
+        </div>
+      )}
+    </header>
+  );
 }
