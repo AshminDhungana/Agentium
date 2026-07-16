@@ -137,12 +137,24 @@ log "  HAS_MIC=$HAS_MIC"
 # -- Step 1.6  Docker gateway (backend URL) -----------------------------------
 log "Step 1.6 -- Detecting Docker gateway"
 DOCKER_GW="172.17.0.1"
-if command -v docker &>/dev/null; then
-    GW=$(docker network inspect bridge \
-        --format '{{range .IPAM.Config}}{{.Gateway}}{{end}}' 2>/dev/null || true)
-    [[ -n "$GW" ]] && DOCKER_GW="$GW"
-fi
-BACKEND_URL="http://${DOCKER_GW}:8000"
+case "$OS_FAMILY" in
+    macos|windows|wsl2)
+        # Docker Desktop runs containers in a VM; the host reaches them via
+        # the magic hostname, not the in-VM bridge gateway (172.17.0.1).
+        BACKEND_URL="http://host.docker.internal:8000"
+        ;;
+    linux)
+        if command -v docker &>/dev/null; then
+            GW=$(docker network inspect bridge \
+                --format '{{range .IPAM.Config}}{{.Gateway}}{{end}}' 2>/dev/null || true)
+            [[ -n "$GW" ]] && DOCKER_GW="$GW"
+        fi
+        BACKEND_URL="http://${DOCKER_GW}:8000"
+        ;;
+    *)
+        BACKEND_URL="http://127.0.0.1:8000"
+        ;;
+esac
 conf "BACKEND_URL" "$BACKEND_URL"
 log "  BACKEND_URL=$BACKEND_URL"
 
