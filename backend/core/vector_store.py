@@ -40,8 +40,8 @@ COLLECTIONS_V2: Dict[str, str] = {
 class BgeEmbeddingFunction(EmbeddingFunction):
     """bge-base-en-v1.5 — asymmetric: prefix queries, not documents; L2-normalized."""
 
-    def __init__(self, model_name: str = V2_EMBEDDING_MODEL) -> None:
-        self.model_name = model_name
+    def __init__(self, model_name: Optional[str] = None) -> None:
+        self.model_name = model_name or _settings.EMBEDDING_MODEL
         self._model = None
 
     @property
@@ -66,6 +66,9 @@ class BgeEmbeddingFunction(EmbeddingFunction):
     def __call__(self, input: List[str]) -> List[List[float]]:
         # Default path (collection init / stored documents) = no prefix, normalized.
         return self.embed_documents(input)
+
+
+AgentiumEmbeddingFunction = BgeEmbeddingFunction
 
 
 class VectorStore:
