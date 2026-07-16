@@ -13,6 +13,9 @@
 # =============================================================================
 set -euo pipefail
 
+# Only use sudo when we are not already root and sudo exists.
+if [[ $EUID -eq 0 ]] || ! command -v sudo &>/dev/null; then SUDO=""; else SUDO="sudo"; fi
+
 CONF_DIR="$HOME/.agentium"
 CONF_FILE="$CONF_DIR/env.conf"
 LOG_FILE="$CONF_DIR/install.log"
@@ -53,29 +56,34 @@ log "OS_FAMILY=$OS_FAMILY  PKG_MGR=$PKG_MGR  PYTHON_BIN=$PYTHON_BIN  SVC_MGR=$SV
 log "Step 2.1 -- Installing system audio packages"
 case "$PKG_MGR" in
     apt)
-        run_or_warn "apt update"        sudo apt-get update -qq
-        run_or_warn "portaudio19-dev"   sudo apt-get install -y -qq portaudio19-dev
-        run_or_warn "python3-pyaudio"   sudo apt-get install -y -qq python3-pyaudio
-        run_or_warn "espeak"            sudo apt-get install -y -qq espeak espeak-data
-        run_or_warn "alsa-utils"        sudo apt-get install -y -qq alsa-utils
+        run_or_warn "apt update"        $SUDO apt-get update -qq
+        run_or_warn "portaudio19-dev"   $SUDO apt-get install -y -qq portaudio19-dev
+        run_or_warn "python3-pyaudio"   $SUDO apt-get install -y -qq python3-pyaudio
+        run_or_warn "espeak"            $SUDO apt-get install -y -qq espeak espeak-data
+        run_or_warn "alsa-utils"        $SUDO apt-get install -y -qq alsa-utils
         ;;
     brew)
         # brew must NOT run as root -- run as the actual user
         BREW_USER="${SUDO_USER:-$USER}"
-        run_or_warn "portaudio"   sudo -u "$BREW_USER" brew install portaudio
-        run_or_warn "espeak-ng"   sudo -u "$BREW_USER" brew install espeak-ng
+        run_or_warn "portaudio"   $SUDO -u "$BREW_USER" brew install portaudio
+        run_or_warn "espeak-ng"   $SUDO -u "$BREW_USER" brew install espeak-ng
         ;;
     dnf)
-        run_or_warn "portaudio-devel"   sudo dnf install -y portaudio-devel
-        run_or_warn "espeak"            sudo dnf install -y espeak
+        run_or_warn "portaudio-devel"   $SUDO dnf install -y portaudio-devel
+        run_or_warn "espeak"            $SUDO dnf install -y espeak
         ;;
     pacman)
-        run_or_warn "portaudio"         sudo pacman -S --noconfirm portaudio
-        run_or_warn "espeak-ng"         sudo pacman -S --noconfirm espeak-ng
+        run_or_warn "portaudio"         $SUDO pacman -S --noconfirm portaudio
+        run_or_warn "espeak-ng"         $SUDO pacman -S --noconfirm espeak-ng
         ;;
     zypper)
-        run_or_warn "portaudio-devel"   sudo zypper install -y portaudio-devel
-        run_or_warn "espeak-ng"         sudo zypper install -y espeak-ng
+        run_or_warn "portaudio-devel"   $SUDO zypper install -y portaudio-devel
+        run_or_warn "espeak-ng"         $SUDO zypper install -y espeak-ng
+        ;;
+    apk)
+        run_or_warn "alsa-lib-dev"  $SUDO apk add --no-cache alsa-lib-dev
+        run_or_warn "portaudio-dev" $SUDO apk add --no-cache portaudio-dev
+        run_or_warn "espeak"        $SUDO apk add --no-cache espeak
         ;;
     *)
         warn "Unknown pkg manager '$PKG_MGR' -- skipping system audio packages"
@@ -339,5 +347,9 @@ EOF
         start_bridge_now
         ;;
 esac
+
+# Signal successful install (consumed by voice-autoinstall guard + launchers)
+touch "$CONF_DIR/voice-installed.marker"
+log "Install marker written: $CONF_DIR/voice-installed.marker"
 
 log "=== Installation complete. Check $LOG_FILE for any warnings. ==="
