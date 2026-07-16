@@ -343,11 +343,13 @@ export const AgentsPage: React.FC = () => {
         const counts = { head: 0, council: 0, lead: 0, task: 0 };
         agents.forEach(a => {
             if (a.status === 'terminated') return;
-            const prefix = (a.agentium_id ?? a.id ?? '')[0];
-            if (prefix === '0') counts.head++;
-            else if (prefix === '1') counts.council++;
-            else if (prefix === '2') counts.lead++;
-            else if (prefix === '3') counts.task++;
+            switch (a.agent_type) {
+                case 'head_of_council': counts.head++;   break;
+                case 'council_member':  counts.council++; break;
+                case 'lead_agent':      counts.lead++;   break;
+                case 'task_agent':      counts.task++;   break;
+                default: break;
+            }
         });
         return counts;
     }, [agents]);

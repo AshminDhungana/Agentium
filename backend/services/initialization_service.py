@@ -380,7 +380,7 @@ class InitializationService:
             self._log("INFO", f"Head 00001 created: {head.id}")
 
             # Step 2: Create Council Members
-            council = await self._create_council_members()
+            council = await self._create_council_members(head)
             results["steps_completed"].append(f"created_council_members:{len(council)}")
             self._log("INFO", f"Created {len(council)} Council Members")
 
@@ -511,8 +511,8 @@ class InitializationService:
         self.db.flush()
         return head
 
-    async def _create_council_members(self) -> List[CouncilMember]:
-        """Create initial Council Members (10001, 10002)."""
+    async def _create_council_members(self, head: HeadOfCouncil) -> List[CouncilMember]:
+        """Create initial Council Members (10001, 10002), parented to the Head."""
         council = []
 
         for i in range(self.DEFAULT_COUNCIL_SIZE):
@@ -520,6 +520,10 @@ class InitializationService:
 
             existing = self.db.query(CouncilMember).filter_by(agentium_id=agentium_id).first()
             if existing:
+                # Repair any pre-existing members missing the parent link
+                if not existing.parent_id:
+                    existing.parent_id = head.id
+                    self.db.flush()
                 council.append(existing)
                 continue
 
@@ -529,6 +533,7 @@ class InitializationService:
                 description=f"Founding Council Member {i+1}",
                 status=AgentStatus.ACTIVE,
                 is_active=True,
+                parent_id=head.id,
                 specialization=self._assign_specialization(i)
             )
 

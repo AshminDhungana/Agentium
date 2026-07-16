@@ -15,7 +15,8 @@
 import React from 'react';
 import { Agent } from '../../types';
 import { Shield, Brain, Users, Terminal, Activity, Zap, TrendingUp, Trash2, CheckSquare } from 'lucide-react';
-import { AGENT_TYPE_LABELS, HIDDEN_FROM_AGENTS_PAGE } from '../../constants/agents';
+import { AGENT_TYPE_LABELS } from '../../constants/agents';
+import { isCriticType } from '../../utils/agentIds';
 
 interface AgentListViewProps {
     agents:      Agent[];
@@ -54,12 +55,10 @@ function StatusBadge({ status }: { status: Agent['status'] }) {
 export const AgentListView: React.FC<AgentListViewProps> = React.memo(({
     agents, onSpawn, onTerminate, onPromote,
 }) => {
-    // Filter out all critic prefixes (4–9) — critics are shown via the
+    // Filter out critics (7/8/9) — critics are shown via the
     // dedicated Critics panel in AgentTree, not in the flat list.
-    const displayAgents = agents.filter(a => {
-        const prefix = (a.agentium_id ?? a.id ?? '')[0];
-        return !HIDDEN_FROM_AGENTS_PAGE.includes(prefix);
-    });
+    // Task Agents may use prefixes 3–6, so we classify by type, not id prefix.
+    const displayAgents = agents.filter(a => !isCriticType(a.agent_type));
 
     if (displayAgents.length === 0) {
         return (

@@ -71,6 +71,3 @@ export function isAgentWsEvent(type: string, content?: string | null): boolean {
     }
     return false;
 }
-
-/** All prefixes that should be hidden from the main agents list/tree. */
-export const HIDDEN_FROM_AGENTS_PAGE: string[] = ['4', '5', '6', '7', '8', '9'];

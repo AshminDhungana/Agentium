@@ -9,7 +9,7 @@ import { Agent } from '../../types';
 import { AgentCard } from './AgentCard';
 import { ChevronRight, ChevronDown, ShieldAlert, FoldVertical, UnfoldVertical, Layers } from 'lucide-react';
 import { useDragDrop } from '../../context/DragDropContext';
-import { isCriticAgentId } from '../../utils/agentIds';
+import { isCriticType, isCriticAgentId } from '../../utils/agentIds';
 import { useVirtualizer } from '@tanstack/react-virtual';
 
 // ─── DragDropProps — kept for external backward-compat but no longer used internally ──
@@ -126,7 +126,7 @@ DraggableCard.displayName = 'DraggableCard';
 // ─── Critic helper ────────────────────────────────────────────────────────────
 
 function isCriticAgent(agent: Agent): boolean {
-    return isCriticAgentId(agent.agentium_id ?? agent.id);
+    return isCriticType(agent.agent_type) || isCriticAgentId(agent.agentium_id ?? agent.id);
 }
 
 // ─── Flattened node type ──────────────────────────────────────────────────────
