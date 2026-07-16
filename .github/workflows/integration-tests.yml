@@ -114,10 +114,29 @@ jobs:
           python -m pip install -U playwright
           python -m playwright install --with-deps
 
+      # ── Embedding model cache (Phase: CI speed/flakiness) ───────────────────
+      # The integration suite loads BAAI/bge-base-en-v1.5 via SentenceTransformer.
+      # conftest.py assumes the model is baked into the image (HF_HUB_OFFLINE=1),
+      # but this job runs pytest in the raw runner VM, so we must download it
+      # once and reuse it across runs — otherwise each run hangs on a ~250MB
+      # HuggingFace download (and can stall the whole suite).
+      - name: Cache HuggingFace models
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: hf-${{ runner.os }}-bge-base-en-v1.5
+          restore-keys: hf-${{ runner.os }}-
+
+      - name: Pre-download embedding model
+        working-directory: ./backend
+        run: |
+          python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('BAAI/bge-base-en-v1.5'); SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')"
+
       - name: Run integration tests with coverage
         working-directory: ./backend
         run: pytest
         env:
+          HF_HUB_OFFLINE: "1"
           DATABASE_URL: postgresql://agentium:agentium@localhost:5432/agentium_test
           REDIS_URL: redis://localhost:6379/1
           CELERY_BROKER_URL: redis://localhost:6379/1
