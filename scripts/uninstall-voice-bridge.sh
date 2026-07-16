@@ -46,4 +46,6 @@ case "${SVC_MGR:-none}" in
 esac
 
 log "Venv and conf files left in $HOME/.agentium (remove manually if desired)"
+rm -f "$HOME/.agentium/voice-installed.marker"
+log "install marker removed"
 log "=== Uninstall complete ==="
