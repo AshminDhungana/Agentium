@@ -33,21 +33,29 @@ uninstall-voice:
 
 # -- Tail voice bridge logs --
 voice-logs:
-	@SVC=$$(grep SVC_MGR ~/.agentium/env.conf 2>/dev/null | cut -d= -f2); \
-	case "$$SVC" in \
-	  systemd) journalctl --user -u agentium-voice -f ;; \
-	  launchd)  tail -f ~/.agentium/voice-bridge.log ;; \
-	  *)        tail -f ~/.agentium/voice-bridge.log ;; \
-	esac
+	@if [ -d /run/desktop/mnt/host ] || uname -s | grep -qiE "MINGW|MSYS|CYGWIN"; then \
+	  powershell.exe -NoProfile -Command "Get-Content (Join-Path $$env:USERPROFILE '.agentium\\voice-bridge.log') -Tail 50"; \
+	else \
+	  SVC=$$(grep SVC_MGR ~/.agentium/env.conf 2>/dev/null | cut -d= -f2); \
+	  case "$$SVC" in \
+	    systemd) journalctl --user -u agentium-voice -f ;; \
+	    launchd)  tail -f ~/.agentium/voice-bridge.log ;; \
+	    *)        tail -f ~/.agentium/voice-bridge.log ;; \
+	  esac; \
+	fi
 
 # -- Check voice bridge service status --
 voice-status:
-	@SVC=$$(grep SVC_MGR ~/.agentium/env.conf 2>/dev/null | cut -d= -f2); \
-	case "$$SVC" in \
-	  systemd) systemctl --user status agentium-voice ;; \
-	  launchd)  launchctl list com.agentium.voice ;; \
-	  *)        echo "Run manually: ps aux | grep agentium-voice" ;; \
-	esac
+	@if [ -d /run/desktop/mnt/host ] || uname -s | grep -qiE "MINGW|MSYS|CYGWIN"; then \
+	  powershell.exe -NoProfile -Command "Get-ScheduledTask -TaskName AgentiumVoiceBridge -ErrorAction SilentlyContinue | Select-Object TaskName,State"; \
+	else \
+	  SVC=$$(grep SVC_MGR ~/.agentium/env.conf 2>/dev/null | cut -d= -f2); \
+	  case "$$SVC" in \
+	    systemd) systemctl --user status agentium-voice ;; \
+	    launchd)  launchctl print gui/$$(id -u)/com.agentium.voice ;; \
+	    *)        echo "Run manually: ps aux | grep agentium-voice" ;; \
+	  esac; \
+	fi
 
 # -- Integration Tests (Phase 18) --
 test-integration:
