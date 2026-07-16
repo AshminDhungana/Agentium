@@ -313,6 +313,7 @@ async def refresh_token_endpoint(
     description="Verify if the current bearer token is valid. Reads token from the Authorization header only.")
 async def verify_token_endpoint(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(_security),
+    db: Session = Depends(get_db),
 ):
     """
     Verify if the current bearer token is valid.
@@ -335,14 +336,25 @@ async def verify_token_endpoint(
     if not payload:
         return VerifyResponse(valid=False)
 
+    # Fetch the persisted user so profile fields not carried in the JWT
+    # (e.g. avatar_url) are returned to the client on every session check.
+    user = None
+    user_id = payload.get("user_id")
+    if user_id:
+        user = db.query(User).filter(User.id == user_id).first()
+
+    user_payload = {
+        "username": payload.get("sub"),
+        "user_id": user_id,
+        "is_admin": payload.get("is_admin", False),
+        "role": payload.get("role", "user"),
+    }
+    if user:
+        user_payload["avatar_url"] = user.avatar_url
+
     return VerifyResponse(
         valid=True,
-        user={
-            "username": payload.get("sub"),
-            "user_id": payload.get("user_id"),
-            "is_admin": payload.get("is_admin", False),
-            "role": payload.get("role", "user"),
-        },
+        user=user_payload,
     )
 
 # B2: GET /verify endpoint removed — it accepted the JWT as a query parameter
