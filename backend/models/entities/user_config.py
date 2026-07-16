@@ -351,6 +351,10 @@ class ModelUsageLog(BaseEntity):
 
     __tablename__ = 'model_usage_logs'
 
+    # Inherited from BaseEntity but this is a log table: many rows per agent,
+    # so agentium_id must NOT be unique. Kept nullable to avoid insert failures.
+    agentium_id = Column(String(10), nullable=True)
+
     config_id = Column(String(36), ForeignKey('user_model_configs.id'), nullable=False)
 
     provider = Column(Enum(ProviderType), nullable=False)

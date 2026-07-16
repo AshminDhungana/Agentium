@@ -15,6 +15,10 @@ class ToolVersion(BaseEntity):
     """
     __tablename__ = 'tool_versions'
 
+    # Inherited from BaseEntity but not used here; kept nullable to match the DB
+    # schema (these tool tables never populate agentium_id).
+    agentium_id = Column(String(20), nullable=True)
+
     tool_name = Column(String(100), nullable=False, index=True)
     version_number = Column(Integer, nullable=False)            # 1, 2, 3 …
     version_tag = Column(String(20), nullable=False)            # "v1.0.0", "v2.0.0"

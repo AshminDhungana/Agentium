@@ -15,6 +15,10 @@ class ToolUsageLog(BaseEntity):
     """
     __tablename__ = 'tool_usage_logs'
 
+    # Inherited from BaseEntity but not used here; kept nullable to match the DB
+    # schema (these tool tables never populate agentium_id).
+    agentium_id = Column(String(20), nullable=True)
+
     # What was called
     tool_name = Column(String(100), nullable=False, index=True)
     tool_version = Column(Integer, nullable=False, default=1)

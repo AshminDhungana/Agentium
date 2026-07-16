@@ -9,39 +9,55 @@
 
 ---
 
-## 0. Observation and Checks:
+## 0. Observations and Checks
 
-- [x] Voice bridge disconnected notification with the command should only show once after login but if shows quite often.
+### Voice Bridge
+- [x] The "voice bridge disconnected" notification (with the accompanying command) should only appear once after login. Currently it shows up too often — fix this.
+- [x] Improve the voice bridge setup scripts — currently broken on Windows. Intended flow: the voice-bridge container installs the required scripts on the host system, and only then does the voice bridge start.
 
-- [x] Improve scripts for voice bridge, in windows it is not working.
-the step should be voice-bridge contaner runs installs scripts in the host system and then voice bridge will run. 
+- [ ] The command Interface in main layout as well as the chat page logo shows no of messages from the ai agent, but after the messsage is viewed it still shows the number. it should only display the number when user is not in chatpage and after the message is read i.e user is in chatpage, the indicated should disapper.
 
-- [ ] In Agents page, the scrooling bar are black in white mode, and Tier Groups:
-Expand All Level 1, Level 2 , should be displayed as  dark in light mode but is white. 
+- [ ] Determine whether Voice Bridge communication from the desktop requires the user to be logged in via the frontend.
+- [ ] Voice bridge communication should also be visible in the chat. Confirm whether this currently happens, and if not, implement it.
+- [ ] Align the voice bridge persona with the chat persona so they behave consistently (addressing the admin as "sir" is acceptable for both).
 
-- [ ]  Chat message send no reply head of council is getting disconnected see logs. 
+- [ ] In chatpage hovering above the chat message, will display 2 small icone one for copy and another for forward, when copy icon is clicked it copy the message, and when forward is clicked it copy the message to the chat message where user can send it again. 
 
-- [ ] Does the Voice Bridge communication form the desktop requires login from the frontend or not
+[ ] - Verify and improve all tools and add tools if necessary.
+[ ] - Inject information to knowledge library, such as which tools to use for what, best practices and others to make the system work properly from the beginning. When agent starts the agent should know general best practices, we can do is insert basic things to ethos, or tell agent to read from chroma on ethos , or feed the information during creation . choose the best methord for the case. 
 
-- [ ] The communication with the voice using voice bridge appears in the chat or not . it should appear in the chat also. 
+- Provider Analytics in dashboard should automatically show data after key are added but, user need to click on the refresh button for that. 
 
-- [ ] Chat message in the chatscreen should be optimized, older chat example more then 7 days should be removed, the chat should keep last few messages even if it is old if no communication has been done in chat. 
+### Chat Page — UX Improvements
+- [ ] Show a typing indicator (e.g., animated three dots) when a message is sent and the reply is taking time, similar to most modern chat apps.
+- [ ] Support streaming message display in the chat interface when a response can be streamed, similar to most modern chat apps.
+- [ ] Fix: sometimes a sent chat message gets no reply because the "Head of Council" disconnects — investigate via logs.
+- [ ] Optimize chat history: automatically remove messages older than 7 days, but retain the last few messages regardless of age if there has been no further activity in that chat.
+- [ ] The Head of Council should address the admin specifically as "Sovereign." All other users should be addressed by their username, or simply as "sir."
 
-- [ ] Users should be able to upload their profile picture.
+### Agents Page
+- [ ] Fix scrollbar color — currently black in light mode; it should be dark/visible appropriately for the theme.
+- [ ] Fix "Tier Groups: Expand All — Level 1, Level 2" text color — currently white in light mode; it should be dark for readability.
+- [ ] Fix mismatch: the Agents list shows 3 agents, but the graph displays only 1.
 
-- [ ] Actual genisis as per todo naming the country is not running after adding api key .
+### Other Fixes
+- [ ] Users should be able to upload a profile picture.
+- [ ] The "Genesis" step (per the original todo) for naming the country does not run after the API key is added — investigate and fix.
 
-- [ ] Agent page : list shows 3 agents but graph shows only one. 
+### Chat Widget Redesign
+**Current behavior:**
+Chat only works from the Chat page. When the user is on another page and a message arrives, a notification appears, and the user must navigate back to the Chat page to view/reply. If the browser is minimized or closed, the user can still communicate via the voice bridge.
 
-- [ ] The head of council should only call th admin Sovereign in the chat , and for other user user their username or just call them sir.
+**Desired behavior:**
+- [ ] While on the Chat page, the user can chat and use voice as normal.
+- [ ] When the user navigates away from the Chat page, a small floating chat icon (messenger-style) appears in the bottom-right corner of the screen.
+- [ ] When a new message arrives, the user can click this icon to open a popup chat window and reply — with voice support available there too.
+- [ ] Minimizing the popup chat window should switch communication over to the voice bridge.
+- [ ] When the user returns to the Chat page, the popup should disappear (the popup essentially mirrors the Chat page's chat box when outside of it).
+- [ ] When the browser is closed, the user can continue communicating via the voice bridge.
+- [ ] The popup should live in the main layout (above all other pages) so it stays fixed in place while scrolling, and should not interfere with the use of other pages.
+- [ ] Default appearance: a small dot in the corner; on hover, it expands into a circular chat icon; on click, the full chat popup window opens.
 
-- [ ] The voice bridge and the chat persona should match . Calling the admin as sir is also fine. 
-
-
-- [ ] Current structure: Chat in Chatpage, when in other page, notification appears when message. then user has to go to chat page to view message, and when the browser is minimized or closed , user can communicate thorough voice bridge. 
-    Update the above to, when in chat screen user can chat and use voice, when user leaves chatpage and go to other page, a small messanger type chat circle appears in the right hand bottom of the page, and when any message comes user can click that box and can chat from there as well as use voice from there as well, minimizing the chat window will let user to run voice . and when user enters chatpage the chat popup will disapper. the chat popup acts as chatpage chatbox outside the chatpage. and when user closes the browser then he can use the voice bridge to communicate as well. 
-    The chat popu can be placed in the mainlayout above the other pages so it doesnt move while scrolling. it should be a small gree dot when hover then convert into a circular chat popup and when pressed chat window opens. it should not disturb the use of the other page inside main layout. 
-    
 
 ## 1. Roadmap Consistency & Incomplete Items
 
@@ -122,6 +138,9 @@ Mapped from Galileo 8-point + Harness 25-point checklists; verify against Agenti
 - [ ] **[P3]** Check `docker-compose.yml` base images for newer security patches; bump and re-test.
 
 ---
+
+[ ] - Verify and improve all tools and add tools if necessary.
+[ ] - Inject information to knowledge library, such as which tools to use for what, best practices and others to make the system work properly from the beginning.
 
 ## Suggested Verification Order
 

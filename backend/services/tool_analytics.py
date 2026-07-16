@@ -287,6 +287,11 @@ class ToolAnalyticsService:
     def _write_log(self, **kwargs):
         """Write log."""
 
+        # Callers use the friendly `called_by` name; the column is
+        # `called_by_agentium_id`. Translate to avoid an invalid-kwarg error.
+        if "called_by" in kwargs:
+            kwargs["called_by_agentium_id"] = kwargs.pop("called_by")
+
         log = ToolUsageLog(**kwargs, invoked_at=datetime.utcnow())
         self.db.add(log)
         try:
