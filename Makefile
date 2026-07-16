@@ -15,7 +15,7 @@ restart:
 # -- Force reinstall voice bridge --
 voice-reinstall:
 	@if [ -d /run/desktop/mnt/host ] || uname -s | grep -qiE "MINGW|MSYS|CYGWIN"; then \
-	  powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/setup.ps1; \
+	  powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/setup.ps1 -Force; \
 	else \
 	  rm -f ~/.agentium/voice-installed.marker; \
 	  docker compose up -d voice-autoinstall; \

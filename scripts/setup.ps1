@@ -3,7 +3,8 @@
 # Automatically requests UAC elevation if needed.
 # NOTE: param() MUST be the first executable statement — only comments above it.
 param(
-    [string]$RepoRoot = ""
+    [string]$RepoRoot = "",
+    [switch]$Force
 )
 
 $ErrorActionPreference = "Stop"
@@ -44,6 +45,16 @@ if (-not (Test-IsAdmin)) {
         Read-Host "Press Enter to exit"
         exit 1
     }
+}
+
+# ---------------------------------------------------------------------------
+# Already installed? Skip the full (UAC-triggering) reinstall unless forced.
+# ---------------------------------------------------------------------------
+$Marker = Join-Path $env:USERPROFILE ".agentium\voice-installed.marker"
+if ((Test-Path $Marker) -and -not $Force) {
+    Write-Host "Agentium voice bridge is already installed." -ForegroundColor Green
+    Write-Host "Run with -Force to reinstall." -ForegroundColor Yellow
+    exit 0
 }
 
 # ---------------------------------------------------------------------------
