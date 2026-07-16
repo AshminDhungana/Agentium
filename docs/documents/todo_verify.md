@@ -16,6 +16,9 @@
 - [x] Improve scripts for voice bridge, in windows it is not working.
 the step should be voice-bridge contaner runs installs scripts in the host system and then voice bridge will run. 
 
+- [ ] In Agents page, the scrooling bar are black in white mode, and Tier Groups:
+Expand All Level 1, Level 2 , should be displayed as  dark in light mode but is white. 
+
 - [ ]  Chat message send no reply head of council is getting disconnected see logs. 
 
 - [ ] Does the Voice Bridge communication form the desktop requires login from the frontend or not
