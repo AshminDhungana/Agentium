@@ -49,11 +49,14 @@ services:
     ports:
       - "8001:8000"
     healthcheck:
-      # HTTP readiness check (not just TCP) so the client never connects to a
-      # half-started server and hangs. Tries the v2 then v1 heartbeat endpoint.
-      test: ["CMD", "python", "-c", "import urllib.request,sys\nfor ep in ('/api/v2/heartbeat','/api/v1/heartbeat'):\n    try:\n        if urllib.request.urlopen('http://localhost:8000'+ep).status==200: sys.exit(0)\n    except Exception: pass\nsys.exit(1)"]
-      interval: 15s
-      timeout: 10s
-      retries: 10
+      # Readiness check via bash's /dev/tcp. The chromadb/chroma image ships as
+      # a standalone ELF binary with NO python/curl/wget in PATH, so the previous
+      # `python -c` check exited 127 on every probe and chroma never reported
+      # healthy. Chroma only binds :8000 once it is ready to serve, so a
+      # successful TCP connect is a valid readiness signal.
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/localhost/8000 && exec 3>&-"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
       start_period: 30s
     # No volumes — ephemeral

@@ -9,7 +9,10 @@ vi.mock('@/hooks/useDashboardData', () => ({
     refetchAgents: vi.fn(), refetchTasks: vi.fn(),
   }),
 }));
-vi.mock('@/services/api', () => ({ api: { get: vi.fn().mockResolvedValue({ data: {} }) } }));
+vi.mock('@/services/api', () => ({
+  api: { get: vi.fn().mockResolvedValue({ data: {} }) },
+  rawFetch: vi.fn().mockResolvedValue({}),
+}));
 vi.mock('@/services/admin', () => ({
   adminService: {
     getBudgetStatus: vi.fn().mockResolvedValue({ data: {} }),

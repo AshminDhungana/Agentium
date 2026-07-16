@@ -11,7 +11,10 @@ vi.mock('@/hooks/useDashboardData', () => ({
   }),
 }));
 // Confirmed module paths from prior tasks:
-vi.mock('@/services/api', () => ({ api: { get: vi.fn().mockResolvedValue({ data: {} }) } }));
+vi.mock('@/services/api', () => ({
+  api: { get: vi.fn().mockResolvedValue({ data: {} }) },
+  rawFetch: vi.fn().mockResolvedValue({}),
+}));
 vi.mock('@/services/admin', () => ({
   adminService: {
     getBudgetStatus: vi.fn().mockResolvedValue({ data: {} }),
