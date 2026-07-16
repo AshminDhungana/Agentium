@@ -24,6 +24,7 @@ from backend.tools.desktop_tool  import (
     document_tool  as desktop_doc_tool,
     browser_tool   as desktop_browser_tool,
 )
+from backend.tools.mcp_agent_tools import add_mcp_server, vote_on_mcp_server
 
 
 class ToolRegistry:
@@ -1098,6 +1099,59 @@ class ToolRegistry:
                 "view_range":  {"type": "array",   "description": "[start_line, end_line] for partial view — optional for 'view'", "optional": True},
             },
             authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx"],
+        )
+
+        # ══════════════════════════════════════════════════════════════════════
+        # AGENT-CALLABLE MCP SERVER REGISTRATION
+        # ══════════════════════════════════════════════════════════════════════
+        self.register_tool(
+            name="add_mcp_server",
+            description=(
+                "Propose and register a new MCP server. Connects to the server, "
+                "auto-discovers its available tools (capabilities), and opens a "
+                "Council vote. Head agents auto-approve immediately; Council agents "
+                "queue the proposal for a vote. Tier must be pre_approved, "
+                "restricted, or forbidden."
+            ),
+            function=add_mcp_server,
+            parameters={
+                "name": {"type": "string", "description": "Unique MCP server name"},
+                "description": {"type": "string", "description": "Human-readable description"},
+                "server_url": {
+                    "type": "string",
+                    "description": "MCP server connection string / stdio command",
+                },
+                "tier": {
+                    "type": "string",
+                    "description": "Constitutional tier: pre_approved | restricted | forbidden",
+                    "enum": ["pre_approved", "restricted", "forbidden"],
+                },
+                "constitutional_article": {
+                    "type": "string",
+                    "description": "Optional Constitution article governing this tool",
+                    "optional": True,
+                },
+            },
+            authorized_tiers=["0xxxx", "1xxxx"],
+        )
+
+        self.register_tool(
+            name="vote_on_mcp_server",
+            description=(
+                "Cast a Council vote (for | against | abstain) on a pending MCP "
+                "server proposal created via add_mcp_server. On quorum approval the "
+                "server is registered live as mcp__<name>."
+            ),
+            function=vote_on_mcp_server,
+            parameters={
+                "tool_id": {"type": "string", "description": "MCPTool id from add_mcp_server"},
+                "vote": {
+                    "type": "string",
+                    "description": "for | against | abstain",
+                    "enum": ["for", "against", "abstain"],
+                },
+            },
+            authorized_tiers=["0xxxx", "1xxxx"],
         )
 
     # ── Registration ───────────────────────────────────────────────────────────
