@@ -9,11 +9,6 @@ WebSocket control channel at `ws://127.0.0.1:9999`. It is what turns Agentium in
 Because it needs the host microphone and speakers, it cannot live inside a container
 that has no audio device. So Agentium installs it **on the host** automatically.
 
-> Related: feature/design background lives in
-> `docs/superpowers/specs/2026-07-15-voice-bridge-jarvis-design.md`.
-> Installer fixes are tracked in
-> `docs/superpowers/plans/2026-07-16-voice-bridge-install-fix.md` and
-> `docs/superpowers/plans/2026-07-16-voice-bridge-install-improvements.md`.
 
 ## Prerequisites
 
@@ -40,6 +35,21 @@ On `docker compose up`, the `voice-autoinstall` service runs once:
   so it only **drops installer files** into your user profile via the
   `${USERPROFILE}` mount, then exits. The real install happens later on the host
   (see Windows below).
+
+| Env var | Default | Purpose |
+|---|---|---|
+| `REQUIRE_WAKE_WORD` | `true` | `false` = direct mode (no wake word needed) |
+| `WAKE_WORD` | `agentium` | trigger phrase (informational; the openWakeWord model decides) |
+| `WAKE_WORD_MODEL` | _(empty)_ | path to an openWakeWord `.onnx`; empty = bundled default |
+| `WAKE_WORD_THRESHOLD` | `0.5` | detector trigger score |
+| `WAKE_CHIME_PATH` | `assets/wake_chime.wav` | instant "I heard you" chime |
+| `VAD_SILENCE_MS` | `700` | base end-of-speech silence |
+| `VOICE_TTS_VOICE` | `af_bella` | Kokoro voice id |
+| `VOICE_PERSONA` | _(empty)_ | override the default Jarvis persona (else `persona.md`) |
+| `VOICE_PROACTIVE_ENABLED` | `false` | opt-in proactive announcements |
+| `VOICE_PROACTIVE_COOLDOWN_S` | `300` | per-event-type cooldown |
+| `VOICE_NS_ENABLED` | `true` | noise suppression before VAD |
+| `BACKEND_WS_URL` | `ws://127.0.0.1:8000/ws` | backend event bus for proactive mode |
 
 ## Install by OS (manual)
 

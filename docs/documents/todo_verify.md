@@ -16,14 +16,19 @@
 - [x] Improve scripts for voice bridge, in windows it is not working.
 the step should be voice-bridge contaner runs installs scripts in the host system and then voice bridge will run. 
 
-- [ ] Users should be able to upload their profile picture.
-
-- [ ] Actual genisys as per todo naming the country is not running after adding api key .
-
-- [ ] Agent page : list shows 3 agents but graph shows only one. 
-
 - [ ]  Chat message send no reply head of council is getting disconnected see logs. 
 
+- [ ] Does the Voice Bridge communication form the desktop requires login from the frontend or not
+
+- [ ] The communication with the voice using voice bridge appears in the chat or not . it should appear in the chat also. 
+
+- [ ] Chat message in the chatscreen should be optimized, older chat example more then 7 days should be removed, the chat should keep last few messages even if it is old if no communication has been done in chat. 
+
+- [ ] Users should be able to upload their profile picture.
+
+- [ ] Actual genisis as per todo naming the country is not running after adding api key .
+
+- [ ] Agent page : list shows 3 agents but graph shows only one. 
 
 
 ## 1. Roadmap Consistency & Incomplete Items

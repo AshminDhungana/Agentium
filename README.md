@@ -126,21 +126,6 @@ safer behavior, and every new setting defaults to the previous behavior.
 > **Setup & operations:** see [`docs/documents/voice-bridge-setup.md`](docs/documents/voice-bridge-setup.md)
 > for install/uninstall/verify per OS, logs, and troubleshooting.
 
-| Env var | Default | Purpose |
-|---|---|---|
-| `REQUIRE_WAKE_WORD` | `true` | `false` = direct mode (no wake word needed) |
-| `WAKE_WORD` | `agentium` | trigger phrase (informational; the openWakeWord model decides) |
-| `WAKE_WORD_MODEL` | _(empty)_ | path to an openWakeWord `.onnx`; empty = bundled default |
-| `WAKE_WORD_THRESHOLD` | `0.5` | detector trigger score |
-| `WAKE_CHIME_PATH` | `assets/wake_chime.wav` | instant "I heard you" chime |
-| `VAD_SILENCE_MS` | `700` | base end-of-speech silence |
-| `VOICE_TTS_VOICE` | `af_bella` | Kokoro voice id |
-| `VOICE_PERSONA` | _(empty)_ | override the default Jarvis persona (else `persona.md`) |
-| `VOICE_PROACTIVE_ENABLED` | `false` | opt-in proactive announcements |
-| `VOICE_PROACTIVE_COOLDOWN_S` | `300` | per-event-type cooldown |
-| `VOICE_NS_ENABLED` | `true` | noise suppression before VAD |
-| `BACKEND_WS_URL` | `ws://127.0.0.1:8000/ws` | backend event bus for proactive mode |
-
 ### 🔄 Git Versioning for Config
 
 All constitution, model, plugin, and channel configuration changes are automatically snapshotted to a local Git repository with one-click restore.
