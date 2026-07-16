@@ -18,14 +18,16 @@ import { ClipboardList, ArrowUpRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import type { Task } from '@/types';
-import { getTaskStatusColors }  from '@/utils/statusColors';
-import { WidgetErrorFallback }  from '@/components/ui/WidgetErrorFallback';
+import { getTaskStatusColors } from '@/utils/statusColors';
+import { WidgetCard } from './WidgetCard';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { WidgetErrorFallback } from '@/components/ui/WidgetErrorFallback';
 
 interface RecentTasksProps {
-    tasks:     Task[];
+    tasks: Task[];
     isLoading: boolean;
-    isError:   boolean;
-    onRetry:   () => void;
+    isError: boolean;
+    onRetry: () => void;
 }
 
 function SkeletonRow() {
@@ -49,82 +51,59 @@ function formatDate(dateStr: string | null | undefined): string | null {
     }
 }
 
-export function RecentTasks({ tasks, isLoading, isError, onRetry }: RecentTasksProps) {
-    if (isError) {
-        return <WidgetErrorFallback widgetName="Recent Tasks" onRetry={onRetry} />;
-    }
-
+function TaskRow({ task }: { task: Task }) {
+    const colors = getTaskStatusColors(task.status);
+    const dateStr = formatDate(task.updated_at ?? task.created_at);
     return (
-        <div className="bg-white dark:bg-[#161b27] rounded-xl border border-gray-200 dark:border-[#1e2535] shadow-sm dark:shadow-[0_2px_16px_rgba(0,0,0,0.25)] overflow-hidden transition-colors duration-200">
-
-            {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-[#1e2535]">
-                <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-500/10 flex items-center justify-center">
-                        <ClipboardList className="w-4 h-4 text-blue-600 dark:text-blue-400" aria-hidden="true" />
-                    </div>
-                    <h2 className="text-base font-semibold text-gray-900 dark:text-white">
-                        Recent Tasks
-                    </h2>
+        <li
+            className="flex items-center gap-3 px-6 py-3 hover:bg-gray-50 dark:hover:bg-[#0f1117] transition-colors duration-100"
+        >
+            <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                    {task.title}
+                </p>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                    <span className="text-xs text-gray-600 dark:text-gray-500 capitalize">
+                        {task.priority}
+                    </span>
+                    {dateStr && (
+                        <>
+                            <span className="text-xs text-gray-300 dark:text-gray-600">·</span>
+                            <span className="text-xs text-gray-600 dark:text-gray-500">
+                                {dateStr}
+                            </span>
+                        </>
+                    )}
                 </div>
-                <Link
-                    to="/tasks"
-                    className="inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:underline"
-                    aria-label="View all tasks"
-                >
-                    View all
-                    <ArrowUpRight className="w-3 h-3" aria-hidden="true" />
-                </Link>
             </div>
+            <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${colors.badge}`}>
+                {colors.label}
+            </span>
+        </li>
+    );
+}
 
-            {/* Rows */}
-            <div
-                role="status"
-                className="divide-y divide-gray-100 dark:divide-[#1e2535]"
-                aria-live="polite"
-                aria-atomic="false"
-            >
-                {isLoading ? (
-                    Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} />)
-                ) : tasks.length === 0 ? (
-                    <div className="px-6 py-8 text-center text-sm text-gray-600 dark:text-gray-400">
-                        No tasks yet
-                    </div>
-                ) : (
-                    tasks.map(task => {
-                        const colors  = getTaskStatusColors(task.status);
-                        const dateStr = formatDate(task.updated_at ?? task.created_at);
-                        return (
-                            <div
-                                key={task.id}
-                                className="flex items-center gap-3 px-6 py-3 hover:bg-gray-50 dark:hover:bg-[#0f1117] transition-colors duration-100"
-                            >
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-                                        {task.title}
-                                    </p>
-                                    <div className="flex items-center gap-1.5 mt-0.5">
-                                        <span className="text-xs text-gray-600 dark:text-gray-500 capitalize">
-                                            {task.priority}
-                                        </span>
-                                        {dateStr && (
-                                            <>
-                                                <span className="text-xs text-gray-300 dark:text-gray-600">·</span>
-                                                <span className="text-xs text-gray-600 dark:text-gray-500">
-                                                    {dateStr}
-                                                </span>
-                                            </>
-                                        )}
-                                    </div>
-                                </div>
-                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${colors.badge}`}>
-                                    {colors.label}
-                                </span>
-                            </div>
-                        );
-                    })
-                )}
-            </div>
-        </div>
+export function RecentTasks({ tasks, isLoading, isError, onRetry }: RecentTasksProps) {
+    return (
+        <WidgetCard title="Recent Tasks" icon={ClipboardList} aria-label="Recent tasks">
+            {isError ? (
+                <WidgetErrorFallback widgetName="Recent Tasks" onRetry={onRetry} />
+            ) : isLoading ? (
+                <div className="divide-y divide-hairline">
+                    {Array.from({ length: 5 }).map((_, i) => (<SkeletonRow key={i} />))}
+                </div>
+            ) : tasks.length === 0 ? (
+                <EmptyState
+                    icon={ClipboardList}
+                    title="No tasks yet"
+                    description="Tasks you create will appear here in real time."
+                    size="sm"
+                />
+            ) : (
+                <ul className="divide-y divide-hairline" role="status" aria-live="polite">
+                    {tasks.slice(0, 5).map((task) => (<TaskRow key={task.id} task={task} />))}
+                </ul>
+            )}
+        </WidgetCard>
     );
 }
