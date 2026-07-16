@@ -517,8 +517,16 @@ export function MainLayout() {
 
                 <div className="px-4 py-3 border-t border-gray-200 dark:border-[#1e2535]">
                     <div className="flex items-center gap-3 mb-2">
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-sm font-bold">
-                            {user?.username?.charAt(0).toUpperCase() || 'U'}
+                        <div className="w-8 h-8 rounded-full overflow-hidden bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-sm font-bold">
+                            {user?.avatar_url ? (
+                                <img
+                                    src={user.avatar_url}
+                                    alt={user?.username || 'User'}
+                                    className="w-full h-full object-cover"
+                                />
+                            ) : (
+                                user?.username?.charAt(0).toUpperCase() || 'U'
+                            )}
                         </div>
                         <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
