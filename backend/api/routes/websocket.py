@@ -647,8 +647,23 @@ async def genesis_status(current_user=Depends(get_current_user)):
       3. API key (UserModelConfig) exists       -> {"status": "running"}
       4. otherwise                              -> {"status": "not_started"}
 
-    Returns one of: "not_started", "running", "complete", "failed".
+    Returns one of: "not_started", "running", "complete", "failed", "awaiting_name".
     """
+    # If a genesis task is currently paused waiting for the Sovereign to name
+    # the nation, surface that as a dedicated status so the dashboard can show
+    # the name-entry prompt. The chat WebSocket is gated until Head 00001
+    # exists, so the in-process prompt broadcast cannot reach the client — and
+    # Head 00001 already exists by the time the prompt fires, so this check
+    # must run before the "complete" check below.
+    from backend.services import initialization_service as _init_svc
+    active = _init_svc.get_active_genesis()
+    if active is not None and getattr(active, "awaiting_country_name", False):
+        return {
+            "status": "awaiting_name",
+            "prompt": active.country_name_prompt,
+            "timeout_seconds": active.COUNTRY_NAME_TIMEOUT_SECONDS,
+        }
+
     with get_fresh_db() as db:
         head = db.query(HeadOfCouncil).filter_by(agentium_id="00001").first()
         if head:

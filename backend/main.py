@@ -70,6 +70,7 @@ from backend.api.routes import voice as voice_routes
 from backend.api.routes import monitoring_routes as monitoring_router
 from backend.api.routes import audit_routes as audit_routes_router
 from backend.services.api_key_manager import init_api_key_manager, api_key_manager
+from backend.api.routes import genesis as genesis_route
 from backend.api.routes import api_keys as api_keys_routes
 from backend.api.routes.mcp_tools import router as mcp_tools_router
 from backend.api.routes import tools as tools_routes  
@@ -601,6 +602,7 @@ app.include_router(lifecycle_routes.router)
 app.include_router(reassign_routes.router)
 app.include_router(audit_routes_router.router,      prefix="/api/v1")
 app.include_router(monitoring_router.router,        prefix="/api/v1")
+app.include_router(genesis_route.router,            prefix="/api/v1")
 app.include_router(api_keys_routes.router,          prefix="/api/v1")
 app.include_router(critics_routes.router,           prefix="/api/v1")
 app.include_router(checkpoints_routes.router,       prefix="/api/v1")
