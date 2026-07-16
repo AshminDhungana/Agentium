@@ -63,10 +63,15 @@ case "$PKG_MGR" in
         run_or_warn "alsa-utils"        $SUDO apt-get install -y -qq alsa-utils
         ;;
     brew)
-        # brew must NOT run as root -- run as the actual user
+        # brew must NOT run as root -- run as the actual user when we are root.
         BREW_USER="${SUDO_USER:-$USER}"
-        run_or_warn "portaudio"   $SUDO -u "$BREW_USER" brew install portaudio
-        run_or_warn "espeak-ng"   $SUDO -u "$BREW_USER" brew install espeak-ng
+        if [[ -n "$SUDO" ]]; then
+            run_or_warn "portaudio" $SUDO -u "$BREW_USER" brew install portaudio
+            run_or_warn "espeak-ng" $SUDO -u "$BREW_USER" brew install espeak-ng
+        else
+            run_or_warn "portaudio" brew install portaudio
+            run_or_warn "espeak-ng" brew install espeak-ng
+        fi
         ;;
     dnf)
         run_or_warn "portaudio-devel"   $SUDO dnf install -y portaudio-devel
