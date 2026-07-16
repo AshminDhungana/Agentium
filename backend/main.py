@@ -65,6 +65,7 @@ from backend.api.routes import tool_creation as tool_creation_routes
 from backend.api.routes import admin as admin_routes
 from backend.api.routes import tasks as tasks_routes
 from backend.api.routes import files as files_routes
+from backend.api.routes import users as users_routes
 from backend.api.routes import voice as voice_routes
 from backend.api.routes import monitoring_routes as monitoring_router
 from backend.api.routes import audit_routes as audit_routes_router
@@ -593,6 +594,7 @@ app.include_router(tool_creation_routes.router,     prefix="/api/v1")
 app.include_router(admin_routes.router,             prefix="/api/v1")
 app.include_router(tasks_routes.router,             prefix="/api/v1")
 app.include_router(files_routes.router,             prefix="/api/v1")
+app.include_router(users_routes.router,             prefix="/api/v1")
 app.include_router(voice_routes.router,             prefix="/api/v1")
 app.include_router(capability_routes.router)
 app.include_router(lifecycle_routes.router)
