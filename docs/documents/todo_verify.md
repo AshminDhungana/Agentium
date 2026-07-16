@@ -13,7 +13,7 @@
 
 - [x] Voice bridge disconnected notification with the command should only show once after login but if shows quite often.
 
-- [ ] Improve scripts for voice bridge, in windows it is not working.
+- [x] Improve scripts for voice bridge, in windows it is not working.
 the step should be voice-bridge contaner runs installs scripts in the host system and then voice bridge will run. 
 
 - [ ] Users should be able to upload their profile picture.
@@ -39,11 +39,11 @@ Items marked `[ ]` in `docs/documents/todo.md` while their parent phase is marke
 
 ## 2. Voice Bridge
 
-- [ ] **[P1]** Voice bridge does not work well on Windows — verify mic capture, `Path.home()/.agentium/env.conf` loading, and Vosk offline fallback on a Windows host (`voice-bridge/main.py`); Linux-only `logging`/`signal` assumptions may break.
+- [x] **[P1]** Voice bridge does not work well on Windows — verified cross-platform: `voice-bridge/main.py` + `audio_source.py` use only PyAudio + `logging.StreamHandler` (no `signal`/`fcntl`/`fork`/`termios`). Installer fixed: premature `voice-installed.marker` removed, single guarded Startup launcher + Desktop shortcut, marker now created only on successful host install.
 - [x] **[P1]** Duplicate voice notifications — `frontend/src/services/voiceBridge.ts` (L82) re-fires a `showToast.error` on every reconnect attempt (`MAX_RETRIES=5`); add a dedup/seen-guard so the user sees it once.
 - [ ] **[P1]** `frontend/src/components/VoiceIndicator.tsx` (L224–237) re-shows the install/error card on every `error↔offline` status flip with no dedupe — add a seen-guard.
-- [ ] **[P2]** Windows auto-install/startup (`scripts/install-voice-bridge.ps1`, `setup.ps1`, `windows-bootstrap.cmd`, Task Scheduler / `.vbs` / Startup folder) — verify reliable single registration, no double-start.
-- [ ] **[P2]** `docker-compose.yml` `voice-autoinstall` relies on `${USERPROFILE}` inside the Linux container + host path resolution via `windows-bootstrap.cmd` — verify reliability on Docker Desktop.
+- [x] **[P2]** Windows auto-install/startup (`scripts/install-voice-bridge.ps1`, `setup.ps1`, `windows-bootstrap.cmd`, Task Scheduler / `.vbs` / Startup folder) — consolidated to a single guarded Startup launcher (`agentium-voice-startup.cmd`) + one Desktop shortcut; legacy `.vbs`/HTA/`.reg`/duplicate `.cmd` triggers removed; `install-voice-bridge.ps1` cleans legacy artifacts so there is no double-start.
+- [x] **[P2]** `docker-compose.yml` `voice-autoinstall` relies on `${USERPROFILE}` inside the Linux container + host path resolution via `windows-bootstrap.cmd` — verified reliable on Docker Desktop: container drops `bootstrap-voice.cmd` (with baked repo root) + Startup launcher + Desktop shortcut into the `/host_home` mount; `make uninstall-voice`/`voice-reinstall` are now Docker-Desktop/WSL aware.
 
 ## 3. Frontend Polish & Accessibility
 
@@ -95,7 +95,7 @@ Mapped from Galileo 8-point + Harness 25-point checklists; verify against Agenti
 - [ ] **[P2]** Verify `AuditLog` entries are complete and immutable for security-relevant actions (privilege escalations, MCP invocations, auto-remediations).
 - [ ] **[P2]** Verify slow-query log parsing (`backend` Celery task → `AuditLog`) actually populates `GET /admin/slow-queries`.
 - [ ] **[P2]** Verify frontend caught errors reach `POST /frontend/errors` and show in `MonitoringPage.tsx` (Phase 14.3).
-- [ ] **[P3]** Verify voice-bridge emits useful logs on Windows failures (install, mic capture, STT/TTS) for diagnosability.
+- [x] **[P3]** Verify voice-bridge emits useful logs on Windows failures (install, mic capture, STT/TTS) for diagnosability — install steps write to `%USERPROFILE%\.agentium\install.log`; `setup.ps1` verifies port 9999 and tails `voice-bridge.log` on failure; bridge logs to stdout/file via launcher redirection.
 
 ## 10. Dependency Updates (deprecated packages)
 
