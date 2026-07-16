@@ -52,6 +52,7 @@ class VoiceBridgeService {
   private handlers      = new Set<InteractionHandler>();
   private statusListeners = new Set<(s: BridgeStatus) => void>();
   private stateListeners = new Set<StateHandler>();
+  private voiceToken:   string | null = null;
 
   status: BridgeStatus = 'offline';
 
@@ -97,6 +98,7 @@ class VoiceBridgeService {
       return;
     }
 
+    this.voiceToken = token;
     this._openSocket(token);
   }
 
@@ -162,6 +164,9 @@ class VoiceBridgeService {
       this.retryCount = 0;
       this.disconnectedToastShown = false;
       this._setStatus('connected');
+      // Deliver a long-lived host token to the bridge so it can authenticate
+      // to the backend even after this browser session is closed.
+      this._pushHostToken();
     };
 
     this.ws.onmessage = (evt) => {
@@ -217,6 +222,32 @@ class VoiceBridgeService {
         this._setStatus('offline');
       }
     };
+  }
+
+  /**
+   * Push a backend-issued voice token to the host bridge over the local WS so
+   * it can authenticate to the backend without a browser session.  Prefers the
+   * long-lived admin host token; falls back to the session voice token (which
+   * keeps voice working only while this browser is open).
+   */
+  private async _pushHostToken(): Promise<void> {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+    let token: string | null = null;
+    try {
+      const { data } = await api.post<{ voice_token: string }>('/api/v1/auth/voice-token/host');
+      token = data.voice_token;
+    } catch {
+      // Non-admin or endpoint unavailable — use the session voice token.
+      token = this.voiceToken;
+    }
+    if (token) {
+      try {
+        this.ws.send(JSON.stringify({ type: 'set_token', token }));
+        console.info('[voiceBridge] Pushed voice token to host bridge');
+      } catch (e) {
+        console.warn('[voiceBridge] Failed to push token to bridge:', e);
+      }
+    }
   }
 
   private _clearRetry(): void {

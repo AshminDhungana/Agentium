@@ -56,6 +56,12 @@ voice-status:
 	    *)        echo "Run manually: ps aux | grep agentium-voice" ;; \
 	  esac; \
 	fi
+	@echo "── whisper.cpp (local STT) ──"
+	@if docker compose ps --status running backend >/dev/null 2>&1; then \
+	  docker compose exec -T backend sh -c 'if [ -x /usr/local/bin/whisper-cli ] && [ -f /opt/whisper/models/ggml-base.en.bin ]; then echo "whisper.cpp: OK (binary + model present)"; else echo "whisper.cpp: MISSING (binary or model not found)"; fi'; \
+	else \
+	  echo "backend container not running — start with 'make up' to verify whisper.cpp"; \
+	fi
 
 # -- Integration Tests (Phase 18) --
 test-integration:

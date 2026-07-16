@@ -66,6 +66,21 @@ def verify_token(token: str) -> Optional[Dict[str, Any]]:
         return None
 
 
+def _normalize_user(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Normalize a decoded JWT payload to the standard user dict shape."""
+    return {
+        "sub": payload.get("sub"),
+        "user_id": payload.get("user_id"),
+        "username": payload.get("sub"),  # "sub" is the standard JWT subject claim
+        "is_admin": payload.get("is_admin", False),
+        "is_active": payload.get("is_active", True),
+        "role": payload.get("role", "user"),
+        # Agent-specific fields for MCP tool governance and tier enforcement
+        "tier": payload.get("tier", "3xxxx"),
+        "agentium_id": payload.get("agentium_id", payload.get("sub")),
+    }
+
+
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
     """
     Dependency to get current authenticated user from JWT.
@@ -79,23 +94,54 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         raise UnauthorizedError(error="Invalid or expired access token", code="INVALID_OR_EXPIRED_ACCESS_TOKEN", headers={"WWW-Authenticate": "Bearer"})
 
     # Normalize the payload to ensure consistent field names
-    normalized_payload = {
-        "sub": payload.get("sub"),
-        "user_id": payload.get("user_id"),
-        "username": payload.get("sub"),  # "sub" is the standard JWT subject claim
-        "is_admin": payload.get("is_admin", False),
-        "is_active": payload.get("is_active", True),
-        "role": payload.get("role", "user"),
-        # Agent-specific fields for MCP tool governance and tier enforcement
-        "tier": payload.get("tier", "3xxxx"),
-        "agentium_id": payload.get("agentium_id", payload.get("sub")),
-    }
-
-    return normalized_payload
+    return _normalize_user(payload)
 
 
 async def get_current_active_user(current_user: Dict[str, Any] = Depends(get_current_user)):
     """Verify user is active."""
+    if not current_user.get("is_active"):
+        raise BadRequestError(error="Inactive user", code="INACTIVE_USER")
+    return current_user
+
+
+async def get_voice_or_session_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """
+    Accept EITHER a normal session access token OR a voice-scoped JWT.
+
+    The host-native voice bridge authenticates to the backend with a
+    voice-scoped JWT (``VOICE_JWT_SECRET``) so a leaked voice token can never
+    impersonate a full session.  Endpoints the bridge calls (``/chat/send``,
+    ``/audio/transcribe``, ``/audio/speakers/identify``) must accept both so
+    the bridge works without a browser session being logged in.
+    """
+    if not credentials:
+        raise UnauthorizedError(error="Not authenticated", code="NOT_AUTHENTICATED", headers={"WWW-Authenticate": "Bearer"})
+
+    # 1) Session access token (primary — used by the browser client).
+    payload = verify_token(credentials.credentials)
+    if payload is not None and payload.get("type", "access") == "access":
+        return _normalize_user(payload)
+
+    # 2) Voice-scoped JWT (host bridge).  verify_voice_token() never raises.
+    from backend.core.voice_auth import verify_voice_token
+    vpayload = verify_voice_token(credentials.credentials)
+    if vpayload is not None:
+        return {
+            "sub": vpayload.get("sub"),
+            "user_id": vpayload.get("user_id"),
+            "username": vpayload.get("sub"),
+            "is_admin": False,
+            "is_active": True,
+            "role": "user",
+            "tier": "3xxxx",
+            "agentium_id": vpayload.get("sub"),
+        }
+
+    raise UnauthorizedError(error="Invalid or expired token", code="INVALID_OR_EXPIRED_TOKEN", headers={"WWW-Authenticate": "Bearer"})
+
+
+async def get_voice_or_active_user(current_user: Dict[str, Any] = Depends(get_voice_or_session_user)):
+    """Like get_voice_or_session_user, but also verifies the user is active."""
     if not current_user.get("is_active"):
         raise BadRequestError(error="Inactive user", code="INACTIVE_USER")
     return current_user

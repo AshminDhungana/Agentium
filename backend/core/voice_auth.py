@@ -31,6 +31,29 @@ def create_voice_token(username: str, user_id: Optional[str] = None) -> str:
     Raises:
         RuntimeError: if VOICE_JWT_SECRET is not configured.
     """
+    return _encode_voice_token(username, user_id, _DURATION_MINUTES)
+
+
+def create_host_voice_token(username: str, user_id: Optional[str] = None,
+                            days: Optional[int] = None) -> str:
+    """
+    Create a LONG-lived voice-scoped JWT for the host-native voice bridge.
+
+    Unlike the short session-bound voice token (issued to the browser client),
+    the host bridge runs independently of any browser session and must keep
+    authenticating to the backend after the browser is closed.  This token is
+    delivered to the bridge locally over its trusted 127.0.0.1 WS by an
+    authenticated admin, never over the network, so a long lifetime is safe.
+
+    Raises:
+        RuntimeError: if VOICE_JWT_SECRET is not configured.
+    """
+    if days is None:
+        days = int(os.getenv("VOICE_HOST_TOKEN_DURATION_DAYS", "30"))
+    return _encode_voice_token(username, user_id, days * 24 * 60)
+
+
+def _encode_voice_token(username: str, user_id: Optional[str], minutes: int) -> str:
     if not _VOICE_SECRET:
         raise RuntimeError(
             "VOICE_JWT_SECRET is not set. "
@@ -43,11 +66,11 @@ def create_voice_token(username: str, user_id: Optional[str] = None) -> str:
         "user_id": user_id,
         "type": _TOKEN_TYPE,
         "iat": now,
-        "exp": now + timedelta(minutes=_DURATION_MINUTES),
+        "exp": now + timedelta(minutes=minutes),
     }
 
     token = jwt.encode(payload, _VOICE_SECRET, algorithm=_ALGORITHM)
-    logger.info("[voice_auth] Issued voice token for user '%s' (expires in %dm)", username, _DURATION_MINUTES)
+    logger.info("[voice_auth] Issued voice token for user '%s' (expires in %dm)", username, minutes)
     return token
 
 

@@ -10,14 +10,13 @@ from typing import Optional
 
 from fastapi import (
     APIRouter, Depends, File, Form,
-    UploadFile, WebSocket, WebSocketDisconnect,
+    Request, UploadFile, WebSocket, WebSocketDisconnect,
 )
 
 from backend.core.exceptions import BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, TooLargeError, RateLimitError, InternalServerError, ServiceUnavailableError, ServerSTTUnavailable
 from sqlalchemy.orm import Session
 
-from backend.api.routes.auth import get_current_active_user
-from backend.core.auth import get_current_user
+from backend.core.auth import get_current_active_user, get_voice_or_active_user
 from backend.models.database import get_db
 from backend.models.entities.user import User
 from backend.models.entities.speaker_profile import SpeakerProfile
@@ -57,7 +56,7 @@ async def transcribe_audio(
     audio: UploadFile = File(...),
     language: Optional[str] = Form(None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
+    current_user: dict = Depends(get_voice_or_active_user),
 ):
     """Single-shot audio transcription via OpenAI Whisper."""
     svc = get_audio_service()
@@ -66,7 +65,7 @@ async def transcribe_audio(
         audio_bytes = await audio.read()
         text = await svc.transcribe(
             db,
-            str(current_user.id),
+            str(current_user.get("user_id")),
             audio_bytes,
             language=language,
             filename=audio.filename or "audio.wav",
@@ -152,6 +151,42 @@ async def register_speaker(
         logger.error("Speaker registration failed: %s", exc)
         raise InternalServerError(error="Speaker registration failed", code="SPEAKER_REGISTRATION_FAILED")
 
+@router.post(
+    "/speakers/identify",
+    summary="Identify Speaker",
+    description="Identify a speaker from a raw audio sample (WAV) using enrolled voice "
+                "embeddings. Accepts the raw audio bytes in the request body (Content-Type "
+                "audio/wav) as sent by the host voice bridge, and personalizes greetings.",
+    responses=build_responses(None),
+)
+async def identify_speaker(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_voice_or_active_user),
+):
+    """Identify a speaker from an uploaded audio sample."""
+    identifier = get_speaker_identifier()
+    if not identifier.is_available():
+        return {
+            "speaker_id": "unknown",
+            "name": "Unknown Speaker",
+            "confidence": 0.0,
+            "is_known": False,
+        }
+    try:
+        audio_bytes = await request.body()
+        if not audio_bytes:
+            return {
+                "speaker_id": "unknown",
+                "name": "Unknown Speaker",
+                "confidence": 0.0,
+                "is_known": False,
+            }
+        result = identifier.identify(db, audio_bytes)
+        return result
+    except Exception as exc:
+        logger.error("Speaker identification failed: %s", exc)
+        raise InternalServerError(error="Speaker identification failed", code="SPEAKER_ID_FAILED")
 @router.get(
     "/speakers",
     summary="Get Speakers",

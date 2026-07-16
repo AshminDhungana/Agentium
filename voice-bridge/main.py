@@ -377,10 +377,43 @@ async def _speak_fallback(text: str) -> None:
     await _broadcast({"type": "voice_tts_broadcast", "text": text, "ts": time.time()})
 
 
+def _fetch_backend_persona() -> Optional[str]:
+    """Fetch the Head of Council's persona from the backend so the voice bridge
+    speaks with the exact same persona as the text chat.
+
+    Returns None on any failure (no token, backend unreachable) so the caller
+    falls back to the local persona.md / VOICE_PERSONA.
+    """
+    if not VOICE_TOKEN:
+        return None
+    try:
+        url = f"{BACKEND_URL}/api/v1/chat/persona"
+        req = urllib.request.Request(url, headers=_auth_headers(), method="GET")
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            body = json.loads(resp.read().decode())
+        persona = (body.get("persona") or "").strip()
+        if persona:
+            logger.info("[bridge] Loaded Head persona from backend (%d chars)", len(persona))
+            return persona
+    except Exception as exc:
+        logger.debug("[bridge] Could not fetch backend persona: %s", exc)
+    return None
+
+
 def _load_persona() -> Optional[str]:
-    """Default Jarvis persona, overridable by VOICE_PERSONA env / persona.md."""
+    """Persona resolution order (Fix C — align voice with chat):
+
+      1. VOICE_PERSONA env override (explicit operator choice)
+      2. Backend Head persona (/api/v1/chat/persona) — single source of truth,
+         driven by the constitution so editing the constitution updates both
+         chat and voice consistently
+      3. Local persona.md fallback
+    """
     if VOICE_PERSONA:
         return VOICE_PERSONA
+    backend_persona = _fetch_backend_persona()
+    if backend_persona:
+        return backend_persona
     p = Path(__file__).parent / "persona.md"
     if p.is_file():
         return p.read_text().strip() or None
@@ -731,6 +764,20 @@ _connected_browsers: set = set()
 
 
 async def _ws_handler(websocket) -> None:
+    # Best-effort token check (the WS is bound to 127.0.0.1, so this is
+    # defense-in-depth, not the primary auth boundary — backend calls are).
+    try:
+        req_path = getattr(getattr(websocket, "request", None), "path", None) or getattr(websocket, "path", "")
+        from urllib.parse import urlparse, parse_qs, parse_qsl
+        qs = parse_qs(urlparse(req_path).query)
+        supplied = (qs.get("token") or [None])[0]
+        if VOICE_TOKEN and supplied and not _tokens_equal(supplied, VOICE_TOKEN):
+            logger.warning("[bridge][WS] Rejecting browser with mismatched token")
+            await websocket.close(code=1008)
+            return
+    except Exception as exc:
+        logger.debug("[bridge][WS] token check skipped: %s", exc)
+
     _connected_browsers.add(websocket)
     logger.info("[bridge][WS] Browser connected (%d total)", len(_connected_browsers))
     try:
@@ -740,11 +787,44 @@ async def _ws_handler(websocket) -> None:
                 logger.debug("[bridge][WS] Message from browser: %s", msg)
             except (json.JSONDecodeError, TypeError) as exc:
                 logger.warning("[WARN][WS] Invalid JSON from browser: %s", exc)
+                continue
+
+            # The frontend pushes a long-lived host voice token here so the
+            # bridge can authenticate to the backend even when no browser
+            # session is logged in.  Persisted to env.conf for restarts.
+            if isinstance(msg, dict) and msg.get("type") == "set_token":
+                token = msg.get("token")
+                if token:
+                    _set_voice_token(token)
+                    await _broadcast({"type": "voice_token_set", "ts": time.time()})
     except Exception:
         pass
     finally:
         _connected_browsers.discard(websocket)
         logger.info("[bridge][WS] Browser disconnected (%d remaining)", len(_connected_browsers))
+
+
+def _tokens_equal(a: str, b: str) -> bool:
+    """Constant-time-ish compare to avoid trivial timing leaks (localhost only)."""
+    return str(a) == str(b)
+
+
+def _set_voice_token(token: str) -> None:
+    """Update the active VOICE_TOKEN and persist it to ~/.agentium/env.conf."""
+    global VOICE_TOKEN
+    VOICE_TOKEN = token
+    try:
+        conf_path = _ENV_CONF
+        lines = []
+        if conf_path.is_file():
+            lines = conf_path.read_text().splitlines()
+        lines = [ln for ln in lines if not ln.strip().startswith("VOICE_TOKEN=")]
+        lines.append(f"VOICE_TOKEN={token}")
+        conf_path.parent.mkdir(parents=True, exist_ok=True)
+        conf_path.write_text("\n".join(lines) + "\n")
+        logger.info("[bridge] VOICE_TOKEN updated and persisted to %s", conf_path)
+    except Exception as exc:
+        logger.warning("[WARN] Could not persist VOICE_TOKEN to %s: %s", _ENV_CONF, exc)
 
 
 async def _broadcast(event: dict) -> None:

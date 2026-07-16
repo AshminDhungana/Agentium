@@ -465,6 +465,46 @@ async def get_voice_token(
     return VoiceTokenResponse(voice_token=token, expires_in_minutes=duration)
 
 
+class HostVoiceTokenResponse(BaseModel):
+    voice_token: str
+    expires_in_days: int
+
+
+@router.post(
+    "/voice-token/host",
+    response_model=HostVoiceTokenResponse,
+    summary="Issue a long-lived host voice bridge token",
+    description="Issue a long-lived voice-scoped JWT for the host-native voice bridge. "
+                "Admin only. The token is delivered to the bridge locally over its "
+                "trusted 127.0.0.1 WebSocket, never over the network.")
+async def get_host_voice_token(
+    current_user: dict = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Issue a long-lived voice-scoped JWT for the host-native voice bridge.
+
+    The bridge runs independently of any browser session, so it needs a token
+    that survives the browser being closed.  Only admins may request one; the
+    resulting token is pushed to the bridge over the local WS by the frontend,
+    so a long lifetime is acceptable (it cannot be phished remotely).
+    """
+    if not current_user.get("is_admin"):
+        raise ForbiddenError(error="Admin privileges required", code="ADMIN_REQUIRED")
+
+    try:
+        days = int(os.getenv("VOICE_HOST_TOKEN_DURATION_DAYS", "30"))
+        token = create_host_voice_token(
+            username=current_user.get("username", "unknown"),
+            user_id=current_user.get("user_id"),
+            days=days,
+        )
+    except RuntimeError as exc:
+        raise ServiceUnavailableError(error=str(exc), code="STREXC")
+
+    return HostVoiceTokenResponse(voice_token=token, expires_in_days=days)
+
+
 @router.get(
     "/verify-session", response_model=VerifyResponse,
     summary="Verify current session",

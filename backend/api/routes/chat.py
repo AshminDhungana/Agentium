@@ -33,7 +33,7 @@ from backend.api.routes.websocket import manager as ws_manager
 from backend.models.entities.chat_message import ChatMessage as ChatMessageEntity
 
 logger = logging.getLogger(__name__)
-from backend.core.auth import get_current_active_user
+from backend.core.auth import get_current_active_user, get_voice_or_active_user
 from backend.api.schemas.examples import ErrorResponseExample, SuccessResponseExample
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
@@ -352,7 +352,7 @@ async def get_chat_stats(
 async def send_message(
     chat_msg: ChatMessage,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_active_user),
+    current_user: dict = Depends(get_voice_or_active_user),
 ):
     """
     Send message to Head of Council (00001).
@@ -442,6 +442,36 @@ async def send_structured_card(
         "external_text": render_external_text(card),
     })
     return {"status": "ok", "message": msg.to_dict()}
+
+
+class PersonaResponse(BaseModel):
+    persona: str
+    source: str
+
+
+@router.get(
+    "/persona",
+    response_model=PersonaResponse,
+    summary="Get the Head of Council persona",
+    description="Return the Head of Council's effective system prompt so the voice "
+                "bridge can speak in the same persona as the text chat.",
+)
+async def get_persona(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_voice_or_active_user),
+):
+    """
+    Return the Head of Council's effective persona (system prompt).
+
+    The voice bridge calls this so its spoken replies match the chat persona
+    exactly — both are driven by the same Head system prompt / constitution,
+    which keeps behavior consistent across channels.
+    """
+    head = db.query(HeadOfCouncil).filter_by(agentium_id="00001").first()
+    if not head:
+        return PersonaResponse(persona="", source="none")
+    prompt = head.get_system_prompt()
+    return PersonaResponse(persona=prompt or "", source="head_system_prompt")
 
 
 async def _stream_response(
