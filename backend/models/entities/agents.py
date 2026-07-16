@@ -510,7 +510,22 @@ class Agent(BaseEntity):
         try:
             from backend.services.model_provider import ModelService
 
-            llm_response = asyncio.get_event_loop().run_until_complete(
+            # Run the coroutine in a dedicated event loop. This method may be
+            # invoked from a Celery worker thread (e.g. ThreadPoolExecutor) that
+            # has no running event loop, so get_event_loop() would raise.
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                loop = None
+            if loop is None or loop.is_closed():
+                try:
+                    loop = asyncio.get_event_loop()
+                except RuntimeError:
+                    loop = None
+            if loop is None or loop.is_closed():
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+            llm_response = loop.run_until_complete(
                 ModelService.generate_with_agent(
                     agent=self,
                     user_message=compression_prompt,

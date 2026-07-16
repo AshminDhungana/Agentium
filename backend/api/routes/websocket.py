@@ -4,6 +4,7 @@ WebSocket endpoint for real-time chat with authentication.
 
 import json
 import logging
+import asyncio
 from contextlib import contextmanager
 from datetime import datetime
 from typing import Optional, Dict, Any, List
@@ -100,10 +101,21 @@ class ConnectionManager:
         self.active_connections: Dict[WebSocket, Dict[str, Any]] = {}
         self.user_connections: Dict[str, WebSocket] = {}
         self.redis_client: Optional[redis.Redis] = None
+        # Track which event loop the cached redis client is bound to.  Celery
+        # broadcast tasks spin up (and close) a fresh loop on every invocation,
+        # so a client bound to a closed loop raises "Event loop is closed".
+        self._redis_loop: Optional["asyncio.AbstractEventLoop"] = None
 
     async def _get_redis(self) -> redis.Redis:
-        if not self.redis_client:
+        current_loop = asyncio.get_running_loop()
+        if self.redis_client is None or self._redis_loop is not current_loop:
+            if self.redis_client is not None:
+                try:
+                    await self.redis_client.aclose()
+                except Exception:
+                    pass
             self.redis_client = await redis.from_url(settings.REDIS_URL, decode_responses=True)
+            self._redis_loop = current_loop
         return self.redis_client
 
     # ── connection lifecycle ─────────────────────────────────────────────────
