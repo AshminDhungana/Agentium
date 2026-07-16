@@ -37,4 +37,12 @@ describe('VoiceIndicator install notification', () => {
     const alert = await screen.findByRole('alert');
     expect(alert.parentElement).toBe(document.body);
   });
+
+  it('shows the current Windows launcher command, not the legacy run-prompt.cmd', async () => {
+    setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36');
+    render(<VoiceIndicator />);
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('bootstrap-voice.cmd');
+    expect(alert).not.toHaveTextContent('run-prompt.cmd');
+  });
 });

@@ -46,8 +46,8 @@ function getInstallInfo(os: DetectedOS): InstallInfo {
             cmd: 'powershell -ExecutionPolicy Bypass -File ".\\scripts\\setup.ps1"',
           },
           {
-            caption: 'Or if Docker is running, it auto-installs — check:',
-            cmd: '%USERPROFILE%\\.agentium\\run-prompt.cmd',
+            caption: 'Or if Docker already installed it, run the dropped launcher:',
+            cmd: '%USERPROFILE%\\.agentium\\bootstrap-voice.cmd',
           },
         ],
       };
