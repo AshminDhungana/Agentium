@@ -76,6 +76,19 @@ $PidFile    = Join-Path $CONF_DIR "voice-bridge.pid"
 $TaskName   = "AgentiumVoiceBridge"
 $StartupDir = [Environment]::GetFolderPath("Startup")
 
+# --- Remove legacy / duplicate trigger artifacts so we never double-start ----
+function Remove-IfExists($path) {
+    if (Test-Path $path) {
+        Remove-Item $path -Force -ErrorAction SilentlyContinue
+        Write-Log "  Removed legacy artifact: $path"
+    }
+}
+Remove-IfExists (Join-Path $StartupDir "agentium-voice-prompt.cmd")
+Remove-IfExists (Join-Path $StartupDir "agentium-voice-setup.hta")
+Remove-IfExists (Join-Path $CONF_DIR   "prompt.vbs")
+Remove-IfExists (Join-Path $CONF_DIR   "run-prompt.cmd")
+Remove-IfExists (Join-Path $CONF_DIR   "agentium-runonce.reg")
+
 Write-Log "=== Agentium Voice Bridge Installer (Windows) ==="
 Write-Log "REPO_ROOT=$RepoRoot"
 Write-Log "PYTHON_BIN=$PYTHON_BIN"
@@ -466,6 +479,15 @@ else {
         "`"$VENV_PYTHON`" `"$MainPy`""
     ) | Set-Content -Path $startupBat -Encoding ASCII
     Write-Log "  Startup bat written for persistence: $startupBat"
+}
+
+# --- Signal successful install so autoinstall prompts / Startup no longer fire ---
+$MarkerFile = Join-Path $CONF_DIR "voice-installed.marker"
+try {
+    New-Item -Path $MarkerFile -ItemType File -Force -ErrorAction Stop | Out-Null
+    Write-Log "  Install marker written: $MarkerFile"
+} catch {
+    Write-Warn "Could not write install marker: $_"
 }
 
 Write-Log "=== Installation complete. Check $LOG_FILE for details. ==="
