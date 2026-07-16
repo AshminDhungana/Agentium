@@ -38,6 +38,17 @@ class ToolRegistry:
 
     def _initialize_tools(self):
         """Register all built-in (non-MCP) tools."""
+        from backend.tools.governance_tool import (
+            spawn_agent,
+            liquidate_agent,
+            create_task,
+            dispatch_task,
+            complete_task,
+            propose_amendment,
+            open_vote,
+            cast_vote,
+            conclude_vote,
+        )
         # ══════════════════════════════════════════════════════════════════════
         # CODE ANALYZER TOOL
         # ══════════════════════════════════════════════════════════════════════
@@ -210,7 +221,7 @@ class ToolRegistry:
                 "filepath": {"type": "string",  "description": "Absolute file path"},
                 "limit":    {"type": "integer", "description": "Max characters to read", "optional": True},
             },
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx"],
         )
         self.register_tool(
             name="write_file",
@@ -220,7 +231,7 @@ class ToolRegistry:
                 "filepath": {"type": "string", "description": "Absolute file path"},
                 "content":  {"type": "string", "description": "Content to write"},
             },
-            authorized_tiers=["0xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx"],
         )
 
         # ── Shell Tool ─────────────────────────────────────────────────────────
@@ -233,7 +244,7 @@ class ToolRegistry:
                 "command": {"type": "array",   "description": "Command and args as list"},
                 "timeout": {"type": "integer", "description": "Timeout in seconds", "optional": True},
             },
-            authorized_tiers=["0xxxx", "1xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx"],
         )
 
         # ══════════════════════════════════════════════════════════════════════
@@ -1098,7 +1109,103 @@ class ToolRegistry:
                 "insert_text": {"type": "string",  "description": "Text to insert — required for 'insert'", "optional": True},
                 "view_range":  {"type": "array",   "description": "[start_line, end_line] for partial view — optional for 'view'", "optional": True},
             },
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx"],
+        )
+
+        # ═══════════════════════════════════════════════════════════
+        # GOVERNANCE TOOLS
+        # ═══════════════════════════════════════════════════════════
+        self.register_tool(
+            name="spawn_agent",
+            description=(
+                "Spawn a new agent under your authority. agent_type must be "
+                "'council' (Head only), 'lead', or 'task'. Returns the new agent id."
+            ),
+            function=spawn_agent,
+            parameters={
+                "agent_type": {"type": "string", "description": "council | lead | task"},
+                "name": {"type": "string", "description": "Name for the new agent"},
+                "description": {"type": "string", "description": "Role/purpose description"},
+                "capabilities": {"type": "array", "description": "Optional custom capabilities (task only)", "optional": True},
+            },
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx"],
+        )
+        self.register_tool(
+            name="liquidate_agent",
+            description="Retire/terminate an agent. Cannot liquidate the Head (00001).",
+            function=liquidate_agent,
+            parameters={
+                "target_agentium_id": {"type": "string", "description": "Agentium ID of the agent to liquidate"},
+                "reason": {"type": "string", "description": "Justification for liquidation"},
+            },
+            authorized_tiers=["0xxxx", "2xxxx"],
+        )
+        self.register_tool(
+            name="create_task",
+            description="Create a new task under your authority. Opens Council deliberation if a Council exists.",
+            function=create_task,
+            parameters={
+                "title": {"type": "string", "description": "Short task title"},
+                "description": {"type": "string", "description": "Task description"},
+                "priority": {"type": "string", "description": "low | normal | high | critical", "optional": True},
+            },
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx"],
+        )
+        self.register_tool(
+            name="dispatch_task",
+            description="Assign a task to a Lead (or auto-pick an available Lead). Triggers critic review.",
+            function=dispatch_task,
+            parameters={
+                "task_id": {"type": "string", "description": "Agentium ID of the task"},
+                "target_agentium_id": {"type": "string", "description": "Lead agent ID (optional; auto-picks if omitted)", "optional": True},
+            },
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx"],
+        )
+        self.register_tool(
+            name="complete_task",
+            description="Mark a task as completed with a result summary.",
+            function=complete_task,
+            parameters={
+                "task_id": {"type": "string", "description": "Agentium ID of the task"},
+                "result_summary": {"type": "string", "description": "Summary of the completed work"},
+            },
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx"],
+        )
+        self.register_tool(
+            name="propose_amendment",
+            description="Propose a constitutional amendment. Returns the new amendment id.",
+            function=propose_amendment,
+            parameters={
+                "title": {"type": "string", "description": "Amendment title"},
+                "description": {"type": "string", "description": "Rationale for the amendment"},
+                "proposed_text": {"type": "string", "description": "The proposed change (markdown diff)"},
+            },
+            authorized_tiers=["0xxxx", "1xxxx"],
+        )
+        self.register_tool(
+            name="open_vote",
+            description="Open voting on a proposed amendment.",
+            function=open_vote,
+            parameters={"amendment_id": {"type": "string", "description": "Amendment ID"}},
+            authorized_tiers=["0xxxx", "1xxxx"],
+        )
+        self.register_tool(
+            name="cast_vote",
+            description="Cast your vote on an open amendment. vote: for | against | abstain.",
+            function=cast_vote,
+            parameters={
+                "amendment_id": {"type": "string", "description": "Amendment ID"},
+                "vote": {"type": "string", "description": "for | against | abstain"},
+                "rationale": {"type": "string", "description": "Optional reasoning", "optional": True},
+            },
+            authorized_tiers=["0xxxx", "1xxxx"],
+        )
+        self.register_tool(
+            name="conclude_vote",
+            description="Conclude voting and ratify/rollback the amendment (Head only).",
+            function=conclude_vote,
+            parameters={"amendment_id": {"type": "string", "description": "Amendment ID"}},
+            authorized_tiers=["0xxxx"],
         )
 
         # ══════════════════════════════════════════════════════════════════════
@@ -1369,5 +1476,15 @@ class ToolRegistry:
         return result
 
 
-# Global registry instance
-tool_registry = ToolRegistry()
+# Global registry instance (lazy to avoid import-time circular dependencies
+# via backend.tools.governance_tool -> ... -> agent_orchestrator -> tool_registry)
+class _LazyToolRegistry:
+    _instance = None
+
+    def __getattr__(self, name):
+        if _LazyToolRegistry._instance is None:
+            _LazyToolRegistry._instance = ToolRegistry()
+        return getattr(_LazyToolRegistry._instance, name)
+
+
+tool_registry = _LazyToolRegistry()

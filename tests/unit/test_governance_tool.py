@@ -1,6 +1,7 @@
 import pytest
 from unittest.mock import patch, MagicMock, AsyncMock
 from backend.tools.governance_tool import spawn_agent, liquidate_agent, create_task, dispatch_task, complete_task, propose_amendment, open_vote, cast_vote, conclude_vote
+from backend.core.tool_registry import tool_registry
 
 
 def _agent(agentium_id="00001", prefix="0"):
@@ -89,3 +90,28 @@ async def test_cast_vote_happy_path():
                               db=MagicMock(), agent_id="10001")
         assert res["success"] is True
         assert res["data"]["tally"]["for"] == 1
+
+
+def test_governance_tools_registered_with_tiers():
+    expected = {
+        "spawn_agent": ["0xxxx", "1xxxx", "2xxxx"],
+        "liquidate_agent": ["0xxxx", "2xxxx"],
+        "create_task": ["0xxxx", "1xxxx", "2xxxx"],
+        "dispatch_task": ["0xxxx", "1xxxx", "2xxxx"],
+        "complete_task": ["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx"],
+        "propose_amendment": ["0xxxx", "1xxxx"],
+        "open_vote": ["0xxxx", "1xxxx"],
+        "cast_vote": ["0xxxx", "1xxxx"],
+        "conclude_vote": ["0xxxx"],
+    }
+    for name, tiers in expected.items():
+        desc = tool_registry.get_tool(name)
+        assert desc is not None, f"{name} not registered"
+        assert desc["authorized_tiers"] == tiers, f"{name} tiers wrong: {desc['authorized_tiers']}"
+
+
+def test_existing_tool_tier_changes():
+    assert tool_registry.get_tool("read_file")["authorized_tiers"] == ["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx"]
+    assert tool_registry.get_tool("write_file")["authorized_tiers"] == ["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx"]
+    assert tool_registry.get_tool("text_editor")["authorized_tiers"] == ["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx"]
+    assert tool_registry.get_tool("execute_command")["authorized_tiers"] == ["0xxxx", "1xxxx", "2xxxx"]
