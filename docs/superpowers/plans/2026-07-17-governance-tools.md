@@ -352,7 +352,7 @@ git commit -m "feat: add spawn_agent and liquidate_agent governance tools"
 - Consumes (from Task 2): `_result`, `_caller`, `_require`, `db`/`agent_id` injection pattern.
 - Produces:
   - `create_task(title: str, description: str, priority: str = "normal", db: Session = None, agent_id: str = None) -> Dict[str, Any]`
-  - `dispatch_task(task_id: str, target_agentium_id: Optional[str] = None, db: Session = None, agent_id: str = None) -> Dict[str, Any]`
+  - `dispatch_task(task_id: str, target_agentium_id: Optional[str] = None, db: Session = None, agent_id: str = None) -> Dict[str, Any]` — **async** (awaits `AgentOrchestrator.delegate_to_task`).
   - `complete_task(task_id: str, result_summary: str, db: Session = None, agent_id: str = None) -> Dict[str, Any]`
 
 - [ ] **Step 1: Write the failing test**
@@ -367,13 +367,29 @@ def test_create_task_unauthorized():
 
 def test_complete_task_happy_path():
     task = MagicMock(); task.agentium_id = "t1"; task.status.value = "completed"
-    with patch("backend.tools.governance_tool.CapabilityRegistry.can_agent", return_value=True), \
-         patch("backend.tools.governance_tool.Task.get_by_id", return_value=task), \
-         patch("backend.tools.governance_tool.db_commit") as cm:
-        res = complete_task(task_id="t1", result_summary="done", db=MagicMock(), agent_id="30001")
+    db = MagicMock()
+    db.query.return_value.filter.return_value.first.return_value = task
+    with patch("backend.tools.governance_tool.CapabilityRegistry.can_agent", return_value=True):
+        res = complete_task(task_id="t1", result_summary="done", db=db, agent_id="30001")
         assert res["success"] is True
-        task.complete.assert_called_once()
-        cm.assert_called_once()
+        task.complete.assert_called_once_with(result_summary="done", result_data={})
+        db.commit.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_dispatch_task_happy_path():
+    task = MagicMock(); task.id = "db-t1"; task.agentium_id = "t1"
+    task.task_type.value = "execution"; task.description = "do it"; task.tools_allowed = []
+    lead = MagicMock(); lead.agentium_id = "20001"; lead.status = "active"
+    db = MagicMock()
+    db.query.return_value.filter.return_value.first.side_effect = [task, lead]
+    orch = MagicMock()
+    orch.delegate_to_task = AsyncMock(return_value=MagicMock(success=True))
+    with patch("backend.tools.governance_tool.CapabilityRegistry.can_agent", return_value=True), \
+         patch("backend.tools.governance_tool.AgentOrchestrator", return_value=orch):
+        res = await dispatch_task(task_id="t1", db=db, agent_id="00001")
+        assert res["success"] is True
+        orch.delegate_to_task.assert_awaited_once()
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -427,7 +443,7 @@ def create_task(
     return _result(True, data={"task_id": task.agentium_id, "status": task.status.value})
 
 
-def dispatch_task(
+async def dispatch_task(
     task_id: str,
     target_agentium_id: Optional[str] = None,
     db: Session = None,
@@ -444,7 +460,6 @@ def dispatch_task(
     if task is None:
         return _result(False, error=f"task {task_id} not found")
 
-    lead = None
     if target_agentium_id:
         lead = db.query(LeadAgent).filter(LeadAgent.agentium_id == target_agentium_id).first()
         if lead is None:
@@ -454,11 +469,23 @@ def dispatch_task(
     if lead is None:
         return _result(False, error="no available Lead agent to dispatch to")
 
-    orchestrator = AgentOrchestrator()
+    orchestrator = AgentOrchestrator(db)
+    # delegate_to_task expects a task DICT (id/description/task_type) and
+    # auto-selects an available Task Agent when task_id (recipient) is None.
+    task_dict = {
+        "id": task.id,
+        "task_type": task.task_type.value if task.task_type else "general",
+        "description": task.description or "",
+        "allowed_tools": task.tools_allowed or [],
+    }
     try:
-        outcome = orchestrator.delegate_to_task(task=task, lead_id=lead.agentium_id,
-                                                task_id=task.id, retry_count=0)
-    except Exception as e:  # delegate is async; executor runs it
+        outcome = await orchestrator.delegate_to_task(
+            task=task_dict,
+            lead_id=lead.agentium_id,
+            task_id=None,
+            retry_count=0,
+        )
+    except Exception as e:
         return _result(False, error=str(e))
     return _result(True, data={"task_id": task.agentium_id,
                               "lead_id": lead.agentium_id,
@@ -487,20 +514,6 @@ def complete_task(
     except Exception as e:
         return _result(False, error=str(e))
     return _result(True, data={"task_id": task.agentium_id, "status": task.status.value})
-```
-
-Note: the test for `complete_task` asserts a `db_commit` helper — replace the test stub with a direct `db.commit` patch. Use:
-
-```python
-def test_complete_task_happy_path():
-    task = MagicMock(); task.agentium_id = "t1"; task.status.value = "completed"
-    db = MagicMock()
-    with patch("backend.tools.governance_tool.CapabilityRegistry.can_agent", return_value=True), \
-         patch("backend.tools.governance_tool.Task.get_by_id", return_value=task):
-        res = complete_task(task_id="t1", result_summary="done", db=db, agent_id="30001")
-        assert res["success"] is True
-        task.complete.assert_called_once_with(result_summary="done", result_data={})
-        db.commit.assert_called_once()
 ```
 
 - [ ] **Step 4: Run test to verify it passes**
@@ -535,6 +548,17 @@ git commit -m "feat: add create_task, dispatch_task, complete_task governance to
 - [ ] **Step 1: Write the failing test**
 
 ```python
+# tests/unit/test_governance_tool.py  (voting section)
+import pytest
+from unittest.mock import patch, MagicMock, AsyncMock
+from backend.tools.governance_tool import (
+    propose_amendment,
+    open_vote,
+    cast_vote,
+    conclude_vote,
+)
+
+
 @pytest.mark.asyncio
 async def test_propose_amendment_unauthorized():
     with patch("backend.tools.governance_tool.CapabilityRegistry.can_agent", return_value=False):
@@ -910,7 +934,7 @@ def test_head_create_dispatch_complete_task(seeded_db):
     task_id = c_res["data"]["task_id"]
 
     dt = tool_registry.get_tool_function("dispatch_task")
-    d_res = dt(task_id=task_id, target_agentium_id=lead.agentium_id, db=db, agent_id="00001")
+    d_res = await dt(task_id=task_id, target_agentium_id=lead.agentium_id, db=db, agent_id="00001")
     assert d_res["success"] is True
 
     cm = tool_registry.get_tool_function("complete_task")
@@ -923,21 +947,21 @@ def test_head_create_dispatch_complete_task(seeded_db):
 def test_head_full_vote_cycle(seeded_db):
     db = seeded_db
     pa = tool_registry.get_tool_function("propose_amendment")
-    p_res = pa(title="Amend A", description="reason", proposed_text="diff", db=db, agent_id="00001")
+    p_res = await pa(title="Amend A", description="reason", proposed_text="diff", db=db, agent_id="00001")
     assert p_res["success"] is True
     aid = p_res["data"]["amendment_id"]
 
     ov = tool_registry.get_tool_function("open_vote")
-    assert ov(amendment_id=aid, db=db, agent_id="00001")["success"] is True
+    assert (await ov(amendment_id=aid, db=db, agent_id="00001"))["success"] is True
 
     cv = tool_registry.get_tool_function("cast_vote")
     council = db.query(Agent).filter(Agent.agentium_id.like("1%")).all()
     for c in council:
-        r = cv(amendment_id=aid, vote="for", db=db, agent_id=c.agentium_id)
+        r = await cv(amendment_id=aid, vote="for", db=db, agent_id=c.agentium_id)
         assert r["success"] is True
 
     cl = tool_registry.get_tool_function("conclude_vote")
-    cl_res = cl(amendment_id=aid, db=db, agent_id="00001")
+    cl_res = await cl(amendment_id=aid, db=db, agent_id="00001")
     assert cl_res["success"] is True
 ```
 
@@ -961,3 +985,13 @@ git commit -m "test: add end-to-end integration tests for governance tools"
 2. **Placeholder scan:** No TBD/TODO/"similar to" — all steps contain concrete code. The `AsyncMock`/`MagicMock` usage in tests is real. (Minor: test stubs corrected inline for `complete_task`.)
 3. **Type consistency:** `spawn_agent` returns `data.agentium_id` consistently; `AmendmentService(db)` constructed per-call in voting tools; `Task.complete(result_summary=, result_data=)` matches entity signature (`task.py:447`); `VoteType(vote.lower())` matches enum; `agent_types` strings match `AgentType` values. Consistent across tasks.
 4. **Note on `tool_creation_service.py`:** Plan does **not** edit it — injection is automatic via `inspect` (`tool_creation_service.py:329-334`). This corrects the spec's "add to injection list" line; the behavior is identical.
+
+## Plan Corrections (post-review against live source)
+
+During review the following inaccuracies in the first draft were corrected:
+
+- **`dispatch_task` is `async`** (previously written sync). `AgentOrchestrator.delegate_to_task` is a coroutine; a sync wrapper would return an unawaited coroutine. The executor only `asyncio.run`s coroutine *functions*, so the wrapper itself must be `async` and `await` the call.
+- **`AgentOrchestrator(db)`** (not zero-arg) — matches every other call site (`mobile.py`, integration tests). `message_bus` defaults to `None`.
+- **`delegate_to_task(task: Dict, lead_id, task_id, retry_count)`** takes a **task DICT** (`id`/`description`/`task_type`/`allowed_tools`), not a `Task` object, and auto-selects the executing Task Agent when `task_id` (recipient) is `None`. The wrapper now builds that dict and passes `task_id=None`.
+- **No `get_by_id` classmethod** exists on `Agent`/`Task`; unit tests were rewritten to use `db.query(...).filter(...).first()` mocks.
+- **Async tool calls must be `await`ed** in the integration test (voting tools *and* `dispatch_task`), since the test invokes the functions directly rather than through the executor.
