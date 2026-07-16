@@ -15,6 +15,7 @@
 export function DashboardSkeleton() {
     return (
         <div
+            data-testid="dashboard-skeleton"
             className="space-y-8"
             aria-busy="true"
             aria-label="Loading dashboard…"
