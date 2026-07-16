@@ -277,7 +277,56 @@ class InitializationService:
                 f"You may propose a constitutional amendment to rename it later."
             )
 
-        await self._broadcast_to_user(message, is_urgent=False)
+        message_id = await self._persist_head_message(message)
+        await self._broadcast_head_message(message, message_id)
+
+    async def _persist_head_message(self, content: str) -> Optional[str]:
+        """
+        Persist a Head-of-Council message to chat history so it shows up in the
+        dashboard conversation log. Returns the created message id (also used as
+        the WebSocket message_id for client-side dedup).
+        """
+        from backend.models.entities.chat_message import ChatMessage as ChatMsg
+        import uuid
+
+        sovereign_user = self.db.query(User).filter_by(
+            is_admin=True, is_active=True
+        ).first()
+        if not sovereign_user:
+            self._log("WARNING", "No sovereign user found — cannot persist welcome message")
+            return None
+
+        message_id = str(uuid.uuid4())
+        self.db.add(ChatMsg(
+            id=message_id,
+            user_id=str(sovereign_user.id),
+            role="head_of_council",
+            content=content,
+            agent_id="00001",
+            message_metadata={"source": "genesis", "event": "country_name_decision"},
+        ))
+        self.db.flush()
+        return message_id
+
+    async def _broadcast_head_message(self, content: str, message_id: Optional[str]) -> None:
+        """
+        Broadcast a Head-of-Council message using the chat `message` event type
+        (not `genesis_prompt`) so the dashboard renders it inline in the chat
+        thread and dedups it against the persisted row via message_id.
+        """
+        try:
+            from backend.api.routes.websocket import manager as ws_manager
+            await ws_manager.broadcast({
+                "type": "message",
+                "role": "head_of_council",
+                "content": content,
+                "message_id": message_id,
+                "agent_id": "00001",
+                "timestamp": datetime.utcnow().isoformat(),
+                "metadata": {"source": "genesis", "event": "country_name_decision"},
+            })
+        except Exception as e:
+            self._log("WARNING", f"Welcome message broadcast failed: {e}")
 
     async def _ensure_default_model_config(self) -> None:
         """
