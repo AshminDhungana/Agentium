@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import patch, MagicMock, AsyncMock
-from backend.tools.governance_tool import spawn_agent, liquidate_agent, create_task, dispatch_task, complete_task
+from backend.tools.governance_tool import spawn_agent, liquidate_agent, create_task, dispatch_task, complete_task, propose_amendment, open_vote, cast_vote, conclude_vote
 
 
 def _agent(agentium_id="00001", prefix="0"):
@@ -68,3 +68,24 @@ async def test_dispatch_task_happy_path():
         res = await dispatch_task(task_id="t1", db=db, agent_id="00001")
         assert res["success"] is True
         orch.delegate_to_task.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_propose_amendment_unauthorized():
+    with patch("backend.tools.governance_tool.CapabilityRegistry.can_agent", return_value=False):
+        res = await propose_amendment(title="T", description="D", proposed_text="X",
+                                      db=MagicMock(), agent_id="30001")
+        assert res["success"] is False
+        assert "not authorized" in res["error"].lower()
+
+
+@pytest.mark.asyncio
+async def test_cast_vote_happy_path():
+    svc = MagicMock()
+    svc.cast_vote = AsyncMock(return_value={"tally": {"for": 1}})
+    with patch("backend.tools.governance_tool.CapabilityRegistry.can_agent", return_value=True), \
+         patch("backend.tools.governance_tool.AmendmentService", return_value=svc):
+        res = await cast_vote(amendment_id="a1", vote="for", rationale="ok",
+                              db=MagicMock(), agent_id="10001")
+        assert res["success"] is True
+        assert res["data"]["tally"]["for"] == 1

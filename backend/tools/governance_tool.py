@@ -26,6 +26,8 @@ from backend.models.entities.agents import (
     TaskAgent,
 )
 from backend.services.capability_registry import Capability, CapabilityRegistry
+from backend.services.amendment_service import AmendmentService
+from backend.models.entities.voting import VoteType
 from backend.services.reincarnation_service import reincarnation_service
 from backend.models.entities.task import Task, TaskType, TaskPriority, TaskStatus
 from backend.services.agent_orchestrator import AgentOrchestrator
@@ -245,3 +247,102 @@ def complete_task(
     except Exception as e:
         return _result(False, error=str(e))
     return _result(True, data={"task_id": task.agentium_id, "status": task.status.value})
+
+
+async def propose_amendment(
+    title: str,
+    description: str,
+    proposed_text: str,
+    db: Session = None,
+    agent_id: str = None,
+) -> Dict[str, Any]:
+    caller = _caller(db, agent_id) if db and agent_id else None
+    if caller is None:
+        return _result(False, error="caller agent not found")
+    denied = _require(Capability.PROPOSE_AMENDMENT, caller, db, "propose amendment")
+    if denied:
+        return denied
+    try:
+        svc = AmendmentService(db)
+        result = await svc.propose_amendment(
+            proposer_id=caller.agentium_id,
+            title=title,
+            diff_markdown=proposed_text,
+            rationale=description or title,
+        )
+    except (PermissionError, ValueError) as e:
+        return _result(False, error=str(e))
+    return _result(True, data={"amendment_id": result.get("amendment_id"), "status": result.get("status")})
+
+
+async def open_vote(
+    amendment_id: str,
+    db: Session = None,
+    agent_id: str = None,
+) -> Dict[str, Any]:
+    caller = _caller(db, agent_id) if db and agent_id else None
+    if caller is None:
+        return _result(False, error="caller agent not found")
+    if not caller.agentium_id.startswith("0"):
+        denied = _require(Capability.PROPOSE_AMENDMENT, caller, db, "open vote")
+        if denied:
+            return denied
+    else:
+        denied = _require(Capability.AMEND_CONSTITUTION, caller, db, "open vote")
+        if denied:
+            return denied
+    try:
+        svc = AmendmentService(db)
+        result = await svc.start_voting(amendment_id)
+    except (PermissionError, ValueError) as e:
+        return _result(False, error=str(e))
+    return _result(True, data={"amendment_id": amendment_id, "status": result.get("status")})
+
+
+async def cast_vote(
+    amendment_id: str,
+    vote: str,
+    rationale: Optional[str] = None,
+    db: Session = None,
+    agent_id: str = None,
+) -> Dict[str, Any]:
+    caller = _caller(db, agent_id) if db and agent_id else None
+    if caller is None:
+        return _result(False, error="caller agent not found")
+    denied = _require(Capability.VOTE_ON_AMENDMENT, caller, db, "cast vote")
+    if denied:
+        return denied
+    try:
+        vtype = VoteType(vote.lower())
+    except ValueError:
+        return _result(False, error=f"invalid vote '{vote}' (expected for|against|abstain)")
+    try:
+        svc = AmendmentService(db)
+        result = await svc.cast_vote(
+            amendment_id=amendment_id,
+            voter_id=caller.agentium_id,
+            vote=vtype,
+            rationale=rationale,
+        )
+    except (PermissionError, ValueError) as e:
+        return _result(False, error=str(e))
+    return _result(True, data={"amendment_id": amendment_id, "tally": result.get("tally")})
+
+
+async def conclude_vote(
+    amendment_id: str,
+    db: Session = None,
+    agent_id: str = None,
+) -> Dict[str, Any]:
+    caller = _caller(db, agent_id) if db and agent_id else None
+    if caller is None:
+        return _result(False, error="caller agent not found")
+    denied = _require(Capability.AMEND_CONSTITUTION, caller, db, "conclude vote")
+    if denied:
+        return denied
+    try:
+        svc = AmendmentService(db)
+        result = await svc.conclude_voting(amendment_id, actor_id=caller.agentium_id)
+    except (PermissionError, ValueError) as e:
+        return _result(False, error=str(e))
+    return _result(True, data={"amendment_id": amendment_id, "outcome": result})
