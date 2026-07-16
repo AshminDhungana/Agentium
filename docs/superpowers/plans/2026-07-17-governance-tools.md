@@ -170,8 +170,7 @@ def test_spawn_agent_task_happy_path():
 
 
 def test_liquidate_agent_unauthorized_returns_error():
-    with patch("backend.tools.governance_tool.CapabilityRegistry.can_agent", return_value=False), \
-         patch("backend.tools.governance_tool.Agent.get_by_id", return_value=_agent()):
+    with patch("backend.tools.governance_tool.CapabilityRegistry.can_agent", return_value=False):
         res = liquidate_agent(target_agentium_id="30001", reason="x",
                               db=MagicMock(), agent_id="30001")
         assert res["success"] is False
