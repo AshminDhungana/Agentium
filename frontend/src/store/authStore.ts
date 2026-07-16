@@ -27,6 +27,7 @@ interface User {
     isAuthenticated: boolean;
     isSovereign?: boolean;
     agentium_id?: string;
+    avatar_url?: string;
 }
 
 // B5: result type for signup — avoids modifying the AuthState.isLoading /
@@ -52,6 +53,7 @@ interface AuthState {
     logout: () => void;
     changePassword: (oldPassword: string, newPassword: string) => Promise<boolean>;
     checkAuth: () => Promise<boolean>;
+    updateAvatar: (avatarUrl: string | null) => void;
 }
 
 const extractUserFromToken = (token: string): Partial<User> | null => {
@@ -120,6 +122,7 @@ export const useAuthStore = create<AuthState>()(
                             // B6: use deriveIsSovereign instead of blindly equating
                             //     isSovereign to is_admin (not all admins are sovereign)
                             isSovereign: deriveIsSovereign(user),
+                            avatar_url: user.avatar_url ?? undefined,
                         },
                         isLoading: false,
                         isInitialized: true,
@@ -223,6 +226,14 @@ export const useAuthStore = create<AuthState>()(
                 }
             },
 
+            updateAvatar: (avatarUrl: string | null) => {
+                set((state) => ({
+                    user: state.user
+                        ? { ...state.user, avatar_url: avatarUrl ?? undefined }
+                        : null,
+                }));
+            },
+
             checkAuth: async () => {
                 const token = localStorage.getItem('access_token');
 
@@ -257,6 +268,7 @@ export const useAuthStore = create<AuthState>()(
                                 role: userData.role ?? (userData.is_admin ? 'admin' : 'user'),
                                 // B6: consistent isSovereign derivation
                                 isSovereign: deriveIsSovereign(userData),
+                                avatar_url: userData.avatar_url ?? undefined,
                             },
                             isLoading: false,
                             isInitialized: true,

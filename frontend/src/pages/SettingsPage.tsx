@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, type ChangeEvent } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { useForm } from 'react-hook-form';
 import {
@@ -15,6 +15,7 @@ import {
     Users,
 } from 'lucide-react';
 import { showToast } from '@/hooks/useToast';
+import { api } from '@/services/api';
 import UserManagement from './Usermanagement';
 // C14: password strength logic extracted into a reusable hook
 import { usePasswordStrength } from '@/hooks/usePasswordStrength';
@@ -36,7 +37,7 @@ const ROLE_PERMISSION_LABELS: Record<string, string> = {
 };
 
 export function SettingsPage() {
-    const { user, changePassword } = useAuthStore();
+    const { user, changePassword, updateAvatar } = useAuthStore();
     const [activeTab, setActiveTab] = useState<'account' | 'users'>('account');
 
     // C8: individual show/hide states for all three password fields
@@ -50,6 +51,9 @@ export function SettingsPage() {
     //     of a duplicate API call made here. Starts at 0; UserManagement sets
     //     it after its own initial fetch completes.
     const [pendingCount, setPendingCount] = useState(0);
+
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [uploading, setUploading] = useState(false);
 
     const {
         register,
@@ -107,6 +111,44 @@ export function SettingsPage() {
             showToast.error(message);
         } finally {
             setIsSubmitting(false);
+        }
+    };
+
+    const handleAvatarChange = async (e: ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.type)) {
+            showToast.error('Unsupported image type. Use jpg, png, webp or gif.');
+            return;
+        }
+        if (file.size > 5 * 1024 * 1024) {
+            showToast.error('Image must be 5 MB or smaller.');
+            return;
+        }
+        setUploading(true);
+        try {
+            const form = new FormData();
+            form.append('file', file);
+            const res = await api.post('/api/v1/users/me/avatar', form, {
+                headers: { 'Content-Type': 'multipart/form-data' },
+            });
+            updateAvatar(res.data.avatar_url);
+            showToast.success('Profile picture updated.');
+        } catch {
+            showToast.error('Upload failed. Please try again.');
+        } finally {
+            setUploading(false);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+        }
+    };
+
+    const handleAvatarRemove = async () => {
+        try {
+            await api.delete('/api/v1/users/me/avatar');
+            updateAvatar(null);
+            showToast.success('Profile picture removed.');
+        } catch {
+            showToast.error('Remove failed. Please try again.');
         }
     };
 
@@ -183,9 +225,46 @@ export function SettingsPage() {
                             {/* Account Card */}
                             <div className="bg-white dark:bg-[#161b27] rounded-xl border border-gray-200 dark:border-[#1e2535] p-6 shadow-sm dark:shadow-[0_2px_16px_rgba(0,0,0,0.25)] transition-colors duration-200">
                                 <div className="flex flex-col items-center text-center">
-                                    {/* Avatar */}
-                                    <div className="w-20 h-20 rounded-full bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 flex items-center justify-center mb-4 shadow-lg">
-                                        <User className="w-10 h-10 text-white" />
+                                    {/* Avatar — uploaded picture or gradient fallback */}
+                                    <div className="w-20 h-20 rounded-full overflow-hidden bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 flex items-center justify-center mb-4 shadow-lg">
+                                        {user?.avatar_url ? (
+                                            <img
+                                                src={user.avatar_url}
+                                                alt="Profile"
+                                                className="w-full h-full object-cover"
+                                            />
+                                        ) : (
+                                            <User className="w-10 h-10 text-white" />
+                                        )}
+                                    </div>
+
+                                    {/* Upload / Remove controls */}
+                                    <input
+                                        ref={fileInputRef}
+                                        type="file"
+                                        accept="image/*"
+                                        className="hidden"
+                                        onChange={handleAvatarChange}
+                                    />
+                                    <div className="flex flex-col gap-2 w-full max-w-[12rem]">
+                                        <button
+                                            type="button"
+                                            onClick={() => fileInputRef.current?.click()}
+                                            disabled={isSubmitting || uploading}
+                                            className="px-3 py-1.5 text-sm rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium transition-colors disabled:opacity-50"
+                                        >
+                                            {uploading ? 'Uploading…' : 'Upload picture'}
+                                        </button>
+                                        {user?.avatar_url && (
+                                            <button
+                                                type="button"
+                                                onClick={handleAvatarRemove}
+                                                disabled={isSubmitting || uploading}
+                                                className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-[#1e2535] text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#1e2535] transition-colors disabled:opacity-50"
+                                            >
+                                                Remove
+                                            </button>
+                                        )}
                                     </div>
 
                                     {/* User Info */}
