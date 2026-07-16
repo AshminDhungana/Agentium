@@ -100,8 +100,24 @@ def db_engine():
     # may have a different name in the DB than in the model (migrations,
     # circular dependencies, etc).  If drop_all fails, we still dispose so a
     # subsequent run can recreate the DB from scratch.
+    #
+    # NB: drop_all() can BLOCK indefinitely waiting for an exclusive table lock
+    # if any connection (e.g. the app's pooled engine) still holds one. A hung
+    # session-scoped teardown stalls the ENTIRE suite — pytest-timeout does NOT
+    # cover fixture teardown. Terminate stray backends first and bound the work
+    # with a statement_timeout so teardown can never hang the run.
     try:
-        Base.metadata.drop_all(bind=engine_test)
+        with engine_test.connect() as conn:
+            conn.execute(text(
+                "SELECT pg_terminate_backend(pid) "
+                "FROM pg_stat_activity WHERE datname = 'agentium_test' "
+                "AND pid <> pg_backend_pid()"
+            ))
+            conn.execute(text("SET statement_timeout = '30s'"))
+            try:
+                Base.metadata.drop_all(bind=conn)
+            except Exception:
+                pass
     except Exception:
         pass
     finally:
