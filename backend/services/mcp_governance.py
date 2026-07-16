@@ -250,6 +250,74 @@ class MCPGovernanceService:
             "capabilities": capabilities,
         }
 
+    def vote_on_mcp_proposal(
+        self, tool_id: str, voter_agentium_id: str, vote: str
+    ) -> Dict[str, Any]:
+        """
+        Cast a Council vote on a pending MCP proposal. Finalises (conclude())
+        once every eligible voter has cast; on PASS, approves + syncs live.
+        """
+        from backend.models.entities.voting import VoteType
+
+        tool = self._get_tool_or_404(tool_id)
+        if not tool.voting_id:
+            raise ValueError("This MCP tool has no open Council vote.")
+
+        voting = (
+            self.db.query(AmendmentVoting).filter_by(id=tool.voting_id).first()
+        )
+        if not voting:
+            raise ValueError("Linked AmendmentVoting not found.")
+        if voting.status != AmendmentStatus.VOTING:
+            raise ValueError(f"Voting is not open (status={voting.status.value}).")
+
+        try:
+            vt = VoteType(vote)
+        except ValueError:
+            raise ValueError("vote must be 'for', 'against', or 'abstain'.")
+
+        voting.cast_vote(voter_agentium_id, vt)
+        self.db.commit()
+
+        total = voting.votes_for + voting.votes_against + voting.votes_abstain
+        if total < len(voting.eligible_voters):
+            return {
+                "voted": True,
+                "approved": False,
+                "tool_id": tool_id,
+                "tally": {
+                    "for": voting.votes_for,
+                    "against": voting.votes_against,
+                    "abstain": voting.votes_abstain,
+                },
+            }
+
+        result = voting.conclude()  # sets status PASSED / REJECTED
+        self.db.commit()
+
+        if voting.status == AmendmentStatus.PASSED:
+            approved = self.approve_mcp_server(
+                tool_id, approved_by=voter_agentium_id, vote_id=str(voting.id)
+            )
+            bridge = self._lazy_bridge()
+            if bridge:
+                bridge.sync_one(approved)
+            return {
+                "voted": True,
+                "approved": True,
+                "tool_id": tool_id,
+                "registry_key": f"mcp__{tool.name}",
+                "result": result,
+            }
+
+        return {
+            "voted": True,
+            "approved": False,
+            "tool_id": tool_id,
+            "result": result,
+            "status": voting.status.value,
+        }
+
     def approve_mcp_server(
         self,
         tool_id: str,
