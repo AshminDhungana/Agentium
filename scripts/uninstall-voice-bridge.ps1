@@ -46,6 +46,7 @@ $artifacts = @(
     (Join-Path $startupFolder "agentium-voice-prompt.cmd")
     (Join-Path $startupFolder "agentium-voice-setup.hta")
     (Join-Path $startupFolder "agentium-voice-bridge.bat")
+    (Join-Path $startupFolder "AgentiumVoiceBridge.lnk")
     (Join-Path $CONF_DIR     "bootstrap-voice.cmd")
     (Join-Path $CONF_DIR     "prompt.vbs")
     (Join-Path $CONF_DIR     "run-prompt.cmd")
