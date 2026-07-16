@@ -76,6 +76,10 @@ $PidFile    = Join-Path $CONF_DIR "voice-bridge.pid"
 $TaskName   = "AgentiumVoiceBridge"
 $StartupDir = [Environment]::GetFolderPath("Startup")
 
+# Tracks whether the bridge actually came up; gates the install marker so a
+# failed start does not mark the install "done" and disable re-prompting.
+$BridgeUp = $false
+
 # --- Remove legacy / duplicate trigger artifacts so we never double-start ----
 function Remove-IfExists($path) {
     if (Test-Path $path) {
@@ -88,6 +92,7 @@ Remove-IfExists (Join-Path $StartupDir "agentium-voice-setup.hta")
 Remove-IfExists (Join-Path $CONF_DIR   "prompt.vbs")
 Remove-IfExists (Join-Path $CONF_DIR   "run-prompt.cmd")
 Remove-IfExists (Join-Path $CONF_DIR   "agentium-runonce.reg")
+Remove-IfExists (Join-Path $StartupDir "AgentiumVoiceBridge.lnk")
 
 Write-Log "=== Agentium Voice Bridge Installer (Windows) ==="
 Write-Log "REPO_ROOT=$RepoRoot"
@@ -353,6 +358,7 @@ Next
     }
 
     $up = Wait-ForBridge -TimeoutSeconds 20
+    $BridgeUp = $up
     if ($up) {
         Write-Log "  Bridge is UP on port 9999 ✓"
     } else {
@@ -437,6 +443,7 @@ elseif ($SVC_MGR -eq "task_scheduler") {
     }
 
     $up = Wait-ForBridge -TimeoutSeconds 20
+    $BridgeUp = $up
     if ($up) {
         Write-Log "  Bridge is UP on port 9999 ✓"
     } else {
@@ -446,6 +453,7 @@ elseif ($SVC_MGR -eq "task_scheduler") {
         Write-Log "  Last-resort: launching python directly without bat wrapper..."
         Start-BridgeDirect -Label "last-resort" | Out-Null
         $up = Wait-ForBridge -TimeoutSeconds 15
+        $BridgeUp = $up
         if ($up) {
             Write-Log "  Bridge is UP after last-resort launch ✓"
         } else {
@@ -481,13 +489,18 @@ else {
     Write-Log "  Startup bat written for persistence: $startupBat"
 }
 
-# --- Signal successful install so autoinstall prompts / Startup no longer fire ---
+# --- Signal successful install ONLY when the bridge is actually listening ---
+# (so a failed start does not mark "done" and silently disable re-prompting)
 $MarkerFile = Join-Path $CONF_DIR "voice-installed.marker"
-try {
-    New-Item -Path $MarkerFile -ItemType File -Force -ErrorAction Stop | Out-Null
-    Write-Log "  Install marker written: $MarkerFile"
-} catch {
-    Write-Warn "Could not write install marker: $_"
+if ($BridgeUp) {
+    try {
+        New-Item -Path $MarkerFile -ItemType File -Force -ErrorAction Stop | Out-Null
+        Write-Log "  Install marker written: $MarkerFile"
+    } catch {
+        Write-Warn "Could not write install marker: $_"
+    }
+} else {
+    Write-Warn "Bridge did NOT come up -- NOT writing install marker; will retry on next login."
 }
 
 Write-Log "=== Installation complete. Check $LOG_FILE for details. ==="
