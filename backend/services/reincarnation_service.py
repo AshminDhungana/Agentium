@@ -1121,7 +1121,25 @@ Provide a concise summary (max 300 words) that the successor agent will inherit.
             "7": "critic", "8": "critic", "9": "critic",
         }
         tier_name = tier_map.get(agent.agentium_id[0], "task")
-        
+
+        # ── IN-PLACE REINCARNATION FOR THE HEAD OF COUNCIL (tier "0") ──
+        # The rest of the system hardcodes "00001" as the canonical Head
+        # (chat, websocket genesis gate, host access, capability grants,
+        # model assignment, orchestrator parents, …). Minting a fresh ID
+        # (e.g. 00002) orphans every one of those lookups and breaks the
+        # runtime. So the Head is revived in place: same ID, status flipped
+        # back to ACTIVE, incarnation counter incremented. Accumulated
+        # wisdom already lives in this row's Ethos via _update_ethos_with_wisdom.
+        if agent.agentium_id.startswith("0"):
+            agent.status = AgentStatus.ACTIVE
+            agent.is_active = True
+            agent.terminated_at = None
+            agent.termination_reason = None
+            agent.current_task_id = None
+            agent.incarnation_number = (agent.incarnation_number or previous_incarnation) + 1
+            db.flush()
+            return agent
+
         new_id = ReincarnationService.generate_id_with_retry(tier_name, db)
         
         # Create new agent of same type
