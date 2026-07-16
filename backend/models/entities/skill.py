@@ -4,8 +4,8 @@ Defines the standardized skill schema.
 
 Embedding / ChromaDB size contract
 ────────────────────────────────────
-sentence-transformers/all-MiniLM-L6-v2 silently truncates input beyond
-512 tokens (~1 800 safe characters).  To guarantee every document fits
+BAAI/bge-base-en-v1.5 silently truncates input beyond 512 tokens
+(~2 000 safe characters).  To guarantee every document fits
 within that window, to_chroma_document() assembles fields in
 retrieval-value order (most important first) and hard-clips the final
 string to CHROMA_CHAR_LIMIT.  A warning is logged whenever clipping
@@ -37,9 +37,9 @@ logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # ChromaDB embedding window guard
-# all-MiniLM-L6-v2 → 512 tokens ≈ 1 800 characters (conservative estimate)
+# BAAI/bge-base-en-v1.5 → 512 tokens ≈ 2 000 characters (conservative estimate)
 # ---------------------------------------------------------------------------
-CHROMA_CHAR_LIMIT: int = 1_800
+CHROMA_CHAR_LIMIT: int = 2_000
 
 
 class SkillSchema(BaseModel):
@@ -111,7 +111,7 @@ class SkillSchema(BaseModel):
     # ChromaDB tracking
     chroma_collection: str = Field(default="agent_skills")
     embedding_model: str = Field(
-        default="sentence-transformers/all-MiniLM-L6-v2"
+        default="BAAI/bge-base-en-v1.5"
     )
 
     @field_validator("tags")
@@ -259,7 +259,7 @@ class SkillDB(BaseEntity):
     chroma_id = Column(String(100), nullable=False)
     chroma_collection = Column(String(50), default="agent_skills")
     embedding_model = Column(
-        String(100), default="sentence-transformers/all-MiniLM-L6-v2"
+        String(100), default="BAAI/bge-base-en-v1.5"
     )
 
     # Provenance
