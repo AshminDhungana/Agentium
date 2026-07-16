@@ -28,7 +28,7 @@ case "${SVC_MGR:-none}" in
     log "systemd service removed"
     ;;
   launchd)
-    launchctl unload -w "$HOME/Library/LaunchAgents/com.agentium.voice.plist" 2>/dev/null || warn "unload failed"
+    launchctl bootout "gui/$(id -u)/com.agentium.voice" 2>/dev/null || warn "bootout failed"
     rm -f "$HOME/Library/LaunchAgents/com.agentium.voice.plist"
     log "launchd plist removed"
     ;;
