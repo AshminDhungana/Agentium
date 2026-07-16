@@ -11,7 +11,7 @@
 
 ## 0. Observation and Checks:
 
-- [ ] Voice bridge disconnected notification with the command should only show once after login but if shows quite often.
+- [x] Voice bridge disconnected notification with the command should only show once after login but if shows quite often.
 
 - [ ] Improve scripts for voice bridge, in windows it is not working.
 the step should be voice-bridge contaner runs installs scripts in the host system and then voice bridge will run. 
@@ -40,7 +40,7 @@ Items marked `[ ]` in `docs/documents/todo.md` while their parent phase is marke
 ## 2. Voice Bridge
 
 - [ ] **[P1]** Voice bridge does not work well on Windows — verify mic capture, `Path.home()/.agentium/env.conf` loading, and Vosk offline fallback on a Windows host (`voice-bridge/main.py`); Linux-only `logging`/`signal` assumptions may break.
-- [ ] **[P1]** Duplicate voice notifications — `frontend/src/services/voiceBridge.ts` (L82) re-fires a `showToast.error` on every reconnect attempt (`MAX_RETRIES=5`); add a dedup/seen-guard so the user sees it once.
+- [x] **[P1]** Duplicate voice notifications — `frontend/src/services/voiceBridge.ts` (L82) re-fires a `showToast.error` on every reconnect attempt (`MAX_RETRIES=5`); add a dedup/seen-guard so the user sees it once.
 - [ ] **[P1]** `frontend/src/components/VoiceIndicator.tsx` (L224–237) re-shows the install/error card on every `error↔offline` status flip with no dedupe — add a seen-guard.
 - [ ] **[P2]** Windows auto-install/startup (`scripts/install-voice-bridge.ps1`, `setup.ps1`, `windows-bootstrap.cmd`, Task Scheduler / `.vbs` / Startup folder) — verify reliable single registration, no double-start.
 - [ ] **[P2]** `docker-compose.yml` `voice-autoinstall` relies on `${USERPROFILE}` inside the Linux container + host path resolution via `windows-bootstrap.cmd` — verify reliability on Docker Desktop.

@@ -48,6 +48,7 @@ class VoiceBridgeService {
   private ws:           WebSocket | null = null;
   private retryCount    = 0;
   private retryTimer:   ReturnType<typeof setTimeout> | null = null;
+  private disconnectedToastShown = false;
   private handlers      = new Set<InteractionHandler>();
   private statusListeners = new Set<(s: BridgeStatus) => void>();
   private stateListeners = new Set<StateHandler>();
@@ -60,6 +61,12 @@ class VoiceBridgeService {
   async connect(): Promise<void> {
     if (this.status === 'connecting' || this.status === 'connected') return;
 
+    // Fresh connection attempt — reset the retry budget and the one-shot
+    // disconnect toast guard so a new attempt re-arms both. Without this,
+    // a manual reconnect (or re-mount) after the first failed sequence
+    // would see retryCount already at MAX_RETRIES and re-fire the toast
+    // instantly on every connect() call.
+    this.retryCount = 0;
     this._setStatus('connecting');
 
     let token: string | null = null;
@@ -153,6 +160,7 @@ class VoiceBridgeService {
     this.ws.onopen = () => {
       console.info('[voiceBridge] Connected to bridge at', WS_URL);
       this.retryCount = 0;
+      this.disconnectedToastShown = false;
       this._setStatus('connected');
     };
 
@@ -199,7 +207,13 @@ class VoiceBridgeService {
         this.retryTimer = setTimeout(() => this._openSocket(token), delay);
       } else {
         console.warn('[voiceBridge] Max reconnect attempts reached — going offline');
-        showToast.error('Voice bridge disconnected — text chat unaffected');
+        // Show the disconnect notification at most once per connection
+        // episode. A genuine later reconnect (onopen) re-arms the guard, so
+        // a real drop after a successful session will still notify once.
+        if (!this.disconnectedToastShown) {
+          this.disconnectedToastShown = true;
+          showToast.error('Voice bridge disconnected — text chat unaffected');
+        }
         this._setStatus('offline');
       }
     };
