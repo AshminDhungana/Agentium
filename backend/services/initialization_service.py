@@ -286,27 +286,37 @@ class InitializationService:
         Persist a Head-of-Council message to chat history so it shows up in the
         dashboard conversation log. Returns the created message id (also used as
         the WebSocket message_id for client-side dedup).
+
+        Uses its OWN fresh DB session + commit rather than genesis's shared
+        transaction.  The live WebSocket broadcast fires while the chat socket
+        is still gated (no clients connected), so the only way the welcome
+        survives is via the post-genesis history reload.  Committing it
+        independently guarantees it lands in the DB even if a later genesis
+        step fails and rolls back the shared transaction — otherwise the
+        welcome would disappear entirely.
         """
         from backend.models.entities.chat_message import ChatMessage as ChatMsg
+        from backend.models.database import get_db_context
         import uuid
 
-        sovereign_user = self.db.query(User).filter_by(
-            is_admin=True, is_active=True
-        ).first()
-        if not sovereign_user:
-            self._log("WARNING", "No sovereign user found — cannot persist welcome message")
-            return None
-
         message_id = str(uuid.uuid4())
-        self.db.add(ChatMsg(
-            id=message_id,
-            user_id=str(sovereign_user.id),
-            role="head_of_council",
-            content=content,
-            agent_id="00001",
-            message_metadata={"source": "genesis", "event": "country_name_decision"},
-        ))
-        self.db.flush()
+        with get_db_context() as fresh_db:
+            sovereign_user = fresh_db.query(User).filter_by(
+                is_admin=True, is_active=True
+            ).first()
+            if not sovereign_user:
+                self._log("WARNING", "No sovereign user found — cannot persist welcome message")
+                return None
+
+            fresh_db.add(ChatMsg(
+                id=message_id,
+                user_id=str(sovereign_user.id),
+                role="head_of_council",
+                content=content,
+                agent_id="00001",
+                message_metadata={"source": "genesis", "event": "country_name_decision"},
+            ))
+            fresh_db.commit()
         return message_id
 
     async def _broadcast_head_message(self, content: str, message_id: Optional[str]) -> None:
@@ -1297,6 +1307,12 @@ def trigger_genesis_if_needed(db) -> bool:
                     "status":    result.get("status"),
                     "timestamp": datetime.utcnow().isoformat(),
                 })
+                # Re-broadcast the genesis welcome message now that clients are
+                # (re)connected. The original push at country-name decision time
+                # was sent while the chat socket was gated (no listeners), so we
+                # replay it here from the DB so it appears live, not just in the
+                # history reload.
+                await _replay_genesis_welcome(ws_manager)
             except Exception as bexc:
                 logger.warning(f"genesis_complete broadcast failed: {bexc}")
         except Exception as exc:
@@ -1358,3 +1374,51 @@ async def initialize_agentium(
     else:
         service = InitializationService(db)
         return await service.run_genesis_protocol(force, country_name)
+
+
+async def _replay_genesis_welcome(ws_manager) -> None:
+    """
+    Re-broadcast the genesis welcome (country-name-decision) message so clients
+    that reconnect after genesis_complete receive it live. The original push
+    during genesis is lost because the chat WebSocket is gated until Head 00001
+    exists. We read the already-persisted genesis message back from the DB and
+    re-emit it with its stable message_id so the dashboard dedups correctly.
+    """
+    from sqlalchemy import desc
+    from backend.models.database import get_db_context
+    from backend.models.entities.chat_message import ChatMessage as ChatMsg
+
+    try:
+        with get_db_context() as db:
+            msg = (
+                db.query(ChatMsg)
+                .filter(
+                    ChatMsg.message_metadata.op("->>")("event") == "country_name_decision",
+                    ChatMsg.message_metadata.op("->>")("source") == "genesis",
+                    ChatMsg.is_deleted != True,  # noqa: E712
+                )
+                .order_by(desc(ChatMsg.created_at))
+                .first()
+            )
+            if not msg:
+                return
+            content = msg.content
+            message_id = msg.id
+            agent_id = msg.agent_id
+            metadata = msg.message_metadata or {}
+    except Exception as exc:
+        logger.warning(f"Could not load genesis welcome for replay: {exc}")
+        return
+
+    try:
+        await ws_manager.broadcast({
+            "type": "message",
+            "role": "head_of_council",
+            "content": content,
+            "message_id": message_id,
+            "agent_id": agent_id,
+            "timestamp": datetime.utcnow().isoformat(),
+            "metadata": metadata,
+        })
+    except Exception as exc:
+        logger.warning(f"Genesis welcome replay broadcast failed: {exc}")
