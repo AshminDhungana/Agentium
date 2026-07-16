@@ -307,6 +307,37 @@ class AgentOrchestrator:
         if self._detect_tool_creation_intent(raw_input, source_id):
             return await self._handle_tool_creation_request(raw_input, source_id, start)
 
+        # ── Governance command fast-path (all tiers) ───────────────────────────
+        # Explicit provisioning directives are executed by the *issuing* agent
+        # according to its own authority. On no authority we fall through to
+        # normal hierarchical routing so the message is not silently dropped.
+        from backend.services.governance_command_service import GovernanceCommandService
+        gov_command = GovernanceCommandService.detect_command(raw_input)
+        if gov_command:
+            source_agent = self._get_agent(source_id)
+            if source_agent is not None:
+                try:
+                    gov_result = GovernanceCommandService.execute(
+                        gov_command, source_agent, self.db
+                    )
+                    await self._log(
+                        actor=source_id,
+                        action=gov_result["action"],
+                        desc=f"Governance command executed: "
+                             f"{gov_result.get('agentium_id') or gov_result.get('task_id')}",
+                        level=AuditLevel.INFO,
+                    )
+                    return RouteResult(
+                        success=True,
+                        message_id=f"gov_{gov_result['action']}_{datetime.utcnow().timestamp()}",
+                        path_taken=[source_id],
+                        constitutional_basis=[f"Governance command by {source_id}"],
+                        metadata=gov_result,
+                    )
+                except PermissionError as pe:
+                    logger.warning("Governance command rejected (no authority): %s", pe)
+                    # Fall through to normal routing below.
+
         # Determine target
         direction = self._get_direction(source_id, recipient)
 

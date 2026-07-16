@@ -19,6 +19,7 @@ from backend.models.entities.audit import AuditLog, AuditCategory
 from backend.models.entities.task import Task
 from backend.services.reincarnation_service import reincarnation_service
 from backend.services.governance_command_service import GovernanceCommandService
+from backend.services.agent_orchestrator import AgentOrchestrator
 
 pytestmark = pytest.mark.integration
 
@@ -149,7 +150,36 @@ async def test_chat_process_message_spawns_without_llm(seeded_db):
 
 
 @pytest.mark.asyncio
-async def test_chat_process_message_ignores_small_talk(seeded_db):
+async def test_process_intent_executes_directive_for_lead(seeded_db: Session):
+    head = seeded_db.query(HeadOfCouncil).filter_by(agentium_id="00001").first()
+    lead = reincarnation_service.spawn_lead_agent(parent=head, name="L", description="x", db=seeded_db)
+    seeded_db.commit()
+
+    orch = AgentOrchestrator(db=seeded_db)
+    result = await orch.process_intent(
+        raw_input="spawn a task agent named ViaOrchestrator",
+        source_id=lead.agentium_id,
+    )
+    assert result.success is True
+    assert result.metadata["action"] == "spawn_task_agent"
+    agent = seeded_db.query(Agent).filter_by(agentium_id=result.metadata["agentium_id"]).first()
+    assert agent.parent_id == lead.id
+
+
+@pytest.mark.asyncio
+async def test_process_intent_denies_task_agent_directive(seeded_db: Session):
+    head = seeded_db.query(HeadOfCouncil).filter_by(agentium_id="00001").first()
+    lead = reincarnation_service.spawn_lead_agent(parent=head, name="L", description="x", db=seeded_db)
+    seeded_db.commit()
+    task_agent = reincarnation_service.spawn_task_agent(parent=lead, name="T", description="x", db=seeded_db)
+    seeded_db.commit()
+
+    orch = AgentOrchestrator(db=seeded_db)
+    result = await orch.process_intent(
+        raw_input="spawn a task agent named Nope",
+        source_id=task_agent.agentium_id,
+    )
+    assert not (result.success and result.metadata.get("action") == "spawn_task_agent")
     head = seeded_db.query(HeadOfCouncil).filter_by(agentium_id="00001").first()
     before = seeded_db.query(Agent).count()
     try:
