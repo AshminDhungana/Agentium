@@ -41,6 +41,12 @@ docker compose logs -f
 
 # Access the dashboard
 open http://localhost:3000
+
+# Default login 
+username : admin
+password : admin
+# Password can be changed from settings
+
 ```
 
 **First Login**: You'll be guided through the **Genesis Protocol** — your AI Nation is named by democratic Council vote before any tasks are accepted.

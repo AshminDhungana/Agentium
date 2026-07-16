@@ -15,18 +15,27 @@
 - [x] The "voice bridge disconnected" notification (with the accompanying command) should only appear once after login. Currently it shows up too often — fix this.
 - [x] Improve the voice bridge setup scripts — currently broken on Windows. Intended flow: the voice-bridge container installs the required scripts on the host system, and only then does the voice bridge start.
 
-- [ ] The command Interface in main layout as well as the chat page logo shows no of messages from the ai agent, but after the messsage is viewed it still shows the number. it should only display the number when user is not in chatpage and after the message is read i.e user is in chatpage, the indicated should disapper.
+- [x] The command Interface in main layout as well as the chat page logo shows no of messages from the ai agent, but after the messsage is viewed it still shows the number. it should only display the number when user is not in chatpage and after the message is read i.e user is in chatpage, the indicated should disapper.
+
+- [ ] - Genisis should run as per README.md, the steps are users logins for the first time, then adds the api key, then the genisis starts, the Ai greets the users and asks for the nation name and then the genisis proceeds, nation name is saved, if nation name is there then no need to run this again. 
+
+- [x1] The voice bridge notification that appears in the mainlayout, is being cut off bt the page, it should appear above the page. and also update the voicebridge content if necessary refer docs\documents\voice-bridge-setup.md
 
 - [ ] Determine whether Voice Bridge communication from the desktop requires the user to be logged in via the frontend.
 - [ ] Voice bridge communication should also be visible in the chat. Confirm whether this currently happens, and if not, implement it.
 - [ ] Align the voice bridge persona with the chat persona so they behave consistently (addressing the admin as "sir" is acceptable for both).
 
+- [ ] Check wishper.cpp is downloaded in docker and is running properly.
+
 - [ ] In chatpage hovering above the chat message, will display 2 small icone one for copy and another for forward, when copy icon is clicked it copy the message, and when forward is clicked it copy the message to the chat message where user can send it again. 
+
+- [ ] when adding ai module, the rate limit field should autoupdate after selecting the model, if the api provides that detail. and should update to the model config page for the user to view. The max token which is set to a default of 4000 should also follow the same procedure. 
+max token, rate limit - has default values - after adding api - recive from api, autoupdate and show in the ui, if not use the default. comm
 
 [ ] - Verify and improve all tools and add tools if necessary.
 [ ] - Inject information to knowledge library, such as which tools to use for what, best practices and others to make the system work properly from the beginning. When agent starts the agent should know general best practices, we can do is insert basic things to ethos, or tell agent to read from chroma on ethos , or feed the information during creation . choose the best methord for the case. 
 
-- Provider Analytics in dashboard should automatically show data after key are added but, user need to click on the refresh button for that. 
+[ ] - Provider Analytics in dashboard should automatically show data after key are added but, user need to click on the refresh button for that. 
 
 ### Chat Page — UX Improvements
 - [ ] Show a typing indicator (e.g., animated three dots) when a message is sent and the reply is taking time, similar to most modern chat apps.
