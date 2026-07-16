@@ -133,3 +133,27 @@ async def test_spawn_audit_log_written(seeded_db: Session):
     ).first()
     assert audit is not None
     assert audit.category == AuditCategory.GOVERNANCE
+
+
+from backend.services.chat_service import ChatService
+
+
+@pytest.mark.asyncio
+async def test_chat_process_message_spawns_without_llm(seeded_db):
+    head = seeded_db.query(HeadOfCouncil).filter_by(agentium_id="00001").first()
+    result = await ChatService.process_message(head, "spawn a task agent named Scout", seeded_db)
+    assert result["model"] == "governance-command"
+    assert result["agent_spawned"] is not None
+    agent = seeded_db.query(Agent).filter_by(agentium_id=result["agent_spawned"]).first()
+    assert agent.agent_type == AgentType.TASK_AGENT
+
+
+@pytest.mark.asyncio
+async def test_chat_process_message_ignores_small_talk(seeded_db):
+    head = seeded_db.query(HeadOfCouncil).filter_by(agentium_id="00001").first()
+    before = seeded_db.query(Agent).count()
+    try:
+        await ChatService.process_message(head, "hello there", seeded_db)
+    except Exception:
+        pass
+    assert seeded_db.query(Agent).count() == before

@@ -149,6 +149,42 @@ class ChatService:
             model_name
         )
 
+        # ── Governance command fast-path ───────────────────────────────────────
+        # Explicit provisioning directives are executed deterministically through
+        # the service layer and short-circuit the LLM so the Head cannot merely
+        # *declare* intent. Actor = Head (the Sovereign's only chat counterpart).
+        from backend.services.governance_command_service import GovernanceCommandService
+        gov_command = GovernanceCommandService.detect_command(message)
+        if gov_command:
+            try:
+                gov_result = GovernanceCommandService.execute(gov_command, head, db)
+                if sovereign_user:
+                    try:
+                        db.add(ChatMsg(
+                            id=str(_uuid.uuid4()),
+                            user_id=str(sovereign_user.id),
+                            role="head_of_council",
+                            content=gov_result["content"],
+                            message_metadata={
+                                "agent_id": head.agentium_id,
+                                "governance_action": gov_result["action"],
+                            },
+                        ))
+                        db.commit()
+                    except Exception as _gov_persist_err:
+                        logger.warning(f"Governance confirmation persist failed: {_gov_persist_err}")
+                return {
+                    "content": gov_result["content"],
+                    "model": "governance-command",
+                    "task_created": gov_result.get("action") == "create_task",
+                    "task_id": gov_result.get("task_id"),
+                    "agent_spawned": gov_result.get("agentium_id"),
+                    "reincarnated": False,
+                }
+            except Exception as gov_exc:
+                logger.error(f"Governance command execution failed: {gov_exc}")
+                # Fall through to the normal LLM path on failure.
+
         # Get provider using extracted primitive config_id
         provider = await ModelService.get_provider("sovereign", config_id)
         
