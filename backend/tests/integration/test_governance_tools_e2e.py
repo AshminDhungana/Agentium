@@ -14,7 +14,8 @@ def test_head_spawns_task_agent(seeded_db):
 
 
 @pytest.mark.integration
-def test_head_create_dispatch_complete_task(seeded_db):
+@pytest.mark.asyncio
+async def test_head_create_dispatch_complete_task(seeded_db):
     db = seeded_db
     lead = db.query(LeadAgent).filter(LeadAgent.status == "active").first()
     assert lead is not None, "test requires a seeded active Lead"
@@ -24,7 +25,7 @@ def test_head_create_dispatch_complete_task(seeded_db):
     task_id = c_res["data"]["task_id"]
 
     dt = tool_registry.get_tool_function("dispatch_task")
-    d_res = dt(task_id=task_id, target_agentium_id=lead.agentium_id, db=db, agent_id="00001")
+    d_res = await dt(task_id=task_id, target_agentium_id=lead.agentium_id, db=db, agent_id="00001")
     assert d_res["success"] is True
 
     cm = tool_registry.get_tool_function("complete_task")
@@ -42,11 +43,19 @@ async def test_head_full_vote_cycle(seeded_db):
     assert p_res["success"] is True
     aid = p_res["data"]["amendment_id"]
 
+    # Sponsorship: 2 sponsors (Head + one Council member) move PROPOSED -> DELIBERATING.
+    sp = tool_registry.get_tool_function("sponsor_amendment")
+    s_head = await sp(amendment_id=aid, db=db, agent_id="00001")
+    assert s_head["success"] is True
+    council = db.query(Agent).filter(Agent.agentium_id.like("1%")).all()
+    assert council, "test requires a seeded Council member to sponsor"
+    s_council = await sp(amendment_id=aid, db=db, agent_id=council[0].agentium_id)
+    assert s_council["success"] is True
+
     ov = tool_registry.get_tool_function("open_vote")
     assert (await ov(amendment_id=aid, db=db, agent_id="00001"))["success"] is True
 
     cv = tool_registry.get_tool_function("cast_vote")
-    council = db.query(Agent).filter(Agent.agentium_id.like("1%")).all()
     for c in council:
         r = await cv(amendment_id=aid, vote="for", db=db, agent_id=c.agentium_id)
         assert r["success"] is True

@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import patch, MagicMock, AsyncMock
-from backend.tools.governance_tool import spawn_agent, liquidate_agent, create_task, dispatch_task, complete_task, propose_amendment, open_vote, cast_vote, conclude_vote
+from backend.tools.governance_tool import spawn_agent, liquidate_agent, create_task, dispatch_task, complete_task, propose_amendment, open_vote, cast_vote, conclude_vote, sponsor_amendment
 from backend.core.tool_registry import tool_registry
 
 
@@ -103,6 +103,7 @@ def test_governance_tools_registered_with_tiers():
         "open_vote": ["0xxxx", "1xxxx"],
         "cast_vote": ["0xxxx", "1xxxx"],
         "conclude_vote": ["0xxxx"],
+        "sponsor_amendment": ["0xxxx", "1xxxx"],
     }
     for name, tiers in expected.items():
         desc = tool_registry.get_tool(name)
@@ -115,3 +116,17 @@ def test_existing_tool_tier_changes():
     assert tool_registry.get_tool("write_file")["authorized_tiers"] == ["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx"]
     assert tool_registry.get_tool("text_editor")["authorized_tiers"] == ["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx"]
     assert tool_registry.get_tool("execute_command")["authorized_tiers"] == ["0xxxx", "1xxxx", "2xxxx"]
+
+
+@pytest.mark.asyncio
+async def test_sponsor_amendment_happy_path():
+    caller = MagicMock(); caller.agentium_id = "00001"
+    svc = MagicMock()
+    svc.sponsor_amendment = AsyncMock(return_value={"status": "deliberating", "sponsors": ["00001", "10001"], "sponsors_needed": 0})
+    with patch("backend.tools.governance_tool.CapabilityRegistry.can_agent", return_value=True), \
+         patch("backend.tools.governance_tool._caller", return_value=caller), \
+         patch("backend.tools.governance_tool.AmendmentService", return_value=svc):
+        res = await sponsor_amendment(amendment_id="a1", db=MagicMock(), agent_id="00001")
+        assert res["success"] is True
+        assert res["data"]["status"] == "deliberating"
+        svc.sponsor_amendment.assert_awaited_once_with("a1", sponsor_id="00001")

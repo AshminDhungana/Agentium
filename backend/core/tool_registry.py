@@ -48,6 +48,7 @@ class ToolRegistry:
             open_vote,
             cast_vote,
             conclude_vote,
+            sponsor_amendment,
         )
         # ══════════════════════════════════════════════════════════════════════
         # CODE ANALYZER TOOL
@@ -1206,6 +1207,13 @@ class ToolRegistry:
             function=conclude_vote,
             parameters={"amendment_id": {"type": "string", "description": "Amendment ID"}},
             authorized_tiers=["0xxxx"],
+        )
+        self.register_tool(
+            name="sponsor_amendment",
+            description="Sponsor a proposed amendment. Requires 2 sponsors (Council/Head) to enter deliberation.",
+            function=sponsor_amendment,
+            parameters={"amendment_id": {"type": "string", "description": "Amendment ID"}},
+            authorized_tiers=["0xxxx", "1xxxx"],
         )
 
         # ══════════════════════════════════════════════════════════════════════

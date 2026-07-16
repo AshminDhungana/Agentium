@@ -346,3 +346,32 @@ async def conclude_vote(
     except (PermissionError, ValueError) as e:
         return _result(False, error=str(e))
     return _result(True, data={"amendment_id": amendment_id, "outcome": result})
+
+
+async def sponsor_amendment(
+    amendment_id: str,
+    db: Session = None,
+    agent_id: str = None,
+) -> Dict[str, Any]:
+    caller = _caller(db, agent_id) if db and agent_id else None
+    if caller is None:
+        return _result(False, error="caller agent not found")
+    if not caller.agentium_id.startswith("0"):
+        denied = _require(Capability.PROPOSE_AMENDMENT, caller, db, "sponsor amendment")
+        if denied:
+            return denied
+    else:
+        denied = _require(Capability.AMEND_CONSTITUTION, caller, db, "sponsor amendment")
+        if denied:
+            return denied
+    try:
+        svc = AmendmentService(db)
+        result = await svc.sponsor_amendment(amendment_id, sponsor_id=caller.agentium_id)
+    except (PermissionError, ValueError) as e:
+        return _result(False, error=str(e))
+    return _result(True, data={
+        "amendment_id": amendment_id,
+        "status": result.get("status"),
+        "sponsors": result.get("sponsors"),
+        "sponsors_needed": result.get("sponsors_needed"),
+    })
