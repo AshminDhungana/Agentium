@@ -69,10 +69,29 @@ function KeepAliveOutlet() {
   const [showOverlay, setShowOverlay] = useState(false);
   const [fadingOut, setFadingOut] = useState(false);
   const [revealPath, setRevealPath] = useState<string | null>(null);
+  const [cachedEntries, setCachedEntries] = useState<[string, React.ReactNode][]>([]);
 
   useEffect(() => { isMounted.current = true; return () => { isMounted.current = false; }; }, []);
-  if (currentOutlet) cache.current.set(location.pathname, currentOutlet);
 
+  // Keep-alive cache is populated outside render (refs must not be read/written during render).
+  useLayoutEffect(() => {
+    if (currentOutlet) cache.current.set(location.pathname, currentOutlet);
+    const next = Array.from(cache.current.entries());
+    setCachedEntries((prev) => {
+      if (prev.length === next.length) {
+        const prevPaths = prev.map(([p]) => p).sort();
+        const nextPaths = next.map(([p]) => p).sort();
+        if (prevPaths.every((p, i) => p === nextPaths[i])) return prev;
+      }
+      return next;
+    });
+  }, [location.pathname, currentOutlet]);
+
+  /* The page-load overlay must appear synchronously on first navigation and
+     reset on revisit. These state transitions are driven by navigation (an
+     effect) and cannot be derived during render, so the
+     react-hooks/set-state-in-effect rule is disabled for this effect only. */
+  /* eslint-disable react-hooks/set-state-in-effect */
   useLayoutEffect(() => {
     const path = location.pathname;
     const isFirst = !visited.current.has(path);
@@ -84,13 +103,14 @@ function KeepAliveOutlet() {
       setFadingOut(true); setRevealPath(path);
     }, OVERLAY_HOLD_MS);
   }, [location.pathname]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => () => { if (holdTimer.current) clearTimeout(holdTimer.current); }, []);
   const handleOverlayDone = useCallback(() => { setShowOverlay(false); setFadingOut(false); }, []);
 
   return (
     <>
-      {Array.from(cache.current.entries()).map(([path, outlet]) => {
+      {cachedEntries.map(([path, outlet]) => {
         const isActive = path === location.pathname;
         const isRevealing = revealPath === path;
         const isHeld = isActive && showOverlay && !isRevealing;

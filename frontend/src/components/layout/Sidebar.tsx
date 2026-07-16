@@ -12,7 +12,6 @@ interface SidebarProps {
   collapsed: boolean;
   mobileOpen: boolean;
   onCloseMobile: () => void;
-  onToggleCollapse: () => void;
 }
 
 const prefetch = (path: string) => {
@@ -34,7 +33,7 @@ const prefetch = (path: string) => {
 };
 
 export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar(
-  { groups, sovereignItem, collapsed, mobileOpen, onCloseMobile, onToggleCollapse },
+  { groups, sovereignItem, collapsed, mobileOpen, onCloseMobile },
   ref
 ) {
   const unreadCount = useWebSocketStore((s) => s.unreadCount);

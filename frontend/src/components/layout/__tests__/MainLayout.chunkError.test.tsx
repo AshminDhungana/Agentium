@@ -31,5 +31,5 @@ test('error boundary catches failed lazy chunk load', async () => {
   });
 
   expect(screen.getByRole('alert')).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument();
 });

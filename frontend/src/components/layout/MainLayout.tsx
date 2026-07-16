@@ -28,7 +28,10 @@ export function MainLayout() {
   const title = getPageTitle(location.pathname);
 
   useEffect(() => {
-    if (isDesktop && mobileOpen) setMobileOpen(false);
+    if (isDesktop && mobileOpen) {
+      const id = requestAnimationFrame(() => setMobileOpen(false));
+      return () => cancelAnimationFrame(id);
+    }
   }, [isDesktop, mobileOpen]);
 
   useEffect(() => {
@@ -67,7 +70,6 @@ export function MainLayout() {
         collapsed={collapsed}
         mobileOpen={mobileOpen}
         onCloseMobile={() => setMobileOpen(false)}
-        onToggleCollapse={toggleCollapse}
       />
 
       {mobileOpen && (

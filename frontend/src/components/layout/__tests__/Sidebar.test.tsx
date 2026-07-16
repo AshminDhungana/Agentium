@@ -1,10 +1,9 @@
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { Sidebar } from '../Sidebar';
 import { NAV_GROUPS, SOVEREIGN_ITEM } from '../navConfig';
 import { useWebSocketStore } from '@/store/websocketStore';
-import { useAuthStore } from '@/store/authStore';
 
 const noop = () => {};
 
@@ -17,7 +16,6 @@ function renderSidebar(props: Partial<React.ComponentProps<typeof Sidebar>> = {}
         collapsed={false}
         mobileOpen={false}
         onCloseMobile={noop}
-        onToggleCollapse={noop}
         {...props}
       />
     </MemoryRouter>
