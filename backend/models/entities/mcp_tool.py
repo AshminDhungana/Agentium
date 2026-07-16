@@ -71,6 +71,8 @@ class MCPTool(BaseEntity):
     # ── Proposal metadata ──────────────────────────────────────────────────────
     proposed_by: Optional[str] = Column(String(64), nullable=True)  # agentium_id
     proposed_at: Optional[datetime] = Column(DateTime, nullable=True)
+    # Link to the AmendmentVoting that governs this proposal's approval
+    voting_id: Optional[str] = Column(String(64), nullable=True)
 
     def to_dict(self) -> dict:
         return {
@@ -97,6 +99,7 @@ class MCPTool(BaseEntity):
             "last_used_at": self.last_used_at.isoformat() if self.last_used_at else None,
             "proposed_by": self.proposed_by,
             "proposed_at": self.proposed_at.isoformat() if self.proposed_at else None,
+            "voting_id": self.voting_id,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
