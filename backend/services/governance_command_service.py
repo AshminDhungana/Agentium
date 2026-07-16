@@ -157,7 +157,7 @@ class GovernanceCommandService:
         return {
             "action": "spawn_task_agent",
             "agentium_id": agent.agentium_id,
-            "parent_id": parent.id,
+            "parent_id": parent.agentium_id,
             "agent_type": "task_agent",
             "content": (
                 f"Task Agent {agent.agentium_id} ('{agent.name}') has been spawned "
@@ -189,7 +189,7 @@ class GovernanceCommandService:
         return {
             "action": "spawn_lead_agent",
             "agentium_id": agent.agentium_id,
-            "parent_id": head.id,
+            "parent_id": head.agentium_id,
             "agent_type": "lead_agent",
             "content": (
                 f"Lead Agent {agent.agentium_id} ('{agent.name}') has been spawned "
@@ -217,7 +217,7 @@ class GovernanceCommandService:
         head = db.query(HeadOfCouncil).filter_by(agentium_id="00001").first()
 
         task = Task(
-            title=(command.name or "Provisioned Task"),
+            title=(command.description or "Directive task")[:120],
             description=command.description or "Task provisioned via directive.",
             task_type=TaskType.EXECUTION,
             priority=TaskPriority.NORMAL,
