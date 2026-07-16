@@ -10,8 +10,10 @@ export interface ReplayResponse {
 }
 
 export interface GenesisStatusResponse {
-    status: 'complete' | 'not_started' | 'running' | 'failed';
+    status: 'complete' | 'not_started' | 'running' | 'failed' | 'awaiting_name';
     reason?: string;
+    prompt?: string;
+    timeout_seconds?: number;
 }
 
 export const websocketReplayApi = {
@@ -24,5 +26,12 @@ export const websocketReplayApi = {
 
     pollGenesisStatus: async (): Promise<GenesisStatusResponse> => {
         return rawFetch<GenesisStatusResponse>('/ws/genesis-status');
+    },
+
+    submitCountryName: async (name: string): Promise<{ accepted: boolean; reason?: string }> => {
+        return rawFetch<{ accepted: boolean; reason?: string }>(
+            '/api/v1/genesis/set-country-name',
+            { method: 'POST', body: JSON.stringify({ name }) },
+        );
     },
 };

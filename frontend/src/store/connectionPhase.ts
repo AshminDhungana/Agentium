@@ -10,7 +10,7 @@ export type PhaseEvent =
   | { type: 'connect_start' }
   | { type: 'system' }
   | { type: 'system_not_ready'; genesisTriggered: boolean }
-  | { type: 'poll'; status: 'complete' | 'failed' | 'running' | 'not_started' }
+  | { type: 'poll'; status: 'complete' | 'failed' | 'running' | 'not_started' | 'awaiting_name' }
   | { type: 'notify_key_added' }
   | { type: 'socket_close'; code: number };
 
@@ -65,12 +65,13 @@ export function canReconnect(phase: ConnectionPhase): boolean {
 }
 
 export function phaseFromGenesisStatus(
-  status: 'complete' | 'failed' | 'running' | 'not_started',
+  status: 'complete' | 'failed' | 'running' | 'not_started' | 'awaiting_name',
 ): ConnectionPhase {
   switch (status) {
     case 'complete': return 'connecting';
     case 'failed': return 'genesis_failed';
     case 'running': return 'genesis_running';
     case 'not_started': return 'genesis_running'; // grace window handled by store
+    case 'awaiting_name': return 'genesis_running'; // awaiting user input, keep polling
   }
 }

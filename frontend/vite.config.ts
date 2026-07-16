@@ -56,6 +56,7 @@ export default defineConfig({
           'src/components/ui/**/*.test.{ts,tsx}',
           'src/pages/**/*.test.{ts,tsx}',
           'src/store/**/*.test.{ts,tsx}',
+          'src/services/**/*.test.{ts,tsx}',
           'src/**/*.a11y.test.{ts,tsx}',
         ],
       },
