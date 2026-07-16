@@ -15,11 +15,14 @@ import {
     Tooltip, ResponsiveContainer, Cell, PieChart, Pie,
 } from 'recharts';
 import {
-    TrendingUp, DollarSign, Zap, CheckCircle2,
-    RefreshCw, ChevronDown, ChevronUp, AlertCircle, Clock,
+    BarChart3, DollarSign, Zap, CheckCircle2,
+    RefreshCw, ChevronDown, AlertCircle, Clock,
     ArrowUpRight, ArrowDownRight, Minus,
 } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { WidgetCard } from './WidgetCard';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { WidgetErrorFallback } from '@/components/ui/WidgetErrorFallback';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -151,15 +154,6 @@ function KpiCard({ icon: Icon, label, value, sub, color, trend }: {
     );
 }
 
-function EmptyChart({ message = 'No data yet' }: { message?: string }) {
-    return (
-        <div className="h-44 flex flex-col items-center justify-center gap-1 text-gray-600 dark:text-gray-500">
-            <TrendingUp className="w-5 h-5 opacity-40" aria-hidden />
-            <p className="text-xs">{message}</p>
-        </div>
-    );
-}
-
 // Clickable legend for the cost-over-time line chart (progressive disclosure).
 function LineLegend({ providers, hidden, onToggle }: {
     providers: string[];
@@ -199,10 +193,9 @@ export function ProviderAnalytics() {
     const [error, setError]                         = useState<string | null>(null);
     const [expanded, setExpanded]                   = useState(true);
     const [days, setDays]                           = useState(30);
-    const [lastUpdated, setLastUpdated]             = useState<Date | null>(null);
     const [hiddenSeries, setHiddenSeries]           = useState<Set<string>>(new Set());
 
-    const fetchAll = useCallback(async () => {
+    const refresh = useCallback(async () => {
         setLoading(true);
         setError(null);
         try {
@@ -221,7 +214,6 @@ export function ProviderAnalytics() {
             setTimeline(tl);
             setTimelineProviders(timelineRes.data.providers ?? []);
             setModels(modelsRes.data.models ?? []);
-            setLastUpdated(new Date());
         } catch (e: any) {
             setError(e?.response?.data?.detail ?? 'Failed to load analytics');
         } finally {
@@ -229,7 +221,7 @@ export function ProviderAnalytics() {
         }
     }, [days]);
 
-    useEffect(() => { fetchAll(); }, [fetchAll]);
+    useEffect(() => { refresh(); }, [refresh]);
 
     const toggleSeries = useCallback((p: string) => {
         setHiddenSeries(prev => {
@@ -265,264 +257,247 @@ export function ProviderAnalytics() {
         : 'text-rose-600 dark:text-rose-400';
 
     return (
-        <section
-            aria-label="Provider Analytics"
-            className="bg-white dark:bg-[#161b27] rounded-2xl border border-gray-200 dark:border-[#1e2535] shadow-sm dark:shadow-[0_2px_16px_rgba(0,0,0,0.25)] transition-colors duration-200 overflow-hidden"
-        >
-
-            {/* Header */}
-            <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-gray-100 dark:border-[#1e2535]">
-                <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-9 h-9 rounded-xl bg-indigo-100 dark:bg-indigo-500/10 flex items-center justify-center flex-shrink-0">
-                        <TrendingUp className="w-4.5 h-4.5 text-indigo-600 dark:text-indigo-400" />
-                    </div>
-                    <div className="min-w-0">
-                        <h2 className="text-base font-semibold text-gray-900 dark:text-white leading-none">Provider Analytics</h2>
-                        <p className="text-[11px] text-gray-600 dark:text-gray-500 mt-1">
-                            {lastUpdated
-                                ? `Updated ${lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-                                : 'Per-provider usage, cost & performance'}
-                        </p>
-                    </div>
-                </div>
-
-                <div className="flex items-center gap-2 flex-shrink-0">
-                    <label className="sr-only" htmlFor="pa-range">Time range</label>
+        <WidgetCard
+            title="Provider Analytics"
+            icon={BarChart3}
+            aria-label="Provider analytics"
+            action={
+                <div className="flex items-center gap-2">
                     <select
-                        id="pa-range"
                         value={days}
-                        onChange={e => setDays(Number(e.target.value))}
-                        className="text-xs bg-gray-100 dark:bg-[#0f1117] border border-gray-200 dark:border-[#2a3347] text-gray-700 dark:text-gray-300 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 transition-colors cursor-pointer"
+                        onChange={(e) => setDays(Number(e.target.value))}
+                        className="rounded-lg border border-hairline bg-panel px-2 py-1 text-sm text-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand dark:text-gray-200"
+                        aria-label="Select time range"
                     >
-                        <option value={7}>Last 7 days</option>
-                        <option value={14}>Last 14 days</option>
-                        <option value={30}>Last 30 days</option>
-                        <option value={90}>Last 90 days</option>
+                        <option value={7}>7 days</option>
+                        <option value={14}>14 days</option>
+                        <option value={30}>30 days</option>
+                        <option value={90}>90 days</option>
                     </select>
-
-                    <button
-                        onClick={fetchAll}
-                        disabled={loading}
-                        aria-label="Refresh analytics"
-                        className="p-1.5 rounded-lg text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-[#1e2535] disabled:opacity-50 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
-                        title="Refresh"
-                    >
-                        {loading ? <LoadingSpinner size="sm" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                    <button onClick={refresh} disabled={loading} aria-label="Refresh analytics" className="rounded-lg p-1.5 text-gray-500 transition-colors duration-200 hover:bg-subtle hover:text-brand disabled:opacity-50 dark:text-gray-400">
+                        {loading ? <LoadingSpinner size="sm" /> : <RefreshCw className="h-4 w-4" aria-hidden="true" />}
                     </button>
-                    <button
-                        onClick={() => setExpanded(v => !v)}
-                        aria-label={expanded ? 'Collapse analytics' : 'Expand analytics'}
-                        aria-expanded={expanded}
-                        className="p-1.5 rounded-lg text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-[#1e2535] transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
-                    >
-                        {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                    <button onClick={() => setExpanded((v) => !v)} aria-label={expanded ? 'Collapse analytics' : 'Expand analytics'} aria-expanded={expanded} className="rounded-lg p-1.5 text-gray-500 transition-colors duration-200 hover:bg-subtle hover:text-brand dark:text-gray-400">
+                        <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${expanded ? '' : '-rotate-90'}`} aria-hidden="true" />
                     </button>
                 </div>
-            </div>
+            }
+        >
+            {!expanded ? null : (
+                <div className="space-y-6 p-5">
 
-            {/* Error */}
-            {error && (
-                <div className="mx-5 mt-4 p-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-lg flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0" />
-                    <p className="text-xs text-red-600 dark:text-red-400">{error}</p>
-                </div>
-            )}
+                    {/* Error */}
+                    {error && (
+                        <WidgetErrorFallback widgetName="Provider analytics" onRetry={refresh} />
+                    )}
 
-            {/* Loading */}
-            {loading && (
-                <div className="px-5 py-8 flex items-center justify-center gap-2">
-                    <LoadingSpinner size="md" />
-                    <span className="text-sm text-gray-600 dark:text-gray-400">Loading analytics…</span>
-                </div>
-            )}
-
-            {/* Empty */}
-            {!loading && !error && summary.length === 0 && (
-                <div className="px-5 py-10 text-center">
-                    <p className="text-sm text-gray-900 dark:text-white font-medium">No usage data for this period.</p>
-                    <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">Data appears once agents start making API calls.</p>
-                </div>
-            )}
-
-            {/* Content */}
-            {!loading && !error && summary.length > 0 && expanded && (
-                <div className="px-5 py-5 space-y-5">
-
-                    {/* KPIs */}
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-                        <KpiCard icon={DollarSign}   label="Total Spend"      value={fmtCurrency(totalCost)}     color="#10b981" sub={topProvider ? `Top: ${topProvider}` : undefined} />
-                        <KpiCard icon={Zap}          label="Total Requests"   value={fmtInt(totalReqs)}          color="#6366f1" />
-                        <KpiCard icon={CheckCircle2} label="Avg Success Rate" value={fmtPct(avgSuccess)}         color="#f59e0b" />
-                        <KpiCard icon={Clock}        label="Avg Latency"      value={`${avgLatency.toFixed(0)}ms`} color="#14b8a6" />
-                        <KpiCard icon={AlertCircle}  label="Failed Requests"  value={fmtInt(totalFailed)}        color="#ef4444" sub={totalReqs ? `${((totalFailed / totalReqs) * 100).toFixed(2)}% of total` : undefined} />
-                    </div>
-
-                    {/* Cost over time + Pie */}
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-                        <ChartCard
-                            title="Cost Over Time"
-                            caption="Daily spend in USD — click a provider to toggle"
-                            className="lg:col-span-2"
-                        >
-                            {timeline.length === 0 ? <EmptyChart /> : (
-                                <>
-                                    <ResponsiveContainer width="100%" height={200}>
-                                        <LineChart data={timeline} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
-                                            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" className="dark:[stroke:#1e2535]" vertical={false} />
-                                            <XAxis dataKey="date" tick={{ fill: '#9ca3af', fontSize: 10 }} axisLine={false} tickLine={false} minTickGap={16} />
-                                            <YAxis tick={{ fill: '#9ca3af', fontSize: 10 }} axisLine={false} tickLine={false} width={52} tickFormatter={fmtCompactCurrency} />
-                                            <Tooltip content={<ChartTooltip prefix="$" />} />
-                                            {visibleTimelineProviders.map((p, i) => (
-                                                <Line
-                                                    key={p}
-                                                    type="monotone"
-                                                    dataKey={p}
-                                                    name={p}
-                                                    stroke={getColor(p)}
-                                                    strokeWidth={2}
-                                                    strokeDasharray={LINE_DASHES[i % LINE_DASHES.length]}
-                                                    dot={false}
-                                                    activeDot={{ r: 4 }}
-                                                    isAnimationActive={false}
-                                                />
-                                            ))}
-                                        </LineChart>
-                                    </ResponsiveContainer>
-                                    <LineLegend providers={timelineProviders} hidden={hiddenSeries} onToggle={toggleSeries} />
-                                </>
-                            )}
-                        </ChartCard>
-
-                        <ChartCard title="Cost Distribution" caption="Share of total spend by provider">
-                            {pieData.length === 0 ? <EmptyChart message="No cost data" /> : (
-                                <div className="relative">
-                                    <ResponsiveContainer width="100%" height={200}>
-                                        <PieChart>
-                                            <Pie
-                                                data={pieData}
-                                                cx="50%" cy="50%"
-                                                innerRadius={52}
-                                                outerRadius={78}
-                                                paddingAngle={3}
-                                                dataKey="value"
-                                                stroke="none"
-                                                isAnimationActive={false}
-                                            >
-                                                {pieData.map((entry, i) => (
-                                                    <Cell key={i} fill={entry.fill} opacity={0.92} />
-                                                ))}
-                                            </Pie>
-                                            <Tooltip content={<ChartTooltip prefix="$" />} />
-                                        </PieChart>
-                                    </ResponsiveContainer>
-                                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                                        <span className="text-[10px] font-medium text-gray-600 dark:text-gray-500 uppercase tracking-wide">Total</span>
-                                        <span className="text-base font-bold text-gray-900 dark:text-white">{fmtCurrency(totalCost)}</span>
-                                    </div>
-                                </div>
-                            )}
-                            {pieData.length > 0 && (
-                                <div className="mt-2 space-y-1 max-h-24 overflow-y-auto">
-                                    {pieData.slice().sort((a, b) => b.value - a.value).map(d => (
-                                        <div key={d.name} className="flex items-center justify-between text-[11px]">
-                                            <span className="flex items-center gap-1.5 text-gray-700 dark:text-gray-300">
-                                                <span className="w-2 h-2 rounded-full" style={{ background: d.fill }} aria-hidden />
-                                                {d.name}
-                                            </span>
-                                            <span className="font-medium text-gray-600 dark:text-gray-400">
-                                                {totalCost ? `${((d.value / totalCost) * 100).toFixed(1)}%` : '0%'}
-                                            </span>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </ChartCard>
-                    </div>
-
-                    {/* Success rate + Latency */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                        <ChartCard title="Success Rate by Provider" caption="Percentage of successful requests">
-                            {summary.length === 0 ? <EmptyChart /> : (
-                                <ResponsiveContainer width="100%" height={190}>
-                                    <BarChart data={summary} barSize={26} margin={{ top: 8, right: 4, bottom: 0, left: 0 }}>
-                                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" className="dark:[stroke:#1e2535]" vertical={false} />
-                                        <XAxis dataKey="provider" tick={{ fill: '#9ca3af', fontSize: 10 }} axisLine={false} tickLine={false} interval={0} angle={summary.length > 5 ? -35 : 0} textAnchor={summary.length > 5 ? 'end' : 'middle'} height={summary.length > 5 ? 48 : 24} />
-                                        <YAxis domain={[0, 100]} tick={{ fill: '#9ca3af', fontSize: 10 }} axisLine={false} tickLine={false} width={28} tickFormatter={v => `${v}%`} />
-                                        <Tooltip cursor={{ fill: 'rgba(148,163,184,0.08)' }} content={<ChartTooltip suffix="%" />} />
-                                        <Bar dataKey="success_rate_pct" name="Success Rate" radius={[4, 4, 0, 0]}>
-                                            {summary.map((entry, i) => <Cell key={i} fill={getColor(entry.provider)} />)}
-                                        </Bar>
-                                    </BarChart>
-                                </ResponsiveContainer>
-                            )}
-                        </ChartCard>
-
-                        <ChartCard title="Avg Latency by Provider" caption="Mean response time in milliseconds">
-                            {summary.every(p => p.avg_latency_ms === 0) ? <EmptyChart message="No latency data yet" /> : (
-                                <ResponsiveContainer width="100%" height={190}>
-                                    <BarChart data={summary} barSize={26} margin={{ top: 8, right: 4, bottom: 0, left: 0 }}>
-                                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" className="dark:[stroke:#1e2535]" vertical={false} />
-                                        <XAxis dataKey="provider" tick={{ fill: '#9ca3af', fontSize: 10 }} axisLine={false} tickLine={false} interval={0} angle={summary.length > 5 ? -35 : 0} textAnchor={summary.length > 5 ? 'end' : 'middle'} height={summary.length > 5 ? 48 : 24} />
-                                        <YAxis tick={{ fill: '#9ca3af', fontSize: 10 }} axisLine={false} tickLine={false} width={40} tickFormatter={v => `${v}ms`} />
-                                        <Tooltip cursor={{ fill: 'rgba(148,163,184,0.08)' }} content={<ChartTooltip suffix="ms" />} />
-                                        <Bar dataKey="avg_latency_ms" name="Avg Latency" radius={[4, 4, 0, 0]}>
-                                            {summary.map((entry, i) => <Cell key={i} fill={getColor(entry.provider)} />)}
-                                        </Bar>
-                                    </BarChart>
-                                </ResponsiveContainer>
-                            )}
-                        </ChartCard>
-                    </div>
-
-                    {/* Model breakdown table */}
-                    <ChartCard title="Model-Level Breakdown" caption="Per-model usage, cost and performance">
-                        <div className="overflow-x-auto -mx-1">
-                            <table className="w-full text-xs">
-                                <thead>
-                                    <tr className="text-gray-600 dark:text-gray-500 border-b border-gray-100 dark:border-[#1e2535]">
-                                        <th className="text-left px-3 py-2.5 font-semibold">Provider</th>
-                                        <th className="text-left px-3 py-2.5 font-semibold">Model</th>
-                                        <th className="text-right px-3 py-2.5 font-semibold">Requests</th>
-                                        <th className="text-right px-3 py-2.5 font-semibold">Success</th>
-                                        <th className="text-right px-3 py-2.5 font-semibold">Avg Latency</th>
-                                        <th className="text-right px-3 py-2.5 font-semibold">Total Cost</th>
-                                        <th className="text-right px-3 py-2.5 font-semibold">Cost / 1K</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-100 dark:divide-[#1e2535]">
-                                    {models.map((row, i) => (
-                                        <tr key={i} className="hover:bg-gray-100/60 dark:hover:bg-white/5 transition-colors">
-                                            <td className="px-3 py-2.5">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: getColor(row.provider) }} aria-hidden />
-                                                    <span className="text-gray-700 dark:text-gray-300">{row.provider}</span>
-                                                </div>
-                                            </td>
-                                            <td className="px-3 py-2.5 font-medium text-gray-900 dark:text-gray-100">{row.model}</td>
-                                            <td className="px-3 py-2.5 text-right text-gray-700 dark:text-gray-300 tabular-nums">{fmtInt(row.total_requests)}</td>
-                                            <td className="px-3 py-2.5 text-right">
-                                                <span className={`font-semibold tabular-nums ${successTone(row.success_rate_pct)}`}>
-                                                    {row.success_rate_pct.toFixed(1)}%
-                                                </span>
-                                            </td>
-                                            <td className="px-3 py-2.5 text-right text-gray-700 dark:text-gray-300 tabular-nums">
-                                                {row.avg_latency_ms > 0 ? `${row.avg_latency_ms.toFixed(0)}ms` : '—'}
-                                            </td>
-                                            <td className="px-3 py-2.5 text-right font-semibold text-gray-900 dark:text-gray-100 tabular-nums">
-                                                {fmtCurrency(row.total_cost_usd)}
-                                            </td>
-                                            <td className="px-3 py-2.5 text-right text-gray-700 dark:text-gray-300 tabular-nums">
-                                                {row.cost_per_1k_tokens > 0 ? `$${row.cost_per_1k_tokens.toFixed(4)}` : '—'}
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                    {/* Loading */}
+                    {loading && !error && (
+                        <div className="py-8 flex items-center justify-center gap-2">
+                            <LoadingSpinner size="md" />
+                            <span className="text-sm text-gray-600 dark:text-gray-400">Loading analytics…</span>
                         </div>
-                    </ChartCard>
+                    )}
 
+                    {/* Empty */}
+                    {!loading && !error && summary.length === 0 && (
+                        <EmptyState
+                            icon={BarChart3}
+                            title="No usage data"
+                            description="Usage will appear once providers are active."
+                            size="sm"
+                        />
+                    )}
+
+                    {/* Content */}
+                    {!loading && !error && summary.length > 0 && (
+                        <div className="space-y-5">
+
+                            {/* KPIs */}
+                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                                <KpiCard icon={DollarSign}   label="Total Spend"      value={fmtCurrency(totalCost)}     color="#10b981" sub={topProvider ? `Top: ${topProvider}` : undefined} />
+                                <KpiCard icon={Zap}          label="Total Requests"   value={fmtInt(totalReqs)}          color="#6366f1" />
+                                <KpiCard icon={CheckCircle2} label="Avg Success Rate" value={fmtPct(avgSuccess)}         color="#f59e0b" />
+                                <KpiCard icon={Clock}        label="Avg Latency"      value={`${avgLatency.toFixed(0)}ms`} color="#14b8a6" />
+                                <KpiCard icon={AlertCircle}  label="Failed Requests"  value={fmtInt(totalFailed)}        color="#ef4444" sub={totalReqs ? `${((totalFailed / totalReqs) * 100).toFixed(2)}% of total` : undefined} />
+                            </div>
+
+                            {/* Cost over time + Pie */}
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                                <ChartCard
+                                    title="Cost Over Time"
+                                    caption="Daily spend in USD — click a provider to toggle"
+                                    className="lg:col-span-2"
+                                >
+                                    {timeline.length === 0 ? (
+                                        <EmptyState icon={BarChart3} title="No usage data" description="Usage will appear once providers are active." size="sm" />
+                                    ) : (
+                                        <>
+                                            <ResponsiveContainer width="100%" height={200}>
+                                                <LineChart data={timeline} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+                                                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" className="dark:[stroke:#1e2535]" vertical={false} />
+                                                    <XAxis dataKey="date" tick={{ fill: '#9ca3af', fontSize: 10 }} axisLine={false} tickLine={false} minTickGap={16} />
+                                                    <YAxis tick={{ fill: '#9ca3af', fontSize: 10 }} axisLine={false} tickLine={false} width={52} tickFormatter={fmtCompactCurrency} />
+                                                    <Tooltip content={<ChartTooltip prefix="$" />} />
+                                                    {visibleTimelineProviders.map((p, i) => (
+                                                        <Line
+                                                            key={p}
+                                                            type="monotone"
+                                                            dataKey={p}
+                                                            name={p}
+                                                            stroke={getColor(p)}
+                                                            strokeWidth={2}
+                                                            strokeDasharray={LINE_DASHES[i % LINE_DASHES.length]}
+                                                            dot={false}
+                                                            activeDot={{ r: 4 }}
+                                                            isAnimationActive={false}
+                                                        />
+                                                    ))}
+                                                </LineChart>
+                                            </ResponsiveContainer>
+                                            <LineLegend providers={timelineProviders} hidden={hiddenSeries} onToggle={toggleSeries} />
+                                        </>
+                                    )}
+                                </ChartCard>
+
+                                <ChartCard title="Cost Distribution" caption="Share of total spend by provider">
+                                    {pieData.length === 0 ? (
+                                        <EmptyState icon={BarChart3} title="No usage data" description="Usage will appear once providers are active." size="sm" />
+                                    ) : (
+                                        <div className="relative">
+                                            <ResponsiveContainer width="100%" height={200}>
+                                                <PieChart>
+                                                    <Pie
+                                                        data={pieData}
+                                                        cx="50%" cy="50%"
+                                                        innerRadius={52}
+                                                        outerRadius={78}
+                                                        paddingAngle={3}
+                                                        dataKey="value"
+                                                        stroke="none"
+                                                        isAnimationActive={false}
+                                                    >
+                                                        {pieData.map((entry, i) => (
+                                                            <Cell key={i} fill={entry.fill} opacity={0.92} />
+                                                        ))}
+                                                    </Pie>
+                                                    <Tooltip content={<ChartTooltip prefix="$" />} />
+                                                </PieChart>
+                                            </ResponsiveContainer>
+                                            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                                                <span className="text-[10px] font-medium text-gray-600 dark:text-gray-500 uppercase tracking-wide">Total</span>
+                                                <span className="text-base font-bold text-gray-900 dark:text-white">{fmtCurrency(totalCost)}</span>
+                                            </div>
+                                        </div>
+                                    )}
+                                    {pieData.length > 0 && (
+                                        <div className="mt-2 space-y-1 max-h-24 overflow-y-auto">
+                                            {pieData.slice().sort((a, b) => b.value - a.value).map(d => (
+                                                <div key={d.name} className="flex items-center justify-between text-[11px]">
+                                                    <span className="flex items-center gap-1.5 text-gray-700 dark:text-gray-300">
+                                                        <span className="w-2 h-2 rounded-full" style={{ background: d.fill }} aria-hidden />
+                                                        {d.name}
+                                                    </span>
+                                                    <span className="font-medium text-gray-600 dark:text-gray-400">
+                                                        {totalCost ? `${((d.value / totalCost) * 100).toFixed(1)}%` : '0%'}
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </ChartCard>
+                            </div>
+
+                            {/* Success rate + Latency */}
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                                <ChartCard title="Success Rate by Provider" caption="Percentage of successful requests">
+                                    {summary.length === 0 ? (
+                                        <EmptyState icon={BarChart3} title="No usage data" description="Usage will appear once providers are active." size="sm" />
+                                    ) : (
+                                        <ResponsiveContainer width="100%" height={190}>
+                                            <BarChart data={summary} barSize={26} margin={{ top: 8, right: 4, bottom: 0, left: 0 }}>
+                                                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" className="dark:[stroke:#1e2535]" vertical={false} />
+                                                <XAxis dataKey="provider" tick={{ fill: '#9ca3af', fontSize: 10 }} axisLine={false} tickLine={false} interval={0} angle={summary.length > 5 ? -35 : 0} textAnchor={summary.length > 5 ? 'end' : 'middle'} height={summary.length > 5 ? 48 : 24} />
+                                                <YAxis domain={[0, 100]} tick={{ fill: '#9ca3af', fontSize: 10 }} axisLine={false} tickLine={false} width={28} tickFormatter={v => `${v}%`} />
+                                                <Tooltip cursor={{ fill: 'rgba(148,163,184,0.08)' }} content={<ChartTooltip suffix="%" />} />
+                                                <Bar dataKey="success_rate_pct" name="Success Rate" radius={[4, 4, 0, 0]}>
+                                                    {summary.map((entry, i) => <Cell key={i} fill={getColor(entry.provider)} />)}
+                                                </Bar>
+                                            </BarChart>
+                                        </ResponsiveContainer>
+                                    )}
+                                </ChartCard>
+
+                                <ChartCard title="Avg Latency by Provider" caption="Mean response time in milliseconds">
+                                    {summary.every(p => p.avg_latency_ms === 0) ? (
+                                        <EmptyState icon={BarChart3} title="No usage data" description="Usage will appear once providers are active." size="sm" />
+                                    ) : (
+                                        <ResponsiveContainer width="100%" height={190}>
+                                            <BarChart data={summary} barSize={26} margin={{ top: 8, right: 4, bottom: 0, left: 0 }}>
+                                                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" className="dark:[stroke:#1e2535]" vertical={false} />
+                                                <XAxis dataKey="provider" tick={{ fill: '#9ca3af', fontSize: 10 }} axisLine={false} tickLine={false} interval={0} angle={summary.length > 5 ? -35 : 0} textAnchor={summary.length > 5 ? 'end' : 'middle'} height={summary.length > 5 ? 48 : 24} />
+                                                <YAxis tick={{ fill: '#9ca3af', fontSize: 10 }} axisLine={false} tickLine={false} width={40} tickFormatter={v => `${v}ms`} />
+                                                <Tooltip cursor={{ fill: 'rgba(148,163,184,0.08)' }} content={<ChartTooltip suffix="ms" />} />
+                                                <Bar dataKey="avg_latency_ms" name="Avg Latency" radius={[4, 4, 0, 0]}>
+                                                    {summary.map((entry, i) => <Cell key={i} fill={getColor(entry.provider)} />)}
+                                                </Bar>
+                                            </BarChart>
+                                        </ResponsiveContainer>
+                                    )}
+                                </ChartCard>
+                            </div>
+
+                            {/* Model breakdown table */}
+                            <ChartCard title="Model-Level Breakdown" caption="Per-model usage, cost and performance">
+                                <div className="overflow-x-auto -mx-1">
+                                    <table className="w-full text-xs">
+                                        <thead>
+                                            <tr className="text-gray-600 dark:text-gray-500 border-b border-gray-100 dark:border-[#1e2535]">
+                                                <th className="text-left px-3 py-2.5 font-semibold">Provider</th>
+                                                <th className="text-left px-3 py-2.5 font-semibold">Model</th>
+                                                <th className="text-right px-3 py-2.5 font-semibold">Requests</th>
+                                                <th className="text-right px-3 py-2.5 font-semibold">Success</th>
+                                                <th className="text-right px-3 py-2.5 font-semibold">Avg Latency</th>
+                                                <th className="text-right px-3 py-2.5 font-semibold">Total Cost</th>
+                                                <th className="text-right px-3 py-2.5 font-semibold">Cost / 1K</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-100 dark:divide-[#1e2535]">
+                                            {models.map((row, i) => (
+                                                <tr key={i} className="hover:bg-gray-100/60 dark:hover:bg-white/5 transition-colors">
+                                                    <td className="px-3 py-2.5">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: getColor(row.provider) }} aria-hidden />
+                                                            <span className="text-gray-700 dark:text-gray-300">{row.provider}</span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-3 py-2.5 font-medium text-gray-900 dark:text-gray-100">{row.model}</td>
+                                                    <td className="px-3 py-2.5 text-right text-gray-700 dark:text-gray-300 tabular-nums">{fmtInt(row.total_requests)}</td>
+                                                    <td className="px-3 py-2.5 text-right">
+                                                        <span className={`font-semibold tabular-nums ${successTone(row.success_rate_pct)}`}>
+                                                            {row.success_rate_pct.toFixed(1)}%
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-3 py-2.5 text-right text-gray-700 dark:text-gray-300 tabular-nums">
+                                                        {row.avg_latency_ms > 0 ? `${row.avg_latency_ms.toFixed(0)}ms` : '—'}
+                                                    </td>
+                                                    <td className="px-3 py-2.5 text-right font-semibold text-gray-900 dark:text-gray-100 tabular-nums">
+                                                        {fmtCurrency(row.total_cost_usd)}
+                                                    </td>
+                                                    <td className="px-3 py-2.5 text-right text-gray-700 dark:text-gray-300 tabular-nums">
+                                                        {row.cost_per_1k_tokens > 0 ? `$${row.cost_per_1k_tokens.toFixed(4)}` : '—'}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </ChartCard>
+
+                        </div>
+                    )}
                 </div>
             )}
-        </section>
+        </WidgetCard>
     );
 }
