@@ -9,26 +9,6 @@
 
 ---
 
-# Project TODO
-
-## ✅ Completed
-
-### Voice Bridge
-- [x] Voice bridge "disconnected" notification (with accompanying command) should only appear once per login, not repeatedly.
-- [x] Fix voice bridge setup scripts, currently broken on Windows. Intended flow: the voice-bridge container installs the required scripts on the host system, and only then does the voice bridge start.
-- [x] Fix the voice bridge notification in the main layout being cut off by the page — it should render above the page content. Also update the notification copy as needed, referencing `docs/documents/voice-bridge-setup.md`.
-
-### Chat / Command Interface
-- [x] Message-count indicator (shown on the command interface and the chat page logo) should only display the unread count while the user is outside the chat page, and disappear once the message has been read (i.e., once the user is on the chat page).
-
-### Genesis Onboarding
-- [x] Genesis flow should follow `README.md`: user logs in for the first time → adds API key → Genesis starts → AI greets the user and asks for the nation name → nation name is saved. If a nation name already exists, skip this flow on subsequent runs.
-
-### Dashboard
-- [x] Provider Analytics on the dashboard should refresh automatically once an API key is added, instead of requiring the user to click the refresh button.
-
----
-
 ## 🔲 In Progress / Pending
 
 ### Voice Bridge
@@ -36,6 +16,42 @@
 - [ ] Confirm whether voice bridge communication is currently visible in the chat; if not, implement it.
 - [ ] Align the voice bridge persona with the chat persona so behavior is consistent across both (e.g., addressing the admin as "sir" is acceptable for both).
 - [ ] Verify that whisper.cpp is downloaded in Docker and running correctly.
+
+- [ ] After contry name is set, the ai should sent welcome message with the info like, welcome the country name is ... or similar. Currently the country name is set , then untill the user sends a message no message appears. 
+
+- [ ] The dark light mode switch button is not functioning correctly. 
+When clicked it takes time to switch form moon logo to sun logo. 
+
+- [ ] Voice Bridge Not Running notification should only show once after login but it is showing repeteadly. 
+
+- [ ] Using free model should not have pricing, the pricing details can be recived from the api itself make it so the pricing is correct. different models uses different api most use open ai api structure, anthropic uses different one. 
+
+- [ ] In chatpage, the icone for the message form the ai, imporve the style to make it look better. 
+
+- [ ] Start voice input when voice is sent is not showing in the chat, as well as clicking voice setting is throwing error in the frontend consel. 
+
+- [ ] - **desktop_screen_size**: ❌ Failing — threw a SQLAlchemy rollback error (likely a backend session fault, not a desktop issue).
+
+- [ ] - Adding tools, creating tools by itself is not implemented correctly.
+
+- [ ] - Improvement on tools 
+    **CATEGORY 3 — DESKTOP FILESYSTEM (⚠️ partial)**
+    - `desktop_list_directory` ✅ — listed your Desktop
+    - `desktop_screen_size` ❌ — SQLAlchemy rollback fault
+    - (Other desktop_* tools — create/read/save/delete/copy/move/file ops — share the same backend as screen_size and are **at risk** of the same fault; only list_directory was confirmed healthy)
+
+    **CATEGORY 4 — PREFERENCES (❌ broken)**
+    - `preference_categories` ❌ — SQLAlchemy rollback fault
+    - `preference_get`, `preference_set`, `preference_list`, `preference_bulk_update` — **all share the same DB backend and are broken** by the same fault
+
+    **CATEGORY 5 — NOT AVAILABLE (no tools provisioned)**
+    - MCP server connection tools — none exist
+    - Agent spawning / task-creation tools — none exposed to my tier (I can only *direct* via governance, not instantiate programmatically)
+    - Custom tool creation — not permitted
+
+[ ] - Add task management tools for ths system. 
+
+resolve the errors and add mcp tools
 
 ### Chat Page
 - [ ] Add hover icons on chat messages: a **copy** icon (copies the message text) and a **forward** icon (copies the message into the compose box so the user can send it again).
@@ -49,7 +65,18 @@
 
 ### Tools & Knowledge Base
 - [ ] Review all existing tools, improve them, and add new tools where needed.
+
+- [ ] In the ethos or startup prompt for all ai agent, after reading constitution, give them basic context, like where they are located inside docker contaner, when is the hostsystem outside docker contaner, where is the internet outside the host system, where they should operate in the host system, how to access the host system. where user says " create a folder in my desktop, the expectation is to create in the host system not inside contaner" this knowledge should be given to the agent to add in the ethos and also put inside the chroma db. 
 - [ ] Seed the knowledge library with foundational operating info for the agent: which tools to use and when, general best practices, how to access the host system, basic CMD/PowerShell usage, and useful utilities (grep, curl, etc.), so the system behaves correctly from the start. Decide on the best delivery method — e.g., bake basics into the ethos/constitution, have the agent read from Chroma on startup, or seed it at creation time — and implement whichever fits best.
+
+part 2 
+- [ ] to know something or before doing something agent will, search the web and the chroma db, if knowledge not in chroma db they will update it , then proceed with the work. if web search is not avilable then uses chroma db knowledge. 
+- [ ] A basic structure should exist to update knowledge in chroma db so all agents will use the same and , their is less dublicate inside chroma db . all agents should use the same.  
+
+
+### Model cap during autoscaling 
+ - [ ] their is only one head of council at a time 00001, when all agents are used and their are no index left to spwan then head of council should use the remaning index to spawn head of council to look for ideal agents to view and report back so they can be terminated to save space. and in this condition new tasks should not be assigned . after the task is done the new created index of head of council should terminate.
+
 
 ### Agent Behavior
 - [ ] Persona and behavior for all AI agents — including the voice bridge — should be driven by the constitution, so that editing the constitution updates persona consistently everywhere. Update the ethos as well as system instruction if necessary to achive this. 
