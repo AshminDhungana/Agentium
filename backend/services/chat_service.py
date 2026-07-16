@@ -6,7 +6,7 @@ Handles message processing, task creation, context management, and reincarnation
 import logging
 import httpx
 from datetime import datetime
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from sqlalchemy.orm import Session
 
 from backend.models.entities import Agent, HeadOfCouncil, Task, TaskPriority, TaskType, UserModelConfig
@@ -19,6 +19,7 @@ from backend.services.model_provider import ModelService
 from backend.services.media_interceptor import MediaInterceptor
 from backend.core.llm_client import LLMClient
 from backend.models.entities.user_config import ConnectionStatus
+from backend.models.entities.chat_message import ChatMessage as ChatMsg
 
 
 logger = logging.getLogger(__name__)
@@ -26,6 +27,44 @@ logger = logging.getLogger(__name__)
 
 class ChatService:
     """Service for handling Sovereign ↔ Head of Council chat with reincarnation support."""
+
+    @staticmethod
+    def _load_chat_history(
+        db: Session,
+        user_id: Optional[str],
+        max_turns: int = 30,
+    ) -> List[Dict[str, str]]:
+        """
+        Return prior conversation turns as OpenAI-style role/content dicts
+        (oldest first) so the model can see the full thread, not just the
+        current message.
+
+        Only persists user/assistant turns (sovereign -> user,
+        head_of_council -> assistant).  System notices, errors, and reincarnation
+        text are skipped to keep the prompt clean.  The most recent ``max_turns``
+        messages are kept to bound prompt size.
+        """
+        if not user_id:
+            return []
+
+        rows = (
+            db.query(ChatMsg)
+            .filter(ChatMsg.user_id == user_id, ChatMsg.is_deleted == "N")
+            .filter(ChatMsg.role.in_(["sovereign", "head_of_council"]))
+            .order_by(ChatMsg.created_at.asc())
+            .all()
+        )
+
+        # Keep only the most recent turns to bound prompt size.
+        rows = rows[-max_turns:]
+
+        role_map = {"sovereign": "user", "head_of_council": "assistant"}
+        history: List[Dict[str, str]] = []
+        for r in rows:
+            mapped = role_map.get(r.role)
+            if mapped and r.content and r.content.strip():
+                history.append({"role": mapped, "content": r.content})
+        return history
 
     @staticmethod
     async def process_message(head: HeadOfCouncil, message: str, db: Session, extra_metadata: Optional[dict] = None):
@@ -74,9 +113,18 @@ class ChatService:
         # post-LLM block, so a missing provider (CI, headless deploys) silently
         # dropped the inbound message and any attached card answer.
         from backend.models.entities.user import User
-        from backend.models.entities.chat_message import ChatMessage as ChatMsg
         import uuid as _uuid
         sovereign_user = db.query(User).filter_by(is_admin=True, is_active=True).first()
+
+        # ── Load conversation history BEFORE persisting the current turn ──────
+        # The frontend already renders the full thread; the model must too,
+        # otherwise context-dependent follow-ups ("try again", "redo the
+        # previous task") have no memory of what came before.  We query here,
+        # ahead of the pending inbound insert (which autoflush would otherwise
+        # include), so the history reflects turns strictly prior to this one.
+        history = ChatService._load_chat_history(
+            db, sovereign_user.id if sovereign_user else None
+        )
 
         if sovereign_user:
             try:
@@ -194,6 +242,7 @@ Address the Sovereign respectfully. If they issue a command that requires execut
                 fallback_configs=fallback_configs,
                 system_prompt_override=full_prompt,
                 agent_tier=f"{head.agentium_id[0]}xxxx",
+                history=history,
             )
         except Exception as e:
             logger.error(f"Model generation failed for Head {head.agentium_id}: {str(e)}")

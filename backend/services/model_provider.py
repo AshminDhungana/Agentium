@@ -1127,6 +1127,7 @@ class ModelService:
         agent_tier: Optional[str] = None,
         task_id: Optional[str] = None,
         max_tool_iterations: int = 10,
+        history: Optional[List[Dict[str, str]]] = None,
         **kwargs,
     ) -> Dict[str, Any]:
         """
@@ -1232,7 +1233,11 @@ class ModelService:
         )
         # ── end enforcement ───────────────────────────────────────────────────
 
-        messages = [{"role": "user", "content": user_message}]
+        # ── Seed with prior conversation history (oldest first) ───────────────
+        # Lets the model recall earlier turns so context-dependent follow-ups
+        # ("try again", "redo the previous task") work like a normal chat.
+        messages: List[Dict[str, str]] = list(history) if history else []
+        messages.append({"role": "user", "content": user_message})
 
         from backend.services.api_key_manager import api_key_manager
 

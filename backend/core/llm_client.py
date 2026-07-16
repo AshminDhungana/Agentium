@@ -360,6 +360,7 @@ class LLMClient:
         max_tool_iterations: int = 10,
         max_retries: Optional[int] = None,
         fallback_configs: Optional[List[str]] = None,
+        history: Optional[List[Dict[str, str]]] = None,
         **kwargs,
     ) -> Dict[str, Any]:
         """Tool-aware generation with retry, failover, and CB integration."""
@@ -403,6 +404,7 @@ class LLMClient:
                         agent_tier=agent_tier,
                         task_id=task_id,
                         max_tool_iterations=max_tool_iterations,
+                        history=history,
                         **kwargs,
                     )
                     effective_config_id = attempt_config_id or "default"
