@@ -995,3 +995,11 @@ During review the following inaccuracies in the first draft were corrected:
 - **`delegate_to_task(task: Dict, lead_id, task_id, retry_count)`** takes a **task DICT** (`id`/`description`/`task_type`/`allowed_tools`), not a `Task` object, and auto-selects the executing Task Agent when `task_id` (recipient) is `None`. The wrapper now builds that dict and passes `task_id=None`.
 - **No `get_by_id` classmethod** exists on `Agent`/`Task`; unit tests were rewritten to use `db.query(...).filter(...).first()` mocks.
 - **Async tool calls must be `await`ed** in the integration test (voting tools *and* `dispatch_task`), since the test invokes the functions directly rather than through the executor.
+- **Added `sponsor_amendment` tool (Task 4.5, not in original spec).** The real `AmendmentService.start_voting` requires the amendment to be in `DELIBERATING` status, reached only via `sponsor_amendment` (needs `REQUIRED_SPONSORS = 2` sponsors: Head or Council). The spec's `open_vote`→`start_voting` alone could never succeed. Added `sponsor_amendment` (Head→`AMEND_CONSTITUTION`, Council→`PROPOSE_AMENDMENT`; tiers `["0xxxx","1xxxx"]`) and inserted sponsor steps into the integration vote-cycle test. Also added `sponsor_amendment` to the registry-matrix unit test.
+
+## Progress Log (resume state)
+
+- **Tasks 1–5 + sponsor tool (4.5): IMPLEMENTED & COMMITTED.** Commits: `0dc6233` (SPAWN_COUNCIL), `200b5b6` (spawn/liquidate), `f1c802b` (task tools), `2dacce4` (voting), `8238179` (registry + tier changes; lazy import to break circular dep `tool_registry`→`governance_tool`→`agent_orchestrator`), `6dfbd96` (sponsor_amendment + test fixes).
+- **Unit tests: 11 passed** (`tests/unit/test_governance_tool.py`).
+- **Integration tests (live stack, `DATABASE_URL=postgresql://agentium:agentium@localhost:5432/agentium_test`):** `test_head_spawns_task_agent` PASSES. `test_head_create_dispatch_complete_task` and `test_head_full_vote_cycle` FAILED as of last run — root cause NOT yet isolated (aborted before reading failure detail). These need debugging tomorrow.
+- **Remaining:** debug + fix the 2 failing integration tests, then final commit. No code defects found in the tool implementations themselves so far (failures are in test orchestration / unverified service interactions).
