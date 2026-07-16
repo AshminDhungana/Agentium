@@ -51,6 +51,8 @@ export default defineConfig({
           'src/components/chat/**/*.test.{ts,tsx}',
           'src/components/tasks/**/*.test.{ts,tsx}',
           'src/components/models/**/*.test.{ts,tsx}',
+          'src/components/dashboard/**/*.test.{ts,tsx}',
+          'src/pages/**/*.test.{ts,tsx}',
           'src/store/**/*.test.{ts,tsx}',
           'src/**/*.a11y.test.{ts,tsx}',
         ],

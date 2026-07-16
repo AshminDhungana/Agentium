@@ -1,14 +1,15 @@
-import { render, screen } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
+import tailwindConfig from '../../../tailwind.config.js';
 
 describe('design tokens', () => {
-  it('exposes semantic color utilities', () => {
-    const el = document.createElement('div');
-    el.className = 'bg-canvas border-hairline text-brand bg-brand-soft';
-    document.body.appendChild(el);
-    const styles = getComputedStyle(el);
-    expect(styles.backgroundColor).not.toBe('');
-    expect(styles.borderColor).not.toBe('');
-    expect(styles.color).not.toBe('');
+  it('defines semantic color tokens bound to CSS variables', () => {
+    const colors = (tailwindConfig.theme as any).extend.colors;
+    expect(colors.canvas).toBe('var(--c-canvas)');
+    expect(colors.panel).toBe('var(--c-panel)');
+    expect(colors.hairline).toBe('var(--c-hairline)');
+    expect(colors.subtle).toBe('var(--c-subtle)');
+    expect(colors.brand.DEFAULT).toBe('var(--c-brand)');
+    expect(colors.brand.soft).toBe('var(--c-brand-soft)');
+    expect(colors.brand.fg).toBe('var(--c-brand-fg)');
   });
 });
