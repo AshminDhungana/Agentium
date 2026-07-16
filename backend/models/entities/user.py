@@ -48,6 +48,10 @@ class User(Base):
     # have not logged in since migration 007_settings_improvements ran.
     last_login_at    = Column(DateTime(timezone=True), nullable=True)
 
+    # Profile picture — public URL and the storage object key (for deletion).
+    avatar_url         = Column(String(512), nullable=True)
+    avatar_object_name = Column(String(512), nullable=True)
+
     # Phase 11.1 — RBAC role system
     role             = Column(String(30), default=ROLE_OBSERVER, nullable=False)
     delegated_by_id  = Column(String(36), ForeignKey("users.id"), nullable=True)
@@ -201,6 +205,8 @@ class User(Base):
             "last_login_at": self.last_login_at.isoformat() if self.last_login_at else None,
             "created_at":   self.created_at.isoformat() if self.created_at else None,
             "updated_at":   self.updated_at.isoformat() if self.updated_at else None,
+            "avatar_url":         self.avatar_url,
+            "avatar_object_name": self.avatar_object_name,
         }
         if include_sensitive:
             data["hashed_password"] = self.hashed_password
