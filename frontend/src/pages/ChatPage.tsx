@@ -17,7 +17,7 @@ import { StructuredInputCard } from '@/components/chat/StructuredInputCard';
 import { inboxApi, UnifiedConversation, UnifiedMessage } from '@/services/inboxApi';
 import { api } from '@/services/api';
 import {
-    Send, Crown, Bot, User, AlertCircle, Wifi, WifiOff, CheckCircle,
+    Send, Crown, User, UserRoundSearch, AlertCircle, Wifi, WifiOff, CheckCircle,
     RefreshCw, Paperclip, Image as ImageIcon, File, X, Mic, MicOff, Pause,
     Download, Copy, Sparkles, Code, FileText, Video, Music, Archive,
     Maximize2, MoreHorizontal, Smile, Plus, MessageCircle, Smartphone,
@@ -1134,7 +1134,7 @@ export function ChatPage() {
                                 {isAwaitingReply && (
                                     <div className="flex gap-3">
                                         <div className="flex-shrink-0 w-8 h-8 rounded-xl bg-gradient-to-br from-gray-700 to-gray-800 flex items-center justify-center text-white">
-                                            <Bot className="w-4 h-4" />
+                                            <UserRoundSearch className="w-4 h-4" />
                                         </div>
                                         <div className="px-4 py-3.5 rounded-2xl bg-white dark:bg-[#161b27] border border-gray-200 dark:border-[#1e2535]">
                                             <div className="flex items-center gap-1.5">
