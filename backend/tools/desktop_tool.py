@@ -387,6 +387,7 @@ class DocumentTool:
 
     def read_document(self, filepath: str) -> Dict[str, Any]:
         """Read a document and return structured content."""
+        filepath = host_path.resolve_host_path(filepath)
         p   = Path(filepath)
         ext = p.suffix.lower()
         try:
@@ -441,6 +442,7 @@ class DocumentTool:
                         doc_type: str = "txt") -> Dict[str, Any]:
         """Create a new document. doc_type: txt | md | docx | xlsx | json | csv"""
         try:
+            filepath = host_path.resolve_host_path(filepath)
             p   = Path(filepath)
             p.parent.mkdir(parents=True, exist_ok=True)
             ext = p.suffix.lower() or f".{doc_type}"
@@ -486,6 +488,7 @@ class DocumentTool:
           {"action": "append_row", "sheet": "Sheet1", "values": [1, 2, 3]}
           {"action": "add_sheet",  "name": "NewSheet"}
         """
+        filepath = host_path.resolve_host_path(filepath)
         p       = Path(filepath)
         ext     = p.suffix.lower()
         applied = []
@@ -583,6 +586,7 @@ class DocumentTool:
     def save_document(self, filepath: str, content: Any,
                       backup: bool = True) -> Dict[str, Any]:
         """Save content to document. Handles JSON dicts, CSV lists, and plain text."""
+        filepath = host_path.resolve_host_path(filepath)
         p   = Path(filepath)
         ext = p.suffix.lower()
         try:
