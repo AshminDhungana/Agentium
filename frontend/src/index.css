@@ -32,6 +32,27 @@
   }
 }
 
+:root {
+  --c-canvas: #f9fafb;
+  --c-panel: #ffffff;
+  --c-panel-2: #f8fafc;
+  --c-hairline: #e5e7eb;
+  --c-subtle: #f3f4f6;
+  --c-brand: #2563eb;
+  --c-brand-soft: #dbeafe;
+  --c-brand-fg: #ffffff;
+}
+.dark {
+  --c-canvas: #0f1117;
+  --c-panel: #161b27;
+  --c-panel-2: #1c2333;
+  --c-hairline: #1e2535;
+  --c-subtle: #252f40;
+  --c-brand: #3b82f6;
+  --c-brand-soft: rgba(59, 130, 246, 0.12);
+  --c-brand-fg: #ffffff;
+}
+
 /* Empty state illustration float animation */
 @keyframes float {
   0%, 100% { transform: translateY(0); }
