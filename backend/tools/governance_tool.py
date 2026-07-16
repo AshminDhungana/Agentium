@@ -27,6 +27,8 @@ from backend.models.entities.agents import (
 )
 from backend.services.capability_registry import Capability, CapabilityRegistry
 from backend.services.reincarnation_service import reincarnation_service
+from backend.models.entities.task import Task, TaskType, TaskPriority, TaskStatus
+from backend.services.agent_orchestrator import AgentOrchestrator
 
 logger = logging.getLogger(__name__)
 
@@ -135,3 +137,111 @@ def liquidate_agent(
     except PermissionError as e:
         return _result(False, error=str(e))
     return _result(True, data=outcome if isinstance(outcome, dict) else {"status": "liquidated"})
+
+
+def create_task(
+    title: str,
+    description: str,
+    priority: str = "normal",
+    db: Session = None,
+    agent_id: str = None,
+) -> Dict[str, Any]:
+    caller = _caller(db, agent_id) if db and agent_id else None
+    if caller is None:
+        return _result(False, error="caller agent not found")
+    denied = _require(Capability.DELEGATE_WORK, caller, db, "create task")
+    if denied:
+        return denied
+
+    head = db.query(HeadOfCouncil).filter_by(agentium_id="00001").first()
+    try:
+        prio = TaskPriority(priority.lower())
+    except ValueError:
+        prio = TaskPriority.NORMAL
+    task = Task(
+        title=(title or description)[:200],
+        description=description or title or "Task provisioned via tool.",
+        task_type=TaskType.EXECUTION,
+        priority=prio,
+        created_by=caller.agentium_id,
+        head_of_council_id=head.id if head else None,
+        requires_deliberation=True,
+    )
+    db.add(task)
+    db.commit()
+    council = db.query(CouncilMember).all()
+    if council:
+        task.start_deliberation([c.agentium_id for c in council])
+        db.commit()
+    return _result(True, data={"task_id": task.agentium_id, "status": task.status.value})
+
+
+async def dispatch_task(
+    task_id: str,
+    target_agentium_id: Optional[str] = None,
+    db: Session = None,
+    agent_id: str = None,
+) -> Dict[str, Any]:
+    caller = _caller(db, agent_id) if db and agent_id else None
+    if caller is None:
+        return _result(False, error="caller agent not found")
+    denied = _require(Capability.DELEGATE_WORK, caller, db, "dispatch task")
+    if denied:
+        return denied
+
+    task = db.query(Task).filter(Task.agentium_id == task_id).first()
+    if task is None:
+        return _result(False, error=f"task {task_id} not found")
+
+    if target_agentium_id:
+        lead = db.query(LeadAgent).filter(LeadAgent.agentium_id == target_agentium_id).first()
+        if lead is None:
+            return _result(False, error=f"lead agent {target_agentium_id} not found")
+    else:
+        lead = db.query(LeadAgent).filter(LeadAgent.status == "active").first()
+    if lead is None:
+        return _result(False, error="no available Lead agent to dispatch to")
+
+    orchestrator = AgentOrchestrator(db)
+    task_dict = {
+        "id": task.id,
+        "task_type": task.task_type.value if task.task_type else "general",
+        "description": task.description or "",
+        "allowed_tools": task.tools_allowed or [],
+    }
+    try:
+        outcome = await orchestrator.delegate_to_task(
+            task=task_dict,
+            lead_id=lead.agentium_id,
+            task_id=None,
+            retry_count=0,
+        )
+    except Exception as e:
+        return _result(False, error=str(e))
+    return _result(True, data={"task_id": task.agentium_id,
+                              "lead_id": lead.agentium_id,
+                              "outcome": str(outcome)})
+
+
+def complete_task(
+    task_id: str,
+    result_summary: str,
+    db: Session = None,
+    agent_id: str = None,
+) -> Dict[str, Any]:
+    caller = _caller(db, agent_id) if db and agent_id else None
+    if caller is None:
+        return _result(False, error="caller agent not found")
+    denied = _require(Capability.EXECUTE_TASK, caller, db, "complete task")
+    if denied:
+        return denied
+
+    task = db.query(Task).filter(Task.agentium_id == task_id).first()
+    if task is None:
+        return _result(False, error=f"task {task_id} not found")
+    try:
+        task.complete(result_summary=result_summary, result_data={})
+        db.commit()
+    except Exception as e:
+        return _result(False, error=str(e))
+    return _result(True, data={"task_id": task.agentium_id, "status": task.status.value})

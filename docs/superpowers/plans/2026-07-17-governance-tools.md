@@ -377,11 +377,12 @@ def test_complete_task_happy_path():
 
 @pytest.mark.asyncio
 async def test_dispatch_task_happy_path():
+    caller = MagicMock(); caller.agentium_id = "00001"
     task = MagicMock(); task.id = "db-t1"; task.agentium_id = "t1"
     task.task_type.value = "execution"; task.description = "do it"; task.tools_allowed = []
     lead = MagicMock(); lead.agentium_id = "20001"; lead.status = "active"
     db = MagicMock()
-    db.query.return_value.filter.return_value.first.side_effect = [task, lead]
+    db.query.return_value.filter.return_value.first.side_effect = [caller, task, lead]
     orch = MagicMock()
     orch.delegate_to_task = AsyncMock(return_value=MagicMock(success=True))
     with patch("backend.tools.governance_tool.CapabilityRegistry.can_agent", return_value=True), \
