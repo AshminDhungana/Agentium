@@ -33,6 +33,7 @@ import asyncio
 import logging
 import platform
 import subprocess
+import backend.tools.host_path as host_path
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -253,14 +254,8 @@ class FileManagementTool:
     Paths on the host are accessed via /host mount inside Docker.
     """
 
-    HOST_PREFIX = "/host"
-
     def _host_path(self, path: str) -> str:
-        if path.startswith(self.HOST_PREFIX):
-            return path
-        if os.path.exists(self.HOST_PREFIX) and not path.startswith("/tmp"):
-            return os.path.join(self.HOST_PREFIX, path.lstrip("/"))
-        return path
+        return host_path.resolve_host_path(path)
 
     def open_file(self, filepath: str) -> Dict[str, Any]:
         """Open a file with the OS default application."""
