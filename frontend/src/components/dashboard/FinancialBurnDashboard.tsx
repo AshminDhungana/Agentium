@@ -133,7 +133,7 @@ export const FinancialBurnDashboard: React.FC = () => {
     const renderContent = () => {
         if (isLoading) {
             return (
-                <div className="flex flex-col items-center justify-center py-20 gap-3 text-gray-600 dark:text-slate-500">
+                <div className="flex flex-col items-center justify-center py-20 gap-3 text-gray-600 dark:text-slate-400">
                     <LoadingSpinner size="lg" />
                     <span>Loading financial metrics...</span>
                 </div>
