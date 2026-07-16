@@ -1,4 +1,4 @@
-import type { RefObject } from 'react';
+import { useEffect, useState, type RefObject } from 'react';
 import { Menu, PanelLeftClose, PanelLeftOpen, Sun, Moon } from 'lucide-react';
 
 interface TopBarProps {
@@ -10,13 +10,24 @@ interface TopBarProps {
 }
 
 export function TopBar({ title, collapsed, onToggleCollapse, onOpenMobile, hamburgerRef }: TopBarProps) {
-  const isDark =
-    typeof window !== 'undefined' && document.documentElement.classList.contains('dark');
+  const [isDark, setIsDark] = useState(
+    () => typeof window !== 'undefined' && document.documentElement.classList.contains('dark'),
+  );
+
+  // Keep the toggle in sync with the actual theme, including changes made
+  // elsewhere (e.g. the auth-layout toggle) or restored from localStorage.
+  useEffect(() => {
+    const sync = () =>
+      setIsDark(document.documentElement.classList.contains('dark'));
+    window.addEventListener('agentium:theme-change', sync);
+    return () => window.removeEventListener('agentium:theme-change', sync);
+  }, []);
 
   const toggleTheme = () => {
     const next = !isDark;
     document.documentElement.classList.toggle('dark', next);
     localStorage.setItem('theme', next ? 'dark' : 'light');
+    setIsDark(next);
     window.dispatchEvent(new Event('agentium:theme-change'));
   };
 
@@ -46,9 +57,18 @@ export function TopBar({ title, collapsed, onToggleCollapse, onOpenMobile, hambu
         <button
           onClick={toggleTheme}
           aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-          className="rounded-lg p-2 text-gray-600 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-white/5"
+          className="relative rounded-lg p-2 text-gray-600 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-white/5"
         >
-          {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+          <Sun
+            className={`absolute inset-0 m-auto h-5 w-5 transition-all duration-300 ease-out ${
+              isDark ? 'rotate-0 scale-100 opacity-100' : 'rotate-90 scale-0 opacity-0'
+            }`}
+          />
+          <Moon
+            className={`h-5 w-5 transition-all duration-300 ease-out ${
+              isDark ? 'rotate-90 scale-0 opacity-0' : 'rotate-0 scale-100 opacity-100'
+            }`}
+          />
         </button>
       </div>
     </header>
