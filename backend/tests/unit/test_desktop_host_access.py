@@ -35,3 +35,21 @@ def test_read_document_reads_from_host_home(tmp_path, monkeypatch):
     res = tool.read_document(str(tmp_path / "Desktop" / "note.md"))
     assert res["status"] == "success"
     assert res["content"] == "body text"
+
+
+from backend.services.prompt_template_manager import PromptTemplateManager
+from backend.models.entities.user_config import ProviderType
+
+
+def test_host_access_hint_in_system_prompt():
+    mgr = PromptTemplateManager()
+    prompt, _, _ = mgr.build_system_prompt(
+        provider=ProviderType.OPENAI,
+        model_name="gpt-4o",
+        task_description="create a document on my desktop",
+        agent_ethos=None,
+        agent_tier=3,
+    )
+    assert "/host_home/Desktop" in prompt
+    assert "mounted read-write" in prompt
+    assert "restricted" in prompt

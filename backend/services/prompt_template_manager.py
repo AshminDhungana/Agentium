@@ -579,6 +579,20 @@ Generate the skill JSON now:"""
         "build on. Use it proactively; do not wait to be asked."
     )
 
+    HOST_ACCESS_HINT: str = (
+        "\n\nHost filesystem access: you run inside a Docker container. The host PC's "
+        "filesystem is mounted read-write and you MAY write to it. Use these mounts:\n"
+        "- The user's home directory (Desktop, Documents, Downloads, etc.) is at "
+        "`/host_home`. Example: the Sovereign's Desktop is `/host_home/Desktop`.\n"
+        "- The entire host filesystem is at `/host` (e.g. `/host/Users/...` on macOS, "
+        "`/host/c/Users/...` on Windows).\n"
+        "When the Sovereign says 'create a file on my desktop' or 'save to my Documents', "
+        "create it directly at `/host_home/Desktop/<name>` (or the appropriate "
+        "`/host_home/...` path). Do NOT treat the desktop or any host path as restricted — "
+        "these mounts are writable. Prefer writing to the host mount directly over copying "
+        "from the container."
+    )
+
     # ═══════════════════════════════════════════════════════════════════════
     # Core methods
     # ═══════════════════════════════════════════════════════════════════════
@@ -725,6 +739,7 @@ Generate the skill JSON now:"""
         # or task category — knows the tool exists and when to use it.
         # This is the single injection point; no per-provider template changes needed.
         system_prompt += self.DEEP_THINK_HINT
+        system_prompt += self.HOST_ACCESS_HINT
 
         return (
             system_prompt,
