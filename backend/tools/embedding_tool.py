@@ -141,7 +141,8 @@ class EmbeddingTool:
             from sentence_transformers import SentenceTransformer
             
             if self._local_model is None:
-                model_name = model or "all-MiniLM-L6-v2"
+                from backend.core.config import settings
+                model_name = model or settings.EMBEDDING_MODEL
                 self._local_model = SentenceTransformer(model_name)
             
             embeddings = self._local_model.encode(texts, convert_to_numpy=True)

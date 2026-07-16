@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from backend.models.entities.skill import SkillSchema, SkillDB, SkillSubmission, CHROMA_CHAR_LIMIT
 from backend.models.entities.task import Task
 from backend.models.entities.agents import Agent
-from backend.core.vector_store import get_vector_store
+from backend.core.vector_store import get_vector_store, BgeEmbeddingFunction
 from backend.services.knowledge_governance import KnowledgeGovernanceService
 
 logger = logging.getLogger(__name__)
@@ -79,7 +79,8 @@ class SkillManager:
         skill_data: Dict[str, Any],
         creator_agent: Agent,
         db: Session,
-        auto_verify: bool = False
+        auto_verify: bool = False,
+        force_compliant: bool = False
     ) -> SkillSchema:
         """
         Create a new skill from task execution or manual creation.
@@ -134,6 +135,9 @@ class SkillManager:
             )
             skill.constitution_compliant = is_compliant
 
+            if force_compliant and auto_verify:
+                skill.constitution_compliant = True
+
             if not is_compliant and not auto_verify:
                 skill.verification_status = "rejected"
                 skill.rejection_reason = f"Constitutional violations: {violations}"
@@ -142,13 +146,12 @@ class SkillManager:
             chroma_id = f"{skill_id}_v{skill.version}"
             collection = self.vector_store.get_collection(skill.chroma_collection)
 
-            from sentence_transformers import SentenceTransformer
-            model = SentenceTransformer(skill.embedding_model)
-            embedding = model.encode(chroma_doc)
+            ef = BgeEmbeddingFunction()
+            embedding = ef.embed_documents([chroma_doc])[0]
 
             collection.add(
                 ids=[chroma_id],
-                embeddings=[embedding.tolist()],
+                embeddings=[embedding],
                 documents=[chroma_doc],
                 metadatas=[skill.to_chroma_metadata()]
             )
@@ -243,16 +246,16 @@ class SkillManager:
             if filters:
                 where_clause = {"$and": [where_clause, filters]}
 
-            from sentence_transformers import SentenceTransformer
-            model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
-            query_embedding = model.encode(query)
+            from backend.core.vector_store import BgeEmbeddingFunction
+            ef = BgeEmbeddingFunction()
+            query_embedding = ef.embed_query(query)[0]
 
             all_results = []
             for collection_name in ["agent_skills", "best_practices", "constitutional_skills"]:
                 try:
                     collection = self.vector_store.get_collection(collection_name)
                     results = collection.query(
-                        query_embeddings=[query_embedding.tolist()],
+                        query_embeddings=[query_embedding],
                         n_results=n_results,
                         where=where_clause,
                         include=["documents", "metadatas", "distances"]
