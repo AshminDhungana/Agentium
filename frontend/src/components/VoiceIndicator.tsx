@@ -10,6 +10,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Mic, MicOff, X, Terminal, Copy, Check } from 'lucide-react';
 import { voiceBridgeService, BridgeStatus } from '@/services/voiceBridge';
 import { useAuthStore } from '@/store/authStore';
@@ -114,7 +115,7 @@ function InstallNotification({ info, onClose }: InstallNotificationProps) {
     }
   };
 
-  return (
+  return createPortal(
     <div
       className="
         fixed bottom-20 left-4 z-50 w-[340px]
@@ -188,7 +189,8 @@ function InstallNotification({ info, onClose }: InstallNotificationProps) {
           Got it
         </button>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
