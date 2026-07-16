@@ -196,3 +196,11 @@ def test_spawn_task_api_accepts_head_parent(seeded_db):
         parent=head, name="API Task", description="via api", db=seeded_db)
     seeded_db.commit()
     assert agent.parent_id == head.id
+
+
+@pytest.mark.asyncio
+async def test_genesis_seeds_a_default_lead(seeded_db):
+    lead = seeded_db.query(LeadAgent).filter_by(is_active=True).first()
+    assert lead is not None
+    assert lead.agentium_id.startswith("2")
+    assert lead.parent_id == seeded_db.query(HeadOfCouncil).filter_by(agentium_id="00001").first().id

@@ -18,6 +18,7 @@ from backend.models.entities.agents import (
     AgentStatus,
     CouncilMember,
     HeadOfCouncil,
+    LeadAgent,
 )
 from backend.models.entities.constitution import Constitution, Ethos
 from backend.models.entities.user import User
@@ -470,6 +471,12 @@ class InitializationService:
             results["steps_completed"].append(f"created_council_members:{len(council)}")
             self._log("INFO", f"Created {len(council)} Council Members")
 
+            # Step 2b: Seed a default Lead Agent so the Lead -> Task chain is
+            # functional immediately after genesis (no manual bootstrap needed).
+            default_lead = await self._create_default_lead(head)
+            results["steps_completed"].append(f"created_default_lead:{default_lead.agentium_id}")
+            self._log("INFO", f"Created default Lead Agent {default_lead.agentium_id}")
+
             # Step 3: Determine country name
             if country_name:
                 selected_name = country_name.strip()
@@ -639,6 +646,24 @@ class InitializationService:
 
         self.db.flush()
         return council
+
+    async def _create_default_lead(self, head: HeadOfCouncil) -> LeadAgent:
+        """Seed one Lead Agent (20001) under the Head so the system is not
+        deadlocked at 0 Leads / 0 Task Agents after genesis."""
+        from backend.services.reincarnation_service import reincarnation_service
+
+        existing = self.db.query(LeadAgent).filter_by(agentium_id="20001").first()
+        if existing:
+            return existing
+
+        lead = reincarnation_service.spawn_lead_agent(
+            parent=head,
+            name="Prime Lead",
+            description="Default Lead Agent seeded at genesis to bootstrap the Task tier.",
+            db=self.db,
+        )
+        self.db.flush()
+        return lead
 
     async def _vote_on_country_name(
         self,
