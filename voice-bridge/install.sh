@@ -2,7 +2,8 @@
 # voice-bridge/install.sh
 # Entry-point: runs OS detection then the full dependency installer.
 # Usage:  bash voice-bridge/install.sh
-# Or via Makefile:  make install-voice
+# (There is no `make install-voice` target — use this script, or
+#  `make voice-reinstall` / `make uninstall-voice` which do exist.)
 
 set -euo pipefail
 

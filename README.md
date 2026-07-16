@@ -123,6 +123,9 @@ The `voice-bridge/` process runs on the host (outside Docker) and streams
 mic audio to the backend. It degrades gracefully: missing models fall back to
 safer behavior, and every new setting defaults to the previous behavior.
 
+> **Setup & operations:** see [`docs/documents/voice-bridge-setup.md`](docs/documents/voice-bridge-setup.md)
+> for install/uninstall/verify per OS, logs, and troubleshooting.
+
 | Env var | Default | Purpose |
 |---|---|---|
 | `REQUIRE_WAKE_WORD` | `true` | `false` = direct mode (no wake word needed) |
