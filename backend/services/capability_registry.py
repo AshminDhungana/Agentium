@@ -29,7 +29,8 @@ class Capability(str, Enum):
     EMERGENCY_SHUTDOWN = "emergency_shutdown"        # System-wide emergency stop
     GRANT_CAPABILITY = "grant_capability"            # Grant capabilities to others
     REVOKE_CAPABILITY = "revoke_capability"          # Revoke capabilities from others
-    
+    SPAWN_COUNCIL = "spawn_council"                  # Create Council Members (Head only)
+
     # ═══════════════════════════════════════════════════════════
     # COUNCIL MEMBER CAPABILITIES (1xxxx)
     # ═══════════════════════════════════════════════════════════
@@ -78,6 +79,7 @@ TIER_CAPABILITIES: Dict[str, Set[Capability]] = {
         Capability.EMERGENCY_SHUTDOWN,
         Capability.GRANT_CAPABILITY,
         Capability.REVOKE_CAPABILITY,
+        Capability.SPAWN_COUNCIL,
         # Inherits all lower tier capabilities
         Capability.PROPOSE_AMENDMENT,
         Capability.ALLOCATE_RESOURCES,
