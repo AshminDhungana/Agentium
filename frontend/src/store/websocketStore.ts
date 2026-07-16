@@ -79,6 +79,12 @@ interface WebSocketState {
     lastMessage: WebSocketMessage | null;
     unreadCount: number;
     messageHistory: WebSocketMessage[];
+    /**
+     * Timestamp (ms) of the last API key save. Bumped by `notifyApiKeyAdded()`
+     * so dashboard widgets (e.g. Provider Analytics) can auto-refresh without a
+     * manual button click when providers become available.
+     */
+    apiKeyAddedAt: number | null;
 
     // Internal (prefixed _)
     _ws: WebSocket | null;
@@ -196,6 +202,7 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
     lastMessage: null,
     unreadCount: 0,
     messageHistory: [],
+    apiKeyAddedAt: null,
 
     _ws: null,
     _reconnectTimeout: null,
@@ -250,6 +257,9 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
         // This is called by the Models page after a successful API key save,
         // which ensures chat becomes active without requiring a page reload.
         logger.debug('[WebSocket] API key added — re-attempting connection');
+        // Bump the timestamp so subscribers (e.g. Provider Analytics) can
+        // auto-refresh without a manual button click.
+        set({ apiKeyAddedAt: Date.now() });
         get().disconnect(true);
         setTimeout(() => {
             get()._transition({ type: 'notify_key_added' });

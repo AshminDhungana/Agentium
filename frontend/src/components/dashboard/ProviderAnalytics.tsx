@@ -8,8 +8,9 @@
  * <ProviderAnalytics />
  * ```
  */
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { api } from '@/services/api';
+import { useWebSocketStore } from '@/store/websocketStore';
 import {
     LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
     Tooltip, ResponsiveContainer, Cell, PieChart, Pie,
@@ -222,6 +223,18 @@ export function ProviderAnalytics() {
     }, [days]);
 
     useEffect(() => { refresh(); }, [refresh]);
+
+    // Auto-refresh when a provider becomes available (e.g. after an API key is
+    // added on the Models page) so the widget updates without a manual refresh.
+    const apiKeyAddedAt = useWebSocketStore((s) => s.apiKeyAddedAt);
+    const didMountRef = useRef(false);
+    useEffect(() => {
+        if (!didMountRef.current) {
+            didMountRef.current = true;
+            return;
+        }
+        refresh();
+    }, [apiKeyAddedAt, refresh]);
 
     const toggleSeries = useCallback((p: string) => {
         setHiddenSeries(prev => {
