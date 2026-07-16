@@ -8,6 +8,7 @@
  * <ChannelHealthWidget />
  * ```
  */
+import { useEffect } from 'react';
 import { WidgetCard } from './WidgetCard';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useBackendStore } from '@/store/backendStore';
@@ -18,6 +19,13 @@ import { Radio, AlertTriangle } from 'lucide-react';
 export function ChannelHealthWidget() {
   const channelMetrics = useBackendStore((s) => s.channelMetrics);
   const isLoading = useBackendStore((s) => s.isLoadingChannelMetrics);
+  const fetchChannelMetrics = useBackendStore((s) => s.fetchChannelMetrics);
+
+  useEffect(() => {
+    fetchChannelMetrics();
+    const id = setInterval(fetchChannelMetrics, 30000);
+    return () => clearInterval(id);
+  }, [fetchChannelMetrics]);
 
   const isEmpty = Array.isArray(channelMetrics)
     ? channelMetrics.length === 0
