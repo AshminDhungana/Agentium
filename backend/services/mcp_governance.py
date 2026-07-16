@@ -9,6 +9,9 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy.orm import Session
 
 from backend.models.entities.mcp_tool import MCPTool
+from backend.models.entities.agents import Agent
+from backend.models.entities.constitution import Constitution
+from backend.models.entities.voting import AmendmentVoting, AmendmentStatus
 from backend.services.mcp_client import MCPClient, MCPConnectionError
 
 logger = logging.getLogger(__name__)
@@ -105,6 +108,147 @@ class MCPGovernanceService:
         self.db.refresh(tool)
         logger.info("[MCPGovernance] Tool proposed: %s (tier=%s) by %s", name, tier, proposed_by)
         return tool
+
+    def _lazy_bridge(self):
+        """Return the global MCPToolBridge singleton, or None if not initialised."""
+        try:
+            from backend.services.mcp_tool_bridge import mcp_bridge
+            return mcp_bridge
+        except ImportError:
+            return None
+
+    async def propose_mcp_server_with_vote(
+        self,
+        *,
+        name: str,
+        description: str,
+        server_url: str,
+        tier: str,
+        proposed_by: str,
+        constitutional_article: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Agent-callable MCP server proposal with live capability discovery
+        and an automatic Council vote (mirrors tool_creation_service).
+
+        - Head (proposed_by starts with '0'): propose -> auto-approve -> sync.
+        - Council: propose (pending) -> open AmendmentVoting -> return voting_id.
+        - Connection failure: return error, create NO MCPTool row.
+        """
+        if tier not in (TIER_PRE_APPROVED, TIER_RESTRICTED, TIER_FORBIDDEN):
+            raise ValueError(
+                f"Invalid tier '{tier}'. Must be pre_approved, restricted, or forbidden."
+            )
+
+        existing = self.db.query(MCPTool).filter_by(server_url=server_url).first()
+        if existing:
+            raise ValueError(
+                f"MCP server '{server_url}' is already registered as '{existing.name}'."
+            )
+
+        # ── Live capability discovery ──────────────────────────────────────────
+        try:
+            async with MCPClient(server_url) as client:
+                discovered = await client.list_tools()
+        except MCPConnectionError as exc:
+            logger.warning(
+                "[MCPGovernance] Discovery failed for %s: %s", server_url, exc
+            )
+            return {
+                "proposed": False,
+                "error": f"Could not connect to MCP server: {exc}",
+            }
+
+        capabilities = [
+            t.get("name")
+            for t in discovered
+            if isinstance(t, dict) and t.get("name")
+        ]
+
+        tool = MCPTool(
+            name=name,
+            description=description,
+            server_url=server_url,
+            tier=tier,
+            constitutional_article=constitutional_article,
+            capabilities=capabilities,
+            status=STATUS_PENDING,
+            proposed_by=proposed_by,
+            proposed_at=datetime.utcnow(),
+            audit_log=[],
+            approved_by_council=False,
+            failure_count=0,
+            consecutive_failures=0,
+            usage_count=0,
+            health_status="unknown",
+            is_active=True,
+            agentium_id=f"mcp-{uuid.uuid4().hex[:12]}",
+            voting_id=None,
+        )
+        self.db.add(tool)
+        self.db.commit()
+        self.db.refresh(tool)
+
+        # ── Head fast-path: auto-approve + sync immediately ─────────────────────
+        if proposed_by.startswith("0"):
+            approved = self.approve_mcp_server(
+                str(tool.id), approved_by=proposed_by, vote_id=None
+            )
+            bridge = self._lazy_bridge()
+            if bridge:
+                bridge.sync_one(approved)
+            return {
+                "proposed": True,
+                "status": STATUS_APPROVED,
+                "tool_id": str(tool.id),
+                "registry_key": f"mcp__{tool.name}",
+                "capabilities": capabilities,
+            }
+
+        # ── Council path: open a governance vote ────────────────────────────────
+        constitution = (
+            self.db.query(Constitution).filter_by(is_active=True).first()
+        )
+        if not constitution:
+            raise ValueError("No active constitution found; cannot open a Council vote.")
+
+        council = (
+            self.db.query(Agent)
+            .filter(Agent.agent_type == "council_member", Agent.status == "active")
+            .all()
+        )
+        eligible = [c.agentium_id for c in council]
+
+        voting = AmendmentVoting(
+            amendment_id=constitution.id,
+            eligible_voters=eligible,
+            required_votes=max(1, len(eligible)),
+            supermajority_threshold=66,
+            status=AmendmentStatus.PROPOSED,
+            proposed_by_agentium_id=proposed_by,
+            proposed_changes=f"MCP Server: {name}",
+            rationale=description,
+        )
+        self.db.add(voting)
+        self.db.commit()
+        self.db.refresh(voting)
+        voting.start_voting()  # PROPOSED -> VOTING so votes can be cast
+
+        tool.voting_id = str(voting.id)
+        self.db.commit()
+
+        logger.info(
+            "[MCPGovernance] MCP proposal %s opened Council vote %s",
+            tool.name, voting.id,
+        )
+        return {
+            "proposed": True,
+            "status": "pending_vote",
+            "tool_id": str(tool.id),
+            "voting_id": str(voting.id),
+            "eligible_voters": eligible,
+            "capabilities": capabilities,
+        }
 
     def approve_mcp_server(
         self,
