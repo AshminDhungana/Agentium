@@ -620,3 +620,40 @@ async def test_chat_service_forwards_on_delta(monkeypatch):
         message="hi", db=MagicMock(), on_delta=on_delta)
     assert res["content"] == "answer"
     assert captured.get("on_delta") is on_delta
+
+
+async def test_governance_path_emits_no_deltas(monkeypatch):
+    from backend.services import chat_service as cs
+    from backend.services.governance_command_service import GovernanceCommandService
+
+    monkeypatch.setattr(
+        GovernanceCommandService,
+        "detect_command",
+        classmethod(lambda cls, msg: MagicMock(action="noop", content="Governed.")),
+    )
+    monkeypatch.setattr(
+        GovernanceCommandService,
+        "execute",
+        classmethod(lambda cls, cmd, head, db: {"action": "noop", "content": "Governed."}),
+    )
+
+    captured = []
+
+    class _FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def generate_with_tools(self, **kwargs):
+            raise AssertionError("LLM must not be called on governance path")
+
+    monkeypatch.setattr(cs, "LLMClient", _FakeClient)
+
+    async def on_delta(t):
+        captured.append(t)
+
+    res = await cs.ChatService.process_message(
+        head=MagicMock(agentium_id="0xxxx", get_model_config=lambda db: None,
+                       preferred_config_id=None, get_system_prompt=lambda: "sys"),
+        message="/govern", db=MagicMock(), on_delta=on_delta)
+    assert res["content"] == "Governed."
+    assert captured == []
