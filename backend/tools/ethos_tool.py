@@ -82,6 +82,9 @@ class EthosTool:
         if action == "append":
             return self._append(db, agent_id, kwargs)
 
+        if action == "compress":
+            return self._compress(db, agent_id, kwargs)
+
         return _result(False, error=f"Unknown or unimplemented action: {action}")
 
     def _read(self, db: Session, agent_id: str) -> Dict[str, Any]:
@@ -127,6 +130,25 @@ class EthosTool:
             ethos.increment_version()
             return _result(True, data={"kind": "reasoning", "written": payload})
         return _result(False, error=f"Unknown append kind: {kind}")
+
+    def _compress(self, db: Session, agent_id: str, kwargs: Dict[str, Any]) -> Dict[str, Any]:
+        agent = db.query(Agent).filter(Agent.agentium_id == agent_id).first()
+        if agent is None or not agent.ethos_id:
+            return _result(False, error=f"Agent or ethos not found for {agent_id}")
+        completed_steps = kwargs.get("completed_steps") or []
+        try:
+            agent.compress_ethos(db, completed_steps=completed_steps)
+            db.flush()
+        except Exception as exc:  # compression must never hard-fail the agent turn
+            logger.warning("ethos compress failed for %s: %s", agent_id, exc)
+            db.rollback()
+            return _result(False, error=f"compress failed: {exc}")
+        ethos = _load_ethos(db, agent_id)
+        return _result(True, data={
+            "version": ethos.version,
+            "lessons_count": len(ethos.get_lessons_learned()),
+            "reasoning_count": len(ethos.get_reasoning_artifacts()),
+        })
 
 
 ethos_tool = EthosTool()

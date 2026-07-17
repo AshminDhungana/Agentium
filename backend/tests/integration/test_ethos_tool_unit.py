@@ -2,6 +2,8 @@
 Unit tests for backend.tools.ethos_tool (read action).
 """
 
+import json
+
 import pytest
 from sqlalchemy.orm import Session
 
@@ -93,3 +95,24 @@ async def test_append_invalid_kind(db_session: Session):
     )
     assert result["success"] is False
     assert "kind" in (result["error"] or "")
+
+
+async def test_compress_runs_and_bumps_version(db_session: Session):
+    _make_agent_with_ethos(db_session, "30001")
+    ethos = _load_ethos(db_session, "30001")
+    for i in range(6):
+        ethos.add_lesson_learned({"key_point": f"lesson {i}"})
+    for i in range(6):
+        arts = ethos.get_reasoning_artifacts()
+        arts.append(f"artifact {i}")
+        ethos.reasoning_artifacts = json.dumps(arts)
+    db_session.flush()
+    before_version = ethos.version
+
+    result = await ethos_tool.execute(
+        action="compress", completed_steps=["step1"],
+        db=db_session, agent_id="30001",
+    )
+    assert result["success"] is True
+    after = _load_ethos(db_session, "30001")
+    assert after.version > before_version
