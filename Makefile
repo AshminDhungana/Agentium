@@ -1,6 +1,6 @@
 # Agentium Makefile
 
-.PHONY: up down restart voice-reinstall voice-logs voice-status uninstall-voice test hallmark test-integration load-test benchmark perf-gate test-staging audit audit-fix pin-digests docker-scout seed-skills
+.PHONY: up down restart voice-reinstall voice-logs voice-status uninstall-voice test hallmark test-integration load-test benchmark perf-gate test-staging audit audit-fix pin-digests docker-scout seed-skills backfill-knowledge backfill-knowledge-collection
 
 # -- Normal start -- voice bridge installs automatically --
 up:
@@ -156,3 +156,11 @@ docker-scout-build: pin-digests
 # -- Seed folder skills into the agent skill library --
 seed-skills:
 	@docker compose exec -T backend python backend/scripts/seed_skills.py --reindex
+
+# -- Backfill chunked parent-document storage for existing ChromaDB knowledge --
+backfill-knowledge:
+	@docker compose exec -T backend python backend/scripts/backfill_knowledge_chunks.py
+
+# -- Backfill a single collection --
+backfill-knowledge-collection:
+	@docker compose exec -T backend python backend/scripts/backfill_knowledge_chunks.py --collection $(COLLECTION)
