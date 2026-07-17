@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { marked } from 'marked';
 import { sanitizeMarkdown } from '../../utils/markdown/sanitizeMarkdown';
+import styles from './MarkdownMessage.module.css';
 
 marked.setOptions({ breaks: true, gfm: true });
 
@@ -8,6 +9,8 @@ interface MarkdownMessageProps {
   content: string;
   className?: string;
   isUser?: boolean;
+  status?: string;
+  role?: string;
 }
 
 /**
@@ -17,7 +20,12 @@ interface MarkdownMessageProps {
  * - Fenced code blocks get an overlay copy button (vector icon, no layout shift).
  * - If parsing fails, falls back to plain text (never blank).
  */
-export function MarkdownMessage({ content, className = '', isUser = false }: MarkdownMessageProps) {
+export function MarkdownMessage({
+  content,
+  className = '',
+  isUser = false,
+  status,
+}: MarkdownMessageProps) {
   const ref = useRef<HTMLDivElement>(null);
 
   // Compute sanitized HTML (empty string = plain-text fallback).
@@ -66,15 +74,25 @@ export function MarkdownMessage({ content, className = '', isUser = false }: Mar
 
   if (isPlain) {
     return (
-      <p className={`text-[15px] leading-relaxed whitespace-pre-wrap ${className}`}>{content}</p>
+      <p className={`text-[15px] leading-relaxed whitespace-pre-wrap ${className}`}>
+        {content}
+        {status === 'streaming' && (
+          <span data-testid="stream-caret" className={styles['stream-caret']} aria-hidden>
+            ▍
+          </span>
+        )}
+      </p>
     );
   }
 
   return (
-    <div
-      ref={ref}
-      className={`markdown-body text-[15px] leading-relaxed ${className}`}
-      dangerouslySetInnerHTML={{ __html: html }}
-    />
+    <div className={`markdown-body text-[15px] leading-relaxed ${className}`}>
+      <div ref={ref} dangerouslySetInnerHTML={{ __html: html }} />
+      {status === 'streaming' && (
+        <span data-testid="stream-caret" className={styles['stream-caret']} aria-hidden>
+          ▍
+        </span>
+      )}
+    </div>
   );
 }

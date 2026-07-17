@@ -1,0 +1,17 @@
+.stream-caret {
+  display: inline-block;
+  margin-left: 1px;
+  animation: caret-blink 1s steps(2, start) infinite;
+}
+
+@keyframes caret-blink {
+  to {
+    visibility: hidden;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stream-caret {
+    animation: none;
+  }
+}

@@ -30,4 +30,18 @@ describe('MarkdownMessage', () => {
     render(<MarkdownMessage content={md} />);
     expect(screen.getByRole('button', { name: /copy code/i })).toBeInTheDocument();
   });
+
+  it('shows a caret while streaming', () => {
+    const { container } = render(
+      <MarkdownMessage content="Hello" status="streaming" role="head_of_council" />
+    );
+    expect(container.querySelector('[data-testid="stream-caret"]')).not.toBeNull();
+  });
+
+  it('hides the caret when complete', () => {
+    const { container } = render(
+      <MarkdownMessage content="Hello" status="sent" role="head_of_council" />
+    );
+    expect(container.querySelector('[data-testid="stream-caret"]')).toBeNull();
+  });
 });
