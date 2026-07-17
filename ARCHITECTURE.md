@@ -281,7 +281,7 @@ flowchart LR
     Embed -->|"768-dim vector (cosine)"| Chroma[("ChromaDB<br/>Similarity Search")]
     Chroma -->|"Top-K with decay_score"| Context["Context Window<br/>Construction"]
     Context -->|"Inject Constitution"| Constitution[("constitution_articles<br/>collection")]
-    Context -->|"Inject Ethos"| Ethos[("agent_ethos<br/>collection")]
+    Context -->|"Inject Ethos (from Postgres)"| Ethos[("ethos table<br/>PostgreSQL")]
     Context -->|"Inject Knowledge"| Knowledge[("domain_knowledge<br/>collection")]
     Constitution --> LLM["LLM Prompt"]
     Ethos --> LLM
@@ -299,7 +299,7 @@ flowchart LR
 | 4 | **Deduplication** | Skip if cosine ≥ 0.95 |
 | 5 | **Context Window** | Top-K (K=5-7), relevance threshold ≥ 0.7 |
 | 6 | **Constitution Injection** | Pull `constitution_articles` filtered by `agent_id` |
-| 7 | **Ethos Injection** | Pull `agent_ethos` for the specific agent |
+| 7 | **Ethos Injection** | Read the agent's ethos directly from the Postgres `ethos` table (not vectorised) |
 | 8 | **LLM Prompt** | Assemble with all context |
 | 9 | **Response** | Generate and return |
 

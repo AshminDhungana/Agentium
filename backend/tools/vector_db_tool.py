@@ -4,7 +4,7 @@ Vector DB Tool — read from and write to the Agentium ChromaDB vector store.
 Wraps the singleton VectorStore (backend.core.vector_store). Available to
 every agent tier (0xxxx–6xxxx). Reads are allowed against all collections;
 writes are restricted to WRITABLE_COLLECTIONS so immutable collections
-(constitution, ethos, constitutional_skills, …) can never be mutated by an
+(constitution, constitutional_skills, …) can never be mutated by an
 agent.
 
 A companion skill at backend/.agentium/skills/vector_db/SKILL.md documents

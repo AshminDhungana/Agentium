@@ -25,11 +25,11 @@ def vs(tmp_path, monkeypatch):
 
 
 def _seed_and_query(vs, version):
-    col = vs.get_collection("ethos", version=version)
+    col = vs.get_collection("task_patterns", version=version)
     col.upsert(
         documents=["The agent must protect sovereign data."],
-        ids=["ethos_seed_1"],
-        metadatas=[{"title": "ethos seed"}],
+        ids=["pattern_seed_1"],
+        metadatas=[{"title": "pattern seed"}],
     )
     res = col.query(query_texts=["protect sovereign data"], n_results=1)
     return res["ids"][0] if res.get("ids") else []
@@ -37,13 +37,13 @@ def _seed_and_query(vs, version):
 
 def test_collection_resolves_to_v2_and_queries_work(vs, monkeypatch):
     # Default resolution is v2.
-    monkeypatch.setattr(_settings, "EMBEDDING_ACTIVE_VERSIONS", {"ethos": "v2"})
-    assert vs._collection_name("ethos") == "agent_ethos_v2"
+    monkeypatch.setattr(_settings, "EMBEDDING_ACTIVE_VERSIONS", {"task_patterns": "v2"})
+    assert vs._collection_name("task_patterns") == "execution_patterns_v2"
     v2_hits = _seed_and_query(vs, "v2")
     assert v2_hits, "v2 query must return results"
 
     # A legacy "v1" request must resolve to the same v2 collection (no v1 path).
-    monkeypatch.setattr(_settings, "EMBEDDING_ACTIVE_VERSIONS", {"ethos": "v1"})
-    assert vs._collection_name("ethos") == "agent_ethos_v2"
+    monkeypatch.setattr(_settings, "EMBEDDING_ACTIVE_VERSIONS", {"task_patterns": "v1"})
+    assert vs._collection_name("task_patterns") == "execution_patterns_v2"
     legacy_hits = _seed_and_query(vs, "v1")
     assert legacy_hits, "v1 request resolves to v2 and must still query"

@@ -140,7 +140,7 @@ class ToolRegistry:
                 "Agentium's collective agent memory (RAG). Use 'query' to semantically "
                 "search across knowledge collections, 'get' to fetch a document by id, "
                 "and 'add' to store new learnings/patterns (writable collections only — "
-                "constitution, ethos and constitutional_skills are immutable). 'list_collections' "
+                "constitution and constitutional_skills are immutable). 'list_collections' "
                 "shows every collection; 'help' explains usage. Full reference and worked "
                 "examples are in the skill file at backend/.agentium/skills/vector_db/SKILL.md, "
                 "which is indexed into ChromaDB via 'make seed-skills' so you can also find it "

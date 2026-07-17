@@ -815,22 +815,10 @@ class InitializationService:
         try:
             self.vector_store.initialize()
             self.knowledge_service.embed_constitution(self.db, constitution)
-
-            # Re-query members so they are bound to the current session before
-            # accessing the lazy-loaded `ethos` relationship.
-            member_ids = [m.agentium_id for m in council]
-            attached_council = (
-                self.db.query(CouncilMember)
-                .filter(CouncilMember.agentium_id.in_(member_ids))
-                .all()
-            )
-            for member in attached_council:
-                if member.ethos:
-                    self.knowledge_service.embed_ethos(member.ethos, db=self.db)
-
-            head = self.db.query(HeadOfCouncil).filter_by(agentium_id="00001").first()
-            if head and head.ethos:
-                self.knowledge_service.embed_ethos(head.ethos, db=self.db)
+            # NOTE: Ethos is intentionally NOT embedded into the vector DB.
+            # Ethos is the source of truth in Postgres (the `ethos` table) and
+            # is read directly from the DB object wherever it is needed, so a
+            # vector copy would be redundant and never queried.
         except Exception as e:
             self._log("WARNING", f"Vector DB indexing skipped: {e}")
 

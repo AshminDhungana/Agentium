@@ -425,11 +425,8 @@ async def lifespan(app: FastAPI):
                 from backend.services.knowledge_service import get_knowledge_service
                 result = get_knowledge_service().initialize_knowledge_base(db)
                 logger.info(
-                    "✅ Knowledge base bootstrapped — constitution: %s, "
-                    "ethos: %d/%d embedded",
+                    "✅ Knowledge base bootstrapped — constitution: %s",
                     result["constitution_embedded"],
-                    result["ethos_embedded"],
-                    result["ethos_total"],
                 )
             finally:
                 db.close()

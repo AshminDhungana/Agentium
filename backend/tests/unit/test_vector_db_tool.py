@@ -33,7 +33,7 @@ async def test_list_collections_returns_known_keys(store):
     result = await store.execute(action="list_collections")
     assert result["success"] is True
     keys = result["collections"]
-    for k in ("constitution", "ethos", "council_memory", "task_patterns"):
+    for k in ("constitution", "council_memory", "task_patterns"):
         assert k in keys
     assert any(".agentium/skills/vector_db" in p for p in result["paths"].values())
 

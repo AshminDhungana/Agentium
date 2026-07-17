@@ -92,24 +92,13 @@ class KnowledgeService:
             )
 
     def embed_ethos(self, ethos: Ethos, db: Optional[Session] = None) -> None:
-        """Vectorise agent ethos for behavioural retrieval."""
-        content_parts = [
-            f"Mission: {ethos.mission_statement}",
-            "Core Values: " + ", ".join(ethos.get_core_values()),
-            "Behavioral Rules: " + ", ".join(ethos.get_behavioral_rules()),
-            "Restrictions: " + ", ".join(ethos.get_restrictions()),
-            "Capabilities: " + ", ".join(ethos.get_capabilities()),
-        ]
-        # FIX: was "\\n\\n" (literal backslash-n) — corrected to newlines
-        full_content = "\n\n".join(content_parts)
+        """Deprecated no-op.
 
-        self.vector_store.add_ethos(
-            agentium_id=ethos.agentium_id or f"E{ethos.agent_id}",
-            ethos_content=full_content,
-            agent_type=ethos.agent_type,
-            verified_by=ethos.verified_by_agentium_id,
-            db=db,
-        )
+        Ethos is stored in Postgres (the `ethos` table) and is never embedded
+        into the vector DB — it is read directly from the DB object wherever
+        needed. Retained as a no-op for backward compatibility with any callers.
+        """
+        return None
 
     # ------------------------------------------------------------------
     # Context retrieval
@@ -682,31 +671,12 @@ class KnowledgeService:
             self.embed_constitution(db, active_const)
             logger.info("Embedded Constitution %s", active_const.version)
 
-        ethos_batch: List[Ethos] = (
-            db.query(Ethos).filter_by(is_verified=True).all()
-        )
-        failed = 0
-        for ethos in ethos_batch:
-            try:
-                self.embed_ethos(ethos, db=db)
-            except Exception:  # noqa: BLE001
-                logger.exception("Failed to embed ethos id=%s", ethos.id)
-                failed += 1
-
-        logger.info(
-            "Embedded %d/%d agent ethos records (%d failed)",
-            len(ethos_batch) - failed,
-            len(ethos_batch),
-            failed,
-        )
-
+        # NOTE: Ethos is deliberately not embedded into the vector DB. It lives
+        # in Postgres (the `ethos` table) and is read directly from the DB.
         return {
             "constitution_embedded": (
                 active_const.version if active_const else None
             ),
-            "ethos_total": len(ethos_batch),
-            "ethos_embedded": len(ethos_batch) - failed,
-            "ethos_failed": failed,
         }
 
 

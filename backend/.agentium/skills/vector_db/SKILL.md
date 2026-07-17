@@ -39,7 +39,6 @@ Writes are restricted to a vetted allow-list. These collections are IMMUTABLE
 and `add` rejects them with "not writable":
 
 - `constitution` (supreme_law) — the living constitution
-- `ethos` (agent_ethos) — agent behavioural rules
 - `constitutional_skills` — skills governing the constitution
 
 Writable agent collections include: `council_memory`, `task_patterns`

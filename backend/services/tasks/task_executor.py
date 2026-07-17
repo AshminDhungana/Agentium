@@ -1503,7 +1503,7 @@ def update_citation_boosts():
 
             cg = get_citation_graph_service()
             vs = get_vector_store()
-            collections_to_boost = ["constitution", "ethos", "task_patterns", "best_practices", "council_memory"]
+            collections_to_boost = ["constitution", "task_patterns", "best_practices", "council_memory"]
             total_updated = 0
 
             for coll_key in collections_to_boost:

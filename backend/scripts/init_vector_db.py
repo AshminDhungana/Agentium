@@ -31,7 +31,6 @@ def main():
         
         print(f"\\n📚 Knowledge Base Stats:")
         print(f"   Constitution: {stats['constitution_embedded']}")
-        print(f"   Agent Ethos: {stats['ethos_count']} records")
     
     # Health check
     health = vector_store.health_check()

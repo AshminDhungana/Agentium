@@ -33,7 +33,6 @@ V2_SUFFIX = "_v2"
 
 COLLECTIONS_V2: Dict[str, str] = {
     "constitution": "supreme_law_v2",
-    "ethos": "agent_ethos_v2",
     "task_patterns": "execution_patterns_v2",
     "domain_knowledge": "domain_knowledge_v2",
 }
@@ -91,7 +90,6 @@ class VectorStore:
     # ------------------------------------------------------------------
     COLLECTIONS: Dict[str, str] = {
         "constitution": "supreme_law",
-        "ethos": "agent_ethos",
         "council_memory": "council_knowledge",
         # FIX: canonical key used everywhere (was "task_patterns" in some
         # places and "execution_patterns" in others — unified to one key)
@@ -252,33 +250,6 @@ class VectorStore:
         collection = self.get_collection("constitution")
         collection.upsert(
             documents=[content],
-            metadatas=[rich_meta],
-            ids=[parent_id],
-        )
-
-    def add_ethos(
-        self,
-        agentium_id: str,
-        ethos_content: str,
-        agent_type: str,
-        verified_by: Optional[str] = None,
-        db: Optional[Any] = None,
-    ) -> None:
-        """Store agent ethos for semantic retrieval."""
-        parent_id = f"ethos_{agentium_id}"
-        rich_meta = {
-            "agentium_id": agentium_id,
-            "agent_type": agent_type,
-            "verified_by": verified_by or "",
-            "type": "ethos",
-            "document_type": "behavioral_rules",
-        }
-        if db is not None:
-            self.upsert_document("ethos", parent_id, ethos_content, rich_meta, db)
-            return
-        collection = self.get_collection("ethos")
-        collection.upsert(
-            documents=[ethos_content],
             metadatas=[rich_meta],
             ids=[parent_id],
         )
