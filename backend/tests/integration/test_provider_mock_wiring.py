@@ -87,3 +87,91 @@ def test_extended_server_anthropic_route():
         assert data["content"][0]["text"] == "ok"
     finally:
         srv.shutdown()
+
+
+import pytest
+import uuid
+import os
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import NullPool
+
+from backend.models.entities.user_config import (
+    UserModelConfig, ProviderType, ConnectionStatus,
+)
+from backend.core.security import encrypt_api_key
+from backend.tests.integration.test_provider_resilience import (
+    make_fake_config, _delete_fake_configs,
+)
+from backend.services.provider_rate_limiter import provider_rate_limiter
+from backend.core.llm_client import LLMClient
+
+
+def make_mock_config(provider: ProviderType, base_url: str) -> UserModelConfig:
+    """Committed UserModelConfig pointing at the mock; sets provider + local URL."""
+    eng = create_engine(os.getenv("DATABASE_URL"), poolclass=NullPool, pool_pre_ping=True)
+    s = sessionmaker(bind=eng)()
+    cfg = UserModelConfig(
+        user_id="sovereign",
+        provider=provider,
+        config_name=f"mock-{provider.value.lower()}-{uuid.uuid4().hex[:6]}",
+        api_key_encrypted=encrypt_api_key("sk-test"),
+        api_key_masked="sk-test",
+        default_model="fake",
+        status=ConnectionStatus.ACTIVE,
+        is_active=True,
+        requests_per_minute=100000,
+        max_concurrent_requests=100,
+        priority=1,
+    )
+    if provider == ProviderType.LOCAL:
+        cfg.local_server_url = base_url
+    else:
+        cfg.api_base_url = base_url
+    s.add(cfg)
+    s.commit()
+    s.refresh(cfg)
+    s.close()
+    eng.dispose()
+    return cfg
+
+
+def reset_resilience():
+    """Clear circuit-breaker + rate-limiter local state between tests."""
+    LLMClient._circuit_breakers.clear()
+    provider_rate_limiter._local_sems.clear()
+    provider_rate_limiter._last_headers.clear()
+
+
+provider_cases = [
+    (ProviderType.OPENAI, "openai_compat"),
+    (ProviderType.ANTHROPIC, "anthropic"),
+    (ProviderType.GEMINI, "openai_compat"),
+    (ProviderType.GROQ, "openai_compat"),
+    (ProviderType.MISTRAL, "openai_compat"),
+    (ProviderType.TOGETHER, "openai_compat"),
+    (ProviderType.COHERE, "openai_compat"),
+    (ProviderType.FIREWORKS, "openai_compat"),
+    (ProviderType.MOONSHOT, "openai_compat"),
+    (ProviderType.DEEPSEEK, "openai_compat"),
+    (ProviderType.AZURE_OPENAI, "openai_compat"),
+    (ProviderType.QIANWEN, "openai_compat"),
+    (ProviderType.ZHIPU, "openai_compat"),
+    (ProviderType.AI21, "openai_compat"),
+    (ProviderType.PERPLEXITY, "openai_compat"),
+    (ProviderType.LOCAL, "openai_compat"),
+    (ProviderType.CUSTOM, "openai_compat"),
+]
+
+
+def test_make_mock_config_committed():
+    srv = ExtendedFakeProviderServer()
+    cfg = make_mock_config(ProviderType.OPENAI, srv.base_url)
+    try:
+        assert cfg.id is not None
+        assert cfg.provider == ProviderType.OPENAI
+        assert cfg.api_base_url == srv.base_url
+    finally:
+        srv.shutdown()
+        _delete_fake_configs([str(cfg.id)])
+        reset_resilience()
