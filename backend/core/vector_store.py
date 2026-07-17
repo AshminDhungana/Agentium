@@ -14,6 +14,8 @@ from chromadb.api.types import EmbeddingFunction, QueryResult
 from sentence_transformers import SentenceTransformer
 
 from backend.core.config import settings as _settings
+from backend.core.chunking import chunk_text
+from backend.models.entities.knowledge_document import KnowledgeDocument
 
 logger = logging.getLogger(__name__)
 
@@ -293,6 +295,91 @@ class VectorStore:
             ],
             ids=[f"pattern_{pattern_id}"],
         )
+
+    # ------------------------------------------------------------------
+    # Chunk-aware parent-document storage
+    # ------------------------------------------------------------------
+
+    def upsert_document(self, collection_key, parent_id, text, metadata, db):
+        """Chunk-aware write: full text -> Postgres, chunk vectors -> ChromaDB.
+
+        Stores the untruncated *text* in the ``knowledge_documents`` table
+        (keyed by collection_key + parent_id) and upserts one embedded chunk
+        entry per chunk into the ChromaDB collection.  Chunk ids follow the
+        scheme ``f"{parent_id}#chunk{i}"`` and carry ``parent_id``,
+        ``chunk_index``, ``chunk_count`` and ``is_chunk`` metadata.
+        """
+        if not text or not text.strip():
+            raise ValueError("text must be non-empty")
+        metadata = dict(metadata or {})
+        chunks = chunk_text(text)
+        chunk_count = len(chunks)
+
+        # 1) Upsert parent full text in Postgres
+        row = (
+            db.query(KnowledgeDocument)
+            .filter_by(collection_key=collection_key, parent_id=parent_id)
+            .first()
+        )
+        if row is None:
+            row = KnowledgeDocument(
+                collection_key=collection_key,
+                parent_id=parent_id,
+                full_text=text,
+                doc_metadata=metadata,
+                chunk_count=chunk_count,
+            )
+            db.add(row)
+        else:
+            row.full_text = text
+            row.doc_metadata = metadata
+            row.chunk_count = chunk_count
+        db.commit()
+
+        # 2) Replace chunk vectors in ChromaDB
+        collection = self.get_collection(collection_key)
+        try:
+            collection.delete(where={"parent_id": parent_id})
+        except Exception:  # noqa: BLE001
+            logger.debug("No prior chunks to delete for %s", parent_id)
+
+        ids = [f"{parent_id}#chunk{i}" for i in range(chunk_count)]
+        metadatas = [
+            {
+                **metadata,
+                "parent_id": parent_id,
+                "chunk_index": i,
+                "chunk_count": chunk_count,
+                "is_chunk": True,
+            }
+            for i in range(chunk_count)
+        ]
+        embeddings = self._v2_embedding_fn.embed_documents(chunks)
+        collection.upsert(
+            ids=ids, documents=chunks, metadatas=metadatas, embeddings=embeddings
+        )
+
+        return {
+            "parent_id": parent_id,
+            "chunk_count": chunk_count,
+            "collection_key": collection_key,
+        }
+
+    def get_parent_document(self, collection_key, parent_id, db):
+        """Return the untruncated parent document, or ``None`` if absent."""
+        row = (
+            db.query(KnowledgeDocument)
+            .filter_by(collection_key=collection_key, parent_id=parent_id)
+            .first()
+        )
+        if row is None:
+            return None
+        return {
+            "parent_id": parent_id,
+            "full_text": row.full_text,
+            "metadata": row.doc_metadata or {},
+            "chunk_count": row.chunk_count,
+        }
 
     # ------------------------------------------------------------------
     # Query helpers
