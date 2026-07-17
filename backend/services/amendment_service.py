@@ -455,29 +455,23 @@ class AmendmentService:
 
         # Create new constitution version
         new_version_number = (current.version_number + 1) if hasattr(current, 'version_number') else 2
-        new_version = f"{new_version_number}.0"
+        new_version = f"v{new_version_number}.0.0"
 
         new_constitution = Constitution(
             agentium_id=f"C{new_version_number:04d}",
-            name=current.name if hasattr(current, 'name') else "Constitution of Agentium",
             version=new_version,
             version_number=new_version_number,
-            content=self._apply_diff(
-                current.content if hasattr(current, 'content') else "",
+            articles=self._apply_diff(
+                current.articles if current.articles else "",
                 diff_content,
             ),
-            created_by=current.created_by if hasattr(current, 'created_by') else "00001",
+            prohibited_actions=current.prohibited_actions,
+            sovereign_preferences=current.sovereign_preferences,
+            created_by_agentium_id=(
+                current.created_by_agentium_id if current.created_by_agentium_id else "00001"
+            ),
             replaces_version_id=current.id,
-            ratified_by_vote_id=amendment.id,
         )
-
-        # Copy structured fields if they exist
-        if hasattr(current, 'articles') and current.articles:
-            new_constitution.articles = current.articles
-        if hasattr(current, 'prohibited_actions') and current.prohibited_actions:
-            new_constitution.prohibited_actions = current.prohibited_actions
-        if hasattr(current, 'sovereign_preferences') and current.sovereign_preferences:
-            new_constitution.sovereign_preferences = current.sovereign_preferences
 
         # Archive old constitution
         current.archive()
@@ -488,10 +482,8 @@ class AmendmentService:
         try:
             from backend.services.config_versioning import ConfigVersioningService
             content_dict = {
-                "name": new_constitution.name,
                 "version": new_constitution.version,
                 "version_number": new_constitution.version_number,
-                "content": new_constitution.content,
                 "articles": new_constitution.articles,
                 "prohibited_actions": new_constitution.prohibited_actions,
                 "sovereign_preferences": new_constitution.sovereign_preferences
@@ -510,7 +502,7 @@ class AmendmentService:
             try:
                 self._vector_store.add_constitution_article(
                     article_id=f"constitution_v{new_version_number}",
-                    content=new_constitution.content if hasattr(new_constitution, 'content') else str(diff_content),
+                    content=new_constitution.articles,
                     metadata={
                         "version": new_version,
                         "version_number": new_version_number,

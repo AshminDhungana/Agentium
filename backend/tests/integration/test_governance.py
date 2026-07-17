@@ -586,17 +586,11 @@ class TestAmendmentLifecycle:
     # -----------------------------------------------------------------------
 
     @pytest.mark.asyncio
-    async def test_conclude_passed_exposes_ratification_bug(self, seeded_db: Session):
+    async def test_conclude_passed_ratifies_amendment(self, seeded_db: Session):
         """
-        All 3 voters vote FOR → voting result is 'passed'.
-
-        BUG-GOV-002: _ratify_amendment creates Constitution() with kwargs that
-        don't match the model columns (created_by=, name=, content=,
-        ratified_by_vote_id=). This raises an exception during ratification.
-
-        This test documents the bug: it asserts the voting logic is correct up
-        to that point, then asserts the ratification step raises as expected.
-        Fix in amendment_service._ratify_amendment, not here.
+        All 3 voters vote FOR → voting result is 'passed' and ratification
+        succeeds. BUG-GOV-002 (Constitution constructed with non-existent
+        kwargs in _ratify_amendment) is fixed in amendment_service.
         """
         svc = AmendmentService(seeded_db)
         await svc.initialize()
@@ -620,16 +614,17 @@ class TestAmendmentLifecycle:
         seeded_db.refresh(row)
         assert row.votes_for == 3
 
-        # BUG-GOV-002: conclude_voting calls _ratify_amendment which crashes
-        with pytest.raises(Exception):
-            await svc.conclude_voting(aid)
+        # BUG-GOV-002 fixed: ratification no longer crashes.
+        result = await svc.conclude_voting(aid)
+        assert result["result"] == "passed"
+        assert result["status"] == "ratified"
 
     @pytest.mark.asyncio
-    async def test_ratification_with_patched_ratify(self, seeded_db: Session):
+    async def test_ratification_creates_new_constitution(self, seeded_db: Session):
         """
-        Bypasses BUG-GOV-002 by monkeypatching _ratify_amendment with a
-        corrected implementation. Asserts DB and status outcomes that would
-        occur after a correct ratification.
+        Full pass path through the (now fixed) _ratify_amendment: a new
+        Constitution version is created, the old one is archived, and exactly
+        one constitution is active afterwards.
         """
         svc = AmendmentService(seeded_db)
         await svc.initialize()
@@ -653,33 +648,7 @@ class TestAmendmentLifecycle:
         )
         old_version_number = current_constitution.version_number
 
-        async def _patched_ratify(amendment_obj, actor_id="system"):
-            """Corrected _ratify_amendment using proper Constitution kwargs."""
-            current = seeded_db.query(Constitution).filter_by(id=amendment_obj.amendment_id).first()
-            new_vn = current.version_number + 1
-            new_constitution = Constitution(
-                agentium_id=f"C{new_vn:04d}",
-                version=f"v{new_vn}.0.0",
-                version_number=new_vn,
-                articles=current.articles,
-                prohibited_actions=current.prohibited_actions,
-                sovereign_preferences=current.sovereign_preferences,
-                created_by_agentium_id=current.created_by_agentium_id,
-                replaces_version_id=current.id,
-            )
-            current.archive()
-            seeded_db.add(new_constitution)
-            seeded_db.flush()
-            amendment_obj.status = AmendmentStatus.RATIFIED
-            return {
-                "new_constitution_id": new_constitution.id,
-                "new_version": new_constitution.version,
-                "vector_db_updated": False,
-                "broadcast_sent": False,
-            }
-
-        with patch.object(svc, "_ratify_amendment", side_effect=_patched_ratify):
-            result = await svc.conclude_voting(aid)
+        result = await svc.conclude_voting(aid)
 
         assert result["result"] == "passed"
         assert result["status"] == "ratified"
