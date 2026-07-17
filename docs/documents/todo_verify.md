@@ -7,96 +7,162 @@
 - **[P2]** Should verify; probable improvement or consistency gap
 - **[P3]** Nice-to-have polish / preventative maintenance
 
+--
+
+# Project TODO — Agentium / Voice Bridge
+
+- [ ] find the problem fix and solve the issue, While creating a task the task got stuck at deliberating, The system still shows no Task Agent registered for dispatch, Sovereign. The spawn of Scribe (30001) succeeded at the agent level but hasn't yet bound to the execution pool the dispatcher checks. 
+
+**Status of task T80280257:**
+- ✅ Created & deliberated
+- ✅ Dispatched to Lead 20001
+- ⚠️ Execution blocked — no Task Agent reachable by dispatcher
+- 🆕 Scribe (30001) spawned but not yet picked up, 
+
+the newly spawned Task Agent (Scribe, 30001) registers in the agent roster but the dispatcher's execution pool is refreshed separately — so it hasn't been "bound" yet, leaving the system's live count at 0 Task Agents. The dispatch therefore has nothing to assign execution to, even though a capable agent exists. This is a sync gap between agent creation and the runtime worker pool, not a permissions or task-definition issue
+**1. A database migration error (the real blocker):**
+```
+ERROR: constraint "fk_tasks_deliberation_id" of relation "tasks" does not exist
+STATEMENT: ALTER TABLE tasks DROP CONSTRAINT fk_tasks_deliberation_id
+```
+This failed migration (at 05:40:23 and again 05:44:45) means the `tasks` table schema is in a partially-migrated state. The dispatch/assignment path that depends on the deliberation linkage is likely broken as a result — so tasks can't be bound to an executor even though the Task Agent (Scribe) exists. That's why the dispatcher reports "No Task Agent available."
+
+
+- [ ] api keys  that supports thinking should be able to use it. configure for each api provider if avialable
+
+- [ ] vector database should not store ethos, ethos should be stored in postgres, check what ethos is pushed in vector database and where. 
+
+- [ ] Find where the ethos is created, and add steps for a **knowledge retrieval** step and a **knowledge update** step — query the vector database to gather information, and also perform a web search; update the vector database when required.
+
+- [ ] Review how system messages are passed to the API. There are two different APIs — OpenAI and Anthropic. Check whether a system message is currently being sent in each case. If not, determine what can be done, per the project, to use system messages to improve performance.
+
+- [ ] **Tool creator tool** — Check the existing tool-creation feature inside the program (there is a tool-creation mechanism via `tool_creation_service` and others). Create a tool that helps with creating new tools, add it to the tool registry, and give the relevant agent the capability to use it.
+
+- [ ] **Skill creation tool** — A tool that helps create new skills and saves them to `.agentium/skills/`, which will be automatically seeded into ChromaDB. Add it to the tool registry, and give the head and council members the capability for their relevant agent category.
+
+- [ ] **Browser control tool — check and improve.** The `browser_control` tool is still **non-functional** due to a code-level defect (Sync API used inside an asyncio loop). Search the web for fixes/improvements. Also verify that browser use is registered and functioning inside the Browser tab on the Tasks page. Review all related features overall.
+
+- [ ] Head should be able to answer new questions while it is still processing/answering a previous one.
+
+- [ ] When a user gives a task to head, head should not execute it directly — head should delegate to other agents so it stays free to chat and report. Head's main job is to control and delegate tasks, not to execute them.
+
+- [x] Add a tool to read/update information in the vector database, usable by every agent, pointing to the skill at `.agentium/skills/` for full usage instructions. Create the tool, add it to the tool registry, and give every agent the capability to use it. For best practices on pointing a tool to a skill, research this via web search and/or document it in the tool's description or help function (stating where the skill lives and how to use it). The system also has a function to add skills to ChromaDB, so agents can access the info there too.
+
+- [ ] Add a **web crawler tool** that crawls the web using cURL and other methods, can deep-dive a page, and can visit every URL to understand the page's content. Add it to the tool registry and give every agent the capability to use it. Also add a skill that lists crawling best practices and the top 100 websites for different purposes with descriptions — covering the most-used sites on the internet. The crawl skill should live in and point to `.agentium/skills/`. For best practices on pointing a tool to a skill, research this via web search and/or document it in the tool's description or help function (stating where the skill lives and how to use it). The system also has a function to add skills to ChromaDB, so agents can access the info there too.
+
+
 ---
 
-## 🔲 In Progress / Pending
+## 1. Core Architecture — Task Agents & Tools
 
-### Voice Bridge
-- [ ] Voice Bridge Not Running notification should only show once after login but it is showing repeteadly. 
+- [ ] **Isolated container execution** — Determine how a Task Agent, when running inside an isolated container, can still access/use tools. Check what commands it's actually capable of running, and clarify the mechanism by which a Task Agent gets spawned.
+- [ ] **Tool Creation Tool** — Review `backend/models/schemas/tool_creation.py` and `backend/services/tool_factory.py`, then build a tool that lets the system create new tools and wire it into `backend/core/tool_registry.py` and also add to agent capability. 
 
-- [ ] Using free model should not have pricing, the pricing details can be recived from the api itself make it so the pricing is correct. different models uses different api most use open ai api structure, anthropic uses different one. 
+- [ ] **Verify frontend tool creation** — Confirm that tools added from the frontend are actually created correctly on the backend (test end-to-end).
+- [ ] **Upgrade read/write tools** — Bring these up to the standard of modern AI coding tools: precise reads with line numbers (grep-style), precise edits (sed-style), and replace-by-line-number/offset.
+- [ ] **Skill Creation Tool** — Similar concept to Claude Skills. Store skills at `./backend/.agentium/skills` and wire the tool into `backend/core/tool_registry.py`.
+- [ ] **Tool audit** — Do a full pass over the project to identify what other tools agents need (including the Critic agent), and register them properly in `backend/core/tool_registry.py`. Known gaps: web fetch, code execution, and tool search (a tool that lets agents search for/discover other tools and their descriptions).
+- [ ] **Task management tools** — Add a proper set of task-management tools for the system.
 
+---
 
-- [ ] Start voice input when voice is sent is not showing in the chat, as well as clicking voice setting is throwing error in the frontend consel. 
+## 2. Onboarding / Setup Flow
 
-- [ ] - Adding tools, creating tools by itself is not implemented correctly.
+- [ ] **Fix setup sequence** — The correct order should be: API key added → Head of Council connects → welcome message sent → nation-name popup appears → reply is given. Currently the nation-name popup appears *before* the Head of Council is active, and no reply is sent after the name is submitted.
+  - *(This looks like the same root cause as the "Genesis step doesn't run after API key is added" bug — worth investigating together.)*
 
-- [ ] After setting the name of the country the chat should recive a welcome message form the ai but it didnt happen. 
+---
 
-- [ ] Where is chat history being stored, removing the contaner  and installing form scratch is still showing the messages. 
+## 3. Models & Providers
 
-- [ ] - task is running but it is stuck in delibrating status check logs to know and find what is worng and fix fixes. 
+- [ ] **Correct pricing display** — Free models should not show pricing. Pricing info should be pulled directly from each provider's API (note: most providers use an OpenAI-style API structure, but Anthropic's is different — handle both).
+- [ ] **Fix Rate Limit input field** — On the Model page, the "Rate limit (requests per minute)" field defaults to 60 and can't be cleared/typed over — only the up/down arrows work. Make it a normal editable input.
+- [ ] **Auto-populate rate limit & max tokens** — When adding an AI module, pull rate limit and max tokens from the provider's API once a model is selected (if available), and reflect the same values on the Model Config page. Fall back to current defaults (max tokens: 4000) if the API doesn't expose this.
+- [ ] **Model search** — In the model selection section, after the user hits "Fetch" and the model list loads, add a search box at the top that filters the list by substring (e.g. typing "openrouter" shows only entries containing "openrouter", such as `openrouter/nvidia/xxx`).
+- [ ] **Validate all model APIs** — Check that every configured model API actually works correctly on the Model page.
+- [ ] **Effort / thinking controls** — Add an "effort" setting on the Model Config page. For models that support extended/deep thinking, enable it where possible (skip if unsupported).
+  - [ ] When thinking mode is active, replace the animated three-dot typing indicator with a "Thinking..." label in the chat page.
 
-[ ] - Add task management tools for ths system. 
-resolve the errors and add mcp tools
+---
 
-### Chat Page
-- [ ] Add hover icons on chat messages: a **copy** icon (copies the message text) and a **followup** icon (copies the message into the compose box so the user can add message and send it again). the copy exists, just add a button to followup near it.
+## 4. Knowledge Base (Chroma DB) & Agent Ethos
 
+- [ ] **Environment context in ethos** — After reading the constitution, every agent should be given basic situational context: that it's running inside a Docker container, where the host system is relative to the container, where "the internet" is from the container's perspective, what part of the host system it's allowed to operate in, and how to access the host. Example: if a user says "create a folder on my desktop," the agent should understand this means the *host* filesystem, not inside the container. This should go into both the ethos and Chroma DB.
+- [ ] **Seed foundational knowledge** — Populate the knowledge base with core operating info: which tools to use and when, general best practices, how to access the host system, basic CMD/PowerShell usage, and common utilities (grep, curl, etc.). Decide the best delivery mechanism (baked into ethos/constitution, read from Chroma on startup, or seeded at agent creation) and implement it.
+- [ ] **Update default agent ethos** — Give every agent's default ethos a basic understanding of its working procedures/methods and a summary of what it's capable of doing.
+- [ ] **Seed web-knowledge index** — Add a reference list of major websites and what kind of information each contains, so agents can search the web more effectively.
+- [ ] **Search-before-acting workflow** — Before doing/knowing something, an agent should search the web and Chroma DB; if the knowledge isn't in Chroma, update it there first, then proceed. If web search isn't available, fall back to whatever is already in Chroma.
+- [ ] **Shared knowledge-update structure** — Build a standard structure for how agents write updates to Chroma DB so all agents update it consistently and duplicate entries are minimized.
 
-### Model Page
- - [ ] Add a search function in the model selection section, when user presses the fetch button then a list of model appears and a small search appears at the top which will help user find the model he is looking for if their are many model. the search should filter but the text, example, if the model is openrouter/nvidia/xxx then serching for openrouter should only show the text that has openrouter. 
+---
 
-### AI Module Configuration
-- [ ] When adding an AI module, the **rate limit** and **max tokens** fields should auto-populate from the provider's API after a model is selected (if the API exposes this data), and the same values should be reflected on the model config page. If the API doesn't provide this info, fall back to the current defaults (max tokens: 4000).
+## 5. Autoscaling & Head of Council Cap
 
-### Tools & Knowledge Base
-- [ ] Review all existing tools, improve them, and add new tools where needed.
+- [ ] **Head of Council overflow handling** — Only one Head of Council (00001) is active at a time. When all agent index slots are full and none are left to spawn, the Head of Council should use one of the remaining slots to spawn a *temporary* Head of Council instance whose job is to review idle agents and report which ones can be terminated to free up space. While this is happening, no new tasks should be assigned. Once the review is complete, the temporary instance should terminate itself.
 
-- [ ] In the ethos or startup prompt for all ai agent, after reading constitution, give them basic context, like where they are located inside docker contaner, when is the hostsystem outside docker contaner, where is the internet outside the host system, where they should operate in the host system, how to access the host system. where user says " create a folder in my desktop, the expectation is to create in the host system not inside contaner" this knowledge should be given to the agent to add in the ethos and also put inside the chroma db. 
-- [ ] Seed the knowledge library with foundational operating info for the agent: which tools to use and when, general best practices, how to access the host system, basic CMD/PowerShell usage, and useful utilities (grep, curl, etc.), so the system behaves correctly from the start. Decide on the best delivery method — e.g., bake basics into the ethos/constitution, have the agent read from Chroma on startup, or seed it at creation time — and implement whichever fits best.
+---
 
-- [ ] Also update the default ethos for each agent so they have basic understanding and working prcedure and methors, summery of what they can do and how should be in the default ethos for all agents. 
+## 6. Agent Behavior & Persona
 
-- [ ] Also add site link with what is in them in the knowledge so it will be easier for ai to search the web. top sites and what do they have . 
+- [ ] **Constitution-driven persona** — Persona/behavior for all agents (including the voice bridge) should be driven entirely by the constitution, so that editing the constitution updates behavior consistently everywhere. Update ethos and system instructions as needed to make this actually true.
+- [ ] **Enable deep thinking where supported** — For models capable of extended/deep thinking, make sure the agent actually uses that capability (ties into item in Section 3).
+- [ ] **Vector DB read/write during tasks** — Chroma should be queried and updated at these points: after receiving a task query, after completing it, and mid-task if needed. Before writing an update, the agent should do a web search first and incorporate that into the update; if web search is unavailable, it's fine to skip that step.
 
-part 2 
-- [ ] to know something or before doing something agent will, search the web and the chroma db, if knowledge not in chroma db they will update it , then proceed with the work. if web search is not avilable then uses chroma db knowledge. 
-- [ ] A basic structure should exist to update knowledge in chroma db so all agents will use the same and , their is less dublicate inside chroma db . all agents should use the same.  
+---
 
+## 7. Chat Page — Functionality & Bugs
 
-### Model cap during autoscaling 
- - [ ] their is only one head of council at a time 00001, when all agents are used and their are no index left to spwan then head of council should use the remaning index to spawn head of council to look for ideal agents to view and report back so they can be terminated to save space. and in this condition new tasks should not be assigned . after the task is done the new created index of head of council should terminate.
+- [ ] **Markdown rendering** — Model replies are returned as markdown but the chat UI doesn't render them properly. Check how the backend generates/formats the markdown and improve the frontend reply box to render it well (example failing case: task-status replies with headers/bold/bullets).
+- [ ] **Slash command support** — Add `/clear` (and other slash commands) to the chat page. `/clear` should clear the chat on the frontend, and from then on only show messages sent *after* the clear timestamp.
+- [ ] **"Voice Bridge Not Running" notification loops** — This should show once after login, but currently repeats. Fix so it only fires once per session.
+- [ ] **Voice input bugs** — Starting voice input doesn't show up in the chat, and clicking voice settings throws an error in the frontend console.
+- [ ] **Task stuck "Deliberating"** — A task shows as running but is stuck in "deliberating" status. Check logs to find the root cause and fix.
+- [ ] **Follow-up button on messages** — A copy icon already exists on hover over chat messages. Add a follow-up icon next to it that copies the message into the compose box so the user can edit and resend it.
 
+---
 
-### Agent Behavior
-- [ ] Persona and behavior for all AI agents — including the voice bridge — should be driven by the constitution, so that editing the constitution updates persona consistently everywhere. Update the ethos as well as system instruction if necessary to achive this. 
+## 8. Chat Page — UX Improvements
 
-- [ ] for models that can do deep thinking the ai should be able to do that. 
+- [ ] **Typing indicator** — Show an animated three-dot indicator while a reply is being generated (see Section 3 for the "Thinking..." variant).
+- [ ] **Streaming replies** — Support streaming message display when the backend can stream a response.
+- [ ] **Head of Council disconnects mid-chat** — Sometimes a sent message gets no reply because the Head of Council disconnects. Investigate via logs and fix.
+- [ ] **Chat history retention** — Automatically prune messages older than 7 days, but always keep the last few messages regardless of age if there's been no further activity in that chat.
+- [ ] **Address convention** — The Head of Council should address the admin as "Sovereign." All other users should be addressed by username, or simply as "sir."
 
-- [ ] Verctor database should be queried and updated. example: after reciving a task quary, after completing the task quary and the update if necessary. and during a task can also do the quary and update. Before updating agent should web search and then with the knowledge update. if web search not avilable then can skip web search. 
+---
 
+## 9. Chat Widget Redesign (Floating Popup)
 
-### Chat Page — UX Improvements
-- [ ] Show a typing indicator (e.g., animated three dots) when a message is sent and the reply is taking time, similar to most modern chat apps.
-- [ ] Support streaming message display in the chat interface when a response can be streamed, similar to most modern chat apps.
-- [ ] Fix: sometimes a sent chat message gets no reply because the "Head of Council" disconnects — investigate via logs.
-- [ ] Optimize chat history: automatically remove messages older than 7 days, but retain the last few messages regardless of age if there has been no further activity in that chat.
-- [ ] The Head of Council should address the admin specifically as "Sovereign." All other users should be addressed by their username, or simply as "sir."
-
-### Agents Page
-- [ ] Fix scrollbar color — currently black in light mode; it should be dark/visible appropriately for the theme.
-- [ ] Fix "Tier Groups: Expand All — Level 1, Level 2" text color — currently white in light mode; it should be dark for readability.
-- [ ] Fix mismatch: the Agents list shows 3 agents, but the graph displays only 1.
-
-### Other Fixes
-- [ ] Users should be able to upload a profile picture.
-- [ ] The "Genesis" step (per the original todo) for naming the country does not run after the API key is added — investigate and fix.
-
-### Chat Widget Redesign
-**Current behavior:**
-Chat only works from the Chat page. When the user is on another page and a message arrives, a notification appears, and the user must navigate back to the Chat page to view/reply. If the browser is minimized or closed, the user can still communicate via the voice bridge.
+**Current behavior:** Chat only works from the Chat page. Messages that arrive while the user is elsewhere trigger a notification, requiring a return to the Chat page to reply. If the browser is minimized/closed, the voice bridge is the only channel.
 
 **Desired behavior:**
-- [ ] While on the Chat page, the user can chat and use voice as normal.
-- [ ] When the user navigates away from the Chat page, a small floating chat icon (messenger-style) appears in the bottom-right corner of the screen.
-- [ ] When a new message arrives, the user can click this icon to open a popup chat window and reply — with voice support available there too.
-- [ ] Minimizing the popup chat window should switch communication over to the voice bridge.
-- [ ] When the user returns to the Chat page, the popup should disappear (the popup essentially mirrors the Chat page's chat box when outside of it).
-- [ ] When the browser is closed, the user can continue communicating via the voice bridge.
-- [ ] The popup should live in the main layout (above all other pages) so it stays fixed in place while scrolling, and should not interfere with the use of other pages.
-- [ ] Default appearance: a small dot in the corner; on hover, it expands into a circular chat icon; on click, the full chat popup window opens.
+- [ ] Normal chat + voice on the Chat page, unchanged.
+- [ ] When navigating away from the Chat page, show a small floating (messenger-style) chat icon in the bottom-right corner.
+- [ ] New messages: clicking the icon opens a popup chat window with reply + voice support.
+- [ ] Minimizing the popup switches communication back over to the voice bridge.
+- [ ] Returning to the Chat page hides the popup (it mirrors the Chat page's chat box only while the user is elsewhere).
+- [ ] Closing the browser falls back to the voice bridge.
+- [ ] The popup lives in the main layout (above all pages), stays fixed while scrolling, and doesn't interfere with other pages.
+- [ ] Default state: a small dot in the corner → expands into a chat icon on hover → opens full popup on click.
 
+---
+
+## 10. Agents Page — UI Bugs
+
+- [ ] Scrollbar is black in light mode — should adapt to theme (dark/visible appropriately).
+- [ ] "Tier Groups: Expand All — Level 1, Level 2" text is white in light mode — should be dark for readability.
+- [ ] Agents list shows 3 agents, but the graph view only shows 1 — fix the mismatch.
+
+---
+
+## 11. Other Fixes
+
+- [ ] Allow users to upload a profile picture.
+
+---
+
+### Note on merges
+The original list had two entries that appear to describe the same bug: *"the popup to ask the nation name appears before the Head of Council is active and no reply is given after"* and *"the Genesis step for naming the country doesn't run after the API key is added."* These are combined under **Section 2** — worth confirming they're the same root cause before fixing.
 
 ## 1. Roadmap Consistency & Incomplete Items
 

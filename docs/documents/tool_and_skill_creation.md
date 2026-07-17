@@ -17,6 +17,7 @@
 | Lives in | `backend/tools/<name>_tool.py` | `backend/.agentium/skills/<name>/SKILL.md` |
 | Wired via | `backend/core/tool_registry.py` (`register_tool`) | `backend/scripts/seed_skills.py` → ChromaDB |
 | Reaches agent by | LLM function-calling schema (`to_openai_tools` / `to_anthropic_tools`) | Semantic RAG search (`SkillManager.search_skills`) |
+| Capabilities Assignment | Capabilities must be assigned to Agents to use this tool see tool_registry.py | Can be used by any agent |
 | Answers | "*Do* this action" | "*How/when* to do it" |
 
 They are complementary. A well-designed capability ships **both**: a tool that
