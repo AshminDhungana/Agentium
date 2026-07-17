@@ -17,7 +17,7 @@ from backend.core.vector_store import get_vector_store, VectorStore
 from backend.models.entities.agents import Agent, AgentType, AgentStatus
 from backend.models.entities.audit import AuditLog, AuditLevel, AuditCategory
 from backend.models.entities.task import TaskStatus, Task
-from backend.core.capability_registry import CapabilityRegistry, Capability
+from backend.services.capability_registry import CapabilityRegistry, Capability
 from backend.services.reincarnation_service import ReincarnationService
 from backend.core.tool_registry import tool_registry
 from backend.services.idle_governance import idle_budget, token_optimizer
