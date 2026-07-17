@@ -14,6 +14,7 @@ import { useChatStore } from '@/store/chatStore';
 import { submitCardAnswer } from '@/store/websocketStore';
 import type { Message, MessageMetadata, MessageAttachment as Attachment } from '@/store/chatStore';
 import { StructuredInputCard } from '@/components/chat/StructuredInputCard';
+import { MarkdownMessage } from '@/components/chat/MarkdownMessage';
 import { inboxApi, UnifiedConversation, UnifiedMessage } from '@/services/inboxApi';
 import { api } from '@/services/api';
 import {
@@ -1093,7 +1094,7 @@ export function ChatPage() {
                                                                 : message.role === 'system' ? 'bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-900 dark:text-red-300'
                                                                     : 'bg-white dark:bg-[#161b27] border border-gray-200 dark:border-[#1e2535] text-gray-900 dark:text-gray-100 shadow-sm dark:shadow-[0_2px_12px_rgba(0,0,0,0.2)]'
                                                         }`}>
-                                                        <p className="text-[15px] leading-relaxed whitespace-pre-wrap">{message.content}</p>
+                                                        <MarkdownMessage content={message.content as string} isUser={isUser} />
                                                         {message.attachments?.map((att, i) => (
                                                             <div key={i}>{renderAttachment(att, isUser)}</div>
                                                         ))}
@@ -1334,7 +1335,7 @@ export function ChatPage() {
                                                             via {msg.sender_channel}
                                                         </span>
                                                     )}
-                                                    <p className="leading-relaxed">{msg.content}</p>
+                                                    <MarkdownMessage content={msg.content as string} isUser={msg.role === 'user'} />
                                                 </div>
                                             </div>
                                         ))}
