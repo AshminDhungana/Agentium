@@ -471,7 +471,7 @@ class TestProviderResilience:
             reset_resilience()
 
 
-async def _make_streaming_openai_provider():
+async def _make_streaming_openai_provider(on_delta=None, cancel_event=None):
     from backend.services.model_provider import OpenAICompatibleProvider
     provider = OpenAICompatibleProvider.__new__(OpenAICompatibleProvider)
     cfg = MagicMock()
@@ -564,3 +564,28 @@ async def test_anthropic_generate_with_tools_streams_final_turn():
     assert "".join(chunks) == "Hi there"
     assert result["content"] == "Hi there"
     assert result["finish_reason"] == "stop"
+
+async def test_llm_client_forwards_on_delta(monkeypatch):
+    from backend.core.llm_client import LLMClient
+    from backend.services import model_provider as mp
+
+    captured = {}
+    async def fake_gen_with_agent_tools(**kwargs):
+        captured["on_delta"] = kwargs.get("on_delta")
+        captured["cancel_event"] = kwargs.get("cancel_event")
+        provider = await _make_streaming_openai_provider(
+            on_delta=kwargs.get("on_delta"), cancel_event=kwargs.get("cancel_event"))
+        return await provider.generate_with_tools(
+            system_prompt="sys", messages=[{"role": "user", "content": "hi"}],
+            tools=[], tool_executor=None,
+            on_delta=kwargs.get("on_delta"), cancel_event=kwargs.get("cancel_event"))
+    monkeypatch.setattr(mp.ModelService, "generate_with_agent_tools", staticmethod(fake_gen_with_agent_tools))
+
+    async def on_delta(t): pass
+    client = LLMClient.__new__(LLMClient)
+    client.max_retries = 0
+    client.MAX_FALLBACK_CONFIGS = 0
+    await client.generate_with_tools(
+        agent=MagicMock(agentium_id="0xxxx"), user_message="hi",
+        db=None, config_id="cfg-stream", on_delta=on_delta)
+    assert captured["on_delta"] is on_delta

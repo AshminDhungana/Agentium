@@ -1407,6 +1407,8 @@ class ModelService:
         task_id: Optional[str] = None,
         max_tool_iterations: int = 10,
         history: Optional[List[Dict[str, str]]] = None,
+        on_delta: Optional[Callable[[str], Awaitable[None]]] = None,
+        cancel_event: Optional[asyncio.Event] = None,
         **kwargs,
     ) -> Dict[str, Any]:
         """
@@ -1528,6 +1530,8 @@ class ModelService:
                 tool_executor=tool_executor,
                 max_iterations=max_tool_iterations,
                 agentium_id=agent_id,
+                on_delta=on_delta,
+                cancel_event=cancel_event,
                 **kwargs,
             )
             api_key_manager.mark_key_success(provider.config.id, db=db)

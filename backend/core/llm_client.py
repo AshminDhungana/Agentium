@@ -16,7 +16,7 @@ import logging
 import random
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Callable, Awaitable
 
 from sqlalchemy.orm import Session
 
@@ -361,6 +361,8 @@ class LLMClient:
         max_retries: Optional[int] = None,
         fallback_configs: Optional[List[str]] = None,
         history: Optional[List[Dict[str, str]]] = None,
+        on_delta: Optional[Callable[[str], Awaitable[None]]] = None,
+        cancel_event: Optional[asyncio.Event] = None,
         **kwargs,
     ) -> Dict[str, Any]:
         """Tool-aware generation with retry, failover, and CB integration."""
@@ -405,6 +407,8 @@ class LLMClient:
                         task_id=task_id,
                         max_tool_iterations=max_tool_iterations,
                         history=history,
+                        on_delta=on_delta,
+                        cancel_event=cancel_event,
                         **kwargs,
                     )
                     effective_config_id = attempt_config_id or "default"
