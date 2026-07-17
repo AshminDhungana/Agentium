@@ -553,6 +553,10 @@ Progress: {task_progress or 'N/A'}%"""
         db.add(task)
         db.commit()
 
+        # Trace this task back to the decision that spawned it.
+        task.decision_id = decision.decision_id
+        db.commit()
+
         plan = {
             "objective": (decision.task_brief or prompt)[:200],
             "title": task.title,

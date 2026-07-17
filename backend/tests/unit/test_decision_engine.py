@@ -144,3 +144,15 @@ def test_governance_tool_descriptions_have_guidance():
         assert fn is not None, f"{name} not found"
         doc = (fn.__doc__ or "")
         assert "WHEN" in doc, f"{name} missing WHEN guidance"
+
+
+import uuid
+
+
+@pytest.mark.asyncio
+async def test_decision_has_correlation_id():
+    from backend.services.decision_engine import DecisionEngine
+    engine = DecisionEngine()
+    decision = await engine.decide(_FakeAgent(), "hi", db=None, _llm=_make_fake_llm("reply", 0.9))
+    assert isinstance(getattr(decision, "decision_id", None), str)
+    uuid.UUID(decision.decision_id)  # must be valid uuid

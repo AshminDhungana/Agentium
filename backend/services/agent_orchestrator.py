@@ -415,7 +415,7 @@ class AgentOrchestrator:
                     f"create task {decision.task_brief or raw_input}", require_prefix=False)
                 if gov:
                     res = GovernanceCommandService.execute(gov, source_agent, self.db)
-                    return self._decision_result(source_agent, "create_task", res, start)
+                    return self._decision_result(source_agent, "create_task", {**res, "decision_id": decision.decision_id}, start)
             if decision.action in (DecisionAction.DISPATCH_TASK, DecisionAction.DELEGATE):
                 target = await AgentRegistry.choose_target(decision, self.db, source_agent)
                 if target:
@@ -428,11 +428,11 @@ class AgentOrchestrator:
                     f"spawn agent task {decision.task_brief or ''}", require_prefix=False)
                 if gov:
                     res = GovernanceCommandService.execute(gov, source_agent, self.db)
-                    return self._decision_result(source_agent, "spawn_agent", res, start)
+                    return self._decision_result(source_agent, "spawn_agent", {**res, "decision_id": decision.decision_id}, start)
         except PermissionError as pe:
             logger.warning("Decision action rejected (no authority): %s", pe)
-            return self._decision_result(source_agent, "rejected", {"error": str(pe)}, start)
-        return self._decision_result(source_agent, "reply", {"note": "no-op decision"}, start)
+            return self._decision_result(source_agent, "rejected", {**{"error": str(pe)}, "decision_id": decision.decision_id}, start)
+        return self._decision_result(source_agent, "reply", {"note": "no-op decision", "decision_id": decision.decision_id}, start)
 
     def _decision_result(self, actor, action, metadata, start):
         self._record_metric(actor.agentium_id, success=True)

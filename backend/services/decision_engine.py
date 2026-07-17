@@ -1,5 +1,6 @@
 from __future__ import annotations
 import logging
+import uuid
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import List, Optional
@@ -24,6 +25,7 @@ class Decision:
     task_brief: Optional[str] = None
     tools_considered: List[str] = field(default_factory=list)
     confidence: float = 0.0
+    decision_id: str = field(default_factory=lambda: str(uuid.uuid4()))
 
 
 class DecisionEngine:
@@ -69,6 +71,30 @@ class DecisionEngine:
             )
         if cache is not None and cache_key is not None:
             cache.set(cache_key, decision)
+
+        if db is not None:
+            try:
+                from backend.models.entities.audit import AuditLog, AuditLevel
+                db.add(AuditLog(
+                    level=AuditLevel.INFO,
+                    category="GOVERNANCE",
+                    actor_type="agent",
+                    actor_id=getattr(agent, "agentium_id", "?"),
+                    action=f"decision:{decision.action.value}",
+                    description=(
+                        f"rationale={decision.rationale} | "
+                        f"tier={decision.target_tier} | "
+                        f"conf={decision.confidence} | "
+                        f"tools={','.join(decision.tools_considered)}"
+                    ),
+                    target_type="agent",
+                    target_id=decision.target_tier or "",
+                    correlation_id=decision.decision_id,
+                ))
+                db.commit()
+            except Exception as e:
+                logger.warning("Decision audit failed: %s", e)
+
         return decision
 
     @staticmethod

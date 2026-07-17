@@ -187,6 +187,10 @@ class Task(BaseEntity):
     escalation_timeout_seconds = Column(Integer, default=300, nullable=False)
     delegation_metadata = Column(JSON, nullable=True)           # decision trail
 
+    # Correlation id linking this task to the DecisionEngine decision that
+    # spawned it (AuditLog.correlation_id). Enables end-to-end traceability.
+    decision_id = Column(String(64), nullable=True, index=True)
+
     # Relationships
     head_of_council = relationship("Agent", foreign_keys=[head_of_council_id], lazy="joined")
     lead_agent = relationship("Agent", foreign_keys=[lead_agent_id])
