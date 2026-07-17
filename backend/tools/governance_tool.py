@@ -211,17 +211,28 @@ async def dispatch_task(
         "description": task.description or "",
         "allowed_tools": task.tools_allowed or [],
     }
+    # Ensure the Lead has a Task Agent to receive the delegation. Without this,
+    # delegate_to_task would resolve a null recipient and route_down would crash.
+    bound_task_id = await orchestrator._ensure_task_agent(lead.agentium_id)
+    if not bound_task_id:
+        return _result(
+            False,
+            error=f"no Task Agent available to bind under Lead {lead.agentium_id}",
+        )
     try:
         outcome = await orchestrator.delegate_to_task(
             task=task_dict,
             lead_id=lead.agentium_id,
-            task_id=None,
+            task_id=bound_task_id,
             retry_count=0,
         )
     except Exception as e:
         return _result(False, error=str(e))
+    if not outcome.success:
+        return _result(False, error=outcome.error or "task delegation failed")
     return _result(True, data={"task_id": task.agentium_id,
                               "lead_id": lead.agentium_id,
+                              "task_agent_id": bound_task_id,
                               "outcome": str(outcome)})
 
 

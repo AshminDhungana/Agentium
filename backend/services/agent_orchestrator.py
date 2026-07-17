@@ -348,6 +348,13 @@ class AgentOrchestrator:
                         # Fall through to normal routing below.
 
         # Determine target
+        if not recipient:
+            self._record_metric(source_id, success=False)
+            return RouteResult(
+                success=False,
+                message_id="",
+                error=f"Cannot route: no recipient resolved for {source_id}",
+            )
         direction = self._get_direction(source_id, recipient)
 
         # Create message

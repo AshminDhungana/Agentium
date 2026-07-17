@@ -433,6 +433,12 @@ class MessageBus:
         Route message down the hierarchy (delegation).
         Head -> Council -> Lead -> Task
         """
+        if not message.recipient_id:
+            return RouteResult(
+                success=False,
+                message_id=message.message_id,
+                error=f"route_down requires a recipient, got {message.recipient_id!r}",
+            )
         message.route_direction = "down"
         return await self.publish(message)
     

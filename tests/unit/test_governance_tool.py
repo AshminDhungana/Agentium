@@ -64,11 +64,32 @@ async def test_dispatch_task_happy_path():
     db.query.return_value.filter.return_value.first.side_effect = [caller, task, lead]
     orch = MagicMock()
     orch.delegate_to_task = AsyncMock(return_value=MagicMock(success=True))
+    orch._ensure_task_agent = AsyncMock(return_value="30001")
     with patch("backend.tools.governance_tool.CapabilityRegistry.can_agent", return_value=True), \
          patch("backend.tools.governance_tool.AgentOrchestrator", return_value=orch):
         res = await dispatch_task(task_id="t1", db=db, agent_id="00001")
         assert res["success"] is True
+        orch._ensure_task_agent.assert_awaited_once()
         orch.delegate_to_task.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_dispatch_task_no_task_agent_fails_cleanly():
+    """Regression: a Lead with no Task Agent must not crash route_down with a null object."""
+    caller = MagicMock(); caller.agentium_id = "00001"
+    task = MagicMock(); task.id = "db-t1"; task.agentium_id = "t1"
+    task.task_type.value = "execution"; task.description = "do it"; task.tools_allowed = []
+    lead = MagicMock(); lead.agentium_id = "20002"; lead.status = "active"
+    db = MagicMock()
+    db.query.return_value.filter.return_value.first.side_effect = [caller, task, lead]
+    orch = MagicMock()
+    orch._ensure_task_agent = AsyncMock(return_value=None)
+    with patch("backend.tools.governance_tool.CapabilityRegistry.can_agent", return_value=True), \
+         patch("backend.tools.governance_tool.AgentOrchestrator", return_value=orch):
+        res = await dispatch_task(task_id="t1", db=db, agent_id="00001")
+        assert res["success"] is False
+        assert "Task Agent" in res["error"]
+        orch.delegate_to_task.assert_not_called()
 
 
 @pytest.mark.asyncio
