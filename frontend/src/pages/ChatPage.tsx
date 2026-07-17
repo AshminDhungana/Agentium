@@ -15,6 +15,7 @@ import { submitCardAnswer } from '@/store/websocketStore';
 import type { Message, MessageMetadata, MessageAttachment as Attachment } from '@/store/chatStore';
 import { StructuredInputCard } from '@/components/chat/StructuredInputCard';
 import { MarkdownMessage } from '@/components/chat/MarkdownMessage';
+import { TypingIndicator } from '@/components/chat/TypingIndicator';
 import { inboxApi, UnifiedConversation, UnifiedMessage } from '@/services/inboxApi';
 import { api } from '@/services/api';
 import {
@@ -363,11 +364,14 @@ export function ChatPage() {
 
     // Issue 3: Consume isHistoryLoad.current here — not in the WS subscriber —
     // so there is no race between the subscriber and the bulk setMessages call.
+    // Auto-scroll ONLY when the user is already near the bottom (within ~80px);
+    // if they've scrolled up to read history, leave them there (Task 10).
     useEffect(() => {
         if (isHistoryLoad.current) {
             isHistoryLoad.current = false; // consume the flag before any scroll
             return;                        // skip smooth-scroll on history load
         }
+        if (!isNearBottom()) return;
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
 
@@ -574,6 +578,17 @@ export function ChatPage() {
         if (!el) return;
         el.scrollTo({ top: el.scrollHeight, behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
         setShowScrollToBottom(false);
+    };
+
+    /**
+     * Auto-scroll guard: true only when the user is already near the bottom of
+     * the message list (within ~80px). When scrolled up we must NOT auto-scroll
+     * and yank them back down mid-read.
+     */
+    const isNearBottom = () => {
+        const el = messagesScrollRef.current;
+        if (!el) return true;
+        return el.scrollHeight - el.scrollTop - el.clientHeight <= 80;
     };
 
     // ── Voice ─────────────────────────────────────────────────────────────────
@@ -1146,7 +1161,11 @@ export function ChatPage() {
                                                                 : message.role === 'system' ? 'bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-900 dark:text-red-300'
                                                                     : 'bg-white dark:bg-[#161b27] border border-gray-200 dark:border-[#1e2535] text-gray-900 dark:text-gray-100 shadow-sm dark:shadow-[0_2px_12px_rgba(0,0,0,0.2)]'
                                                         }`}>
-                                                        <MarkdownMessage content={message.content as string} isUser={isUser} />
+                                                        {isAwaitingReply && message.status === 'streaming' && !message.content ? (
+                                                            <TypingIndicator />
+                                                        ) : (
+                                                            <MarkdownMessage content={message.content as string} isUser={isUser} status={message.status} />
+                                                        )}
                                                         {message.attachments?.map((att, i) => (
                                                             <div key={i}>{renderAttachment(att, isUser)}</div>
                                                         ))}
@@ -1183,18 +1202,17 @@ export function ChatPage() {
                                     );
                                 })}
 
-                                {/* Typing indicator while awaiting the Head's reply */}
-                                {isAwaitingReply && (
+                                {/* Typing indicator while awaiting the Head's reply.
+                                    During an active stream the indicator is shown inside the
+                                    streaming placeholder bubble above; this standalone bubble is
+                                    only for the legacy (non-streaming) reply path. */}
+                                {isAwaitingReply && !activeStreamId && (
                                     <div className="flex gap-3">
                                         <div className="flex-shrink-0 w-8 h-8 rounded-xl bg-gradient-to-br from-gray-700 to-gray-800 flex items-center justify-center text-white">
                                             <UserRoundSearch className="w-4 h-4" />
                                         </div>
                                         <div className="px-4 py-3.5 rounded-2xl bg-white dark:bg-[#161b27] border border-gray-200 dark:border-[#1e2535]">
-                                            <div className="flex items-center gap-1.5">
-                                                <span className="w-2 h-2 rounded-full bg-gray-400 motion-safe:animate-bounce" style={{ animationDelay: '0ms' }} />
-                                                <span className="w-2 h-2 rounded-full bg-gray-400 motion-safe:animate-bounce" style={{ animationDelay: '150ms' }} />
-                                                <span className="w-2 h-2 rounded-full bg-gray-400 motion-safe:animate-bounce" style={{ animationDelay: '300ms' }} />
-                                            </div>
+                                            <TypingIndicator />
                                         </div>
                                     </div>
                                 )}
