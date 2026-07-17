@@ -13,6 +13,7 @@ from backend.tools.host_os_tool  import host_os_tool
 from backend.tools.code_analyzer_tool import code_analyzer
 from backend.tools.data_transform_tool import data_transform_tool
 from backend.tools.embedding_tool      import embedding_tool
+from backend.tools.vector_db_tool      import vector_db_tool
 from backend.tools.git_tool            import git_tool
 from backend.tools.http_api_tool       import http_api_tool
 from backend.tools.text_editor_tool    import text_editor_tool
@@ -125,6 +126,77 @@ class ToolRegistry:
                 "model":      {"type": "string",  "description": "Model name override (optional)", "optional": True},
                 "top_k":      {"type": "integer", "description": "Number of results to return for search (default 5)", "optional": True},
                 "n_clusters": {"type": "integer", "description": "Number of clusters for cluster action (default 3)", "optional": True},
+            },
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx"],
+        )
+
+        # ══════════════════════════════════════════════════════════════════════
+        # VECTOR DB TOOL — read/write the shared ChromaDB vector store
+        # ══════════════════════════════════════════════════════════════════════
+        self.register_tool(
+            name="vector_db",
+            description=(
+                "Read from and write to the shared ChromaDB vector store that holds "
+                "Agentium's collective agent memory (RAG). Use 'query' to semantically "
+                "search across knowledge collections, 'get' to fetch a document by id, "
+                "and 'add' to store new learnings/patterns (writable collections only — "
+                "constitution, ethos and constitutional_skills are immutable). 'list_collections' "
+                "shows every collection; 'help' explains usage. Full reference and worked "
+                "examples are in the skill file at backend/.agentium/skills/vector_db/SKILL.md, "
+                "which is indexed into ChromaDB via 'make seed-skills' so you can also find it "
+                "by asking 'how do I use the vector DB tool'."
+            ),
+            function=vector_db_tool.execute,
+            parameters={
+                "action": {
+                    "type": "string",
+                    "description": "query | get | add | list_collections | help",
+                },
+                "query": {
+                    "type": "string",
+                    "description": "Natural-language search text for action 'query'",
+                    "optional": True,
+                },
+                "collection": {
+                    "type": "string",
+                    "description": "Single collection key (e.g. task_patterns, council_memory, best_practices)",
+                    "optional": True,
+                },
+                "collection_keys": {
+                    "type": "array",
+                    "description": "List of collection keys to search (action 'query')",
+                    "optional": True,
+                },
+                "n_results": {
+                    "type": "integer",
+                    "description": "Max results to return for 'query' (default 5)",
+                    "optional": True,
+                },
+                "filter_dict": {
+                    "type": "object",
+                    "description": "ChromaDB metadata 'where' filter for 'query' (optional)",
+                    "optional": True,
+                },
+                "doc_id": {
+                    "type": "string",
+                    "description": "Document id for action 'get'",
+                    "optional": True,
+                },
+                "documents": {
+                    "type": "array",
+                    "description": "List of document strings to upsert (action 'add')",
+                    "optional": True,
+                },
+                "metadatas": {
+                    "type": "array",
+                    "description": "List of metadata dicts, one per document (action 'add', optional)",
+                    "optional": True,
+                },
+                "ids": {
+                    "type": "array",
+                    "description": "List of document ids, one per document (action 'add', optional — auto-generated if omitted)",
+                    "optional": True,
+                },
             },
             authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx"],
         )
