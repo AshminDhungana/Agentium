@@ -527,3 +527,40 @@ async def test_generate_with_tools_cancel_stops_stream():
         tools=[], tool_executor=None, on_delta=on_delta, cancel_event=ev)
     assert result["finish_reason"] == "stopped_by_user"
     assert "Hello " in result["content"]
+
+async def _make_streaming_anthropic_provider():
+    from backend.services.model_provider import AnthropicProvider
+    provider = AnthropicProvider.__new__(AnthropicProvider)
+    cfg = MagicMock()
+    cfg.id = "cfg-anthropic"; cfg.provider = "anthropic"; cfg.default_model = "claude-test"
+    cfg.timeout_seconds = 30; cfg.max_concurrent_requests = 10; cfg.requests_per_minute = 60
+    cfg.max_tokens = 512; cfg.temperature = 0.7
+    provider.config = cfg; provider.api_key = "x"
+
+    class _TextDelta:
+        def __init__(self, text):
+            self.type = "content_block_delta"
+            self.delta = MagicMock(); self.delta.text = text
+    class _MsgDelta:
+        def __init__(self):
+            self.type = "message_delta"
+            self.usage = MagicMock(); self.usage.output_tokens = 4
+    async def _gen():
+        yield _TextDelta("Hi "); yield _TextDelta("there"); yield _MsgDelta()
+    class _StreamResp:
+        def __aiter__(self): return _gen().__aiter__()
+    client = MagicMock()
+    client.messages.create = AsyncMock(return_value=_StreamResp())
+    provider._client = client
+    return provider
+
+async def test_anthropic_generate_with_tools_streams_final_turn():
+    provider = await _make_streaming_anthropic_provider()
+    chunks = []
+    async def on_delta(text): chunks.append(text)
+    result = await provider.generate_with_tools(
+        system_prompt="sys", messages=[{"role": "user", "content": "hi"}],
+        tools=[], tool_executor=None, on_delta=on_delta)
+    assert "".join(chunks) == "Hi there"
+    assert result["content"] == "Hi there"
+    assert result["finish_reason"] == "stop"

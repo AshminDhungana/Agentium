@@ -1021,6 +1021,8 @@ class AnthropicProvider(BaseModelProvider):
         tools: List[Dict[str, Any]],
         tool_executor: Callable,
         max_iterations: int = 10,
+        on_delta: Optional[Callable[[str], Awaitable[None]]] = None,
+        cancel_event: Optional[asyncio.Event] = None,
         **kwargs,
     ) -> Dict[str, Any]:
         """
@@ -1030,6 +1032,11 @@ class AnthropicProvider(BaseModelProvider):
         corresponding tool_result user turn as required by the Anthropic spec.
         All tool calls in one response are executed in parallel.
 
+        When ``on_delta`` is supplied and no tools are requested (the final text
+        turn), the final turn is streamed token-by-token and each chunk is
+        forwarded to ``on_delta``. The blocking tool-call path is used
+        unchanged when ``on_delta`` is None or tools are present.
+
         Args:
             system_prompt:   System-level instruction.
             messages:        Initial conversation turns.
@@ -1037,13 +1044,18 @@ class AnthropicProvider(BaseModelProvider):
                              (produced by tool_registry.to_anthropic_tools()).
             tool_executor:   Async callable(name: str, args: dict) -> str.
             max_iterations:  Safety cap on loop turns (default 10).
+            on_delta:        Optional async callback invoked with each streamed
+                             text delta (final text turn only).
+            cancel_event:    Optional asyncio.Event; if set mid-stream the turn
+                             stops early and finish_reason becomes "stopped_by_user".
             **kwargs:        Forwarded to the API (model, max_tokens, agentium_id).
 
         Returns:
-            Same shape as OpenAICompatibleProvider.generate_with_tools().
+            Same shape as OpenAICompatibleProvider.generate_with_tools() plus
+            ``finish_reason`` ("stop" or "stopped_by_user" if cancelled).
         """
         actual_model = kwargs.get("model", self.config.default_model)
-        client = _get_cached_sdk_client(
+        client = getattr(self, "_client", None) or _get_cached_sdk_client(
             self.config,
             api_key=self.api_key,
             base_url=self._anthropic_base_url(self.config),
@@ -1059,6 +1071,8 @@ class AnthropicProvider(BaseModelProvider):
         await provider_rate_limiter.acquire_concurrency(self.config.id, maxc)
 
         try:
+            loop_finish_reason = "stop"
+
             for _ in range(max_iterations):
                 create_kwargs: Dict[str, Any] = dict(
                     model=actual_model,
@@ -1071,6 +1085,57 @@ class AnthropicProvider(BaseModelProvider):
 
                 rpm = getattr(self.config, "requests_per_minute", 60) or 60
                 await provider_rate_limiter.acquire(self.config.id, rpm)
+
+                # ── Streaming final-turn path ─────────────────────────────────
+                # Only when on_delta is provided AND there are no tools (i.e. the
+                # model is producing its final text reply). Tool-call turns and
+                # the on_delta=None case stay on the blocking path below.
+                if on_delta is not None and not tools:
+                    try:
+                        stream = await client.messages.create(
+                            stream=True, **create_kwargs
+                        )
+                        await _record_provider_headers(self.config)
+
+                        content = ""
+                        async for chunk in stream:
+                            if cancel_event is not None and cancel_event.is_set():
+                                loop_finish_reason = "stopped_by_user"
+                                break
+
+                            ctype = getattr(chunk, "type", None)
+                            if ctype == "message_start":
+                                msg = getattr(chunk, "message", None)
+                                usage = getattr(msg, "usage", None) if msg else None
+                                if usage is not None:
+                                    total_prompt_tokens += (
+                                        getattr(usage, "input_tokens", 0) or 0
+                                    )
+                            elif ctype == "content_block_delta":
+                                delta = getattr(chunk, "delta", None)
+                                if delta is not None and getattr(delta, "text", None):
+                                    content += delta.text
+                                    await on_delta(delta.text)
+                            elif ctype == "message_delta":
+                                usage = getattr(chunk, "usage", None)
+                                if usage is not None:
+                                    total_completion_tokens += (
+                                        getattr(usage, "output_tokens", 0) or 0
+                                    )
+
+                        conversation.append(
+                            {"role": "assistant", "content": content}
+                        )
+
+                        if cancel_event is not None and cancel_event.is_set():
+                            loop_finish_reason = "stopped_by_user"
+                        break
+                    except Exception:
+                        # Any streaming failure (unsupported endpoint, mock
+                        # double, transport error) — fall back to the blocking
+                        # create below and reuse the existing result assembly.
+                        pass
+
                 response = await client.messages.create(**create_kwargs)
                 await _record_provider_headers(self.config)
 
@@ -1154,6 +1219,7 @@ class AnthropicProvider(BaseModelProvider):
             "latency_ms":        latency,
             "model":             actual_model,
             "messages":          conversation,
+            "finish_reason":     loop_finish_reason,
             "cost_usd":          calculate_cost(
                 actual_model, self.config.provider,
                 total_prompt_tokens, total_completion_tokens
