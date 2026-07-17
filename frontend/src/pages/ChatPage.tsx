@@ -296,8 +296,8 @@ export function ChatPage() {
                     msg.stream_id as string,
                     (msg.role as Message['role']) || 'head_of_council',
                 );
-                // Swap the "thinking" typing indicator for the streaming bubble.
-                setIsAwaitingReply(false);
+                // Keep isAwaitingReply true so the typing indicator still shows
+                // during the thinking/tool phase; it clears on the first delta.
                 return;
             }
             if (msg.type === 'message_delta') {
