@@ -19,7 +19,7 @@ import { inboxApi, UnifiedConversation, UnifiedMessage } from '@/services/inboxA
 import { api } from '@/services/api';
 import {
     Send, Crown, User, UserRoundSearch, AlertCircle, Wifi, WifiOff, CheckCircle,
-    RefreshCw, Paperclip, Image as ImageIcon, File, X, Mic, MicOff, Pause,
+    RefreshCw, Paperclip, Image as ImageIcon, File, X, Mic, MicOff, Pause, Square,
     Download, Copy, Sparkles, Code, FileText, Video, Music, Archive,
     Maximize2, MoreHorizontal, Smile, Plus, MessageCircle, Smartphone,
     Slack, Mail, Inbox, Volume2, VolumeX, Settings2, ChevronDown, Globe,
@@ -127,6 +127,8 @@ export function ChatPage() {
     const { messages, setMessages } = useChatStore(
         useShallow((s) => ({ messages: s.messages, setMessages: s.setMessages }))
     );
+    // Active streaming message id — drives the Stop button (Task 8).
+    const activeStreamId = useChatStore((s) => s.activeStreamId);
     const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
     const [isRecording, setIsRecording] = useState(false);
     // isPaused was declared here but never consumed — removed (Issue 12)
@@ -282,13 +284,47 @@ export function ChatPage() {
         wsSubscribed.current = true;
 
         const unsubscribe = useWebSocketStore.subscribe((state, prevState) => {
-            if (
-                state.lastMessage &&
-                state.lastMessage !== prevState.lastMessage &&
-                state.lastMessage.type === 'message'
-            ) {
-                const msg = state.lastMessage;
+            const msg = state.lastMessage;
+            // Ignore unchanged/empty frames (compare identity, not deep equal)
+            if (!msg || msg === prevState.lastMessage) return;
 
+            // ── Streaming events (Task 8) ────────────────────────────────────
+            // Stream ids come from the server and are unique per message, so no
+            // legacy dedup set is needed here.
+            if (msg.type === 'message_start') {
+                useChatStore.getState().beginStream(
+                    msg.stream_id as string,
+                    (msg.role as Message['role']) || 'head_of_council',
+                );
+                // Swap the "thinking" typing indicator for the streaming bubble.
+                setIsAwaitingReply(false);
+                return;
+            }
+            if (msg.type === 'message_delta') {
+                useChatStore.getState().appendDelta(msg.stream_id as string, msg.delta as string);
+                setIsAwaitingReply(false);
+                return;
+            }
+            if (msg.type === 'message_end') {
+                const existing = useChatStore.getState().messages.find((m) => m.id === msg.stream_id);
+                useChatStore.getState().endStream(
+                    msg.stream_id as string,
+                    (msg.content as string) ?? existing?.content ?? '',
+                    msg.metadata as MessageMetadata | undefined,
+                );
+                setIsAwaitingReply(false);
+                const endMeta = msg.metadata as MessageMetadata | undefined;
+                if (endMeta?.card) {
+                    useChatStore.getState().registerCard(endMeta.card.card_id, true);
+                }
+                if ((endMeta as any)?.task_created) {
+                    showToast.success(`Task ${(endMeta as any).task_id} created`);
+                }
+                return;
+            }
+
+            // ── Legacy single-shot message (unchanged) ───────────────────────
+            if (msg.type === 'message') {
                 // FIX #2: prefer server-assigned message_id over timestamp
                 const messageId = (msg.message_id as string | undefined) || (msg.timestamp as string | undefined) || crypto.randomUUID();
 
@@ -506,6 +542,20 @@ export function ChatPage() {
             handleSubmit(e as any);
         }
     };
+
+    /**
+     * Task 8: stop an in-flight streamed reply. The WebSocket store's
+     * `sendMessage` only emits `type: 'message'` frames, so we send the
+     * `cancel` frame directly over the open socket (the store is intentionally
+     * left untouched).
+     */
+    const handleStop = useCallback(() => {
+        if (!activeStreamId) return;
+        const ws = useWebSocketStore.getState()._ws;
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'cancel', stream_id: activeStreamId }));
+        }
+    }, [activeStreamId]);
 
     const prefersReducedMotion = () =>
         typeof window !== 'undefined' &&
@@ -1250,11 +1300,19 @@ export function ChatPage() {
                                             <span className="text-xs text-gray-600 dark:text-gray-500">Enter to send · Shift+Enter for new line</span>
                                         </div>
                                     </div>
-                                    <button type="submit" aria-label="Send message"
-                                        disabled={(!input.trim() && uploadedFiles.length === 0) || !isConnected}
-                                        className="p-3.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-200 dark:disabled:bg-[#1e2535] disabled:cursor-not-allowed text-white disabled:text-gray-600 dark:disabled:text-gray-600 rounded-2xl transition-all duration-150 shadow-lg shadow-blue-500/25 dark:shadow-blue-900/40 disabled:shadow-none flex-shrink-0">
-                                        <Send className="w-5 h-5" />
-                                    </button>
+                                    {activeStreamId ? (
+                                        <button type="button" aria-label="Stop generating"
+                                            onClick={handleStop}
+                                            className="p-3.5 min-w-[44px] h-[44px] bg-red-600 hover:bg-red-700 text-white rounded-2xl transition-all duration-150 shadow-lg shadow-red-500/25 dark:shadow-red-900/40 flex-shrink-0 flex items-center justify-center">
+                                            <Square className="w-5 h-5" />
+                                        </button>
+                                    ) : (
+                                        <button type="submit" aria-label="Send message"
+                                            disabled={(!input.trim() && uploadedFiles.length === 0) || !isConnected}
+                                            className="p-3.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-200 dark:disabled:bg-[#1e2535] disabled:cursor-not-allowed text-white disabled:text-gray-600 dark:disabled:text-gray-600 rounded-2xl transition-all duration-150 shadow-lg shadow-blue-500/25 dark:shadow-blue-900/40 disabled:shadow-none flex-shrink-0">
+                                            <Send className="w-5 h-5" />
+                                        </button>
+                                    )}
                                 </form>
 
                                 <input ref={fileInputRef} type="file" className="hidden" multiple
