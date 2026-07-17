@@ -1085,14 +1085,14 @@ export function ChatPage() {
                                                 )}
                                             </div>
 
-                                            <div className={`flex flex-col max-w-[75%] ${isUser ? 'items-end' : 'items-start'}`}>
+                                            <div className={`flex flex-col max-w-[min(88%,var(--chat-col))] ${isUser ? 'items-end' : 'items-start'}`}>
                                                 {message.metadata?.card ? (
                                                     <StructuredInputCard
                                                         card={message.metadata.card}
                                                         onSubmit={(answer) => submitCardAnswer(answer)}
                                                     />
                                                 ) : (
-                                                    <div className={`px-4 py-3 rounded-2xl ${isUser ? 'bg-gradient-to-br from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/20 dark:shadow-blue-900/40'
+                                                    <div className={`max-w-[68ch] px-4 py-3 rounded-2xl ${isUser ? 'bg-gradient-to-br from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/20 dark:shadow-blue-900/40'
                                                             : isError ? 'bg-orange-50 dark:bg-orange-500/10 border border-orange-200 dark:border-orange-500/20 text-orange-900 dark:text-orange-300'
                                                                 : message.role === 'system' ? 'bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-900 dark:text-red-300'
                                                                     : 'bg-white dark:bg-[#161b27] border border-gray-200 dark:border-[#1e2535] text-gray-900 dark:text-gray-100 shadow-sm dark:shadow-[0_2px_12px_rgba(0,0,0,0.2)]'
