@@ -17,6 +17,7 @@ from backend.services.reincarnation_service import reincarnation_service
 from backend.services.clarification_service import clarification_service
 from backend.services.model_provider import ModelService
 from backend.services.media_interceptor import MediaInterceptor
+from backend.services.decision_engine import DecisionEngine, DecisionAction
 from backend.core.llm_client import LLMClient
 from backend.models.entities.user_config import ConnectionStatus
 from backend.models.entities.chat_message import ChatMessage as ChatMsg
@@ -526,73 +527,57 @@ Progress: {task_progress or 'N/A'}%"""
         db: Session
     ) -> Dict[str, Any]:
         """
-        Analyze if the message should create a task.
-        Looks for execution keywords in both prompt and response.
+        Decide whether the message should create a task using the unified
+        DecisionEngine instead of keyword/acknowledgment heuristics.
         """
-        execution_keywords = [
-            "create", "execute", "run", "analyze", "process", "generate",
-            "write", "code", "research", "investigate", "calculate",
-            "deploy", "build", "test", "validate"
-        ]
+        from backend.services.decision_engine import DecisionEngine, DecisionAction
 
-        # Check if it seems like a command
-        is_command = any(keyword in prompt.lower() for keyword in execution_keywords)
+        decision = await DecisionEngine().decide(head, prompt, db)
+        if decision.action is not DecisionAction.CREATE_TASK:
+            return {"created": False}
 
-        # Check if Head acknowledged it as a task
-        task_acknowledged = any(phrase in response.lower() for phrase in [
-            "i shall", "i will", "creating task", "delegating", "assigning",
-            "the council will", "lead agents will"
-        ])
+        # Persistence requires a live session; callers without one (e.g.
+        # offline decision checks) still receive the decision outcome.
+        if db is None:
+            return {"created": True}
 
-        if is_command and task_acknowledged:
-            # Create a task
-            task = Task(
-                title=prompt[:100] + "..." if len(prompt) > 100 else prompt,
-                description=prompt,
-                task_type=TaskType.EXECUTION,
-                priority=TaskPriority.NORMAL,
-                created_by="sovereign",
-                head_of_council_id=head.id,
-                requires_deliberation=True
+        task = Task(
+            title=prompt[:100] + "..." if len(prompt) > 100 else prompt,
+            description=decision.task_brief or prompt,
+            task_type=TaskType.EXECUTION,
+            priority=TaskPriority.NORMAL,
+            created_by="sovereign",
+            head_of_council_id=head.id,
+            requires_deliberation=True,
+        )
+        db.add(task)
+        db.commit()
+
+        plan = {
+            "objective": (decision.task_brief or prompt)[:200],
+            "title": task.title,
+            "task_id": task.agentium_id,
+            "steps": ["deliberation", "delegation", "execution", "review"],
+            "created_at": datetime.utcnow().isoformat(),
+        }
+        try:
+            head.update_ethos_with_plan(plan, db, max_retries=3)
+            db.commit()
+        except RuntimeError as e:
+            logger.warning(
+                "Ethos update failed for Head %s during plan write: %s",
+                head.agentium_id, e
             )
 
-            db.add(task)
+        council = db.query(Agent).filter(
+            Agent.agent_type == AgentType.COUNCIL_MEMBER,
+            Agent.is_active == True,
+        ).all()
+        if council:
+            task.start_deliberation([c.agentium_id for c in council])
             db.commit()
 
-            # Workflow §2: Write plan into Head's Ethos with retry logic
-            plan = {
-                "objective": prompt[:200],
-                "title": task.title,
-                "task_id": task.agentium_id,
-                "steps": ["deliberation", "delegation", "execution", "review"],
-                "created_at": datetime.utcnow().isoformat(),
-            }
-            try:
-                head.update_ethos_with_plan(plan, db, max_retries=3)
-                db.commit()
-            except RuntimeError as e:
-                # Log the failure but don't block task creation
-                logger.warning(
-                    "Ethos update failed for Head %s during plan write: %s",
-                    head.agentium_id, e
-                )
-
-            # Use enum comparison instead of string
-            council = db.query(Agent).filter(
-                Agent.agent_type == AgentType.COUNCIL_MEMBER,
-                Agent.is_active == True
-            ).all()
-
-            if council:
-                task.start_deliberation([c.agentium_id for c in council])
-                db.commit()
-
-            return {
-                "created": True,
-                "task_id": task.agentium_id
-            }
-
-        return {"created": False}
+        return {"created": True, "task_id": task.agentium_id}
 
     @staticmethod
     async def log_interaction(
