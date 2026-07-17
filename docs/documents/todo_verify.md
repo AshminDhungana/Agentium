@@ -44,6 +44,24 @@ Items are **not confirmed bugs unless marked "Confirmed."** Anything else is a l
 
 ---
 
+Here’s a **condensed checklist** of the most urgent fixes to address the issues:
+
+---
+
+### ✅ Critical Fixes
+
+- [ ] **Fix Redis write in Genesis** – define `get_redis_client()` and add missing `await` so Head of Council state persists.
+- [ ] **Handle missing Head gracefully** – prevent WebSocket from closing immediately; return a clear error instead.
+- [ ] **Correct duplicate `tools` argument** in LLM provider call to avoid fallback errors.
+- [ ] **Add error handling to WebSocket** – on disconnect, show a banner and keep UI responsive.
+- [ ] **Implement auto‑scroll** after each message (user & assistant) to always show latest reply.
+- [ ] **Improve streaming animation** – replace blinking with smoother pulse; ensure stop button cancels even if Head goes offline.
+
+---
+
+**Order of execution:**  
+Backend Redis fix → WebSocket error handling → frontend UI enhancements.
+
 ## 1. Log-Reported Defects
 
 Confirmed from application logs. Fix in the priority order given at the end of this section.
@@ -298,9 +316,12 @@ Confirmed from application logs. Fix in the priority order given at the end of t
 
 ## 10. Chat Page — UX
 
-- **10.1 — [P1]** Stream assistant replies token-by-token (or chunk-by-chunk) instead of rendering the whole message at once, matching standard messaging-app UX. Requires backend streaming support end-to-end (provider stream → WebSocket/SSE → frontend incremental render).
+- [ ] Improvements in how ai message are sent to the user, currently the ai sends small messages as reply to the user, this was intended design but it is too small. think of what can be done to imporve on that, do web serch for ideas and improvement.
+
+- [ ] Improvement in display of animation in the chatpage, right now only three dot animation is shown, for thinking that should be shown and for tools use or processing number of tools use or something else should be shown to the user so it keeps user engaging.
+
 - **10.2 — [P2]** When a user pastes long text into the compose box, collapse it to a `[x lines pasted]` placeholder; after sending, show the same collapsed form in the message with an expand button to view the full text.
-- **10.3 — [P2]** Typing indicator: animated three-dot indicator while a reply is generating (distinct from the "Thinking…" label in 5.6, which is for active extended-thinking mode specifically).
+- **10.3 — [P2]** Typing indicator: animated three-dot indicator while a reply is generating (distinct from the "Thinking…" label in 5.6, which is for active extended-thinking mode specifically). for thinking the three dot will be fine, and for tool use add no of tools used +count or somthing similar, the goal is to make the chat user engaging. 
 - **10.4 — [P1]** Investigate and fix cases where Head disconnects mid-chat and a sent message never receives a reply — trace via logs, likely a WebSocket/session lifecycle bug.
 - **10.5 — [P2]** Auto-prune chat history older than 7 days, but always retain the last few messages regardless of age if there's been no further activity.
 - **10.6 — [P3]** Addressing convention: Head addresses the admin as "Sovereign"; all other users are addressed by username, or "sir" if no username context is available.
