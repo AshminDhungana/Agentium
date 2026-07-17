@@ -19,7 +19,7 @@ import time
 import asyncio
 import types
 from contextlib import contextmanager
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from unittest.mock import patch, AsyncMock
 
 import pytest
@@ -357,7 +357,11 @@ class FakeProviderServer:
         self._status_counts = {}  # status_code -> hit count
         self._started = threading.Event()
         handler = self._make_handler()
-        self._httpd = HTTPServer(("127.0.0.1", 0), handler)
+        # ThreadingHTTPServer (not the default single-threaded HTTPServer) so
+        # keep-alive / streaming connections from SDK clients don't block the
+        # one worker and wedge the whole mock (symptom: "connection refused"
+        # / "server disconnected without sending a response" under load).
+        self._httpd = ThreadingHTTPServer(("127.0.0.1", 0), handler)
         self.port = self._httpd.server_address[1]
         self.base_url = f"http://127.0.0.1:{self.port}/v1"
         t = threading.Thread(target=self._httpd.serve_forever, daemon=True)
