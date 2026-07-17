@@ -1046,8 +1046,8 @@ export function ChatPage() {
                         {/* Messages */}
                         <div className="relative flex-1 min-h-0">
                             <div ref={messagesScrollRef} onScroll={handleMessagesScroll}
-                                className="h-full overflow-y-auto px-4 py-6">
-                                <div className="max-w-3xl mx-auto space-y-6">
+                                className="h-full overflow-y-auto px-4 md:px-8 xl:px-12 py-6">
+                                <div className="mx-auto w-full space-y-6" style={{ maxWidth: 'var(--chat-col)' }}>
                                 {messages.length === 0 && (
                                     <div className="h-64 flex items-center justify-center">
                                         <EmptyState
