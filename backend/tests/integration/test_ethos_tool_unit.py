@@ -59,3 +59,37 @@ async def test_read_unknown_agent(db_session: Session):
 
     assert result["success"] is False
     assert result["error"] is not None
+
+
+async def test_append_lesson(db_session: Session):
+    _make_agent_with_ethos(db_session, "30001")
+    result = await ethos_tool.execute(
+        action="append", kind="lesson",
+        payload={"key_point": "cache DB sessions"},
+        db=db_session, agent_id="30001",
+    )
+    assert result["success"] is True
+    ethos = _load_ethos(db_session, "30001")
+    assert ethos.get_lessons_learned()[-1]["key_point"] == "cache DB sessions"
+    assert ethos.last_updated_by_agent is True
+
+
+async def test_append_progress(db_session: Session):
+    _make_agent_with_ethos(db_session, "30001")
+    result = await ethos_tool.execute(
+        action="append", kind="progress",
+        payload={"step2": "done"},
+        db=db_session, agent_id="30001",
+    )
+    assert result["success"] is True
+    assert _load_ethos(db_session, "30001").get_task_progress()["step2"] == "done"
+
+
+async def test_append_invalid_kind(db_session: Session):
+    _make_agent_with_ethos(db_session, "30001")
+    result = await ethos_tool.execute(
+        action="append", kind="bogus", payload={},
+        db=db_session, agent_id="30001",
+    )
+    assert result["success"] is False
+    assert "kind" in (result["error"] or "")

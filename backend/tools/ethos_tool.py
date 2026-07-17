@@ -79,6 +79,9 @@ class EthosTool:
         if action == "read":
             return self._read(db, agent_id)
 
+        if action == "append":
+            return self._append(db, agent_id, kwargs)
+
         return _result(False, error=f"Unknown or unimplemented action: {action}")
 
     def _read(self, db: Session, agent_id: str) -> Dict[str, Any]:
@@ -100,6 +103,30 @@ class EthosTool:
             "is_verified": ethos.is_verified,
         }
         return _result(True, data=data)
+
+    def _append(self, db: Session, agent_id: str, kwargs: Dict[str, Any]) -> Dict[str, Any]:
+        ethos = _load_ethos(db, agent_id)
+        if ethos is None:
+            return _result(False, error=f"Ethos not found for agent {agent_id}")
+        kind = kwargs.get("kind")
+        payload = kwargs.get("payload")
+        if kind == "lesson":
+            if not isinstance(payload, dict):
+                return _result(False, error="lesson payload must be a dict")
+            ethos.add_lesson_learned(payload)
+            return _result(True, data={"kind": "lesson", "written": payload})
+        if kind == "progress":
+            if not isinstance(payload, dict):
+                return _result(False, error="progress payload must be a dict")
+            ethos.set_task_progress(payload)
+            return _result(True, data={"kind": "progress", "written": payload})
+        if kind == "reasoning":
+            artifacts = ethos.get_reasoning_artifacts()
+            artifacts.append(payload if isinstance(payload, (str, dict)) else str(payload))
+            ethos.reasoning_artifacts = json.dumps(artifacts)
+            ethos.increment_version()
+            return _result(True, data={"kind": "reasoning", "written": payload})
+        return _result(False, error=f"Unknown append kind: {kind}")
 
 
 ethos_tool = EthosTool()
