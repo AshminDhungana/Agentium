@@ -10,10 +10,16 @@ logger = logging.getLogger(__name__)
 
 
 class AgentRegistry:
+    # Task agents span 3xxxx-6xxxx (AgentType.TASK_AGENT).
+    TASK_TIER_PREFIXES = {"3", "4", "5", "6"}
+
     @staticmethod
     async def choose_target(decision: Decision, db, caller) -> Optional[str]:
         """Resolve the best agent to receive a delegated task, or auto-spawn one."""
-        if decision.target_tier and decision.target_tier.startswith("3"):
+        if (
+            decision.target_tier
+            and decision.target_tier[:1] in AgentRegistry.TASK_TIER_PREFIXES
+        ):
             agent = (
                 db.query(Agent)
                 .filter(

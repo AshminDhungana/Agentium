@@ -4,14 +4,19 @@ from backend.core.tool_registry import ToolRegistry
 
 
 def test_task_tier_restricted():
-    restricted = ToolRegistry().restricted_tools_for("3xxxx")
-    assert "spawn_agent" in restricted
-    assert "dispatch_task" in restricted
-    assert "create_task" in restricted
-    tools = ToolRegistry().to_openai_tools("3xxxx")
-    names = [t["function"]["name"] for t in tools]
-    assert "spawn_agent" not in names
-    assert "dispatch_task" not in names
+    # Task agents span 3xxxx-6xxxx; all must be withheld governance tools.
+    for tier in ("3xxxx", "4xxxx", "5xxxx", "6xxxx"):
+        restricted = ToolRegistry().restricted_tools_for(tier)
+        assert "spawn_agent" in restricted
+        assert "dispatch_task" in restricted
+        assert "create_task" in restricted
+        tools = ToolRegistry().to_openai_tools(tier)
+        names = [t["function"]["name"] for t in tools]
+        assert "spawn_agent" not in names
+        assert "dispatch_task" not in names
+    # Critics (7xxxx-9xxxx) and governance tiers keep them.
+    for tier in ("0xxxx", "1xxxx", "2xxxx", "7xxxx", "8xxxx", "9xxxx"):
+        assert "spawn_agent" not in ToolRegistry().restricted_tools_for(tier)
 
 
 class _FakeAgent:

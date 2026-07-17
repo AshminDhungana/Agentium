@@ -32,9 +32,11 @@ from backend.tools.mcp_agent_tools import add_mcp_server, vote_on_mcp_server
 class ToolRegistry:
     """Registry of available tools for agents."""
 
-    RESTRICTED_BY_TIER = {
-        "3xxxx": {"spawn_agent", "dispatch_task", "create_task"},
-    }
+    # Task agents span 3xxxx-6xxxx (AgentType.TASK_AGENT). Critics are 7xxxx-9xxxx.
+    # Governance tools that spawn/route work are withheld from all Task tiers to
+    # prevent a Task agent from recursively spawning its own sub-org.
+    TASK_TIER_PREFIXES = {"3", "4", "5", "6"}
+    RESTRICTED_FOR_TASK = {"spawn_agent", "dispatch_task", "create_task"}
 
     def __init__(self):
         self.tools: Dict[str, Dict[str, Any]] = {}
@@ -42,7 +44,10 @@ class ToolRegistry:
 
     def restricted_tools_for(self, tier: str) -> List[str]:
         """Tools withheld from a tier (anti-recursion for Task agents)."""
-        return sorted(self.RESTRICTED_BY_TIER.get(tier, set()))
+        prefix = (tier or "")[:1]
+        if prefix in self.TASK_TIER_PREFIXES:
+            return sorted(self.RESTRICTED_FOR_TASK)
+        return []
 
     # ── Initialisation ─────────────────────────────────────────────────────────
 
