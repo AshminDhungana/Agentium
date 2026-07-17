@@ -111,7 +111,7 @@ def _get_cached_sdk_client(
 
     if is_anthropic:
         import anthropic
-        client = anthropic.AsyncAnthropic(api_key=api_key)
+        client = anthropic.AsyncAnthropic(api_key=api_key, base_url=base_url)
     else:
         import openai
         client = openai.AsyncOpenAI(
@@ -715,13 +715,38 @@ class OpenAICompatibleProvider(BaseModelProvider):
 class AnthropicProvider(BaseModelProvider):
     """Anthropic Claude API."""
 
+    @staticmethod
+    def _anthropic_base_url(config) -> Optional[str]:
+        """
+        SDK base URL for the Anthropic client.
+
+        The anthropic SDK appends ``/v1`` to whatever base_url it is given, so we
+        must NOT pass a URL that already ends in ``/v1``. Defaults to the real
+        Anthropic API when no explicit override is configured, but honours
+        ``config.api_base_url`` (e.g. a self-hosted / OpenAI-compatible Anthropic
+        endpoint, or a local mock server) so users can point Anthropic at a
+        custom base. The previously-hardcoded ``None`` ignored ``api_base_url``
+        entirely, making custom endpoints impossible.
+        """
+        if getattr(config, "api_base_url", None):
+            base = config.api_base_url.rstrip("/")
+            if base.endswith("/v1"):
+                base = base.removesuffix("/v1")
+            return base
+        if getattr(config, "base_url", None):
+            base = config.base_url.rstrip("/")
+            if base.endswith("/v1"):
+                base = base.removesuffix("/v1")
+            return base
+        return None
+
     async def generate(self, system_prompt: str, user_message: str, **kwargs) -> Dict[str, Any]:
         """Generate."""
 
         client = _get_cached_sdk_client(
             self.config,
             api_key=self.api_key,
-            base_url=None,
+            base_url=self._anthropic_base_url(self.config),
             timeout=None,
             is_anthropic=True,
         )
@@ -778,7 +803,7 @@ class AnthropicProvider(BaseModelProvider):
         client = _get_cached_sdk_client(
             self.config,
             api_key=self.api_key,
-            base_url=None,
+            base_url=self._anthropic_base_url(self.config),
             timeout=None,
             is_anthropic=True,
         )
@@ -833,7 +858,7 @@ class AnthropicProvider(BaseModelProvider):
         client = _get_cached_sdk_client(
             self.config,
             api_key=self.api_key,
-            base_url=None,
+            base_url=self._anthropic_base_url(self.config),
             timeout=None,
             is_anthropic=True,
         )
