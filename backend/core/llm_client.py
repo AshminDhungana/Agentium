@@ -458,6 +458,64 @@ class LLMClient:
             "LLMClient.generate_with_tools: No providers available and no error captured"
         )
 
+    DECISION_TOOL = {
+        "type": "function",
+        "function": {
+            "name": "decide",
+            "description": "Decide what action this agent should take for the user message.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "action": {
+                        "type": "string",
+                        "enum": [
+                            "reply", "create_task", "spawn_agent",
+                            "dispatch_task", "vote", "delegate",
+                        ],
+                    },
+                    "rationale": {"type": "string"},
+                    "target_tier": {"type": ["string", "null"]},
+                    "task_brief": {"type": ["string", "null"]},
+                    "tools_considered": {
+                        "type": "array", "items": {"type": "string"},
+                    },
+                    "confidence": {"type": "number"},
+                },
+                "required": ["action", "rationale", "confidence"],
+            },
+        },
+    }
+
+    async def decide(
+        self,
+        agent,
+        user_message: str,
+        *,
+        db,
+        config_id: Optional[str] = None,
+        agent_tier: Optional[str] = None,
+        available_tools: Optional[list] = None,
+    ) -> Dict[str, Any]:
+        """Constrained decision call: forces the model to emit a `decide` tool call."""
+        system_prompt = (
+            "You are a routing decider for an agent in a hierarchical AI council. "
+            "Given the message and the list of available tools, choose the single best "
+            "action. Use `create_task`/`dispatch_task`/`delegate` only when concrete "
+            "execution work is requested. Use `reply` for questions, chit-chat, or when "
+            "uncertain. Available tools: "
+            + ", ".join(t.get("function", {}).get("name", "?") for t in (available_tools or []))
+        )
+        return await self.generate_with_tools(
+            agent,
+            user_message,
+            db=db,
+            config_id=config_id,
+            system_prompt_override=system_prompt,
+            agent_tier=agent_tier,
+            max_tool_iterations=1,
+            **{"tools": [self.DECISION_TOOL], "tool_choice": {"type": "function", "function": {"name": "decide"}}},
+        )
+
     def get_circuit_breaker_metrics(self, config_id: Optional[str] = None) -> Dict[str, Any]:
         """Return CB metrics for one config or all configured configs."""
         if config_id:
