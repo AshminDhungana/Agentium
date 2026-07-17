@@ -59,3 +59,33 @@
   50%      { transform: translateY(-6px); }
 }
 .animate-float { animation: float 3s ease-in-out infinite; }
+/* Chat markdown rendering (MarkdownMessage) — token-driven, light/dark */
+@layer components {
+  .markdown-body h1,
+  .markdown-body h2,
+  .markdown-body h3,
+  .markdown-body h4 {
+    @apply font-semibold mt-2 mb-1 leading-snug text-gray-900 dark:text-gray-100;
+  }
+  .markdown-body h1 { @apply text-xl; }
+  .markdown-body h2 { @apply text-lg; }
+  .markdown-body h3,
+  .markdown-body h4 { @apply text-base; }
+  .markdown-body p { @apply my-1; }
+  .markdown-body ul { @apply list-disc pl-5 my-1; }
+  .markdown-body ol { @apply list-decimal pl-5 my-1; }
+  .markdown-body li { @apply my-0.5; }
+  .markdown-body a {
+    @apply text-blue-600 dark:text-blue-400 underline underline-offset-2;
+  }
+  .markdown-body code {
+    @apply font-mono text-[0.85em] bg-black/5 dark:bg-white/10 px-1 py-0.5 rounded;
+  }
+  .markdown-body pre {
+    @apply bg-black/[0.04] dark:bg-white/[0.06] border border-black/10 dark:border-white/10 rounded-lg p-3 my-2 overflow-x-auto;
+  }
+  .markdown-body pre code { @apply bg-transparent p-0; }
+  .markdown-body blockquote {
+    @apply border-l-[3px] border-black/15 dark:border-white/20 pl-3 my-2 text-gray-600 dark:text-gray-400;
+  }
+}
