@@ -156,3 +156,32 @@ async def test_decision_has_correlation_id():
     decision = await engine.decide(_FakeAgent(), "hi", db=None, _llm=_make_fake_llm("reply", 0.9))
     assert isinstance(getattr(decision, "decision_id", None), str)
     uuid.UUID(decision.decision_id)  # must be valid uuid
+
+
+@pytest.mark.asyncio
+async def test_low_confidence_falls_back_to_reply():
+    from backend.services.decision_engine import DecisionEngine, DecisionAction
+    engine = DecisionEngine()
+    d = await engine.decide(_FakeAgent(), "do x", db=None, _llm=_make_fake_llm("create_task", 0.1))
+    assert d.action is DecisionAction.REPLY
+
+
+@pytest.mark.asyncio
+async def test_llm_failure_falls_back_to_reply():
+    from backend.services.decision_engine import DecisionEngine, DecisionAction
+
+    async def boom(*a, **k):
+        raise RuntimeError("provider down")
+
+    engine = DecisionEngine()
+    d = await engine.decide(_FakeAgent(), "do x", db=None, _llm=boom)
+    assert d.action is DecisionAction.REPLY
+
+
+def test_task_tier_cannot_spawn():
+    from backend.core.tool_registry import ToolRegistry
+    restricted = ToolRegistry().restricted_tools_for("3xxxx")
+    assert "spawn_agent" in restricted
+    tools = ToolRegistry().to_openai_tools("3xxxx")
+    names = [t["function"]["name"] for t in tools]
+    assert "spawn_agent" not in names
