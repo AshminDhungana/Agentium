@@ -1165,7 +1165,7 @@ export function ChatPage() {
 
                         {/* Input bar */}
                         <div className="flex-shrink-0 bg-white dark:bg-[#161b27] border-t border-gray-200 dark:border-[#1e2535] px-4 py-4">
-                            <div className="max-w-3xl mx-auto">
+                            <div className="mx-auto w-full" style={{ maxWidth: 'var(--chat-col)' }}>
                                 {/* File previews */}
                                 {uploadedFiles.length > 0 && (
                                     <div className="flex flex-wrap gap-2 mb-3">
