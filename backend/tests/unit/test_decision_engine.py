@@ -1,5 +1,17 @@
 import pytest
 from backend.services.decision_engine import Decision, DecisionAction
+from backend.core.tool_registry import ToolRegistry
+
+
+def test_task_tier_restricted():
+    restricted = ToolRegistry().restricted_tools_for("3xxxx")
+    assert "spawn_agent" in restricted
+    assert "dispatch_task" in restricted
+    assert "create_task" in restricted
+    tools = ToolRegistry().to_openai_tools("3xxxx")
+    names = [t["function"]["name"] for t in tools]
+    assert "spawn_agent" not in names
+    assert "dispatch_task" not in names
 
 
 class _FakeAgent:

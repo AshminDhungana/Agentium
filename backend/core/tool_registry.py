@@ -32,9 +32,17 @@ from backend.tools.mcp_agent_tools import add_mcp_server, vote_on_mcp_server
 class ToolRegistry:
     """Registry of available tools for agents."""
 
+    RESTRICTED_BY_TIER = {
+        "3xxxx": {"spawn_agent", "dispatch_task", "create_task"},
+    }
+
     def __init__(self):
         self.tools: Dict[str, Dict[str, Any]] = {}
         self._initialize_tools()
+
+    def restricted_tools_for(self, tier: str) -> List[str]:
+        """Tools withheld from a tier (anti-recursion for Task agents)."""
+        return sorted(self.RESTRICTED_BY_TIER.get(tier, set()))
 
     # ── Initialisation ─────────────────────────────────────────────────────────
 
@@ -1561,6 +1569,8 @@ class ToolRegistry:
         for name, tool in self.tools.items():
             if tier not in tool.get("authorized_tiers", []):
                 continue
+            if name in self.restricted_tools_for(tier):
+                continue
             if tool.get("deprecated"):
                 continue
             props, required = self._build_props(tool)
@@ -1588,6 +1598,8 @@ class ToolRegistry:
         result: List[Dict[str, Any]] = []
         for name, tool in self.tools.items():
             if tier not in tool.get("authorized_tiers", []):
+                continue
+            if name in self.restricted_tools_for(tier):
                 continue
             if tool.get("deprecated"):
                 continue
