@@ -36,7 +36,7 @@ export interface Message {
     role: 'sovereign' | 'head_of_council' | 'system';
     content: string;
     timestamp: Date;
-    status?: 'sending' | 'sent' | 'error';
+    status?: 'sending' | 'sent' | 'error' | 'streaming';
     metadata?: MessageMetadata;
     attachments?: MessageAttachment[];
 }
@@ -52,6 +52,10 @@ interface ChatState {
     confirmCard: (cardId: string) => void;
     expireCard: (cardId: string) => void;
     dismissCard: (cardId: string) => void;
+    activeStreamId: string | null;
+    beginStream: (messageId: string, role: Message['role']) => void;
+    appendDelta: (streamId: string, delta: string) => void;
+    endStream: (streamId: string, content: string, metadata?: MessageMetadata) => void;
     sendMessage: (content: string) => Promise<void>;
     sendStreamingMessage: (content: string, onChunk: (chunk: string) => void) => Promise<void>;
     setMessages: (updater: Message[] | ((prev: Message[]) => Message[])) => void;
@@ -67,6 +71,7 @@ export const useChatStore = create<ChatState>()(
             messages: [],
             isLoading: false,
             currentStreamingMessage: '',
+            activeStreamId: null,
             cardStatus: {},
             activeCardId: null,
 
@@ -94,8 +99,31 @@ export const useChatStore = create<ChatState>()(
                 activeCardId: s.activeCardId === cardId ? null : s.activeCardId,
             })),
 
-            // Allows external callers (ChatPage) to write messages into the store
-            // so they survive navigation (component unmount/remount).
+            // Streaming helpers: drive server-pushed token deltas into a single message.
+            beginStream: (messageId, role) => set((s) => ({
+                activeStreamId: messageId,
+                messages: [
+                    ...s.messages,
+                    { id: messageId, role, content: '', timestamp: new Date(), status: 'streaming' },
+                ],
+                currentStreamingMessage: '',
+            })),
+
+            appendDelta: (streamId, delta) => set((s) => ({
+                currentStreamingMessage: s.currentStreamingMessage + delta,
+                messages: s.messages.map((m) =>
+                    m.id === streamId ? { ...m, content: m.content + delta } : m),
+            })),
+
+            endStream: (streamId, content, metadata) => set((s) => ({
+                activeStreamId: s.activeStreamId === streamId ? null : s.activeStreamId,
+                currentStreamingMessage: '',
+                messages: s.messages.map((m) =>
+                    m.id === streamId
+                        ? { ...m, content, status: 'sent', metadata: { ...m.metadata, ...metadata } }
+                        : m),
+            })),
+
             setMessages: (updater) =>
                 set((state) => ({
                     messages: typeof updater === 'function'
