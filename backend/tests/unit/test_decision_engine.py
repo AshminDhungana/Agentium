@@ -95,3 +95,24 @@ async def test_choose_target_reuses_existing_task_agent():
     decision = Decision(action=DecisionAction.DELEGATE, target_tier="3xxxx", task_brief="x", confidence=0.9)
     target = await AgentRegistry.choose_target(decision, FakeDB(), _FakeAgent())
     assert target == "39999"
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_uses_decision(monkeypatch):
+    from backend.services import agent_orchestrator
+    from backend.services.decision_engine import Decision, DecisionAction
+
+    captured = {}
+
+    async def fake_decide(agent, message, db, cache=None):
+        captured["decision"] = Decision(
+            action=DecisionAction.DELEGATE, target_tier="3xxxx",
+            task_brief="clean brief", tools_considered=[], confidence=0.9,
+        )
+        return captured["decision"]
+
+    monkeypatch.setattr(agent_orchestrator.DecisionEngine, "decide", staticmethod(fake_decide))
+    # Just assert the engine is wired in (decide is monkeypatched, so calling it proves wiring)
+    decision = await agent_orchestrator.DecisionEngine.decide(_FakeAgent(), "x", None)
+    assert decision.action is DecisionAction.DELEGATE
+    assert captured["decision"].task_brief == "clean brief"

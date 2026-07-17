@@ -29,6 +29,7 @@ from backend.services.critic_agents import critic_service, CriticType
 from backend.services.api_manager import api_manager
 from backend.core.llm_client import LLMClient
 from backend.models.schemas.tool_creation import ToolCreationRequest
+from backend.services.decision_engine import DecisionEngine, DecisionAction
 
 # Tool execution imports
 from backend.services.host_access import HostAccessService
@@ -301,6 +302,18 @@ class AgentOrchestrator:
                 error=f"Action requires Council Vote: {decision.explanation}"
             )
 
+        # ── Unified decision layer (all tiers) ───────────────────────────────
+        try:
+            decision = await DecisionEngine().decide(source, raw_input, self.db)
+        except Exception as exc:
+            logger.warning("DecisionEngine failed in process_intent: %s", exc)
+            decision = None
+        if decision is not None and decision.action in (
+            DecisionAction.CREATE_TASK, DecisionAction.SPAWN_AGENT,
+            DecisionAction.DISPATCH_TASK, DecisionAction.VOTE, DecisionAction.DELEGATE,
+        ):
+            return await self._execute_decision(decision, source, raw_input, start)
+
         # Check if message is a tool execution command
         tool_detection = self._detect_tool_intent(raw_input, source_id)
         if tool_detection["is_tool_command"]:
@@ -391,6 +404,43 @@ class AgentOrchestrator:
         await self._broadcast_orchestration_event(msg, result)
 
         return result
+
+    async def _execute_decision(self, decision, source_agent, raw_input: str, start):
+        from backend.services.governance_command_service import GovernanceCommandService
+        from backend.services.agent_registry import AgentRegistry
+
+        try:
+            if decision.action is DecisionAction.CREATE_TASK:
+                gov = GovernanceCommandService.detect_command(
+                    f"create task {decision.task_brief or raw_input}", require_prefix=False)
+                if gov:
+                    res = GovernanceCommandService.execute(gov, source_agent, self.db)
+                    return self._decision_result(source_agent, "create_task", res, start)
+            if decision.action in (DecisionAction.DISPATCH_TASK, DecisionAction.DELEGATE):
+                target = await AgentRegistry.choose_target(decision, self.db, source_agent)
+                if target:
+                    return await self.delegate_to_task(
+                        task={"description": decision.task_brief or raw_input},
+                        lead_id=source_agent.agentium_id,
+                        task_id=target, start=start)
+            if decision.action is DecisionAction.SPAWN_AGENT:
+                gov = GovernanceCommandService.detect_command(
+                    f"spawn agent task {decision.task_brief or ''}", require_prefix=False)
+                if gov:
+                    res = GovernanceCommandService.execute(gov, source_agent, self.db)
+                    return self._decision_result(source_agent, "spawn_agent", res, start)
+        except PermissionError as pe:
+            logger.warning("Decision action rejected (no authority): %s", pe)
+            return self._decision_result(source_agent, "rejected", {"error": str(pe)}, start)
+        return self._decision_result(source_agent, "reply", {"note": "no-op decision"}, start)
+
+    def _decision_result(self, actor, action, metadata, start):
+        self._record_metric(actor.agentium_id, success=True)
+        return RouteResult(
+            success=True, message_id=f"dec_{action}_{datetime.utcnow().timestamp()}",
+            path_taken=[actor.agentium_id],
+            constitutional_basis=[f"DecisionEngine:{action}"], metadata=metadata,
+        )
 
     # ── Tool Detection ─────────────────────────────────────────────────────────
 
@@ -733,6 +783,8 @@ class AgentOrchestrator:
         lead_id: str,
         task_id: Optional[str] = None,
         retry_count: int = 0,
+        target_task_agent_id: Optional[str] = None,
+        start=None,
     ) -> RouteResult:
         """
         Delegate from Lead (2xxxx) to Task (3xxxx) with ephemeral critic review.
@@ -749,7 +801,7 @@ class AgentOrchestrator:
         token_optimizer.record_activity()
 
         if not task_id:
-            task_id = await self._find_available_task(lead_id)
+            task_id = target_task_agent_id or await self._find_available_task(lead_id)
 
         if not task_id:
             # No Task Agent is a direct subordinate of this Lead. This is the
