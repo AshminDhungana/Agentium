@@ -131,7 +131,6 @@ export function ChatPage() {
     const [isRecording, setIsRecording] = useState(false);
     // isPaused was declared here but never consumed — removed (Issue 12)
     const [recordingTime, setRecordingTime] = useState(0);
-    const [showFileMenu, setShowFileMenu] = useState(false);
     const [imagePreview, setImagePreview] = useState<{ url: string; name: string } | null>(null);
     const [voiceAvailable, setVoiceAvailable] = useState<boolean | null>(null);
     const [showVoiceTooltip, setShowVoiceTooltip] = useState(false);
@@ -1219,7 +1218,7 @@ export function ChatPage() {
                                         />
                                         <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100 dark:border-[#1e2535]">
                                             <div className="flex items-center gap-1">
-                                                <button type="button" onClick={() => setShowFileMenu(!showFileMenu)} title="Attach file" aria-label="Attach file"
+                                                <button type="button" onClick={() => fileInputRef.current?.click()} title="Attach file" aria-label="Attach file"
                                                     className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-[#1e2535] text-gray-600 dark:text-gray-500 transition-colors">
                                                     <Paperclip className="w-4 h-4" />
                                                 </button>
