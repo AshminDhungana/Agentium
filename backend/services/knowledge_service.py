@@ -88,9 +88,10 @@ class KnowledgeService:
                         else None
                     ),
                 },
+                db=db,
             )
 
-    def embed_ethos(self, ethos: Ethos) -> None:
+    def embed_ethos(self, ethos: Ethos, db: Optional[Session] = None) -> None:
         """Vectorise agent ethos for behavioural retrieval."""
         content_parts = [
             f"Mission: {ethos.mission_statement}",
@@ -107,6 +108,7 @@ class KnowledgeService:
             ethos_content=full_content,
             agent_type=ethos.agent_type,
             verified_by=ethos.verified_by_agentium_id,
+            db=db,
         )
 
     # ------------------------------------------------------------------
@@ -686,7 +688,7 @@ class KnowledgeService:
         failed = 0
         for ethos in ethos_batch:
             try:
-                self.embed_ethos(ethos)
+                self.embed_ethos(ethos, db=db)
             except Exception:  # noqa: BLE001
                 logger.exception("Failed to embed ethos id=%s", ethos.id)
                 failed += 1

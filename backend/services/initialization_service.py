@@ -826,11 +826,11 @@ class InitializationService:
             )
             for member in attached_council:
                 if member.ethos:
-                    self.knowledge_service.embed_ethos(member.ethos)
+                    self.knowledge_service.embed_ethos(member.ethos, db=self.db)
 
             head = self.db.query(HeadOfCouncil).filter_by(agentium_id="00001").first()
             if head and head.ethos:
-                self.knowledge_service.embed_ethos(head.ethos)
+                self.knowledge_service.embed_ethos(head.ethos, db=self.db)
         except Exception as e:
             self._log("WARNING", f"Vector DB indexing skipped: {e}")
 

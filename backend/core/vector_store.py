@@ -229,21 +229,31 @@ class VectorStore:
         article_id: str,
         content: str,
         metadata: Dict[str, Any],
+        db: Optional[Any] = None,
     ) -> None:
-        """Store a constitutional article for RAG retrieval."""
+        """Store a constitutional article for RAG retrieval.
+
+        When ``db`` is supplied the untruncated ``content`` is persisted in the
+        ``knowledge_documents`` parent store (chunked vectors in ChromaDB).
+        Without ``db`` the legacy single-document upsert is used for callers
+        that do not hold a session (e.g. unit tests).
+        """
+        parent_id = f"const_{article_id}"
+        rich_meta = {
+            **metadata,
+            "type": "constitution_article",
+            "article_id": article_id,
+            "document_type": "supreme_law",
+            "immutable": True,
+        }
+        if db is not None:
+            self.upsert_document("constitution", parent_id, content, rich_meta, db)
+            return
         collection = self.get_collection("constitution")
         collection.upsert(
             documents=[content],
-            metadatas=[
-                {
-                    **metadata,
-                    "type": "constitution_article",
-                    "article_id": article_id,
-                    "document_type": "supreme_law",
-                    "immutable": True,
-                }
-            ],
-            ids=[f"const_{article_id}"],
+            metadatas=[rich_meta],
+            ids=[parent_id],
         )
 
     def add_ethos(
@@ -252,21 +262,25 @@ class VectorStore:
         ethos_content: str,
         agent_type: str,
         verified_by: Optional[str] = None,
+        db: Optional[Any] = None,
     ) -> None:
         """Store agent ethos for semantic retrieval."""
+        parent_id = f"ethos_{agentium_id}"
+        rich_meta = {
+            "agentium_id": agentium_id,
+            "agent_type": agent_type,
+            "verified_by": verified_by or "",
+            "type": "ethos",
+            "document_type": "behavioral_rules",
+        }
+        if db is not None:
+            self.upsert_document("ethos", parent_id, ethos_content, rich_meta, db)
+            return
         collection = self.get_collection("ethos")
         collection.upsert(
             documents=[ethos_content],
-            metadatas=[
-                {
-                    "agentium_id": agentium_id,
-                    "agent_type": agent_type,
-                    "verified_by": verified_by or "",
-                    "type": "ethos",
-                    "document_type": "behavioral_rules",
-                }
-            ],
-            ids=[f"ethos_{agentium_id}"],
+            metadatas=[rich_meta],
+            ids=[parent_id],
         )
 
     def add_execution_pattern(
@@ -276,24 +290,28 @@ class VectorStore:
         success_rate: float,
         task_type: str,
         tools_used: Optional[List[str]] = None,
+        db: Optional[Any] = None,
     ) -> None:
         """Store a successful execution pattern for future RAG."""
         # FIX: use canonical key "task_patterns" (collection name is still
         # "execution_patterns" on the ChromaDB side — the key is internal)
+        parent_id = f"pattern_{pattern_id}"
+        rich_meta = {
+            "pattern_id": pattern_id,
+            "success_rate": success_rate,
+            "task_type": task_type,
+            "tools_used": json.dumps(tools_used or []),
+            "type": "execution_pattern",
+            "document_type": "learned_behavior",
+        }
+        if db is not None:
+            self.upsert_document("task_patterns", parent_id, description, rich_meta, db)
+            return
         collection = self.get_collection("task_patterns")
         collection.upsert(
             documents=[description],
-            metadatas=[
-                {
-                    "pattern_id": pattern_id,
-                    "success_rate": success_rate,
-                    "task_type": task_type,
-                    "tools_used": json.dumps(tools_used or []),
-                    "type": "execution_pattern",
-                    "document_type": "learned_behavior",
-                }
-            ],
-            ids=[f"pattern_{pattern_id}"],
+            metadatas=[rich_meta],
+            ids=[parent_id],
         )
 
     # ------------------------------------------------------------------
@@ -391,30 +409,114 @@ class VectorStore:
         collection_keys: Optional[List[str]] = None,
         n_results: int = 5,
         filter_dict: Optional[Dict[str, Any]] = None,
+        db: Optional[Any] = None,
     ) -> QueryResult:
         """
         Query across one or more knowledge collections.
 
         Defaults to searching all collections when ``collection_keys`` is
-        not supplied.  Results are deduplicated by ID and sorted by
-        distance (ascending) before being truncated to ``n_results``.
+        not supplied.  Chunk vectors are queried and then deduplicated by
+        ``parent_id`` (keeping the closest chunk per parent).  When ``db``
+        is provided the untruncated full parent document is returned in
+        place of the chunk text; otherwise the closest chunk text is used.
+        Results are ranked by effective distance (decay + citation) and
+        truncated to ``n_results``.
         """
         keys = collection_keys or list(self.COLLECTIONS.keys())
 
-        results: List[QueryResult] = []
+        # Query both chunk vectors (new parent-document store) and legacy
+        # standalone documents.  Chunks carry ``parent_id`` + ``is_chunk`` and
+        # are later resolved to full text; legacy docs are returned as-is.
+        where = dict(filter_dict or {})
+
+        raw_results: List[QueryResult] = []
         for key in keys:
             try:
                 collection = self.get_collection(key)
-                result = collection.query(
-                    query_texts=[query],
-                    n_results=n_results,
-                    where=filter_dict,
-                )
-                results.append(result)
+                query_kwargs = {"query_texts": [query], "n_results": n_results}
+                if where:
+                    query_kwargs["where"] = where
+                result = collection.query(**query_kwargs)
+                raw_results.append(result)
             except Exception:  # noqa: BLE001
                 logger.exception("Query failed for collection '%s'", key)
 
-        return self._merge_results(results, n_results)
+        # Deduplicate chunks by parent_id, keeping the best raw-distance chunk.
+        best_by_parent: Dict[str, Dict[str, Any]] = {}
+        for result in raw_results:
+            if not result.get("ids"):
+                continue
+            for i, chunk_id in enumerate(result["ids"][0]):
+                meta = (
+                    result["metadatas"][0][i]
+                    if result.get("metadatas")
+                    else {}
+                )
+                parent_id = meta.get("parent_id") or chunk_id
+                distance = (
+                    result["distances"][0][i]
+                    if result.get("distances")
+                    else 0.0
+                )
+                prev = best_by_parent.get(parent_id)
+                if prev is None or distance < prev["distance"]:
+                    best_by_parent[parent_id] = {
+                        "parent_id": parent_id,
+                        "chunk_id": chunk_id,
+                        "chunk_text": (
+                            result["documents"][0][i]
+                            if result.get("documents")
+                            else ""
+                        ),
+                        "metadata": meta,
+                        "distance": distance,
+                    }
+
+        entries: List[Dict[str, Any]] = []
+        for parent_id, best in best_by_parent.items():
+            full_text = best["chunk_text"]
+            merged_meta = dict(best["metadata"])
+            is_chunk = merged_meta.get("is_chunk") is True
+            if is_chunk and db is not None:
+                parent = None
+                for ckey in (collection_keys or keys):
+                    parent = self.get_parent_document(ckey, parent_id, db)
+                    if parent is not None:
+                        break
+                if parent is not None:
+                    full_text = parent["full_text"]
+                    # Parent-level metadata takes precedence (keeps decay/citation).
+                    merged_meta = {**merged_meta, **(parent["metadata"] or {})}
+            merged_meta.pop("is_chunk", None)
+            merged_meta.pop("chunk_index", None)
+            merged_meta.pop("chunk_count", None)
+            entries.append(
+                {
+                    "id": parent_id,
+                    "document": full_text,
+                    "metadata": merged_meta,
+                    "distance": best["distance"],
+                }
+            )
+
+        # Phase 16.2/16.3: decay + citation weighting on effective distance.
+        for entry in entries:
+            meta = entry.get("metadata") or {}
+            decay_score = max(0.1, min(1.0, float(meta.get("decay_score", 1.0))))
+            citation_boost = max(1.0, min(1.3, float(meta.get("citation_boost", 1.0))))
+            entry["effective_distance"] = entry["distance"] / (
+                decay_score * citation_boost
+            )
+
+        entries.sort(key=lambda e: e["effective_distance"])
+        entries = entries[:n_results]
+
+        return {
+            "ids": [[e["id"] for e in entries]],
+            "documents": [[e["document"] for e in entries]],
+            "metadatas": [[e["metadata"] for e in entries]],
+            "distances": [[e["distance"] for e in entries]],
+        }
 
     def query_constitution(
         self,
