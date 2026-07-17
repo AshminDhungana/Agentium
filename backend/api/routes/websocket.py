@@ -5,6 +5,7 @@ WebSocket endpoint for real-time chat with authentication.
 import json
 import logging
 import asyncio
+import uuid
 from contextlib import contextmanager
 from datetime import datetime
 from typing import Optional, Dict, Any, List
@@ -505,6 +506,10 @@ async def websocket_chat_endpoint(
 
     user_info: Optional[Dict[str, Any]] = None
 
+    # Per-connection registry of in-flight streams so a later `cancel` message
+    # can signal an ongoing generation via its asyncio.Event.
+    active_streams: Dict[str, asyncio.Event] = {}
+
     if token:
         user_info = await manager.authenticate(websocket, token)
         if not user_info:
@@ -576,6 +581,14 @@ async def websocket_chat_endpoint(
                 })
                 continue
 
+            # ── Cancel an in-flight stream ───────────────────────────────────
+            if msg_type == "cancel":
+                sid = data.get("stream_id")
+                ev = active_streams.get(sid)
+                if ev:
+                    ev.set()
+                continue
+
             # ── Chat message ──────────────────────────────────────────────────
             if msg_type == "message":
                 content     = data.get("content", "").strip()
@@ -599,17 +612,71 @@ async def websocket_chat_endpoint(
                         continue
 
                     extra_metadata = {"card_response": card_response} if card_response else None
-                    response = await ChatService.process_message(
-                        head, enriched_message, db, extra_metadata=extra_metadata
-                    )
 
-                await websocket.send_json({
-                    "type":      "message",
-                    "role":      "head_of_council",
-                    "content":   response.get("content", ""),
-                    "metadata":  response.get("metadata", {}),
-                    "timestamp": datetime.utcnow().isoformat(),
-                })
+                    stream_id  = str(uuid.uuid4())
+                    message_id = str(uuid.uuid4())
+                    cancel_event = asyncio.Event()
+                    active_streams[stream_id] = cancel_event
+
+                    await websocket.send_json({
+                        "type":       "message_start",
+                        "stream_id":  stream_id,
+                        "role":       "head_of_council",
+                        "message_id": message_id,
+                        "timestamp":  datetime.utcnow().isoformat(),
+                    })
+
+                    async def on_delta(text: str) -> None:
+                        await websocket.send_json({
+                            "type":      "message_delta",
+                            "stream_id": stream_id,
+                            "delta":     text,
+                        })
+
+                    try:
+                        stream_task = asyncio.create_task(
+                            ChatService.process_message(
+                                head, enriched_message, db,
+                                extra_metadata=extra_metadata,
+                                on_delta=on_delta,
+                                cancel_event=cancel_event,
+                            )
+                        )
+                        response = await stream_task
+
+                        finish = response.get("finish_reason", "stop") or "stop"
+                        await websocket.send_json({
+                            "type":         "message_end",
+                            "stream_id":    stream_id,
+                            "content":      response.get("content", ""),
+                            "metadata": {
+                                "model":        response.get("model"),
+                                "tokens_used":  response.get("tokens_used", 0),
+                                "task_created": response.get("task_created", False),
+                                "task_id":      response.get("task_id"),
+                                "agent_spawned": response.get("agent_spawned"),
+                                "card": (response.get("metadata") or {}).get("card")
+                                if isinstance(response.get("metadata"), dict) else None,
+                                "media_urls": (response.get("metadata") or {}).get("media_urls", [])
+                                if isinstance(response.get("metadata"), dict) else [],
+                            },
+                            "finish_reason": finish,
+                            "timestamp":    datetime.utcnow().isoformat(),
+                        })
+                    except asyncio.CancelledError:
+                        raise
+                    except Exception as exc:
+                        logger.error(f"[WebSocket] process_message failed: {exc}")
+                        await websocket.send_json({
+                            "type":         "message_end",
+                            "stream_id":    stream_id,
+                            "content":      "",
+                            "metadata":     {},
+                            "finish_reason": "error",
+                            "timestamp":    datetime.utcnow().isoformat(),
+                        })
+                    finally:
+                        active_streams.pop(stream_id, None)
                 continue
 
             # ── Unknown message type ──────────────────────────────────────────
