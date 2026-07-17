@@ -17,6 +17,8 @@ from backend.core.vector_store import get_vector_store, VectorStore
 from backend.models.entities.agents import Agent, AgentType, AgentStatus
 from backend.models.entities.audit import AuditLog, AuditLevel, AuditCategory
 from backend.models.entities.task import TaskStatus, Task
+from backend.core.capability_registry import CapabilityRegistry, Capability
+from backend.services.reincarnation_service import ReincarnationService
 from backend.core.tool_registry import tool_registry
 from backend.services.idle_governance import idle_budget, token_optimizer
 from backend.api.routes.websocket import manager
@@ -743,6 +745,16 @@ class AgentOrchestrator:
             task_id = await self._find_available_task(lead_id)
 
         if not task_id:
+            # No Task Agent is a direct subordinate of this Lead. This is the
+            # classic "sync gap": a capable Task Agent (e.g. an auto-scaled one
+            # parented to the Head, or a freshly spawned agent) exists in the
+            # roster but is not bound to this Lead's subordinate pool, so the
+            # dispatcher reports "No Task Agent available". Recover instead of
+            # failing: reuse any active Task Agent in the system, and only spawn
+            # a new one if the system genuinely has none.
+            task_id = await self._ensure_task_agent(lead_id)
+
+        if not task_id:
             return RouteResult(success=False, message_id="", error="No Task Agent available")
 
         db_task_id = task.get("id") or task_id
@@ -1209,6 +1221,61 @@ class AgentOrchestrator:
         """Get type."""
 
         return {'0': 'head', '1': 'council', '2': 'lead', '3': 'task'}.get(agent_id[0], 'task')
+
+    async def _ensure_task_agent(self, lead_id: str) -> Optional[str]:
+        """
+        Recovery path when a Lead has no direct Task Agent subordinate.
+
+        Returns an agentium_id to dispatch to, chosen in this order:
+          1. Any active Task Agent already in the system (covers agents spawned
+             under a different parent, e.g. auto-scaled under the Head, or a
+             freshly spawned agent not yet bound to this Lead).
+          2. A newly spawned Task Agent parented to this Lead, if the Lead holds
+             SPAWN_TASK_AGENT and the system has zero active Task Agents.
+
+        Returns None only if no capable Task Agent can be obtained.
+        """
+        lead = self._get_agent(lead_id)
+        if not lead:
+            return None
+
+        # 1) Reuse any active Task Agent in the system.
+        existing = (
+            self.db.query(Agent)
+            .filter(
+                Agent.agent_type == AgentType.TASK_AGENT,
+                Agent.status == AgentStatus.ACTIVE,
+                Agent.is_active == True,  # noqa: E712
+            )
+            .first()
+        )
+        if existing:
+            logger.info(
+                "Dispatcher reuse: binding existing Task Agent %s to Lead %s",
+                existing.agentium_id, lead_id,
+            )
+            return existing.agentium_id
+
+        # 2) No Task Agents exist at all — spawn one under this Lead.
+        try:
+            if CapabilityRegistry.can_agent(lead, Capability.SPAWN_TASK_AGENT, self.db):
+                agent = ReincarnationService.spawn_task_agent(
+                    parent=lead,
+                    name=f"TaskAgent-{lead_id}-{datetime.utcnow().strftime('%H%M%S')}",
+                    description="Auto-spawned Task Agent to satisfy dispatch",
+                    db=self.db,
+                )
+                self.db.commit()
+                logger.info(
+                    "Dispatcher auto-spawned Task Agent %s under Lead %s",
+                    agent.agentium_id, lead_id,
+                )
+                return agent.agentium_id
+        except Exception as e:
+            logger.warning("Dispatcher auto-spawn under %s failed: %s", lead_id, e)
+
+        return None
+
 
     async def _find_available_task(self, lead_id: str) -> Optional[str]:
         """Find available task."""
