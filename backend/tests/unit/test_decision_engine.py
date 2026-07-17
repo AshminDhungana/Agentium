@@ -128,3 +128,14 @@ async def test_orchestrator_uses_decision(monkeypatch):
     decision = await agent_orchestrator.DecisionEngine.decide(_FakeAgent(), "x", None)
     assert decision.action is DecisionAction.DELEGATE
     assert captured["decision"].task_brief == "clean brief"
+
+
+from backend.tools import governance_tool
+
+
+def test_governance_tool_descriptions_have_guidance():
+    for name in ("spawn_agent", "create_task", "dispatch_task"):
+        fn = getattr(governance_tool, name, None)
+        assert fn is not None, f"{name} not found"
+        doc = (fn.__doc__ or "")
+        assert "WHEN" in doc, f"{name} missing WHEN guidance"

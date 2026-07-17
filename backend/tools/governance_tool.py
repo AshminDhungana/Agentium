@@ -57,6 +57,18 @@ def spawn_agent(
     db: Session = None,
     agent_id: str = None,
 ) -> Dict[str, Any]:
+    """
+    Create a new agent (lead or task).
+
+    WHEN to use: You need a dedicated worker for ongoing/parallel execution
+    that exceeds the current roster, and you hold SPAWN_TASK_AGENT (for task)
+    or SPAWN_LEAD_AGENT (for lead).
+
+    WHEN NOT to use: For a one-off unit of work, use create_task/dispatch_task
+    instead. Never call this from a Task agent (3xxxx) -- it is withheld.
+
+    Inputs: atype in {'lead','task'}; name/description required.
+    """
     caller = _caller(db, agent_id) if db and agent_id else None
     if caller is None:
         return _result(False, error="caller agent not found")
@@ -148,6 +160,16 @@ def create_task(
     db: Session = None,
     agent_id: str = None,
 ) -> Dict[str, Any]:
+    """
+    Create a concrete executable Task that requires Council deliberation.
+
+    WHEN to use: The user requested a specific unit of execution work
+    (build, analyze, generate, deploy, etc.) that should be tracked, voted on,
+    and delegated down the hierarchy.
+
+    WHEN NOT to use: For questions, chit-chat, or ambiguous requests -- reply
+    instead. For dynamic spawning of a persistent worker, use spawn_agent.
+    """
     caller = _caller(db, agent_id) if db and agent_id else None
     if caller is None:
         return _result(False, error="caller agent not found")
@@ -184,6 +206,16 @@ async def dispatch_task(
     db: Session = None,
     agent_id: str = None,
 ) -> Dict[str, Any]:
+    """
+    Hand an existing or newly created Task down to a Lead, which resolves a
+    Task Agent and delegates execution.
+
+    WHEN to use: A Task entity already exists (or was just created) and you
+    want it routed to a Lead->Task for execution with critic review.
+
+    WHEN NOT to use: If no Task exists yet, use create_task first. Never call
+    from a Task agent (3xxxx) -- it is withheld.
+    """
     caller = _caller(db, agent_id) if db and agent_id else None
     if caller is None:
         return _result(False, error="caller agent not found")
