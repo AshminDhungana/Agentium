@@ -166,3 +166,12 @@ async def test_verify_identity_denied_for_task(db_session: Session):
         db=db_session, agent_id="30001",
     )
     assert verify["success"] is False
+
+
+def test_ethos_tool_registered_for_all_tiers():
+    from backend.core.tool_registry import tool_registry
+    desc = tool_registry.get_tool("ethos")
+    assert desc is not None, "ethos tool must be registered"
+    assert sorted(desc["authorized_tiers"]) == sorted([
+        "0xxxx","1xxxx","2xxxx","3xxxx","4xxxx",
+        "5xxxx","6xxxx","7xxxx","8xxxx","9xxxx"])

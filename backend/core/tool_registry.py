@@ -19,6 +19,7 @@ from backend.tools.http_api_tool       import http_api_tool
 from backend.tools.text_editor_tool    import text_editor_tool
 from backend.tools.web_search_tool     import web_search_tool
 from backend.tools.deep_think_tool     import deep_think_tool
+from backend.tools.ethos_tool          import ethos_tool
 from backend.tools.desktop_tool  import (
     mouse_kb_tool,
     file_tool      as desktop_file_tool,
@@ -128,6 +129,53 @@ class ToolRegistry:
                 "n_clusters": {"type": "integer", "description": "Number of clusters for cluster action (default 3)", "optional": True},
             },
             authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx"],
+        )
+
+        # ══════════════════════════════════════════════════════════════════════
+        # ETHOS TOOL — agent-callable working memory (read/append/compress/edit)
+        # ══════════════════════════════════════════════════════════════════════
+        self.register_tool(
+            name="ethos",
+            description=(
+                "Manage your own working memory (Ethos). Actions: "
+                "read (view objective/plan/lessons/progress), "
+                "append (add lesson, reasoning artifact, or progress marker), "
+                "compress (LLM-driven 75/25 compression of working memory), "
+                "edit_identity (propose changes to mission/rules/restrictions — "
+                "pending Lead/Head verification), "
+                "verify_identity (Lead/Head only — apply a pending identity edit)."
+            ),
+            function=ethos_tool.execute,
+            parameters={
+                "action": {
+                    "type": "string",
+                    "description": "read | append | compress | edit_identity | verify_identity",
+                },
+                "kind": {
+                    "type": "string",
+                    "description": "For append: lesson | reasoning | progress",
+                    "optional": True,
+                },
+                "payload": {
+                    "type": "any",
+                    "description": "For append: dict (lesson/progress) or str/dict (reasoning)",
+                    "optional": True,
+                },
+                "completed_steps": {
+                    "type": "array",
+                    "description": "For compress: progress-marker keys to drop",
+                    "optional": True,
+                },
+                "patch": {
+                    "type": "object",
+                    "description": "For edit_identity: {mission_statement|behavioral_rules|restrictions|capabilities: value}",
+                    "optional": True,
+                },
+            },
+            authorized_tiers=[
+                "0xxxx","1xxxx","2xxxx","3xxxx","4xxxx",
+                "5xxxx","6xxxx","7xxxx","8xxxx","9xxxx",
+            ],
         )
 
         # ══════════════════════════════════════════════════════════════════════
