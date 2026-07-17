@@ -908,7 +908,10 @@ export function ChatPage() {
 
     // ── Render ────────────────────────────────────────────────────────────────
     return (
-        <div className="h-full bg-gray-50 dark:bg-[#0f1117] flex flex-col overflow-hidden transition-colors duration-200">
+        <div
+            className="h-full bg-gray-50 dark:bg-[#0f1117] flex flex-col overflow-hidden transition-colors duration-200"
+            style={{ ['--chat-col' as any]: 'clamp(560px, 92%, 940px)' }}
+        >
             <div className="w-full h-full flex flex-col">
 
                 {/* ── Header ─────────────────────────────────────────────────── */}
