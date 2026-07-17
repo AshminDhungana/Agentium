@@ -589,3 +589,34 @@ async def test_llm_client_forwards_on_delta(monkeypatch):
         agent=MagicMock(agentium_id="0xxxx"), user_message="hi",
         db=None, config_id="cfg-stream", on_delta=on_delta)
     assert captured["on_delta"] is on_delta
+
+
+async def test_chat_service_forwards_on_delta(monkeypatch):
+    from backend.services import chat_service as cs
+    from backend.services import model_provider as mp
+    from unittest.mock import AsyncMock
+
+    captured = {}
+    class _FakeClient:
+        def __init__(self, *args, **kwargs): pass
+        async def generate_with_tools(self, **kwargs):
+            captured.update(kwargs)
+            return {
+                "content": "answer", "model": "m", "tokens_used": 1,
+                "task_created": False, "task_id": None, "agent_spawned": None,
+                "reincarnated": False, "finish_reason": "stop",
+            }
+    monkeypatch.setattr(cs, "LLMClient", _FakeClient)
+    monkeypatch.setattr(mp.ModelService, "get_provider", AsyncMock(return_value=MagicMock()))
+    monkeypatch.setattr(cs.ChatService, "get_system_context", AsyncMock(return_value=""))
+    monkeypatch.setattr(cs.reincarnation_service, "get_predecessor_context", lambda head, db: {})
+    from backend.services import api_key_manager as _akm
+    monkeypatch.setattr(_akm.api_key_manager, "get_fallback_config_ids", lambda config_id: [])
+
+    async def on_delta(t): pass
+    res = await cs.ChatService.process_message(
+        head=MagicMock(agentium_id="0xxxx", get_model_config=lambda db: None,
+                       preferred_config_id=None, get_system_prompt=lambda: "sys"),
+        message="hi", db=MagicMock(), on_delta=on_delta)
+    assert res["content"] == "answer"
+    assert captured.get("on_delta") is on_delta

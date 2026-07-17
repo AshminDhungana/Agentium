@@ -6,7 +6,8 @@ Handles message processing, task creation, context management, and reincarnation
 import logging
 import httpx
 from datetime import datetime
-from typing import Dict, Any, Optional, List
+import asyncio
+from typing import Dict, Any, Optional, List, Callable, Awaitable
 from sqlalchemy.orm import Session
 
 from backend.models.entities import Agent, HeadOfCouncil, Task, TaskPriority, TaskType, UserModelConfig
@@ -68,7 +69,7 @@ class ChatService:
         return history
 
     @staticmethod
-    async def process_message(head: HeadOfCouncil, message: str, db: Session, extra_metadata: Optional[dict] = None):
+    async def process_message(head: HeadOfCouncil, message: str, db: Session, extra_metadata: Optional[dict] = None, on_delta: Optional[Callable[[str], Awaitable[None]]] = None, cancel_event: Optional[asyncio.Event] = None):
         """
         Process message with context management and potential reincarnation.
         Preserves task state across reincarnations.
@@ -280,6 +281,8 @@ Address the Sovereign respectfully. If they issue a command that requires execut
                 system_prompt_override=full_prompt,
                 agent_tier=f"{head.agentium_id[0]}xxxx",
                 history=history,
+                on_delta=on_delta,
+                cancel_event=cancel_event,
             )
         except Exception as e:
             logger.error(f"Model generation failed for Head {head.agentium_id}: {str(e)}")
