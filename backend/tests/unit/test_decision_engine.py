@@ -72,3 +72,26 @@ async def test_analyze_for_task_uses_engine(monkeypatch):
     result = await chat_service.ChatService.analyze_for_task(head, "build a scraper", "I will create a task", db=None)
     assert result["created"] is True
     assert captured["called"] is True
+
+
+from backend.services.agent_registry import AgentRegistry
+from backend.services.decision_engine import Decision, DecisionAction
+
+
+class _FakeTaskAgent:
+    agentium_id = "39999"
+
+
+@pytest.mark.asyncio
+async def test_choose_target_reuses_existing_task_agent():
+    class FakeDB:
+        def query(self, *a, **k):
+            class Q:
+                def filter(self, *a, **k):
+                    return self
+                def first(self):
+                    return _FakeTaskAgent()
+            return Q()
+    decision = Decision(action=DecisionAction.DELEGATE, target_tier="3xxxx", task_brief="x", confidence=0.9)
+    target = await AgentRegistry.choose_target(decision, FakeDB(), _FakeAgent())
+    assert target == "39999"
