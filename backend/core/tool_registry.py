@@ -65,7 +65,7 @@ class ToolRegistry:
                 "language":       {"type": "string",  "description": "Language: python, javascript, typescript, json, yaml"},
                 "analysis_types": {"type": "array",   "description": "Checks to run: syntax, lint, security, complexity, all", "optional": True},
             },
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
 
         # ══════════════════════════════════════════════════════════════════════
@@ -87,7 +87,7 @@ class ToolRegistry:
                 "max_results": {"type": "integer", "description": "Number of results to return, 1–10 (default 5)", "optional": True},
                 "provider":    {"type": "string",  "description": "Search provider: auto | tavily | brave | serpapi | duckduckgo (default: auto)", "optional": True},
             },
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
 
         # ══════════════════════════════════════════════════════════════════════
@@ -106,7 +106,7 @@ class ToolRegistry:
                 "query":         {"type": "string", "description": "Filter query e.g. 'age>18,status=active'", "optional": True},
                 "options":       {"type": "object", "description": "Extra options: by, descending, group_by, function, separator", "optional": True},
             },
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
 
         # ══════════════════════════════════════════════════════════════════════
@@ -128,7 +128,7 @@ class ToolRegistry:
                 "top_k":      {"type": "integer", "description": "Number of results to return for search (default 5)", "optional": True},
                 "n_clusters": {"type": "integer", "description": "Number of clusters for cluster action (default 3)", "optional": True},
             },
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
 
         # ══════════════════════════════════════════════════════════════════════
@@ -246,7 +246,7 @@ class ToolRegistry:
                     "optional": True,
                 },
             },
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
 
         # ══════════════════════════════════════════════════════════════════════
@@ -268,7 +268,7 @@ class ToolRegistry:
                 "limit":     {"type": "integer", "description": "Number of commits for log (default 10)", "optional": True},
                 "remote":    {"type": "string",  "description": "Remote name for push (default: origin)", "optional": True},
             },
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
 
         # ══════════════════════════════════════════════════════════════════════
@@ -293,7 +293,7 @@ class ToolRegistry:
                 "follow_redirects": {"type": "boolean", "description": "Follow HTTP redirects (default true)", "optional": True},
                 "verify_ssl":       {"type": "boolean", "description": "Verify SSL certificates (default true)", "optional": True},
             },
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
 
         self.register_tool(
@@ -304,7 +304,7 @@ class ToolRegistry:
                 "requests":    {"type": "array",   "description": "List of request dicts (same params as http_api)"},
                 "concurrency": {"type": "integer", "description": "Max concurrent requests (default 5)", "optional": True},
             },
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
 
         # ══════════════════════════════════════════════════════════════════════
@@ -342,17 +342,17 @@ class ToolRegistry:
                 "filepath": {"type": "string",  "description": "Absolute file path"},
                 "limit":    {"type": "integer", "description": "Max characters to read", "optional": True},
             },
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
         self.register_tool(
             name="write_file",
-            description="Write content to file (Head only)",
+            description="Write content to file on host filesystem",
             function=file_tool.write_file,
             parameters={
                 "filepath": {"type": "string", "description": "Absolute file path"},
                 "content":  {"type": "string", "description": "Content to write"},
             },
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
 
         # ── Shell Tool ─────────────────────────────────────────────────────────
@@ -365,7 +365,7 @@ class ToolRegistry:
                 "command": {"type": "array",   "description": "Command and args as list"},
                 "timeout": {"type": "integer", "description": "Timeout in seconds", "optional": True},
             },
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
 
         # ══════════════════════════════════════════════════════════════════════
@@ -381,14 +381,14 @@ class ToolRegistry:
             ),
             function=host_os_tool.detect_os,
             parameters={},
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
         self.register_tool(
             name="host_list_operations",
             description="List all logical operation names available for cross-platform execution.",
             function=host_os_tool.list_operations,
             parameters={},
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
         self.register_tool(
             name="host_resolve_command",
@@ -402,7 +402,7 @@ class ToolRegistry:
                 "os_profile": {"type": "object", "description": "OS profile from host_detect_os (optional)", "optional": True},
                 "extra_args": {"type": "array",  "description": "Extra args to append e.g. service name (optional)", "optional": True},
             },
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
         self.register_tool(
             name="host_execute_for_os",
@@ -420,7 +420,7 @@ class ToolRegistry:
                 "timeout":           {"type": "integer", "description": "Timeout in seconds (default 120)", "optional": True},
                 "working_directory": {"type": "string",  "description": "Working directory (optional)", "optional": True},
             },
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
         self.register_tool(
             name="host_smart_execute",
@@ -434,7 +434,7 @@ class ToolRegistry:
                 "timeout":           {"type": "integer", "description": "Timeout in seconds (default 120)", "optional": True},
                 "working_directory": {"type": "string",  "description": "Working directory (optional)", "optional": True},
             },
-            authorized_tiers=["0xxxx", "1xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
 
         # ══════════════════════════════════════════════════════════════════════
@@ -451,7 +451,7 @@ class ToolRegistry:
                 "y":        {"type": "integer", "description": "Y coordinate"},
                 "duration": {"type": "number",  "description": "Movement duration in seconds (default 0.2)", "optional": True},
             },
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
         self.register_tool(
             name="desktop_mouse_click",
@@ -463,7 +463,7 @@ class ToolRegistry:
                 "button": {"type": "string",  "description": "left | right | middle (default left)", "optional": True},
                 "clicks": {"type": "integer", "description": "Number of clicks (default 1)", "optional": True},
             },
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
         self.register_tool(
             name="desktop_mouse_double_click",
@@ -473,7 +473,7 @@ class ToolRegistry:
                 "x": {"type": "integer", "description": "X coordinate"},
                 "y": {"type": "integer", "description": "Y coordinate"},
             },
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
         self.register_tool(
             name="desktop_mouse_right_click",
@@ -483,7 +483,7 @@ class ToolRegistry:
                 "x": {"type": "integer", "description": "X coordinate"},
                 "y": {"type": "integer", "description": "Y coordinate"},
             },
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
         self.register_tool(
             name="desktop_mouse_drag",
@@ -496,7 +496,7 @@ class ToolRegistry:
                 "to_y":     {"type": "integer", "description": "End Y"},
                 "duration": {"type": "number",  "description": "Drag duration in seconds (default 0.5)", "optional": True},
             },
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
         self.register_tool(
             name="desktop_mouse_scroll",
@@ -508,14 +508,14 @@ class ToolRegistry:
                 "clicks":    {"type": "integer", "description": "Scroll steps (default 3)", "optional": True},
                 "direction": {"type": "string",  "description": "up | down | left | right", "optional": True},
             },
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
         self.register_tool(
             name="desktop_mouse_position",
             description="Get current mouse cursor (x, y) position.",
             function=mouse_kb_tool.get_position,
             parameters={},
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
         self.register_tool(
             name="desktop_keyboard_type",
@@ -525,7 +525,7 @@ class ToolRegistry:
                 "text":     {"type": "string", "description": "Text to type"},
                 "interval": {"type": "number", "description": "Delay between keystrokes in seconds (default 0.02)", "optional": True},
             },
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
         self.register_tool(
             name="desktop_keyboard_press",
@@ -538,7 +538,7 @@ class ToolRegistry:
             parameters={
                 "key": {"type": "string", "description": "Key name e.g. 'enter', 'escape', 'f5'"},
             },
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
         self.register_tool(
             name="desktop_keyboard_hotkey",
@@ -550,7 +550,7 @@ class ToolRegistry:
             parameters={
                 "keys": {"type": "array", "description": "List of key names to press together"},
             },
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
         self.register_tool(
             name="desktop_keyboard_key_down",
@@ -559,7 +559,7 @@ class ToolRegistry:
             parameters={
                 "key": {"type": "string", "description": "Key name to hold"},
             },
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
         self.register_tool(
             name="desktop_keyboard_key_up",
@@ -568,7 +568,7 @@ class ToolRegistry:
             parameters={
                 "key": {"type": "string", "description": "Key name to release"},
             },
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
         self.register_tool(
             name="desktop_screenshot",
@@ -577,14 +577,14 @@ class ToolRegistry:
             parameters={
                 "save_path": {"type": "string", "description": "File path to save screenshot (default /tmp/desktop_screenshot.png)", "optional": True},
             },
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
         self.register_tool(
             name="desktop_screen_size",
             description="Get the host screen resolution (width x height).",
             function=mouse_kb_tool.get_screen_size,
             parameters={},
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
         self.register_tool(
             name="desktop_find_on_screen",
@@ -597,7 +597,7 @@ class ToolRegistry:
                 "image_path": {"type": "string", "description": "Path to reference image (PNG/JPG)"},
                 "confidence": {"type": "number", "description": "Match threshold 0.0-1.0 (default 0.9)", "optional": True},
             },
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
 
         # ── File Management ────────────────────────────────────────────────────
@@ -608,7 +608,7 @@ class ToolRegistry:
             parameters={
                 "filepath": {"type": "string", "description": "Absolute path to file"},
             },
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
         self.register_tool(
             name="desktop_create_file",
@@ -618,7 +618,7 @@ class ToolRegistry:
                 "filepath": {"type": "string", "description": "Path for new file. Use /host_home/... for the host user's home (e.g. /host_home/Desktop/file.txt) or /host/... for the host root. These mounts are writable."},
                 "content":  {"type": "string", "description": "Initial file content (optional)", "optional": True},
             },
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
         self.register_tool(
             name="desktop_read_file",
@@ -629,7 +629,7 @@ class ToolRegistry:
                 "offset":   {"type": "integer", "description": "Line offset to start reading from (default 0)", "optional": True},
                 "limit":    {"type": "integer", "description": "Max lines to return (default 500)", "optional": True},
             },
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
         self.register_tool(
             name="desktop_save_file",
@@ -640,7 +640,7 @@ class ToolRegistry:
                 "content":  {"type": "string",  "description": "Content to write"},
                 "backup":   {"type": "boolean", "description": "Create .bak backup before overwriting (default true)", "optional": True},
             },
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
         self.register_tool(
             name="desktop_delete_file",
@@ -660,7 +660,7 @@ class ToolRegistry:
                 "src": {"type": "string", "description": "Source path. Use /host_home/... or /host/... (writable host mounts)."},
                 "dst": {"type": "string", "description": "Destination path. Use /host_home/... or /host/... (writable host mounts)."},
             },
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
         self.register_tool(
             name="desktop_move_file",
@@ -670,7 +670,7 @@ class ToolRegistry:
                 "src": {"type": "string", "description": "Source path. Use /host_home/... or /host/... (writable host mounts)."},
                 "dst": {"type": "string", "description": "Destination path. Use /host_home/... or /host/... (writable host mounts)."},
             },
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
         self.register_tool(
             name="desktop_list_directory",
@@ -681,7 +681,7 @@ class ToolRegistry:
                 "show_hidden": {"type": "boolean", "description": "Include hidden files (default false)", "optional": True},
                 "recursive":   {"type": "boolean", "description": "List recursively (default false)", "optional": True},
             },
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
 
         # ── Document Editing ───────────────────────────────────────────────────
@@ -695,7 +695,7 @@ class ToolRegistry:
             parameters={
                 "filepath": {"type": "string", "description": "Path to document. Use /host_home/... (host home, e.g. /host_home/Desktop/x.md) or /host/... (host root)."},
             },
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
         self.register_tool(
             name="desktop_create_document",
@@ -706,7 +706,7 @@ class ToolRegistry:
                 "content":  {"type": "string", "description": "Initial content (optional, plain text types only)", "optional": True},
                 "doc_type": {"type": "string", "description": "txt | md | docx | xlsx | json | csv", "optional": True},
             },
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
         self.register_tool(
             name="desktop_edit_document",
@@ -722,7 +722,7 @@ class ToolRegistry:
                 "filepath": {"type": "string", "description": "Path to document. Use /host_home/... (host home) or /host/... (host root)."},
                 "edits":    {"type": "array",  "description": "List of edit operation dicts"},
             },
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
         self.register_tool(
             name="desktop_save_document",
@@ -736,7 +736,7 @@ class ToolRegistry:
                 "content":  {"type": "string",  "description": "Content: string | dict | list"},
                 "backup":   {"type": "boolean", "description": "Create .bak backup (default true)", "optional": True},
             },
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
 
         # ── Browser Automation (Playwright, full-featured) ─────────────────────
@@ -749,7 +749,7 @@ class ToolRegistry:
                 "wait_until": {"type": "string",  "description": "domcontentloaded | load | networkidle (default domcontentloaded)", "optional": True},
                 "headless":   {"type": "boolean", "description": "Run browser headless (default true)", "optional": True},
             },
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
         self.register_tool(
             name="desktop_browser_get_text",
@@ -759,7 +759,7 @@ class ToolRegistry:
                 "selector": {"type": "string",  "description": "CSS selector (default 'body')", "optional": True},
                 "limit":    {"type": "integer", "description": "Max characters to return (default 5000)", "optional": True},
             },
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
         self.register_tool(
             name="desktop_browser_click",
@@ -768,7 +768,7 @@ class ToolRegistry:
             parameters={
                 "selector": {"type": "string", "description": "CSS selector of element to click"},
             },
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
         self.register_tool(
             name="desktop_browser_type",
@@ -779,7 +779,7 @@ class ToolRegistry:
                 "text":        {"type": "string",  "description": "Text to type"},
                 "clear_first": {"type": "boolean", "description": "Clear field before typing (default true)", "optional": True},
             },
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
         self.register_tool(
             name="desktop_browser_fill_form",
@@ -792,7 +792,7 @@ class ToolRegistry:
                 "fields":          {"type": "object", "description": "Dict of {css_selector: value}"},
                 "submit_selector": {"type": "string", "description": "CSS selector of submit button (optional)", "optional": True},
             },
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
         self.register_tool(
             name="desktop_browser_screenshot",
@@ -802,7 +802,7 @@ class ToolRegistry:
                 "save_path": {"type": "string",  "description": "File path to save screenshot", "optional": True},
                 "full_page": {"type": "boolean", "description": "Capture full scrollable page (default false)", "optional": True},
             },
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
         self.register_tool(
             name="desktop_browser_scroll",
@@ -812,21 +812,21 @@ class ToolRegistry:
                 "direction": {"type": "string",  "description": "up | down | top | bottom"},
                 "amount":    {"type": "integer", "description": "Pixels to scroll (default 500)", "optional": True},
             },
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
         self.register_tool(
             name="desktop_browser_back",
             description="Navigate the browser back to the previous page.",
             function=desktop_browser_tool.browser_back,
             parameters={},
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
         self.register_tool(
             name="desktop_browser_forward",
             description="Navigate the browser forward.",
             function=desktop_browser_tool.browser_forward,
             parameters={},
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
         self.register_tool(
             name="desktop_browser_find_element",
@@ -835,7 +835,7 @@ class ToolRegistry:
             parameters={
                 "selector": {"type": "string", "description": "CSS selector to find"},
             },
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
         self.register_tool(
             name="desktop_browser_execute_js",
@@ -844,14 +844,14 @@ class ToolRegistry:
             parameters={
                 "script": {"type": "string", "description": "JavaScript code to execute"},
             },
-            authorized_tiers=["0xxxx", "1xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
         self.register_tool(
             name="desktop_browser_get_links",
             description="Extract all hyperlinks from the current page.",
             function=desktop_browser_tool.browser_get_links,
             parameters={},
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
         self.register_tool(
             name="desktop_browser_download",
@@ -861,21 +861,21 @@ class ToolRegistry:
                 "url":       {"type": "string", "description": "URL of file to download"},
                 "save_path": {"type": "string", "description": "Local path to save the file"},
             },
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
         self.register_tool(
             name="desktop_browser_current_url",
             description="Return the current URL of the open browser page.",
             function=desktop_browser_tool.get_current_url,
             parameters={},
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
         self.register_tool(
             name="desktop_browser_close",
             description="Close the browser and free all resources.",
             function=desktop_browser_tool.browser_close,
             parameters={},
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
 
         # ══════════════════════════════════════════════════════════════════════
@@ -894,7 +894,7 @@ class ToolRegistry:
                 "user_id":    {"type": "string", "description": "User ID (optional, for user-specific prefs)", "optional": True},
                 "default":    {"type": "string", "description": "Default value if preference not found", "optional": True},
             },
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
         self.register_tool(
             name="preference_set",
@@ -921,7 +921,7 @@ class ToolRegistry:
                 "category":       {"type": "string",  "description": "Filter by category", "optional": True},
                 "include_values": {"type": "boolean", "description": "Include values in response", "optional": True},
             },
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
         self.register_tool(
             name="preference_categories",
@@ -930,7 +930,7 @@ class ToolRegistry:
             parameters={
                 "agent_tier": {"type": "string", "description": "Agent tier (0xxxx, 1xxxx, 2xxxx, 3xxxx)"},
             },
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
         self.register_tool(
             name="preference_bulk_update",
@@ -964,7 +964,7 @@ class ToolRegistry:
                 "new_window": {"type": "boolean", "description": "Open in a new window (default false)", "optional": True},
                 "timeout":    {"type": "number",  "description": "Page-load timeout in seconds (default 30)", "optional": True},
             },
-            authorized_tiers=["0xxxx", "1xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
         self.register_tool(
             name="nodriver_get_content",
@@ -973,7 +973,7 @@ class ToolRegistry:
             parameters={
                 "max_chars": {"type": "integer", "description": "Max characters to return (default 8000)", "optional": True},
             },
-            authorized_tiers=["0xxxx", "1xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
         self.register_tool(
             name="nodriver_find_element",
@@ -987,7 +987,7 @@ class ToolRegistry:
                 "best_match": {"type": "boolean", "description": "Return shortest/closest match (default true)", "optional": True},
                 "timeout":    {"type": "number",  "description": "Retry timeout in seconds (default 10)", "optional": True},
             },
-            authorized_tiers=["0xxxx", "1xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
         self.register_tool(
             name="nodriver_find_all_elements",
@@ -997,7 +997,7 @@ class ToolRegistry:
                 "text":    {"type": "string", "description": "Visible text to search for"},
                 "timeout": {"type": "number", "description": "Retry timeout in seconds (default 10)", "optional": True},
             },
-            authorized_tiers=["0xxxx", "1xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
         self.register_tool(
             name="nodriver_select",
@@ -1011,7 +1011,7 @@ class ToolRegistry:
                 "css_selector": {"type": "string", "description": "CSS selector string"},
                 "timeout":      {"type": "number", "description": "Retry timeout in seconds (default 10)", "optional": True},
             },
-            authorized_tiers=["0xxxx", "1xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
         self.register_tool(
             name="nodriver_select_all",
@@ -1021,7 +1021,7 @@ class ToolRegistry:
                 "css_selector": {"type": "string", "description": "CSS selector string"},
                 "timeout":      {"type": "number", "description": "Retry timeout in seconds (default 10)", "optional": True},
             },
-            authorized_tiers=["0xxxx", "1xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
         self.register_tool(
             name="nodriver_xpath",
@@ -1031,7 +1031,7 @@ class ToolRegistry:
                 "xpath_selector": {"type": "string", "description": "XPath expression"},
                 "timeout":        {"type": "number", "description": "Retry timeout in seconds (default 10)", "optional": True},
             },
-            authorized_tiers=["0xxxx", "1xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
         self.register_tool(
             name="nodriver_click",
@@ -1079,7 +1079,7 @@ class ToolRegistry:
                 "amount":    {"type": "integer", "description": "Pixels to scroll (default 200)", "optional": True},
                 "direction": {"type": "string",  "description": "'down' or 'up' (default 'down')", "optional": True},
             },
-            authorized_tiers=["0xxxx", "1xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
         self.register_tool(
             name="nodriver_screenshot",
@@ -1088,7 +1088,7 @@ class ToolRegistry:
             parameters={
                 "save_path": {"type": "string", "description": "File path to save PNG (default /tmp/nodriver_screenshot.png)", "optional": True},
             },
-            authorized_tiers=["0xxxx", "1xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
         self.register_tool(
             name="nodriver_save_cookies",
@@ -1113,7 +1113,7 @@ class ToolRegistry:
             description="Read the current page's localStorage and return it as a dict.",
             function=nodriver_tool.get_local_storage,
             parameters={},
-            authorized_tiers=["0xxxx", "1xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
         self.register_tool(
             name="nodriver_set_local_storage",
@@ -1146,21 +1146,21 @@ class ToolRegistry:
             description="Reload the current stealth browser page.",
             function=nodriver_tool.reload,
             parameters={},
-            authorized_tiers=["0xxxx", "1xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
         self.register_tool(
             name="nodriver_close_tab",
             description="Close the currently active stealth browser tab.",
             function=nodriver_tool.close_tab,
             parameters={},
-            authorized_tiers=["0xxxx", "1xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
         self.register_tool(
             name="nodriver_close",
             description="Shut down the stealth browser entirely and free all resources.",
             function=nodriver_tool.close,
             parameters={},
-            authorized_tiers=["0xxxx", "1xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
 
         # ══════════════════════════════════════════════════════════════════════
@@ -1204,7 +1204,7 @@ class ToolRegistry:
                     "optional":    True,
                 },
             },
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
 
         # ══════════════════════════════════════════════════════════════════════
@@ -1230,7 +1230,7 @@ class ToolRegistry:
                 "insert_text": {"type": "string",  "description": "Text to insert — required for 'insert'", "optional": True},
                 "view_range":  {"type": "array",   "description": "[start_line, end_line] for partial view — optional for 'view'", "optional": True},
             },
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
 
         # ═══════════════════════════════════════════════════════════
@@ -1290,7 +1290,7 @@ class ToolRegistry:
                 "task_id": {"type": "string", "description": "Agentium ID of the task"},
                 "result_summary": {"type": "string", "description": "Summary of the completed work"},
             },
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
         self.register_tool(
             name="propose_amendment",
