@@ -39,6 +39,7 @@ from backend.models.entities.tool_staging import ToolStaging
 from backend.models.entities.tool_version import ToolVersion
 from backend.models.entities.tool_usage_log import ToolUsageLog
 from backend.models.entities.tool_marketplace_listing import ToolMarketplaceListing
+from backend.models.entities.knowledge_document import KnowledgeDocument
 
 # this is the Alembic Config object
 config = context.config
