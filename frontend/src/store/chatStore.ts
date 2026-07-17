@@ -57,7 +57,6 @@ interface ChatState {
     appendDelta: (streamId: string, delta: string) => void;
     endStream: (streamId: string, content: string, metadata?: MessageMetadata) => void;
     sendMessage: (content: string) => Promise<void>;
-    sendStreamingMessage: (content: string, onChunk: (chunk: string) => void) => Promise<void>;
     setMessages: (updater: Message[] | ((prev: Message[]) => Message[])) => void;
     clearHistory: () => void;
     loadHistory: () => Promise<void>;
@@ -176,90 +175,6 @@ export const useChatStore = create<ChatState>()(
 
                 } catch (error: any) {
                     console.error('Chat error:', error);
-
-                    const errorMessage: Message = {
-                        id: crypto.randomUUID(),
-                        role: 'system',
-                        content: `Failed to reach Head of Council: ${error instanceof Error ? error.message : 'Unknown error'}`,
-                        timestamp: new Date(),
-                        status: 'error'
-                    };
-
-                    set((state) => ({
-                        messages: [...state.messages, errorMessage],
-                        isLoading: false,
-                        currentStreamingMessage: ''
-                    }));
-
-                    showToast.error('Failed to send message');
-                }
-            },
-
-            sendStreamingMessage: async (content: string, onChunk: (chunk: string) => void) => {
-                const userMessage: Message = {
-                    id: crypto.randomUUID(),
-                    role: 'sovereign',
-                    content,
-                    timestamp: new Date(),
-                    status: 'sent'
-                };
-
-                set((state) => ({
-                    messages: [...state.messages, userMessage],
-                    isLoading: true,
-                    currentStreamingMessage: ''
-                }));
-
-                let assistantContent = '';
-                let metadata: any = {};
-
-                try {
-                    await chatStreamApi.sendStreamingMessage(
-                        content,
-                        // On chunk
-                        (chunk: string) => {
-                            assistantContent += chunk;
-                            onChunk(chunk);
-                            set({ currentStreamingMessage: assistantContent });
-                        },
-                        // On complete
-                        (meta: any) => {
-                            metadata = meta;
-                        },
-                        // On error
-                        (error: string) => {
-                            throw new Error(error);
-                        }
-                    );
-
-                    // Add assistant message
-                    const assistantMessage: Message = {
-                        id: crypto.randomUUID(),
-                        role: 'head_of_council',
-                        content: assistantContent,
-                        timestamp: new Date(),
-                        status: 'sent',
-                        metadata: {
-                            agent_used: metadata.agent_id,
-                            model: metadata.model,
-                            task_created: metadata.task_created,
-                            task_id: metadata.task_id,
-                            tokens_used: metadata.tokens_used
-                        }
-                    };
-
-                    set((state) => ({
-                        messages: [...state.messages, assistantMessage],
-                        isLoading: false,
-                        currentStreamingMessage: ''
-                    }));
-
-                    if (metadata.task_created) {
-                        showToast.success(`Task ${metadata.task_id} created`);
-                    }
-
-                } catch (error: any) {
-                    console.error('Streaming chat error:', error);
 
                     const errorMessage: Message = {
                         id: crypto.randomUUID(),
