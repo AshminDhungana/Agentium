@@ -35,7 +35,10 @@ def test_chroma_char_limit_is_2000():
     assert CHROMA_CHAR_LIMIT == 2000
 
 
-def test_to_chroma_document_truncates_at_2000():
-    long_steps = [f"step {i} " * 50 for i in range(100)]
+def test_to_chroma_document_is_not_truncated():
+    # The hard clip was removed: long skills are stored in full and chunked
+    # at write time, so to_chroma_document() must return the complete text.
+    long_steps = [f"unique-step-{i} " * 50 for i in range(100)]
     doc = _base_skill(steps=long_steps).to_chroma_document()
-    assert len(doc) <= 2000
+    assert len(doc) > 2000
+    assert "unique-step-99" in doc

@@ -15,6 +15,7 @@ action and the tool description both point agents at that skill file.
 from typing import Any, Dict, List, Optional
 
 from backend.core.vector_store import get_vector_store
+from backend.models.database import get_db_context
 
 
 SKILL_PATH = "backend/.agentium/skills/vector_db/SKILL.md"
@@ -81,12 +82,23 @@ class VectorDBTool:
         if not query:
             return {"success": False, "error": "query is required for action 'query'"}
         keys = collection_keys or list(self.store.COLLECTIONS.keys())
-        result = self.store.query_knowledge(
-            query=query,
-            collection_keys=keys,
-            n_results=n_results,
-            filter_dict=filter_dict,
-        )
+        try:
+            with get_db_context() as db:
+                result = self.store.query_knowledge(
+                    query=query,
+                    collection_keys=keys,
+                    n_results=n_results,
+                    filter_dict=filter_dict,
+                    db=db,
+                )
+        except Exception:  # noqa: BLE001
+            # Without a DB session we still return chunk/legacy text.
+            result = self.store.query_knowledge(
+                query=query,
+                collection_keys=keys,
+                n_results=n_results,
+                filter_dict=filter_dict,
+            )
         matches = []
         if result and result.get("ids"):
             for i, doc_id in enumerate(result["ids"][0]):
@@ -108,6 +120,20 @@ class VectorDBTool:
             return {"success": False, "error": "collection is required for action 'get'"}
         if collection not in self.store.COLLECTIONS:
             return {"success": False, "error": f"Unknown collection '{collection}'"}
+        # Prefer the untruncated parent document when one exists.
+        try:
+            with get_db_context() as db:
+                parent = self.store.get_parent_document(collection, doc_id, db)
+                if parent is not None:
+                    return {
+                        "success": True,
+                        "id": doc_id,
+                        "document": parent["full_text"],
+                        "metadata": parent["metadata"],
+                        "chunk_count": parent["chunk_count"],
+                    }
+        except Exception:  # noqa: BLE001
+            pass
         coll = self.store.get_collection(collection)
         got = coll.get(ids=[doc_id], include=["documents", "metadatas"])
         if not got or not got.get("ids"):
@@ -174,13 +200,22 @@ class VectorDBTool:
             ids = [f"{collection}_{i}" for i in range(len(docs))]
         if metadatas is None:
             metadatas = [{} for _ in docs]
-        coll = self.store.get_collection(collection)
-        coll.upsert(documents=docs, metadatas=metadatas, ids=ids)
+        stored = []
+        try:
+            with get_db_context() as db:
+                for d_id, doc, meta in zip(ids, docs, metadatas):
+                    self.store.upsert_document(collection, d_id, doc, meta or {}, db)
+                    stored.append(d_id)
+        except Exception:  # noqa: BLE001
+            # Fallback: legacy single-doc upsert (no parent store available).
+            coll = self.store.get_collection(collection)
+            coll.upsert(documents=docs, metadatas=metadatas, ids=ids)
+            stored = ids
         return {
             "success": True,
             "collection": collection,
-            "count": len(docs),
-            "ids": ids,
+            "count": len(stored),
+            "ids": stored,
         }
 
 

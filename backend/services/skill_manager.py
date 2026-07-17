@@ -8,7 +8,7 @@ from datetime import datetime
 from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session
 
-from backend.models.entities.skill import SkillSchema, SkillDB, SkillSubmission, CHROMA_CHAR_LIMIT
+from backend.models.entities.skill import SkillSchema, SkillDB, SkillSubmission
 from backend.models.entities.task import Task
 from backend.models.entities.agents import Agent
 from backend.core.vector_store import get_vector_store, BgeEmbeddingFunction
@@ -51,23 +51,14 @@ class SkillManager:
     @staticmethod
     def _build_and_check_document(skill: SkillSchema) -> str:
         """
-        Build the ChromaDB document string for *skill* and emit a structured
-        warning if the content was clipped to CHROMA_CHAR_LIMIT.
+        Build the (untruncated) ChromaDB document string for *skill*.
 
         Call this exactly once per create/update so we never encode and store
-        different strings for the embedding vs the document field.
+        different strings for the embedding vs the document field.  The full
+        text is stored; chunking in ``VectorStore.upsert_document`` keeps long
+        skills complete while still enabling retrieval.
         """
         doc = skill.to_chroma_document()
-        if len(doc) == CHROMA_CHAR_LIMIT:
-            # to_chroma_document clips to CHROMA_CHAR_LIMIT when content overflows
-            logger.warning(
-                "[SkillManager] Skill '%s' (id=%s) was clipped to %d chars before "
-                "ChromaDB storage. Original content exceeded the embedding window. "
-                "Shorten description/steps/code_template to avoid information loss.",
-                skill.skill_name,
-                skill.skill_id,
-                CHROMA_CHAR_LIMIT,
-            )
         return doc
 
     # ═══════════════════════════════════════════════════════════
@@ -142,18 +133,14 @@ class SkillManager:
                 skill.verification_status = "rejected"
                 skill.rejection_reason = f"Constitutional violations: {violations}"
 
-            # Store in ChromaDB
+            # Store in ChromaDB (chunked; full text persisted in Postgres)
             chroma_id = f"{skill_id}_v{skill.version}"
-            collection = self.vector_store.get_collection(skill.chroma_collection)
-
-            ef = BgeEmbeddingFunction()
-            embedding = ef.embed_documents([chroma_doc])[0]
-
-            collection.add(
-                ids=[chroma_id],
-                embeddings=[embedding],
-                documents=[chroma_doc],
-                metadatas=[skill.to_chroma_metadata()]
+            self.vector_store.upsert_document(
+                collection_key=skill.chroma_collection,
+                parent_id=chroma_id,
+                text=chroma_doc,
+                metadata=skill.to_chroma_metadata(),
+                db=db,
             )
 
             # Store metadata in PostgreSQL
@@ -268,15 +255,26 @@ class SkillManager:
                             results['metadatas'][0],
                             results['distances'][0]
                         ):
-                            skill_db = db.query(SkillDB).filter_by(chroma_id=doc_id).first()
+                            # Chunked storage: the hit is a chunk; the parent id
+                            # is the stored SkillDB chroma_id.
+                            parent_id = meta.get("parent_id") or doc_id
+                            skill_db = db.query(SkillDB).filter_by(chroma_id=parent_id).first()
+
+                            # Prefer the untruncated full text from the parent store.
+                            full_doc = doc
+                            parent = self.vector_store.get_parent_document(
+                                collection_name, parent_id, db
+                            )
+                            if parent is not None:
+                                full_doc = parent["full_text"]
 
                             all_results.append({
                                 "skill_id": meta.get("skill_id"),
-                                "chroma_id": doc_id,
+                                "chroma_id": parent_id,
                                 "relevance_score": max(0.0, 1.0 - dist),
                                 "semantic_distance": dist,
-                                # content_preview: full stored doc (already capped at CHROMA_CHAR_LIMIT)
-                                "content_preview": doc,
+                                # content_preview: full stored doc (untruncated)
+                                "content_preview": full_doc,
                                 "metadata": meta,
                                 "db_record": skill_db.to_dict() if skill_db else None,
                                 "collection": collection_name
@@ -362,16 +360,27 @@ class SkillManager:
 
         chroma_doc = schema.to_chroma_document()
         chroma_id = f"{schema.skill_id}_v{schema.version}"
-        collection = self.vector_store.get_collection(schema.chroma_collection)
-        ef = BgeEmbeddingFunction()
-        embedding = ef.embed_documents([chroma_doc])[0]
 
-        collection.upsert(
-            ids=[chroma_id],
-            embeddings=[embedding],
-            documents=[chroma_doc],
-            metadatas=[schema.to_chroma_metadata()],
-        )
+        if db is not None:
+            # Chunked parent-document store: full text in Postgres.
+            self.vector_store.upsert_document(
+                collection_key=schema.chroma_collection,
+                parent_id=chroma_id,
+                text=chroma_doc,
+                metadata=schema.to_chroma_metadata(),
+                db=db,
+            )
+        else:
+            # Fallback for non-DB callers (legacy single-doc upsert).
+            collection = self.vector_store.get_collection(schema.chroma_collection)
+            ef = BgeEmbeddingFunction()
+            embedding = ef.embed_documents([chroma_doc])[0]
+            collection.upsert(
+                ids=[chroma_id],
+                embeddings=[embedding],
+                documents=[chroma_doc],
+                metadatas=[schema.to_chroma_metadata()],
+            )
 
         if db is not None:
             existing = db.query(SkillDB).filter_by(skill_id=schema.skill_id).first()
@@ -425,12 +434,18 @@ class SkillManager:
         if not skill_db:
             return None
 
-        collection = self.vector_store.get_collection(skill_db.chroma_collection)
-        result = collection.get(ids=[skill_db.chroma_id], include=["documents", "metadatas"])
+        # Resolve full (untruncated) skill document from the parent store.
+        parent = self.vector_store.get_parent_document(
+            skill_db.chroma_collection, skill_db.chroma_id, db
+        )
+        if parent is not None:
+            return SkillSchema(**(parent["metadata"] or {}))
 
+        # Fallback for legacy non-chunked documents still in ChromaDB.
+        collection = self.vector_store.get_collection(skill_db.chroma_collection)
+        result = collection.get(ids=[skill_db.chroma_id], include=["metadatas"])
         if result and result['ids']:
-            meta = result['metadatas'][0]
-            return SkillSchema(**meta)
+            return SkillSchema(**result['metadatas'][0])
 
         return None
 
@@ -471,17 +486,12 @@ class SkillManager:
         chroma_doc = self._build_and_check_document(new_skill)
 
         chroma_id = f"{skill_id}_v{new_version}"
-        collection = self.vector_store.get_collection(new_skill.chroma_collection)
-
-        from sentence_transformers import SentenceTransformer
-        model = SentenceTransformer(new_skill.embedding_model)
-        embedding = model.encode(chroma_doc)
-
-        collection.add(
-            ids=[chroma_id],
-            embeddings=[embedding.tolist()],
-            documents=[chroma_doc],
-            metadatas=[new_skill.to_chroma_metadata()]
+        self.vector_store.upsert_document(
+            collection_key=new_skill.chroma_collection,
+            parent_id=chroma_id,
+            text=chroma_doc,
+            metadata=new_skill.to_chroma_metadata(),
+            db=db,
         )
 
         skill_db = SkillDB(

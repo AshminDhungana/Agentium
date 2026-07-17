@@ -4,26 +4,15 @@ Defines the standardized skill schema.
 
 Embedding / ChromaDB size contract
 ────────────────────────────────────
-BAAI/bge-base-en-v1.5 silently truncates input beyond 512 tokens
-(~2 000 safe characters).  To guarantee every document fits
-within that window, to_chroma_document() assembles fields in
-retrieval-value order (most important first) and hard-clips the final
-string to CHROMA_CHAR_LIMIT.  A warning is logged whenever clipping
-occurs so operators can identify skills whose content is too dense.
-
-Field order in to_chroma_document():
-  1. Identity  (name / type / domain / complexity / tags)
-  2. Description
-  3. Steps
-  4. Validation criteria
-  5. Prerequisites
-  6. Common pitfalls
-  7. Code template       ← large, low search value → pushed toward tail
-  8. Examples            ← largest, lowest search value → last
+BAAI/bge-base-en-v1.5 silently truncates input beyond 512 tokens, and the
+prior ``to_chroma_document()`` hard-clipped the assembled string to
+``CHROMA_CHAR_LIMIT`` — losing skill content.  That clip has been removed.
+The ``VectorStore`` now stores the full skill text in PostgreSQL and chunks
+it into ChromaDB for retrieval, so untruncated skills are served back at
+query time.  ``CHROMA_CHAR_LIMIT`` is retained only for preview sizing.
 
 """
 
-import logging
 from datetime import datetime, timezone
 from typing import List, Optional, Dict, Any
 
@@ -33,11 +22,10 @@ from sqlalchemy.orm import relationship
 
 from backend.models.entities.base import Base, BaseEntity
 
-logger = logging.getLogger(__name__)
-
 # ---------------------------------------------------------------------------
-# ChromaDB embedding window guard
+# Preview size guard
 # BAAI/bge-base-en-v1.5 → 512 tokens ≈ 2 000 characters (conservative estimate)
+# No longer used to clip stored documents; retained for preview sizing only.
 # ---------------------------------------------------------------------------
 CHROMA_CHAR_LIMIT: int = 2_000
 
@@ -130,12 +118,11 @@ class SkillSchema(BaseModel):
         """
         Convert skill to a flat text string for embedding.
 
-        Fields are ordered from highest to lowest retrieval value so that
-        when the string is clipped to CHROMA_CHAR_LIMIT the most useful
-        semantic content is always preserved.
-
-        A module-level warning is emitted when clipping occurs, giving
-        operators visibility into skills that are too large.
+        The full (untruncated) document is returned.  Chunking and parent
+        document storage in the ``VectorStore`` keep long skills complete:
+        chunk vectors drive retrieval while the untruncated text is served
+        back at query time, so no information is lost to the embedding
+        window limit.  ``CHROMA_CHAR_LIMIT`` is retained only for previews.
         """
         identity = (
             f"Skill: {self.display_name} | "
@@ -192,18 +179,6 @@ class SkillSchema(BaseModel):
             footer,
         ]
         document = "\n\n".join(p for p in parts if p)
-
-        if len(document) > CHROMA_CHAR_LIMIT:
-            logger.warning(
-                "Skill '%s' (id=%s) document length %d exceeds "
-                "CHROMA_CHAR_LIMIT=%d.  Clipping to limit.  Consider "
-                "shortening description, steps, or code_template.",
-                self.skill_name,
-                self.skill_id,
-                len(document),
-                CHROMA_CHAR_LIMIT,
-            )
-            document = document[:CHROMA_CHAR_LIMIT]
 
         return document
 

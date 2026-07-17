@@ -5,21 +5,18 @@ from backend.services.skill_manager import SkillManager
 from backend.core.vector_store import get_vector_store
 
 
-def test_create_skill_embeds_documents_with_bge(monkeypatch):
-    fake_ef = MagicMock()
-    fake_ef.embed_documents.return_value = [[0.1] * 768]
-    import backend.core.vector_store as vs
-    monkeypatch.setattr(vs, "BgeEmbeddingFunction", lambda: fake_ef)
-    monkeypatch.setattr(sm, "BgeEmbeddingFunction", lambda: fake_ef)
-
+def test_create_skill_routes_through_upsert_document(monkeypatch):
     mgr = SkillManager()
     captured = {}
-    fake_col = MagicMock()
-    def _add(**kwargs):
-        captured.update(kwargs)
-        return None
-    fake_col.add.side_effect = _add
-    monkeypatch.setattr(mgr.vector_store, "get_collection", lambda name: fake_col)
+
+    def _upsert(collection_key, parent_id, text, metadata, db):
+        captured.update(
+            collection_key=collection_key, parent_id=parent_id,
+            text=text, metadata=metadata, db=db,
+        )
+        return {"parent_id": parent_id, "chunk_count": 1, "collection_key": collection_key}
+
+    monkeypatch.setattr(mgr.vector_store, "upsert_document", _upsert)
     monkeypatch.setattr(mgr, "_build_and_check_document",
                         lambda skill: "chroma doc for embedding")
     # Stub the constitutional-compliance dependency (property returns a fake).
@@ -40,12 +37,11 @@ def test_create_skill_embeds_documents_with_bge(monkeypatch):
         },
         creator_agent=fake_agent, db=fake_db, auto_verify=True,
     )
-    assert fake_ef.embed_documents.called
-    # Documents (not queries) must NOT carry the bge query prefix.
-    emb_text_arg = fake_ef.embed_documents.call_args[0][0]
-    assert isinstance(emb_text_arg, list) and not emb_text_arg[0].startswith("Represent this sentence")
-    # The stored embedding is a 768-dim vector produced by embed_documents.
-    assert len(captured["embeddings"][0]) == 768
+    # Skill is persisted via the chunk-aware parent-document store (full text).
+    assert captured["collection_key"] == "agent_skills"
+    assert captured["parent_id"].endswith("_v1.0.0")
+    assert captured["db"] is fake_db
+    assert captured["text"] == "chroma doc for embedding"
 
 
 def test_search_skill_query_uses_bge_embed_query(monkeypatch):
