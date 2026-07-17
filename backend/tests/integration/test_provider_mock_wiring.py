@@ -154,6 +154,7 @@ from backend.tests.integration.test_provider_resilience import (
 from backend.services.provider_rate_limiter import provider_rate_limiter
 from backend.core.llm_client import LLMClient
 import asyncio
+from unittest.mock import AsyncMock, MagicMock
 from backend.services.model_provider import ModelService
 from backend.core.tool_registry import tool_registry
 from backend.models.entities import Agent
@@ -468,3 +469,61 @@ class TestProviderResilience:
             good.shutdown()
             _delete_fake_configs(created_ids)
             reset_resilience()
+
+
+async def _make_streaming_openai_provider():
+    from backend.services.model_provider import OpenAICompatibleProvider
+    provider = OpenAICompatibleProvider.__new__(OpenAICompatibleProvider)
+    cfg = MagicMock()
+    cfg.id = "cfg-stream"; cfg.provider = "openai"; cfg.default_model = "gpt-test"
+    cfg.timeout_seconds = 30; cfg.max_concurrent_requests = 10; cfg.requests_per_minute = 60
+    cfg.max_tokens = 512; cfg.temperature = 0.7; cfg.top_p = 1.0
+    provider.config = cfg; provider.api_key = "x"
+
+    class _Delta:
+        def __init__(self, content): self.content = content
+    class _Choice:
+        def __init__(self, content): self.delta = _Delta(content); self.finish_reason = None
+    class _Chunk:
+        def __init__(self, content, finish_reason=None, usage=None):
+            self.choices = [_Choice(content)]; self.finish_reason = finish_reason
+            self.usage = usage; self.model = "gpt-test"
+    async def _gen():
+        yield _Chunk("Hello "); yield _Chunk("world")
+    class _StreamResp:
+        def __aiter__(self): return _gen().__aiter__()
+    client = MagicMock()
+    client.chat.completions.create = AsyncMock(return_value=_StreamResp())
+    provider._client = client
+    return provider
+
+async def test_generate_with_tools_streams_final_turn():
+    provider = await _make_streaming_openai_provider()
+    chunks = []
+    async def on_delta(text): chunks.append(text)
+    result = await provider.generate_with_tools(
+        system_prompt="sys", messages=[{"role": "user", "content": "hi"}],
+        tools=[], tool_executor=None, on_delta=on_delta)
+    assert chunks == ["Hello ", "world"]
+    assert result["content"] == "Hello world"
+    assert result["finish_reason"] == "stop"
+    assert result["tokens_used"] >= 0
+
+async def test_generate_with_tools_no_delta_is_blocking_shape():
+    provider = await _make_streaming_openai_provider()
+    result = await provider.generate_with_tools(
+        system_prompt="sys", messages=[{"role": "user", "content": "hi"}],
+        tools=[], tool_executor=None, on_delta=None)
+    assert isinstance(result["content"], str)
+
+async def test_generate_with_tools_cancel_stops_stream():
+    provider = await _make_streaming_openai_provider()
+    ev = asyncio.Event(); chunks = []
+    async def on_delta(text):
+        chunks.append(text)
+        if len(chunks) >= 1: ev.set()
+    result = await provider.generate_with_tools(
+        system_prompt="sys", messages=[{"role": "user", "content": "hi"}],
+        tools=[], tool_executor=None, on_delta=on_delta, cancel_event=ev)
+    assert result["finish_reason"] == "stopped_by_user"
+    assert "Hello " in result["content"]

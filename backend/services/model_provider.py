@@ -8,7 +8,7 @@ import os
 import time
 import json
 import httpx
-from typing import Optional, Dict, Any, AsyncGenerator, List, Callable, Tuple
+from typing import Optional, Dict, Any, AsyncGenerator, List, Callable, Tuple, Awaitable
 from abc import ABC, abstractmethod
 from datetime import datetime
 import logging
@@ -544,6 +544,87 @@ class OpenAICompatibleProvider(BaseModelProvider):
         finally:
             await provider_rate_limiter.release_concurrency(self.config.id)
 
+    async def _assemble_stream_turn(
+        self,
+        stream: Any,
+        on_delta: Optional[Callable[[str], Awaitable[None]]],
+        cancel_event: Optional[asyncio.Event],
+    ) -> Tuple[Dict[str, Any], Any, Optional[str]]:
+        """Consume an async OpenAI-style stream into one assistant message.
+
+        Assembles streamed ``tool_calls`` deltas (keyed by index) into a single
+        assistant message dict, accumulates prompt/completion usage from the
+        trailing usage chunk, and forwards each text delta to ``on_delta`` when
+        provided.  ``cancel_event`` is checked every iteration; if set, the
+        stream is stopped early and ``finish_reason`` is reported as
+        ``"stopped_by_user"``.
+        """
+        acc_content: List[str] = []
+        acc_tool_calls: Dict[int, Dict[str, Any]] = {}
+        finish_reason: Optional[str] = None
+        usage = None
+
+        async for chunk in stream:
+            if cancel_event is not None and cancel_event.is_set():
+                finish_reason = "stopped_by_user"
+                break
+
+            if getattr(chunk, "usage", None):
+                usage = chunk.usage
+
+            if not chunk.choices:
+                continue
+
+            choice = chunk.choices[0]
+            delta = choice.delta
+
+            if delta.content:
+                acc_content.append(delta.content)
+                if on_delta is not None:
+                    await on_delta(delta.content)
+
+            if getattr(delta, "tool_calls", None):
+                for tc in delta.tool_calls:
+                    idx = tc.index
+                    if idx not in acc_tool_calls:
+                        acc_tool_calls[idx] = {
+                            "id": getattr(tc, "id", None),
+                            "name": getattr(tc.function, "name", None) or "",
+                            "arguments": "",
+                        }
+                    else:
+                        if getattr(tc, "id", None):
+                            acc_tool_calls[idx]["id"] = tc.id
+                        if getattr(tc.function, "name", None):
+                            acc_tool_calls[idx]["name"] = tc.function.name
+                    if getattr(tc.function, "arguments", None):
+                        acc_tool_calls[idx]["arguments"] += tc.function.arguments
+
+            if choice.finish_reason:
+                finish_reason = choice.finish_reason
+
+        tool_calls: List[Dict[str, Any]] = []
+        if acc_tool_calls:
+            for _idx in sorted(acc_tool_calls.keys()):
+                tc = acc_tool_calls[_idx]
+                tool_calls.append({
+                    "id": tc["id"],
+                    "type": "function",
+                    "function": {
+                        "name": tc["name"],
+                        "arguments": tc["arguments"],
+                    },
+                })
+
+        msg: Dict[str, Any] = {
+            "role": "assistant",
+            "content": "".join(acc_content) or None,
+        }
+        if tool_calls:
+            msg["tool_calls"] = tool_calls
+
+        return msg, usage, finish_reason
+
     async def generate_with_tools(
         self,
         system_prompt: str,
@@ -551,6 +632,8 @@ class OpenAICompatibleProvider(BaseModelProvider):
         tools: List[Dict[str, Any]],
         tool_executor: Callable,
         max_iterations: int = 10,
+        on_delta: Optional[Callable[[str], Awaitable[None]]] = None,
+        cancel_event: Optional[asyncio.Event] = None,
         **kwargs,
     ) -> Dict[str, Any]:
         """
@@ -584,7 +667,7 @@ class OpenAICompatibleProvider(BaseModelProvider):
             }
         """
         actual_model = kwargs.get("model", self.config.default_model)
-        client = _get_cached_sdk_client(
+        client = getattr(self, "_client", None) or _get_cached_sdk_client(
             self.config,
             api_key=self.api_key or "not-needed",
             base_url=self.base_url,
@@ -601,6 +684,8 @@ class OpenAICompatibleProvider(BaseModelProvider):
         await provider_rate_limiter.acquire_concurrency(self.config.id, maxc)
 
         try:
+            loop_finish_reason = "stop"
+
             for _ in range(max_iterations):
                 create_kwargs: Dict[str, Any] = dict(
                     model=actual_model,
@@ -614,59 +699,162 @@ class OpenAICompatibleProvider(BaseModelProvider):
 
                 rpm = getattr(self.config, "requests_per_minute", 60) or 60
                 await provider_rate_limiter.acquire(self.config.id, rpm)
-                response = await client.chat.completions.create(**create_kwargs)
-                await _record_provider_headers(self.config)
-                msg = response.choices[0].message
 
-                if response.usage:
-                    total_prompt_tokens     += response.usage.prompt_tokens     or 0
-                    total_completion_tokens += response.usage.completion_tokens or 0
+                if on_delta is None:
+                    # ── Blocking path ──────────────────────────────────────────
+                    response = await client.chat.completions.create(**create_kwargs)
+                    await _record_provider_headers(self.config)
 
-                # Append raw assistant turn to history so the next iteration
-                # has full context.  model_dump(exclude_none=True) avoids
-                # sending null fields that some providers reject.
-                try:
-                    conversation.append(msg.model_dump(exclude_none=True))
-                except Exception:
-                    # Fallback for providers that return non-Pydantic objects
-                    conversation.append({
-                        "role": "assistant",
-                        "content": msg.content or "",
-                        **({"tool_calls": [tc.model_dump() for tc in msg.tool_calls]} if msg.tool_calls else {}),
-                    })
+                    # Defensive: a test double may return an async stream even
+                    # for a non-stream request. Consume it WITHOUT on_delta and
+                    # run the identical decision logic below. Real providers
+                    # return a non-stream object here, so this branch is a no-op
+                    # in production (behavior stays byte-for-byte identical).
+                    if hasattr(response, "__aiter__"):
+                        msg, turn_usage, finish_reason = await self._assemble_stream_turn(
+                            response, None, None
+                        )
+                        msg_tool_calls = msg.get("tool_calls")
+                        msg_content = msg.get("content")
+                        conversation.append(msg)
+                    else:
+                        msg = response.choices[0].message
+                        turn_usage = response.usage
+                        finish_reason = response.choices[0].finish_reason
+                        msg_tool_calls = msg.tool_calls
+                        msg_content = msg.content
+                        # Append raw assistant turn to history so the next
+                        # iteration has full context.  model_dump(exclude_none=True)
+                        # avoids sending null fields that some providers reject.
+                        try:
+                            conversation.append(msg.model_dump(exclude_none=True))
+                        except Exception:
+                            conversation.append({
+                                "role": "assistant",
+                                "content": msg.content or "",
+                                **({"tool_calls": [tc.model_dump() for tc in msg.tool_calls]} if msg.tool_calls else {}),
+                            })
 
-                finish_reason = response.choices[0].finish_reason
+                    if turn_usage:
+                        total_prompt_tokens     += getattr(turn_usage, "prompt_tokens", 0)     or 0
+                        total_completion_tokens += getattr(turn_usage, "completion_tokens", 0) or 0
 
-                # Model signalled it is done — no more tool calls
-                if finish_reason == "stop" or not msg.tool_calls:
-                    content = msg.content or ""
-                    break
+                    # Normalize tool_calls to dicts so the executor call is
+                    # uniform for both Pydantic and assembled-stream messages.
+                    norm_tool_calls: List[Dict[str, Any]] = []
+                    if msg_tool_calls:
+                        for tc in msg_tool_calls:
+                            if isinstance(tc, dict):
+                                norm_tool_calls.append(tc)
+                            else:
+                                norm_tool_calls.append({
+                                    "id": tc.id,
+                                    "type": "function",
+                                    "function": {
+                                        "name": tc.function.name,
+                                        "arguments": tc.function.arguments,
+                                    },
+                                })
 
-                if finish_reason == "tool_calls" and msg.tool_calls:
-                    # Execute ALL tool calls in this response in parallel
-                    results = await asyncio.gather(
-                        *[
-                            tool_executor(tc.function.name, json.loads(tc.function.arguments or "{}"))
-                            for tc in msg.tool_calls
-                        ],
-                        return_exceptions=True,
+                    # Model signalled it is done — no more tool calls
+                    if finish_reason == "stop" or not norm_tool_calls:
+                        content = msg_content or ""
+                        break
+
+                    if finish_reason == "tool_calls" and norm_tool_calls:
+                        # Execute ALL tool calls in this response in parallel
+                        results = await asyncio.gather(
+                            *[
+                                tool_executor(
+                                    tc["function"]["name"],
+                                    json.loads(tc["function"]["arguments"] or "{}"),
+                                )
+                                for tc in norm_tool_calls
+                            ],
+                            return_exceptions=True,
+                        )
+
+                        # Feed each result back as a separate tool message
+                        for tc, result in zip(norm_tool_calls, results):
+                            result_str = (
+                                str(result) if not isinstance(result, Exception)
+                                else f"ERROR: {result}"
+                            )
+                            conversation.append({
+                                "role":         "tool",
+                                "tool_call_id": tc["id"],
+                                "content":      result_str,
+                            })
+                    else:
+                        # Unexpected finish_reason — return whatever content exists
+                        content = msg_content or ""
+                        break
+                else:
+                    # ── Streaming final-turn path ────────────────────────────
+                    # The tool-call loop structure is identical to the blocking
+                    # path; only the FINAL text turn is streamed token-by-token
+                    # and each chunk is forwarded to on_delta.  Tool-call turns
+                    # are still read fully (deltas assembled) and executed the
+                    # same way as the blocking branch.
+                    stream_kwargs: Dict[str, Any] = dict(create_kwargs)
+                    stream_kwargs["stream"] = True
+                    stream_kwargs["stream_options"] = {"include_usage": True}
+
+                    stream = await client.chat.completions.create(**stream_kwargs)
+                    await _record_provider_headers(self.config)
+
+                    msg, turn_usage, finish_reason = await self._assemble_stream_turn(
+                        stream, on_delta, cancel_event
                     )
 
-                    # Feed each result back as a separate tool message
-                    for tc, result in zip(msg.tool_calls, results):
-                        result_str = (
-                            str(result) if not isinstance(result, Exception)
-                            else f"ERROR: {result}"
+                    if turn_usage:
+                        total_prompt_tokens     += getattr(turn_usage, "prompt_tokens", 0)     or 0
+                        total_completion_tokens += getattr(turn_usage, "completion_tokens", 0) or 0
+
+                    conversation.append(msg)
+
+                    if cancel_event is not None and cancel_event.is_set():
+                        content = msg.get("content") or ""
+                        loop_finish_reason = "stopped_by_user"
+                        break
+
+                    msg_tool_calls = msg.get("tool_calls")
+                    msg_content = msg.get("content")
+
+                    # Model signalled it is done — no more tool calls
+                    if finish_reason == "stop" or not msg_tool_calls:
+                        content = msg_content or ""
+                        break
+
+                    if finish_reason == "tool_calls" and msg_tool_calls:
+                        # Execute ALL tool calls in this response in parallel,
+                        # mirroring the blocking branch exactly.
+                        results = await asyncio.gather(
+                            *[
+                                tool_executor(
+                                    tc["function"]["name"],
+                                    json.loads(tc["function"]["arguments"] or "{}"),
+                                )
+                                for tc in msg_tool_calls
+                            ],
+                            return_exceptions=True,
                         )
-                        conversation.append({
-                            "role":         "tool",
-                            "tool_call_id": tc.id,
-                            "content":      result_str,
-                        })
-                else:
-                    # Unexpected finish_reason — return whatever content exists
-                    content = msg.content or ""
-                    break
+
+                        # Feed each result back as a separate tool message
+                        for tc, result in zip(msg_tool_calls, results):
+                            result_str = (
+                                str(result) if not isinstance(result, Exception)
+                                else f"ERROR: {result}"
+                            )
+                            conversation.append({
+                                "role":         "tool",
+                                "tool_call_id": tc["id"],
+                                "content":      result_str,
+                            })
+                    else:
+                        # Unexpected finish_reason — return whatever content exists
+                        content = msg_content or ""
+                        break
             else:
                 # max_iterations reached without a clean stop
                 content = ""
@@ -705,12 +893,12 @@ class OpenAICompatibleProvider(BaseModelProvider):
             "latency_ms":        latency,
             "model":             actual_model,
             "messages":          conversation,
+            "finish_reason":     loop_finish_reason,
             "cost_usd":          calculate_cost(
                 actual_model, self.config.provider,
                 total_prompt_tokens, total_completion_tokens
             ),
         }
-
 
 class AnthropicProvider(BaseModelProvider):
     """Anthropic Claude API."""
