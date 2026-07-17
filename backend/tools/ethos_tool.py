@@ -85,6 +85,11 @@ class EthosTool:
         if action == "compress":
             return self._compress(db, agent_id, kwargs)
 
+        if action == "edit_identity":
+            return self._edit_identity(db, agent_id, kwargs)
+        if action == "verify_identity":
+            return self._verify_identity(db, agent_id)
+
         return _result(False, error=f"Unknown or unimplemented action: {action}")
 
     def _read(self, db: Session, agent_id: str) -> Dict[str, Any]:
@@ -149,6 +154,44 @@ class EthosTool:
             "lessons_count": len(ethos.get_lessons_learned()),
             "reasoning_count": len(ethos.get_reasoning_artifacts()),
         })
+
+    def _edit_identity(self, db: Session, agent_id: str, kwargs: Dict[str, Any]) -> Dict[str, Any]:
+        ethos = _load_ethos(db, agent_id)
+        agent = db.query(Agent).filter(Agent.agentium_id == agent_id).first()
+        if ethos is None or agent is None:
+            return _result(False, error=f"Agent or ethos not found for {agent_id}")
+        patch = kwargs.get("patch")
+        if not isinstance(patch, dict):
+            return _result(False, error="edit_identity requires a dict 'patch'")
+        allowed = {"mission_statement", "behavioral_rules",
+                   "restrictions", "capabilities"}
+        cleaned = {k: v for k, v in patch.items() if k in allowed}
+        if not cleaned:
+            return _result(False, error=f"patch must contain one of {sorted(allowed)}")
+        agent.pending_identity_edit = json.dumps(cleaned)
+        agent.ethos_action_pending = True
+        db.flush()
+        return _result(True, data={"staged": cleaned, "pending": True})
+
+    def _verify_identity(self, db: Session, agent_id: str) -> Dict[str, Any]:
+        caller_tier = agent_id[0] if agent_id and agent_id[0].isdigit() else "?"
+        if caller_tier not in ("0", "2"):
+            return _result(False, error="only Lead (2xxxx) or Head (0xxxx) may verify identity edits")
+        pending_agent = db.query(Agent).filter(Agent.ethos_action_pending == True).first()
+        if pending_agent is None:
+            return _result(False, error="no pending identity edit to verify")
+        pending_ethos = _load_ethos(db, pending_agent.agentium_id)
+        patch = json.loads(pending_agent.pending_identity_edit) if pending_agent.pending_identity_edit else None
+        if not patch:
+            return _result(False, error="pending edit payload missing")
+        for field, value in patch.items():
+            setattr(pending_ethos, field,
+                    json.dumps(value) if isinstance(value, (list, dict)) else value)
+        pending_ethos.verify(agent_id)
+        pending_agent.pending_identity_edit = None
+        pending_agent.ethos_action_pending = False
+        db.flush()
+        return _result(True, data={"applied": patch, "verified_by": agent_id})
 
 
 ethos_tool = EthosTool()

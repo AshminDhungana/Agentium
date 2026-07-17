@@ -116,3 +116,53 @@ async def test_compress_runs_and_bumps_version(db_session: Session):
     assert result["success"] is True
     after = _load_ethos(db_session, "30001")
     assert after.version > before_version
+
+
+async def test_edit_identity_stages_pending(db_session: Session):
+    _make_agent_with_ethos(db_session, "30001")
+    result = await ethos_tool.execute(
+        action="edit_identity",
+        patch={"restrictions": ["do not delete prod"]},
+        db=db_session, agent_id="30001",
+    )
+    assert result["success"] is True
+    agent = db_session.query(Agent).filter_by(agentium_id="30001").first()
+    assert agent.ethos_action_pending is True
+    ethos = _load_ethos(db_session, "30001")
+    # Live restrictions must NOT change until verified
+    assert ethos.get_restrictions() == []
+    pending = json.loads(agent.pending_identity_edit) if agent.pending_identity_edit else {}
+    assert pending["restrictions"] == ["do not delete prod"]
+
+
+async def test_verify_identity_applies(db_session: Session):
+    _make_agent_with_ethos(db_session, "30001")
+    await ethos_tool.execute(
+        action="edit_identity",
+        patch={"restrictions": ["do not delete prod"]},
+        db=db_session, agent_id="30001",
+    )
+    verify = await ethos_tool.execute(
+        action="verify_identity",
+        db=db_session, agent_id="20001",  # Lead tier
+    )
+    assert verify["success"] is True
+    ethos = _load_ethos(db_session, "30001")
+    assert ethos.get_restrictions() == ["do not delete prod"]
+    assert ethos.is_verified is True
+    agent = db_session.query(Agent).filter_by(agentium_id="30001").first()
+    assert agent.ethos_action_pending is False
+
+
+async def test_verify_identity_denied_for_task(db_session: Session):
+    _make_agent_with_ethos(db_session, "30001")
+    await ethos_tool.execute(
+        action="edit_identity",
+        patch={"restrictions": ["x"]},
+        db=db_session, agent_id="30001",
+    )
+    verify = await ethos_tool.execute(
+        action="verify_identity",
+        db=db_session, agent_id="30001",
+    )
+    assert verify["success"] is False

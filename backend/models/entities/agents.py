@@ -101,7 +101,8 @@ class Agent(BaseEntity):
     last_constitution_read_at = Column(DateTime, nullable=True)
     constitution_read_count = Column(Integer, default=0)
     ethos_last_read_at = Column(DateTime, nullable=True)
-    ethos_action_pending = Column(Boolean, default=False) 
+    ethos_action_pending = Column(Boolean, default=False)
+    pending_identity_edit = Column(Text, nullable=True)  # JSON: staged ethos identity edit
     
     # Relationships
     parent = relationship("Agent", remote_side="Agent.id", backref="subordinates")
