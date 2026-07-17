@@ -206,7 +206,7 @@ class ToolRegistry:
         # ══════════════════════════════════════════════════════════════════════
         self.register_tool(
             name="git",
-            description="Git version control: clone repos, manage branches, view history/diffs, commit and push changes. Not available to task-tier agents (3xxxx).",
+            description="Git version control: clone repos, manage branches, view history/diffs, commit and push changes. Available to every agent tier (0xxxx-6xxxx).",
             function=git_tool.execute,
             parameters={
                 "action":    {"type": "string",  "description": "clone, status, log, diff, checkout, pull, commit, push, branch_list, blame"},
@@ -220,7 +220,7 @@ class ToolRegistry:
                 "limit":     {"type": "integer", "description": "Number of commits for log (default 10)", "optional": True},
                 "remote":    {"type": "string",  "description": "Remote name for push (default: origin)", "optional": True},
             },
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx"],  # intentionally excludes 3xxxx
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx"],
         )
 
         # ══════════════════════════════════════════════════════════════════════
