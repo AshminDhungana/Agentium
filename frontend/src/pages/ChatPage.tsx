@@ -327,9 +327,6 @@ export function ChatPage() {
                 );
                 setIsAwaitingReply(false);
                 const endMeta = msg.metadata as MessageMetadata | undefined;
-                if (endMeta?.card) {
-                    useChatStore.getState().registerCard(endMeta.card.card_id, true);
-                }
                 if ((endMeta as any)?.task_created) {
                     showToast.success(`Task ${(endMeta as any).task_id} created`);
                 }
@@ -357,11 +354,6 @@ export function ChatPage() {
                 setMessages((prev) => [...prev, newMessage]);
                 // Any incoming message means the assistant is no longer "thinking"
                 setIsAwaitingReply(false);
-                // A structured input card arrived — register it as the active card
-                // (replacing any previously-unanswered one). See chatStore lifecycle.
-                if (newMessage.metadata?.card) {
-                    useChatStore.getState().registerCard(newMessage.metadata.card.card_id, true);
-                }
                 if (msg.metadata?.task_created) {
                     showToast.success(`Task ${msg.metadata.task_id} created`);
                 }

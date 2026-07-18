@@ -15,6 +15,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Shield } from 'lucide-react';
 import { modelsApi } from '@/services/models';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { useGlobalChatCards } from '@/hooks/useGlobalChatCards';
 
 // ── Session key ───────────────────────────────────────────────────────────────
 // Marks that the model-redirect check has already fired for this login session.
@@ -91,6 +92,7 @@ function useModelRedirect() {
 // (useNavigate requires being inside <Router>).
 function AppWithRedirect() {
     useModelRedirect();
+    useGlobalChatCards();
     const { user, isInitialized } = useAuthStore();
     const { startPolling, stopPolling } = useBackendStore();
 
