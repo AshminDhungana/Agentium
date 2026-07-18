@@ -34,6 +34,7 @@ import logging
 import platform
 import subprocess
 import backend.tools.host_path as host_path
+import backend.tools._workspace as _ws
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -257,8 +258,9 @@ class FileManagementTool:
     def _host_path(self, path: str) -> str:
         return host_path.resolve_host_path(path)
 
-    def open_file(self, filepath: str) -> Dict[str, Any]:
+    def open_file(self, filepath: str, agent_id: str = "30001") -> Dict[str, Any]:
         """Open a file with the OS default application."""
+        filepath = _ws.resolve_in_workspace(filepath, agent_id)
         filepath = self._host_path(filepath)
         system = platform.system().lower()
         try:
@@ -272,8 +274,9 @@ class FileManagementTool:
         except Exception as e:
             return {"status": "error", "error": str(e)}
 
-    def create_file(self, filepath: str, content: str = "") -> Dict[str, Any]:
+    def create_file(self, filepath: str, content: str = "", agent_id: str = "30001") -> Dict[str, Any]:
         """Create a new file with optional initial content."""
+        filepath = _ws.resolve_in_workspace(filepath, agent_id)
         filepath = self._host_path(filepath)
         try:
             Path(filepath).parent.mkdir(parents=True, exist_ok=True)
@@ -283,8 +286,9 @@ class FileManagementTool:
         except Exception as e:
             return {"status": "error", "error": str(e)}
 
-    def read_file(self, filepath: str, offset: int = 0, limit: int = 500) -> Dict[str, Any]:
+    def read_file(self, filepath: str, offset: int = 0, limit: int = 500, agent_id: str = "30001") -> Dict[str, Any]:
         """Read file contents with optional line offset and limit."""
+        filepath = _ws.resolve_in_workspace(filepath, agent_id)
         filepath = self._host_path(filepath)
         try:
             lines  = Path(filepath).read_text(encoding="utf-8", errors="replace").splitlines()
@@ -294,8 +298,9 @@ class FileManagementTool:
         except Exception as e:
             return {"status": "error", "error": str(e)}
 
-    def save_file(self, filepath: str, content: str, backup: bool = True) -> Dict[str, Any]:
+    def save_file(self, filepath: str, content: str, backup: bool = True, agent_id: str = "30001") -> Dict[str, Any]:
         """Write content to file, optionally creating a .bak backup first."""
+        filepath = _ws.resolve_in_workspace(filepath, agent_id)
         filepath = self._host_path(filepath)
         try:
             p = Path(filepath)
@@ -308,8 +313,9 @@ class FileManagementTool:
         except Exception as e:
             return {"status": "error", "error": str(e)}
 
-    def delete_file(self, filepath: str, confirm: bool = False) -> Dict[str, Any]:
+    def delete_file(self, filepath: str, confirm: bool = False, agent_id: str = "30001") -> Dict[str, Any]:
         """Delete a file or directory. confirm must be True to proceed."""
+        filepath = _ws.resolve_in_workspace(filepath, agent_id)
         if not confirm:
             return {"status": "error",
                     "error": "Set confirm=True to confirm deletion. This is irreversible."}
@@ -324,8 +330,9 @@ class FileManagementTool:
         except Exception as e:
             return {"status": "error", "error": str(e)}
 
-    def copy_file(self, src: str, dst: str) -> Dict[str, Any]:
+    def copy_file(self, src: str, dst: str, agent_id: str = "30001") -> Dict[str, Any]:
         """Copy a file or directory."""
+        src = _ws.resolve_in_workspace(src, agent_id)
         src = self._host_path(src)
         dst = self._host_path(dst)
         try:
@@ -338,8 +345,9 @@ class FileManagementTool:
         except Exception as e:
             return {"status": "error", "error": str(e)}
 
-    def move_file(self, src: str, dst: str) -> Dict[str, Any]:
+    def move_file(self, src: str, dst: str, agent_id: str = "30001") -> Dict[str, Any]:
         """Move or rename a file or directory."""
+        src = _ws.resolve_in_workspace(src, agent_id)
         src = self._host_path(src)
         dst = self._host_path(dst)
         try:
@@ -350,8 +358,9 @@ class FileManagementTool:
             return {"status": "error", "error": str(e)}
 
     def list_directory(self, path: str, show_hidden: bool = False,
-                       recursive: bool = False) -> Dict[str, Any]:
+                       recursive: bool = False, agent_id: str = "30001") -> Dict[str, Any]:
         """List directory contents with metadata."""
+        path = _ws.resolve_in_workspace(path, agent_id)
         path = self._host_path(path)
         try:
             entries  = []
