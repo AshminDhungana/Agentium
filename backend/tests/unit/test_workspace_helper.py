@@ -45,3 +45,31 @@ def test_manifest_lists_files(tmp_path):
     items = w._manifest(str(tmp_path))
     names = {i["name"] for i in items}
     assert names == {"a.txt", "sub/b.txt"}
+
+
+def test_resolve_disabled_returns_unchanged(monkeypatch):
+    monkeypatch.setenv("AGENTIUM_WORKSPACE_ENABLED", "false")
+    monkeypatch.setenv("AGENTIUM_WORKSPACE_ROOT", "/host_home/agentium-workspace")
+    assert w.resolve_in_workspace("output.html", "30001") == "output.html"
+
+
+def test_resolve_host_slash_prefix_passthrough(monkeypatch):
+    monkeypatch.setenv("AGENTIUM_WORKSPACE_ROOT", "/host_home/agentium-workspace")
+    assert w.resolve_in_workspace("/host/x.txt", "30001") == "/host/x.txt"
+    assert w.resolve_in_workspace("/host_home/x.txt", "30001") == "/host_home/x.txt"
+
+
+def test_validate_config_ok_under_host(monkeypatch, caplog):
+    import logging
+    monkeypatch.setenv("AGENTIUM_WORKSPACE_ROOT", "/host_home/agentium-workspace")
+    caplog.set_level(logging.WARNING)
+    assert w.validate_workspace_config() is True
+    assert not any("not under /host" in r.message for r in caplog.records)
+
+
+def test_validate_config_warns_when_not_under_host(monkeypatch, caplog):
+    import logging
+    monkeypatch.setenv("AGENTIUM_WORKSPACE_ROOT", "/var/lib/agentium")
+    caplog.set_level(logging.WARNING)
+    assert w.validate_workspace_config() is False
+    assert any("not under /host" in r.message for r in caplog.records)

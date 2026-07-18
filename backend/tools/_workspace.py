@@ -9,7 +9,10 @@ Mirrors host_path.resolve_host_path: relative/bare paths resolve into the
 agent workspace; absolute /host or /host_home paths pass through; other
 absolute or /tmp paths stay container-local.
 """
+import logging
 import os
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_WORKSPACE_ROOT = "/host_home/agentium-workspace"
 HOME_MOUNT = "/host_home"
@@ -46,17 +49,40 @@ def ensure_agent_workspace(agent_id: str, task_id: str | None = None) -> str:
 def resolve_in_workspace(path: str, agent_id: str) -> str:
     """Resolve a possibly-relative path into the agent's host workspace.
 
-    - absolute under /host or /host_home -> unchanged
+    - absolute under /host/ or /host_home/ -> unchanged
     - /tmp or other absolute -> unchanged (container-local)
     - relative/bare filename -> <workspace>/<path>
+
+    When the workspace feature is disabled, paths are returned unchanged so
+    file writes stay container-local (graceful degradation).
     """
+    if not workspace_enabled():
+        return path
     if not isinstance(path, str) or not path.strip():
         return path
-    if path.startswith("/host") or path.startswith("/host_home"):
+    if path.startswith("/host/") or path.startswith("/host_home/"):
         return path
     if path.startswith("/tmp") or path.startswith("/"):
         return path
     return _join(agent_workspace_path(agent_id), path)
+
+
+def validate_workspace_config() -> bool:
+    """Validate AGENTIUM_WORKSPACE_ROOT resolves under a host bind mount.
+
+    Returns True when the root is under /host or /host_home (so artifacts are
+    actually visible on the host machine). Logs a warning and returns False
+    otherwise — the feature simply degrades to container-local storage.
+    """
+    root = workspace_root()
+    if root.startswith("/host/") or root.startswith("/host_home/"):
+        return True
+    logger.warning(
+        "AGENTIUM_WORKSPACE_ROOT=%s is not under /host or /host_home; "
+        "generated artifacts will NOT be visible on the host machine.",
+        root,
+    )
+    return False
 
 
 def host_visible_path(path: str) -> str:

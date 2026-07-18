@@ -181,6 +181,28 @@ async def lifespan(app: FastAPI):
             raise
 
     # ─────────────────────────────────────────────────────────────
+    # 0b. Workspace persistence config sanity check
+    # ─────────────────────────────────────────────────────────────
+    # When the host-workspace feature is enabled, confirm the root actually
+    # resolves under a host bind mount (/host or /host_home) so generated
+    # artifacts are visible on the user's machine. Non-fatal warning only.
+    if os.environ.get("TESTING") != "true":
+        try:
+            from backend.tools._workspace import (
+                workspace_enabled,
+                validate_workspace_config,
+            )
+            if workspace_enabled() and not validate_workspace_config():
+                logger.warning(
+                    "⚠️ Host workspace enabled but misconfigured — "
+                    "artifacts will NOT be visible on the host machine."
+                )
+            elif workspace_enabled():
+                logger.info("✅ Host workspace persistence configured")
+        except Exception as ws_cfg_err:  # pragma: no cover - non-fatal guard
+            logger.warning("⚠️ Workspace config check failed (non-fatal): %s", ws_cfg_err)
+
+    # ─────────────────────────────────────────────────────────────
     # 1. Initialize Database
     # ─────────────────────────────────────────────────────────────
     try:

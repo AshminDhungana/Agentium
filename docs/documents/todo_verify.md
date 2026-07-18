@@ -1,18 +1,6 @@
 # Agentium — Verification & Improvement Backlog
 
-set as blank string to not see this error , time="2026-07-18T20:32:38+05:45" level=warning msg="The \"MINIO_ROOT_USER\" variable is not set. Defaulting to a blank string."
-time="2026-07-18T20:32:38+05:45" level=warning msg="The \"MINIO_ROOT_PASSWORD\" variable is not set. Defaulting to a blank string."
-time="2026-07-18T20:32:38+05:45" level=warning msg="The \"MINIO_ROOT_USER\" variable is not set. Defaulting to a blank string."
-time="2026-07-18T20:32:38+05:45" level=warning msg="The \"MINIO_ROOT_PASSWORD\" variable is not set. Defaulting to a blank string."
-time="2026-07-18T20:32:38+05:45" level=warning msg="The \"MINIO_ROOT_USER\" variable is not set. Defaulting to a blank string."
-time="2026-07-18T20:32:38+05:45" level=warning msg="The \"MINIO_ROOT_PASSWORD\" variable is not set. Defaulting to a blank string."
-time="2026-07-18T20:32:38+05:45" level=warning msg="The \"MINIO_ROOT_USER\" variable is not set. Defaulting to a blank string."
-time="2026-07-18T20:32:38+05:45" level=warning msg="The \"MINIO_ROOT_PASSWORD\" variable is not set. Defaulting to a blank string."
-
-
-[ ] - When user says, to head, create me a website, the head asks questions to the user and gather all the information from web search or knowledge database, and then hands the task to the lead agent the lead agent then break the tasks and create several task agent, the critics verify the work of task agent , and when the task is done, the user must see the files created in his workspace. the files should not be created and kept in docker. the user should see the data in the user workspace that is the host machine. This is the indented workflow , check how the current system operates and what and how the sytem function right now and create a summery. 
-
-
+[ ] - When user says, to head, create me a website, the head asks questions to the user and gather all the information from web search or knowledge database, and then hands the task to the lead agent the lead agent then break the tasks and create several task agent, the critics verify the work of task agent , and when the task is done, the user must see the files created in his workspace. the files should not be created and kept in docker. the user should see the data in the user workspace that is the host machine. This is the indented workflow , check how the current system operates and what and how the sytem function right now and create a summery.
 
 - [ ] - The Head of Council task is to not do the work but assign the work and monitor, so when user asks to do something the head should not do the work but assign it to other agents as per system design then report back to user. What can be done to make the chat that is handeled by the head work smoothly, so that user gets fast response. 
 
