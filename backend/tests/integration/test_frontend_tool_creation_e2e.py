@@ -6,6 +6,8 @@ the backend and are not lost to a stale registry / cache.
 """
 import pytest
 
+from sqlalchemy import select
+
 from backend.core.auth import create_access_token
 
 
@@ -32,6 +34,7 @@ def head_auth_headers():
 from uuid import uuid4
 
 from backend.core.tool_registry import tool_registry
+from backend.models.entities.tool_staging import ToolStaging
 from backend.models.schemas.tool_creation import ToolCreationRequest
 from backend.services.tool_creation_service import ToolCreationService
 
@@ -60,6 +63,14 @@ def test_direct_service_tool_persists_and_is_invocable(seeded_db):
 
         # 1) Persisted in the live registry
         assert name in tool_registry.tools
+
+        # (1b) Persisted at the storage layer (not just the in-memory registry)
+        from sqlalchemy import select
+        row = seeded_db.execute(
+            select(ToolStaging).where(ToolStaging.tool_name == name)
+        ).scalar_one_or_none()
+        assert row is not None, "ToolStaging row missing after activation"
+        assert row.status == "activated", row.status
 
         # 2) Exported to OpenAI schema
         oai = tool_registry.to_openai_tools("0xxxx")
@@ -97,8 +108,18 @@ def test_http_propose_route_registers_and_exports_tool(client, seeded_db, head_a
         # Live persistence in the registry singleton (catches stale/cache gaps)
         assert name in tool_registry.tools
 
+        # (1b) Persisted at the storage layer (not just the in-memory registry)
+        from sqlalchemy import select
+        row = seeded_db.execute(
+            select(ToolStaging).where(ToolStaging.tool_name == name)
+        ).scalar_one_or_none()
+        assert row is not None, "ToolStaging row missing after activation"
+        assert row.status == "activated", row.status
+
         oai = tool_registry.to_openai_tools("0xxxx")
         assert name in [t["function"]["name"] for t in oai]
+        spec = next(t for t in oai if t["function"]["name"] == name)
+        assert spec["function"]["description"] == "E2E probe tool"
 
         ant = tool_registry.to_anthropic_tools("0xxxx")
         assert name in [t["name"] for t in ant]
