@@ -490,7 +490,7 @@ class ToolCreationService:
     def _log_tool_activation(self, agentium_id: str, tool_name: str):
         """Log tool activation."""
 
-        audit = AuditLog(
+        audit = AuditLog.log(
             level=AuditLevel.INFO,
             category=AuditCategory.SYSTEM,
             actor_type='agent',
@@ -504,8 +504,6 @@ class ToolCreationService:
                 "activated_by": agentium_id,
                 "timestamp": datetime.utcnow().isoformat(),
             },
-            is_active=True,
-            created_at=datetime.utcnow(),
         )
         self.db.add(audit)
         self.db.commit()
