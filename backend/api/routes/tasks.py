@@ -14,6 +14,7 @@ from backend.models.entities.task import Task, TaskStatus, TaskType, TaskPriorit
 from backend.models.entities.task_events import TaskEvent, TaskEventType
 from backend.api.schemas.task import TaskCreate, TaskResponse, TaskUpdate
 from backend.core.auth import get_current_active_user
+from backend.core.tool_runner import cancel_tool_run
 from backend.services.task_state_machine import TaskStateMachine, IllegalStateTransition
 from backend.services.acceptance_criteria import AcceptanceCriteriaService  # Phase 6.3
 from backend.services.browser_service import get_browser_service
@@ -789,3 +790,10 @@ async def get_dependency_graph(
         "total_dependencies": len(nodes),
         "dependencies": nodes,
     }
+
+
+@router.post("/{task_id}/cancel")
+async def cancel_task_run(task_id: str, reason: str = "user stop", current_user: dict = Depends(get_current_active_user)):
+    """Cancel a running agent tool-call loop by its task_id (run_id)."""
+    cancelled = cancel_tool_run(task_id, reason)
+    return {"cancelled": cancelled}
