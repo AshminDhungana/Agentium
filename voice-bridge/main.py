@@ -733,16 +733,21 @@ def _post_card_response(answer: dict) -> None:
 
 async def _maybe_handle_pending_card() -> None:
     """Speak any pending clarification card and capture the spoken answer."""
-    card = _get_pending_card()
+    loop = asyncio.get_event_loop()
+    card = await loop.run_in_executor(_executor, _get_pending_card)
     if not card:
         return
     card_id = card.get("card_id") or card.get("id")
-    if card_id:
-        _handled_card_ids.add(card_id)
     await speak(_card_to_speech_text(card))
     utterance = await listen_once(timeout=30)
     if utterance:
-        _post_card_response(_build_card_answer(card, utterance))
+        await loop.run_in_executor(
+            _executor, _post_card_response, _build_card_answer(card, utterance)
+        )
+        # Mark handled only after a successful post so a failed post can be
+        # retried next turn (a failed post simply leaves the card un-handled).
+        if card_id:
+            _handled_card_ids.add(card_id)
 
 
 def _post_chat_message(text: str) -> Optional[str]:
