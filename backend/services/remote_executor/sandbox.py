@@ -154,9 +154,13 @@ class SandboxManager:
         sandbox_id = f"sandbox_{uuid.uuid4().hex[:12]}"
 
         # Build the egress policy. When the network is opt-in (bridge mode) we
-        # record the allowlist + always-blocked CIDRs as labels so the policy is
-        # visible on every opt-in container. Full proxy enforcement is future
-        # work (spec §10 Out of Scope); the labels are the self-contained control.
+        # record the deny-list CIDRs as labels so the intended policy is visible
+        # and auditable on every opt-in container.
+        # NOTE: egress deny-list is recorded as labels only; actual enforcement
+        # requires a host egress proxy (future work, spec §10 Out of Scope).
+        # Bridge mode currently grants outbound internet. Do NOT treat the
+        # blocked_egress_cidrs() label as a security control, and avoid passing
+        # secrets into any opt-in-network sandbox.
         egress = effective_egress_policy(config)
         egress_labels = {}
         if config.network_mode == "bridge":
@@ -230,11 +234,15 @@ class SandboxManager:
         await self._ensure_pool_lock()
         
         warm_container = None
-        # Fast path: try to pop from warm pool
-        async with self._pool_lock:
-            if self._warm_pool:
-                warm_container = self._warm_pool.pop()
-                
+        # Fast path: try to pop from warm pool. Warm containers are pre-allocated
+        # with the default config (network_mode="none"). If the caller opts into
+        # network (bridge mode), we must NOT serve a "none" warm container — cold
+        # start a dedicated container so the requested network posture is honored.
+        if not (config and config.network_mode == "bridge"):
+            async with self._pool_lock:
+                if self._warm_pool:
+                    warm_container = self._warm_pool.pop()
+
         if warm_container:
             logger.info(f"Popped warm sandbox {warm_container['sandbox_id']} for agent {agent_id}. Replenishing pool...")
             # Claim it by updating labels (best effort)

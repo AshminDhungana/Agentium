@@ -38,17 +38,20 @@ async def execute(
         input_data: Optional data available inside the sandbox as
             ``input_data``. Shape/schema only — never raw PII rows.
         dependencies: Optional list of pip packages to install in the sandbox.
-        network_access: If True, allow egress via an allowlisted bridge
-            (private/IMDS ranges blocked). Default False (network_mode="none").
+        network_access: If True, allow opt-in outbound internet via a bridge
+            network. Default False (network_mode="none"). Note the intended
+            egress deny-list is recorded as a label only and is not enforced;
+            avoid passing secrets.
         timeout_seconds / memory_limit_mb / cpu_limit: Resource bounds.
-        db: Injected by ToolCreationService; intentionally unused here so the
-            sandbox path stays independent of the caller's DB session.
+        db: Injected by ToolCreationService. Passed through to the service so the
+            audit-trail DB record is written; defaults to None for direct/test
+            calls where no session is available.
 
     Returns:
         Dict with execution_id, status, summary (NEVER raw data),
         error, security_result, timings.
     """
-    service = RemoteExecutorService(db_session=None)
+    service = RemoteExecutorService(db_session=db)
     result = await service.execute(
         code=code,
         agent_id=agent_id,

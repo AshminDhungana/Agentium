@@ -446,9 +446,13 @@ class ToolRegistry:
                 "truncated rows, stats, and truncated stdout/stderr. Assign your result to "
                 "a variable named 'result' (or 'output') to get the best summary. "
                 "Use for data processing, file operations inside the sandbox, and (with "
-                "network_access=true) allowlisted outbound HTTP. Network is OFF by default. "
-                "Dangerous patterns (rm -rf /, exec, eval, os.system, subprocess) are blocked "
-                "before execution. Full reference in backend/.agentium/skills/remote_exec/SKILL.md."
+                "network_access=true) opt-in outbound internet via a bridge network. Network "
+                "is OFF by default. On opt-in, the intended egress deny-list (private/IMDS/"
+                "link-local ranges) is recorded on the container as a label, but is NOT "
+                "currently enforced — treat opt-in network as granting outbound internet and "
+                "avoid passing secrets. Dangerous patterns (rm -rf /, exec, eval, os.system, "
+                "subprocess) are blocked before execution. Full reference in "
+                "backend/.agentium/skills/remote_exec/SKILL.md."
             ),
             function=remote_exec_tool_execute,
             parameters={
@@ -468,7 +472,7 @@ class ToolRegistry:
                 },
                 "network_access": {
                     "type": "boolean",
-                    "description": "Allow allowlisted outbound network (default False = no network)",
+                    "description": "Allow opt-in outbound internet via bridge network (default False = no network). Deny-list of private/IMDS ranges is recorded as a label but not enforced; avoid secrets.",
                     "optional": True,
                 },
                 "timeout_seconds": {
