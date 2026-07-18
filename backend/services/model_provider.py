@@ -1525,7 +1525,6 @@ class ModelService:
             }
         """
         from backend.core.tool_registry import tool_registry
-        from backend.services.tool_creation_service import ToolCreationService
 
         provider = await ModelService.get_provider("sovereign", config_id)
         if not provider:

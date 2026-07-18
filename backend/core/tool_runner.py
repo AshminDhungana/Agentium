@@ -74,15 +74,20 @@ async def run_tool_async(
     async def _call() -> Any:
         if use_service and db is not None:
             from backend.services.tool_creation_service import ToolCreationService
-            return ToolCreationService(db).execute_tool(
-                tool_name=name, called_by=called_by, kwargs=kwargs, task_id=task_id
+            svc = ToolCreationService(db)
+            loop = asyncio.get_running_loop()
+            return await loop.run_in_executor(
+                None,
+                lambda: svc.execute_tool(
+                    tool_name=name, called_by=called_by, kwargs=kwargs, task_id=task_id
+                ),
             )
         fn = tool_registry.get_tool_function(name)
         if fn is None:
             return {"status": "error", "error": f"Tool '{name}' not found"}
         if inspect.iscoroutinefunction(fn):
             return await fn(**kwargs)
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, lambda: fn(**kwargs))
 
     async def _wait_race(call_task: asyncio.Task) -> None:
