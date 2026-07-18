@@ -42,7 +42,10 @@ class Settings(BaseSettings):
     )
     REDIS_POOL_SIZE: int = 50
     REDIS_TIMEOUT: int = 5  # seconds
-    
+
+    # Tool execution — default per-call timeout for agent tool calls (seconds)
+    TOOL_TIMEOUT_DEFAULT: float = Field(default=60.0, env="TOOL_TIMEOUT_DEFAULT")
+
     # Vector Database (ChromaDB)
     CHROMA_PERSIST_DIR: str = "./chroma_data"
     CHROMA_HOST: Optional[str] = None  # For server mode, default None = embedded
