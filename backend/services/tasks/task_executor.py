@@ -148,8 +148,8 @@ def execute_task_async(self, task_id: str, agent_id: str):
                     from backend.api.routes.websocket import manager
                     asyncio.run(manager.broadcast({
                         "type": "workspace_ready",
-                        "agent_id": getattr(task, "agentium_id", None),
-                        "task_id": getattr(task, "agentium_id", None),
+                        "agent_id": agent_id,
+                        "task_id": task_id,
                         "workspace_path": ws_path,
                         "artifact_count": len(arts or []),
                     }))
