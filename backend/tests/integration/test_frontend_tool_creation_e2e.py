@@ -74,6 +74,6 @@ def test_direct_service_tool_persists_and_is_invocable(seeded_db):
 
         # 4) Invocable by an authorized agent
         fn = tool_registry.get_tool_function(name)
-        assert fn() == {"echo": "ok", "n": 42}
+        assert fn() == {"status": "success", "result": {"echo": "ok", "n": 42}}
     finally:
         tool_registry.deregister_tool(name)
