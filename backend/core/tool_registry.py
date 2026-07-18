@@ -53,6 +53,60 @@ class ToolRegistry:
 
     def _initialize_tools(self):
         """Register all built-in (non-MCP) tools."""
+        from backend.tools.tool_creator_tool import tool_creator_tool
+        # ══════════════════════════════════════════════════════════════════════
+        # TOOL CREATOR TOOL — Head/Council agents create new tools at runtime
+        # ══════════════════════════════════════════════════════════════════════
+        self.register_tool(
+            name="tool_creator",
+            description=(
+                "Let a Head or Council agent define and register a new runtime tool for "
+                "itself. Accepts tool_name, description, parameters, code_template "
+                "(Python, security-validated), rationale, and optional test_cases/"
+                "authorized_tiers. Head-created tools auto-activate; Council-created tools "
+                "enter the democratic Council vote workflow. Restricted to 0xxxx/1xxxx "
+                "tiers. Full reference in backend/.agentium/skills/tool_creator/SKILL.md."
+            ),
+            function=tool_creator_tool.execute,
+            parameters={
+                "action": {
+                    "type": "string",
+                    "description": "create | help",
+                },
+                "tool_name": {
+                    "type": "string",
+                    "description": "Unique name for the new tool (create action)",
+                },
+                "description": {
+                    "type": "string",
+                    "description": "What the tool does (create action)",
+                },
+                "parameters": {
+                    "type": "array",
+                    "description": "List of {name, type, description, required, default} params (create action)",
+                },
+                "code_template": {
+                    "type": "string",
+                    "description": "Python code implementing the tool's execute() body (create action)",
+                },
+                "rationale": {
+                    "type": "string",
+                    "description": "Why this tool is needed (create action)",
+                },
+                "test_cases": {
+                    "type": "array",
+                    "description": "Optional list of {input, expected} test cases",
+                    "optional": True,
+                },
+                "authorized_tiers": {
+                    "type": "array",
+                    "description": "Tiers allowed to call the created tool; clamped to 0xxxx/1xxxx (optional)",
+                    "optional": True,
+                },
+            },
+            authorized_tiers=["0xxxx", "1xxxx"],
+        )
+
         from backend.tools.governance_tool import (
             spawn_agent,
             liquidate_agent,
