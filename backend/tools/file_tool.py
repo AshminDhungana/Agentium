@@ -46,25 +46,36 @@ def _is_binary_file(filepath: str) -> bool:
 class FileSystemTool:
     """Tool for agents to manage files on the local filesystem."""
 
-    def read_file(self, filepath: str, limit: int = 1000) -> Dict[str, Any]:
+    def read_file(
+        self,
+        filepath: str,
+        offset: int = 1,
+        limit: int | None = None,
+        char_limit: int = 1000,
+    ) -> Dict[str, Any]:
         """
         Read text file contents.
 
+        Two modes:
+        - Whole-file (default): offset=1 and limit=None. Returns raw text
+          capped at char_limit*100 characters (legacy behavior).
+        - Precise (line-based): offset/limit select an inclusive 1-based line
+          range and the returned content is line-numbered ("%6d\\t" prefix),
+          matching text_editor's view format.
+
         Returns an error dict (without raising) if:
-        - The file is binary (PDF, image, archive, etc.) — use the
-          file extraction API (/api/v1/files/upload) for those.
+        - The file is binary (PDF, image, archive, etc.)
         - The file cannot be decoded as UTF-8.
         - The path does not exist or is not accessible.
+        - In precise mode, offset is out of range.
 
         Args:
-            filepath: Absolute or relative path to the file.
-            limit:    Approximate kilobyte limit on returned content
-                      (actual cap = limit × 100 characters).
+            filepath:   Absolute or relative path to the file.
+            offset:     1-based start line for precise mode (default 1).
+            limit:      Number of lines to return in precise mode (None = whole file).
+            char_limit: Legacy whole-file char cap = limit * 100 characters.
         """
         try:
-            # Guard: reject binary files before attempting text decode.
-            # The original code would either raise a UnicodeDecodeError or
-            # return garbled replacement characters for binary content.
             if _is_binary_file(filepath):
                 return {
                     "status": "error",
@@ -80,15 +91,44 @@ class FileSystemTool:
             with open(filepath, 'r', encoding='utf-8') as f:
                 content = f.read()
 
-            char_limit = limit * 100
-            truncated  = len(content) > char_limit
+            total_lines = content.count("\n") + (0 if content.endswith("\n") or content == "" else 1)
+            if content == "":
+                total_lines = 0
 
+            precise = (offset != 1) or (limit is not None)
+            if not precise:
+                char_cap = char_limit * 100
+                truncated = len(content) > char_cap
+                return {
+                    "status":    "success",
+                    "path":      filepath,
+                    "content":   content[:char_cap],
+                    "size":      len(content),
+                    "total_lines": total_lines,
+                    "truncated": truncated,
+                }
+
+            # Precise (line-based) mode
+            lines = content.splitlines()
+            total = len(lines)
+            if offset < 1 or offset > total:
+                return {
+                    "status": "error",
+                    "path":   filepath,
+                    "error":  f"offset out of range (file has {total} lines)",
+                }
+            end = total if limit is None else min(offset + limit - 1, total)
+            selected = lines[offset - 1 : end]
+            numbered = "\n".join(
+                f"{i + offset:>6}\t{line}" for i, line in enumerate(selected)
+            )
+            truncated = (limit is not None) and (offset + limit - 1 < total)
             return {
-                "status":    "success",
-                "path":      filepath,
-                "content":   content[:char_limit],
-                "size":      len(content),
-                "truncated": truncated,
+                "status":     "success",
+                "path":       filepath,
+                "total_lines": total,
+                "content":    numbered,
+                "truncated":  truncated,
             }
         except UnicodeDecodeError:
             return {
