@@ -7,12 +7,6 @@ from backend.scripts.seed_skills import parse_skill_file
 from backend.services.skill_manager import skill_manager
 from backend.tools.skill_creator_tool import skill_creator_tool, SKILLS_ROOT
 
-SKILL_TYPES = ["automation", "analysis", "research", "debugging", "testing",
-               "deployment", "design", "code_generation", "integration",
-               "optimization", "documentation"]
-DOMAINS = ["backend", "frontend", "devops", "data", "ai", "security", "mobile",
-           "desktop", "general", "database", "api"]
-
 
 def _valid_payload(**overrides):
     p = dict(
