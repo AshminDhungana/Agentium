@@ -12,6 +12,7 @@ import os
 import json
 import uuid
 import logging
+import subprocess
 import subprocess as sp
 from datetime import datetime
 from typing import Optional, Dict, Any, List
