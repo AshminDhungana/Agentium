@@ -11,6 +11,7 @@ import io
 from dataclasses import dataclass, field
 import logging
 import tempfile
+import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -494,6 +495,7 @@ class SpeakerIdentifier:
 
         profile = SpeakerProfile(
             id=str(uuid.uuid4()),
+            agentium_id=f"SP{uuid.uuid4().hex[:8]}",
             user_id=user_id,
             name=username,
             embedding=embedding,

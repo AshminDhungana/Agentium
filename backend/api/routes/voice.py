@@ -4,6 +4,7 @@ Uses OpenAI API key from user's model configurations (if available).
 """
 
 import os
+import json
 import uuid
 import tempfile
 from pathlib import Path
@@ -132,7 +133,7 @@ async def get_enhanced_voice_status(
     Get detailed voice status including local fallback availability.
     Frontend uses this to decide between OpenAI and local voice.
     """
-    user_id = str(current_user.id)
+    user_id = str(current_user["sub"])
 
     # Check OpenAI availability
     openai_status = check_voice_available(db, user_id)
@@ -178,7 +179,7 @@ async def get_voice_status(
     Check if voice features are available for current user.
     Frontend should call this to show appropriate UI.
     """
-    user_id = current_user.id if hasattr(current_user, 'id') else current_user.get('id')
+    user_id = str(current_user["sub"])
     return check_voice_available(db, str(user_id))
 
 
@@ -198,7 +199,7 @@ async def transcribe_audio(
     Transcribe audio to text using OpenAI Whisper.
     Requires active OpenAI provider configuration.
     """
-    user_id = str(current_user.id)
+    user_id = str(current_user["sub"])
     
     # Check voice availability first
     voice_status = check_voice_available(db, user_id)
@@ -293,7 +294,7 @@ async def text_to_speech(
     Convert text to speech using OpenAI TTS.
     Requires active OpenAI provider configuration.
     """
-    user_id = str(current_user.id)
+    user_id = str(current_user["sub"])
     
     # Check voice availability first
     voice_status = check_voice_available(db, user_id)
@@ -389,7 +390,7 @@ async def get_audio_file(
     Retrieve a generated audio file.
     """
     # Security check
-    if str(current_user.id) != user_id and not current_user.is_admin:
+    if str(current_user["sub"]) != user_id and not current_user.get("is_admin"):
         raise ForbiddenError(error="Access denied", code="ACCESS_DENIED")
     
     object_name = f"voice/{user_id}/{filename}"
@@ -638,7 +639,7 @@ async def get_voice_config(
     current_user: User = Depends(get_current_active_user),
 ):
     """Return the current voice-bridge engine config for this user."""
-    return _load_voice_config(str(current_user.id))
+    return _load_voice_config(str(current_user["sub"]))
 
 
 @router.put(
@@ -653,7 +654,7 @@ async def update_voice_config(
     current_user: User = Depends(get_current_active_user),
 ):
     """Persist voice-bridge engine config for this user (merged over defaults)."""
-    current = _load_voice_config(str(current_user.id))
+    current = _load_voice_config(str(current_user["sub"]))
     if config.requireWakeWord is not None:
         current["requireWakeWord"] = config.requireWakeWord
     if config.ttsVoice is not None:
@@ -661,7 +662,7 @@ async def update_voice_config(
     if config.proactiveEnabled is not None:
         current["proactiveEnabled"] = config.proactiveEnabled
     try:
-        _voice_config_path(str(current_user.id)).write_text(json.dumps(current, indent=2))
+        _voice_config_path(str(current_user["sub"])).write_text(json.dumps(current, indent=2))
     except Exception as exc:
         raise InternalServerError(error=f"Failed to persist voice config: {exc}", code="VOICE_CONFIG_WRITE_FAILED")
     return current

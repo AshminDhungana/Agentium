@@ -43,7 +43,7 @@ async def audio_status(
 ):
     """Check audio service availability for the current user."""
     svc = get_audio_service()
-    return svc.get_status(db, str(current_user.id))
+    return svc.get_status(db, str(current_user["sub"]))
 
 
 @router.post(
@@ -110,7 +110,7 @@ async def synthesize_speech(
     svc = get_audio_service()
     try:
         audio_bytes = await svc.synthesize(
-            db, str(current_user.id), text, voice=voice, speed=speed,
+            db, str(current_user["sub"]), text, voice=voice, speed=speed,
         )
         return Response(
             content=audio_bytes,
@@ -143,7 +143,7 @@ async def register_speaker(
         raise BadRequestError(error="Speaker identification is disabled.", code="SPEAKER_ID_DISABLED")
     try:
         audio_bytes = await audio.read()
-        profile = identifier.enroll(db, str(current_user.id), name, audio_bytes)
+        profile = identifier.enroll(db, str(current_user["sub"]), name, audio_bytes)
         if not profile:
             raise BadRequestError(error="Failed to extract embedding from audio sample.", code="FAILED_TO_EXTRACT_EMBEDDING_FROM")
         return profile.to_dict()

@@ -65,7 +65,7 @@ export function MarkdownMessage({
         className={`${styles['stream-caret']}${caretFading ? ` ${styles['stream-caret--fading']}` : ''}`}
         aria-hidden
       >
-        ▍
+        _
       </span>
     ) : null;
 

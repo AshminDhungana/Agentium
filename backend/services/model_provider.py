@@ -695,7 +695,9 @@ class OpenAICompatibleProvider(BaseModelProvider):
                 )
                 if tools:
                     create_kwargs["tools"] = tools
-                    create_kwargs["tool_choice"] = "auto"
+                    # Honor an explicit tool_choice from the caller (e.g. the
+                    # decision engine forces a specific tool); default to "auto".
+                    create_kwargs["tool_choice"] = kwargs.get("tool_choice", "auto")
 
                 # ── Prompt caching (Task 2.1) ────────────────────────────────────
                 # A stable prefix (system + summary + first message) is identical
@@ -1504,6 +1506,16 @@ class ModelService:
             else tool_registry.to_openai_tools(tier)
         )
 
+        # A caller (e.g. LLMClient.decide()) may supply its own ``tools`` and
+        # ``tool_choice`` via **kwargs to force a specific tool call. Those must
+        # win over the generic registry tool set — but ``tools`` is also passed
+        # as an explicit keyword below, so pop them out of kwargs first to avoid
+        # a "multiple values for keyword argument 'tools'" TypeError.
+        caller_tools = kwargs.pop("tools", None)
+        caller_tool_choice = kwargs.pop("tool_choice", None)
+        if caller_tools is not None:
+            tools = caller_tools
+
         # ── Analytics-wrapped executor ─────────────────────────────────────────
         # Routes every tool call through ToolCreationService.execute_tool() so
         # ToolUsageLog rows, version tracking, and audit entries are all written
@@ -1569,6 +1581,7 @@ class ModelService:
                 agentium_id=agent_id,
                 on_delta=on_delta,
                 cancel_event=cancel_event,
+                **({"tool_choice": caller_tool_choice} if caller_tool_choice else {}),
                 **kwargs,
             )
             api_key_manager.mark_key_success(provider.config.id, db=db)

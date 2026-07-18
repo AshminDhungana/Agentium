@@ -17,6 +17,7 @@ from backend.models.database import get_db_context
 from backend.models.database import get_system_agent_id
 import logging
 import asyncio
+import uuid
 
 logger = logging.getLogger(__name__)
 
@@ -128,6 +129,7 @@ class MonitoringService:
                 raise PermissionError("No authority to report this agent")
         
         report = ViolationReport(
+            agentium_id=f"VR{uuid.uuid4().hex[:8]}",
             reporter_agent_id=reporter_id,
             reporter_agentium_id=reporter.agentium_id,
             violator_agent_id=violator_id,
@@ -1106,6 +1108,7 @@ class MonitoringService:
             try:
                 system_id = get_system_agent_id(db)
                 report = ViolationReport(
+                    agentium_id=f"VR{uuid.uuid4().hex[:8]}",
                     reporter_agent_id=system_id,
                     reporter_agentium_id="SYSTEM",
                     violator_agent_id=system_id,

@@ -87,7 +87,10 @@ async def manual_scaling_override(
     Expects { action: 'spawn' | 'liquidate', count: int, tier: int }
     Admin only (or sovereign).
     """
-    if current_user.get("role") not in ["primary_sovereign", "admin"]:
+    if not (
+        current_user.get("is_admin")
+        or current_user.get("role") in ("primary_sovereign", "deputy_sovereign")
+    ):
         raise ForbiddenError(error="Admin permissions required.", code="ADMIN_PERMISSIONS_REQUIRED")
 
     action = payload.get("action")

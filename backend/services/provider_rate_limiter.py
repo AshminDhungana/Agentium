@@ -101,10 +101,14 @@ class ProviderRateLimiter:
     def __init__(self) -> None:
         self._redis: Any = None
         self._sha: Optional[str] = None
-        self._sha_lock = asyncio.Lock()
+        # Locks are created lazily (see _get_sha / _sem) so they bind to the
+        # running event loop. Creating asyncio.Lock() eagerly at import time
+        # binds them to whatever loop is active then and raises
+        # "task bound to a different loop" when awaited on the request loop.
+        self._sha_lock: Optional["asyncio.Lock"] = None
         # In-process semaphore cache (per config) for same-worker concurrency.
         self._local_sems: Dict[str, "asyncio.Semaphore"] = {}
-        self._sem_lock = asyncio.Lock()
+        self._sem_lock: Optional["asyncio.Lock"] = None
         # Best-effort capture of the LAST response headers per config, populated
         # by the httpx event hook attached to each shared SDK client (see Task 17).
         # Keyed by config_id; read + cleared right after each successful SDK call.
@@ -125,6 +129,8 @@ class ProviderRateLimiter:
         return self._redis
 
     async def _get_sha(self, r) -> Optional[str]:
+        if self._sha_lock is None:
+            self._sha_lock = asyncio.Lock()
         async with self._sha_lock:
             if self._sha is None:
                 try:
@@ -376,6 +382,8 @@ class ProviderRateLimiter:
         counter (below) bounds it across workers/replicas on the same config.
         """
         maxc = max(1, int(max_concurrent_requests or 10))
+        if self._sem_lock is None:
+            self._sem_lock = asyncio.Lock()
         async with self._sem_lock:
             sem = self._local_sems.get(config_id)
             if sem is None:

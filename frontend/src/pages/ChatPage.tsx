@@ -1156,7 +1156,11 @@ export function ChatPage() {
                                                         (user?.username?.[0]?.toUpperCase() ?? 'S')
                                                     )
                                                 ) : (
-                                                    <User className="w-4 h-4" />
+                                                    isAwaitingReply ? (
+                                                        <UserRoundSearch className="w-4 h-4" />
+                                                    ) : (
+                                                        <User className="w-4 h-4" />
+                                                    )
                                                 )}
                                             </div>
 

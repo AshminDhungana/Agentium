@@ -194,7 +194,23 @@ class VoiceBridgeService {
     };
 
     this.ws.onerror = (evt) => {
-      console.warn('[voiceBridge] WebSocket error', evt);
+      // The native WebSocket error event carries no detail; surface what we
+      // can so "connection refused" vs "auth rejected" vs "timeout" is at
+      // least distinguishable in the console instead of a bare Event object.
+      const ws = this.ws;
+      const readyState = ws ? ws.readyState : 'unknown';
+      const stateLabel =
+        readyState === WebSocket.CONNECTING ? 'CONNECTING'
+        : readyState === WebSocket.OPEN ? 'OPEN'
+        : readyState === WebSocket.CLOSING ? 'CLOSING'
+        : readyState === WebSocket.CLOSED ? 'CLOSED'
+        : String(readyState);
+      console.warn(
+        `[voiceBridge] WebSocket error (state=${stateLabel}). ` +
+        `Likely causes: bridge process not running on ${WS_URL} (connection refused), ` +
+        `invalid/expired token (auth rejected), or network timeout. ` +
+        `Raw event:`, evt,
+      );
     };
 
     this.ws.onclose = () => {
