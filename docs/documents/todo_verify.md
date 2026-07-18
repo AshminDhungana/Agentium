@@ -12,6 +12,48 @@ Items are **not confirmed bugs unless marked "Confirmed."** Anything else is a l
 - **[P3]** Nice-to-have polish / preventative maintenance
 
 
+- [ ] - In chat page when clicking to voice setting error is thier, when clicked at voice setting error is voiceBridge.ts:155 WebSocket connection to 'ws://127.0.0.1:9999/?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbiIsInVzZXJfaWQiOiJkNjc5MDMwNS1kZWY4LTQ1ZWYtOTc2MS1jOGVlMjNiN2E1ZWUiLCJ0eXBlIjoidm9pY2UiLCJpYXQiOjE3ODQzNzUwODAsImV4cCI6MTc4NDM3Njg4MH0.6bUp_H5dS1dswjXSVLdxU7PaPa3N4bpVOJ6ZGAdCeE4' failed: 
+_openSocket @ voiceBridge.ts:155
+voiceBridge.ts:197 [voiceBridge] WebSocket error Event
+(anonymous) @ voiceBridge.ts:197
+voiceBridge.ts:210 [voiceBridge] Reconnecting in 1072ms (attempt 1/5)
+voiceBridge.ts:155 WebSocket connection to 'ws://127.0.0.1:9999/?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbiIsInVzZXJfaWQiOiJkNjc5MDMwNS1kZWY4LTQ1ZWYtOTc2MS1jOGVlMjNiN2E1ZWUiLCJ0eXBlIjoidm9pY2UiLCJpYXQiOjE3ODQzNzUwODAsImV4cCI6MTc4NDM3Njg4MH0.6bUp_H5dS1dswjXSVLdxU7PaPa3N4bpVOJ6ZGAdCeE4' failed: 
+_openSocket @ voiceBridge.ts:155
+voiceBridge.ts:197 [voiceBridge] WebSocket error Event
+(anonymous) @ voiceBridge.ts:197
+voiceBridge.ts:210 [voiceBridge] Reconnecting in 2094ms (attempt 2/5)
+4chat:1 Uncaught (in promise) Error: A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+voiceBridge.ts:155 WebSocket connection to 'ws://127.0.0.1:9999/?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbiIsInVzZXJfaWQiOiJkNjc5MDMwNS1kZWY4LTQ1ZWYtOTc2MS1jOGVlMjNiN2E1ZWUiLCJ0eXBlIjoidm9pY2UiLCJpYXQiOjE3ODQzNzUwODAsImV4cCI6MTc4NDM3Njg4MH0.6bUp_H5dS1dswjXSVLdxU7PaPa3N4bpVOJ6ZGAdCeE4' failed: 
+_openSocket @ voiceBridge.ts:155
+voiceBridge.ts:197 [voiceBridge] WebSocket error Event
+(anonymous) @ voiceBridge.ts:197
+voiceBridge.ts:210 [voiceBridge] Reconnecting in 3336ms (attempt 3/5)
+api/v1/voice/config:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+api/v1/audio/speakers:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+voiceBridge.ts:155 WebSocket connection to 'ws://127.0.0.1:9999/?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbiIsInVzZXJfaWQiOiJkNjc5MDMwNS1kZWY4LTQ1ZWYtOTc2MS1jOGVlMjNiN2E1ZWUiLCJ0eXBlIjoidm9pY2UiLCJpYXQiOjE3ODQzNzUwODAsImV4cCI6MTc4NDM3Njg4MH0.6bUp_H5dS1dswjXSVLdxU7PaPa3N4bpVOJ6ZGAdCeE4' failed: 
+_openSocket @ voiceBridge.ts:155
+voiceBridge.ts:197 [voiceBridge] WebSocket error Event
+(anonymous) @ voiceBridge.ts:197
+voiceBridge.ts:210 [voiceBridge] Reconnecting in 8366ms (attempt 4/5)
+voiceBridge.ts:155 WebSocket connection to 'ws://127.0.0.1:9999/?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbiIsInVzZXJfaWQiOiJkNjc5MDMwNS1kZWY4LTQ1ZWYtOTc2MS1jOGVlMjNiN2E1ZWUiLCJ0eXBlIjoidm9pY2UiLCJpYXQiOjE3ODQzNzUwODAsImV4cCI6MTc4NDM3Njg4MH0.6bUp_H5dS1dswjXSVLdxU7PaPa3N4bpVOJ6ZGAdCeE4' failed: 
+_openSocket @ voiceBridge.ts:155
+(anonymous) @ voiceBridge.ts:212
+voiceBridge.ts:197 [voiceBridge] WebSocket error Event {isTrusted: true, type: 'error', target: WebSocket, currentTarget: WebSocket, eventPhase: 2, …}
+(anonymous) @ voiceBridge.ts:197
+voiceBridge.ts:210 [voiceBridge] Reconnecting in 14120ms (attempt 5/5)
+voiceBridge.ts:155 WebSocket connection to 'ws://127.0.0.1:9999/?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbiIsInVzZXJfaWQiOiJkNjc5MDMwNS1kZWY4LTQ1ZWYtOTc2MS1jOGVlMjNiN2E1ZWUiLCJ0eXBlIjoidm9pY2UiLCJpYXQiOjE3ODQzNzUwODAsImV4cCI6MTc4NDM3Njg4MH0.6bUp_H5dS1dswjXSVLdxU7PaPa3N4bpVOJ6ZGAdCeE4' failed: 
+_openSocket @ voiceBridge.ts:155
+(anonymous) @ voiceBridge.ts:212
+voiceBridge.ts:197 [voiceBridge] WebSocket error Event {isTrusted: true, type: 'error', target: WebSocket, currentTarget: WebSocket, eventPhase: 2, …}
+(anonymous) @ voiceBridge.ts:197
+voiceBridge.ts:214 [voiceBridge] Max reconnect attempts reached — going offline
+
+and voice bridge is also not runnning, [voiceBridge] Reconnecting in 4314ms (attempt 3/5)
+voiceBridge.ts:155 WebSocket connection to 'ws://127.0.0.1:9999/?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbiIsInVzZXJfaWQiOiJkNjc5MDMwNS1kZWY4LTQ1ZWYtOTc2MS1jOGVlMjNiN2E1ZWUiLCJ0eXBlIjoidm9pY2UiLCJpYXQiOjE3ODQzNzUyNDEsImV4cCI6MTc4NDM3NzA0MX0.xDLoY7KtxPgDGakU7KT0B7v5bPuVpc5yN9GBv39n3pI' failed: 
+_openSocket @ voiceBridge.ts:155
+(anonymous) @ voiceBridge.ts:212
+voiceBridge.ts:197 [voiceBridge] WebSocket error Event {isTrusted: true, type: 'error', target: WebSocket, currentTarget: WebSocket, eventPhase: 2, …}
+
 [ ] -  How does the system opeartes, when user sends a message create a text file in my deskotp, how does the whole operations happens, is it, head creates lead agent, lead agent spwan a task agent and the task agent does the work. how does task agent do the work, does it creates the file directly in the desktop,  or does it create inside contanier and they copy it to the deskotp ? 
 
 

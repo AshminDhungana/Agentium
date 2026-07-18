@@ -82,8 +82,6 @@ class ChatService:
         caller (tool or REST endpoint) is not blocked on socket I/O.
         """
         global ws_manager
-        if ws_manager is None:
-            from backend.api.routes.websocket import manager as ws_manager
         msg = ChatMessageEntity(
             id=str(uuid.uuid4()),
             user_id=str(user_id),
@@ -98,6 +96,8 @@ class ChatService:
         db.commit()
         db.refresh(msg)
         try:
+            if ws_manager is None:
+                from backend.api.routes.websocket import manager as ws_manager
             loop = asyncio.get_event_loop()
             loop.create_task(ws_manager.broadcast({
                 "type": "message",
