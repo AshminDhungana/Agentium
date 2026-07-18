@@ -93,6 +93,17 @@ def get_task_db():
 # Core Task Execution
 # ═══════════════════════════════════════════════════════════
 
+def _extract_workspace(result: dict) -> tuple:
+    """Pull workspace metadata out of an execution result, defaulting to None.
+
+    Returns ``(workspace_path, artifacts)``. When no workspace was used
+    (or ``result`` is not a dict), ``workspace_path`` is ``None`` and
+    ``artifacts`` defaults to an empty list.
+    """
+    if not isinstance(result, dict):
+        return None, []
+    return result.get("workspace_path"), result.get("artifacts") or []
+
 @celery_app.task(name="agentium.tasks.task_executor.execute_task_async", bind=True, max_retries=1)
 def execute_task_async(self, task_id: str, agent_id: str):
     """
@@ -122,14 +133,31 @@ def execute_task_async(self, task_id: str, agent_id: str):
             result = agent.execute_with_skill_rag(task, db)
             
             # Update task with result
+            ws_path, arts = _extract_workspace(result)
+            result_data = {
+                "full_output": result["content"],
+                "skills_used": result.get("skills_used", []),
+                "model": result.get("model"),
+                "tokens_used": result.get("tokens_used")
+            }
+            if ws_path:
+                result_data["workspace_path"] = ws_path
+                result_data["artifacts"] = arts
+                try:
+                    import asyncio
+                    from backend.api.routes.websocket import manager
+                    asyncio.run(manager.broadcast({
+                        "type": "workspace_ready",
+                        "agent_id": getattr(task, "agentium_id", None),
+                        "task_id": getattr(task, "agentium_id", None),
+                        "workspace_path": ws_path,
+                        "artifact_count": len(arts or []),
+                    }))
+                except Exception as ws_err:  # pragma: no cover - broadcast is best-effort
+                    logger.warning(f"workspace_ready broadcast failed: {ws_err}")
             task.complete(
                 result_summary=result["content"][:500],
-                result_data={
-                    "full_output": result["content"],
-                    "skills_used": result.get("skills_used", []),
-                    "model": result.get("model"),
-                    "tokens_used": result.get("tokens_used")
-                }
+                result_data=result_data
             )
             
             # Record success for used skills
