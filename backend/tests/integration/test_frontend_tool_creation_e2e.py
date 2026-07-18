@@ -77,3 +77,33 @@ def test_direct_service_tool_persists_and_is_invocable(seeded_db):
         assert fn() == {"status": "success", "result": {"echo": "ok", "n": 42}}
     finally:
         tool_registry.deregister_tool(name)
+
+
+@pytest.mark.integration
+def test_http_propose_route_registers_and_exports_tool(client, seeded_db, head_auth_headers):
+    name = f"e2e_probe_{uuid4().hex[:8]}"
+    body = _make_request(name).model_dump()
+    resp = client.post(
+        "/api/v1/tool-management/propose",
+        json=body,
+        headers=head_auth_headers,
+    )
+    try:
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        assert data.get("status") == "activated", data
+        assert data.get("tool_name") == name, data
+
+        # Live persistence in the registry singleton (catches stale/cache gaps)
+        assert name in tool_registry.tools
+
+        oai = tool_registry.to_openai_tools("0xxxx")
+        assert name in [t["function"]["name"] for t in oai]
+
+        ant = tool_registry.to_anthropic_tools("0xxxx")
+        assert name in [t["name"] for t in ant]
+
+        fn = tool_registry.get_tool_function(name)
+        assert fn() == {"status": "success", "result": {"echo": "ok", "n": 42}}
+    finally:
+        tool_registry.deregister_tool(name)
