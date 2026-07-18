@@ -120,7 +120,10 @@ class WebFetchTool:
         url = (kwargs.get("url") or "").strip()
         if not url:
             return {"status": "error", "error": "url is required"}
-        max_tokens = int(kwargs.get("max_tokens", _DEFAULT_MAX_TOKENS))
+        try:
+            max_tokens = int(kwargs.get("max_tokens", _DEFAULT_MAX_TOKENS))
+        except (ValueError, TypeError):
+            max_tokens = _DEFAULT_MAX_TOKENS
         allowed = kwargs.get("allowed_domains") or []
         use_cache = bool(kwargs.get("use_cache", True))
 
@@ -186,3 +189,7 @@ async def execute(action: str, **kwargs) -> Dict[str, Any]:
     intact while exposing a flat `execute`.
     """
     return await web_fetch_tool.execute(action, **kwargs)
+
+
+# Required by ToolFactory.load_tool() dynamic loader (same as other tools)
+tool_instance = web_fetch_tool
