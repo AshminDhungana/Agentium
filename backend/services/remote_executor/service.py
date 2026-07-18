@@ -375,6 +375,9 @@ import os
 import json
 import time
 import traceback
+import logging
+
+logger = logging.getLogger("agentium.executor")
 
 def analyze_result(result):
     """Analyze result and return summary only."""
