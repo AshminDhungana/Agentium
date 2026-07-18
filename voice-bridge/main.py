@@ -624,6 +624,127 @@ def _auth_headers() -> dict:
 _RESOLVED_CHAT_ENDPOINT = f"{BACKEND_URL}/api/v1/chat/send"
 
 
+# ── Clarification card polling (agent → Sovereign follow-up questions) ────────
+# The chat WebSocket (/ws/chat) uses a different JWT than VOICE_TOKEN, so the
+# bridge cannot subscribe to it. Instead it polls the REST chat history (which
+# accepts the voice token) for the most recent unanswered structured input card,
+# speaks the question(s), captures the spoken answer, and POSTs it back to
+# /chat/send as a card_response on the inbound sovereign message.
+#
+# Confirmed field names (do not guess):
+#   backend/api/routes/chat.py get_chat_history → each message is
+#   {id, role, content, created_at, metadata, attachments} where `metadata`
+#   IS the DB column message_metadata (see chat_message.to_dict).
+#   The card object lives at message["metadata"]["card"].
+#   Card schema (backend/models/schemas/structured_input.py):
+#     card_id, card_group_id, title, questions[ {id, question, options[
+#       {id, label, value}] } ]
+#   Answer schema: {card_id, card_group_id, answers[
+#     {question_id, selected_option_ids[], other_text}]}
+
+_handled_card_ids: set = set()
+
+
+def _get_pending_card() -> Optional[dict]:
+    """Return the most recent unanswered clarification card, or None.
+
+    Polls GET /api/v1/chat/history (voice-token authenticated) and returns the
+    latest message whose metadata contains a card object that the bridge has not
+    already handled.
+    """
+    if not VOICE_TOKEN:
+        return None
+    try:
+        url = f"{BACKEND_URL}/api/v1/chat/history?limit=20"
+        req = urllib.request.Request(url, headers=_auth_headers(), method="GET")
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            body = json.loads(resp.read().decode())
+    except Exception as exc:
+        logger.debug("[bridge] Could not fetch chat history for cards: %s", exc)
+        return None
+
+    messages = body.get("messages") or []
+    for msg in reversed(messages):  # most recent first
+        metadata = msg.get("metadata") or {}
+        card = metadata.get("card")
+        if not card:
+            continue
+        card_id = card.get("card_id") or card.get("id")
+        if not card_id or card_id in _handled_card_ids:
+            continue
+        return card
+    return None
+
+
+def _card_to_speech_text(card: dict) -> str:
+    """Render a clarification card into natural spoken text."""
+    parts = ["I have a question for you."]
+    if card.get("title"):
+        parts.append(card["title"])
+    for i, q in enumerate(card.get("questions", []), start=1):
+        question_text = q.get("question") or q.get("text") or ""
+        parts.append(f"Question {i}: {question_text}")
+        labels = [opt.get("label", opt.get("value", "")) for opt in q.get("options", [])]
+        if labels:
+            if len(labels) == 1:
+                parts.append(f"Your options are: {labels[0]}, or just tell me your answer.")
+            else:
+                joined = ", ".join(labels[:-1]) + f", or {labels[-1]}"
+                parts.append(f"Your options are: {joined}, or just tell me your answer.")
+    return " ".join(p for p in parts if p)
+
+
+def _build_card_answer(card: dict, spoken: str) -> dict:
+    """Map a spoken reply onto the card's answers structure."""
+    spoken_lower = (spoken or "").lower()
+    answers = []
+    for q in card.get("questions", []):
+        selected = []
+        for opt in q.get("options", []):
+            label = (opt.get("label") or "").strip().lower()
+            value = (opt.get("value") or "").strip().lower()
+            if (label and label in spoken_lower) or (value and value in spoken_lower):
+                selected.append(opt.get("id"))
+        answers.append({
+            "question_id": q.get("id"),
+            "selected_option_ids": selected,
+            "other_text": spoken if not selected else None,
+        })
+    return {
+        "card_id": card.get("card_id") or card.get("id"),
+        "card_group_id": card.get("card_group_id"),
+        "answers": answers,
+    }
+
+
+def _post_card_response(answer: dict) -> None:
+    """POST a card answer back to the backend as a card_response frame."""
+    payload = json.dumps({"message": "", "card_response": answer}).encode()
+    try:
+        req = urllib.request.Request(
+            _RESOLVED_CHAT_ENDPOINT, data=payload, headers=_auth_headers(), method="POST"
+        )
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            json.loads(resp.read().decode())
+        logger.info("[bridge] Posted card_response for %s", answer.get("card_id"))
+    except Exception as exc:
+        logger.warning("[WARN] Failed to post card_response %s: %s", answer.get("card_id"), exc)
+
+
+async def _maybe_handle_pending_card() -> None:
+    """Speak any pending clarification card and capture the spoken answer."""
+    card = _get_pending_card()
+    if not card:
+        return
+    card_id = card.get("card_id") or card.get("id")
+    if card_id:
+        _handled_card_ids.add(card_id)
+    await speak(_card_to_speech_text(card))
+    utterance = await listen_once(timeout=30)
+    if utterance:
+        _post_card_response(_build_card_answer(card, utterance))
+
+
 def _post_chat_message(text: str) -> Optional[str]:
     """
     Single POST attempt against the resolved chat endpoint.
@@ -1090,6 +1211,10 @@ class VoiceSession:
                 "type": "voice_interaction", "user": text, "reply": full_reply,
                 "ts": time.time(), "speaker_id": self.speaker_id,
             })
+            # Speak any clarification card the agent posted this turn and capture
+            # the Sovereign's spoken answer (runs inside the async session turn;
+            # does not block the outer wake-word/mic loop).
+            await _maybe_handle_pending_card()
 
     async def _speak_reply_stream(self, text: str) -> str:
         """Consume the streaming chat response, flushing complete sentences to
