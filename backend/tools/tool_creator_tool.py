@@ -1,6 +1,6 @@
 """tool_creator — let Head/Council agents define and register new runtime tools."""
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict
 
 from backend.models.schemas.tool_creation import ToolCreationRequest, ToolParameter
 from backend.models.database import get_db_context
