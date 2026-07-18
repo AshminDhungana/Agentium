@@ -18,52 +18,47 @@ class CodeExecutionTool:
     TOOL_NAME = "code_execution"
     AUTHORIZED_TIERS = ["0xxxx", "1xxxx", "2xxxx"]
 
+    def _make_service(self):
+        from backend.services.remote_executor.service import RemoteExecutorService
+        return RemoteExecutorService(db_session=None)
 
-def _make_service():
-    from backend.services.remote_executor.service import RemoteExecutorService
-    return RemoteExecutorService(db_session=None)
+    async def execute(self, action: str, **kwargs) -> Dict[str, Any]:
+        if action == "help":
+            return {
+                "status": "success",
+                "description": (
+                    "Execute code in an isolated Docker sandbox. Raw data never leaves "
+                    "the sandbox; you receive only a structured summary. Full reference "
+                    "in backend/.agentium/skills/code_execution/SKILL.md."
+                ),
+            }
+        if action != "execute":
+            return {"status": "error", "error": f"Unknown action: {action}"}
 
+        code = kwargs.get("code")
+        if not code:
+            return {"status": "error", "error": "code is required"}
+        agent_id = kwargs.get("agent_id") or "00001"
 
-async def execute(action: str, **kwargs) -> Dict[str, Any]:
-    if action == "help":
-        return {
-            "status": "success",
-            "description": (
-                "Execute code in an isolated Docker sandbox. Raw data never leaves "
-                "the sandbox; you receive only a structured summary. Full reference "
-                "in backend/.agentium/skills/code_execution/SKILL.md."
-            ),
-        }
-    if action != "execute":
-        return {"status": "error", "error": f"Unknown action: {action}"}
-
-    code = kwargs.get("code")
-    if not code:
-        return {"status": "error", "error": "code is required"}
-    agent_id = kwargs.get("agent_id") or "00001"
-
-    service = _make_service()
-    try:
-        result = await service.execute(
-            code=code,
-            agent_id=agent_id,
-            task_id=kwargs.get("task_id"),
-            language=kwargs.get("language", "python"),
-            dependencies=kwargs.get("dependencies"),
-            input_data=kwargs.get("input_data"),
-            timeout_seconds=int(kwargs.get("timeout_seconds", 300)),
-            network_access=bool(kwargs.get("network_access", False)),
-        )
-    except Exception as exc:
-        logger.exception("code_execution failed")
-        return {"status": "error", "error": str(exc)}
-    return result
+        service = self._make_service()
+        try:
+            result = await service.execute(
+                code=code,
+                agent_id=agent_id,
+                task_id=kwargs.get("task_id"),
+                language=kwargs.get("language", "python"),
+                dependencies=kwargs.get("dependencies"),
+                input_data=kwargs.get("input_data"),
+                timeout_seconds=int(kwargs.get("timeout_seconds", 300)),
+                network_access=bool(kwargs.get("network_access", False)),
+            )
+        except Exception as exc:
+            logger.exception("code_execution failed")
+            return {"status": "error", "error": str(exc)}
+        return result
 
 
 code_execution_tool = CodeExecutionTool()
 
 # Required by ToolFactory.load_tool() dynamic loader (same as other tools).
-# The unit tests import the module as `code_execution_tool` and call
-# `code_execution_tool.execute(...)` / monkeypatch `code_execution_tool._make_service`,
-# so the public callables above double as the module-level entry points.
 tool_instance = code_execution_tool
