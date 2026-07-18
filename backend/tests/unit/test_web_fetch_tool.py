@@ -75,3 +75,16 @@ def test_ssrf_guard_blocks_localhost(monkeypatch):
     )
     assert result["status"] == "error"
     assert "SSRF" in result["error"]
+
+
+def test_ssrf_guard_blocks_ipv6_private(monkeypatch):
+    monkeypatch.setattr(web_fetch_tool, "_client", _FakeClient())
+    result = asyncio.get_event_loop().run_until_complete(
+        web_fetch_tool.execute(
+            "fetch",
+            url="http://[fd00::1]/",
+            use_cache=False,
+        )
+    )
+    assert result["status"] == "error"
+    assert "SSRF" in result["error"]

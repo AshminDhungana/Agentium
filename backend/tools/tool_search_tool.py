@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -24,8 +24,8 @@ class ToolSearchTool:
     TOOL_NAME = "tool_search"
     AUTHORIZED_TIERS = [f"{i}xxxx" for i in range(10)]
 
-    def _resolve_tier(self, kwargs: Dict[str, Any]) -> str:
-        aid = kwargs.get("agent_id") or ""
+    def _resolve_tier(self, agent_id: Optional[str], kwargs: Dict[str, Any]) -> str:
+        aid = agent_id or kwargs.get("agent_id") or ""
         caller_tier = (aid[:1] + "xxxx") if aid else "0xxxx"
         requested = kwargs.get("tier")
         if not requested:
@@ -54,7 +54,7 @@ class ToolSearchTool:
             reasons.append("description/parameter match")
         return score, "; ".join(reasons) or "partial relevance"
 
-    async def execute(self, action: str, **kwargs) -> Dict[str, Any]:
+    async def execute(self, action: str, agent_id: Optional[str] = None, **kwargs) -> Dict[str, Any]:
         if action == "help":
             return {
                 "status": "success",
@@ -68,7 +68,7 @@ class ToolSearchTool:
             name = kwargs.get("name")
             if not name:
                 return {"status": "error", "error": "name is required"}
-            tier = self._resolve_tier(kwargs)
+            tier = self._resolve_tier(agent_id, kwargs)
             from backend.core.tool_registry import tool_registry
             available = tool_registry.list_tools(tier)
             if name not in available:
@@ -82,7 +82,7 @@ class ToolSearchTool:
         if not query:
             return {"status": "error", "error": "query is required"}
         limit = int(kwargs.get("limit", 10))
-        tier = self._resolve_tier(kwargs)
+        tier = self._resolve_tier(agent_id, kwargs)
         from backend.core.tool_registry import tool_registry
         available = tool_registry.list_tools(tier)
         q_tokens = _tokens(query)

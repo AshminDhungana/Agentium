@@ -22,7 +22,7 @@ class CodeExecutionTool:
         from backend.services.remote_executor.service import RemoteExecutorService
         return RemoteExecutorService(db_session=None)
 
-    async def execute(self, action: str, **kwargs) -> Dict[str, Any]:
+    async def execute(self, action: str, agent_id: Optional[str] = None, **kwargs) -> Dict[str, Any]:
         if action == "help":
             return {
                 "status": "success",
@@ -38,7 +38,7 @@ class CodeExecutionTool:
         code = kwargs.get("code")
         if not code:
             return {"status": "error", "error": "code is required"}
-        agent_id = kwargs.get("agent_id") or "00001"
+        agent_id = agent_id or "00001"
 
         service = self._make_service()
         try:

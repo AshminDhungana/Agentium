@@ -41,8 +41,10 @@ def _is_blocked_host(host: str) -> bool:
     """
     if not host:
         return True
-    # strip an optional :port (and IPv6 brackets)
-    host = host.split(":")[0].strip("[]")
+    # urlparse().hostname already strips IPv6 brackets and any :port. We only
+    # defensively strip stray brackets here — splitting on ":" would corrupt
+    # IPv6 addresses (e.g. fd00::1 -> fd00) and let private ranges bypass.
+    host = host.strip().strip("[]")
     if not host:
         return True
     low = host.lower()
@@ -208,6 +210,10 @@ class WebFetchTool:
             break
         if resp is None:
             return {"status": "error", "error": "fetch failed: no response"}
+        # If the redirect loop exhausted its hops (or a 3xx had no location),
+        # we never actually fetched content — don't fall through to success.
+        if 300 <= resp.status_code < 400:
+            return {"status": "error", "error": "too many redirects or blocked redirect"}
 
         ctype = resp.headers.get("content-type", "").lower()
         if "pdf" in ctype or url.lower().endswith(".pdf"):
