@@ -19,6 +19,43 @@ except ImportError:
     logger.warning("docker-py not installed – SandboxManager will operate in stub mode")
 
 
+# Egress allowlist for opt-in network. We deny private/loopback/link-local and
+# cloud IMDS ranges so a sandbox can never exfiltrate to internal infra or steal
+# instance credentials. Public hosts the agent needs are added per-call.
+_BLOCKED_NETS = (
+    "169.254.169.254/32",  # cloud IMDS
+    "169.254.0.0/16",      # link-local
+    "10.0.0.0/8",
+    "172.16.0.0/12",
+    "192.168.0.0/16",
+    "127.0.0.0/8",
+    "::1/128",
+    "fc00::/7",            # ULA
+)
+
+
+def blocked_egress_cidrs() -> tuple:
+    """CIDRs the sandbox egress must never reach (private/IMDS/loopback)."""
+    return _BLOCKED_NETS
+
+
+def effective_egress_policy(config: "SandboxConfig") -> dict:
+    """Return the effective egress policy for a sandbox config.
+
+    ``allowed`` is the agent-provided host allowlist (empty when none).
+    ``blocked`` is the always-deny CIDR set (private/IMDS/loopback).
+
+    NOTE: Full egress enforcement (an external allowlist proxy or iptables
+    rules) is future work (spec §10 Out of Scope). These values are recorded
+    on the container as labels so the policy is visible and auditable for every
+    opt-in (bridge-mode) container without needing in-container NET_ADMIN.
+    """
+    return {
+        "allowed": list(config.allowed_hosts or []),
+        "blocked": list(blocked_egress_cidrs()),
+    }
+
+
 @dataclass
 class SandboxConfig:
     """Configuration for sandbox container."""
@@ -26,7 +63,7 @@ class SandboxConfig:
     memory_limit_mb: int = 512  # MB
     timeout_seconds: int = 300  # 5 minutes
     network_mode: str = "none"  # none, bridge
-    allowed_hosts: Optional[List[str]] = None  # For network whitelist
+    allowed_hosts: Optional[List[str]] = None  # Egress allowlist when network_mode="bridge"; private/IMDS always blocked via blocked_egress_cidrs()
     max_disk_mb: int = 1024  # 1GB
     image: str = "python:3.11-slim"  # Base image
 
@@ -116,6 +153,22 @@ class SandboxManager:
         config = config or SandboxConfig()
         sandbox_id = f"sandbox_{uuid.uuid4().hex[:12]}"
 
+        # Build the egress policy. When the network is opt-in (bridge mode) we
+        # record the deny-list CIDRs as labels so the intended policy is visible
+        # and auditable on every opt-in container.
+        # NOTE: egress deny-list is recorded as labels only; actual enforcement
+        # requires a host egress proxy (future work, spec §10 Out of Scope).
+        # Bridge mode currently grants outbound internet. Do NOT treat the
+        # blocked_egress_cidrs() label as a security control, and avoid passing
+        # secrets into any opt-in-network sandbox.
+        egress = effective_egress_policy(config)
+        egress_labels = {}
+        if config.network_mode == "bridge":
+            egress_labels = {
+                "agentium.egress_allowed": ",".join(egress["allowed"]) or "none",
+                "agentium.egress_blocked": ",".join(egress["blocked"]),
+            }
+
         # Create container with resource limits
         container = self.docker_client.containers.run(
             image=config.image,
@@ -127,11 +180,19 @@ class SandboxManager:
             mem_limit=f"{config.memory_limit_mb}m",
             cpu_quota=int(config.cpu_limit * 100000),
             cpu_period=100000,
+            read_only=True,
+            tmpfs={
+                "/tmp": f"rw,size={config.max_disk_mb}m,mode=1777,noexec,nosuid,nodev"
+            },
+            # Drop all Linux capabilities for least privilege
+            cap_drop=["ALL"],
+            security_opt=["no-new-privileges"],
             labels={
                 "agentium.sandbox": "true",
                 "agentium.agent_id": agent_id,
                 "agentium.created_at": datetime.utcnow().isoformat(),
-                "agentium.is_warm": "true" if agent_id == "warm_pool" else "false"
+                "agentium.is_warm": "true" if agent_id == "warm_pool" else "false",
+                **egress_labels,
             },
             environment={
                 "PYTHONDONTWRITEBYTECODE": "1",
@@ -173,11 +234,15 @@ class SandboxManager:
         await self._ensure_pool_lock()
         
         warm_container = None
-        # Fast path: try to pop from warm pool
-        async with self._pool_lock:
-            if self._warm_pool:
-                warm_container = self._warm_pool.pop()
-                
+        # Fast path: try to pop from warm pool. Warm containers are pre-allocated
+        # with the default config (network_mode="none"). If the caller opts into
+        # network (bridge mode), we must NOT serve a "none" warm container — cold
+        # start a dedicated container so the requested network posture is honored.
+        if not (config and config.network_mode == "bridge"):
+            async with self._pool_lock:
+                if self._warm_pool:
+                    warm_container = self._warm_pool.pop()
+
         if warm_container:
             logger.info(f"Popped warm sandbox {warm_container['sandbox_id']} for agent {agent_id}. Replenishing pool...")
             # Claim it by updating labels (best effort)

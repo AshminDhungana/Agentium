@@ -27,6 +27,7 @@ from backend.tools.desktop_tool  import (
     browser_tool   as desktop_browser_tool,
 )
 from backend.tools.mcp_agent_tools import add_mcp_server, vote_on_mcp_server
+from backend.tools.remote_exec_tool import execute as remote_exec_tool_execute
 
 
 class ToolRegistry:
@@ -433,6 +434,64 @@ class ToolRegistry:
                 "timeout": {"type": "integer", "description": "Timeout in seconds", "optional": True},
             },
             authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
+        )
+
+        # ── Remote Exec Tool ──────────────────────────────────────────────────
+        self.register_tool(
+            name="remote_exec",
+            description=(
+                "Run Python code inside an isolated Docker sandbox (Brains vs Hands). "
+                "Raw data and PII NEVER leave the sandbox — you receive only a structured "
+                "summary: output_schema (column->type), row_count, a sample of at most 3 "
+                "truncated rows, stats, and truncated stdout/stderr. Assign your result to "
+                "a variable named 'result' (or 'output') to get the best summary. "
+                "Use for data processing, file operations inside the sandbox, and (with "
+                "network_access=true) opt-in outbound internet via a bridge network. Network "
+                "is OFF by default. On opt-in, the intended egress deny-list (private/IMDS/"
+                "link-local ranges) is recorded on the container as a label, but is NOT "
+                "currently enforced — treat opt-in network as granting outbound internet and "
+                "avoid passing secrets. Dangerous patterns (rm -rf /, exec, eval, os.system, "
+                "subprocess) are blocked before execution. Full reference in "
+                "backend/.agentium/skills/remote_exec/SKILL.md."
+            ),
+            function=remote_exec_tool_execute,
+            parameters={
+                "code": {
+                    "type": "string",
+                    "description": "Python source to execute. Assign output to 'result'/'output'.",
+                },
+                "input_data": {
+                    "type": "any",
+                    "description": "Optional input available as 'input_data' in the sandbox (shape/schema only)",
+                    "optional": True,
+                },
+                "dependencies": {
+                    "type": "array",
+                    "description": "Optional pip packages to install in the sandbox (e.g. ['pandas','numpy'])",
+                    "optional": True,
+                },
+                "network_access": {
+                    "type": "boolean",
+                    "description": "Allow opt-in outbound internet via bridge network (default False = no network). Deny-list of private/IMDS ranges is recorded as a label but not enforced; avoid secrets.",
+                    "optional": True,
+                },
+                "timeout_seconds": {
+                    "type": "integer",
+                    "description": "Execution timeout in seconds (default 300, min 10, max 3600)",
+                    "optional": True,
+                },
+                "memory_limit_mb": {
+                    "type": "integer",
+                    "description": "Memory limit in MB (default 512, min 64, max 8192)",
+                    "optional": True,
+                },
+                "cpu_limit": {
+                    "type": "number",
+                    "description": "CPU core limit (default 1.0, min 0.1, max 4.0)",
+                    "optional": True,
+                },
+            },
+            authorized_tiers=["3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
 
         # ══════════════════════════════════════════════════════════════════════
