@@ -42,10 +42,11 @@ def test_code_output_persists_to_host(tmp_path, monkeypatch):
     monkeypatch.setenv("AGENTIUM_WORKSPACE_ROOT", str(tmp_path))
     monkeypatch.setenv("AGENTIUM_WORKSPACE_ENABLED", "true")
 
-    # Write via pathlib to avoid tripping the execution guard's `open(..., 'w')`
-    # CRITICAL pattern; the goal here is to prove workspace persistence, not to
-    # exercise the security layer.
-    code = "from pathlib import Path; Path('widget.html').write_text('<h1>hi</h1>')"
+    # Use the natural idiom agents actually produce (open with write mode).
+    # The execution guard permits file writes inside the isolated sandbox
+    # (read-only rootfs; only /tmp and /workspace are writable), so this is
+    # no longer blocked. This exercises the realistic end-to-end path.
+    code = "open('widget.html', 'w').write('<h1>hi</h1>')"
 
     from backend.services.remote_executor.service import RemoteExecutorService
 

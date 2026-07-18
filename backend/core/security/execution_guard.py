@@ -26,7 +26,12 @@ class ExecutionGuard:
     Multi-layer security: AST parsing + pattern matching + import whitelist.
     """
 
-    # Dangerous patterns that are always blocked
+    # Dangerous patterns that are always blocked.
+    # NOTE: write-mode file opens (open(..., 'w') / file(..., 'w')) are
+    # intentionally NOT blocked here. Code runs inside an isolated sandbox with
+    # a read-only rootfs where only /tmp and the task /workspace are writable,
+    # so file generation must be permitted. Other destructive/system patterns
+    # remain blocked.
     DANGEROUS_PATTERNS = [
         r'rm\s+-rf\s+/',
         r'mkfs\.',
@@ -40,8 +45,6 @@ class ExecutionGuard:
         r'exec\s*\(',
         r'__import__\s*\(',
         r'importlib\.',
-        r'open\s*\([^)]*["\']w',
-        r'file\s*\([^)]*["\']w',
     ]
 
     # Whitelist of allowed imports (stdlib + common data science)
