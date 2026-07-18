@@ -2,3 +2,4 @@
 # code_execution_tool` binds to the instance (with `execute`/`_make_service`
 # as instance methods), matching how the unit tests drive it.
 from .code_execution_tool import code_execution_tool  # noqa: F401
+from .tool_search_tool import tool_search_tool  # noqa: F401
