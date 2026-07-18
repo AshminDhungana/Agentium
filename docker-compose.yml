@@ -231,6 +231,9 @@ services:
       - HOST_DOCKER_SOCKET=/var/run/docker.sock
       - HOST_FS_MOUNT=/host
       - HOST_HOME_MOUNT=/host_home
+      - AGENTIUM_WORKSPACE_ENABLED=true
+      - AGENTIUM_WORKSPACE_ROOT=/host_home/agentium-workspace
+      - AGENTIUM_WORKSPACE_HOST_DIR=${USERPROFILE}/agentium-workspace
       - WHATSAPP_BRIDGE_URL=ws://whatsapp-bridge:3001
       - WHATSAPP_BRIDGE_TOKEN=${WHATSAPP_BRIDGE_TOKEN:-changeme}
       - DISPLAY=:99
