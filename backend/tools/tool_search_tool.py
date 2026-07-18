@@ -25,10 +25,21 @@ class ToolSearchTool:
     AUTHORIZED_TIERS = [f"{i}xxxx" for i in range(10)]
 
     def _resolve_tier(self, kwargs: Dict[str, Any]) -> str:
-        if kwargs.get("tier"):
-            return kwargs["tier"]
         aid = kwargs.get("agent_id") or ""
-        return (aid[:1] + "xxxx") if aid else "0xxxx"
+        caller_tier = (aid[:1] + "xxxx") if aid else "0xxxx"
+        requested = kwargs.get("tier")
+        if not requested:
+            return caller_tier
+        # A caller may not discover tools more privileged than its own tier
+        # (lower leading digit == higher privilege). Clamp upward requests.
+        try:
+            caller_level = int(caller_tier[0])
+            req_level = int(str(requested)[0])
+        except (ValueError, TypeError, IndexError):
+            return caller_tier
+        if req_level < caller_level:
+            return caller_tier
+        return requested
 
     def _score(self, query_tokens: List[str], name: str, desc: str, params: Dict) -> tuple:
         hay = _tokens(name) + _tokens(desc) + _tokens(" ".join(params.keys()))

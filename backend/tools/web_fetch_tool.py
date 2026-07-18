@@ -9,9 +9,12 @@ agent context. Registered in ToolRegistry as "web_fetch".
 from __future__ import annotations
 
 import hashlib
+import ipaddress
 import logging
 import re
+import socket
 from typing import Any, Dict, Optional
+from urllib.parse import urljoin, urlparse
 
 import httpx
 
@@ -28,6 +31,50 @@ _USER_AGENT = (
 
 def _estimate_tokens(text: str) -> int:
     return max(1, len(text) // 4)
+
+
+def _is_blocked_host(host: str) -> bool:
+    """SSRF guard: reject private/loopback/link-local/reserved/metadata hosts.
+
+    Checks both the literal host (if an IP) and any resolved IP via DNS.
+    Also blocks localhost / *.local / *.internal style names.
+    """
+    if not host:
+        return True
+    # strip an optional :port (and IPv6 brackets)
+    host = host.split(":")[0].strip("[]")
+    if not host:
+        return True
+    low = host.lower()
+    if low == "localhost" or low.endswith(".local") or low.endswith(".internal"):
+        return True
+    try:
+        ip = ipaddress.ip_address(host)
+        if (
+            ip.is_private
+            or ip.is_loopback
+            or ip.is_link_local
+            or ip.is_reserved
+            or str(ip) == "169.254.169.254"
+        ):
+            return True
+    except ValueError:
+        pass
+    # DNS resolution check (best-effort)
+    try:
+        resolved = socket.gethostbyname(host)
+        ip = ipaddress.ip_address(resolved)
+        if (
+            ip.is_private
+            or ip.is_loopback
+            or ip.is_link_local
+            or ip.is_reserved
+            or str(ip) == "169.254.169.254"
+        ):
+            return True
+    except Exception:
+        pass
+    return False
 
 
 def _extract_markdown(html: str, url: str) -> str:
@@ -121,9 +168,14 @@ class WebFetchTool:
         use_cache = bool(kwargs.get("use_cache", True))
 
         if allowed:
-            host = re.sub(r"^https?://", "", url).split("/")[0].lower()
+            host = re.sub(r"^https?://", "", url).split("/")[0].split(":")[0].lower()
             if not any(host == d.lower() or host.endswith("." + d.lower()) for d in allowed):
                 return {"status": "error", "error": f"domain not allowed: {host}"}
+
+        # SSRF guard: reject internal/metadata hosts before any network call
+        parsed = urlparse(url)
+        if _is_blocked_host(parsed.hostname):
+            return {"status": "error", "error": "host not allowed (SSRF guard)"}
 
         cache_key = self._cache_key(url, max_tokens)
         if use_cache:
@@ -135,12 +187,27 @@ class WebFetchTool:
                     "cached": True, "truncated": False,
                 }
 
-        try:
-            resp = await self.client.get(url, follow_redirects=True)
-        except Exception as exc:
-            return {"status": "error", "error": f"fetch failed: {exc}"}
-        if resp.status_code >= 400:
-            return {"status": "error", "error": f"HTTP {resp.status_code}"}
+        # Fetch with bounded manual redirect following (no automatic redirects)
+        current_url = url
+        resp = None
+        for _hop in range(6):
+            try:
+                resp = await self.client.get(current_url, follow_redirects=False)
+            except Exception as exc:
+                return {"status": "error", "error": f"fetch failed: {exc}"}
+            if resp.status_code >= 400:
+                return {"status": "error", "error": f"HTTP {resp.status_code}"}
+            loc = resp.headers.get("location")
+            if resp.status_code < 400 and resp.status_code >= 300 and loc:
+                next_url = urljoin(current_url, loc)
+                nxt = urlparse(next_url)
+                if _is_blocked_host(nxt.hostname):
+                    return {"status": "error", "error": "host not allowed (SSRF guard)"}
+                current_url = next_url
+                continue
+            break
+        if resp is None:
+            return {"status": "error", "error": "fetch failed: no response"}
 
         ctype = resp.headers.get("content-type", "").lower()
         if "pdf" in ctype or url.lower().endswith(".pdf"):

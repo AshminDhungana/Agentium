@@ -44,3 +44,34 @@ def test_help_action():
     result = asyncio.get_event_loop().run_until_complete(web_fetch_tool.execute("help"))
     assert result["status"] == "success"
     assert "SKILL.md" in result["description"]
+
+
+class _FakeClient:
+    async def get(self, url, **kw):
+        return None
+
+
+def test_ssrf_guard_blocks_metadata_ip(monkeypatch):
+    monkeypatch.setattr(web_fetch_tool, "_client", _FakeClient())
+    result = asyncio.get_event_loop().run_until_complete(
+        web_fetch_tool.execute(
+            "fetch",
+            url="http://169.254.169.254/latest/meta-data/",
+            use_cache=False,
+        )
+    )
+    assert result["status"] == "error"
+    assert "SSRF" in result["error"]
+
+
+def test_ssrf_guard_blocks_localhost(monkeypatch):
+    monkeypatch.setattr(web_fetch_tool, "_client", _FakeClient())
+    result = asyncio.get_event_loop().run_until_complete(
+        web_fetch_tool.execute(
+            "fetch",
+            url="http://localhost:5432/",
+            use_cache=False,
+        )
+    )
+    assert result["status"] == "error"
+    assert "SSRF" in result["error"]

@@ -31,3 +31,23 @@ def test_empty_query_errors():
 def test_help_action():
     result = asyncio.get_event_loop().run_until_complete(tool_search_tool.execute("help"))
     assert result["status"] == "success"
+
+
+def test_search_scoped_to_caller_tier():
+    result = asyncio.get_event_loop().run_until_complete(
+        tool_search_tool.execute("search", query="execute code", agent_id="30001")
+    )
+    assert result["status"] == "success"
+    names = [r["name"] for r in result["results"]]
+    assert "code_execution" not in names
+
+
+def test_tier_override_clamped():
+    result = asyncio.get_event_loop().run_until_complete(
+        tool_search_tool.execute(
+            "search", query="execute code", agent_id="30001", tier="0xxxx"
+        )
+    )
+    assert result["status"] == "success"
+    names = [r["name"] for r in result["results"]]
+    assert "code_execution" not in names

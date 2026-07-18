@@ -292,6 +292,7 @@ class ToolRegistry:
                 "timeout_seconds":{"type": "integer","description": "Execution timeout (default 300)", "optional": True},
                 "network_access": {"type": "boolean","description": "Allow outbound network in sandbox (default false)", "optional": True},
                 "agent_id":       {"type": "string", "description": "Caller agentium id, used for tier authorization", "optional": True},
+                "task_id":        {"type": "string", "description": "Optional associated task id", "optional": True},
             },
             authorized_tiers=["0xxxx", "1xxxx", "2xxxx"],
         )
@@ -315,6 +316,7 @@ class ToolRegistry:
                 "name":    {"type": "string", "description": "Tool name to retrieve (get action)", "optional": True},
                 "limit":   {"type": "integer","description": "Max results (default 10)", "optional": True},
                 "tier":    {"type": "string", "description": "Tier whose tools to search; defaults to caller tier", "optional": True},
+                "agent_id":{"type": "string", "description": "Caller agentium id, used for tier authorization", "optional": True},
             },
             authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
