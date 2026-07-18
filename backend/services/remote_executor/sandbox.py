@@ -66,6 +66,8 @@ class SandboxConfig:
     allowed_hosts: Optional[List[str]] = None  # Egress allowlist when network_mode="bridge"; private/IMDS always blocked via blocked_egress_cidrs()
     max_disk_mb: int = 1024  # 1GB
     image: str = "python:3.11-slim"  # Base image
+    workspace_enabled: bool = False  # Mount a writable /workspace tmpfs for artifact persistence
+    workspace_tmpfs_size_mb: int = 256  # Size of the /workspace tmpfs
 
 
 class SandboxManager:
@@ -182,7 +184,11 @@ class SandboxManager:
             cpu_period=100000,
             read_only=True,
             tmpfs={
-                "/tmp": f"rw,size={config.max_disk_mb}m,mode=1777,noexec,nosuid,nodev"
+                "/tmp": f"rw,size={config.max_disk_mb}m,mode=1777,noexec,nosuid,nodev",
+                **(
+                    {"/workspace": f"rw,size={config.workspace_tmpfs_size_mb}m,noexec,nosuid,nodev"}
+                    if config.workspace_enabled else {}
+                ),
             },
             # Drop all Linux capabilities for least privilege
             cap_drop=["ALL"],
@@ -238,7 +244,7 @@ class SandboxManager:
         # with the default config (network_mode="none"). If the caller opts into
         # network (bridge mode), we must NOT serve a "none" warm container — cold
         # start a dedicated container so the requested network posture is honored.
-        if not (config and config.network_mode == "bridge"):
+        if not (config and (config.network_mode == "bridge" or config.workspace_enabled)):
             async with self._pool_lock:
                 if self._warm_pool:
                     warm_container = self._warm_pool.pop()
