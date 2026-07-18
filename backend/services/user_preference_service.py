@@ -27,6 +27,7 @@ class UserPreferenceService:
         'ui.sidebar_collapsed': False,
         'ui.font_size': 'medium',
         'chat.history_limit': 50,
+        'chat.context_window_size': 10,
         'chat.auto_save': True,
         'chat.show_typing_indicator': True,
         'notifications.enabled': True,

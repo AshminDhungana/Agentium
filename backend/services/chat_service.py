@@ -118,15 +118,52 @@ class ChatService:
         import uuid as _uuid
         sovereign_user = db.query(User).filter_by(is_admin=True, is_active=True).first()
 
-        # ── Load conversation history BEFORE persisting the current turn ──────
-        # The frontend already renders the full thread; the model must too,
-        # otherwise context-dependent follow-ups ("try again", "redo the
-        # previous task") have no memory of what came before.  We query here,
-        # ahead of the pending inbound insert (which autoflush would otherwise
-        # include), so the history reflects turns strictly prior to this one.
-        history = ChatService._load_chat_history(
-            db, sovereign_user.id if sovereign_user else None
+        # ── Build token-efficient chat context (Task 2.1) ─────────────────────
+        # Load the compacted history (sliding window + pinned first message) and
+        # any rolling summary, BEFORE persisting the current turn so history
+        # reflects turns strictly prior to this one.
+        from backend.services.chat_context import (
+            ChatContextBuilder,
+            load_summary,
+            format_summary_for_prompt,
+            set_chat_request,
+            clear_chat_request,
+            summarize_history,
         )
+        from backend.services.user_preference_service import UserPreferenceService
+
+        window_size = 10
+        try:
+            pref_svc = UserPreferenceService(db)
+            ws = pref_svc.get_value(
+                "chat.context_window_size",
+                user_id=sovereign_user.id if sovereign_user else None,
+            )
+            if ws is not None:
+                window_size = int(ws)
+        except Exception:
+            pass
+
+        summary_json = None
+        summary_text = ""
+        if sovereign_user:
+            try:
+                summary_json = await load_summary(str(sovereign_user.id))
+                if summary_json:
+                    summary_text = format_summary_for_prompt(summary_json)
+            except Exception:
+                summary_json = None
+
+        history = []
+        context_compressed = False
+        raw_turn_count = 0
+        if sovereign_user:
+            built = ChatContextBuilder(window_size=window_size).build(
+                db, str(sovereign_user.id), summary=summary_json
+            )
+            history = built["history"]
+            context_compressed = built["context_compressed"]
+            raw_turn_count = built["raw_turn_count"]
 
         if sovereign_user:
             try:
@@ -248,7 +285,14 @@ class ChatService:
                 f"{predecessor_context['wisdom_summary']}"
             )
 
-        full_prompt = f"""{system_prompt}{predecessor_note}
+        summary_block = ""
+        if summary_text:
+            summary_block = (
+                "\n\n[Conversation summary — earlier turns were compressed to "
+                "save tokens]\n" + summary_text
+            )
+
+        full_prompt = f"""{system_prompt}{predecessor_note}{summary_block}
 
 Current System State:
 {context}{consultation_note}
@@ -262,6 +306,9 @@ Address the Sovereign respectfully. If they issue a command that requires execut
         # so all downstream code (reincarnation check, audit log, etc.) is
         # completely unaffected.
         # FIX: Handle model generation failures with try/except
+        cache_key = f"chat:{sovereign_user.id}" if sovereign_user else None
+        if sovereign_user:
+            set_chat_request(user_id=str(sovereign_user.id), db=db)
         try:
             # Phase 19.3 (Task 14): provider failover chain so a throttled/expired
             # Head key rolls over to a sibling key / cross-provider / local Ollama.
@@ -283,8 +330,10 @@ Address the Sovereign respectfully. If they issue a command that requires execut
                 history=history,
                 on_delta=on_delta,
                 cancel_event=cancel_event,
+                prompt_cache_key=cache_key,
             )
         except Exception as e:
+            clear_chat_request()
             logger.error(f"Model generation failed for Head {head.agentium_id}: {str(e)}")
             return {
                 "content": (
@@ -313,6 +362,7 @@ Address the Sovereign respectfully. If they issue a command that requires execut
 
         # Validate result has content
         if not result or not result.get("content"):
+            clear_chat_request()
             logger.error(f"Empty response from model for Head {head.agentium_id}")
             return {
                 "content": (
@@ -327,6 +377,32 @@ Address the Sovereign respectfully. If they issue a command that requires execut
                 "task_created": False,
                 "task_id": None
             }
+
+        # ── Attach context-compaction metadata (Task 2.1) ─────────────────────
+        from backend.services.chat_context import estimate_tokens
+
+        result["context_compressed"] = context_compressed
+        result["raw_turn_count"] = raw_turn_count
+        result["estimated_tokens"] = estimate_tokens(history, full_prompt)
+        logger.info(
+            "Chat context: turns=%s window=%s compressed=%s est_tokens=%s",
+            raw_turn_count, window_size, context_compressed, result["estimated_tokens"],
+        )
+        # Release the per-request chat context used by the full-history tools.
+        clear_chat_request()
+
+        # ── Background summarization (Layer 2) ─────────────────────────────────
+        # Condense overflow turns into a rolling summary for future turns. Runs
+        # fire-and-forget so it never blocks the user-facing response.
+        if sovereign_user and raw_turn_count > window_size + 1:
+            try:
+                import asyncio as _asyncio
+
+                _asyncio.create_task(
+                    summarize_history(db, str(sovereign_user.id), config_id)
+                )
+            except Exception as _summ_err:  # pragma: no cover - best-effort
+                logger.debug("Chat summarization schedule failed: %s", _summ_err)
 
         # Update context usage
         tokens_used = result.get("tokens_used", 0)

@@ -1402,6 +1402,50 @@ class ToolRegistry:
             authorized_tiers=["0xxxx", "1xxxx"],
         )
 
+        # ══════════════════════════════════════════════════════════════════════
+        # CHAT CONTEXT RECOVERY (Task 2.1) — on-demand full-history retrieval
+        # ══════════════════════════════════════════════════════════════════════
+        from backend.services.chat_context import get_full_history, search_chat_history
+
+        self.register_tool(
+            name="get_full_history",
+            description=(
+                "Retrieve the full, chronological Sovereign↔Head chat history "
+                "(deduplicated) when the recent context window is insufficient to "
+                "answer. Use this to recover facts, decisions, or instructions from "
+                "earlier in the conversation that were summarized or scrolled out of "
+                "the sliding window. Returns role/content turns oldest-first."
+            ),
+            function=get_full_history,
+            parameters={
+                "limit": {
+                    "type": "integer",
+                    "description": "Max turns to return (default 50, max 200)",
+                    "optional": True,
+                },
+            },
+            authorized_tiers=["0xxxx"],
+        )
+
+        self.register_tool(
+            name="search_chat_history",
+            description=(
+                "Search past Sovereign↔Head chat turns containing a query string "
+                "when you need a specific earlier fact, decision, or instruction that "
+                "may have been summarized or scrolled out of the sliding window."
+            ),
+            function=search_chat_history,
+            parameters={
+                "query": {"type": "string", "description": "Substring to search for"},
+                "limit": {
+                    "type": "integer",
+                    "description": "Max matching turns to return (default 20)",
+                    "optional": True,
+                },
+            },
+            authorized_tiers=["0xxxx"],
+        )
+
     # ── Registration ───────────────────────────────────────────────────────────
 
     def register_tool(

@@ -697,6 +697,16 @@ class OpenAICompatibleProvider(BaseModelProvider):
                     create_kwargs["tools"] = tools
                     create_kwargs["tool_choice"] = "auto"
 
+                # ── Prompt caching (Task 2.1) ────────────────────────────────────
+                # A stable prefix (system + summary + first message) is identical
+                # across turns, so route it to a shared cache via prompt_cache_key.
+                # Only meaningful for OpenAI-family providers; others ignore it.
+                _pc_key = kwargs.get("prompt_cache_key")
+                if _pc_key and str(getattr(self.config, "provider", "")).lower() in (
+                    "openai", "azure", "azure_openai",
+                ):
+                    create_kwargs["prompt_cache_key"] = _pc_key
+
                 rpm = getattr(self.config, "requests_per_minute", 60) or 60
                 await provider_rate_limiter.acquire(self.config.id, rpm)
 
@@ -1080,6 +1090,33 @@ class AnthropicProvider(BaseModelProvider):
                     system=system_prompt,
                     messages=conversation,
                 )
+                # ── Prompt caching (Task 2.1) ────────────────────────────────────
+                # Mark the stable prefix (system prompt + everything up to the last
+                # stable turn) as cacheable. The current user turn is the final
+                # message, so the boundary is the second-to-last message.
+                _pc_key = kwargs.get("prompt_cache_key")
+                if _pc_key:
+                    create_kwargs["system"] = [
+                        {
+                            "type": "text",
+                            "text": system_prompt,
+                            "cache_control": {"type": "ephemeral"},
+                        }
+                    ]
+                    if len(conversation) >= 2:
+                        _last_stable = conversation[-2]
+                        if isinstance(_last_stable, dict):
+                            _content = _last_stable.get("content")
+                            if isinstance(_content, str):
+                                _last_stable["content"] = [
+                                    {
+                                        "type": "text",
+                                        "content": _content,
+                                        "cache_control": {"type": "ephemeral"},
+                                    }
+                                ]
+                            elif isinstance(_content, list) and _content and isinstance(_content[-1], dict):
+                                _content[-1]["cache_control"] = {"type": "ephemeral"}
                 if tools:
                     create_kwargs["tools"] = tools
 

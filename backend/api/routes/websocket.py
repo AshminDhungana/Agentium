@@ -655,6 +655,9 @@ async def websocket_chat_endpoint(
                                 "task_created": response.get("task_created", False),
                                 "task_id":      response.get("task_id"),
                                 "agent_spawned": response.get("agent_spawned"),
+                                "context_compressed": response.get("context_compressed", False),
+                                "raw_turn_count": response.get("raw_turn_count", 0),
+                                "estimated_tokens": response.get("estimated_tokens", 0),
                                 "card": (response.get("metadata") or {}).get("card")
                                 if isinstance(response.get("metadata"), dict) else None,
                                 "media_urls": (response.get("metadata") or {}).get("media_urls", [])

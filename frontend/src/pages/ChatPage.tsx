@@ -1200,6 +1200,15 @@ export function ChatPage() {
                                                     <span className="text-xs text-gray-600 dark:text-gray-500">
                                                         {formatTimestamp(message.timestamp)}
                                                     </span>
+                                                    {!isUser && message.metadata?.context_compressed && (
+                                                        <span
+                                                            className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20"
+                                                            title={`Earlier turns were compressed to save tokens. Estimated ${message.metadata?.estimated_tokens ?? 0} tokens sent across ${message.metadata?.raw_turn_count ?? 0} total turns.`}
+                                                        >
+                                                            <Sparkles className="w-3 h-3" aria-hidden="true" />
+                                                            Context compressed
+                                                        </span>
+                                                    )}
                                                     {!message.metadata?.card && (
                                                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
                                                             <button onClick={() => copyMessage(message.content)}

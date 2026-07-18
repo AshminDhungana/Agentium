@@ -47,15 +47,11 @@ Items are **not confirmed bugs unless marked "Confirmed."** Anything else is a l
 Here’s a **condensed checklist** of the most urgent fixes to address the issues:
 
 ---
-
 ### ✅ Critical Fixes
 
 - [ ] **Fix Redis write in Genesis** – define `get_redis_client()` and add missing `await` so Head of Council state persists.
 - [ ] **Handle missing Head gracefully** – prevent WebSocket from closing immediately; return a clear error instead.
 - [ ] **Correct duplicate `tools` argument** in LLM provider call to avoid fallback errors.
-- [ ] **Add error handling to WebSocket** – on disconnect, show a banner and keep UI responsive.
-- [ ] **Implement auto‑scroll** after each message (user & assistant) to always show latest reply.
-- [ ] **Improve streaming animation** – replace blinking with smoother pulse; ensure stop button cancels even if Head goes offline.
 
 ---
 
@@ -66,24 +62,6 @@ Backend Redis fix → WebSocket error handling → frontend UI enhancements.
 
 Confirmed from application logs. Fix in the priority order given at the end of this section.
 
-### 1.1 — [P0] Agent polymorphic identity missing for `OUTPUT_CRITIC`
-**Problem:** Loading an agent of type `OUTPUT_CRITIC` fails because it isn't registered in the SQLAlchemy polymorphic mapping. This 500s `/api/v1/agents`, breaks WebSocket connections, and breaks the constitutional patrol loop.
-**Task:** Register `AgentType.OUTPUT_CRITIC` as a valid `polymorphic_identity` in the Agent model (check `__mapper_args__`), and confirm the critic subclass is imported wherever the mapper registry is built. Audit `CODE_CRITIC` and `PLAN_CRITIC` for the same gap.
-**Acceptance criteria:** `/api/v1/agents` returns 200 with all three critic types present; WebSocket connects cleanly; patrol loop runs without mapper errors; add a regression test that instantiates all three critic types.
-
-### 1.2 — [P0] Playwright browser not installed / Sync API used inside an asyncio loop
-**Problem:** The browser service fails to start — the Chromium headless shell executable is missing, **and** the code appears to invoke `playwright.sync_api` from within an already-running asyncio event loop (FastAPI/async context), which raises `"It looks like you are using Playwright Sync API inside the asyncio loop. Please use the Async API instead."` The sync API only works in a plain thread with no running loop; it cannot be called from async code.
-**Task:**
-- Add `playwright install --with-deps chromium` to the Dockerfile (or an image build/startup step) so the browser binary is present at build time, not first-use time.
-- Replace any `from playwright.sync_api import sync_playwright` usage inside async request/task handlers with `from playwright.async_api import async_playwright`, and `await` all Playwright calls end-to-end.
-- If a genuinely synchronous call site can't be converted, run it in a dedicated thread via `asyncio.to_thread(...)` rather than mixing sync Playwright into the running loop.
-**Acceptance criteria:** Browser tool starts cleanly on a fresh container with no manual `playwright install` step; no sync-API-in-event-loop errors in logs; Browser tab on the Tasks page successfully drives a real page load and returns a screenshot.
-
-### 1.3 — [P0] Genesis Redis write not awaited / `get_redis_client` undefined
-**Problem:** Two related symptoms from the same code path: (a) a Redis write during genesis initialization is fired without `await`, so it may not complete before the app proceeds; (b) a warning `genesis:state redis write failed: name 'get_redis_client' is not defined` shows a missing import/undefined function.
-**Task:** Locate the genesis initialization service's Redis write (e.g. `get_redis_client().execute_command(...)` or similar) and (1) ensure `get_redis_client` is properly imported/defined in that module, and (2) `await` the call inside its async context. Add a startup assertion that genesis state actually landed in Redis before continuing.
-**Acceptance criteria:** No `not defined` or unawaited-coroutine warnings during genesis on a clean boot; genesis state is verifiably present in Redis immediately after initialization; add a test that boots genesis against a real (test) Redis and asserts the key exists.
-
 ### 1.4 — [P2] Redis AOF fsync slow (performance warning, non-blocking)
 **Problem:** Redis logs warn that asynchronous AOF fsync is taking too long due to slow disk I/O. Doesn't stop the app but degrades performance under load.
 **Task:** Check the disk backing the Redis volume; consider `appendfsync everysec` (default, safe tradeoff) vs `no` (faster, less durable) depending on how critical Redis durability is for this deployment; document the chosen tradeoff.
@@ -92,7 +70,7 @@ Confirmed from application logs. Fix in the priority order given at the end of t
 ### 1.5 — [P0] MinIO using default credentials (`minioadmin:minioadmin`)
 **Problem:** Security risk — default credentials in any non-trivial deployment.
 **Task:** Set `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` to generated, non-default values in `docker-compose.yml` / `.env.example`, and document that they must be rotated on first deploy. Add a startup check that warns/blocks if defaults are still in use.
-**Acceptance criteria:** Fresh install requires the user to set (or auto-generates) non-default MinIO credentials; a startup guard flags the default pair if detected.
+**Acceptance criteria:** Fresh install requires the user to set (or auto-generates) non-default MinIO credentials; a startup guard flags the default pair if detected. If mino default is used store data locally inside docker . 
 
 ### 1.6 — [P3] nginx `user` directive warning (cosmetic)
 **Problem:** nginx logs an ignored `user` directive warning because the master process doesn't run as root.

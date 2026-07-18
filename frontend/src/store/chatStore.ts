@@ -29,6 +29,12 @@ export interface MessageMetadata {
     connection_id?: number;
     /** structured input card payload (replaces prompt_type/requires_response) */
     card?: StructuredInputCardPayload;
+    /** True when older turns were compressed/summarized to save tokens (Task 2.1) */
+    context_compressed?: boolean;
+    /** Total raw turns in the conversation before windowing (for transparency) */
+    raw_turn_count?: number;
+    /** Estimated tokens sent to the model this turn (Task 2.1) */
+    estimated_tokens?: number;
 }
 
 export interface Message {

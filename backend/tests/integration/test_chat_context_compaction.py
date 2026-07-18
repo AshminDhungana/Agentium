@@ -1,0 +1,62 @@
+"""
+Integration test for chat-context compaction (Task 2.1).
+
+Seeds 55+ chat turns and asserts the compacted history is bounded by the window
+while older context remains recoverable via the full-history tool or summary.
+Requires the integration stack (postgres + redis); skipped otherwise.
+"""
+
+import pytest
+
+from backend.models.entities.chat_message import ChatMessage as ChatMsg
+from backend.models.entities.user import User
+from backend.services.chat_context import (
+    ChatContextBuilder,
+    set_chat_request,
+    clear_chat_request,
+    get_full_history,
+)
+
+
+@pytest.mark.integration
+def test_long_conversation_compaction(db_session):
+    user = db_session.query(User).filter_by(is_admin=True, is_active=True).first()
+    assert user is not None, "needs an admin/sovereign user in the test DB"
+
+    # Seed 55 turns (alternating sovereign / head_of_council).
+    N = 55
+    for i in range(N):
+        role = "sovereign" if i % 2 == 0 else "head_of_council"
+        db_session.add(
+            ChatMsg(
+                user_id=str(user.id),
+                role=role,
+                content=f"turn-{i}-unique-marker-{i}",
+            )
+        )
+    db_session.commit()
+
+    builder = ChatContextBuilder(window_size=10)
+    out = builder.build(db_session, str(user.id))
+    history = out["history"]
+
+    # history = [pinned first] + last 10 turns (current msg appended later).
+    assert len(history) == 11, history
+    assert out["raw_turn_count"] == N
+    assert out["context_compressed"] is True
+    # First turn is pinned and recoverable.
+    assert history[0]["content"] == "turn-0-unique-marker-0"
+    # Most recent turn present.
+    assert history[-1]["content"] == f"turn-{N-1}-unique-marker-{N-1}"
+    # Middle turn is NOT in the compacted window...
+    assert all("turn-27" not in m["content"] for m in history)
+    # ...but IS recoverable via the full-history tool.
+    set_chat_request(user_id=str(user.id), db=db_session)
+    try:
+        recovered = get_full_history(limit=200)
+    finally:
+        clear_chat_request()
+    assert recovered["status"] == "ok"
+    assert recovered["message_count"] == N
+    contents = [m["content"] for m in recovered["history"]]
+    assert "turn-27-unique-marker-27" in contents
