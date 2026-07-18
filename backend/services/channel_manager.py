@@ -1154,7 +1154,34 @@ class ChannelManager:
             
             db.commit()
             db.refresh(message)
-            
+
+            # If the user is answering a pending clarification card (channels can't
+            # render the inline card, so they reply in the plain-text format from
+            # render_external_text), parse and record the answer.
+            if user_id:
+                from backend.services.structured_input_service import parse_card_answer
+                from backend.models.schemas.structured_input import StructuredInputCard
+                from backend.services.chat_service import ChatService
+                pending = (
+                    db.query(ChatMessage)
+                      .filter_by(user_id=str(user_id), message_type="input_card", is_deleted="N")
+                      .order_by(ChatMessage.created_at.desc())
+                      .first()
+                )
+                if pending and (pending.message_metadata or {}).get("card"):
+                    try:
+                        card = StructuredInputCard(**(pending.message_metadata["card"]))
+                        answer = parse_card_answer(content, card)
+                        head = db.query(HeadOfCouncil).first()
+                        # record the answer on the sovereign message exactly like the
+                        # WebSocket card_response path does
+                        await ChatService.process_message(
+                            head, content, db,
+                            extra_metadata={"card_response": answer.model_dump()},
+                        )
+                    except Exception as _ce:  # noqa: BLE001
+                        logger.warning("Channel card answer parse failed: %s", _ce)
+
             if has_unified_msg:
                 # Broadcast the new message to web clients
                 try:

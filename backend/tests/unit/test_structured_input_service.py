@@ -1,5 +1,5 @@
 from models.schemas.structured_input import CardOption, CardQuestion, StructuredInputCard
-from services.structured_input_service import render_external_text, chunk_questions
+from services.structured_input_service import render_external_text, chunk_questions, parse_card_answer
 
 def _q(qid):
     return CardQuestion(id=qid, question=f"{qid}?", input_type="single_select",
@@ -15,3 +15,21 @@ def test_render_external_text_numbers_and_letters():
 def test_chunk_questions_splits_over_three():
     chunked = chunk_questions([_q(f"q{i}") for i in range(5)], size=3)
     assert [len(c) for c in chunked] == [3, 2]
+
+def test_parse_card_answer_numbered():
+    card = StructuredInputCard(
+        card_id="c1",
+        questions=[
+            CardQuestion(id="q1", question="Color?", input_type="single_select", required=True,
+                         options=[CardOption(id="a", label="Red", value="red"),
+                                  CardOption(id="b", label="Blue", value="blue")]),
+            CardQuestion(id="q2", question="Size?", input_type="single_select", required=False,
+                         options=[CardOption(id="s", label="S", value="s"),
+                                  CardOption(id="l", label="L", value="l")]),
+        ],
+    )
+    ans = parse_card_answer("1a\n2l", card)
+    assert ans.card_id == "c1"
+    by_q = {a.question_id: a for a in ans.answers}
+    assert by_q["q1"].selected_option_ids == ["a"]
+    assert by_q["q2"].selected_option_ids == ["l"]
