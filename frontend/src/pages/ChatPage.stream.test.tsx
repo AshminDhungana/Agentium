@@ -22,10 +22,12 @@ import { useWebSocketStore } from '@/store/websocketStore';
 describe('chatStore streaming helpers (driven by ChatPage WS subscriber)', () => {
     beforeEach(() => {
         // Reset to a clean slate before each case.
+        useChatStore.getState()._stopFlush();
         useChatStore.setState({
             messages: [],
             activeStreamId: null,
             currentStreamingMessage: '',
+            _streamBuffer: '',
             cardStatus: {},
             activeCardId: null,
         });
@@ -41,12 +43,19 @@ describe('chatStore streaming helpers (driven by ChatPage WS subscriber)', () =>
         expect(useChatStore.getState().activeStreamId).toBe('s1');
     });
 
-    it('appendDelta accumulates content', () => {
+    it('appendDelta buffers then reveals content at a paced rate', async () => {
         useChatStore.getState().beginStream('s1', 'head_of_council');
         useChatStore.getState().appendDelta('s1', 'Hello');
 
-        const m = useChatStore.getState().messages.find((x) => x.id === 's1');
-        expect(m!.content).toBe('Hello');
+        // Deltas are buffered, not revealed synchronously…
+        const m0 = useChatStore.getState().messages.find((x) => x.id === 's1');
+        expect(m0!.content).toBe('');
+
+        // …then flushed to the rendered message on a timer (~40ms cadence).
+        await new Promise((r) => setTimeout(r, 80));
+        const m1 = useChatStore.getState().messages.find((x) => x.id === 's1');
+        expect(m1!.content).toBe('Hello');
+        expect(useChatStore.getState().activeStreamId).toBe('s1');
     });
 
     it('endStream finalizes status, merges metadata, and clears activeStreamId', () => {

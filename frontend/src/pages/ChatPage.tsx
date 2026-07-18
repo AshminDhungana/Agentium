@@ -279,6 +279,18 @@ export function ChatPage() {
         }
     }, [isConnected]);
 
+    // FIX: if the WebSocket drops (or goes into reconnect) while a reply is
+    // still streaming, the server never sends `message_end`, so `activeStreamId`
+    // and `isAwaitingReply` would hang forever — leaving the Stop button stuck,
+    // the caret blinking, and the status stuck on "offline". Finalize the
+    // partial stream and clear the awaiting flag so the UI recovers.
+    useEffect(() => {
+        if (connectionPhase !== 'active') {
+            if (activeStreamId) useChatStore.getState().resetStream();
+            setIsAwaitingReply(false);
+        }
+    }, [connectionPhase, activeStreamId]);
+
     // FIX #14 + #2: subscribe to incoming WS messages exactly once
     useEffect(() => {
         if (wsSubscribed.current) return;
@@ -371,9 +383,16 @@ export function ChatPage() {
             isHistoryLoad.current = false; // consume the flag before any scroll
             return;                        // skip smooth-scroll on history load
         }
+        // While a reply is streaming in, always pin to the bottom so the user
+        // never has to manually scroll to keep reading (Issue: AI reply below
+        // the fold). When idle, only auto-scroll if already near the bottom.
+        if (activeStreamId) {
+            scrollToBottom();
+            return;
+        }
         if (!isNearBottom()) return;
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages]);
+    }, [messages, activeStreamId]);
 
     // Auto-resize textarea
     useEffect(() => {

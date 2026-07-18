@@ -1,17 +1,33 @@
 .stream-caret {
   display: inline-block;
   margin-left: 1px;
-  animation: caret-blink 1s steps(2, start) infinite;
+  /* Soft, breathing pulse instead of a hard on/off blink. */
+  animation: caret-pulse 1.1s ease-in-out infinite;
 }
 
-@keyframes caret-blink {
-  to {
-    visibility: hidden;
+@keyframes caret-pulse {
+  0%,
+  100% {
+    opacity: 1;
   }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* Applied for ~250ms when streaming ends so the caret fades out smoothly
+   rather than vanishing abruptly. */
+.stream-caret--fading {
+  animation: none;
+  opacity: 0;
+  transition: opacity 0.25s ease;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .stream-caret {
     animation: none;
+  }
+  .stream-caret--fading {
+    transition: none;
   }
 }

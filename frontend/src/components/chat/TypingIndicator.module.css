@@ -1,0 +1,45 @@
+.shimmer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.bar {
+  width: 30px;
+  height: 8px;
+  border-radius: 999px;
+  /* Neutral slate gradient — visible on both light and dark bubbles. */
+  background: linear-gradient(
+    90deg,
+    rgba(148, 163, 184, 0.2) 25%,
+    rgba(148, 163, 184, 0.55) 37%,
+    rgba(148, 163, 184, 0.2) 63%
+  );
+  background-size: 400% 100%;
+  animation: shimmer-sweep 1.4s ease-in-out infinite;
+}
+
+.bar:nth-child(2) {
+  width: 38px;
+  animation-delay: 0.18s;
+}
+
+.bar:nth-child(3) {
+  width: 24px;
+  animation-delay: 0.36s;
+}
+
+@keyframes shimmer-sweep {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: 0 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bar {
+    animation: none;
+  }
+}

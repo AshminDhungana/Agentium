@@ -41,6 +41,34 @@ export function MarkdownMessage({
 
   const isPlain = isUser || html === '';
 
+  // Soft fade-out: keep the caret mounted briefly after streaming ends so it
+  // fades rather than disappearing abruptly. (The harsh `steps(2)` blink was
+  // replaced with a gentle pulse in the CSS module.)
+  const isStreaming = status === 'streaming';
+  const [showCaret, setShowCaret] = useState(isStreaming);
+  const [caretFading, setCaretFading] = useState(false);
+  useEffect(() => {
+    if (isStreaming) {
+      setShowCaret(true);
+      setCaretFading(false);
+    } else if (showCaret && !caretFading) {
+      setCaretFading(true);
+      const t = setTimeout(() => setShowCaret(false), 260);
+      return () => clearTimeout(t);
+    }
+  }, [isStreaming, showCaret, caretFading]);
+
+  const renderCaret = () =>
+    showCaret ? (
+      <span
+        data-testid="stream-caret"
+        className={`${styles['stream-caret']}${caretFading ? ` ${styles['stream-caret--fading']}` : ''}`}
+        aria-hidden
+      >
+        ▍
+      </span>
+    ) : null;
+
   // Attach a copy button to every <pre> block. No-op when rendering plain text.
   useEffect(() => {
     if (isPlain) return;
@@ -76,11 +104,7 @@ export function MarkdownMessage({
     return (
       <p className={`text-[15px] leading-relaxed whitespace-pre-wrap ${className}`}>
         {content}
-        {status === 'streaming' && (
-          <span data-testid="stream-caret" className={styles['stream-caret']} aria-hidden>
-            ▍
-          </span>
-        )}
+        {renderCaret()}
       </p>
     );
   }
@@ -88,11 +112,7 @@ export function MarkdownMessage({
   return (
     <div className={`markdown-body text-[15px] leading-relaxed ${className}`}>
       <div ref={ref} dangerouslySetInnerHTML={{ __html: html }} />
-      {status === 'streaming' && (
-        <span data-testid="stream-caret" className={styles['stream-caret']} aria-hidden>
-          ▍
-        </span>
-      )}
+      {renderCaret()}
     </div>
   );
 }

@@ -56,6 +56,22 @@ interface ChatState {
     beginStream: (messageId: string, role: Message['role']) => void;
     appendDelta: (streamId: string, delta: string) => void;
     endStream: (streamId: string, content: string, metadata?: MessageMetadata) => void;
+    /**
+     * Finalize an in-flight stream that was interrupted (e.g. the WebSocket
+     * dropped before a `message_end` arrived). Keeps whatever text was already
+     * revealed, marks the message `sent`, and clears `activeStreamId` so the
+     * Stop button and blinking caret don't get stuck.
+     */
+    resetStream: () => void;
+    /**
+     * Buffer of delta text not yet flushed to the rendered message. Flushed in
+     * small slices on a timer so the reply reveals at a readable pace instead of
+     * popping in as fast as the backend emits deltas.
+     */
+    _streamBuffer: string;
+    _streamFlushTimer: ReturnType<typeof setInterval> | null;
+    _startFlush: (streamId: string) => void;
+    _stopFlush: () => void;
     sendMessage: (content: string) => Promise<void>;
     setMessages: (updater: Message[] | ((prev: Message[]) => Message[])) => void;
     clearHistory: () => void;
@@ -73,6 +89,8 @@ export const useChatStore = create<ChatState>()(
             activeStreamId: null,
             cardStatus: {},
             activeCardId: null,
+            _streamBuffer: '',
+            _streamFlushTimer: null,
 
             registerCard: (cardId, replaceActive) => set((s) => {
                 // Idempotent: a re-delivered card message (e.g. on WS reconnect)
@@ -99,29 +117,101 @@ export const useChatStore = create<ChatState>()(
             })),
 
             // Streaming helpers: drive server-pushed token deltas into a single message.
-            beginStream: (messageId, role) => set((s) => ({
-                activeStreamId: messageId,
-                messages: [
-                    ...s.messages,
-                    { id: messageId, role, content: '', timestamp: new Date(), status: 'streaming' },
-                ],
-                currentStreamingMessage: '',
-            })),
+            beginStream: (messageId, role) => {
+                get()._stopFlush();
+                set((s) => ({
+                    activeStreamId: messageId,
+                    messages: [
+                        ...s.messages,
+                        { id: messageId, role, content: '', timestamp: new Date(), status: 'streaming' },
+                    ],
+                    currentStreamingMessage: '',
+                    _streamBuffer: '',
+                }));
+            },
 
-            appendDelta: (streamId, delta) => set((s) => ({
-                currentStreamingMessage: s.currentStreamingMessage + delta,
-                messages: s.messages.map((m) =>
-                    m.id === streamId ? { ...m, content: m.content + delta } : m),
-            })),
+            appendDelta: (streamId, delta) => {
+                // Honour reduced-motion: reveal immediately, no pacing.
+                if (
+                    typeof window !== 'undefined' &&
+                    window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+                ) {
+                    set((s) => ({
+                        currentStreamingMessage: s.currentStreamingMessage + delta,
+                        messages: s.messages.map((m) =>
+                            m.id === streamId ? { ...m, content: m.content + delta } : m),
+                    }));
+                    return;
+                }
+                // Otherwise buffer and reveal in paced slices.
+                set({ _streamBuffer: get()._streamBuffer + delta });
+                get()._startFlush(streamId);
+            },
 
-            endStream: (streamId, content, metadata) => set((s) => ({
-                activeStreamId: s.activeStreamId === streamId ? null : s.activeStreamId,
-                currentStreamingMessage: '',
-                messages: s.messages.map((m) =>
-                    m.id === streamId
-                        ? { ...m, content, status: 'sent', metadata: { ...m.metadata, ...metadata } }
-                        : m),
-            })),
+            _startFlush: (streamId) => {
+                if (get()._streamFlushTimer != null) return; // already running
+                const timer = setInterval(() => {
+                    const pending = get()._streamBuffer;
+                    if (!pending) { get()._stopFlush(); return; }
+                    // Reveal a small slice normally, but catch up instantly if a
+                    // large backlog has built up so we never lag far behind.
+                    const slice = pending.length > 120 ? pending.length : Math.min(pending.length, 6);
+                    const take = pending.slice(0, slice);
+                    const rest = pending.slice(slice);
+                    set((s) => ({
+                        _streamBuffer: rest,
+                        currentStreamingMessage: s.currentStreamingMessage + take,
+                        messages: s.messages.map((m) =>
+                            m.id === streamId ? { ...m, content: m.content + take } : m),
+                    }));
+                    if (!rest) get()._stopFlush();
+                }, 40);
+                set({ _streamFlushTimer: timer });
+            },
+
+            _stopFlush: () => {
+                const t = get()._streamFlushTimer;
+                if (t != null) {
+                    clearInterval(t);
+                    set({ _streamFlushTimer: null });
+                }
+            },
+
+            resetStream: () => {
+                get()._stopFlush();
+                const s = get();
+                const id = s.activeStreamId;
+                if (!id) return;
+                const buffered = s._streamBuffer || '';
+                set((st) => ({
+                    activeStreamId: null,
+                    currentStreamingMessage: '',
+                    _streamBuffer: '',
+                    messages: st.messages.map((m) =>
+                        m.id === id
+                            ? { ...m, content: m.content + buffered, status: 'sent' }
+                            : m),
+                }));
+            },
+
+            endStream: (streamId, content, metadata) => {
+                get()._stopFlush();
+                set((s) => {
+                    // Prefer the authoritative server content; fall back to what
+                    // we have locally (revealed text + any still-buffered text).
+                    const localContent = s.messages.find((m) => m.id === streamId)?.content ?? '';
+                    const finalContent = content || (localContent + (s._streamBuffer || ''));
+                    return {
+                        activeStreamId: s.activeStreamId === streamId ? null : s.activeStreamId,
+                        currentStreamingMessage: '',
+                        _streamBuffer: '',
+                        messages: s.messages.map((m) =>
+                            m.id === streamId
+                                ? { ...m, content: finalContent, status: 'sent', metadata: { ...m.metadata, ...metadata } }
+                                : m),
+                    };
+                });
+            },
 
             setMessages: (updater) =>
                 set((state) => ({
@@ -231,6 +321,18 @@ export const useChatStore = create<ChatState>()(
             }),
             // Only persist messages — skip transient loading/streaming state
             partialize: (state) => ({ messages: state.messages }),
+            // A stream interrupted by a reload/crash would otherwise rehydrate
+            // with status 'streaming' and blink its caret forever. Finalize any
+            // such message and clear transient stream fields on load.
+            onRehydrateStorage: () => (state) => {
+                if (!state) return;
+                state.messages = state.messages.map((m) =>
+                    m.status === 'streaming' ? { ...m, status: 'sent' } : m);
+                state.activeStreamId = null;
+                state.currentStreamingMessage = '';
+                state._streamBuffer = '';
+                state._streamFlushTimer = null;
+            },
         }
     )
 );
