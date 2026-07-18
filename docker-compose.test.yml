@@ -36,12 +36,15 @@ services:
     container_name: agentium-test-redis
     ports:
       - "6379:6379"
+    volumes:
+      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    command: redis-server /usr/local/etc/redis/redis.conf
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 3s
       retries: 5
-    # No volumes — ephemeral
+    # No data volume — ephemeral
 
   chromadb:
     image: chromadb/chroma:1.5.1
