@@ -78,6 +78,7 @@ class SkillCreatorTool:
                 "error": "skill_creator is restricted to Head (0xxxx) and Council (1xxxx) agents",
             }
         try:
+            kwargs.pop("agent_id", None)
             return self._create(agent_id=agent_id, **kwargs)
         except Exception as exc:  # never crash the agent loop
             return {"success": False, "error": str(exc)}

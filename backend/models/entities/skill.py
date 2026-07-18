@@ -16,6 +16,7 @@ query time.  ``CHROMA_CHAR_LIMIT`` is retained only for preview sizing.
 from datetime import datetime, timezone
 from typing import List, Optional, Dict, Any
 
+from typing import Literal
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import Column, String, DateTime, JSON, Float, Integer, Boolean, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import relationship
@@ -47,17 +48,17 @@ class SkillSchema(BaseModel):
     display_name: str = Field(..., min_length=5, max_length=200)
 
     # Categorization
-    skill_type: str = Field(..., enum=[
+    skill_type: Literal[
         "code_generation", "analysis", "integration",
         "automation", "research", "design", "testing", "deployment",
         "debugging", "optimization", "documentation",
-    ])
-    domain: str = Field(..., enum=[
+    ]
+    domain: Literal[
         "frontend", "backend", "devops", "data", "ai",
         "security", "mobile", "desktop", "general", "database", "api",
-    ])
+    ]
     tags: List[str] = Field(..., min_items=1, max_items=10)
-    complexity: str = Field(..., enum=["beginner", "intermediate", "advanced"])
+    complexity: Literal["beginner", "intermediate", "advanced"]
 
     # Content
     # max_length=300 matches SKILL_CREATION_TEMPLATE instruction and keeps the
@@ -75,7 +76,7 @@ class SkillSchema(BaseModel):
     version: str = Field(default="1.0.0", pattern=r"\d+\.\d+\.\d+")
     created_at: datetime
     updated_at: datetime
-    creator_tier: str = Field(..., enum=["head", "council", "lead", "task"])
+    creator_tier: Literal["head", "council", "lead", "task"]
     # Fix 14 — previous pattern r"[0-6]xxxx" matched only literal "0xxxx"…
     # "6xxxx".  Agentium IDs are zero-padded numerics like "00001", "10023".
     creator_id: str = Field(..., pattern=r"[a-z0-9]{4,20}")
@@ -90,9 +91,7 @@ class SkillSchema(BaseModel):
 
     # Governance
     constitution_compliant: bool
-    verification_status: str = Field(
-        ..., enum=["pending", "verified", "rejected"]
-    )
+    verification_status: Literal["pending", "verified", "rejected"]
     verified_by: Optional[str] = None
     rejection_reason: Optional[str] = None
 
