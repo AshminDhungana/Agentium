@@ -144,9 +144,12 @@ def test_registry_exposes_replace_lines():
     reg = ToolRegistry()
     reg._initialize_tools()
 
+    expected = FileSystemTool.replace_lines
     tool = reg.get_tool("replace_lines")
     assert tool is not None
     assert callable(tool["function"])
-    assert tool["function"] is FileSystemTool().replace_lines or callable(tool["function"])
-    assert "start_line" in tool["parameters"]
-    assert "end_line" in tool["parameters"]
+    assert tool["function"].__func__ is expected
+    for key in ("filepath", "start_line", "end_line", "content"):
+        assert key in tool["parameters"]
+    assert "0xxxx" in tool["authorized_tiers"]
+    assert "9xxxx" in tool["authorized_tiers"]
