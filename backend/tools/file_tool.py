@@ -142,6 +142,104 @@ class FileSystemTool:
         except Exception as e:
             return {"status": "error", "path": filepath, "error": str(e)}
 
+    def replace_lines(
+        self,
+        filepath: str,
+        start_line: int,
+        end_line: int,
+        content: str,
+        backup: bool = True,
+    ) -> Dict[str, Any]:
+        """
+        Replace an inclusive 1-based line range [start_line, end_line] with
+        `content` (may be multi-line). Lines outside the range are preserved.
+
+        Fails loudly (error dict, no write) if:
+        - start_line or end_line < 1
+        - start_line > end_line
+        - file is missing / not a file
+        - start_line or end_line is out of range
+
+        Args:
+            filepath:   Target file path.
+            start_line: 1-based start line (inclusive).
+            end_line:   1-based end line (inclusive).
+            content:    Replacement text (may be multi-line).
+            backup:     If True, save a .bak copy before writing.
+        """
+        try:
+            if _is_binary_file(filepath):
+                return {
+                    "status": "error",
+                    "path": filepath,
+                    "error": (
+                        f"'{os.path.basename(filepath)}' is a binary file "
+                        "(PDF, image, archive, etc.) and cannot be edited as text."
+                    ),
+                }
+
+            if start_line < 1 or end_line < 1:
+                return {
+                    "status": "error",
+                    "path":   filepath,
+                    "error":  "start_line and end_line must be >= 1",
+                }
+            if start_line > end_line:
+                return {
+                    "status": "error",
+                    "path":   filepath,
+                    "error":  "start_line must be <= end_line",
+                }
+            if not os.path.isfile(filepath):
+                return {
+                    "status": "error",
+                    "path":   filepath,
+                    "error":  f"File not found: {filepath}",
+                }
+
+            with open(filepath, 'r', encoding='utf-8') as f:
+                original = f.read()
+
+            lines = original.splitlines(keepends=True)
+            total = len(lines)
+
+            if start_line > total:
+                return {
+                    "status": "error",
+                    "path":   filepath,
+                    "error":  f"start_line out of range (file has {total} lines)",
+                }
+            if end_line > total:
+                return {
+                    "status": "error",
+                    "path":   filepath,
+                    "error":  f"end_line out of range (file has {total} lines)",
+                }
+
+            if backup:
+                shutil.copy2(filepath, f"{filepath}.bak")
+
+            replacement = content if content.endswith("\n") else content + "\n"
+            new_text = (
+                "".join(lines[: start_line - 1])
+                + replacement
+                + "".join(lines[end_line:])
+            )
+
+            with open(filepath, 'w', encoding='utf-8') as f:
+                f.write(new_text)
+
+            return {
+                "status":        "success",
+                "path":          filepath,
+                "start_line":    start_line,
+                "end_line":      end_line,
+                "lines_replaced": end_line - start_line + 1,
+                "bytes_written": len(new_text.encode('utf-8')),
+            }
+        except Exception as e:
+            return {"status": "error", "path": filepath, "error": str(e)}
+
     def write_file(self, filepath: str, content: str, backup: bool = True) -> Dict[str, Any]:
         """
         Write text content to a file with optional backup.
