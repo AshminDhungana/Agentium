@@ -1,10 +1,17 @@
 # Agentium — Verification & Improvement Backlog
 
+- [ ] **Optimize Head of Council chat performance**
+  - **Role clarification:** The Head of Council should never perform tasks directly. Its job is to interpret the user's request, delegate it to the appropriate agent(s) per the system design, monitor execution, and report the result back to the user.
+  - **Problem:** Response times are slow because the Head of Council appears to be spending cycles on work that should be offloaded to other agents.
+  - **Action items:**
+    - [ ] Map out the current request flow (user → Head of Council → agent(s) → back to user) to identify where time is actually being spent.
+    - [ ] Identify any steps where the Head of Council is doing task work itself instead of delegating.
+    - [ ] Define clear boundaries for what the Head of Council should handle directly (routing, monitoring, summarizing) vs. what must always go to a sub-agent.
+    - [ ] Optimize the delegation/monitoring loop (e.g., async handoff, reduced round-trips) so the user gets a fast acknowledgment/response.
+    - [ ] Test end-to-end latency before and after changes to confirm improvement.
+
+
 - [ ] **Full intended workflow (still open)** — When the user says "to head, create me a website", the Head should ask clarifying questions, gather info from web search / knowledge DB, then hand off to a Lead agent which breaks the work into Task agents; Critics verify the Task agents' output; on completion the user sees the resulting files in their host workspace. The persistence half above is built, but the Head→Lead→Task→Critics orchestration + "user sees the files" UX flow is a separate, larger effort not yet implemented.
-
-- [ ] - The Head of Council task is to not do the work but assign the work and monitor, so when user asks to do something the head should not do the work but assign it to other agents as per system design then report back to user. What can be done to make the chat that is handeled by the head work smoothly, so that user gets fast response. 
-
-- [ ] All agents should be able to use tools asyncrously, so agent will not get stuck waiting for a tool to work, and each tool should have a timelimit so that agent can retry it. if agent have to wait for a long time then the agent might get stuck. agent should be able to manage their own tools calling, if agent want then they can stop the calling, so that if any tool use gets stuck then it can be stoped. 
 
 
 ## 3. Core Architecture — Tools & Skills
