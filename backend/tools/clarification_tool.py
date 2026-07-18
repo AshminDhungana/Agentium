@@ -43,5 +43,10 @@ def request_user_clarification(
         return f"error: invalid card payload: {exc}"
 
     user_id = _resolve_sovereign_user_id(db)
-    result = ChatService.send_structured_card(card, db, user_id)
+    if not user_id:
+        return "error: no sovereign user found"
+    try:
+        result = ChatService.send_structured_card(card, db, user_id)
+    except Exception as exc:  # noqa: BLE001
+        return f"error: failed to send card: {exc}"
     return f"ok: clarification card {result.get('card_id')} sent to the Sovereign"

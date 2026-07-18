@@ -59,3 +59,30 @@ def test_request_user_clarification_tool_happy_path():
 def test_request_user_clarification_tool_rejects_empty():
     out = request_user_clarification(questions=[], db=MagicMock())
     assert out.startswith("error:")
+
+
+def test_request_user_clarification_tool_send_failure():
+    with patch("backend.tools.clarification_tool.ChatService") as CS, \
+         patch("backend.tools.clarification_tool._resolve_sovereign_user_id", return_value="u1"):
+        CS.send_structured_card.side_effect = RuntimeError("boom")
+        out = request_user_clarification(
+            title="T", questions=[{
+                "id": "q1", "question": "Q?", "input_type": "single_select",
+                "required": True, "options": [{"id": "a", "label": "A", "value": "a"}],
+            }], db=MagicMock(),
+        )
+    assert out.startswith("error:")
+    assert "failed to send" in out
+
+
+def test_request_user_clarification_tool_no_sovereign():
+    with patch("backend.tools.clarification_tool.ChatService") as CS, \
+         patch("backend.tools.clarification_tool._resolve_sovereign_user_id", return_value=""):
+        out = request_user_clarification(
+            title="T", questions=[{
+                "id": "q1", "question": "Q?", "input_type": "single_select",
+                "required": True, "options": [{"id": "a", "label": "A", "value": "a"}],
+            }], db=MagicMock(),
+        )
+    assert out == "error: no sovereign user found"
+    CS.send_structured_card.assert_not_called()
