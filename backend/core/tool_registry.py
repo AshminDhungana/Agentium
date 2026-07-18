@@ -28,6 +28,9 @@ from backend.tools.desktop_tool  import (
 )
 from backend.tools.mcp_agent_tools import add_mcp_server, vote_on_mcp_server
 from backend.tools.remote_exec_tool import execute as remote_exec_tool_execute
+from backend.tools.web_fetch_tool     import web_fetch_tool
+from backend.tools.code_execution_tool import code_execution_tool
+from backend.tools.tool_search_tool    import tool_search_tool
 
 
 class ToolRegistry:
@@ -240,6 +243,78 @@ class ToolRegistry:
                 "query":       {"type": "string",  "description": "Natural language search query"},
                 "max_results": {"type": "integer", "description": "Number of results to return, 1–10 (default 5)", "optional": True},
                 "provider":    {"type": "string",  "description": "Search provider: auto | tavily | brave | serpapi | duckduckgo (default: auto)", "optional": True},
+            },
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
+        )
+
+        # ══════════════════════════════════════════════════════════════════════
+        # WEB FETCH TOOL
+        # ══════════════════════════════════════════════════════════════════════
+        self.register_tool(
+            name="web_fetch",
+            description=(
+                "Fetch a URL and return its content as clean Markdown with a token "
+                "budget, so you can read a page without blowing your context window. "
+                "Distinct from web_search (which returns result lists). Supports caching "
+                "and domain allow-lists. Full reference in "
+                "backend/.agentium/skills/web_fetch/SKILL.md."
+            ),
+            function=web_fetch_tool.execute,
+            parameters={
+                "action":         {"type": "string",  "description": "fetch | help"},
+                "url":            {"type": "string",  "description": "URL to fetch"},
+                "max_tokens":     {"type": "integer", "description": "Truncate returned Markdown to ~this token budget (default 4000)", "optional": True},
+                "use_cache":      {"type": "boolean", "description": "Serve cached result if <5 min old (default true)", "optional": True},
+                "allowed_domains":{"type": "array",   "description": "If set, only these domains are permitted", "optional": True},
+            },
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
+        )
+
+        # ══════════════════════════════════════════════════════════════════════
+        # CODE EXECUTION TOOL
+        # ══════════════════════════════════════════════════════════════════════
+        self.register_tool(
+            name="code_execution",
+            description=(
+                "Execute code in an isolated Docker sandbox (brains vs hands). Raw data "
+                "never leaves the sandbox — you receive only a structured summary. Use for "
+                "computation, data transforms, or running snippets safely. Distinct from "
+                "execute_command (shell). Restricted to 0xxxx/1xxxx/2xxxx. Full reference "
+                "in backend/.agentium/skills/code_execution/SKILL.md."
+            ),
+            function=code_execution_tool.execute,
+            parameters={
+                "action":         {"type": "string", "description": "execute | help"},
+                "code":           {"type": "string", "description": "Source code to run (default language python)"},
+                "language":       {"type": "string", "description": "Language (default python)", "optional": True},
+                "dependencies":   {"type": "array",  "description": "pip packages to install in the sandbox", "optional": True},
+                "input_data":     {"type": "any",    "description": "Input data exposed to code as input_data", "optional": True},
+                "timeout_seconds":{"type": "integer","description": "Execution timeout (default 300)", "optional": True},
+                "network_access": {"type": "boolean","description": "Allow outbound network in sandbox (default false)", "optional": True},
+                "agent_id":       {"type": "string", "description": "Caller agentium id, used for tier authorization", "optional": True},
+            },
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx"],
+        )
+
+        # ══════════════════════════════════════════════════════════════════════
+        # TOOL SEARCH TOOL
+        # ══════════════════════════════════════════════════════════════════════
+        self.register_tool(
+            name="tool_search",
+            description=(
+                "Discover registered tools by describing what you need. Returns ranked "
+                "tool names + descriptions scoped to your tier, so you can find the right "
+                "tool without being handed the entire tool list. Use 'get' to fetch one "
+                "tool's full descriptor. Full reference in "
+                "backend/.agentium/skills/tool_search/SKILL.md."
+            ),
+            function=tool_search_tool.execute,
+            parameters={
+                "action":  {"type": "string", "description": "search | get | help"},
+                "query":   {"type": "string", "description": "Natural-language need / capability phrase (search action)"},
+                "name":    {"type": "string", "description": "Tool name to retrieve (get action)", "optional": True},
+                "limit":   {"type": "integer","description": "Max results (default 10)", "optional": True},
+                "tier":    {"type": "string", "description": "Tier whose tools to search; defaults to caller tier", "optional": True},
             },
             authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
