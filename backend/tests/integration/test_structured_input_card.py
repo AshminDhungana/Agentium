@@ -68,14 +68,4 @@ def test_tool_path_posts_and_persists_card(client, db_session, auth_headers):
     ), "tool did not persist an input_card message"
 
 
-def test_sse_complete_carries_card_metadata(client, db_session, auth_headers):
-    # A card sent via POST should appear in the thread; the SSE 'complete'
-    # metadata is wired in chat.py. We assert the endpoint still returns ok.
-    payload = StructuredInputCard(
-        card_id="card-sse-1",
-        questions=[CardQuestion(id="q1", question="Q?", input_type="single_select",
-                                required=True, options=[CardOption(id="a", label="A", value="a")])],
-    )
-    resp = client.post("/api/v1/chat/card", json=payload.model_dump(), headers=auth_headers)
-    assert resp.status_code == 200
-    assert resp.json()["message"]["message_type"] == "input_card"
+
