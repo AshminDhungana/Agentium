@@ -65,7 +65,6 @@ def test_direct_service_tool_persists_and_is_invocable(seeded_db):
         assert name in tool_registry.tools
 
         # (1b) Persisted at the storage layer (not just the in-memory registry)
-        from sqlalchemy import select
         row = seeded_db.execute(
             select(ToolStaging).where(ToolStaging.tool_name == name)
         ).scalar_one_or_none()
@@ -109,7 +108,6 @@ def test_http_propose_route_registers_and_exports_tool(client, seeded_db, head_a
         assert name in tool_registry.tools
 
         # (1b) Persisted at the storage layer (not just the in-memory registry)
-        from sqlalchemy import select
         row = seeded_db.execute(
             select(ToolStaging).where(ToolStaging.tool_name == name)
         ).scalar_one_or_none()
