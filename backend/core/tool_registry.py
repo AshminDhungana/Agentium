@@ -490,7 +490,12 @@ class ToolRegistry:
         file_tool = FileSystemTool()
         self.register_tool(
             name="read_file",
-            description="Read file contents from host filesystem",
+            description=(
+                "Read file contents from host filesystem. Whole-file mode returns "
+                "raw text (legacy). Precise mode: pass offset (1-based start line) "
+                "and/or limit (line count) to read a line range; in precise mode the "
+                "returned content is line-numbered and includes total_lines."
+            ),
             function=file_tool.read_file,
             parameters={
                 "filepath": {"type": "string",  "description": "Absolute file path"},
@@ -505,6 +510,25 @@ class ToolRegistry:
             parameters={
                 "filepath": {"type": "string", "description": "Absolute file path"},
                 "content":  {"type": "string", "description": "Content to write"},
+            },
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
+        )
+        self.register_tool(
+            name="replace_lines",
+            description=(
+                "Replace an inclusive 1-based line range [start_line, end_line] in a "
+                "file with new content. Deterministic (line-addressed) — fails loudly "
+                "if start_line/end_line are out of range or start_line > end_line. "
+                "Optional .bak backup. Use read_file with offset/limit first to see "
+                "line numbers."
+            ),
+            function=file_tool.replace_lines,
+            parameters={
+                "filepath":   {"type": "string",  "description": "Absolute file path"},
+                "start_line": {"type": "integer", "description": "1-based start line (inclusive)"},
+                "end_line":   {"type": "integer", "description": "1-based end line (inclusive)"},
+                "content":    {"type": "string",  "description": "Replacement text (may be multi-line)"},
+                "backup":     {"type": "boolean", "description": "Write a .bak copy first (default true)", "optional": True},
             },
             authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )

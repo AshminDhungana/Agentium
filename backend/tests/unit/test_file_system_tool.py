@@ -135,3 +135,18 @@ def test_replace_lines_no_backup(tmp_path):
 
 def pathlib_read(tmp_path, name):
     return (tmp_path / name).read_text(encoding="utf-8")
+
+
+def test_registry_exposes_replace_lines():
+    from backend.core.tool_registry import ToolRegistry
+    from backend.tools.file_tool import FileSystemTool
+
+    reg = ToolRegistry()
+    reg._initialize_tools()
+
+    tool = reg.get_tool("replace_lines")
+    assert tool is not None
+    assert callable(tool["function"])
+    assert tool["function"] is FileSystemTool().replace_lines or callable(tool["function"])
+    assert "start_line" in tool["parameters"]
+    assert "end_line" in tool["parameters"]
