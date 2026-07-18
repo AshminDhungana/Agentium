@@ -73,6 +73,18 @@ export interface WebSocketMessage {
     [key: string]: unknown;
 }
 
+/**
+ * Payload of the backend `workspace_ready` broadcast — emitted when a task's
+ * generated artifacts are copied out of the container into the host-visible
+ * workspace directory.
+ */
+export interface WorkspaceReadyEvent {
+    workspace_path: string;
+    agent_id?: string;
+    task_id?: string;
+    artifact_count?: number;
+}
+
 interface WebSocketState {
     // Public state
     /** Single source of truth for connection/genesis status. */
@@ -89,6 +101,13 @@ interface WebSocketState {
     lastMessage: WebSocketMessage | null;
     unreadCount: number;
     messageHistory: WebSocketMessage[];
+
+    /**
+     * Most recent task-workspace artifact event. Surfaced so the user can
+     * see where generated files landed on their host machine (spec: "the user
+     * must see the files created in his workspace").
+     */
+    lastWorkspace: WorkspaceReadyEvent | null;
     /** True while genesis is paused waiting for the user to name their nation. */
     genesisAwaitingName: boolean;
     /** Prompt text surfaced with the awaiting-name request. */
@@ -149,6 +168,11 @@ interface WebSocketState {
     markAsRead: () => void;
     addMessageToHistory: (message: WebSocketMessage) => void;
     clearError: () => void;
+    /**
+     * Record a `workspace_ready` event (task artifacts persisted to the host
+     * workspace) so the UI can surface the path to the user.
+     */
+    setWorkspaceReady: (event: WorkspaceReadyEvent) => void;
     /**
      * Call this after the user saves their first API key on the Models page.
      * It kicks the WebSocket out of the silent "no API key yet" state and
@@ -225,6 +249,7 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
     lastMessage: null,
     unreadCount: 0,
     messageHistory: [],
+    lastWorkspace: null,
     apiKeyAddedAt: null,
 
     genesisAwaitingName: false,
@@ -278,6 +303,8 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
     _incrementUnread: () => set(s => ({ unreadCount: s.unreadCount + 1 })),
     markAsRead: () => set({ unreadCount: 0 }),
     clearError: () => set({ error: null }),
+
+    setWorkspaceReady: (event) => set({ lastWorkspace: event }),
 
     notifyApiKeyAdded: () => {
         // Leave the silent "waiting_for_key" state and immediately try to connect.
@@ -640,6 +667,25 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
                     if (data.type === 'auth_required') {
                         logger.warn('[WebSocket] Received auth_required — resending auth');
                         ws.send(JSON.stringify({ type: 'auth', token }));
+                        return;
+                    }
+
+                    if (data.type === 'workspace_ready') {
+                        const path = String(data.workspace_path ?? '');
+                        get().setWorkspaceReady({
+                            workspace_path: path,
+                            agent_id: data.agent_id as string | undefined,
+                            task_id: data.task_id as string | undefined,
+                            artifact_count:
+                                typeof data.artifact_count === 'number' ? data.artifact_count : 0,
+                        });
+                        const count = typeof data.artifact_count === 'number' ? data.artifact_count : 0;
+                        const summary = count > 0
+                            ? `${count} artifact${count === 1 ? '' : 's'}`
+                            : 'artifacts';
+                        showToast.success(
+                            `✅ Task ${summary} saved to your workspace: ${path}`,
+                        );
                         return;
                     }
 
