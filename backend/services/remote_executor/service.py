@@ -12,12 +12,20 @@ import os
 import json
 import uuid
 import logging
+import subprocess
+import subprocess as sp
 from datetime import datetime
 from typing import Optional, Dict, Any, List
 
 from backend.services.remote_executor.sandbox import SandboxManager, SandboxConfig
 from backend.services.remote_executor.executor import ExecutionResult
 from backend.core.security.execution_guard import execution_guard
+from backend.tools._workspace import (
+    workspace_enabled as _ws_enabled,
+    ensure_agent_workspace,
+    host_visible_path,
+    _manifest,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -137,6 +145,15 @@ class RemoteExecutorService:
 
         # Step 4: Create sandbox and execute
         sandbox_id = None
+        host_dir = None
+        workspace_path = None
+        artifacts: list = []
+
+        # Enable host workspace persistence when allowed and we have a task id.
+        if _ws_enabled() and task_id:
+            host_dir = ensure_agent_workspace(agent_id, task_id)
+            config.workspace_enabled = True
+
         try:
             # Update status
             if self.db and record:
@@ -175,6 +192,20 @@ class RemoteExecutorService:
                 record.execution_time_ms = result.execution_time_ms
                 self.db.commit()
 
+            # Copy artifacts from the sandbox /workspace to the host-mounted dir.
+            if config.workspace_enabled and host_dir:
+                try:
+                    sp.run(
+                        ["docker", "cp", f"{sandbox_id}:/workspace/.", host_dir],
+                        check=False,
+                        capture_output=True,
+                        timeout=60,
+                    )
+                    artifacts = _manifest(host_dir)
+                    workspace_path = host_visible_path(host_dir)
+                except Exception as cp_err:  # pragma: no cover - best-effort copy
+                    logger.warning(f"workspace cp failed for {execution_id}: {cp_err}")
+
             # Cleanup sandbox
             await self.sandbox_manager.destroy_sandbox(sandbox_id, "execution_complete")
 
@@ -192,7 +223,9 @@ class RemoteExecutorService:
                 },
                 "started_at": start_time.isoformat(),
                 "completed_at": datetime.utcnow().isoformat(),
-                "execution_time_ms": result.execution_time_ms
+                "execution_time_ms": result.execution_time_ms,
+                "workspace_path": workspace_path,
+                "artifacts": artifacts,
             }
 
         except Exception as e:
@@ -225,7 +258,9 @@ class RemoteExecutorService:
                 "completed_at": datetime.utcnow().isoformat(),
                 "execution_time_ms": int(
                     (datetime.utcnow() - start_time).total_seconds() * 1000
-                )
+                ),
+                "workspace_path": workspace_path,
+                "artifacts": artifacts,
             }
 
     async def _execute_in_sandbox(
@@ -336,6 +371,7 @@ class RemoteExecutorService:
         """Build the Python script that runs inside the container."""
         return '''
 import sys
+import os
 import json
 import time
 import traceback
@@ -390,6 +426,13 @@ exec_globals = {'input_data': input_data, 'result': None}
 exec_locals = {}
 
 try:
+    # Route generated files into the writable /workspace so they can be copied
+    # to the host after execution. Tolerate sandboxes without the mount.
+    try:
+        os.chdir('/workspace')
+    except Exception:
+        pass
+
     with open('/tmp/code.py', 'r') as f:
         code = f.read()
 
