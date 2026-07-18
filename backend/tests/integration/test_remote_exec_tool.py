@@ -46,7 +46,10 @@ async def test_remote_exec_network_blocked_by_default():
     res = await execute(agent_id="30001", code=code, network_access=False)
     # default deny: must NOT reach the internet
     assert res["status"] == "completed"
-    assert "blocked" in str(res["summary"]["sample"]).lower() or "blocked" in str(res["summary"].get("stdout", "")).lower()
+    sample = str(res["summary"]["sample"])
+    stdout = str(res["summary"].get("stdout", ""))
+    assert "network_ok" not in sample and "network_ok" not in stdout
+    assert "blocked" in sample.lower() or "blocked" in stdout.lower()
 
 
 @pytest.mark.asyncio
@@ -63,7 +66,10 @@ async def test_remote_exec_network_allowed_optin():
     res = await execute(agent_id="30001", code=code, network_access=True)
     assert res["status"] == "completed"
     # with opt-in bridge, the public fetch succeeds
-    assert res["summary"]["output_schema"] == {"type": "int"} or "err" not in str(res["summary"].get("sample", ""))
+    sample = str(res["summary"].get("sample", ""))
+    assert "err" not in sample
+    # success sets result = r.status (an HTTP 200), yielding an int schema
+    assert res["summary"]["output_schema"] == {"type": "int"}
 
 
 @pytest.mark.asyncio
