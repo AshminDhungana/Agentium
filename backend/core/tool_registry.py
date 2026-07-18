@@ -28,7 +28,7 @@ from backend.tools.desktop_tool  import (
 )
 from backend.tools.mcp_agent_tools import add_mcp_server, vote_on_mcp_server
 from backend.tools.remote_exec_tool import execute as remote_exec_tool_execute
-from backend.tools.web_fetch_tool     import web_fetch_tool
+from backend.tools import web_fetch_tool
 from backend.tools.code_execution_tool import code_execution_tool
 from backend.tools.tool_search_tool    import tool_search_tool
 

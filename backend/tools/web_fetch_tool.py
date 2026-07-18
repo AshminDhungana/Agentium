@@ -30,11 +30,6 @@ def _estimate_tokens(text: str) -> int:
     return max(1, len(text) // 4)
 
 
-_extract = None  # set to _extract_markdown below; monkeypatchable at module level
-
-_client = None   # module-level httpx client (lazy); monkeypatchable at module level
-
-
 def _extract_markdown(html: str, url: str) -> str:
     try:
         import trafilatura  # type: ignore
@@ -49,10 +44,7 @@ def _extract_markdown(html: str, url: str) -> str:
     except Exception:
         pass
     # last-resort: strip tags
-    return re.sub(r"<[^>]+>", "", html)
-
-
-_extract = _extract_markdown  # module-level extractor; monkeypatchable in tests
+        return re.sub(r"<[^>]+>", "", html)
 
 
 def _extract_pdf(payload: bytes) -> str:
@@ -70,15 +62,16 @@ class WebFetchTool:
 
     def __init__(self) -> None:
         self._redis = None
+        self._client = None
+        self._extract = _extract_markdown
 
     @property
     def client(self):
-        global _client
-        if _client is None:
-            _client = httpx.AsyncClient(
+        if self._client is None:
+            self._client = httpx.AsyncClient(
                 timeout=_REQUEST_TIMEOUT, headers={"User-Agent": _USER_AGENT}
             )
-        return _client
+        return self._client
 
     def _cache_key(self, url: str, max_tokens: int) -> str:
         digest = hashlib.sha256(f"{url.strip().lower()}:{max_tokens}".encode()).hexdigest()[:16]
@@ -155,7 +148,7 @@ class WebFetchTool:
             if not markdown:
                 return {"status": "error", "error": "PDF extraction unavailable"}
         else:
-            markdown = (_extract or _extract_markdown)(resp.text, url)
+            markdown = self._extract(resp.text, url)
 
         title = ""
         m = re.search(r"<title[^>]*>(.*?)</title>", resp.text, re.IGNORECASE | re.DOTALL)
@@ -182,11 +175,12 @@ web_fetch_tool = WebFetchTool()
 
 
 async def execute(action: str, **kwargs) -> Dict[str, Any]:
-    """Module-level entry point — delegates to the singleton.
+    """Module-level entry point — delegates to the singleton instance.
 
-    The unit tests monkeypatch the module-level `_client` and `_extract`
-    attributes, which the singleton reads, so this shim keeps that wiring
-    intact while exposing a flat `execute`.
+    The unit tests monkeypatch the singleton's `_client` and `_extract`
+    instance attributes (via `backend.tools.web_fetch_tool`), which the
+    instance reads, so this shim keeps a flat `execute` while preserving that
+    wiring.
     """
     return await web_fetch_tool.execute(action, **kwargs)
 
