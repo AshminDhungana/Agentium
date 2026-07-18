@@ -7,6 +7,7 @@ import asyncio
 import os
 import time
 import json
+import uuid
 import httpx
 from typing import Optional, Dict, Any, AsyncGenerator, List, Callable, Tuple, Awaitable
 from abc import ABC, abstractmethod
@@ -24,6 +25,12 @@ except ImportError:
     settings = None  # type: ignore
 
 from backend.services.provider_rate_limiter import provider_rate_limiter
+from backend.core.tool_runner import (
+    run_tool_async,
+    ToolCallToken,
+    register_tool_run,
+    deregister_tool_run,
+)
 
 
 async def _record_provider_headers(config) -> None:
@@ -1361,6 +1368,38 @@ PROVIDERS = {
 }
 
 
+def build_tool_executor(
+    agent_id: str,
+    task_id: Optional[str],
+    db: Any,
+    cancel_event: asyncio.Event,
+    run_id: str,
+) -> Any:
+    """Build the per-turn tool executor used by the agentic loop.
+
+    Routes every call through run_tool_async so each tool gets its own
+    timeout (per-tool override or global default) and is cancellable via
+    ``cancel_event``. Returns a JSON string (the model's tool_result).
+    """
+    from backend.core.tool_registry import tool_registry
+
+    async def tool_executor(name: str, args: Dict[str, Any]) -> str:
+        result = await run_tool_async(
+            name,
+            args,
+            timeout=tool_registry.get_tool_timeout(name),
+            cancel_event=cancel_event,
+            called_by=agent_id,
+            task_id=task_id,
+            db=db,
+            use_service=True,
+            run_id=run_id,
+        )
+        return json.dumps(result)
+
+    return tool_executor
+
+
 class ModelService:
     """Service to manage model interactions with any provider."""
 
@@ -1517,27 +1556,12 @@ class ModelService:
             tools = caller_tools
 
         # ── Analytics-wrapped executor ─────────────────────────────────────────
-        # Routes every tool call through ToolCreationService.execute_tool() so
-        # ToolUsageLog rows, version tracking, and audit entries are all written
-        # exactly as they are for direct tool executions.
-        svc = ToolCreationService(db)
+        # Routes every tool call through run_tool_async() (Task 3/4) so each tool
+        # gets its own timeout (per-tool override or global default) and is
+        # cancellable via the run's cancel_event. ToolCreationService is invoked
+        # inside run_tool_async (use_service=True), so ToolUsageLog rows, version
+        # tracking, and audit entries are all written exactly as before.
         agent_id = getattr(agent, "agentium_id", "system")
-
-        async def tool_executor(name: str, args: Dict[str, Any]) -> str:
-            """Tool executor."""
-            # execute_tool is synchronous; run in thread pool to avoid blocking
-            # the event loop during heavy tool calls.
-            loop = asyncio.get_event_loop()
-            result = await loop.run_in_executor(
-                None,
-                lambda: svc.execute_tool(
-                    tool_name=name,
-                    called_by=agent_id,
-                    kwargs=args,
-                    task_id=task_id,
-                ),
-            )
-            return json.dumps(result)
 
         # ── Build system prompt ────────────────────────────────────────────────
         system_prompt = system_prompt_override
@@ -1571,7 +1595,16 @@ class ModelService:
 
         from backend.services.api_key_manager import api_key_manager
 
+        run_id = task_id or f"run_{uuid.uuid4().hex}"
+        run_event = cancel_event or asyncio.Event()
+        register_tool_run(
+            ToolCallToken(run_id=run_id, cancel_event=run_event, started_at=time.time())
+        )
         try:
+            tool_executor = build_tool_executor(
+                agent_id=agent_id, task_id=task_id, db=db,
+                cancel_event=run_event, run_id=run_id,
+            )
             result = await provider.generate_with_tools(
                 system_prompt=system_prompt,
                 messages=messages,
@@ -1580,7 +1613,7 @@ class ModelService:
                 max_iterations=max_tool_iterations,
                 agentium_id=agent_id,
                 on_delta=on_delta,
-                cancel_event=cancel_event,
+                cancel_event=run_event,
                 **({"tool_choice": caller_tool_choice} if caller_tool_choice else {}),
                 **kwargs,
             )
@@ -1593,6 +1626,8 @@ class ModelService:
             is_rate_limit = "rate limit" in str(e).lower() or "429" in str(e)
             api_key_manager.mark_key_failed(provider.config.id, error=str(e), is_rate_limit=is_rate_limit, db=db)
             raise
+        finally:
+            deregister_tool_run(run_id)
 
     @staticmethod
     async def test_connection(config: UserModelConfig) -> Dict[str, Any]:
