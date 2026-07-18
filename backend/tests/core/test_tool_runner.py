@@ -127,3 +127,27 @@ async def test_cancel_tool_run_sets_event():
     assert active_tool_runs["r1"].cancel_reason == "user stop"
     assert cancel_tool_run("missing") is False
     deregister_tool_run("r1")
+
+
+@pytest.mark.asyncio
+async def test_execute_tool_async_timeout_legacy_shape():
+    async def slow(**kwargs):
+        await asyncio.sleep(10)
+        return {"status": "success"}
+
+    tool_registry.register_tool("eta_slow", "desc", slow, {}, None, timeout=0.05)
+    out = await tool_registry.execute_tool_async("eta_slow")
+    assert out["status"] == "error"
+    assert "timed out" in out["error"].lower()
+
+
+@pytest.mark.asyncio
+async def test_execute_tool_async_success_legacy_shape():
+    def fast(**kwargs):
+        return {"status": "success", "data": 42}
+
+    tool_registry.register_tool("eta_fast", "desc", fast, {}, None)
+    out = await tool_registry.execute_tool_async("eta_fast")
+    assert out["status"] == "success"
+    assert out["data"] == 42
+    assert out["tool_name"] == "eta_fast"

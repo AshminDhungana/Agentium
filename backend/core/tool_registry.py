@@ -1876,19 +1876,20 @@ class ToolRegistry:
             return {"status": "error", "error": str(exc)}
 
     async def execute_tool_async(self, name: str, **kwargs) -> Dict[str, Any]:
-        tool = self.get_tool(name)
-        if not tool:
-            return {"status": "error", "error": f"Tool '{name}' not found"}
-        try:
-            fn = tool["function"]
-            if inspect.iscoroutinefunction(fn):
-                result = await fn(**kwargs)
-            else:
-                loop   = asyncio.get_event_loop()
-                result = await loop.run_in_executor(None, lambda: fn(**kwargs))
-            return result
-        except Exception as exc:
-            return {"status": "error", "error": str(exc)}
+        """Async execution with a timeout, preserving the legacy return shape.
+
+        Delegates to run_tool_async (no service layer, no DB needed here) so a
+        hung tool cannot block forever. The timeout resolves to the tool's
+        per-tool override (if any) or the global TOOL_TIMEOUT_DEFAULT. On
+        success returns the raw tool result; on failure/timeout returns
+        {"status": "error", "error": ...}.
+        """
+        from backend.core.tool_runner import run_tool_async
+
+        structured = await run_tool_async(name, kwargs, use_service=False)
+        if structured["status"] == "success":
+            return structured.get("result", structured)
+        return {"status": "error", "error": structured.get("error", "unknown error")}
 
     # ── Lifecycle helpers ──────────────────────────────────────────────────────
 
