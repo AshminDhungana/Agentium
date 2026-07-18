@@ -19,6 +19,26 @@ except ImportError:
     logger.warning("docker-py not installed – SandboxManager will operate in stub mode")
 
 
+# Egress allowlist for opt-in network. We deny private/loopback/link-local and
+# cloud IMDS ranges so a sandbox can never exfiltrate to internal infra or steal
+# instance credentials. Public hosts the agent needs are added per-call.
+_BLOCKED_NETS = (
+    "169.254.169.254/32",  # cloud IMDS
+    "169.254.0.0/16",      # link-local
+    "10.0.0.0/8",
+    "172.16.0.0/12",
+    "192.168.0.0/16",
+    "127.0.0.0/8",
+    "::1/128",
+    "fc00::/7",            # ULA
+)
+
+
+def blocked_egress_cidrs() -> tuple:
+    """CIDRs the sandbox egress must never reach (private/IMDS/loopback)."""
+    return _BLOCKED_NETS
+
+
 @dataclass
 class SandboxConfig:
     """Configuration for sandbox container."""
@@ -127,6 +147,13 @@ class SandboxManager:
             mem_limit=f"{config.memory_limit_mb}m",
             cpu_quota=int(config.cpu_limit * 100000),
             cpu_period=100000,
+            read_only=True,
+            tmpfs={
+                "/tmp": f"rw,size={config.max_disk_mb}m,mode=1777,noexec,nosuid,nodev"
+            },
+            # Drop all Linux capabilities for least privilege
+            cap_drop=["ALL"],
+            security_opt=["no-new-privileges"],
             labels={
                 "agentium.sandbox": "true",
                 "agentium.agent_id": agent_id,
