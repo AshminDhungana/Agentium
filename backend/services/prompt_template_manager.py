@@ -593,6 +593,12 @@ Generate the skill JSON now:"""
         "from the container."
     )
 
+    WORKSPACE_HINT = (
+        "\n\nFiles you generate should be written to your workspace at "
+        "/host_home/agentium-workspace/<your_agent_id>/ so the user can open them "
+        "on their machine. Use the get_workspace tool to discover your exact path."
+    )
+
     # ═══════════════════════════════════════════════════════════════════════
     # Core methods
     # ═══════════════════════════════════════════════════════════════════════
@@ -740,6 +746,7 @@ Generate the skill JSON now:"""
         # This is the single injection point; no per-provider template changes needed.
         system_prompt += self.DEEP_THINK_HINT
         system_prompt += self.HOST_ACCESS_HINT
+        system_prompt += self.WORKSPACE_HINT
 
         return (
             system_prompt,
