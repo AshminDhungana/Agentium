@@ -12,7 +12,6 @@ import os
 import json
 import uuid
 import logging
-import subprocess
 import subprocess as sp
 from datetime import datetime
 from typing import Optional, Dict, Any, List
@@ -150,9 +149,15 @@ class RemoteExecutorService:
         artifacts: list = []
 
         # Enable host workspace persistence when allowed and we have a task id.
+        # If the host dir cannot be created, degrade gracefully (no workspace,
+        # summary-only) instead of aborting the whole execution.
         if _ws_enabled() and task_id:
-            host_dir = ensure_agent_workspace(agent_id, task_id)
-            config.workspace_enabled = True
+            try:
+                host_dir = ensure_agent_workspace(agent_id, task_id)
+                config.workspace_enabled = True
+            except Exception as ws_err:
+                logger.warning(f"workspace dir creation failed for {execution_id}: {ws_err}")
+                host_dir = None
 
         try:
             # Update status
