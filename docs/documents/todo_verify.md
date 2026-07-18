@@ -1,61 +1,62 @@
 # Agentium — Verification & Improvement Backlog
 
-**File:** `docs/documents/todo_verify.md`
-**Purpose:** A backlog of candidate issues and improvements to verify, fix, or build, one item at a time. Each item is written to be **self-contained**: copy a single item into an AI coding agent (or a human dev) and it should have enough context — problem, relevant files, concrete task, and a definition of done — to start work without reading the rest of this document.
 
-Items are **not confirmed bugs unless marked "Confirmed."** Anything else is a lead to verify first, then fix.
+Here's a cleaned-up, structured todo based on that log dump:
 
-**Priority key:**
-- **[P0]** Breaks core functionality / data integrity / security — fix immediately
-- **[P1]** Likely real defect, user-reported, or blocks a claimed feature
-- **[P2]** Should verify; probable improvement or consistency gap
-- **[P3]** Nice-to-have polish / preventative maintenance
+## Bug: Voice settings fails to connect — voice bridge unreachable
 
+**Priority:** High
+**Area:** Chat page → Voice settings
 
-- [ ] - In chat page when clicking to voice setting error is thier, when clicked at voice setting error is voiceBridge.ts:155 WebSocket connection to 'ws://127.0.0.1:9999/?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbiIsInVzZXJfaWQiOiJkNjc5MDMwNS1kZWY4LTQ1ZWYtOTc2MS1jOGVlMjNiN2E1ZWUiLCJ0eXBlIjoidm9pY2UiLCJpYXQiOjE3ODQzNzUwODAsImV4cCI6MTc4NDM3Njg4MH0.6bUp_H5dS1dswjXSVLdxU7PaPa3N4bpVOJ6ZGAdCeE4' failed: 
-_openSocket @ voiceBridge.ts:155
-voiceBridge.ts:197 [voiceBridge] WebSocket error Event
-(anonymous) @ voiceBridge.ts:197
-voiceBridge.ts:210 [voiceBridge] Reconnecting in 1072ms (attempt 1/5)
-voiceBridge.ts:155 WebSocket connection to 'ws://127.0.0.1:9999/?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbiIsInVzZXJfaWQiOiJkNjc5MDMwNS1kZWY4LTQ1ZWYtOTc2MS1jOGVlMjNiN2E1ZWUiLCJ0eXBlIjoidm9pY2UiLCJpYXQiOjE3ODQzNzUwODAsImV4cCI6MTc4NDM3Njg4MH0.6bUp_H5dS1dswjXSVLdxU7PaPa3N4bpVOJ6ZGAdCeE4' failed: 
-_openSocket @ voiceBridge.ts:155
-voiceBridge.ts:197 [voiceBridge] WebSocket error Event
-(anonymous) @ voiceBridge.ts:197
-voiceBridge.ts:210 [voiceBridge] Reconnecting in 2094ms (attempt 2/5)
-4chat:1 Uncaught (in promise) Error: A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
-voiceBridge.ts:155 WebSocket connection to 'ws://127.0.0.1:9999/?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbiIsInVzZXJfaWQiOiJkNjc5MDMwNS1kZWY4LTQ1ZWYtOTc2MS1jOGVlMjNiN2E1ZWUiLCJ0eXBlIjoidm9pY2UiLCJpYXQiOjE3ODQzNzUwODAsImV4cCI6MTc4NDM3Njg4MH0.6bUp_H5dS1dswjXSVLdxU7PaPa3N4bpVOJ6ZGAdCeE4' failed: 
-_openSocket @ voiceBridge.ts:155
-voiceBridge.ts:197 [voiceBridge] WebSocket error Event
-(anonymous) @ voiceBridge.ts:197
-voiceBridge.ts:210 [voiceBridge] Reconnecting in 3336ms (attempt 3/5)
-api/v1/voice/config:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)
-api/v1/audio/speakers:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)
-voiceBridge.ts:155 WebSocket connection to 'ws://127.0.0.1:9999/?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbiIsInVzZXJfaWQiOiJkNjc5MDMwNS1kZWY4LTQ1ZWYtOTc2MS1jOGVlMjNiN2E1ZWUiLCJ0eXBlIjoidm9pY2UiLCJpYXQiOjE3ODQzNzUwODAsImV4cCI6MTc4NDM3Njg4MH0.6bUp_H5dS1dswjXSVLdxU7PaPa3N4bpVOJ6ZGAdCeE4' failed: 
-_openSocket @ voiceBridge.ts:155
-voiceBridge.ts:197 [voiceBridge] WebSocket error Event
-(anonymous) @ voiceBridge.ts:197
-voiceBridge.ts:210 [voiceBridge] Reconnecting in 8366ms (attempt 4/5)
-voiceBridge.ts:155 WebSocket connection to 'ws://127.0.0.1:9999/?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbiIsInVzZXJfaWQiOiJkNjc5MDMwNS1kZWY4LTQ1ZWYtOTc2MS1jOGVlMjNiN2E1ZWUiLCJ0eXBlIjoidm9pY2UiLCJpYXQiOjE3ODQzNzUwODAsImV4cCI6MTc4NDM3Njg4MH0.6bUp_H5dS1dswjXSVLdxU7PaPa3N4bpVOJ6ZGAdCeE4' failed: 
-_openSocket @ voiceBridge.ts:155
-(anonymous) @ voiceBridge.ts:212
-voiceBridge.ts:197 [voiceBridge] WebSocket error Event {isTrusted: true, type: 'error', target: WebSocket, currentTarget: WebSocket, eventPhase: 2, …}
-(anonymous) @ voiceBridge.ts:197
-voiceBridge.ts:210 [voiceBridge] Reconnecting in 14120ms (attempt 5/5)
-voiceBridge.ts:155 WebSocket connection to 'ws://127.0.0.1:9999/?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbiIsInVzZXJfaWQiOiJkNjc5MDMwNS1kZWY4LTQ1ZWYtOTc2MS1jOGVlMjNiN2E1ZWUiLCJ0eXBlIjoidm9pY2UiLCJpYXQiOjE3ODQzNzUwODAsImV4cCI6MTc4NDM3Njg4MH0.6bUp_H5dS1dswjXSVLdxU7PaPa3N4bpVOJ6ZGAdCeE4' failed: 
-_openSocket @ voiceBridge.ts:155
-(anonymous) @ voiceBridge.ts:212
-voiceBridge.ts:197 [voiceBridge] WebSocket error Event {isTrusted: true, type: 'error', target: WebSocket, currentTarget: WebSocket, eventPhase: 2, …}
-(anonymous) @ voiceBridge.ts:197
-voiceBridge.ts:214 [voiceBridge] Max reconnect attempts reached — going offline
+### Summary
+Opening Voice Settings on the chat page throws errors and never initializes. The frontend (`voiceBridge.ts`) tries to open a WebSocket to a local voice bridge service on `ws://127.0.0.1:9999`, but the connection fails every time, retries 5x with exponential backoff, then gives up ("going offline"). Two backend endpoints also return 500s during the same flow.
 
-and voice bridge is also not runnning, [voiceBridge] Reconnecting in 4314ms (attempt 3/5)
-voiceBridge.ts:155 WebSocket connection to 'ws://127.0.0.1:9999/?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbiIsInVzZXJfaWQiOiJkNjc5MDMwNS1kZWY4LTQ1ZWYtOTc2MS1jOGVlMjNiN2E1ZWUiLCJ0eXBlIjoidm9pY2UiLCJpYXQiOjE3ODQzNzUyNDEsImV4cCI6MTc4NDM3NzA0MX0.xDLoY7KtxPgDGakU7KT0B7v5bPuVpc5yN9GBv39n3pI' failed: 
-_openSocket @ voiceBridge.ts:155
-(anonymous) @ voiceBridge.ts:212
-voiceBridge.ts:197 [voiceBridge] WebSocket error Event {isTrusted: true, type: 'error', target: WebSocket, currentTarget: WebSocket, eventPhase: 2, …}
+### Steps to reproduce
+1. Open chat page.
+2. Click Voice Settings.
+3. Observe console errors and non-functional voice UI.
+
+### Observed errors
+- [ ] `voiceBridge.ts:155` — WebSocket connection to `ws://127.0.0.1:9999/?token=...` fails immediately on every attempt.
+- [ ] `voiceBridge.ts:197` — generic `WebSocket error Event` logged, no useful error detail surfaced.
+- [ ] `voiceBridge.ts:210/214` — reconnect logic runs 5 attempts (1s → 2s → 3.3s → 8.4s → 14s backoff), then permanently gives up with "Max reconnect attempts reached — going offline". No UI fallback or user-facing message when this happens.
+- [ ] `GET /api/v1/voice/config` → 500 Internal Server Error
+- [ ] `GET /api/v1/audio/speakers` → 500 Internal Server Error
+- [ ] `Uncaught (in promise) Error: A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received` — likely a separate issue (common with `chrome.runtime` message listeners left async without responding in time; may also just be a browser extension and unrelated to this app — needs confirming).
+
+### Root cause hypotheses (to verify)
+- [ ] Local voice bridge process (the service that should be listening on port `9999`) is not running/started as part of the dev environment or app boot sequence.
+- [ ] If it is supposed to be running, check whether it crashed on startup — correlate with the `/api/v1/voice/config` and `/api/v1/audio/speakers` 500s, since those look like they could be served by the same backend process that's down.
+- [ ] Confirm whether the JWT `token` used in the WS URL is valid/expected format, to rule out an auth rejection being misreported as a generic connection failure.
+
+### Action items
+- [ ] Check whether the voice bridge service is expected to auto-start with the app; if yes, find why it isn't (crash log, missing process, port conflict on 9999).
+- [ ] Fix root cause of `/api/v1/voice/config` 500 (check server logs for stack trace).
+- [ ] Fix root cause of `/api/v1/audio/speakers` 500 (check server logs for stack trace).
+- [ ] Add proper error surfacing in `voiceBridge.ts`: when max reconnect attempts are hit, show a user-facing message/toast in the Voice Settings UI instead of just logging to console and silently going offline.
+- [ ] Improve the WS error logging to include actual failure reason (e.g. connection refused vs auth failure vs timeout) instead of the generic `Event` object.
+- [ ] Investigate the "message channel closed" promise rejection separately — confirm source (extension vs app code) before deciding if it needs a fix.
+
+### Acceptance criteria
+- Voice Settings opens without console errors when the voice bridge service is running.
+- If the voice bridge service is down, the user sees a clear in-app message (not just console errors) explaining voice is unavailable. which is already implemented, the notification is shown in main layout near the username form the voice icon. 
+- `/api/v1/voice/config` and `/api/v1/audio/speakers` return 200 with expected payloads under normal conditions.
+
 
 [ ] -  How does the system opeartes, when user sends a message create a text file in my deskotp, how does the whole operations happens, is it, head creates lead agent, lead agent spwan a task agent and the task agent does the work. how does task agent do the work, does it creates the file directly in the desktop,  or does it create inside contanier and they copy it to the deskotp ? 
 
+- [ ] The streaming of message in the chatpage feels a little fast, and the blinking line is not looking good, we should change it to blinking _ insted. And when the thinking animation is displayed the ai icone should change to UserRoundSearch from User. 
+
+- [ ] During chatting the head gets disconnected quite often and gets 
+logs, 
+- [ ] Fix `generate_with_tools()` duplicate `tools` kwarg in `OpenAICompatibleProvider` (breaks all decision-engine LLM calls)
+- [ ] Fix asyncio event-loop mismatch in `ProviderRateLimiter` (task bound to wrong loop)
+- [ ] Run missing migration to add `agentium_id` to `speaker_profiles`
+- [ ] Fix anomaly-detection code path to set `agentium_id` when auto-creating `violation_reports` rows
+- [ ] Investigate backend hang causing 504s on `/tasks`, `/channels/metrics`, `/agents` (~12:16:58) — likely downstream of the two bugs above
+- [ ] Investigate repeated `admin` role auth failures (role doesn't exist — confirm source/legitimacy)
+- [ ] Check what's killing `agentium_test` connections via "administrator command"
+- [ ] Monitor WAL checkpoint distance spike (~7.4MB) around 12:05–12:12 for root cause
 
 ## 3. Core Architecture — Tools & Skills
 
