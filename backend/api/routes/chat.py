@@ -421,27 +421,9 @@ async def send_structured_card(
     current_user: Annotated[dict, Depends(get_current_active_user)],
 ):
     """Persist an agent-issued structured input card and broadcast it to the chat thread."""
-    msg = ChatMessageEntity(
-        id=str(uuid.uuid4()),
-        user_id=str(current_user.get("user_id", "")),
-        role="head_of_council",
-        content=card.title or "Please answer the following:",
-        message_type="input_card",
-        message_metadata={"card": card.model_dump()},
-        created_at=datetime.utcnow(),
-        is_deleted="N",
-    )
-    db.add(msg)
-    db.commit()
-    db.refresh(msg)
-    # External channels get the plain-text fallback instead of the inline card.
-    await ws_manager.broadcast({
-        "type": "message",
-        "role": "head_of_council",
-        "message": msg.to_dict(),
-        "external_text": render_external_text(card),
-    })
-    return {"status": "ok", "message": msg.to_dict()}
+    user_id = str(current_user.get("user_id", ""))
+    msg = ChatService.send_structured_card(card, db, user_id)
+    return {"status": "ok", "message": msg}
 
 
 class PersonaResponse(BaseModel):
@@ -573,7 +555,7 @@ async def _stream_response(
 
         message_id = str(uuid.uuid4())
 
-        yield f"data: {json.dumps({'type': 'complete', 'content': '', 'message_id': message_id, 'metadata': {'agent_id': agent_id, 'model': model_name, 'task_created': task_info['created'], 'task_id': task_info.get('task_id')}})}\n\n"
+        yield f"data: {json.dumps({'type': 'complete', 'content': '', 'message_id': message_id, 'metadata': {'agent_id': agent_id, 'model': model_name, 'task_created': task_info['created'], 'task_id': task_info.get('task_id'), 'card': (response.get('metadata') or {}).get('card') if isinstance(response.get('metadata'), dict) else None}})}\n\n"
 
         await ChatService.log_interaction(agent_id, message, full_text, config_id, db)
 

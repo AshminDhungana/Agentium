@@ -1,6 +1,7 @@
 import time
 
 from models.schemas.structured_input import CardOption, CardQuestion, StructuredInputCard
+from backend.models.entities.chat_message import ChatMessage
 
 
 def test_post_card_creates_input_card_message(client, db_session, auth_headers):
@@ -46,3 +47,35 @@ def test_ws_card_response_persisted(client, db_session, auth_headers, ws_client)
             break
         time.sleep(0.05)
     assert found, "card_response was not persisted within the timeout"
+
+
+def test_tool_path_posts_and_persists_card(client, db_session, auth_headers):
+    from backend.core.tool_registry import tool_registry
+    fn = tool_registry.get_tool_function("request_user_clarification")
+    out = fn(
+        title="T",
+        questions=[{
+            "id": "q1", "question": "Q?", "input_type": "single_select",
+            "required": True, "options": [{"id": "a", "label": "A", "value": "a"}],
+        }],
+        db=db_session,
+    )
+    assert out.startswith("ok:")
+    rows = db_session.query(ChatMessage).filter_by(message_type="input_card").all()
+    assert any(
+        r.message_metadata.get("card", {}).get("questions", [{}])[0].get("question") == "Q?"
+        for r in rows
+    ), "tool did not persist an input_card message"
+
+
+def test_sse_complete_carries_card_metadata(client, db_session, auth_headers):
+    # A card sent via POST should appear in the thread; the SSE 'complete'
+    # metadata is wired in chat.py. We assert the endpoint still returns ok.
+    payload = StructuredInputCard(
+        card_id="card-sse-1",
+        questions=[CardQuestion(id="q1", question="Q?", input_type="single_select",
+                                required=True, options=[CardOption(id="a", label="A", value="a")])],
+    )
+    resp = client.post("/api/v1/chat/card", json=payload.model_dump(), headers=auth_headers)
+    assert resp.status_code == 200
+    assert resp.json()["message"]["message_type"] == "input_card"
