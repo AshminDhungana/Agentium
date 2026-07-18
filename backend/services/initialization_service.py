@@ -1251,6 +1251,7 @@ def trigger_genesis_if_needed(db) -> bool:
     request without hitting a closed/invalid session.
     """
     import asyncio
+    from backend.core.redis import get_redis_client
 
     if InitializationService(db).is_system_initialized():
         logger.info("ℹ️  System already initialized — skipping genesis trigger")
@@ -1259,14 +1260,18 @@ def trigger_genesis_if_needed(db) -> bool:
     async def _run_genesis() -> None:
         """Run genesis."""
         from backend.models.database import get_db_context
-        from backend.core.redis import get_redis_client
         _redis = get_redis_client()
         try:
-            _redis.set(
+            await _redis.set(
                 "genesis:state",
                 json.dumps({"phase": "running", "started_at": datetime.utcnow().isoformat()}),
                 ex=3600,
             )
+            # Startup assertion: confirm the genesis state actually landed in
+            # Redis before we proceed with the (potentially long) genesis run.
+            persisted = await _redis.get("genesis:state")
+            if persisted is None:
+                raise RuntimeError("genesis:state failed to persist to Redis")
         except Exception as rexc:
             logger.warning(f"genesis:state redis write failed: {rexc}")
         try:
@@ -1279,7 +1284,7 @@ def trigger_genesis_if_needed(db) -> bool:
                     result.get("message"),
                 )
             try:
-                _redis.set("genesis:state", json.dumps({"phase": "complete"}), ex=3600)
+                await _redis.set("genesis:state", json.dumps({"phase": "complete"}), ex=3600)
             except Exception as rexc:
                 logger.warning(f"genesis:state redis write failed: {rexc}")
             # Note: this broadcast only reaches clients that are already
@@ -1306,7 +1311,7 @@ def trigger_genesis_if_needed(db) -> bool:
         except Exception as exc:
             logger.error("❌ Auto-genesis failed: %s", exc, exc_info=True)
             try:
-                _redis.set(
+                await _redis.set(
                     "genesis:state",
                     json.dumps({
                         "phase": "failed",
@@ -1327,14 +1332,6 @@ def trigger_genesis_if_needed(db) -> bool:
             except Exception as bexc:
                 logger.warning(f"genesis_failed broadcast failed: {bexc}")
 
-    try:
-        get_redis_client().set(
-            "genesis:state",
-            json.dumps({"phase": "running", "started_at": datetime.utcnow().isoformat()}),
-            ex=3600,
-        )
-    except Exception as rexc:
-        logger.warning(f"genesis:state redis write failed: {rexc}")
     asyncio.create_task(_run_genesis())
     logger.info("🚀 Genesis protocol triggered after API key configuration")
     return True
