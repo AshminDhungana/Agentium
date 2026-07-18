@@ -32,8 +32,10 @@ COPY --from=builder --chown=101:www-data /app/dist /usr/share/nginx/html
 # Copy nginx config
 COPY --from=builder --chown=101:www-data /app/nginx.conf /etc/nginx/conf.d/default.conf
 
-# Set worker processes to auto and pid path for non-root
-RUN sed -i 's/user  nginx;/user agentium-nginx;/g' /etc/nginx/nginx.conf && \
+# Set worker processes to auto and pid path for non-root.
+# The master process runs as non-root (USER 101), so nginx ignores any `user`
+# directive and logs a warning. Remove it entirely rather than substituting.
+RUN sed -i '/^user /d' /etc/nginx/nginx.conf && \
     sed -i '/^pid/d' /etc/nginx/nginx.conf && \
     echo 'pid /tmp/nginx.pid;' >> /etc/nginx/nginx.conf
 
