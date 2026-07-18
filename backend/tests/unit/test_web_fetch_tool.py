@@ -21,7 +21,7 @@ def test_fetch_success_truncates(monkeypatch):
     monkeypatch.setattr(web_fetch_tool, "_extract", lambda html, url: html)
 
     result = asyncio.get_event_loop().run_until_complete(
-        web_fetch_tool.execute("fetch", url="https://example.com", max_tokens=100)
+        web_fetch_tool.execute("fetch", url="https://example.com", max_tokens=100, use_cache=False)
     )
     assert result["status"] == "success"
     assert result["title"] == "Hi"
