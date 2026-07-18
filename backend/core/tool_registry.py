@@ -31,6 +31,7 @@ from backend.tools.remote_exec_tool import execute as remote_exec_tool_execute
 from backend.tools import web_fetch_tool
 from backend.tools.code_execution_tool import code_execution_tool
 from backend.tools.tool_search_tool    import tool_search_tool
+from backend.tools.clarification_tool import request_user_clarification as _clarification_tool
 
 
 class ToolRegistry:
@@ -1744,6 +1745,46 @@ class ToolRegistry:
                 },
             },
             authorized_tiers=["0xxxx"],
+        )
+
+        # ══════════════════════════════════════════════════════════
+        # USER CLARIFICATION — agent asks the Sovereign a question
+        # ══════════════════════════════════════════════════════════
+        self.register_tool(
+            name="request_user_clarification",
+            description=(
+                "Ask the Sovereign (the user) a structured clarifying question during "
+                "a chat turn — e.g. choose an option or type a free-text answer. Use "
+                "when you need the user's input or decision before proceeding. Posts an "
+                "interactive card to the chat; the user's answer is recorded and appears "
+                "in later chat history. Fire-and-forget: continue your turn after posting."
+            ),
+            function=_clarification_tool,
+            parameters={
+                "title": {
+                    "type": "string",
+                    "description": "Optional heading for the question card",
+                    "optional": True,
+                },
+                "questions": {
+                    "type": "array",
+                    "description": (
+                        "List of questions. Each item: "
+                        "{id: str, question: str, "
+                        "input_type: 'single_select'|'multi_select', required: bool, "
+                        "options: [{id: str, label: str, value: str}]}. "
+                        "Keep ids unique and stable across questions."
+                    ),
+                },
+                "expires_at": {
+                    "type": "string",
+                    "description": "ISO-8601 expiry (optional; defaults to 10 minutes)",
+                    "optional": True,
+                },
+            },
+            authorized_tiers=[
+                "0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx",
+            ],
         )
 
     # ── Registration ───────────────────────────────────────────────────────────

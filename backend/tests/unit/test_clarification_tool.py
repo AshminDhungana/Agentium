@@ -36,3 +36,26 @@ def test_send_structured_card_persists_and_broadcasts():
     broadcast_msg = ws.broadcast.call_args.args[0]
     assert broadcast_msg["type"] == "message"
     assert broadcast_msg["metadata"]["card"]["card_id"] == "card-unit-1"
+
+
+from backend.tools.clarification_tool import request_user_clarification
+
+
+def test_request_user_clarification_tool_happy_path():
+    card = {}
+    with patch("backend.tools.clarification_tool.ChatService") as CS, \
+         patch("backend.tools.clarification_tool._resolve_sovereign_user_id", return_value="u1"):
+        CS.send_structured_card.return_value = {"card_id": "card-x", "id": "m9"}
+        out = request_user_clarification(
+            title="T", questions=[{
+                "id": "q1", "question": "Q?", "input_type": "single_select",
+                "required": True, "options": [{"id": "a", "label": "A", "value": "a"}],
+            }], db=MagicMock(),
+        )
+    assert out.startswith("ok:"), out
+    assert "card-x" in out
+
+
+def test_request_user_clarification_tool_rejects_empty():
+    out = request_user_clarification(questions=[], db=MagicMock())
+    assert out.startswith("error:")
