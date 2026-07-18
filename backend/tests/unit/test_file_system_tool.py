@@ -24,6 +24,16 @@ def test_read_whole_file_legacy_shape(tmp_path):
     assert "\t" not in res["content"]
 
 
+def test_read_total_lines_no_trailing_newline(tmp_path):
+    tool = FileSystemTool()
+    path = _write(tmp_path, "f.txt", "a\nb\nc")
+    res = tool.read_file(path)
+    assert res["status"] == "success"
+    assert res["total_lines"] == 3
+    assert res["content"] == "a\nb\nc"
+    assert res["truncated"] is False
+
+
 def test_read_precise_slice_is_numbered(tmp_path):
     tool = FileSystemTool()
     text = "\n".join(f"line{n}" for n in range(1, 11)) + "\n"
@@ -36,6 +46,7 @@ def test_read_precise_slice_is_numbered(tmp_path):
     assert lines[0] == "     2\tline2"
     assert lines[1] == "     3\tline3"
     assert lines[2] == "     4\tline4"
+    assert res["truncated"] is True
 
 
 def test_read_offset_out_of_range(tmp_path):
