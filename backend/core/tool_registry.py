@@ -617,7 +617,7 @@ class ToolRegistry:
             parameters={
                 "agent_id": {"type": "string", "description": "Agentium ID of the calling agent", "optional": True},
             },
-            authorized_tiers=["0", "1", "2", "3"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
 
         # ── Shell Tool ─────────────────────────────────────────────────────────

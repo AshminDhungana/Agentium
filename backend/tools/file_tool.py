@@ -2,7 +2,7 @@ import os
 import shutil
 from typing import Dict, Any
 
-from backend.tools._workspace import resolve_in_workspace, ensure_agent_workspace, agent_workspace_path
+from backend.tools._workspace import resolve_in_workspace, ensure_agent_workspace
 
 # Binary file magic byte signatures — used to detect binary files before
 # attempting a UTF-8 decode which would silently corrupt or error on them.
