@@ -82,7 +82,8 @@ async def run_tool_async(
                     tool_name=name, called_by=called_by, kwargs=kwargs, task_id=task_id
                 ),
             )
-        fn = tool_registry.get_tool_function(name)
+        else:
+            fn = tool_registry.get_tool_function(name)
         if fn is None:
             return {"status": "error", "error": f"Tool '{name}' not found"}
         if inspect.iscoroutinefunction(fn):

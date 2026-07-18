@@ -17,7 +17,6 @@ async def test_register_tool_timeout_metadata():
     assert tool_registry.get_tool_timeout("timeout_meta_none") is None
 
 
-import json
 import time
 
 from backend.core.tool_runner import (
@@ -62,7 +61,6 @@ async def test_run_tool_async_success_shape():
 @pytest.mark.asyncio
 async def test_run_tool_async_external_cancel():
     started = asyncio.Event()
-    done = asyncio.Event()
 
     async def slow(**kwargs):
         started.set()
