@@ -143,9 +143,11 @@ def test_direct_service_tool_persists_and_is_invocable(seeded_db):
         ant = tool_registry.to_anthropic_tools("0xxxx")
         assert name in [t["name"] for t in ant]
 
-        # 4) Invocable by an authorized agent
+        # 4) Invocable by an authorized agent (ToolFactory wraps the return
+        #    value in a {"status": "success", "result": ...} envelope — see
+        #    backend/services/tool_factory.py:121)
         fn = tool_registry.get_tool_function(name)
-        assert fn() == {"echo": "ok", "n": 42}
+        assert fn() == {"status": "success", "result": {"echo": "ok", "n": 42}}
     finally:
         tool_registry.deregister_tool(name)
 ```
@@ -206,7 +208,7 @@ def test_http_propose_route_registers_and_exports_tool(client, seeded_db, head_a
         assert name in [t["name"] for t in ant]
 
         fn = tool_registry.get_tool_function(name)
-        assert fn() == {"echo": "ok", "n": 42}
+        assert fn() == {"status": "success", "result": {"echo": "ok", "n": 42}}
     finally:
         tool_registry.deregister_tool(name)
 ```
