@@ -67,3 +67,21 @@ def test_card_to_speech_text_contains_question():
     assert "Production" in text
     assert "Staging" in text
     assert "Development" in text
+
+
+def test_token_matching_avoids_substring_false_positives():
+    # Whole-word (token) matching must not let "no" match inside "none"/"now"
+    # nor "yes" inside "yesterday".
+    card = _sample_card()
+    ans = bridge._build_card_answer(card, "I will do it now")
+    q2 = ans["answers"][1]
+    assert q2["selected_option_ids"] == []
+    assert q2["other_text"] == "I will do it now"
+
+    ans2 = bridge._build_card_answer(card, "we discussed it yesterday")
+    assert ans2["answers"][1]["selected_option_ids"] == []
+    assert ans2["answers"][1]["other_text"] == "we discussed it yesterday"
+
+    # A real "no"/"yes" token must still match.
+    assert bridge._build_card_answer(card, "no")["answers"][1]["selected_option_ids"] == ["n"]
+    assert bridge._build_card_answer(card, "yes")["answers"][1]["selected_option_ids"] == ["y"]

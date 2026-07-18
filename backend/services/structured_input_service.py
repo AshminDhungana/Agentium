@@ -50,6 +50,9 @@ def parse_card_answer(text: str, card: StructuredInputCard) -> StructuredInputAn
                 if token == letter or token == opt.value.lower() or token == opt.label.lower():
                     selected.append(opt.id)
                     matched = True
+            # A single_select question may only accept ONE answer: keep the first match.
+            if q.input_type == "single_select" and len(selected) > 1:
+                selected = selected[:1]
             if not matched:
                 other = raw
         answers.append(CardAnswerQuestion(

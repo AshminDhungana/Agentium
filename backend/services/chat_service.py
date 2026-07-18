@@ -98,7 +98,12 @@ class ChatService:
         try:
             if ws_manager is None:
                 from backend.api.routes.websocket import manager as ws_manager
-            loop = asyncio.get_event_loop()
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                # send_structured_card may be invoked from synchronous contexts
+                # (e.g. unit tests or non-async callers); fall back gracefully.
+                loop = asyncio.get_event_loop()
             loop.create_task(ws_manager.broadcast({
                 "type": "message",
                 "role": "head_of_council",

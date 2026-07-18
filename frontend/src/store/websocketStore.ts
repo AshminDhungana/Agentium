@@ -678,8 +678,13 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
                             get()._incrementUnread();
                             const existingToastId = get()._activeToastId;
                             if (existingToastId) showToast.dismiss(existingToastId);
-                            const toastId = showToast.success('New message from Head of Council');
-                            set({ _activeToastId: toastId });
+                            // The global card hook shows a distinct, actionable
+                            // question toast for cards; don't also fire the generic
+                            // "New message" toast on top of it.
+                            if (!data.metadata || !data.metadata.card) {
+                                const toastId = showToast.success('New message from Head of Council');
+                                set({ _activeToastId: toastId });
+                            }
                         }
                     }
                 } catch (e) {

@@ -33,3 +33,35 @@ def test_parse_card_answer_numbered():
     by_q = {a.question_id: a for a in ans.answers}
     assert by_q["q1"].selected_option_ids == ["a"]
     assert by_q["q2"].selected_option_ids == ["l"]
+
+
+def test_single_select_clamps_to_one_option():
+    # Two options share a value so a single answer line matches both; a
+    # single_select question must keep only the first match.
+    card = StructuredInputCard(
+        card_id="c1",
+        questions=[
+            CardQuestion(id="q1", question="Color?", input_type="single_select", required=True,
+                         options=[CardOption(id="a", label="Red", value="red"),
+                                  CardOption(id="b", label="Crimson", value="red")]),
+        ],
+    )
+    ans = parse_card_answer("1red", card)
+    by_q = {a.question_id: a for a in ans.answers}
+    assert by_q["q1"].selected_option_ids == ["a"]
+
+
+def test_unrelated_message_yields_no_selected_options():
+    # A normal message with no "<n><letter>" line must not be parsed as a
+    # card answer — the channel layer's regex guard prevents reaching here,
+    # and parse_card_answer itself attaches no options to such text.
+    card = StructuredInputCard(
+        card_id="c1",
+        questions=[
+            CardQuestion(id="q1", question="Color?", input_type="single_select", required=False,
+                         options=[CardOption(id="a", label="Red", value="red")]),
+        ],
+    )
+    ans = parse_card_answer("thanks, sounds good", card)
+    by_q = {a.question_id: a for a in ans.answers}
+    assert by_q["q1"].selected_option_ids == []

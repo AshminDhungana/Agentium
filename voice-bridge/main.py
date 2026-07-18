@@ -695,15 +695,20 @@ def _card_to_speech_text(card: dict) -> str:
 
 
 def _build_card_answer(card: dict, spoken: str) -> dict:
-    """Map a spoken reply onto the card's answers structure."""
-    spoken_lower = (spoken or "").lower()
+    """Map a spoken reply onto the card's answers structure.
+
+    Uses TOKEN (whole-word) matching rather than substring matching so that
+    words like "no" don't accidentally match inside "now"/"none" and "yes"
+    doesn't match inside "yesterday".
+    """
+    spoken_tokens = set((spoken or "").lower().split())
     answers = []
     for q in card.get("questions", []):
         selected = []
         for opt in q.get("options", []):
             label = (opt.get("label") or "").strip().lower()
             value = (opt.get("value") or "").strip().lower()
-            if (label and label in spoken_lower) or (value and value in spoken_lower):
+            if (label and label in spoken_tokens) or (value and value in spoken_tokens):
                 selected.append(opt.get("id"))
         answers.append({
             "question_id": q.get("id"),
@@ -717,7 +722,7 @@ def _build_card_answer(card: dict, spoken: str) -> dict:
     }
 
 
-def _post_card_response(answer: dict) -> None:
+def _post_card_response(answer: dict) -> bool:
     """POST a card answer back to the backend as a card_response frame."""
     payload = json.dumps({"message": "", "card_response": answer}).encode()
     try:

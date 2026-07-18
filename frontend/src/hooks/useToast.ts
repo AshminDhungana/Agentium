@@ -22,25 +22,35 @@ const TOAST_STYLE = {
     boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
 } as const;
 
-const success = (message: string) =>
+/** Extra options forwarded to react-hot-toast (e.g. duration / onClick). */
+export type ToastOptions = {
+    duration?: number;
+    onClick?: () => void;
+    [key: string]: unknown;
+};
+
+const success = (message: string, options?: ToastOptions) =>
     toast.success(message, {
         duration: 3000,
         style: TOAST_STYLE,
         iconTheme: { primary: '#22c55e', secondary: '#fff' },
+        ...options,
     });
 
-const error = (message: string) =>
+const error = (message: string, options?: ToastOptions) =>
     toast.error(message, {
         duration: 5000,
         style: TOAST_STYLE,
         iconTheme: { primary: '#ef4444', secondary: '#fff' },
+        ...options,
     });
 
-const info = (message: string) =>
+const info = (message: string, options?: ToastOptions) =>
     toast(message, {
         duration: 4000,
         icon: 'ℹ️',
         style: TOAST_STYLE,
+        ...options,
     });
 
 const warning = (message: string) =>

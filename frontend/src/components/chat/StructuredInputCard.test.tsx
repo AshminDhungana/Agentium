@@ -101,3 +101,23 @@ it('grants a grace window when the card would otherwise be already expired', () 
   expect(screen.getByText(/Confirm/)).toBeTruthy();
   expect(screen.queryByText(/expired/)).toBeNull();
 });
+
+test('confirmed card is never flipped to expired by a late timer', () => {
+  vi.useFakeTimers();
+  try {
+    const past = new Date(Date.now() - 1000).toISOString();
+    const onSubmit = vi.fn(() => true);
+    render(<StructuredInputCard card={{ ...card, expires_at: past }} onSubmit={onSubmit} />);
+    fireEvent.click(screen.getByLabelText('Tokyo'));
+    const btn = screen.getByRole('button', { name: /confirm/i }) as HTMLButtonElement;
+    fireEvent.click(btn);
+    // Card is now confirmed (summary showing the answers).
+    expect(screen.getByText('Your answers')).toBeInTheDocument();
+    // Even after advancing far past the grace window, it stays confirmed.
+    act(() => { vi.advanceTimersByTime(120_000 + 10); });
+    expect(screen.queryByText(/expired/i)).not.toBeInTheDocument();
+    expect(screen.getByText('Your answers')).toBeInTheDocument();
+  } finally {
+    vi.useRealTimers();
+  }
+});

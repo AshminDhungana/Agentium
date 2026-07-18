@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useWebSocketStore } from '@/store/websocketStore';
 import { useChatStore } from '@/store/chatStore';
 import { showToast } from '@/hooks/useToast';
@@ -12,6 +13,7 @@ import type { MessageMetadata } from '@/store/chatStore';
  * never silently missed.
  */
 export function useGlobalChatCards() {
+  const navigate = useNavigate();
   useEffect(() => {
     const unsub = useWebSocketStore.subscribe((state, prev) => {
       const msg = state.lastMessage;
@@ -25,14 +27,12 @@ export function useGlobalChatCards() {
       useChatStore.getState().registerCard(card.card_id, true);
 
       if (window.location.pathname !== '/chat') {
-        // NOTE: the project's `showToast.info` wrapper only accepts a single
-        // `message` string — it does NOT support `duration` or `onClick` options,
-        // and the installed react-hot-toast version has no `onClick` on its toast
-        // options either. So we fall back to a distinct INFO toast whose message
-        // itself is the actionable hint. The card is already registered globally
-        // by the call above, so when the Sovereign opens /chat the question is
-        // waiting — the toast just needs to be noticeable and self-explanatory.
-        showToast.info('Head of Council asked you a question — open the Chat tab to answer');
+        // A distinct, actionable INFO toast. Clicking it jumps straight to the
+        // chat page where the question is already registered and waiting.
+        showToast.info('Head of Council asked you a question — open the Chat tab to answer', {
+          duration: 8000,
+          onClick: () => navigate('/chat'),
+        });
       }
     });
     return unsub;

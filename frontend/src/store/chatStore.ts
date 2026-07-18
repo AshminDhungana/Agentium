@@ -113,10 +113,17 @@ export const useChatStore = create<ChatState>()(
                 cardStatus: { ...s.cardStatus, [cardId]: 'confirmed' },
                 activeCardId: s.activeCardId === cardId ? null : s.activeCardId,
             })),
-            expireCard: (cardId) => set((s) => ({
-                cardStatus: { ...s.cardStatus, [cardId]: 'expired' },
-                activeCardId: s.activeCardId === cardId ? null : s.activeCardId,
-            })),
+            expireCard: (cardId) => set((s) => {
+                // Defense-in-depth: never flip an already answered/dismissed card
+                // back to expired even if a stale timer fires after confirmation.
+                if (s.cardStatus[cardId] === 'confirmed' || s.cardStatus[cardId] === 'dismissed') {
+                    return s;
+                }
+                return {
+                    cardStatus: { ...s.cardStatus, [cardId]: 'expired' },
+                    activeCardId: s.activeCardId === cardId ? null : s.activeCardId,
+                };
+            }),
             dismissCard: (cardId) => set((s) => ({
                 cardStatus: { ...s.cardStatus, [cardId]: 'dismissed' },
                 activeCardId: s.activeCardId === cardId ? null : s.activeCardId,

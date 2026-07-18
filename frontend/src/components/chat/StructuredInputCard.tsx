@@ -30,6 +30,9 @@ export function StructuredInputCard({ card, onSubmit }: { card: StructuredInputC
   // expiration → expired state (with a first-view grace so off-page cards
   // never expire before the user has had a chance to see them)
   useEffect(() => {
+    // Once a card is answered or dismissed there is nothing to expire — bail
+    // out so a late timer can never flip it back to the expired state.
+    if (status === 'confirmed' || status === 'dismissed') return;
     if (!card.expires_at) return;
     const original = new Date(card.expires_at).getTime();
     const floor = Date.now() + GRACE_MS;
@@ -38,7 +41,7 @@ export function StructuredInputCard({ card, onSubmit }: { card: StructuredInputC
     if (ms <= 0) { expireCard(card.card_id); return; }
     const t = setTimeout(() => expireCard(card.card_id), ms);
     return () => clearTimeout(t);
-  }, [card.expires_at, card.card_id, expireCard]);
+  }, [card.expires_at, card.card_id, expireCard, status]);
 
   if (status === 'confirmed' || status === 'dismissed') {
     return <CardSummary card={card} values={values} dismissed={status === 'dismissed'} />;

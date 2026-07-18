@@ -36,6 +36,7 @@ from enum import Enum
 from collections import defaultdict
 import threading
 import logging
+import re
 logger = logging.getLogger(__name__)
 
 from sqlalchemy.orm import Session
@@ -1168,21 +1169,54 @@ class ChannelManager:
                       .first()
                 )
                 if pending and (pending.message_metadata or {}).get("card"):
-                    try:
-                        card = StructuredInputCard(**(pending.message_metadata["card"]))
-                        answer = parse_card_answer(content, card)
-                        # Attach the parsed answer to the sovereign message that was
-                        # already persisted above (mirrors the WebSocket card_response
-                        # path which merges extra_metadata into message_metadata),
-                        # instead of spawning a second process_message run.
-                        unified_msg.message_metadata = {
-                            **(unified_msg.message_metadata or {}),
-                            "card_response": answer.model_dump(),
-                        }
-                        db.add(unified_msg)
-                        db.commit()
-                    except Exception as _ce:  # noqa: BLE001
-                        logger.warning("Channel card answer parse failed: %s", _ce)
+                    card_meta = pending.message_metadata["card"]
+                    card_id = card_meta.get("card_id")
+                    content_text = content or ""
+
+                    # Guard 1: skip expired cards (compare ISO-8601 timestamps).
+                    expires_at = card_meta.get("expires_at")
+                    if expires_at and isinstance(expires_at, str) and expires_at < datetime.utcnow().isoformat():
+                        pass
+                    # Guard 2: skip cards that were already answered by the sovereign.
+                    elif card_id:
+                        already_answered = False
+                        recent = (
+                            db.query(ChatMessage)
+                              .filter(
+                                  ChatMessage.user_id == str(user_id),
+                                  ChatMessage.message_type == "sovereign",
+                                  ChatMessage.is_deleted == "N",
+                              )
+                              .order_by(ChatMessage.created_at.desc())
+                              .limit(50)
+                              .all()
+                        )
+                        for m in recent:
+                            cr = (m.message_metadata or {}).get("card_response")
+                            if cr and cr.get("card_id") == card_id:
+                                already_answered = True
+                                break
+                        if already_answered:
+                            pass
+                    # Guard 3: only treat text that actually looks like a card answer.
+                    elif not re.search(r'^\s*\d+\s*[a-zA-Z]', content_text):
+                        pass
+                    else:
+                        try:
+                            card = StructuredInputCard(**card_meta)
+                            answer = parse_card_answer(content_text, card)
+                            # Attach the parsed answer to the sovereign message that was
+                            # already persisted above (mirrors the WebSocket card_response
+                            # path which merges extra_metadata into message_metadata),
+                            # instead of spawning a second process_message run.
+                            unified_msg.message_metadata = {
+                                **(unified_msg.message_metadata or {}),
+                                "card_response": answer.model_dump(),
+                            }
+                            db.add(unified_msg)
+                            db.commit()
+                        except Exception as _ce:  # noqa: BLE001
+                            logger.warning("Channel card answer parse failed: %s", _ce)
 
             if has_unified_msg:
                 # Broadcast the new message to web clients
