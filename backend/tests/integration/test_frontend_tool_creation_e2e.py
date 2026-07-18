@@ -27,3 +27,53 @@ def head_auth_headers():
         "agentium_id": "00001",
     })
     return {"Authorization": f"Bearer {token}"}
+
+
+from uuid import uuid4
+
+from backend.core.tool_registry import tool_registry
+from backend.models.schemas.tool_creation import ToolCreationRequest
+from backend.services.tool_creation_service import ToolCreationService
+
+
+def _make_request(unique_name: str) -> ToolCreationRequest:
+    return ToolCreationRequest(
+        tool_name=unique_name,
+        description="E2E probe tool",
+        parameters=[],
+        code_template="result = {'echo': 'ok', 'n': 42}",
+        test_cases=[],
+        authorized_tiers=["0xxxx", "1xxxx"],
+        created_by_agentium_id="00001",
+        rationale="e2e verification",
+    )
+
+
+@pytest.mark.integration
+def test_direct_service_tool_persists_and_is_invocable(seeded_db):
+    name = f"e2e_probe_{uuid4().hex[:8]}"
+    service = ToolCreationService(seeded_db)
+    res = service.propose_tool(_make_request(name))
+    try:
+        assert res.get("proposed") is True, res
+        assert res.get("status") == "activated", res
+
+        # 1) Persisted in the live registry
+        assert name in tool_registry.tools
+
+        # 2) Exported to OpenAI schema
+        oai = tool_registry.to_openai_tools("0xxxx")
+        oai_names = [t["function"]["name"] for t in oai]
+        assert name in oai_names
+        spec = next(t for t in oai if t["function"]["name"] == name)
+        assert spec["function"]["description"] == "E2E probe tool"
+
+        # 3) Exported to Anthropic schema
+        ant = tool_registry.to_anthropic_tools("0xxxx")
+        assert name in [t["name"] for t in ant]
+
+        # 4) Invocable by an authorized agent
+        fn = tool_registry.get_tool_function(name)
+        assert fn() == {"echo": "ok", "n": 42}
+    finally:
+        tool_registry.deregister_tool(name)
