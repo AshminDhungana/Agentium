@@ -4,7 +4,7 @@ from backend.scripts.seed_skills import parse_skill_file
 
 
 def test_three_skills_parse():
-    base = Path("backend/.agentium/skills")
+    base = Path(__file__).resolve().parents[2] / ".agentium" / "skills"
     for name in ["web_fetch", "code_execution", "tool_search"]:
         p = base / name / "SKILL.md"
         assert p.exists(), f"missing {p}"
