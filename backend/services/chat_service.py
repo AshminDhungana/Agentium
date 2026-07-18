@@ -23,6 +23,12 @@ from backend.core.llm_client import LLMClient
 from backend.models.entities.user_config import ConnectionStatus
 from backend.models.entities.chat_message import ChatMessage as ChatMsg
 
+import uuid
+from backend.models.entities.chat_message import ChatMessage as ChatMessageEntity
+from backend.services.structured_input_service import render_external_text
+from backend.models.schemas.structured_input import StructuredInputCard as _SIC
+
+ws_manager = None
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +73,42 @@ class ChatService:
             if mapped and r.content and r.content.strip():
                 history.append({"role": mapped, "content": r.content})
         return history
+
+    @staticmethod
+    def send_structured_card(card: "_SIC", db: Session, user_id: str) -> dict:
+        """Persist an agent-issued structured input card and broadcast it.
+
+        Fire-and-forget: the WS broadcast is scheduled on the running loop so the
+        caller (tool or REST endpoint) is not blocked on socket I/O.
+        """
+        global ws_manager
+        if ws_manager is None:
+            from backend.api.routes.websocket import manager as ws_manager
+        msg = ChatMessageEntity(
+            id=str(uuid.uuid4()),
+            user_id=str(user_id),
+            role="head_of_council",
+            content=card.title or "Please answer the following:",
+            message_type="input_card",
+            message_metadata={"card": card.model_dump()},
+            created_at=datetime.utcnow(),
+            is_deleted="N",
+        )
+        db.add(msg)
+        db.commit()
+        db.refresh(msg)
+        try:
+            loop = asyncio.get_event_loop()
+            loop.create_task(ws_manager.broadcast({
+                "type": "message",
+                "role": "head_of_council",
+                "message": msg.to_dict(),
+                "metadata": {"card": card.model_dump()},
+                "external_text": render_external_text(card),
+            }))
+        except Exception:
+            logger.warning("Card broadcast scheduling failed", exc_info=True)
+        return msg.to_dict()
 
     @staticmethod
     async def process_message(head: HeadOfCouncil, message: str, db: Session, extra_metadata: Optional[dict] = None, on_delta: Optional[Callable[[str], Awaitable[None]]] = None, cancel_event: Optional[asyncio.Event] = None):
