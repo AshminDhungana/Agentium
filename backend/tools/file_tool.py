@@ -2,6 +2,8 @@ import os
 import shutil
 from typing import Dict, Any
 
+from backend.tools._workspace import resolve_in_workspace, ensure_agent_workspace, agent_workspace_path
+
 # Binary file magic byte signatures — used to detect binary files before
 # attempting a UTF-8 decode which would silently corrupt or error on them.
 _BINARY_SIGNATURES: tuple[bytes, ...] = (
@@ -52,6 +54,7 @@ class FileSystemTool:
         offset: int = 1,
         limit: int | None = None,
         char_limit: int = 1000,
+        agent_id: str = "30001",
     ) -> Dict[str, Any]:
         """
         Read text file contents.
@@ -75,6 +78,7 @@ class FileSystemTool:
             limit:      Number of lines to return in precise mode (None = whole file).
             char_limit: Legacy whole-file char cap = limit * 100 characters.
         """
+        filepath = resolve_in_workspace(filepath, agent_id)
         try:
             if _is_binary_file(filepath):
                 return {
@@ -149,6 +153,7 @@ class FileSystemTool:
         end_line: int,
         content: str,
         backup: bool = True,
+        agent_id: str = "30001",
     ) -> Dict[str, Any]:
         """
         Replace an inclusive 1-based line range [start_line, end_line] with
@@ -167,6 +172,7 @@ class FileSystemTool:
             content:    Replacement text (may be multi-line).
             backup:     If True, save a .bak copy before writing.
         """
+        filepath = resolve_in_workspace(filepath, agent_id)
         try:
             if _is_binary_file(filepath):
                 return {
@@ -240,7 +246,8 @@ class FileSystemTool:
         except Exception as e:
             return {"status": "error", "path": filepath, "error": str(e)}
 
-    def write_file(self, filepath: str, content: str, backup: bool = True) -> Dict[str, Any]:
+    def write_file(self, filepath: str, content: str, backup: bool = True,
+                   agent_id: str = "30001") -> Dict[str, Any]:
         """
         Write text content to a file with optional backup.
 
@@ -249,10 +256,13 @@ class FileSystemTool:
             content:  Text content to write.
             backup:   If True and file already exists, saves a .bak copy first.
         """
+        filepath = resolve_in_workspace(filepath, agent_id)
         try:
+            parent = os.path.dirname(filepath)
+            if parent:
+                os.makedirs(parent, exist_ok=True)
             if backup and os.path.exists(filepath):
                 shutil.copy2(filepath, f"{filepath}.bak")
-
             with open(filepath, 'w', encoding='utf-8') as f:
                 f.write(content)
 
@@ -264,13 +274,14 @@ class FileSystemTool:
         except Exception as e:
             return {"status": "error", "path": filepath, "error": str(e)}
 
-    def list_directory(self, path: str) -> Dict[str, Any]:
+    def list_directory(self, path: str, agent_id: str = "30001") -> Dict[str, Any]:
         """
         List directory contents with file metadata.
 
         Args:
             path: Directory path to list.
         """
+        path = resolve_in_workspace(path, agent_id)
         try:
             entries = []
             for item in os.listdir(path):
@@ -293,3 +304,8 @@ class FileSystemTool:
             return {"status": "success", "path": path, "entries": entries}
         except Exception as e:
             return {"status": "error", "path": path, "error": str(e)}
+
+    def get_workspace(self, agent_id: str = "30001") -> Dict[str, Any]:
+        """Return this agent's host-visible workspace directory."""
+        path = ensure_agent_workspace(agent_id)
+        return {"status": "success", "agent_id": agent_id, "path": path}
