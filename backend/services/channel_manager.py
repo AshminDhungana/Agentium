@@ -1161,7 +1161,6 @@ class ChannelManager:
             if user_id:
                 from backend.services.structured_input_service import parse_card_answer
                 from backend.models.schemas.structured_input import StructuredInputCard
-                from backend.services.chat_service import ChatService
                 pending = (
                     db.query(ChatMessage)
                       .filter_by(user_id=str(user_id), message_type="input_card", is_deleted="N")
@@ -1172,13 +1171,16 @@ class ChannelManager:
                     try:
                         card = StructuredInputCard(**(pending.message_metadata["card"]))
                         answer = parse_card_answer(content, card)
-                        head = db.query(HeadOfCouncil).first()
-                        # record the answer on the sovereign message exactly like the
-                        # WebSocket card_response path does
-                        await ChatService.process_message(
-                            head, content, db,
-                            extra_metadata={"card_response": answer.model_dump()},
-                        )
+                        # Attach the parsed answer to the sovereign message that was
+                        # already persisted above (mirrors the WebSocket card_response
+                        # path which merges extra_metadata into message_metadata),
+                        # instead of spawning a second process_message run.
+                        unified_msg.message_metadata = {
+                            **(unified_msg.message_metadata or {}),
+                            "card_response": answer.model_dump(),
+                        }
+                        db.add(unified_msg)
+                        db.commit()
                     except Exception as _ce:  # noqa: BLE001
                         logger.warning("Channel card answer parse failed: %s", _ce)
 
