@@ -2,9 +2,15 @@
 Storage Service — S3/MinIO primary with automatic local filesystem fallback.
 
 Selection logic (at startup):
-  1. If AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY are set AND the S3/MinIO
-     endpoint is reachable → use S3Backend.
+  1. If AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY are set AND they are NOT the
+     insecure default (minioadmin/minioadmin) AND the S3/MinIO endpoint is
+     reachable → use S3Backend.
   2. Otherwise → use LocalBackend and log a clear warning.
+
+Using the default MinIO credentials is treated as "not properly configured":
+the backend refuses to talk to MinIO with default creds and stores files on
+LOCAL disk inside the container instead. Set unique MINIO_ROOT_USER /
+MINIO_ROOT_PASSWORD to enable S3/MinIO.
 
 All callers use the same StorageService interface regardless of backend.
 
@@ -32,6 +38,14 @@ from pathlib import Path
 from typing import BinaryIO, Dict, Any, List, Optional
 
 logger = logging.getLogger(__name__)
+
+# Well-known insecure MinIO default shipped by the old Compose config. The
+# backend refuses to use MinIO with these credentials and falls back to local
+# disk (see _init_backend). Must stay in sync with
+# backend/core/security_checks.py.
+_DEFAULT_MINIO_USER = "minioadmin"
+_DEFAULT_MINIO_PASSWORD = "minioadmin"
+
 
 # ── Read environment ──────────────────────────────────────────────────────────
 
@@ -288,12 +302,25 @@ class StorageService:
 
     @staticmethod
     def _init_backend():
-        """Try S3; fall back to local on any failure."""
+        """Try S3; fall back to local on any failure or insecure defaults."""
         # No credentials at all → skip S3 attempt immediately
         if not _ACCESS_KEY or not _SECRET_KEY:
             logger.warning(
                 "[Storage] AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY not set. "
                 "Skipping S3 init."
+            )
+            return _LocalBackend()
+
+        # Insecure default credentials (minioadmin/minioadmin) → refuse S3.
+        # Storing data in MinIO with the well-known default is a critical risk,
+        # so we fall back to local disk inside the container instead.
+        if _ACCESS_KEY == _DEFAULT_MINIO_USER and _SECRET_KEY == _DEFAULT_MINIO_PASSWORD:
+            logger.warning(
+                "[Storage] MinIO/S3 is configured with the insecure default "
+                "credentials (minioadmin/minioadmin). Refusing S3 backend — "
+                "falling back to LOCAL storage at: %s. "
+                "Set unique MINIO_ROOT_USER / MINIO_ROOT_PASSWORD to enable MinIO.",
+                _LOCAL_ROOT,
             )
             return _LocalBackend()
 

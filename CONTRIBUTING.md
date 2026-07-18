@@ -606,12 +606,12 @@ All backend configuration is managed through environment variables in `backend/.
 | `REDIS_URL` | Redis connection string | `redis://redis:6379/0` |
 | `CELERY_BROKER_URL` | Celery message broker (Redis) | `redis://redis:6379/0` |
 | `CELERY_RESULT_BACKEND` | Celery result backend (Redis) | `redis://redis:6379/0` |
-| `MINIO_ROOT_USER` | MinIO root username | `minioadmin` |
-| `MINIO_ROOT_PASSWORD` | MinIO root password | `minioadmin` |
+| `MINIO_ROOT_USER` | MinIO root username (**required** — generate via `make setup`; never `minioadmin`) | *none (generated)* |
+| `MINIO_ROOT_PASSWORD` | MinIO root password (**required** — generate via `make setup`; rotate on first deploy) | *none (generated)* |
 | `S3_ENDPOINT` | S3-compatible object storage endpoint | `http://minio:9000` |
 | `S3_BUCKET_NAME` | Default S3 bucket name | `agentium-media` |
-| `AWS_ACCESS_KEY_ID` | AWS access key (defaults to `MINIO_ROOT_USER`) | `${MINIO_ROOT_USER}` |
-| `AWS_SECRET_ACCESS_KEY` | AWS secret key (defaults to `MINIO_ROOT_PASSWORD`) | `${MINIO_ROOT_PASSWORD}` |
+| `AWS_ACCESS_KEY_ID` | AWS access key (mirrors `MINIO_ROOT_USER`) | `${MINIO_ROOT_USER}` |
+| `AWS_SECRET_ACCESS_KEY` | AWS secret key (mirrors `MINIO_ROOT_PASSWORD`) | `${MINIO_ROOT_PASSWORD}` |
 | `VOICE_JWT_SECRET` | Secret for Voice WebSocket JWT tokens | *(required)* |
 | `VOICE_TOKEN_DURATION_MINUTES` | Voice bridge session token duration | `30` |
 | `FEDERATION_ENABLED` | Enable federation between Agentium instances | `false` |

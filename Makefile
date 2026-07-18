@@ -1,15 +1,23 @@
 # Agentium Makefile
 
-.PHONY: up down restart voice-reinstall voice-logs voice-status uninstall-voice test hallmark test-integration load-test benchmark perf-gate test-staging audit audit-fix pin-digests docker-scout seed-skills backfill-knowledge backfill-knowledge-collection
+.PHONY: up down restart setup voice-reinstall voice-logs voice-status uninstall-voice test hallmark test-integration load-test benchmark perf-gate test-staging audit audit-fix pin-digests docker-scout seed-skills backfill-knowledge backfill-knowledge-collection
+
+# -- First-run env bootstrap (P0 #1.5) --
+# Generates a secure .env with unique, non-default MinIO credentials if one
+# does not already exist. Idempotent — safe to run any time.
+setup:
+	python backend/scripts/setup_env.py
 
 # -- Normal start -- voice bridge installs automatically --
-up:
+# `setup` runs first so fresh installs always get unique, non-default MinIO
+# credentials. It is a no-op if .env already has real credentials.
+up: setup
 	docker compose up -d
 
 down:
 	docker compose down
 
-restart:
+restart: setup
 	docker compose down && docker compose up -d
 
 # -- Force reinstall voice bridge --

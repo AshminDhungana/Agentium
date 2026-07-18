@@ -110,6 +110,10 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 celery = celery_app
 
+# ── Security startup guards ──────────────────────────────────────────────────
+# Flags insecure configuration (e.g. MinIO default credentials) before boot.
+from backend.core.security_checks import run_security_startup_checks
+
 
 
 class ConstitutionUpdateRequest(BaseModel):
@@ -152,6 +156,7 @@ def create_default_admin(db: Session):
 async def lifespan(app: FastAPI):
     """
     Application lifespan with:
+    - Security startup checks (default-credential guards)
     - Database initialization
     - Constitution seed (API-key independent)
     - Persistent Council status check (genesis runs on-demand, not at startup)
@@ -161,6 +166,19 @@ async def lifespan(app: FastAPI):
     - Capability Registry
     - MCP Tool Bridge (Phase 6.7)
     """
+
+    # ─────────────────────────────────────────────────────────────
+    # 0. Security startup checks
+    # ─────────────────────────────────────────────────────────────
+    # Detect insecure configuration (e.g. MinIO minioadmin/minioadmin) and
+    # warn loudly. Non-fatal by default; set MINIO_BLOCK_DEFAULT_CREDS=true
+    # to abort startup instead. Skipped under TESTING (no MinIO configured).
+    if os.environ.get("TESTING") != "true":
+        try:
+            run_security_startup_checks()
+        except Exception as sec_err:  # a strict guard raises RuntimeError
+            logger.error("❌ Security startup check failed: %s", sec_err)
+            raise
 
     # ─────────────────────────────────────────────────────────────
     # 1. Initialize Database
