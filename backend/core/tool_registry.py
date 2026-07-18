@@ -108,6 +108,92 @@ class ToolRegistry:
             authorized_tiers=["0xxxx", "1xxxx"],
         )
 
+        from backend.tools.skill_creator_tool import skill_creator_tool
+        # ══════════════════════════════════════════════════════════════════════
+        # SKILL CREATOR TOOL — Head/Council agents author new Skills at runtime
+        # ══════════════════════════════════════════════════════════════════════
+        self.register_tool(
+            name="skill_creator",
+            description=(
+                "Let a Head or Council agent define and persist a new Skill (SKILL.md) "
+                "at runtime. Accepts skill_name, display_name, description (50-300 chars), "
+                "skill_type, domain, complexity (enums), tags, steps, validation_criteria, "
+                "and optional prerequisites/examples/code_template. The skill is written to "
+                "backend/.agentium/skills/<name>/ and indexed into ChromaDB, retrievable via "
+                "semantic search. Restricted to 0xxxx/1xxxx tiers. Full reference in "
+                "backend/.agentium/skills/skill_creator/SKILL.md."
+            ),
+            function=skill_creator_tool.execute,
+            parameters={
+                "action": {
+                    "type": "string",
+                    "description": "create | help",
+                },
+                "skill_name": {
+                    "type": "string",
+                    "description": "Unique skill name (3-100 chars, slugified to lower/underscore)",
+                },
+                "display_name": {
+                    "type": "string",
+                    "description": "Human-readable name (>=5 chars)",
+                },
+                "description": {
+                    "type": "string",
+                    "description": "What the skill does (50-300 chars)",
+                },
+                "skill_type": {
+                    "type": "string",
+                    "description": "code_generation|analysis|integration|automation|research|design|testing|deployment|debugging|optimization|documentation",
+                },
+                "domain": {
+                    "type": "string",
+                    "description": "frontend|backend|devops|data|ai|security|mobile|desktop|general|database|api",
+                },
+                "complexity": {
+                    "type": "string",
+                    "description": "beginner|intermediate|advanced",
+                },
+                "tags": {
+                    "type": "array",
+                    "description": "List of 1-10 lowercase tags",
+                },
+                "steps": {
+                    "type": "array",
+                    "description": "Ordered list of how-to steps (>=1)",
+                },
+                "validation_criteria": {
+                    "type": "array",
+                    "description": "List of success/validation criteria (>=1)",
+                },
+                "prerequisites": {
+                    "type": "array",
+                    "description": "Optional list of prerequisites",
+                    "optional": True,
+                },
+                "examples": {
+                    "type": "array",
+                    "description": "Optional list of {input, output} examples",
+                    "optional": True,
+                },
+                "code_template": {
+                    "type": "string",
+                    "description": "Optional code template body",
+                    "optional": True,
+                },
+                "authorized_tiers": {
+                    "type": "array",
+                    "description": "Ignored/clamped; skill_creator is always 0xxxx/1xxxx only",
+                    "optional": True,
+                },
+                "agent_id": {
+                    "type": "string",
+                    "description": "Caller agentium id, used for tier authorization",
+                    "optional": True,
+                },
+            },
+            authorized_tiers=["0xxxx", "1xxxx"],
+        )
+
         from backend.tools.governance_tool import (
             spawn_agent,
             liquidate_agent,
