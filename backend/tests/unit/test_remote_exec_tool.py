@@ -56,3 +56,25 @@ async def test_remote_exec_passes_real_agent_id():
     assert captured["agent_id"] == "30001"
     assert captured["code"] == "print('hi')"
     assert captured["network_access"] is False
+
+
+from backend.core.tool_registry import ToolRegistry
+
+
+def test_remote_exec_registered_for_task_tiers():
+    reg = ToolRegistry()
+    assert "remote_exec" in reg.tools
+    tiers = reg.tools["remote_exec"]["authorized_tiers"]
+    assert "3xxxx" in tiers and "9xxxx" in tiers
+    # governance tiers must NOT have it
+    assert "0xxxx" not in tiers and "1xxxx" not in tiers and "2xxxx" not in tiers
+    # not withheld as a restricted (anti-recursion) tool for tasks
+    assert "remote_exec" not in reg.restricted_tools_for("3xxxx")
+
+
+def test_remote_exec_visible_in_openai_schema_for_task():
+    reg = ToolRegistry()
+    names = [t["function"]["name"] for t in reg.to_openai_tools("3xxxx")]
+    assert "remote_exec" in names
+    names_gov = [t["function"]["name"] for t in reg.to_openai_tools("0xxxx")]
+    assert "remote_exec" not in names_gov
