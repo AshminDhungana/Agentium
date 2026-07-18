@@ -1805,6 +1805,7 @@ class ToolRegistry:
         function: Callable,
         parameters: Dict[str, Any],
         authorized_tiers: Optional[List[str]] = None,
+        timeout: Optional[float] = None,
     ) -> None:
         self.tools[name] = {
             "name":             name,
@@ -1812,12 +1813,20 @@ class ToolRegistry:
             "function":         function,
             "parameters":       parameters,
             "authorized_tiers": authorized_tiers or [],
+            "timeout":          timeout,
         }
 
     # ── Queries ────────────────────────────────────────────────────────────────
 
     def get_tool(self, name: str) -> Optional[Dict[str, Any]]:
         return self.tools.get(name)
+
+    def get_tool_timeout(self, name: str) -> Optional[float]:
+        """Per-tool timeout override, or None to use the global default."""
+        tool = self.tools.get(name)
+        if tool and tool.get("timeout") is not None:
+            return float(tool["timeout"])
+        return None
 
     def list_tools(self, agent_tier: str) -> Dict[str, Any]:
         available: Dict[str, Any] = {}
