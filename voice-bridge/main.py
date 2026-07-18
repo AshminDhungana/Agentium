@@ -727,8 +727,10 @@ def _post_card_response(answer: dict) -> None:
         with urllib.request.urlopen(req, timeout=30) as resp:
             json.loads(resp.read().decode())
         logger.info("[bridge] Posted card_response for %s", answer.get("card_id"))
+        return True
     except Exception as exc:
         logger.warning("[WARN] Failed to post card_response %s: %s", answer.get("card_id"), exc)
+        return False
 
 
 async def _maybe_handle_pending_card() -> None:
@@ -741,12 +743,10 @@ async def _maybe_handle_pending_card() -> None:
     await speak(_card_to_speech_text(card))
     utterance = await listen_once(timeout=30)
     if utterance:
-        await loop.run_in_executor(
+        ok = await loop.run_in_executor(
             _executor, _post_card_response, _build_card_answer(card, utterance)
         )
-        # Mark handled only after a successful post so a failed post can be
-        # retried next turn (a failed post simply leaves the card un-handled).
-        if card_id:
+        if ok:
             _handled_card_ids.add(card_id)
 
 
