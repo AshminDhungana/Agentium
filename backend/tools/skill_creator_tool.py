@@ -10,18 +10,6 @@ from backend.services.skill_manager import skill_manager
 
 SKILLS_ROOT = Path(__file__).resolve().parents[1] / ".agentium" / "skills"
 ALLOWED_TIERS = {"0", "1"}
-ALLOWED_TIER_IDS = ["0xxxx", "1xxxx"]
-
-# Enums must match SkillSchema exactly.
-SKILL_TYPES = {
-    "code_generation", "analysis", "integration", "automation", "research",
-    "design", "testing", "deployment", "debugging", "optimization", "documentation",
-}
-DOMAINS = {
-    "frontend", "backend", "devops", "data", "ai", "security", "mobile",
-    "desktop", "general", "database", "api",
-}
-COMPLEXITIES = {"beginner", "intermediate", "advanced"}
 
 
 def _tier_to_creator_tier(agent_id: str) -> str:
@@ -33,7 +21,7 @@ def _build_skill_md(name: str, display_name: str, description: str,
                     tags: List[str], steps: List[str],
                     validation_criteria: List[str],
                     prerequisites: List[str], examples: List[Dict[str, str]],
-                    code_template: str) -> str:
+                    code_template: str, creator_tier: str) -> str:
     def yaml_list(items):
         return "[" + ", ".join(f'"{i}"' for i in items) + "]"
 
@@ -47,7 +35,7 @@ def _build_skill_md(name: str, display_name: str, description: str,
         f"domain: {domain}",
         f"complexity: {complexity}",
         f"tags: {yaml_list(tags)}",
-        f"creator_tier: {_tier_to_creator_tier('')}",
+        f"creator_tier: {creator_tier}",
         "---",
         "",
     ]
@@ -144,6 +132,7 @@ class SkillCreatorTool:
             _build_skill_md(
                 name, display_name, description, skill_type, domain, complexity,
                 tags, steps, validation_criteria, prerequisites, examples, code_template,
+                creator_tier=_tier_to_creator_tier(agent_id),
             ),
             encoding="utf-8",
         )
