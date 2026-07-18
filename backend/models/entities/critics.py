@@ -130,6 +130,32 @@ class CriticAgent(Agent):
         return base
 
 
+class OutputCriticAgent(CriticAgent):
+    """
+    Output critic (8xxxx) — single-table subclass of CriticAgent.
+
+    Shares the `critic_agents` table with the other critic types; the distinct
+    `polymorphic_identity` lets SQLAlchemy resolve `output_critic` rows on load.
+    """
+
+    __mapper_args__ = {
+        'polymorphic_identity': AgentType.OUTPUT_CRITIC,
+    }
+
+
+class PlanCriticAgent(CriticAgent):
+    """
+    Plan critic (9xxxx) — single-table subclass of CriticAgent.
+
+    Shares the `critic_agents` table with the other critic types; the distinct
+    `polymorphic_identity` lets SQLAlchemy resolve `plan_critic` rows on load.
+    """
+
+    __mapper_args__ = {
+        'polymorphic_identity': AgentType.PLAN_CRITIC,
+    }
+
+
 class CritiqueReview(BaseEntity):
     """
     Individual review record linking a task output to a critic's verdict.

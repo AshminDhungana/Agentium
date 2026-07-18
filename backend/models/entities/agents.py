@@ -1521,7 +1521,11 @@ class TaskAgent(Agent):
 
 
 # Import CriticAgent here to avoid circular imports
-from backend.models.entities.critics import CriticAgent
+from backend.models.entities.critics import (
+    CriticAgent,
+    OutputCriticAgent,
+    PlanCriticAgent,
+)
 logger = logging.getLogger(__name__)
 
 AGENT_TYPE_MAP: Dict[AgentType, Type[Agent]] = {
@@ -1530,8 +1534,8 @@ AGENT_TYPE_MAP: Dict[AgentType, Type[Agent]] = {
     AgentType.LEAD_AGENT: LeadAgent,
     AgentType.TASK_AGENT: TaskAgent,
     AgentType.CODE_CRITIC: CriticAgent,
-    AgentType.OUTPUT_CRITIC: CriticAgent,
-    AgentType.PLAN_CRITIC: CriticAgent,
+    AgentType.OUTPUT_CRITIC: OutputCriticAgent,
+    AgentType.PLAN_CRITIC: PlanCriticAgent,
 }
 
 
