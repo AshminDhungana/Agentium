@@ -25,10 +25,16 @@ export function StructuredInputCard({ card, onSubmit }: { card: StructuredInputC
     () => Object.fromEntries(card.questions.map((q) => [q.id, { selectedIds: [], otherText: null }]))
   );
 
-  // expiration → expired state
+  const GRACE_MS = 120_000; // 2 minutes minimum window before a card can expire
+
+  // expiration → expired state (with a first-view grace so off-page cards
+  // never expire before the user has had a chance to see them)
   useEffect(() => {
     if (!card.expires_at) return;
-    const ms = new Date(card.expires_at).getTime() - Date.now();
+    const original = new Date(card.expires_at).getTime();
+    const floor = Date.now() + GRACE_MS;
+    const effective = Math.max(original, floor);
+    const ms = effective - Date.now();
     if (ms <= 0) { expireCard(card.card_id); return; }
     const t = setTimeout(() => expireCard(card.card_id), ms);
     return () => clearTimeout(t);
