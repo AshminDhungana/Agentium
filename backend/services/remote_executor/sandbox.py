@@ -39,6 +39,23 @@ def blocked_egress_cidrs() -> tuple:
     return _BLOCKED_NETS
 
 
+def effective_egress_policy(config: "SandboxConfig") -> dict:
+    """Return the effective egress policy for a sandbox config.
+
+    ``allowed`` is the agent-provided host allowlist (empty when none).
+    ``blocked`` is the always-deny CIDR set (private/IMDS/loopback).
+
+    NOTE: Full egress enforcement (an external allowlist proxy or iptables
+    rules) is future work (spec §10 Out of Scope). These values are recorded
+    on the container as labels so the policy is visible and auditable for every
+    opt-in (bridge-mode) container without needing in-container NET_ADMIN.
+    """
+    return {
+        "allowed": list(config.allowed_hosts or []),
+        "blocked": list(blocked_egress_cidrs()),
+    }
+
+
 @dataclass
 class SandboxConfig:
     """Configuration for sandbox container."""
@@ -46,7 +63,7 @@ class SandboxConfig:
     memory_limit_mb: int = 512  # MB
     timeout_seconds: int = 300  # 5 minutes
     network_mode: str = "none"  # none, bridge
-    allowed_hosts: Optional[List[str]] = None  # For network whitelist
+    allowed_hosts: Optional[List[str]] = None  # Egress allowlist when network_mode="bridge"; private/IMDS always blocked via blocked_egress_cidrs()
     max_disk_mb: int = 1024  # 1GB
     image: str = "python:3.11-slim"  # Base image
 
@@ -136,6 +153,18 @@ class SandboxManager:
         config = config or SandboxConfig()
         sandbox_id = f"sandbox_{uuid.uuid4().hex[:12]}"
 
+        # Build the egress policy. When the network is opt-in (bridge mode) we
+        # record the allowlist + always-blocked CIDRs as labels so the policy is
+        # visible on every opt-in container. Full proxy enforcement is future
+        # work (spec §10 Out of Scope); the labels are the self-contained control.
+        egress = effective_egress_policy(config)
+        egress_labels = {}
+        if config.network_mode == "bridge":
+            egress_labels = {
+                "agentium.egress_allowed": ",".join(egress["allowed"]) or "none",
+                "agentium.egress_blocked": ",".join(egress["blocked"]),
+            }
+
         # Create container with resource limits
         container = self.docker_client.containers.run(
             image=config.image,
@@ -158,7 +187,8 @@ class SandboxManager:
                 "agentium.sandbox": "true",
                 "agentium.agent_id": agent_id,
                 "agentium.created_at": datetime.utcnow().isoformat(),
-                "agentium.is_warm": "true" if agent_id == "warm_pool" else "false"
+                "agentium.is_warm": "true" if agent_id == "warm_pool" else "false",
+                **egress_labels,
             },
             environment={
                 "PYTHONDONTWRITEBYTECODE": "1",
