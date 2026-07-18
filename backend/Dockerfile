@@ -100,6 +100,19 @@ COPY --from=builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 ENV PYTHONPATH="/app"
 
+# Install the Chromium browser binary + system deps at build time so it is
+# present on fresh containers (no first-use `playwright install` step).
+# PLAYWRIGHT_BROWSERS_PATH keeps the binary inside the image independent of
+# the (non-root) runtime HOME, so it is found when the app runs as agentium.
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libcups2 \
+        libdrm2 libdbus-1-3 libxkbcommon0 libxcomposite1 libxdamage1 \
+        libxfixes3 libxrandr2 libgbm1 libpango-1.0-0 libcairo2 libasound2 \
+        libxshmfence1 libx11-xcb1 libxcb-dri3-0 libxext6 libx11-6 \
+    && rm -rf /var/lib/apt/lists/* \
+    && playwright install --with-deps chromium
+
 # whisper.cpp runtime: whisper-cli + model (CPU default; CUDA uses same path but built differently)
 COPY --from=whisper-cpp-src /usr/local/bin/whisper-cli /usr/local/bin/whisper-cli
 COPY --from=whisper-cpp-src /opt/whisper/models/ /opt/whisper/models/

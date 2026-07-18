@@ -114,6 +114,13 @@ RUN pip install --no-cache-dir --default-timeout=600 --retries=5 -r requirements
 ENV HF_HOME=/app/.cache/huggingface
 RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('BAAI/bge-base-en-v1.5')"
 
+# Pre-install the Playwright-managed Chromium browser + system deps at build
+# time so it is present on fresh containers (no first-use `playwright install`).
+# PLAYWRIGHT_BROWSERS_PATH keeps the binary inside the image independent of
+# the (non-root) runtime HOME, so it is found when the app runs as agentium.
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+RUN playwright install --with-deps chromium
+
 # Copy application code
 COPY . .
 
