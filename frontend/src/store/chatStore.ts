@@ -260,9 +260,7 @@ export const useChatStore = create<ChatState>()(
                         status: 'sent',
                         metadata: {
                             agent_used: response.agent_id,
-                            model: response.model,
-                            task_created: response.task_created,
-                            task_id: response.task_id
+                            model: response.model
                         }
                     };
 
@@ -271,11 +269,6 @@ export const useChatStore = create<ChatState>()(
                         isLoading: false,
                         currentStreamingMessage: ''
                     }));
-
-                    if (response.task_created) {
-                        showToast.success(`Task ${response.task_id} created`);
-                    }
-
                 } catch (error: any) {
                     console.error('Chat error:', error);
 

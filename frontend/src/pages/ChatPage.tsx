@@ -326,10 +326,6 @@ export function ChatPage() {
                     msg.metadata as MessageMetadata | undefined,
                 );
                 setIsAwaitingReply(false);
-                const endMeta = msg.metadata as MessageMetadata | undefined;
-                if ((endMeta as any)?.task_created) {
-                    showToast.success(`Task ${(endMeta as any).task_id} created`);
-                }
                 return;
             }
 
@@ -354,9 +350,6 @@ export function ChatPage() {
                 setMessages((prev) => [...prev, newMessage]);
                 // Any incoming message means the assistant is no longer "thinking"
                 setIsAwaitingReply(false);
-                if (msg.metadata?.task_created) {
-                    showToast.success(`Task ${msg.metadata.task_id} created`);
-                }
             }
         });
 
@@ -1184,12 +1177,6 @@ export function ChatPage() {
                                                         {message.attachments?.map((att, i) => (
                                                             <div key={i}>{renderAttachment(att, isUser)}</div>
                                                         ))}
-                                                        {message.metadata?.task_created && (
-                                                            <div className="mt-3 pt-3 border-t border-white/20 flex items-center gap-2 text-xs">
-                                                                <CheckCircle className="w-3.5 h-3.5" />
-                                                                Task {message.metadata.task_id} created
-                                                            </div>
-                                                        )}
                                                     </div>
                                                 )}
                                                 <div className={`flex items-center gap-2 mt-1.5 px-1 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
