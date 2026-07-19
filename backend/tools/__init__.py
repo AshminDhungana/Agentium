@@ -7,3 +7,4 @@ from .tool_search_tool import tool_search_tool  # noqa: F401
 # binds to the instance (with `execute`/`client`/`_extract` as instance
 # attributes), matching how the unit tests monkeypatch and drive it.
 from .web_fetch_tool import web_fetch_tool  # noqa: F401
+from .web_crawler_tool import web_crawler_tool  # noqa: F401

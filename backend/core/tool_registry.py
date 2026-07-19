@@ -29,6 +29,7 @@ from backend.tools.desktop_tool  import (
 from backend.tools.mcp_agent_tools import add_mcp_server, vote_on_mcp_server
 from backend.tools.remote_exec_tool import execute as remote_exec_tool_execute
 from backend.tools import web_fetch_tool
+from backend.tools.web_crawler_tool import web_crawler_tool
 from backend.tools.code_execution_tool import code_execution_tool
 from backend.tools.tool_search_tool    import tool_search_tool
 from backend.tools.clarification_tool import request_user_clarification as _clarification_tool
@@ -268,6 +269,36 @@ class ToolRegistry:
                 "max_tokens":     {"type": "integer", "description": "Truncate returned Markdown to ~this token budget (default 4000)", "optional": True},
                 "use_cache":      {"type": "boolean", "description": "Serve cached result if <5 min old (default true)", "optional": True},
                 "allowed_domains":{"type": "array",   "description": "If set, only these domains are permitted", "optional": True},
+            },
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
+        )
+
+        # ══════════════════════════════════════════════════════════════════════
+        # WEB CRAWLER TOOL
+        # ══════════════════════════════════════════════════════════════════════
+        self.register_tool(
+            name="web_crawler",
+            description=(
+                "Crawl a website depth-first/ breadth-first: fetch a start URL and follow "
+                "its links up to a depth and page budget, returning each page as clean "
+                "Markdown. Polite by default — honors robots.txt, rate-limits requests, and "
+                "blocks private hosts (SSRF guard). Use for multi-page traversal, sitelinks, "
+                "and structured site reading. Distinct from web_fetch (single page) and "
+                "web_search (result lists). Full reference in "
+                "backend/.agentium/skills/web_crawling/SKILL.md."
+            ),
+            function=web_crawler_tool.execute,
+            parameters={
+                "action":          {"type": "string",  "description": "crawl | help"},
+                "url":             {"type": "string",  "description": "Start URL to crawl (http:// or https://)"},
+                "max_depth":       {"type": "integer", "description": "Maximum link-following depth (default 1)", "optional": True},
+                "max_pages":       {"type": "integer", "description": "Maximum number of pages to fetch (default 20)", "optional": True},
+                "max_tokens":      {"type": "integer", "description": "Truncate each page's Markdown to ~this token budget (default 2000)", "optional": True},
+                "stay_on_domain":  {"type": "boolean", "description": "Only follow links within the start domain (default true)", "optional": True},
+                "allowed_domains": {"type": "array",   "description": "If set, only these domains are permitted (overrides stay_on_domain)", "optional": True},
+                "respect_robots":  {"type": "boolean", "description": "Honor robots.txt Disallow/Allow (default true)", "optional": True},
+                "rate_limit_ms":   {"type": "integer", "description": "Delay between requests in ms for politeness (default 200)", "optional": True},
+                "use_cache":       {"type": "boolean", "description": "Serve cached page content if available (default true)", "optional": True},
             },
             authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
