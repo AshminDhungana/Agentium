@@ -22,21 +22,46 @@ none | low | medium | high | xhigh
 - `low|medium|high|xhigh` — thinking enabled at increasing intensity. Mapped per
   provider (see Wiring).
 
-## Support detection (which models get the control)
+## Support detection — every provider in the Model Config page
 
-The setting is **only rendered for models that support extended thinking**, satisfying
-the "present only for models that support it" acceptance criterion. Detection is a
-prefix/contains match on `(provider, default_model)`:
+The Model Config page exposes these providers (from `list_providers()` + the
+Custom/Universal card): `OPENAI`, `ANTHROPIC`, `GEMINI`, `GROQ`, `MISTRAL`,
+`TOGETHER`, `COHERE`, `MOONSHOT`, `DEEPSEEK`, `AZURE_OPENAI`, `LOCAL`, and
+`CUSTOM` (OpenAI-compatible). The control must be accounted for on **all** of them.
 
-| Provider        | Match rule (model name contains)                |
-|-----------------|------------------------------------------------|
-| `OPENAI`        | `o1`, `o3`, `o4`, `gpt-5` (reasoning-capable) |
-| `ANTHROPIC`     | `claude` (opus/sonnet/haiku 4.x all support thinking) |
-| `DEEPSEEK`      | `reasoner`                                     |
-| `QIANWEN`/`ZHIPU`/`MOONSHOT` | any (best-effort)                     |
-| all others       | not shown (control hidden, value stays `none`)  |
+Each provider maps to a thinking *strategy*. A single registry
+`PROVIDER_THINKING` (in `model_provider.py`, mirrored on the frontend as a small
+`providerThinking` table in `ModelConfigForm.tsx`) defines, per provider:
 
-If unsupported, the saved value is coerced to `none` and no provider param is emitted.
+- `param_kind`: how the effort value is translated — one of
+  `reasoning_effort` (OpenAI-style), `anthropic_thinking`, `gemini_thinking`,
+  `deepseek_thinking`, or `none`.
+- `model_hint`: an optional regex on `default_model`. When present, the control is
+  only **shown** (and the param only **emitted**) if the model name matches. When
+  `None`, the provider's API always accepts the thinking param, so the control is
+  always shown for that provider.
+- `always_show`: when `True` and there is no `model_hint`, the control renders for
+  every model of that provider.
+
+| Provider        | param_kind            | model_hint (shown/emitted only if matches)        |
+|-----------------|-----------------------|--------------------------------------------------|
+| `OPENAI`        | `reasoning_effort`    | `o1`, `o3`, `o4`, `gpt-5.*`                    |
+| `AZURE_OPENAI`  | `reasoning_effort`    | same as OPENAI                                   |
+| `ANTHROPIC`     | `anthropic_thinking`  | none (all Claude 4.x support thinking)            |
+| `GEMINI`        | `gemini_thinking`     | none (Gemini 2.5 Flash/Pro support thinking)     |
+| `DEEPSEEK`      | `deepseek_thinking`   | `reasoner`                                       |
+| `GROQ`          | `reasoning_effort`    | `r1`, `qwq`, `reason`, `thinking`               |
+| `MISTRAL`       | `reasoning_effort`    | `magistral`, `thinking`                          |
+| `TOGETHER`      | `reasoning_effort`    | `r1`, `qwq`, `reasoner`, `thinking`             |
+| `MOONSHOT`      | `deepseek_thinking`   | `k2`, `kimi` (Kimi thinking)                    |
+| `LOCAL`         | `reasoning_effort`    | `qwq`, `r1`, `deepseek`, `thinking`, `z1`       |
+| `CUSTOM`        | `reasoning_effort`    | `o1/o3/o4`, `qwq`, `r1`, `reasoner`, `thinking`|
+| `COHERE`        | `none`                | — (Command models have no native extended thinking; control hidden) |
+
+If a provider/model combination is unsupported, the saved value is coerced to `none`
+and no provider param is emitted (no-op). This satisfies the "present only for models
+that support it (or is a no-op/hidden otherwise)" acceptance criterion for **every**
+provider in the page.
 
 ## Backend changes
 
@@ -59,19 +84,36 @@ If unsupported, the saved value is coerced to `none` and no provider param is em
 
 ### Provider wiring — `backend/services/model_provider.py`
 The actual LLM call builders (around lines 491, 564, 722, 995, 1051) read
-`self.config.effort`. A small helper `_resolve_thinking_param(effort, provider, model)`
-returns the provider-specific kwarg dict or `{}`:
+`self.config.effort` and the resolved `param_kind` for the config's provider. A single
+helper `_resolve_thinking_param(effort, provider, model)` consults `PROVIDER_THINKING`
+and returns the provider-specific kwarg dict, or `{}` when effort is `none` / the
+provider or model is unsupported. Effort → provider-param mapping:
 
-- **OpenAI-compatible reasoning** (`reasoning_effort`):
-  `{"reasoning_effort": {"none":None,"low":"low","medium":"medium","high":"high","xhigh":"high"}[effort]}`
-  — `xhigh` caps at `"high"` (OpenAI's max). Omitted entirely when `none`.
-- **Anthropic** (`thinking`):
-  `{"thinking": {"type": "enabled", "budget_tokens": B}}` where `B` scales
-  `low=2000, medium=8000, high=16000, xhigh=32000`. When thinking is on,
-  `temperature` is forced to `1` (required by Anthropic) — applied only in the
-  thinking branch.
-- **DeepSeek reasoner**: passes `{"thinking": True}` (or provider-specific flag).
-- **All other providers / unsupported models**: returns `{}` (no-op).
+- **`reasoning_effort`** (OpenAI, Azure OpenAI, Groq, Mistral, Together, Local,
+  Custom/OpenAI-compatible):
+  `{"reasoning_effort": {"low":"low","medium":"medium","high":"high","xhigh":"high"}[effort]}`.
+  `xhigh` caps at OpenAI's `"high"`. Omitted when `none` or model doesn't match
+  `model_hint`.
+
+- **`anthropic_thinking`** (Anthropic):
+  `{"thinking": {"type": "enabled", "budget_tokens": B}}` where
+  `B = {"low":2000,"medium":8000,"high":16000,"xhigh":32000}[effort]`.
+  When thinking is on, `temperature` is forced to `1` (required by Anthropic) —
+  applied only in the thinking branch.
+
+- **`gemini_thinking`** (Gemini):
+  `{"thinkingConfig": {"thinkingBudget": B, "includeThoughts": True}}` where
+  `B = {"low":1024,"medium":4096,"high":8192,"xhigh":24576}[effort]`.
+
+- **`deepseek_thinking`** (DeepSeek reasoner, Moonshot Kimi):
+  `{"thinking": {"type": "enabled"}}` (DeepSeek/Kimi accept the thinking flag;
+  budget is provider-managed, so effort only toggles enablement).
+
+- **`none`** (Cohere, and any unsupported provider/model): returns `{}` (no-op).
+
+The helper is the single source of truth: it returns `{}` for any unsupported
+combo, so a thinking param is **never** sent to a provider/model that would reject
+it. This makes the no-op path robust across all 12 providers in the page.
 
 ### WebSocket signal — chat generation
 When the Head's active config has `effort != "none"` and the provider supports it,
