@@ -32,6 +32,7 @@ from backend.tools import web_fetch_tool
 from backend.tools.code_execution_tool import code_execution_tool
 from backend.tools.tool_search_tool    import tool_search_tool
 from backend.tools.clarification_tool import request_user_clarification as _clarification_tool
+from backend.tools.task_management_tool import task_management_tool
 
 
 class ToolRegistry:
@@ -1834,6 +1835,108 @@ class ToolRegistry:
                 "confidence": {"type": "number"},
             },
             authorized_tiers=["0xxxx"],
+        )
+
+        # ══════════════════════════════════════════════════════════════════════
+        # TASK MANAGEMENT TOOL — first-class programmatic task CRUD for agents
+        # (spec §3.7). Lead+ agents may create/close/edit; Task agents may only
+        # update the status of tasks assigned to them. Tier policy is enforced
+        # inside the tool (see backend/tools/task_management_tool.py).
+        # ══════════════════════════════════════════════════════════════════════
+        self.register_tool(
+            name="task_management",
+            description=(
+                "First-class task management for agents. Actions: "
+                "create, get, update, list, close. Lead+ agents (0xxxx/1xxxx/2xxxx) "
+                "may create and close tasks and edit any field; Task agents "
+                "(3xxxx-6xxxx) may only update the status of tasks assigned to them. "
+                "On create/close the caller is recorded as created_by/actor; status "
+                "changes are validated by the task state machine. Full reference in "
+                "backend/.agentium/skills/task_management/SKILL.md."
+            ),
+            function=task_management_tool.execute,
+            parameters={
+                "action": {
+                    "type": "string",
+                    "description": "create | get | update | list | close | help",
+                },
+                "task_id": {
+                    "type": "string",
+                    "description": "Task id or agentium_id (for get/update/close)",
+                    "optional": True,
+                },
+                "title": {
+                    "type": "string",
+                    "description": "Task title (create; optional)",
+                    "optional": True,
+                },
+                "description": {
+                    "type": "string",
+                    "description": "Task description (create; required)",
+                    "optional": True,
+                },
+                "priority": {
+                    "type": "string",
+                    "description": "sovereign|critical|high|normal|low|idle (create/update; default normal)",
+                    "optional": True,
+                },
+                "task_type": {
+                    "type": "string",
+                    "description": "execution|research|automation|analysis|... (create/update; default execution)",
+                    "optional": True,
+                },
+                "status": {
+                    "type": "string",
+                    "description": "New status (update/close). Validated by the task state machine.",
+                    "optional": True,
+                },
+                "assigned_to": {
+                    "type": "array",
+                    "description": "List of Task-agent ids to assign (create/update)",
+                    "optional": True,
+                },
+                "lead_agent_id": {
+                    "type": "string",
+                    "description": "Lead agent id owning the task (create/update)",
+                    "optional": True,
+                },
+                "parent_task_id": {
+                    "type": "string",
+                    "description": "Parent task id for hierarchical tasks (create/update)",
+                    "optional": True,
+                },
+                "due_date": {
+                    "type": "string",
+                    "description": "ISO-8601 due date (create/update)",
+                    "optional": True,
+                },
+                "progress": {
+                    "type": "integer",
+                    "description": "Completion percentage 0-100 (update)",
+                    "optional": True,
+                },
+                "result_summary": {
+                    "type": "string",
+                    "description": "Outcome summary (update/close)",
+                    "optional": True,
+                },
+                "outcome": {
+                    "type": "string",
+                    "description": "close only: 'completed' (default) or 'cancelled'",
+                    "optional": True,
+                },
+                "status_filter": {
+                    "type": "string",
+                    "description": "list only: filter by status",
+                    "optional": True,
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": "list only: max tasks to return (default 100)",
+                    "optional": True,
+                },
+            },
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx"],
         )
 
     # ── Registration ───────────────────────────────────────────────────────────
