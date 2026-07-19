@@ -10,6 +10,7 @@ from contextlib import contextmanager
 from typing import Any, Dict, Generator, List, Optional, Union
 
 import chromadb
+import numpy as np
 from chromadb.api.types import EmbeddingFunction, QueryResult
 from sentence_transformers import SentenceTransformer
 
@@ -54,15 +55,20 @@ class BgeEmbeddingFunction(EmbeddingFunction):
     def _with_prefix(self, text: str) -> str:
         return f"{BGE_QUERY_PREFIX}{text}"
 
-    def embed_documents(self, input: List[str]) -> List[List[float]]:
-        return self.model.encode(input, convert_to_numpy=True, normalize_embeddings=True).tolist()
+    def embed_documents(self, input: List[str]) -> List[Any]:
+        # Return a list of 1-D numpy arrays. ChromaDB's rust binding calls
+        # `.tolist()` on each embedding during query, so plain Python lists
+        # raise AttributeError — ndarrays are required.
+        arr = self.model.encode(input, convert_to_numpy=True, normalize_embeddings=True)
+        return [np.asarray(v) for v in arr]
 
-    def embed_query(self, input: Union[str, List[str]]) -> List[List[float]]:
+    def embed_query(self, input: Union[str, List[str]]) -> List[Any]:
         # ChromaDB 1.5.1 calls embed_query with a list of query texts; accept
         # both a single string and a list so v2 queries don't crash.
         texts = input if isinstance(input, list) else [input]
         prefixed = [self._with_prefix(t) for t in texts]
-        return self.model.encode(prefixed, convert_to_numpy=True, normalize_embeddings=True).tolist()
+        arr = self.model.encode(prefixed, convert_to_numpy=True, normalize_embeddings=True)
+        return [np.asarray(v) for v in arr]
 
     def __call__(self, input: List[str]) -> List[List[float]]:
         # Default path (collection init / stored documents) = no prefix, normalized.
