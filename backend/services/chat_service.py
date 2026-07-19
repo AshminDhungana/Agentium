@@ -5,6 +5,7 @@ Handles message processing, task creation, context management, and reincarnation
 
 import logging
 import httpx
+import time
 from datetime import datetime
 import asyncio
 from typing import Dict, Any, Optional, List, Callable, Awaitable
@@ -18,10 +19,11 @@ from backend.services.reincarnation_service import reincarnation_service
 from backend.services.clarification_service import clarification_service
 from backend.services.model_provider import ModelService
 from backend.services.media_interceptor import MediaInterceptor
-from backend.services.decision_engine import DecisionEngine, DecisionAction
+from backend.services.decision_engine import Decision, DecisionEngine, DecisionAction
 from backend.core.llm_client import LLMClient
 from backend.models.entities.user_config import ConnectionStatus
 from backend.models.entities.chat_message import ChatMessage as ChatMsg
+from backend.models.database import SessionLocal
 
 import uuid
 from backend.models.entities.chat_message import ChatMessage as ChatMessageEntity
@@ -31,6 +33,9 @@ from backend.models.schemas.structured_input import StructuredInputCard as _SIC
 ws_manager = None
 
 logger = logging.getLogger(__name__)
+
+_SYSTEM_CONTEXT_TTL = 20.0
+_system_context_cache: dict = {"ts": 0.0, "value": None}
 
 
 class ChatService:
@@ -301,7 +306,7 @@ class ChatService:
 
         # Get system prompt and context
         system_prompt = head.get_system_prompt()
-        context = await ChatService.get_system_context(db)
+        context = await ChatService.get_cached_system_context(db)
 
         # Build consultation note from predecessor context for reincarnated agents
         consultation_result = None
@@ -346,6 +351,26 @@ Current System State:
 
 Address the Sovereign respectfully. If they issue a command that requires execution, indicate that you will create a task."""
 
+        # ── Task 3: Inject the `decide` tool so routing is classified in the ──
+        #    same LLM turn, eliminating the second round-trip in analyze_for_task.
+        #    The `decide` tool is already registered in ToolRegistry (0xxxx tier)
+        #    and therefore included by to_openai_tools(), so we do NOT append it
+        #    manually (a duplicate function name is rejected by providers).
+        tier = f"{head.agentium_id[0]}xxxx"
+        try:
+            from backend.core.tool_registry import ToolRegistry
+            registry_tools = ToolRegistry().to_openai_tools(tier)
+        except Exception as _reg_err:
+            logger.warning(f"[ChatService] ToolRegistry lookup failed, falling back to empty: {_reg_err}")
+            registry_tools = []
+        gen_tools = list(registry_tools)
+
+        # Instruct the model to always emit the routing decision alongside its reply.
+        full_prompt += (
+            "\n\nAlways call the `decide` tool to classify your action "
+            "(reply/create_task/delegate/dispatch_task) in the same turn as your reply."
+        )
+
         # Switch to tool-aware generation so the Head agent can call deep_think
         # and any other registered tool during conversational turns.
         # generate_with_agent_tools() returns the same dict shape as
@@ -373,11 +398,13 @@ Address the Sovereign respectfully. If they issue a command that requires execut
                 config_id=config_id,
                 fallback_configs=fallback_configs,
                 system_prompt_override=full_prompt,
-                agent_tier=f"{head.agentium_id[0]}xxxx",
+                agent_tier=tier,
                 history=history,
                 on_delta=on_delta,
                 cancel_event=cancel_event,
                 prompt_cache_key=cache_key,
+                tools=gen_tools,
+                tool_choice={"type": "auto"},
             )
         except Exception as e:
             clear_chat_request()
@@ -455,57 +482,31 @@ Address the Sovereign respectfully. If they issue a command that requires execut
         tokens_used = result.get("tokens_used", 0)
         context_status = context_manager.update_usage(head.agentium_id, tokens_used)
 
-        # ── System-Generated Media Interception (Issue #11) ────────────────────
-        # Intercept media URLs in LLM response, download & store permanently,
-        # rewrite content with storage URLs before persistence + broadcast.
+        # ── Defer media interception + Head-turn persistence (Task 5) ──────────
+        # BOTH the (potentially slow) media URL download/rewrite AND the
+        # ChatMessage persistence for the Head-of-Council turn are moved OFF the
+        # critical path. The streamed reply (result["content"]) is returned to
+        # the user immediately; the heavy work runs in a fire-and-forget
+        # background task so it can never block message_end.
         if sovereign_user:
             try:
-                # Reuse a single httpx client for all downloads in this request
-                async with httpx.AsyncClient(timeout=MediaInterceptor.DOWNLOAD_TIMEOUT) as http_client:
-                    result["content"], media_urls = await MediaInterceptor.intercept_and_store(
-                        text=result["content"],
-                        user_id=str(sovereign_user.id),
-                        db=db,
-                        http_client=http_client
+                asyncio.create_task(
+                    ChatService._media_and_persist_background(
+                        str(sovereign_user.id),
+                        result["content"],
+                        head.agentium_id,
+                        result.get("model", model_name),
+                        [],
                     )
-                    # Attach media URLs to result for metadata persistence
-                    if media_urls:
-                        result["media_urls"] = media_urls
-            except Exception as e:
-                # Graceful degradation: log but don't block response
-                logger.warning(f"[ChatService] Media interception failed (non-fatal): {e}")
+                )
+            except Exception as exc:
+                logger.warning(f"[ChatService] media bg schedule failed: {exc}")
         # ────────────────────────────────────────────────────────────────────────
 
         # Broadcast response to user's external channels (Unified Inbox)
         from backend.services.channel_manager import ChannelManager
 
-        # ── Persist the Head-of-Council turn.  The inbound (user) turn is ──
-        #    persisted earlier, before the model round-trip, so it is never lost.
         if sovereign_user:
-            try:
-                msg_id = str(_uuid.uuid4())
-                db.add(ChatMsg(
-                    id=msg_id,
-                    user_id=str(sovereign_user.id),
-                    role="head_of_council",
-                    content=result["content"],
-                    message_metadata={
-                        "agent_id": head.agentium_id,
-                        "model": result.get("model", model_name),
-                        "media_urls": result.get("media_urls", []),
-                    },
-                ))
-                db.commit()
-            except Exception as _persist_err:
-                logger.warning(f"ChatMessage (outbound) persist failed (non-fatal): {_persist_err}")
-                try:
-                    db.rollback()
-                except Exception:
-                    pass
-        # ─────────────────────────────────────────────────────────────────────
-
-        if sovereign_user:
-            import asyncio
             asyncio.create_task(
                 ChannelManager.broadcast_to_channels(
                     user_id=sovereign_user.id,
@@ -514,8 +515,44 @@ Address the Sovereign respectfully. If they issue a command that requires execut
                 )
             )
 
-        # Analyze if we should create a task
-        task_info = await ChatService.analyze_for_task(head, message, result["content"], db)
+        # ── Task creation decoupled from the message_end response (Task 4) ──
+        #    Classification still happens on the hot path (free from the `decide`
+        #    tool call), but the actual task creation + deliberation startup is
+        #    handed off to a fire-and-forget background task so message_end is not
+        #    blocked. The real status arrives via the `task_created` WS event.
+        decision = ChatService.classify_action_from_result(result)
+
+        # Fallback: the model may not have emitted the `decide` tool call (tool_choice
+        # is "auto"). Defaulting to REPLY would silently drop task creation for a real
+        # execution request, so run the deterministic decision to be safe.
+        if decision.action is DecisionAction.REPLY and decision.rationale == "no_decide_tool_call":
+            try:
+                decision = await DecisionEngine().decide(head, message, db)
+            except Exception as _fb_exc:
+                logger.warning(f"[ChatService] fallback decision failed: {_fb_exc}")
+                decision = Decision(action=DecisionAction.REPLY, rationale="decide_fallback_error", confidence=0.0)
+
+        _delegate_actions = (
+            DecisionAction.CREATE_TASK,
+            DecisionAction.DISPATCH_TASK,
+            DecisionAction.DELEGATE,
+            DecisionAction.SPAWN_AGENT,
+        )
+        if decision.action in _delegate_actions:
+            try:
+                asyncio.create_task(
+                    ChatService._create_task_background(
+                        head.agentium_id,
+                        decision,
+                        message,
+                        str(sovereign_user.id) if sovereign_user else None,
+                    )
+                )
+            except Exception as exc:
+                logger.warning(f"[ChatService] failed to schedule background task: {exc}")
+            task_info = {"created": True, "task_id": None, "pending": True}
+        else:
+            task_info = {"created": False}
 
         # Get current task ID if any (for preservation during reincarnation)
         current_task_id = head.current_task_id
@@ -618,6 +655,23 @@ Progress: {task_progress or 'N/A'}%"""
         }
 
     @staticmethod
+    async def get_cached_system_context(db: Session) -> str:
+        """
+        Return the descriptive system context used in the Head's prompt, cached
+        for 20 s. System state (agent counts, pending tasks) changes slowly
+        relative to chat cadence, so a slightly stale snapshot is acceptable and
+        removes a full table scan from every chat message's critical path.
+        """
+        now = time.monotonic()
+        cached = _system_context_cache
+        if cached["value"] is not None and (now - cached["ts"]) < _SYSTEM_CONTEXT_TTL:
+            return cached["value"]
+        value = await ChatService.get_system_context(db)
+        cached["ts"] = now
+        cached["value"] = value
+        return value
+
+    @staticmethod
     async def get_system_context(db: Session) -> str:
         """Get current system state for context."""
         # Count agents by type
@@ -646,26 +700,60 @@ Progress: {task_progress or 'N/A'}%"""
 - Pending Tasks: {pending_tasks}{reincarnation_info if reincarnation_info else ""}"""
 
     @staticmethod
-    async def analyze_for_task(
+    def classify_action_from_result(result: Dict[str, Any]):
+        """
+        Extract the routing decision from the SAME generation call that produced
+        the Head's reply (no second LLM round-trip). Looks for a `decide` tool
+        call in the result; if the model didn't emit one, default to REPLY so we
+        never create a spurious task.
+
+        ``provider.generate_with_tools`` returns a dict whose TOP LEVEL has no
+        ``tool_calls`` key — parsed tool calls live only inside
+        ``result["messages"][*].tool_calls`` (the assistant turns). So we scan
+        the message list for the last assistant message that carries a `decide`
+        call.
+        """
+        from backend.services.decision_engine import DecisionEngine, DecisionAction, Decision
+
+        for message in reversed(result.get("messages", []) or []):
+            if message.get("role") != "assistant":
+                continue
+            calls = message.get("tool_calls") or []
+            for call in calls:
+                if call.get("function", {}).get("name") == "decide":
+                    return DecisionEngine._parse({"tool_calls": [call]})
+        return Decision(
+            action=DecisionAction.REPLY,
+            rationale="no_decide_tool_call",
+            confidence=0.0,
+        )
+
+    @staticmethod
+    async def create_task_from_decision(
         head: HeadOfCouncil,
+        decision,
         prompt: str,
-        response: str,
-        db: Session
+        db: Session,
     ) -> Dict[str, Any]:
         """
-        Decide whether the message should create a task using the unified
-        DecisionEngine instead of keyword/acknowledgment heuristics.
+        Create + route a Task from an already-computed Decision. No LLM call.
+        Extracted from analyze_for_task so the hot path can reuse a decision that
+        was obtained for free from the main generation.
         """
-        from backend.services.decision_engine import DecisionEngine, DecisionAction
-
-        decision = await DecisionEngine().decide(head, prompt, db)
-        if decision.action is not DecisionAction.CREATE_TASK:
-            return {"created": False}
-
-        # Persistence requires a live session; callers without one (e.g.
-        # offline decision checks) still receive the decision outcome.
+        # Offline / no-session callers (e.g. unit tests, decision-only checks)
+        # still receive the decision outcome without persisting a Task.
         if db is None:
             return {"created": True}
+
+        from backend.services.decision_engine import DecisionAction
+
+        if decision.action is not DecisionAction.CREATE_TASK:
+            if decision.action not in (
+                DecisionAction.DISPATCH_TASK,
+                DecisionAction.DELEGATE,
+                DecisionAction.SPAWN_AGENT,
+            ):
+                return {"created": False}
 
         task = Task(
             title=prompt[:100] + "..." if len(prompt) > 100 else prompt,
@@ -679,7 +767,6 @@ Progress: {task_progress or 'N/A'}%"""
         db.add(task)
         db.commit()
 
-        # Trace this task back to the decision that spawned it.
         task.decision_id = decision.decision_id
         db.commit()
 
@@ -696,7 +783,7 @@ Progress: {task_progress or 'N/A'}%"""
         except RuntimeError as e:
             logger.warning(
                 "Ethos update failed for Head %s during plan write: %s",
-                head.agentium_id, e
+                head.agentium_id, e,
             )
 
         council = db.query(Agent).filter(
@@ -708,6 +795,147 @@ Progress: {task_progress or 'N/A'}%"""
             db.commit()
 
         return {"created": True, "task_id": task.agentium_id}
+
+    @staticmethod
+    async def _create_task_background(
+        head_agentium_id: str,
+        decision,
+        prompt: str,
+        user_id: Optional[str],
+    ) -> None:
+        """
+        Fire-and-forget: create + route the Task in its own DB session and announce
+        it via a follow-up WebSocket event so message_end is not blocked by task
+        creation / deliberation startup.
+
+        This runs in a separate ``asyncio.create_task`` from ``process_message``,
+        which means the caller's ``db`` session (closed by the time this runs) must
+        NOT be reused — hence the dedicated ``SessionLocal()`` here.
+        """
+        global ws_manager
+        try:
+            from backend.services.decision_engine import DecisionAction
+
+            db: Session = SessionLocal()
+            try:
+                head = db.query(HeadOfCouncil).filter_by(agentium_id=head_agentium_id).first()
+                if not head:
+                    return
+                task_info = await ChatService.create_task_from_decision(head, decision, prompt, db)
+            finally:
+                db.close()
+
+            if task_info.get("created"):
+                if ws_manager is None:
+                    from backend.api.routes.websocket import manager as ws_manager
+                try:
+                    await ws_manager.broadcast({
+                        "type": "task_created",
+                        "task_id": task_info.get("task_id"),
+                        "action": getattr(decision.action, "value", str(decision.action)),
+                        "content": decision.task_brief or (prompt[:100] if prompt else ""),
+                        "timestamp": datetime.utcnow().isoformat(),
+                    })
+                except Exception as exc:
+                    logger.warning(f"[ChatService] task_created broadcast failed: {exc}")
+        except Exception as exc:
+            logger.error(f"[ChatService] background task creation failed: {exc}")
+            if ws_manager is None:
+                from backend.api.routes.websocket import manager as ws_manager
+            try:
+                await ws_manager.broadcast({
+                    "type": "task_failed",
+                    "content": f"Task creation failed: {exc}",
+                    "timestamp": datetime.utcnow().isoformat(),
+                })
+            except Exception:
+                pass
+
+    @staticmethod
+    async def _media_and_persist_background(
+        user_id: str,
+        content: str,
+        agent_id: str,
+        model: str,
+        media_urls: list,
+    ) -> None:
+        """
+        Fire-and-forget: download/rewrite media URLs in the Head's reply, then
+        persist the Head-of-Council turn. Runs in its own ``asyncio.create_task``
+        spawned from ``process_message`` so the user-facing stream is not blocked
+        by network downloads or DB writes.
+        """
+        try:
+            import httpx
+            from backend.services.media_interceptor import MediaInterceptor
+
+            # Own DB session: the caller's session may already be closed by the
+            # time this background task runs. Open it in try/finally and close it
+            # after use so the connection is never leaked.
+            db: Session = SessionLocal()
+            try:
+                async with httpx.AsyncClient(timeout=MediaInterceptor.DOWNLOAD_TIMEOUT) as http_client:
+                    content, media_urls = await MediaInterceptor.intercept_and_store(
+                        text=content,
+                        user_id=user_id,
+                        db=db,
+                        http_client=http_client,
+                    )
+            finally:
+                db.close()
+        except Exception as exc:
+            logger.warning(f"[ChatService] media interception (bg) failed: {exc}")
+        await ChatService._persist_head_turn_background(
+            user_id, content, agent_id, model, media_urls
+        )
+
+    @staticmethod
+    async def _persist_head_turn_background(
+        user_id: str,
+        content: str,
+        agent_id: str,
+        model: str,
+        media_urls: list,
+    ) -> None:
+        """Persist the Head-of-Council turn + media rewrite off the critical path."""
+        try:
+            db: Session = SessionLocal()
+            try:
+                msg_id = str(uuid.uuid4())
+                db.add(ChatMsg(
+                    id=msg_id,
+                    user_id=user_id,
+                    role="head_of_council",
+                    content=content,
+                    message_metadata={
+                        "agent_id": agent_id,
+                        "model": model,
+                        "media_urls": media_urls or [],
+                    },
+                ))
+                db.commit()
+            finally:
+                db.close()
+        except Exception as exc:
+            logger.warning(f"[ChatService] Head turn persist (bg) failed: {exc}")
+
+    @staticmethod
+    async def analyze_for_task(
+        head: HeadOfCouncil,
+        prompt: str,
+        response: str,
+        db: Session
+    ) -> Dict[str, Any]:
+        """
+        Standalone path: make a fresh Decision via the DecisionEngine (its own LLM
+        call) and create the task. Retained for non-chat callers / tests. The chat
+        hot path uses classify_action_from_result + create_task_from_decision
+        instead, so it performs zero extra LLM calls.
+        """
+        from backend.services.decision_engine import DecisionEngine
+
+        decision = await DecisionEngine().decide(head, prompt, db)
+        return await ChatService.create_task_from_decision(head, decision, prompt, db)
 
     @staticmethod
     async def log_interaction(

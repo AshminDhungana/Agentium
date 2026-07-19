@@ -1796,6 +1796,46 @@ class ToolRegistry:
             ],
         )
 
+        # ══════════════════════════════════════════════════════════════════════
+        # DECIDE TOOL — routing SIGNAL only (no-op; not real work)
+        # The Head's chat path injects this tool so the model can classify its
+        # action (reply/create_task/...) in the same turn as its reply. The
+        # decision is read from the generated message's tool_calls; the tool
+        # itself never executes real work. Restricted to 0xxxx (Head) tier.
+        # ══════════════════════════════════════════════════════════════════════
+        async def _decide_tool(
+            action=None,
+            rationale=None,
+            target_tier=None,
+            task_brief=None,
+            tools_considered=None,
+            confidence=None,
+        ):
+            return {"status": "ok", "recorded": True}
+
+        self.register_tool(
+            name="decide",
+            description="Decide what action this agent should take for the user message.",
+            function=_decide_tool,
+            parameters={
+                "action": {
+                    "type": "string",
+                    "enum": [
+                        "reply", "create_task", "spawn_agent",
+                        "dispatch_task", "vote", "delegate",
+                    ],
+                },
+                "rationale": {"type": "string"},
+                "target_tier": {"type": "string"},
+                "task_brief": {"type": "string"},
+                "tools_considered": {
+                    "type": "array", "items": {"type": "string"},
+                },
+                "confidence": {"type": "number"},
+            },
+            authorized_tiers=["0xxxx"],
+        )
+
     # ── Registration ───────────────────────────────────────────────────────────
 
     def register_tool(

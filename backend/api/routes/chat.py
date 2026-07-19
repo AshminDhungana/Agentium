@@ -538,7 +538,7 @@ async def _stream_response(
 
         full_text = "".join(full_response)
         # Use original message (without file content) for task analysis
-        # to avoid false-positive task creation from extracted PDF keywords
+        # to avoid false-positive task creation from extracted PDF keywords.
         task_info = await ChatService.analyze_for_task(head, message, full_text, db)
 
         # ── 2–3 line response policy enforcement ─────────────────────────────

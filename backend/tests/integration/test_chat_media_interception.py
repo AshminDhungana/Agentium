@@ -3,6 +3,8 @@ Integration tests for System-Generated Media Interception in ChatService.
 Tests the full pipeline: LLM response -> MediaInterceptor -> Storage -> Broadcast.
 """
 
+import asyncio
+
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from io import BytesIO
@@ -130,10 +132,19 @@ class TestChatServiceMediaInterception:
                 # Execute
                 result = await ChatService.process_message(head, "Show me sales", seeded_db)
 
-        # Verify: content rewritten with storage URL
-        assert "https://s3.bucket/files/user-admin-media-1/abc123.png" in result["content"]
-        assert "https://charts.example.com/sales.png" not in result["content"]
-        assert "![Sales Chart]" in result["content"]  # alt text preserved
+        # Synchronous result still carries the ORIGINAL external URL (not yet rewritten)
+        assert "https://charts.example.com/sales.png" in result["content"]
+        assert "https://s3.bucket/files/user-admin-media-1/abc123.png" not in result["content"]
+
+        # Drive the background media interception + Head-turn persistence
+        await asyncio.sleep(0.1)
+
+        # Verify the persisted Head-of-Council ChatMessage has the rewritten storage URL
+        from backend.models.entities.chat_message import ChatMessage
+        msgs = seeded_db.query(ChatMessage).filter_by(role="head_of_council").all()
+        assert any("https://s3.bucket/files/user-admin-media-1/abc123.png" in m.content for m in msgs)
+        assert any("https://charts.example.com/sales.png" not in m.content for m in msgs)
+        assert any("![Sales Chart]" in m.content for m in msgs)  # alt text preserved
 
     @pytest.mark.asyncio
     async def test_raw_image_url_intercepted_and_stored(self, seeded_db, monkeypatch):
@@ -187,8 +198,18 @@ class TestChatServiceMediaInterception:
 
                 result = await ChatService.process_message(head, "Show photo", seeded_db)
 
-        assert "https://s3.bucket/files/user-admin-media-2/xyz789.jpg" in result["content"]
-        assert "https://cdn.example.com/photo.jpg" not in result["content"]
+        # Synchronous result still carries the ORIGINAL external URL (not yet rewritten)
+        assert "https://cdn.example.com/photo.jpg" in result["content"]
+        assert "https://s3.bucket/files/user-admin-media-2/xyz789.jpg" not in result["content"]
+
+        # Drive the background media interception + Head-turn persistence
+        await asyncio.sleep(0.1)
+
+        # Verify the persisted Head-of-Council ChatMessage has the rewritten storage URL
+        from backend.models.entities.chat_message import ChatMessage
+        msgs = seeded_db.query(ChatMessage).filter_by(role="head_of_council").all()
+        assert any("https://s3.bucket/files/user-admin-media-2/xyz789.jpg" in m.content for m in msgs)
+        assert any("https://cdn.example.com/photo.jpg" not in m.content for m in msgs)
 
     @pytest.mark.asyncio
     async def test_non_media_text_passthrough(self, seeded_db):
@@ -339,10 +360,16 @@ class TestChatServiceMediaInterception:
 
                 result = await ChatService.process_message(head, "Chart please", seeded_db)
 
+        # Drive the background media interception + Head-turn persistence
+        await asyncio.sleep(0.1)
+
         # Verify ChatMessage was created with media_urls in metadata
         from backend.models.entities.chat_message import ChatMessage
-        msg = seeded_db.query(ChatMessage).filter_by(role="head_of_council").first()
-        assert msg is not None
-        assert msg.message_metadata is not None
-        assert "media_urls" in msg.message_metadata
-        assert "https://s3.bucket/files/user-admin-media-5/chart.png" in msg.message_metadata["media_urls"]
+        msgs = seeded_db.query(ChatMessage).filter_by(role="head_of_council").all()
+        assert msgs
+        matched = [m for m in msgs if m.message_metadata and "media_urls" in (m.message_metadata or {})]
+        assert matched
+        assert any(
+            "https://s3.bucket/files/user-admin-media-5/chart.png" in (m.message_metadata["media_urls"] or [])
+            for m in matched
+        )
