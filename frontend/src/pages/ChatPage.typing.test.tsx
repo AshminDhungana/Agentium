@@ -28,4 +28,17 @@ describe('ChatPage streaming polish', () => {
         // Three animated dots.
         expect(container.querySelectorAll('span').length).toBe(3);
     });
+
+    it('renders the Thinking label when thinking prop is true', () => {
+        const { container, getByText } = render(<TypingIndicator thinking />);
+        expect(container.querySelector('[data-testid="typing-indicator"]')).toBeInTheDocument();
+        expect(getByText('Thinking…')).toBeInTheDocument();
+    });
+
+    it('still renders the three-dot shimmer when thinking is false', () => {
+        const { container } = render(<TypingIndicator thinking={false} />);
+        expect(container.querySelector('[data-testid="typing-indicator"]')).toBeInTheDocument();
+        expect(container.querySelectorAll('span').length).toBe(3);
+        expect(container.textContent).not.toContain('Thinking…');
+    });
 });
