@@ -2,6 +2,7 @@ from backend.core.environment_context import (
     AGENT_ENVIRONMENT_CONTEXT,
     ENV_CONTEXT_DOC_ID,
 )
+from backend.models.entities.constitution import Ethos
 
 
 def test_context_mentions_host_home_desktop():
@@ -16,9 +17,6 @@ def test_context_states_internet_egress():
 
 def test_doc_id_is_stable():
     assert ENV_CONTEXT_DOC_ID == "agent_environment_context"
-
-
-from backend.models.entities.constitution import Ethos
 
 
 def test_ethos_has_environment_context_column():
