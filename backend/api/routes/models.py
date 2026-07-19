@@ -26,6 +26,7 @@ from backend.models.entities.model_pricing import ModelPricing
 
 from backend.api.schemas.examples import ErrorResponseExample, SuccessResponseExample, build_responses
 from backend.core.config import settings
+from backend.core.security import encrypt_api_key, decrypt_api_key
 
 logger = logging.getLogger(__name__)
 
