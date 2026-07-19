@@ -90,6 +90,7 @@ class VectorStore:
     # ------------------------------------------------------------------
     COLLECTIONS: Dict[str, str] = {
         "constitution": "supreme_law",
+        "agent_environment": "agent_environment",
         "council_memory": "council_knowledge",
         # FIX: canonical key used everywhere (was "task_patterns" in some
         # places and "execution_patterns" in others — unified to one key)
@@ -248,6 +249,34 @@ class VectorStore:
             self.upsert_document("constitution", parent_id, content, rich_meta, db)
             return
         collection = self.get_collection("constitution")
+        collection.upsert(
+            documents=[content],
+            metadatas=[rich_meta],
+            ids=[parent_id],
+        )
+
+    def add_environment_context(
+        self,
+        content: str,
+        doc_id: str = "agent_environment_context",
+        db: Optional[Any] = None,
+    ) -> None:
+        """Store the agent runtime/host-environment grounding as a read-only
+        RAG document (constitution-adjacent). Idempotent via a stable doc_id.
+
+        Mirrors add_constitution_article: chunk-aware when a session is
+        supplied, legacy single-document upsert otherwise.
+        """
+        parent_id = f"envctx_{doc_id}"
+        rich_meta = {
+            "type": "agent_environment",
+            "document_type": "agent_environment",
+            "immutable": True,
+        }
+        if db is not None:
+            self.upsert_document("agent_environment", parent_id, content, rich_meta, db)
+            return
+        collection = self.get_collection("agent_environment")
         collection.upsert(
             documents=[content],
             metadatas=[rich_meta],
@@ -524,6 +553,14 @@ class VectorStore:
         context["constitution"] = self.query_constitution(
             task_description, n_results=2
         )
+
+        # All tiers are also grounded in the runtime/host environment context
+        try:
+            context["agent_environment"] = self.get_collection(
+                "agent_environment"
+            ).query(query_texts=[task_description], n_results=1)
+        except Exception:  # noqa: BLE001
+            logger.debug("agent_environment collection not yet seeded")
 
         if agent_type == "council_member":
             context["council_memory"] = self.get_collection(
