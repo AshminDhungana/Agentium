@@ -5,6 +5,7 @@ Handles message processing, task creation, context management, and reincarnation
 
 import logging
 import httpx
+import time
 from datetime import datetime
 import asyncio
 from typing import Dict, Any, Optional, List, Callable, Awaitable
@@ -31,6 +32,9 @@ from backend.models.schemas.structured_input import StructuredInputCard as _SIC
 ws_manager = None
 
 logger = logging.getLogger(__name__)
+
+_SYSTEM_CONTEXT_TTL = 20.0
+_system_context_cache: dict = {"ts": 0.0, "value": None}
 
 
 class ChatService:
@@ -301,7 +305,7 @@ class ChatService:
 
         # Get system prompt and context
         system_prompt = head.get_system_prompt()
-        context = await ChatService.get_system_context(db)
+        context = await ChatService.get_cached_system_context(db)
 
         # Build consultation note from predecessor context for reincarnated agents
         consultation_result = None
@@ -616,6 +620,23 @@ Progress: {task_progress or 'N/A'}%"""
             "can_escalate": consultation.get("escalation_available"),
             "advice": "Follow parent's guidance or review inherited ethos behavioral rules for [LIFE_X_WISDOM] entries."
         }
+
+    @staticmethod
+    async def get_cached_system_context(db: Session) -> str:
+        """
+        Return the descriptive system context used in the Head's prompt, cached
+        for 20 s. System state (agent counts, pending tasks) changes slowly
+        relative to chat cadence, so a slightly stale snapshot is acceptable and
+        removes a full table scan from every chat message's critical path.
+        """
+        now = time.monotonic()
+        cached = _system_context_cache
+        if cached["value"] is not None and (now - cached["ts"]) < _SYSTEM_CONTEXT_TTL:
+            return cached["value"]
+        value = await ChatService.get_system_context(db)
+        cached["ts"] = now
+        cached["value"] = value
+        return value
 
     @staticmethod
     async def get_system_context(db: Session) -> str:
