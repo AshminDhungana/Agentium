@@ -70,7 +70,7 @@ A new agent, without any task-specific context, correctly answers:
   `knowledge_documents`, chunk vectors in ChromaDB).
 - `KnowledgeService.initialize_knowledge_base()`
   (`backend/services/knowledge_service.py:657`) seeds the block once (idempotent
-  upsert) when no active constitution article of that id exists.
+  upsert keyed by a stable `env_context` doc id, so re-runs do not duplicate it).
 - `VectorStore.query_hierarchical_context()`
   (`backend/core/vector_store.py:505`) includes `agent_environment` for **all**
   tiers (currently every tier already receives `constitution`; we add the
