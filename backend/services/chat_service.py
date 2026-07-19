@@ -695,13 +695,22 @@ Progress: {task_progress or 'N/A'}%"""
         the Head's reply (no second LLM round-trip). Looks for a `decide` tool
         call in the result; if the model didn't emit one, default to REPLY so we
         never create a spurious task.
+
+        ``provider.generate_with_tools`` returns a dict whose TOP LEVEL has no
+        ``tool_calls`` key — parsed tool calls live only inside
+        ``result["messages"][*].tool_calls`` (the assistant turns). So we scan
+        the message list for the last assistant message that carries a `decide`
+        call.
         """
         from backend.services.decision_engine import DecisionEngine, DecisionAction, Decision
 
-        calls = result.get("tool_calls") or []
-        for call in calls:
-            if call.get("function", {}).get("name") == "decide":
-                return DecisionEngine._parse({"tool_calls": [call]})
+        for message in reversed(result.get("messages", []) or []):
+            if message.get("role") != "assistant":
+                continue
+            calls = message.get("tool_calls") or []
+            for call in calls:
+                if call.get("function", {}).get("name") == "decide":
+                    return DecisionEngine._parse({"tool_calls": [call]})
         return Decision(
             action=DecisionAction.REPLY,
             rationale="no_decide_tool_call",

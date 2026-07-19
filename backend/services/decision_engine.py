@@ -101,6 +101,20 @@ class DecisionEngine:
     def _parse(result: Dict[str, Any]) -> Decision:
         import json
         calls = result.get("tool_calls") or []
+        # Fallback: provider.generate_with_tools returns a dict whose top level
+        # has no `tool_calls` key — the parsed call lives inside
+        # result["messages"][*].tool_calls (the assistant turns). Scan for the
+        # last assistant message that carries a `decide` call.
+        if not calls:
+            for message in reversed(result.get("messages", []) or []):
+                if message.get("role") != "assistant":
+                    continue
+                for call in (message.get("tool_calls") or []):
+                    if call.get("function", {}).get("name") == "decide":
+                        calls = [call]
+                        break
+                if calls:
+                    break
         if not calls:
             return Decision(action=DecisionAction.REPLY, rationale="no_tool_call", confidence=0.0)
         args = calls[0].get("function", {}).get("arguments", "{}")
