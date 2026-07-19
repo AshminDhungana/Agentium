@@ -23,6 +23,7 @@ from backend.services.decision_engine import DecisionEngine, DecisionAction
 from backend.core.llm_client import LLMClient
 from backend.models.entities.user_config import ConnectionStatus
 from backend.models.entities.chat_message import ChatMessage as ChatMsg
+from backend.models.database import SessionLocal
 
 import uuid
 from backend.models.entities.chat_message import ChatMessage as ChatMessageEntity
@@ -539,12 +540,34 @@ Address the Sovereign respectfully. If they issue a command that requires execut
                 )
             )
 
-        # ── Task 3: classify the routing action from the Head's own turn ──
-        #    (the `decide` tool call is captured in result["tool_calls"]), then
-        #    create a task directly — no second LLM round-trip. analyze_for_task
-        #    is retained only for backward compatibility.
+        # ── Task creation decoupled from the message_end response (Task 4) ──
+        #    Classification still happens on the hot path (free from the `decide`
+        #    tool call), but the actual task creation + deliberation startup is
+        #    handed off to a fire-and-forget background task so message_end is not
+        #    blocked. The real status arrives via the `task_created` WS event.
         decision = ChatService.classify_action_from_result(result)
-        task_info = await ChatService.create_task_from_decision(head, decision, message, db)
+
+        _delegate_actions = (
+            DecisionAction.CREATE_TASK,
+            DecisionAction.DISPATCH_TASK,
+            DecisionAction.DELEGATE,
+            DecisionAction.SPAWN_AGENT,
+        )
+        if decision.action in _delegate_actions:
+            try:
+                asyncio.create_task(
+                    ChatService._create_task_background(
+                        head.agentium_id,
+                        decision,
+                        message,
+                        str(sovereign_user.id) if sovereign_user else None,
+                    )
+                )
+            except Exception as exc:
+                logger.warning(f"[ChatService] failed to schedule background task: {exc}")
+            task_info = {"created": True, "task_id": None, "pending": True}
+        else:
+            task_info = {"created": False}
 
         # Get current task ID if any (for preservation during reincarnation)
         current_task_id = head.current_task_id
@@ -778,6 +801,51 @@ Progress: {task_progress or 'N/A'}%"""
             db.commit()
 
         return {"created": True, "task_id": task.agentium_id}
+
+    @staticmethod
+    async def _create_task_background(
+        head_agentium_id: str,
+        decision,
+        prompt: str,
+        user_id: Optional[str],
+    ) -> None:
+        """
+        Fire-and-forget: create + route the Task in its own DB session and announce
+        it via a follow-up WebSocket event so message_end is not blocked by task
+        creation / deliberation startup.
+
+        This runs in a separate ``asyncio.create_task`` from ``process_message``,
+        which means the caller's ``db`` session (closed by the time this runs) must
+        NOT be reused — hence the dedicated ``SessionLocal()`` here.
+        """
+        global ws_manager
+        try:
+            from backend.services.decision_engine import DecisionAction
+
+            db: Session = SessionLocal()
+            try:
+                head = db.query(HeadOfCouncil).filter_by(agentium_id=head_agentium_id).first()
+                if not head:
+                    return
+                task_info = await ChatService.create_task_from_decision(head, decision, prompt, db)
+            finally:
+                db.close()
+
+            if task_info.get("created"):
+                if ws_manager is None:
+                    from backend.api.routes.websocket import manager as ws_manager
+                try:
+                    await ws_manager.broadcast({
+                        "type": "task_created",
+                        "task_id": task_info.get("task_id"),
+                        "action": getattr(decision.action, "value", str(decision.action)),
+                        "content": decision.task_brief or (prompt[:100] if prompt else ""),
+                        "timestamp": datetime.utcnow().isoformat(),
+                    })
+                except Exception as exc:
+                    logger.warning(f"[ChatService] task_created broadcast failed: {exc}")
+        except Exception as exc:
+            logger.error(f"[ChatService] background task creation failed: {exc}")
 
     @staticmethod
     async def analyze_for_task(
