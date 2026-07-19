@@ -667,26 +667,46 @@ Progress: {task_progress or 'N/A'}%"""
 - Pending Tasks: {pending_tasks}{reincarnation_info if reincarnation_info else ""}"""
 
     @staticmethod
-    async def analyze_for_task(
+    def classify_action_from_result(result: Dict[str, Any]):
+        """
+        Extract the routing decision from the SAME generation call that produced
+        the Head's reply (no second LLM round-trip). Looks for a `decide` tool
+        call in the result; if the model didn't emit one, default to REPLY so we
+        never create a spurious task.
+        """
+        from backend.services.decision_engine import DecisionEngine, DecisionAction, Decision
+
+        calls = result.get("tool_calls") or []
+        for call in calls:
+            if call.get("function", {}).get("name") == "decide":
+                return DecisionEngine._parse({"tool_calls": [call]})
+        return Decision(
+            action=DecisionAction.REPLY,
+            rationale="no_decide_tool_call",
+            confidence=0.0,
+        )
+
+    @staticmethod
+    async def create_task_from_decision(
         head: HeadOfCouncil,
+        decision,
         prompt: str,
-        response: str,
-        db: Session
+        db: Session,
     ) -> Dict[str, Any]:
         """
-        Decide whether the message should create a task using the unified
-        DecisionEngine instead of keyword/acknowledgment heuristics.
+        Create + route a Task from an already-computed Decision. No LLM call.
+        Extracted from analyze_for_task so the hot path can reuse a decision that
+        was obtained for free from the main generation.
         """
-        from backend.services.decision_engine import DecisionEngine, DecisionAction
+        from backend.services.decision_engine import DecisionAction
 
-        decision = await DecisionEngine().decide(head, prompt, db)
         if decision.action is not DecisionAction.CREATE_TASK:
-            return {"created": False}
-
-        # Persistence requires a live session; callers without one (e.g.
-        # offline decision checks) still receive the decision outcome.
-        if db is None:
-            return {"created": True}
+            if decision.action not in (
+                DecisionAction.DISPATCH_TASK,
+                DecisionAction.DELEGATE,
+                DecisionAction.SPAWN_AGENT,
+            ):
+                return {"created": False}
 
         task = Task(
             title=prompt[:100] + "..." if len(prompt) > 100 else prompt,
@@ -700,7 +720,6 @@ Progress: {task_progress or 'N/A'}%"""
         db.add(task)
         db.commit()
 
-        # Trace this task back to the decision that spawned it.
         task.decision_id = decision.decision_id
         db.commit()
 
@@ -717,7 +736,7 @@ Progress: {task_progress or 'N/A'}%"""
         except RuntimeError as e:
             logger.warning(
                 "Ethos update failed for Head %s during plan write: %s",
-                head.agentium_id, e
+                head.agentium_id, e,
             )
 
         council = db.query(Agent).filter(
@@ -729,6 +748,24 @@ Progress: {task_progress or 'N/A'}%"""
             db.commit()
 
         return {"created": True, "task_id": task.agentium_id}
+
+    @staticmethod
+    async def analyze_for_task(
+        head: HeadOfCouncil,
+        prompt: str,
+        response: str,
+        db: Session
+    ) -> Dict[str, Any]:
+        """
+        Standalone path: make a fresh Decision via the DecisionEngine (its own LLM
+        call) and create the task. Retained for non-chat callers / tests. The chat
+        hot path uses classify_action_from_result + create_task_from_decision
+        instead, so it performs zero extra LLM calls.
+        """
+        from backend.services.decision_engine import DecisionEngine
+
+        decision = await DecisionEngine().decide(head, prompt, db)
+        return await ChatService.create_task_from_decision(head, decision, prompt, db)
 
     @staticmethod
     async def log_interaction(
