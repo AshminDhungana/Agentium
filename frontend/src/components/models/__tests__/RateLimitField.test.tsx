@@ -33,11 +33,29 @@ describe('RateLimitField per-second helper', () => {
         expect(onChange).toHaveBeenCalledWith(30);
     });
 
-    it('falls back to 60 when input is emptied', () => {
+    it('keeps the field empty while cleared and does not commit until a valid value', () => {
         const onChange = vi.fn();
         render(<RateLimitField value={60} onChange={onChange} />);
         const input = screen.getByRole('spinbutton') as HTMLInputElement;
         fireEvent.change(input, { target: { value: '' } });
-        expect(onChange).toHaveBeenCalledWith(60);
+        expect(input.value).toBe('');
+        expect(onChange).not.toHaveBeenCalled();
+    });
+
+    it('resets to the last valid value on blur when left empty or invalid', () => {
+        const onChange = vi.fn();
+        render(<RateLimitField value={60} onChange={onChange} />);
+        const input = screen.getByRole('spinbutton') as HTMLInputElement;
+        fireEvent.change(input, { target: { value: '' } });
+        fireEvent.blur(input);
+        expect(input.value).toBe('60');
+    });
+
+    it('commits an arbitrary typed value', () => {
+        const onChange = vi.fn();
+        render(<RateLimitField value={60} onChange={onChange} />);
+        const input = screen.getByRole('spinbutton') as HTMLInputElement;
+        fireEvent.change(input, { target: { value: '350' } });
+        expect(onChange).toHaveBeenCalledWith(350);
     });
 });
