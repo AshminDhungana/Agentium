@@ -32,6 +32,15 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/models", tags=["Model Configuration"])
 
 
+_VALID_EFFORTS = {"none", "low", "medium", "high", "xhigh"}
+
+
+def _validate_effort(v: str) -> str:
+    if v not in _VALID_EFFORTS:
+        raise ValueError("effort must be one of: none, low, medium, high, xhigh")
+    return v
+
+
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Pydantic Schemas
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -50,6 +59,7 @@ class ModelConfigCreate(BaseModel):
     temperature: float = Field(default=0.7, ge=0.0, le=2.0)
     top_p: Optional[float] = Field(default=1.0, ge=0.0, le=1.0)
     timeout_seconds: int = Field(default=60, ge=5, le=300)
+    effort: str = Field(default="none")
     requests_per_minute: int = Field(default=60, ge=1, le=1000000,
                                             description="Max outbound requests/minute (whole integer)")
     tokens_per_minute: Optional[int] = Field(default=None, ge=1,
@@ -73,6 +83,11 @@ class ModelConfigCreate(BaseModel):
             raise ValueError('URL must start with http:// or https://')
         return v
 
+    @field_validator('effort')
+    @classmethod
+    def _check_effort(cls, v):
+        return _validate_effort(v)
+
 
 class ModelConfigUpdate(BaseModel):
     config_name: Optional[str] = None
@@ -89,6 +104,12 @@ class ModelConfigUpdate(BaseModel):
     requests_per_minute: Optional[int] = Field(default=None, ge=1, le=1000000)
     tokens_per_minute: Optional[int] = Field(default=None, ge=1)
     max_concurrent_requests: Optional[int] = Field(default=None, ge=1)
+    effort: Optional[str] = None
+
+    @field_validator('effort')
+    @classmethod
+    def _check_effort(cls, v):
+        return _validate_effort(v) if v is not None else v
 
 
 class ModelConfigResponse(BaseModel):
@@ -107,6 +128,7 @@ class ModelConfigResponse(BaseModel):
     tokens_per_minute: Optional[int] = None
     max_concurrent_requests: Optional[int] = None
     settings: Dict[str, Any] = Field(default_factory=dict)
+    effort: str = "none"
     last_tested: Optional[str] = None
     total_usage: Dict[str, Any] = Field(default_factory=dict)
 
@@ -253,11 +275,13 @@ def _serialize_config(config: UserModelConfig) -> Dict[str, Any]:
         'requests_per_minute': config.requests_per_minute,
         'tokens_per_minute': config.tokens_per_minute,
         'max_concurrent_requests': config.max_concurrent_requests,
+        'effort':        config.effort or 'none',
         'settings': {
             'max_tokens':  config.max_tokens,
             'temperature': config.temperature,
             'top_p':       config.top_p,
             'timeout':     config.timeout_seconds,
+            'effort':      config.effort or 'none',
         },
         'last_tested': (
             config.last_tested_at.isoformat()
@@ -456,6 +480,7 @@ async def create_config(
         temperature       = config.temperature,
         top_p             = config.top_p,
         timeout_seconds   = config.timeout_seconds,
+        effort            = config.effort,
         requests_per_minute = config.requests_per_minute,
         tokens_per_minute   = config.tokens_per_minute,
         max_concurrent_requests = config.max_concurrent_requests,
@@ -625,6 +650,10 @@ async def update_config(
 
     if "api_key_encrypted" in update_data:
         config.status = ConnectionStatus.TESTING
+
+    if updates.effort is not None:
+        config.effort = _validate_effort(updates.effort)
+        flag_modified(config, "effort")
 
     db.commit()
     db.refresh(config)
