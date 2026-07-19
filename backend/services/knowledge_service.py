@@ -671,6 +671,17 @@ class KnowledgeService:
             self.embed_constitution(db, active_const)
             logger.info("Embedded Constitution %s", active_const.version)
 
+        from backend.core.environment_context import (
+            AGENT_ENVIRONMENT_CONTEXT,
+            ENV_CONTEXT_DOC_ID,
+        )
+
+        # Seed the runtime/host-environment grounding (6.1) as a read-only RAG
+        # document, idempotent via the stable doc id.
+        self.vector_store.add_environment_context(
+            AGENT_ENVIRONMENT_CONTEXT, doc_id=ENV_CONTEXT_DOC_ID, db=db
+        )
+
         # NOTE: Ethos is deliberately not embedded into the vector DB. It lives
         # in Postgres (the `ethos` table) and is read directly from the DB.
         return {

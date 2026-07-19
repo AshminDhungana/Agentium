@@ -44,3 +44,18 @@ def test_hierarchical_context_returns_environment_for_all_tiers():
     for tier in ("head_of_council", "council_member", "lead_agent", "task_agent"):
         ctx = vs.query_hierarchical_context(tier, "can you reach the internet")
         assert "agent_environment" in ctx
+
+
+def test_initialize_knowledge_base_seeds_environment_context(db_session: Session):
+    from backend.services.knowledge_service import get_knowledge_service
+
+    svc = get_knowledge_service()
+    svc.initialize_knowledge_base(db_session)
+
+    vs = get_vector_store()
+    ctx = vs.query_hierarchical_context("task_agent", "where is my desktop")
+    env = ctx.get("agent_environment")
+    assert env is not None
+    blob = " ".join(env["documents"][0])
+    assert "/host_home/Desktop" in blob
+    assert "internet" in blob.lower()
