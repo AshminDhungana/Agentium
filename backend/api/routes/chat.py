@@ -539,12 +539,7 @@ async def _stream_response(
         full_text = "".join(full_response)
         # Use original message (without file content) for task analysis
         # to avoid false-positive task creation from extracted PDF keywords.
-        # Task 3: classify the routing action from the streamed turn via the
-        # `decide` parser / create_task_from_decision hot path (no 2nd LLM call).
-        # NOTE: _stream_response does not run a tool-aware generation, so it has
-        # no tool_calls to parse — fall back to the lightweight heuristic.
-        decision = ChatService.classify_action_from_result({"content": full_text, "tool_calls": []})
-        task_info = await ChatService.create_task_from_decision(head, decision, message, db)
+        task_info = await ChatService.analyze_for_task(head, message, full_text, db)
 
         # ── 2–3 line response policy enforcement ─────────────────────────────
         if not task_info.get("created", False):
