@@ -10,6 +10,7 @@ from contextlib import contextmanager
 from typing import Any, Dict, Generator, List, Optional, Union
 
 import chromadb
+import numpy as np
 from chromadb.api.types import EmbeddingFunction, QueryResult
 from sentence_transformers import SentenceTransformer
 
@@ -54,15 +55,20 @@ class BgeEmbeddingFunction(EmbeddingFunction):
     def _with_prefix(self, text: str) -> str:
         return f"{BGE_QUERY_PREFIX}{text}"
 
-    def embed_documents(self, input: List[str]) -> List[List[float]]:
-        return self.model.encode(input, convert_to_numpy=True, normalize_embeddings=True).tolist()
+    def embed_documents(self, input: List[str]) -> List[Any]:
+        # Return a list of 1-D numpy arrays. ChromaDB's rust binding calls
+        # `.tolist()` on each embedding during query, so plain Python lists
+        # raise AttributeError — ndarrays are required.
+        arr = self.model.encode(input, convert_to_numpy=True, normalize_embeddings=True)
+        return [np.asarray(v) for v in arr]
 
-    def embed_query(self, input: Union[str, List[str]]) -> List[List[float]]:
+    def embed_query(self, input: Union[str, List[str]]) -> List[Any]:
         # ChromaDB 1.5.1 calls embed_query with a list of query texts; accept
         # both a single string and a list so v2 queries don't crash.
         texts = input if isinstance(input, list) else [input]
         prefixed = [self._with_prefix(t) for t in texts]
-        return self.model.encode(prefixed, convert_to_numpy=True, normalize_embeddings=True).tolist()
+        arr = self.model.encode(prefixed, convert_to_numpy=True, normalize_embeddings=True)
+        return [np.asarray(v) for v in arr]
 
     def __call__(self, input: List[str]) -> List[List[float]]:
         # Default path (collection init / stored documents) = no prefix, normalized.
@@ -90,6 +96,11 @@ class VectorStore:
     # ------------------------------------------------------------------
     COLLECTIONS: Dict[str, str] = {
         "constitution": "supreme_law",
+        # "agent_environment" is absent from COLLECTIONS_V2, so _collection_name
+        # falls back to f"{key}{V2_SUFFIX}" → "agent_environment_v2", keeping the
+        # resolved name consistent between the write path (add_environment_context)
+        # and the read path (query_hierarchical_context).
+        "agent_environment": "agent_environment",
         "council_memory": "council_knowledge",
         # FIX: canonical key used everywhere (was "task_patterns" in some
         # places and "execution_patterns" in others — unified to one key)
@@ -248,6 +259,38 @@ class VectorStore:
             self.upsert_document("constitution", parent_id, content, rich_meta, db)
             return
         collection = self.get_collection("constitution")
+        collection.upsert(
+            documents=[content],
+            metadatas=[rich_meta],
+            ids=[parent_id],
+        )
+
+    def add_environment_context(
+        self,
+        content: str,
+        doc_id: str = "agent_environment_context",
+        db: Optional[Any] = None,
+    ) -> None:
+        """Store the agent runtime/host-environment grounding as a read-only
+        RAG document (constitution-adjacent). Idempotent via a stable doc_id.
+
+        Mirrors add_constitution_article: chunk-aware when a session is
+        supplied, legacy single-document upsert otherwise.
+        """
+        parent_id = f"envctx_{doc_id}"
+        rich_meta = {
+            "type": "agent_environment",
+            "document_type": "agent_environment",
+            # "immutable": True marks read-only-by-convention: no decay/pruning
+            # path (decay_stale_entries / apply_learning_decay) targets this
+            # collection, and initialize_knowledge_base is its only writer, so
+            # the document is effectively immutable once seeded.
+            "immutable": True,
+        }
+        if db is not None:
+            self.upsert_document("agent_environment", parent_id, content, rich_meta, db)
+            return
+        collection = self.get_collection("agent_environment")
         collection.upsert(
             documents=[content],
             metadatas=[rich_meta],
@@ -524,6 +567,14 @@ class VectorStore:
         context["constitution"] = self.query_constitution(
             task_description, n_results=2
         )
+
+        # All tiers are also grounded in the runtime/host environment context
+        try:
+            context["agent_environment"] = self.get_collection(
+                "agent_environment"
+            ).query(query_texts=[task_description], n_results=1)
+        except Exception:  # noqa: BLE001
+            logger.debug("agent_environment collection not yet seeded")
 
         if agent_type == "council_member":
             context["council_memory"] = self.get_collection(

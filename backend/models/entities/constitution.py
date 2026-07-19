@@ -264,6 +264,9 @@ class Ethos(BaseEntity):
     
     # Update tracking (agents can update their own ethos)
     last_updated_by_agent = Column(Boolean, default=False)  # True if agent updated itself
+
+    # Environment / host grounding (6.1) — core identity, set at agent creation
+    environment_context = Column(Text, nullable=True)
     def get_core_values(self) -> List[str]:
         import json
         val = self.core_values
@@ -434,6 +437,7 @@ class Ethos(BaseEntity):
             "lessons_learned":     self.get_lessons_learned(),
             "constitutional_refs": self.get_constitutional_references(),
             "outcome_summary":     self.outcome_summary,
+            "environment_context": self.environment_context,
         }
 
     def apply_llm_compression(
@@ -721,7 +725,8 @@ class Ethos(BaseEntity):
             'created_by': self.created_by_agentium_id,
             'verified': self.is_verified,
             'verified_by': self.verified_by_agentium_id,
-            'agent_id': self.agent_id
+            'agent_id': self.agent_id,
+            'environment_context': self.environment_context,
         })
         return base
 
