@@ -7,6 +7,20 @@ import type {
     ProviderType
 } from '../types';
 
+/** Per-model price in USD per 1M tokens. `null` => free / unknown (suppress). */
+export interface ModelPrice {
+    input_rate_per_1m: number;
+    output_rate_per_1m: number;
+}
+
+/** Map of model_id -> price (or null when the provider exposes no price). */
+export type PricingMap = Record<string, ModelPrice | null>;
+
+export interface ConfigPricing {
+    model_id: string;
+    pricing: ModelPrice | null;
+}
+
 export const modelsApi = {
     // Get all available providers with metadata
     getProviders: async (): Promise<ProviderInfo[]> => {
@@ -88,6 +102,7 @@ export const modelsApi = {
         provider: string;
         models: string[];
         count: number;
+        pricing?: PricingMap;
     }> => {
         const response = await api.post(`/api/v1/models/configs/${configId}/fetch-models`);
         return response.data;
@@ -104,8 +119,15 @@ export const modelsApi = {
         models: string[];
         count: number;
         default_recommended?: string;
+        pricing?: PricingMap;
     }> => {
         const response = await api.post('/api/v1/models/providers/fetch-models-direct', params);
+        return response.data;
+    },
+
+    // Get the live/registry price for a config's default model (null if free)
+    getConfigPricing: async (configId: string): Promise<ConfigPricing> => {
+        const response = await api.get(`/api/v1/models/configs/${configId}/pricing`);
         return response.data;
     },
 

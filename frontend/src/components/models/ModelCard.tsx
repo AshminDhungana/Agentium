@@ -30,6 +30,7 @@ import type { ModelConfig } from '@/types';
 import { getProviderMeta } from '@/constants/providerMeta';
 import { formatTokenCount } from '@/utils/time';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { modelsApi, type ModelPrice } from '@/services/models';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -128,6 +129,18 @@ export const ModelCard: React.FC<ModelCardProps> = React.memo(({
     const isAnyBusy = activeAction !== null;
     const awaitingDeleteConfirm = pendingDeleteId === config.id;
 
+    // Live/registry price for this config's default model.
+    // `undefined` = not yet loaded, `null` = free/unknown (suppress), object = paid.
+    const [price, setPrice] = useState<ModelPrice | null | undefined>(undefined);
+    useEffect(() => {
+        let cancelled = false;
+        setPrice(undefined);
+        modelsApi.getConfigPricing(config.id)
+            .then((res) => { if (!cancelled) setPrice(res.pricing); })
+            .catch(() => { if (!cancelled) setPrice(null); });
+        return () => { cancelled = true; };
+    }, [config.id, config.default_model]);
+
     // FIX: when the Trash button is swapped for Confirm/Cancel, focus stayed
     // wherever it was — keyboard and screen-reader users got no signal the UI
     // changed under them. Move focus to Confirm as soon as it appears.
@@ -204,6 +217,21 @@ export const ModelCard: React.FC<ModelCardProps> = React.memo(({
                             {config.requests_per_minute} requests/minute
                         </span>
                     </div>
+                    {price ? (
+                        <div className="flex items-center justify-between text-sm">
+                            <span className="text-gray-600 dark:text-gray-400">Price / 1M</span>
+                            <span className="font-mono text-xs text-gray-900 dark:text-gray-100">
+                                ${price.input_rate_per_1m.toFixed(2)} in
+                                {' / '}
+                                ${price.output_rate_per_1m.toFixed(2)} out
+                            </span>
+                        </div>
+                    ) : price === null ? null : (
+                        <div className="flex items-center justify-between text-sm opacity-60">
+                            <span className="text-gray-600 dark:text-gray-400">Price / 1M</span>
+                            <span className="font-mono text-xs text-gray-400 dark:text-gray-500">…</span>
+                        </div>
+                    )}
                 </div>
 
                 {/* ── Available model tags ────────────────────────────────── */}

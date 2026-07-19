@@ -24,8 +24,9 @@ import {
     CheckCircle,
     XCircle,
     Download,
+    DollarSign,
 } from 'lucide-react';
-import { modelsApi } from '@/services/models';
+import { modelsApi, type PricingMap } from '@/services/models';
 import { getProviderFormGradient, ProviderFormIcon } from '@/constants/providerMeta';
 import type { ModelConfig, ProviderInfo, ProviderType } from '@/types';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
@@ -37,6 +38,7 @@ import { RateLimitField } from './RateLimitField';
 // which look like: { detail: [{type, loc, msg, input, ctx}, ...] }
 // If that object (or the array) reaches JSX it triggers React error #31 and
 // the page goes dark. This helper always returns a plain string.
+
 
 function extractErrorMessage(err: unknown): string {
     if (err && typeof err === 'object') {
@@ -83,6 +85,26 @@ function extractErrorMessage(err: unknown): string {
 
     if (typeof err === 'string') return err;
     return 'An unexpected error occurred';
+}
+
+// ─── Price line for a single model (free/unknown → suppressed) ─────────────
+function ModelPriceLine({ pricingMap, modelId }: {
+    pricingMap: PricingMap | null;
+    modelId: string;
+}) {
+    if (!pricingMap || !modelId) return null;
+    const price = pricingMap[modelId.toLowerCase().trim()];
+    // null => free / no pricing data => show nothing.
+    if (!price) return null;
+    return (
+        <p className="text-xs text-gray-600 dark:text-gray-400 mt-1.5 flex items-center gap-1.5" role="status">
+            <DollarSign className="w-3 h-3" aria-hidden="true" />
+            <span className="font-mono">
+                ${price.input_rate_per_1m.toFixed(2)} in / ${price.output_rate_per_1m.toFixed(2)} out
+            </span>
+            <span className="text-gray-400 dark:text-gray-500">per 1M tokens</span>
+        </p>
+    );
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -132,6 +154,9 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
         error?: string;
     } | null>(null);
     const [error, setError] = useState<string | null>(null);
+    // Live, provider-sourced pricing keyed by model id (lower-cased).
+    // A value of `null` means the model is free / has no price → suppress.
+    const [pricingMap, setPricingMap] = useState<PricingMap | null>(null);
 
     // ── Load providers on mount ────────────────────────────────────────────
 
@@ -281,6 +306,8 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
                     || result.models?.[0]
                     || '',
             }));
+            // Live, provider-sourced pricing (free models map to null → suppressed).
+            setPricingMap((result.pricing as PricingMap) ?? null);
             setTestResult({
                 success: true,
                 // FIX: String() coerce — result.provider comes from the API and could be
@@ -807,10 +834,16 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
                             </div>
 
                             {formData.available_models.length > 0 ? (
-                                <p className="text-xs text-green-600 dark:text-green-400 mt-1.5 flex items-center gap-1" role="status">
-                                    <Check className="w-3 h-3" aria-hidden="true" />
-                                    {formData.available_models.length} models available from {formData.provider}
-                                </p>
+                                <>
+                                    <p className="text-xs text-green-600 dark:text-green-400 mt-1.5 flex items-center gap-1" role="status">
+                                        <Check className="w-3 h-3" aria-hidden="true" />
+                                        {formData.available_models.length} models available from {formData.provider}
+                                    </p>
+                                    <ModelPriceLine
+                                        pricingMap={pricingMap}
+                                        modelId={formData.default_model}
+                                    />
+                                </>
                             ) : (
                                 <p className="text-xs text-gray-600 dark:text-gray-500 mt-1.5">
                                     {isUniversal

@@ -436,6 +436,28 @@ class BaseModelProvider(ABC):
             logger.error(f"⚠️  _log_usage failed: {exc}")
 
 
+def _normalize_tool_choice(tool_choice: Any) -> Any:
+    """
+    Collapse the dict form of ``tool_choice`` to its string equivalent.
+
+    OpenAI accepts both ``"auto"`` and ``{"type": "auto"}``, but some
+    OpenAI-compatible upstreams (e.g. Novita, which OpenRouter routes certain
+    models such as ``tencent/hy3:free`` to) reject the dict form and return
+    ``invalid_request_error`` (HTTP 400). The two forms are semantically
+    identical for ``auto`` / ``none`` / ``required``, so collapsing them costs
+    nothing and makes tool-calling robust across providers.
+
+    Forced function calls (``{"type": "function", "function": {...}}``) are left
+    untouched — only the bare-mode dicts are normalized.
+    """
+    if (
+        isinstance(tool_choice, dict)
+        and tool_choice.get("type") in ("auto", "none", "required")
+    ):
+        return tool_choice["type"]
+    return tool_choice
+
+
 class OpenAICompatibleProvider(BaseModelProvider):
     """
     Universal provider for ANY OpenAI-compatible API.
@@ -704,7 +726,11 @@ class OpenAICompatibleProvider(BaseModelProvider):
                     create_kwargs["tools"] = tools
                     # Honor an explicit tool_choice from the caller (e.g. the
                     # decision engine forces a specific tool); default to "auto".
-                    create_kwargs["tool_choice"] = kwargs.get("tool_choice", "auto")
+                    # Normalize the dict form {"type": "auto"} to the string
+                    # "auto" — some upstreams (Novita) reject the dict form.
+                    create_kwargs["tool_choice"] = _normalize_tool_choice(
+                        kwargs.get("tool_choice", "auto")
+                    )
 
                 # ── Prompt caching (Task 2.1) ────────────────────────────────────
                 # A stable prefix (system + summary + first message) is identical
@@ -1936,6 +1962,198 @@ class ModelService:
         except Exception as e:
             logger.error(f"Error fetching models for {provider}: {e}")
             return ModelService._get_default_models(provider)
+
+    @staticmethod
+    def _normalize_base_url(base_url: Optional[str]) -> Optional[str]:
+        """Strip a trailing /chat/completions so the base is the API root."""
+        if not base_url:
+            return None
+        base_url = base_url.rstrip('/')
+        if base_url.lower().endswith('/chat/completions'):
+            base_url = base_url[: -len('/chat/completions')]
+        return base_url
+
+    @staticmethod
+    def _parse_openai_pricing(model: dict) -> Optional[tuple]:
+        """
+        Extract (input_per_1m, output_per_1m) USD from an OpenAI-compatible
+        model object, handling the two real-world shapes explicitly:
+
+        1. OpenRouter-style nested `pricing` object — values are STRINGS of
+           per-token USD, e.g. {"prompt": "0.000005",
+           "completion": "0.000015"}. Multiply by 1e6 for per-1M.
+        2. LiteLLM-style flat fields `input_cost_per_token` /
+           `output_cost_per_token` (also per-token USD, numeric or string).
+
+        Returns None when the model exposes no pricing (treated as free/unknown).
+        """
+        pricing = model.get("pricing")
+        if isinstance(pricing, dict):
+            prompt = pricing.get("prompt")
+            completion = pricing.get("completion")
+            if prompt is not None and completion is not None:
+                try:
+                    # round() kills float noise from ×1e6 (e.g. 0.0999999… -> 0.1)
+                    return (
+                        round(float(prompt) * 1_000_000, 6),
+                        round(float(completion) * 1_000_000, 6),
+                    )
+                except (TypeError, ValueError):
+                    pass
+
+        # LiteLLM-style flat fields
+        ipt = model.get("input_cost_per_token")
+        opt = model.get("output_cost_per_token")
+        if ipt is not None and opt is not None:
+            try:
+                return (
+                    round(float(ipt) * 1_000_000, 6),
+                    round(float(opt) * 1_000_000, 6),
+                )
+            except (TypeError, ValueError):
+                pass
+
+        return None
+
+    @staticmethod
+    async def fetch_model_pricing(
+        provider: ProviderType,
+        api_key: Optional[str] = None,
+        base_url: Optional[str] = None,
+    ) -> Dict[str, Optional[tuple]]:
+        """
+        Fetch live, per-model pricing from a provider's API.
+
+        Returns a map of ``model_id (lower-cased) -> (input_per_1m,
+        output_per_1m) in USD`` when the provider exposes pricing, or
+        ``model_id -> None`` when it does not (free / unknown — the caller
+        should SUPPRESS the price). Providers that don't expose a model list
+        with prices return an empty dict.
+
+        The two schemas are handled explicitly rather than assuming one shape:
+          * OpenAI-compatible (OpenAI, OpenRouter, Groq, Mistral, Together,
+            Fireworks, DeepSeek, Moonshot, Azure, custom): parse the
+            `/models` payload's ``pricing`` (OpenRouter) or
+            ``input_cost_per_token`` (LiteLLM) fields.
+          * Anthropic: ``/v1/models`` returns model metadata ONLY — no
+            pricing fields at all — so every model maps to None.
+        """
+        base_url = ModelService._normalize_base_url(base_url)
+
+        try:
+            import httpx
+
+            # ── ANTHROPIC ────────────────────────────────────────────────
+            # /v1/models returns {data:[{id, capabilities, max_input_tokens,
+            # display_name, ...}]} — NO pricing. Every model is None (free).
+            if provider == ProviderType.ANTHROPIC:
+                if not api_key:
+                    return {}
+                url = (base_url or "https://api.anthropic.com") + "/v1/models"
+                headers = {
+                    "x-api-key": api_key,
+                    "anthropic-version": "2023-06-01",
+                    "Accept": "application/json",
+                }
+                async with httpx.AsyncClient(timeout=15.0, headers=headers) as client:
+                    resp = await client.get(url)
+                    if resp.status_code != 200:
+                        return {}
+                    data = resp.json()
+                result: Dict[str, Optional[tuple]] = {}
+                for m in data.get("data", []):
+                    mid = (m.get("id") or "").strip().lower()
+                    if mid:
+                        result[mid] = None
+                return result
+
+            # ── LOCAL (Ollama / LM Studio) ──────────────────────────────
+            # No published pricing for self-hosted models.
+            if provider == ProviderType.LOCAL:
+                return {}
+
+            # ── OPENAI (native) ──────────────────────────────────────────
+            # Native api.openai.com /models carries no pricing fields, so every
+            # listed model resolves to None (free/unknown). Only query when we
+            # actually have a key; otherwise there's nothing to fetch.
+            if provider == ProviderType.OPENAI and not base_url:
+                if not api_key:
+                    return {}
+                url = "https://api.openai.com/v1/models"
+                headers = {"Authorization": f"Bearer {api_key}", "Accept": "application/json"}
+                return await ModelService._fetch_openai_style_pricing(url, headers)
+
+            # ── OPENAI-COMPATIBLE (custom base, Azure, Groq, Mistral,
+            #    Together, Fireworks, DeepSeek, Moonshot) ───────────────────
+            # All expose an OpenAI-style /models endpoint that MAY include a
+            # `pricing` object (e.g. OpenRouter, Azure Marketplace gateways).
+            openai_compat_bases = {
+                ProviderType.GROQ: "https://api.groq.com/openai/v1",
+                ProviderType.MISTRAL: "https://api.mistral.ai/v1",
+                ProviderType.TOGETHER: "https://api.together.xyz/v1",
+                ProviderType.FIREWORKS: "https://api.fireworks.ai/inference/v1",
+                ProviderType.DEEPSEEK: "https://api.deepseek.com/v1",
+                ProviderType.MOONSHOT: "https://api.moonshot.cn/v1",
+            }
+            if provider in openai_compat_bases:
+                if not api_key:
+                    return {}
+                url = openai_compat_bases[provider] + "/models"
+                headers = {"Authorization": f"Bearer {api_key}", "Accept": "application/json"}
+                return await ModelService._fetch_openai_style_pricing(url, headers)
+
+            if provider in (ProviderType.CUSTOM, ProviderType.OPENAI_COMPATIBLE):
+                if not base_url:
+                    return {}
+                url = base_url + "/models"
+                headers = {"Accept": "application/json"}
+                if api_key:
+                    headers["Authorization"] = f"Bearer {api_key}"
+                return await ModelService._fetch_openai_style_pricing(url, headers)
+
+            if provider == ProviderType.AZURE_OPENAI:
+                if not api_key or not base_url:
+                    return {}
+                url = base_url.rstrip('/') + "/models"
+                headers = {"api-key": api_key, "Accept": "application/json"}
+                return await ModelService._fetch_openai_style_pricing(url, headers)
+
+            # ── OTHER PROVIDERS (Gemini, Perplexity, Cohere, AI21, Qwen,
+            #    Zhipu) ── no price-bearing /models endpoint ────────────────
+            return {}
+
+        except Exception as e:
+            logger.error(f"fetch_model_pricing failed for {provider}: {e}")
+            return {}
+
+    @staticmethod
+    async def _fetch_openai_style_pricing(
+        url: str, headers: dict
+    ) -> Dict[str, Optional[tuple]]:
+        """GET an OpenAI-style /models endpoint and extract per-model pricing."""
+        import httpx
+
+        async with httpx.AsyncClient(timeout=15.0, headers=headers) as client:
+            resp = await client.get(url)
+            if resp.status_code != 200:
+                return {}
+            data = resp.json()
+
+        # OpenRouter wraps in {"data": [...]}; OpenAI returns a bare list.
+        models = data.get("data", data) if isinstance(data, dict) else data
+
+        result: Dict[str, Optional[tuple]] = {}
+        for m in models:
+            if not isinstance(m, dict):
+                # The OpenAI SDK serialises Model objects; coerce to dict.
+                m = m.model_dump() if hasattr(m, "model_dump") else None
+                if not isinstance(m, dict):
+                    continue
+            mid = (m.get("id") or "").strip().lower()
+            if not mid:
+                continue
+            result[mid] = ModelService._parse_openai_pricing(m)
+        return result
 
     @staticmethod
     def _get_default_models(provider: ProviderType) -> List[str]:

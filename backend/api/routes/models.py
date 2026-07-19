@@ -21,7 +21,8 @@ from backend.models.entities.user_config import (
     ModelUsageLog,
 )
 from backend.services.model_provider import ModelService
-from backend.core.security import encrypt_api_key, decrypt_api_key
+from backend.services.pricing_sync_service import PricingSyncService
+from backend.models.entities.model_pricing import ModelPricing
 
 from backend.api.schemas.examples import ErrorResponseExample, SuccessResponseExample, build_responses
 from backend.core.config import settings
@@ -159,16 +160,74 @@ class FetchModelsRequest(BaseModel):
         return v
 
 
+class ModelPrice(BaseModel):
+    """Per-model price in USD per 1M tokens. ``None`` => free / unknown."""
+    input_rate_per_1m: float
+    output_rate_per_1m: float
+
+
 class FetchModelsResponse(BaseModel):
     provider: str
     models: List[str]
     count: int
     default_recommended: Optional[str] = None
+    # model_id (lower-cased) -> price, or None when the provider exposes
+    # no pricing for that model (free / unknown — suppress in the UI).
+    pricing: Dict[str, Optional[ModelPrice]] = Field(default_factory=dict)
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Serialisation helper
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+def _pricing_map_to_response(
+    pricing_map: Dict[str, Optional[tuple]]
+) -> Dict[str, Optional[ModelPrice]]:
+    """
+    Convert ModelService.fetch_model_pricing output (model_id ->
+    (input_per_1m, output_per_1m) tuple, or None) into the JSON-safe
+    response shape (model_id -> ModelPrice, or None for free/unknown).
+    """
+    return {
+        mid: (ModelPrice(input_rate_per_1m=r[0], output_rate_per_1m=r[1])
+                if r is not None else None)
+        for mid, r in pricing_map.items()
+    }
+
+
+def _upsert_pricing(db: Session, provider_value: str,
+                     pricing_map: Dict[str, Optional[tuple]]) -> None:
+    """
+    Persist non-free (paid) fetched prices into the model_pricings table so
+    the existing PricingSyncService / calculate_cost pipeline stays in sync.
+    Free / unknown models (None) are intentionally NOT written.
+    """
+    try:
+        existing = {p.model_id: p for p in db.query(ModelPricing).all()}
+        for mid, rates in pricing_map.items():
+            if rates is None:
+                continue
+            inp, outp = rates
+            if mid in existing:
+                rec = existing[mid]
+                if rec.input_rate_per_1m != inp or rec.output_rate_per_1m != outp:
+                    rec.input_rate_per_1m = inp
+                    rec.output_rate_per_1m = outp
+                    rec.provider = provider_value
+                    rec.is_active = True
+            else:
+                db.add(ModelPricing(
+                    model_id=mid,
+                    provider=provider_value,
+                    input_rate_per_1m=inp,
+                    output_rate_per_1m=outp,
+                    is_active=True,
+                ))
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        logger.error(f"Failed to upsert fetched pricing: {exc}")
+
 
 def _serialize_config(config: UserModelConfig) -> Dict[str, Any]:
     """
@@ -676,6 +735,38 @@ async def test_config(
     )
 
 
+@router.get(
+    "/configs/{config_id}/pricing",
+    summary="Get Config Model Pricing",
+    description="Return the live/registry price for a configuration's default model. "
+                "Null when the model is free / has no pricing data (UI should suppress).",
+    responses=build_responses(None),
+)
+async def get_config_pricing(
+    config_id: str,
+    db: Session = Depends(get_db),
+    user_id: str = "sovereign",
+):
+    """Price for this config's default model (or null if free/unknown)."""
+    config = db.query(UserModelConfig).filter_by(id=config_id, user_id=user_id).first()
+    if not config:
+        raise NotFoundError(error="Configuration not found", code="CONFIGURATION_NOT_FOUND")
+
+    model_id = (config.default_model or "").lower().strip()
+    rates = PricingSyncService.get_price(model_id, db) if model_id else None
+
+    if rates is None:
+        return {"model_id": model_id, "pricing": None}
+
+    return {
+        "model_id": model_id,
+        "pricing": {
+            "input_rate_per_1m": rates[0],
+            "output_rate_per_1m": rates[1],
+        },
+    }
+
+
 @router.post(
     "/configs/{config_id}/fetch-models",
     summary="Fetch Models",
@@ -710,11 +801,21 @@ async def fetch_models(
     flag_modified(config, "available_models")  # Required: SQLAlchemy won't detect JSON column reassignment
     db.commit()
 
+    # ── Live, provider-sourced pricing (free models suppressed) ──
+    provider_value = config.provider.value if hasattr(config.provider, 'value') else str(config.provider)
+    pricing_map = await ModelService.fetch_model_pricing(
+        config.provider,
+        api_key,
+        config.get_effective_base_url(),
+    )
+    _upsert_pricing(db, provider_value, pricing_map)
+
     return {
         "provider": config.provider.value,
         "base_url": config.get_effective_base_url(),
         "models":   models,
         "count":    len(models),
+        "pricing":  _pricing_map_to_response(pricing_map),
     }
 
 
@@ -725,7 +826,10 @@ async def fetch_models(
     description="Fetch available models from a provider WITHOUT requiring an existing config. Used during the configuration setup wizard.",
     responses=build_responses(None),
 )
-async def fetch_provider_models_direct(request: FetchModelsRequest):
+async def fetch_provider_models_direct(
+    request: FetchModelsRequest,
+    db: Session = Depends(get_db),
+):
     """
     Fetch available models from a provider WITHOUT requiring an existing config.
     Used during the configuration setup wizard.
@@ -750,11 +854,20 @@ async def fetch_provider_models_direct(request: FetchModelsRequest):
     if not models:
         raise NotFoundError(error=f"No models found for provider {request.provider.value}", code="NO_MODELS_FOUND_FOR_PROVIDER")
 
+    provider_value = request.provider.value
+    pricing_map = await ModelService.fetch_model_pricing(
+        request.provider,
+        request.api_key,
+        request.api_base_url or request.local_server_url,
+    )
+    _upsert_pricing(db, provider_value, pricing_map)
+
     return FetchModelsResponse(
-        provider             = request.provider.value,
+        provider             = provider_value,
         models               = models,
         count                = len(models),
         default_recommended  = models[0] if models else None,
+        pricing              = _pricing_map_to_response(pricing_map),
     )
 
 

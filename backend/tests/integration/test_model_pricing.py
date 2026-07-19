@@ -1,10 +1,10 @@
 import pytest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 from sqlalchemy import text
 
 from backend.models.entities.model_pricing import ModelPricing
 from backend.services.pricing_sync_service import PricingSyncService
-from backend.services.model_provider import calculate_cost, ProviderType
+from backend.services.model_provider import calculate_cost, ProviderType, ModelService
 from backend.services.api_manager import APIManager
 from backend.models.entities.user_config import UserModelConfig, ConnectionStatus
 
@@ -199,3 +199,156 @@ def test_sync_admin_endpoint(client, auth_headers):
     assert data["added"] == 15
     assert data["updated"] == 2
     assert data["total_cached"] == 150
+
+
+# ── fetch_model_pricing: live, provider-sourced pricing ──────────────────────
+
+def _make_httpx_ctx(payload):
+    """Build a mock `async with httpx.AsyncClient(...) as client` context."""
+    resp = MagicMock()
+    resp.status_code = 200
+    resp.json = lambda: payload
+    client = MagicMock()
+    client.get = AsyncMock(return_value=resp)
+    ctx = MagicMock()
+    ctx.__aenter__ = AsyncMock(return_value=client)
+    ctx.__aexit__ = AsyncMock(return_value=False)
+    return ctx
+
+
+@pytest.mark.asyncio
+async def test_fetch_model_pricing_openai_style():
+    """OpenAI-compatible (OpenRouter) payload exposes a `pricing` object."""
+    payload = {
+        "data": [
+            {
+                "id": "openai/gpt-4o",
+                "pricing": {"prompt": "0.000005", "completion": "0.000015"},
+            },
+            {
+                "id": "anthropic/claude-3-5-sonnet",
+                "pricing": {"prompt": "0.000003", "completion": "0.000015"},
+            },
+        ]
+    }
+    ctx = _make_httpx_ctx(payload)
+    with patch("backend.services.model_provider.httpx.AsyncClient", return_value=ctx):
+        result = await ModelService.fetch_model_pricing(
+            ProviderType.CUSTOM, None, "https://openrouter.ai/api/v1"
+        )
+    # Strings (per-token USD) -> per-1M USD.
+    assert result["openai/gpt-4o"] == (5.0, 15.0)
+    assert result["anthropic/claude-3-5-sonnet"] == (3.0, 15.0)
+
+
+@pytest.mark.asyncio
+async def test_fetch_model_pricing_litellm_shape():
+    """LiteLLM-style flat cost-per-token fields are also handled."""
+    payload = {
+        "data": [
+            {
+                "id": "my-model",
+                "input_cost_per_token": 0.00000010,
+                "output_cost_per_token": 0.00000030,
+            },
+        ]
+    }
+    ctx = _make_httpx_ctx(payload)
+    with patch("backend.services.model_provider.httpx.AsyncClient", return_value=ctx):
+        result = await ModelService.fetch_model_pricing(
+            ProviderType.OPENAI_COMPATIBLE, None, "https://gate.example/v1"
+        )
+    assert result["my-model"] == (0.10, 0.30)
+
+
+@pytest.mark.asyncio
+async def test_fetch_model_pricing_anthropic_no_pricing():
+    """Anthropic /v1/models returns metadata only — no pricing -> all None."""
+    payload = {
+        "data": [
+            {"id": "claude-opus-4-6", "type": "model"},
+            {"id": "claude-sonnet-4-5", "type": "model"},
+        ]
+    }
+    ctx = _make_httpx_ctx(payload)
+    with patch("backend.services.model_provider.httpx.AsyncClient", return_value=ctx):
+        result = await ModelService.fetch_model_pricing(
+            ProviderType.ANTHROPIC, "sk-test", None
+        )
+    # Every model resolves to None (free / unknown -> UI suppresses).
+    assert result["claude-opus-4-6"] is None
+    assert result["claude-sonnet-4-5"] is None
+
+
+@pytest.mark.asyncio
+async def test_fetch_model_pricing_openai_style_no_pricing_fields():
+    """OpenAI-style model with NO pricing fields -> None (suppressed), not a crash."""
+    payload = {"data": [{"id": "gpt-4o"}]}
+    ctx = _make_httpx_ctx(payload)
+    with patch("backend.services.model_provider.httpx.AsyncClient", return_value=ctx):
+        result = await ModelService.fetch_model_pricing(
+            ProviderType.OPENAI_COMPATIBLE, None, "https://example/v1"
+        )
+    assert result["gpt-4o"] is None
+
+
+@pytest.mark.asyncio
+async def test_fetch_model_pricing_local_and_native_openai_no_key():
+    """Local models and native OpenAI without a key expose no prices -> {}."""
+    assert await ModelService.fetch_model_pricing(ProviderType.LOCAL, None, None) == {}
+    # No api_key and no base_url -> nothing to fetch.
+    assert await ModelService.fetch_model_pricing(ProviderType.OPENAI, None, None) == {}
+
+
+@pytest.mark.asyncio
+async def test_get_config_pricing_paid_and_free(client, db_session):
+    """GET /configs/{id}/pricing returns price for paid, null for free."""
+    from backend.models.entities.user_config import ConnectionStatus
+
+    db_session.execute(text("DELETE FROM model_pricings"))
+    db_session.commit()
+    PricingSyncService._cache.clear()
+
+    paid = UserModelConfig(
+        config_name="Paid Cfg",
+        provider=ProviderType.OPENAI,
+        default_model="gpt-4o",
+        is_active=True,
+        status=ConnectionStatus.ACTIVE,
+        requests_per_minute=60,
+        max_tokens=4000,
+        user_id="sovereign",
+    )
+    free = UserModelConfig(
+        config_name="Free Cfg",
+        provider=ProviderType.LOCAL,
+        default_model="llama3.2",
+        is_active=True,
+        status=ConnectionStatus.ACTIVE,
+        requests_per_minute=60,
+        max_tokens=4000,
+        user_id="sovereign",
+    )
+    db_session.add_all([paid, free])
+    db_session.add(ModelPricing(
+        model_id="gpt-4o",
+        provider="OPENAI",
+        input_rate_per_1m=5.0,
+        output_rate_per_1m=15.0,
+        is_active=True,
+    ))
+    db_session.commit()
+    db_session.refresh(paid)
+    db_session.refresh(free)
+    PricingSyncService.load_cache_from_db(db_session)
+
+    paid_resp = client.get(f"/api/v1/models/configs/{paid.id}/pricing")
+    assert paid_resp.status_code == 200
+    paid_data = paid_resp.json()
+    assert paid_data["pricing"]["input_rate_per_1m"] == 5.0
+    assert paid_data["pricing"]["output_rate_per_1m"] == 15.0
+
+    # Free model has no pricing row -> null (UI suppresses).
+    free_resp = client.get(f"/api/v1/models/configs/{free.id}/pricing")
+    assert free_resp.status_code == 200
+    assert free_resp.json()["pricing"] is None
