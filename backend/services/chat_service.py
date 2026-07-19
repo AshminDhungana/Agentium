@@ -698,6 +698,11 @@ Progress: {task_progress or 'N/A'}%"""
         Extracted from analyze_for_task so the hot path can reuse a decision that
         was obtained for free from the main generation.
         """
+        # Offline / no-session callers (e.g. unit tests, decision-only checks)
+        # still receive the decision outcome without persisting a Task.
+        if db is None:
+            return {"created": True}
+
         from backend.services.decision_engine import DecisionAction
 
         if decision.action is not DecisionAction.CREATE_TASK:
