@@ -30,6 +30,7 @@ import type { ModelConfig } from '@/types';
 import { getProviderMeta } from '@/constants/providerMeta';
 import { formatTokenCount } from '@/utils/time';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { ProviderLogo } from '@/components/models/ProviderLogo';
 import { modelsApi, type ModelPrice } from '@/services/models';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -165,7 +166,7 @@ export const ModelCard: React.FC<ModelCardProps> = React.memo(({
                 {/* ── Header row ─────────────────────────────────────────── */}
                 <div className="flex items-start justify-between mb-4">
                     <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg ${meta.bg} border ${meta.border} border-transparent`}>
-                        <span className={meta.color} aria-hidden="true">{meta.cardIcon}</span>
+                        <ProviderLogo provider={config.provider} />
                         <span className={`text-sm font-semibold ${meta.color}`}>
                             {config.provider_name || meta.label}
                         </span>
