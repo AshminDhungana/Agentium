@@ -266,6 +266,28 @@ class APIManager:
 api_manager: Optional[APIManager] = None
 
 
+def _ollama_reachable(base_url: str, timeout: float = 2.0) -> bool:
+    """
+    Best-effort check that an Ollama / LM Studio OpenAI-compatible server is
+    actually listening before we auto-create a fallback LOCAL config for it.
+
+    Hits the OpenAI-compatible ``/models`` endpoint (both Ollama and LM Studio
+    expose it). Returns ``False`` on any failure — unreachable host, timeout,
+    non-HTTP response — so we never create a config that can't serve requests.
+    """
+    try:
+        import httpx
+
+        with httpx.Client(timeout=timeout) as client:
+            resp = client.get(f"{base_url.rstrip('/')}/models")
+            # 200/401/403 all mean *something* is listening; only a server error
+            # (5xx) would be ambiguous, but treat <500 as reachable.
+            return resp.status_code < 500
+    except Exception as exc:
+        logger.info(f"Ollama reachability check failed for {base_url}: {exc}")
+        return False
+
+
 def init_api_manager(db: Session) -> APIManager:
     """
     Initialise the global APIManager.
@@ -298,22 +320,37 @@ def init_api_manager(db: Session) -> APIManager:
         config_count = db.query(UserModelConfig).filter_by(is_active=True).count()
 
         if config_count == 0:
-            logger.info("No model configs found — creating fallback LOCAL config (not set as default)")
-            default_config = UserModelConfig(
-                user_id=None,
-                config_name="Default Local Model",
-                provider=ProviderType.LOCAL,
-                provider_name="Local",
-                default_model="kimi-2.5",
-                is_default=False,     # Don't auto-mark as default — real configs should take precedence
-                is_active=True,
-                status=ConnectionStatus.ACTIVE,
-                requests_per_minute=60,
-            )
-            db.add(default_config)
-            db.commit()
-            db.refresh(default_config)
-            logger.info("Created default model configuration")
+            # Only auto-create the fallback LOCAL config if an Ollama / LM Studio
+            # OpenAI-compatible server is actually reachable. Creating it blindly
+            # (the previous behaviour) means the system tries to use a model
+            # endpoint that isn't there, producing endless "Connection error"
+            # failures for the Head/agents. If nothing is listening, do nothing —
+            # the operator can add a real provider (or start Ollama) instead.
+            from backend.core.config import settings
+
+            ollama_url = settings.OLLAMA_BASE_URL
+            if _ollama_reachable(ollama_url):
+                logger.info("No model configs found — creating fallback LOCAL config (not set as default)")
+                default_config = UserModelConfig(
+                    user_id=None,
+                    config_name="Default Local Model",
+                    provider=ProviderType.LOCAL,
+                    provider_name="Local",
+                    default_model="kimi-2.5",
+                    is_default=False,     # Don't auto-mark as default — real configs should take precedence
+                    is_active=True,
+                    status=ConnectionStatus.ACTIVE,
+                    requests_per_minute=60,
+                )
+                db.add(default_config)
+                db.commit()
+                db.refresh(default_config)
+                logger.info("Created default model configuration")
+            else:
+                logger.info(
+                    f"No model configs found and Ollama not reachable at "
+                    f"{ollama_url} — skipping fallback LOCAL config creation."
+                )
 
         api_manager = APIManager(db)
 

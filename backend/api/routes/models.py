@@ -612,6 +612,20 @@ async def delete_config(
     except Exception as e:
         logger.warning(f"Failed to clear Head preferred model config reference: {e}")
 
+    # ModelUsageLog.config_id is a non-nullable FK to user_model_configs with no
+    # ON DELETE CASCADE. A config that has ever been used (e.g. a temp config
+    # created during "Test Connection", which logs usage) would otherwise make
+    # Postgres reject the delete with an IntegrityError → HTTP 500. Remove the
+    # child rows explicitly before deleting the parent so the config can be
+    # removed cleanly (this was the root cause of the silent 500 on Test
+    # Connection and of the Delete button failing for any used config).
+    try:
+        db.query(ModelUsageLog).filter_by(config_id=config_id).delete()
+        db.commit()
+    except Exception as e:
+        logger.warning(f"Failed to purge usage logs for config {config_id}: {e}")
+        db.rollback()
+
     is_deleted_default = config.is_default
 
     db.delete(config)

@@ -106,9 +106,19 @@ class ProviderRateLimiter:
         # binds them to whatever loop is active then and raises
         # "task bound to a different loop" when awaited on the request loop.
         self._sha_lock: Optional["asyncio.Lock"] = None
-        # In-process semaphore cache (per config) for same-worker concurrency.
-        self._local_sems: Dict[str, "asyncio.Semaphore"] = {}
-        self._sem_lock: Optional["asyncio.Lock"] = None
+        # asyncio primitives bind to the event loop they are FIRST created on.
+        # Agentium drives coroutines from more than one loop (the request loop
+        # and the idle-governance / background-task loop), so a single shared
+        # Lock/Semaphore raises "attached to a different loop" when reused from
+        # another loop. Key these caches by loop id so each loop gets its own
+        # primitives. (This was the root cause of the spurious
+        # "ProviderRateLimiter concurrency: fail-open: ... different loop"
+        # warnings that silently disabled the concurrency cap.)
+        self._sha_locks: Dict[int, "asyncio.Lock"] = {}
+        # In-process semaphore cache ((loop_id, config_id)) for same-worker
+        # concurrency. The Redis counter (below) bounds it across workers.
+        self._local_sems: Dict[Any, "asyncio.Semaphore"] = {}
+        self._sem_locks: Dict[int, "asyncio.Lock"] = {}
         # Best-effort capture of the LAST response headers per config, populated
         # by the httpx event hook attached to each shared SDK client (see Task 17).
         # Keyed by config_id; read + cleared right after each successful SDK call.
@@ -129,9 +139,13 @@ class ProviderRateLimiter:
         return self._redis
 
     async def _get_sha(self, r) -> Optional[str]:
-        if self._sha_lock is None:
-            self._sha_lock = asyncio.Lock()
-        async with self._sha_lock:
+        loop = asyncio.get_running_loop()
+        lid = id(loop)
+        lock = self._sha_locks.get(lid)
+        if lock is None:
+            lock = asyncio.Lock()
+            self._sha_locks[lid] = lock
+        async with lock:
             if self._sha is None:
                 try:
                     self._sha = await r.script_load(_TOKEN_BUCKET_LUA)
@@ -380,15 +394,23 @@ class ProviderRateLimiter:
 
         The semaphore only bounds concurrency *within this worker*. The Redis
         counter (below) bounds it across workers/replicas on the same config.
+
+        Primitives are cached per event loop (keyed by loop id) because
+        asyncio.Lock/Semaphore instances are bound to the loop they were
+        created on and cannot be awaited from another loop.
         """
         maxc = max(1, int(max_concurrent_requests or 10))
-        if self._sem_lock is None:
-            self._sem_lock = asyncio.Lock()
-        async with self._sem_lock:
-            sem = self._local_sems.get(config_id)
+        loop = asyncio.get_running_loop()
+        lid = id(loop)
+        lock = self._sem_locks.get(lid)
+        if lock is None:
+            lock = asyncio.Lock()
+            self._sem_locks[lid] = lock
+        async with lock:
+            sem = self._local_sems.get((lid, config_id))
             if sem is None:
                 sem = asyncio.Semaphore(maxc)
-                self._local_sems[config_id] = sem
+                self._local_sems[(lid, config_id)] = sem
             return sem
 
     async def acquire_concurrency(
@@ -420,9 +442,14 @@ class ProviderRateLimiter:
 
     async def release_concurrency(self, config_id: str) -> None:
         """Release the in-process slot and decrement the Redis counter."""
-        sem = self._local_sems.get(config_id)
-        if sem is not None:
-            sem.release()
+        try:
+            lid = id(asyncio.get_running_loop())
+        except RuntimeError:
+            lid = None
+        if lid is not None:
+            sem = self._local_sems.get((lid, config_id))
+            if sem is not None:
+                sem.release()
         try:
             r = await self._get_redis()
             key = _CONCURRENCY_KEY.format(config_id=config_id)
