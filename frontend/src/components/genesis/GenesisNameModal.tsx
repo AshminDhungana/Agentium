@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useWebSocketStore } from '@/store/websocketStore';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { MarkdownMessage } from '@/components/chat/MarkdownMessage';
 
 export function GenesisNameModal() {
     const open = useWebSocketStore((s) => s.genesisAwaitingName);
@@ -27,9 +28,12 @@ export function GenesisNameModal() {
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                     Establish Your AI Nation
                 </h2>
-                <p className="mt-2 text-sm text-gray-600 dark:text-gray-400 whitespace-pre-line">
-                    {prompt || 'What shall we name this sovereign domain?'}
-                </p>
+                <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                    <MarkdownMessage
+                        content={prompt || 'What shall we name this sovereign domain?'}
+                        className="text-sm text-gray-600 dark:text-gray-400"
+                    />
+                </div>
                 <input
                     className="mt-4 w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent px-3 py-2 text-sm text-gray-900 dark:text-white outline-none focus:border-violet-500"
                     placeholder="Enter nation name"

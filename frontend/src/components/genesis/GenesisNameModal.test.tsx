@@ -18,4 +18,20 @@ describe('GenesisNameModal', () => {
     fireEvent.click(screen.getByText('Establish Nation'));
     expect(submit).toHaveBeenCalledWith('Veridia');
   });
+
+  it('renders the prompt as formatted Markdown, not raw source', () => {
+    const submit = vi.fn().mockResolvedValue(true);
+    useWebSocketStore.setState({
+      genesisAwaitingName: true,
+      genesisNamePrompt: '**Welcome to Agentium**\n\nReply with `name: Foo`',
+      genesisNameTimeout: 60,
+      submitCountryName: submit,
+    });
+    const { container } = render(<GenesisNameModal />);
+    // Bold is rendered as a <strong> element, not literal ** characters.
+    expect(container.querySelector('strong')?.textContent).toBe('Welcome to Agentium');
+    // Inline code is rendered as a <code> element, not literal backticks.
+    expect(container.querySelector('code')?.textContent).toBe('name: Foo');
+    expect(container.textContent).not.toContain('**Welcome to Agentium**');
+  });
 });
