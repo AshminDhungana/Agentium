@@ -55,6 +55,7 @@ export const modelsApi = {
         requests_per_minute?: number;
         tokens_per_minute?: number;
         max_concurrent_requests?: number;
+        effort?: string;
     }): Promise<ModelConfig> => {
         const response = await api.post('/api/v1/models/configs', config);
         return response.data;
@@ -81,6 +82,7 @@ export const modelsApi = {
         requests_per_minute?: number;
         tokens_per_minute?: number;
         max_concurrent_requests?: number;
+        effort?: string;
     }>): Promise<ModelConfig> => {
         const response = await api.put(`/api/v1/models/configs/${configId}`, updates);
         return response.data;

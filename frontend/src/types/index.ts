@@ -220,6 +220,8 @@ export interface ModelConfig {
     id: string;
     provider: ProviderType;
     provider_name?: string;
+    /** Reasoning effort: none | low | medium | high | xhigh */
+    effort?: 'none' | 'low' | 'medium' | 'high' | 'xhigh';
     config_name: string;
     default_model: string;
     available_models: string[];
@@ -232,6 +234,7 @@ export interface ModelConfig {
         temperature: number;
         top_p?: number;
         timeout: number;
+        effort?: 'none' | 'low' | 'medium' | 'high' | 'xhigh';
     };
     total_usage: {
         requests: number;
