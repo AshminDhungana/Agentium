@@ -350,6 +350,25 @@ Current System State:
 
 Address the Sovereign respectfully. If they issue a command that requires execution, indicate that you will create a task."""
 
+        # ── Task 3: Inject the `decide` tool so routing is classified in the ──
+        #    same LLM turn, eliminating the second round-trip in analyze_for_task.
+        #    We MUST include the registry tools too, because generate_with_tools
+        #    replaces (not extends) the Head's normal tool set via the tools kwarg.
+        tier = f"{head.agentium_id[0]}xxxx"
+        try:
+            from backend.core.tool_registry import ToolRegistry
+            registry_tools = ToolRegistry().to_openai_tools(tier)
+        except Exception as _reg_err:
+            logger.warning(f"[ChatService] ToolRegistry lookup failed, falling back to empty: {_reg_err}")
+            registry_tools = []
+        gen_tools = list(registry_tools) + [LLMClient.DECISION_TOOL]
+
+        # Instruct the model to always emit the routing decision alongside its reply.
+        full_prompt += (
+            "\n\nAlways call the `decide` tool to classify your action "
+            "(reply/create_task/delegate/dispatch_task) in the same turn as your reply."
+        )
+
         # Switch to tool-aware generation so the Head agent can call deep_think
         # and any other registered tool during conversational turns.
         # generate_with_agent_tools() returns the same dict shape as
@@ -377,11 +396,13 @@ Address the Sovereign respectfully. If they issue a command that requires execut
                 config_id=config_id,
                 fallback_configs=fallback_configs,
                 system_prompt_override=full_prompt,
-                agent_tier=f"{head.agentium_id[0]}xxxx",
+                agent_tier=tier,
                 history=history,
                 on_delta=on_delta,
                 cancel_event=cancel_event,
                 prompt_cache_key=cache_key,
+                tools=gen_tools,
+                tool_choice={"type": "auto"},
             )
         except Exception as e:
             clear_chat_request()
@@ -518,8 +539,12 @@ Address the Sovereign respectfully. If they issue a command that requires execut
                 )
             )
 
-        # Analyze if we should create a task
-        task_info = await ChatService.analyze_for_task(head, message, result["content"], db)
+        # ── Task 3: classify the routing action from the Head's own turn ──
+        #    (the `decide` tool call is captured in result["tool_calls"]), then
+        #    create a task directly — no second LLM round-trip. analyze_for_task
+        #    is retained only for backward compatibility.
+        decision = ChatService.classify_action_from_result(result)
+        task_info = await ChatService.create_task_from_decision(head, decision, message, db)
 
         # Get current task ID if any (for preservation during reincarnation)
         current_task_id = head.current_task_id
