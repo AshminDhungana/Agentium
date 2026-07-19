@@ -96,3 +96,25 @@ def test_clear_working_state_preserves_context():
     )
     ethos.clear_working_state()
     assert ethos.environment_context == "grounded"
+
+
+def test_apply_llm_compression_preserves_environment_context():
+    # The LLM write-back path (Agent.compress_ethos → apply_llm_compression)
+    # must NOT clear environment_context — it is core identity, not working
+    # memory, and the LLM payload has no field to overwrite it.
+    ethos = Ethos(
+        agentium_id="E30001",
+        agent_type="task_agent",
+        mission_statement="Do tasks.",
+        core_values="[]",
+        behavioral_rules="[]",
+        restrictions="[]",
+        capabilities="[]",
+        created_by_agentium_id="00001",
+        agent_id="00000000-0000-0000-0000-000000000001",
+        version=1,
+        environment_context="grounded",
+    )
+    ethos.apply_llm_compression({"outcome_summary": "done"})
+    assert ethos.environment_context == "grounded"
+    assert ethos.outcome_summary == "done"

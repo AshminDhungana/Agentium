@@ -96,6 +96,10 @@ class VectorStore:
     # ------------------------------------------------------------------
     COLLECTIONS: Dict[str, str] = {
         "constitution": "supreme_law",
+        # "agent_environment" is absent from COLLECTIONS_V2, so _collection_name
+        # falls back to f"{key}{V2_SUFFIX}" → "agent_environment_v2", keeping the
+        # resolved name consistent between the write path (add_environment_context)
+        # and the read path (query_hierarchical_context).
         "agent_environment": "agent_environment",
         "council_memory": "council_knowledge",
         # FIX: canonical key used everywhere (was "task_patterns" in some
@@ -277,6 +281,10 @@ class VectorStore:
         rich_meta = {
             "type": "agent_environment",
             "document_type": "agent_environment",
+            # "immutable": True marks read-only-by-convention: no decay/pruning
+            # path (decay_stale_entries / apply_learning_decay) targets this
+            # collection, and initialize_knowledge_base is its only writer, so
+            # the document is effectively immutable once seeded.
             "immutable": True,
         }
         if db is not None:
