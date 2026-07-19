@@ -478,11 +478,17 @@ def _normalize_tool_choice(tool_choice: Any) -> Any:
 
 # Per-provider extended-thinking strategy. `kind` selects the param shape;
 # `model_hint` (optional regex) gates both UI visibility and param emission.
+#
+# CROSS-REFERENCE: THINKING_PROVIDERS in
+# frontend/src/components/models/ModelConfigForm.tsx is a hand-copied mirror of
+# this map. The two MUST stay in sync (same provider keys + matching hints), or
+# the UI may show the effort control for a model the backend refuses to gate.
+# When editing a hint here, update the frontend copy identically (and vice-versa).
 PROVIDER_THINKING = {
     "OPENAI":        {"kind": "openai",   "model_hint": r"(^|[-/])(o1|o3|o4|gpt-5)"},
     "AZURE_OPENAI": {"kind": "openai",   "model_hint": r"(^|[-/])(o1|o3|o4|gpt-5)"},
-    "ANTHROPIC":     {"kind": "anthropic"},
-    "GEMINI":        {"kind": "gemini"},
+    "ANTHROPIC":     {"kind": "anthropic", "model_hint": r"claude-(opus|sonnet|haiku)[- ]?(4|4[-.]5)"},
+    "GEMINI":        {"kind": "gemini",    "model_hint": r"gemini-2\.5|gemini-3"},
     "DEEPSEEK":      {"kind": "deepseek", "model_hint": r"reasoner|v4"},
     "GROQ":          {"kind": "openai",   "model_hint": r"gpt-oss|qwen|r1|qwq|reason"},
     "MISTRAL":       {"kind": "openai",   "model_hint": r"magistral|thinking"},

@@ -49,3 +49,27 @@ def test_gemini_thinking_config():
 
 def test_local_hint_misses():
     assert _resolve_thinking_kwargs(_Cfg("LOCAL", "llama3.1", "high")) == {}
+
+
+def test_anthropic_non_thinking_model_is_noop():
+    # claude-3-5-sonnet does not support extended thinking -> must yield {}
+    assert _resolve_thinking_kwargs(_Cfg("ANTHROPIC", "claude-3-5-sonnet", "high")) == {}
+
+
+def test_gemini_non_thinking_model_is_noop():
+    # gemini-1.5-flash does not support extended thinking -> must yield {}
+    assert _resolve_thinking_kwargs(_Cfg("GEMINI", "gemini-1.5-flash", "high")) == {}
+
+
+def test_anthropic_thinking_model_still_gated():
+    # claude-opus-4-5 DOES support extended thinking -> must still emit kwargs
+    kw = _resolve_thinking_kwargs(_Cfg("ANTHROPIC", "claude-opus-4-5", "high"))
+    assert kw["thinking"] == {"type": "enabled", "budget_tokens": 16000}
+    assert kw["temperature"] == 1
+
+
+def test_gemini_thinking_model_still_gated():
+    # gemini-2.5-flash DOES support extended thinking -> must still emit kwargs
+    kw = _resolve_thinking_kwargs(_Cfg("GEMINI", "gemini-2.5-flash", "low"))
+    assert kw["extra_body"]["thinkingConfig"]["thinkingBudget"] == 1024
+    assert kw["extra_body"]["thinkingConfig"]["includeThoughts"] is True

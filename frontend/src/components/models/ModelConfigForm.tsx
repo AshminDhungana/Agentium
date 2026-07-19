@@ -35,12 +35,16 @@ import { RateLimitField } from './RateLimitField';
 
 type Effort = 'none' | 'low' | 'medium' | 'high' | 'xhigh';
 
-// Mirrors backend PROVIDER_THINKING. Controls whether the effort control is shown.
+// Mirrors backend PROVIDER_THINKING in backend/services/model_provider.py.
+// Controls whether the effort control is shown. The two maps MUST stay in sync
+// (same provider keys + matching hints): if they drift, the UI may show the
+// effort control for a model the backend refuses to gate, or vice-versa.
+// When editing a hint here, update the backend copy identically (and vice-versa).
 const THINKING_PROVIDERS: Record<string, RegExp | null> = {
     OPENAI: /(^|[-/])(o1|o3|o4|gpt-5)/i,
     AZURE_OPENAI: /(^|[-/])(o1|o3|o4|gpt-5)/i,
-    ANTHROPIC: null,
-    GEMINI: null,
+    ANTHROPIC: /claude-(opus|sonnet|haiku)[- ]?(4|4[-.]5)/i,
+    GEMINI: /gemini-2\.5|gemini-3/i,
     DEEPSEEK: /reasoner|v4/i,
     GROQ: /gpt-oss|qwen|r1|qwq|reason/i,
     MISTRAL: /magistral|thinking/i,
