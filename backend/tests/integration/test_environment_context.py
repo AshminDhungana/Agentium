@@ -59,3 +59,33 @@ def test_initialize_knowledge_base_seeds_environment_context(db_session: Session
     blob = " ".join(env["documents"][0])
     assert "/host_home/Desktop" in blob
     assert "internet" in blob.lower()
+
+
+async def test_spawned_agent_ethos_answers_acceptance(seeded_db: Session):
+    """End-to-end acceptance: a freshly spawned agent (no task context) carries
+    grounding that answers both acceptance questions — host desktop location and
+    internet egress."""
+    parent = seeded_db.query(CouncilMember).first()
+    assert parent is not None
+
+    task_agent = reincarnation_service.spawn_task_agent(
+        parent=parent,
+        name="Acceptance Scout",
+        description="End-to-end acceptance probe for environment grounding",
+        db=seeded_db,
+    )
+    seeded_db.commit()
+
+    result = await ethos_tool.execute(
+        action="read",
+        db=seeded_db,
+        agent_id=task_agent.agentium_id,
+    )
+
+    assert result["success"] is True
+    env_ctx = result["data"]["environment_context"]
+    assert env_ctx is not None
+    assert "/host_home/Desktop" in env_ctx
+    lowered = env_ctx.lower()
+    assert "internet" in lowered
+    assert "egress" in lowered
