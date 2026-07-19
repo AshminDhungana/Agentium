@@ -309,8 +309,8 @@ async def list_providers():
             requires_api_key=True,
             requires_base_url=False,
             default_base_url="https://api.openai.com/v1",
-            description="GPT-4o, GPT-4 Turbo, and other OpenAI models",
-            popular_models=["gpt-4o", "gpt-4o-mini", "o3-mini", "gpt-4-turbo"]
+            description="GPT-5.6, GPT-5.1, o4-mini and other OpenAI models",
+            popular_models=["gpt-5.6", "gpt-5.6-mini", "gpt-5.1", "o4-mini"]
         ),
         ProviderInfo(
             id=ProviderType.ANTHROPIC.value,
@@ -329,8 +329,8 @@ async def list_providers():
             requires_api_key=True,
             requires_base_url=False,
             default_base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
-            description="Google's multimodal models (Gemini 2.0 Flash, 1.5 Pro)",
-            popular_models=["gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash"]
+            description="Google's multimodal models (Gemini 2.5 Flash, 2.5 Pro)",
+            popular_models=["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash"]
         ),
         ProviderInfo(
             id=ProviderType.GROQ.value,
@@ -339,7 +339,7 @@ async def list_providers():
             requires_api_key=True,
             requires_base_url=False,
             default_base_url="https://api.groq.com/openai/v1",
-            description="Ultra-fast inference (100+ tokens/sec) with Llama 3.1",
+            description="Ultra-fast inference (100+ tokens/sec) with Llama 3.3",
             popular_models=["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "deepseek-r1-distill-llama-70b"]
         ),
         ProviderInfo(
@@ -359,7 +359,7 @@ async def list_providers():
             requires_api_key=True,
             requires_base_url=False,
             default_base_url="https://api.together.xyz/v1",
-            description="Access to 100+ open-source models (Llama 3.1, Qwen 2)",
+            description="Access to 100+ open-source models (Llama 3.3, Qwen 2.5)",
             popular_models=["meta-llama/Llama-3.3-70B-Instruct-Turbo", "Qwen/Qwen2.5-72B-Instruct-Turbo", "deepseek-ai/DeepSeek-R1"]
         ),
         ProviderInfo(
@@ -380,7 +380,7 @@ async def list_providers():
             requires_base_url=False,
             default_base_url="https://api.moonshot.cn/v1",
             description="Kimi - Long context (200K+ tokens), Chinese/English",
-            popular_models=["moonshot-v1-8k", "moonshot-v1-32k", "moonshot-v1-128k"]
+            popular_models=["kimi-k2", "moonshot-v1-32k", "moonshot-v1-128k"]
         ),
         ProviderInfo(
             id=ProviderType.DEEPSEEK.value,
@@ -389,7 +389,7 @@ async def list_providers():
             requires_api_key=True,
             requires_base_url=False,
             default_base_url="https://api.deepseek.com/v1",
-            description="DeepSeek Coder V2 and Chat models",
+            description="DeepSeek Chat and Reasoner models",
             popular_models=["deepseek-chat", "deepseek-reasoner"]
         ),
         ProviderInfo(
@@ -400,7 +400,7 @@ async def list_providers():
             requires_base_url=True,
             default_base_url="https://{resource}.openai.azure.com",
             description="Enterprise OpenAI through Azure (requires Endpoint URL)",
-            popular_models=["gpt-4o", "gpt-4", "gpt-35-turbo"]
+            popular_models=["gpt-5.6", "gpt-5.1", "gpt-4o"]
         ),
         ProviderInfo(
             id=ProviderType.LOCAL.value,
