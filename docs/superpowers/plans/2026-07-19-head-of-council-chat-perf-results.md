@@ -3,10 +3,14 @@
 - **Branch:** `feature/head-chat-perf` (Tasks 1–5 merged)
 - **Date:** 2026-07-19
 - **Author:** Task 6 (benchmark) agent
-- **Headline change:** the primary WebSocket chat path (`ChatService.process_message`)
-  now performs **ONE** LLM round-trip — the model emits the `decide` routing action
-  in the same generation call — and `message_end` is no longer blocked by task
-  creation / media interception (those run in background tasks).
+- **Headline change:** the **separate blocking `DecisionEngine().decide` call has been
+  removed from the chat hot path** — the routing decision is now emitted as a `decide`
+  tool call inside the existing generation — and `message_end` is no longer blocked
+  by task creation / media interception (those run in background tasks). The LLM
+  generation *count* on the primary path is comparable to before (the `decide` tool
+  call still executes inside the agentic loop and then runs a finalize generation);
+  the real win is (a) eliminating the extra *blocking* decision call on the hot path
+  and (b) decoupling `message_end` from task creation + media.
 
 > ## ⚠️ Measurement status
 >
@@ -25,26 +29,31 @@
 
 ---
 
-## 1. Round-trip reduction (STATICALLY VERIFIED)
+## 1. Removal of the blocking decision call from the hot path (STATICALLY VERIFIED)
 
-### Finding: before = 2 round-trips, after = 1 on the primary path
+### Finding: the separate blocking `DecisionEngine().decide` call is gone from the hot path
 
 **Before this branch (legacy `analyze_for_task` path):**
-1. `process_message` → `provider.generate(...)` → **LLM call #1** (reply)
-2. `process_message` → `analyze_for_task(...)` → `DecisionEngine().decide(...)` → **LLM call #2** (routing decision)
+1. `process_message` → `provider.generate(...)` → LLM call #1 (reply)
+2. `process_message` → `analyze_for_task(...)` → `DecisionEngine().decide(...)` → **LLM call #2** (a *separate, blocking* routing decision on the hot path)
 
 **After this branch (primary WebSocket path):**
-1. `process_message` → `provider.generate(...)` with the `decide` tool injected → **LLM call #1** (reply **and** routing action in one generation)
-2. Classification is read for free from the tool call: `classify_action_from_result(result)` — **no LLM call**
-3. Task creation is handed to `_create_task_background` via `asyncio.create_task` — **no LLM call**
+1. `process_message` → `provider.generate(...)` with the `decide` tool injected → the routing action is emitted **inside** this generation (no separate blocking decision call on the hot path)
+2. Classification is read for free from the tool call: `classify_action_from_result(result)` — no extra blocking call
+3. Task creation is handed to `_create_task_background` via `asyncio.create_task` — no LLM call
+
+> Note: the `decide` tool call still executes within the model's agentic loop, which
+> then runs a finalize generation — so the *total* generation count on this path is
+> comparable to before. The benefit is removing the **separate blocking**
+> `DecisionEngine().decide` call, not a 2→1 reduction in raw generations.
 
 ### Evidence
 
-- `backend/services/chat_service.py:522` — `decision = ChatService.classify_action_from_result(result)`
+- `backend/services/chat_service.py:523` — `decision = ChatService.classify_action_from_result(result)`
   (reads the `decide` tool call from the single generation; no extra LLM call).
-- `backend/services/chat_service.py:533` — task creation scheduled with
+- `backend/services/chat_service.py:544` — task creation scheduled with
   `asyncio.create_task(ChatService._create_task_background(...))` (off the hot path).
-- `backend/services/chat_service.py:902` — `DecisionEngine().decide(...)` exists **only
+- `backend/services/chat_service.py:937` — `DecisionEngine().decide(...)` exists **only
   inside `analyze_for_task`** (the secondary / legacy path), NOT in `process_message`.
 - `backend/services/agent_orchestrator.py:307` — the other `DecisionEngine().decide`
   call site is the **orchestrator**, not the chat hot path.
@@ -55,10 +64,13 @@
 ```
 grep -rn "DecisionEngine().decide" backend/
   backend/services/agent_orchestrator.py:307   (orchestrator — not chat hot path)
-  backend/services/chat_service.py:902         (inside analyze_for_task — secondary path)
+  backend/services/chat_service.py:937         (inside analyze_for_task — secondary path)
 ```
 
-**Conclusion:** On the primary chat path, LLM round-trips dropped from **2 → 1**.
+**Conclusion:** On the primary chat path, the **separate blocking**
+`DecisionEngine().decide` call is removed (the decision is now a `decide` tool call
+within the existing generation), and `message_end` is no longer blocked by task
+creation / media. The raw generation count remains comparable to before.
 
 ---
 
@@ -68,15 +80,15 @@ grep -rn "DecisionEngine().decide" backend/
 
 ### Evidence
 
-- `backend/services/chat_service.py:492` — `asyncio.create_task(ChatService._media_and_persist_background(...))`
+- `backend/services/chat_service.py:494` — `asyncio.create_task(ChatService._media_and_persist_background(...))`
   (media download/rewrite + Head-turn persistence run fire-and-forget).
-- `backend/services/chat_service.py:532` — `asyncio.create_task(ChatService._create_task_background(...))`
+- `backend/services/chat_service.py:544` — `asyncio.create_task(ChatService._create_task_background(...))`
   for task creation + deliberation startup.
-- `backend/services/chat_service.py:542` — `task_info = {"created": True, "task_id": None, "pending": True}`
+- `backend/services/chat_service.py:553` — `task_info = {"created": True, "task_id": None, "pending": True}`
   is set **immediately**, without awaiting the DB task creation. The real status
   (`task_id`) arrives later via the `task_created` WebSocket event
-  (see `backend/services/chat_service.py:812` broadcast).
-- `backend/services/chat_service.py:780` — `_create_task_background` opens its **own**
+  (see `backend/services/chat_service.py:833` broadcast).
+- `backend/services/chat_service.py:800` — `_create_task_background` opens its **own**
   `SessionLocal()` (the caller's session is already closed) and broadcasts
   `{"type": "task_created", ...}`, so `message_end` is never blocked by task work.
 
@@ -89,7 +101,7 @@ Real status is delivered asynchronously via the `task_created` event.
 
 | Metric | Before (`main`) | After (`feature/head-chat-perf`) | Source |
 |---|---|---|---|
-| LLM round-trips / chat message (primary WebSocket path) | 2 (generate + `DecisionEngine().decide`) | 1 (generate only; `decide` emitted as tool call) | STATICALLY VERIFIED |
+| Separate blocking `DecisionEngine().decide` on chat hot path | Yes (inline 2nd LLM call) | Removed (decision folded into the existing generation as a `decide` tool call); `message_end` no longer blocked by task creation / media | STATICALLY VERIFIED |
 | `DecisionEngine().decide` on chat hot path | Yes | No (only in `analyze_for_task`, the REST/`_stream_response` path) | STATICALLY VERIFIED |
 | `message_end` blocked by task creation | Yes (awaited inline) | No (`asyncio.create_task`) | STATICALLY VERIFIED |
 | `message_end` blocked by media interception | Yes (inline) | No (`asyncio.create_task` `_media_and_persist_background`) | STATICALLY VERIFIED |
@@ -140,9 +152,10 @@ deliberation started).
 
 The two perf claims are **statically verified** against the source:
 
-1. **LLM round-trips on the primary chat path reduced 2 → 1** (routing decision
-   now emitted as a `decide` tool call in the single generation; `analyze_for_task` /
-   `DecisionEngine().decide` remain only on the secondary REST streaming path).
+1. **Separate blocking `DecisionEngine().decide` removed from the chat hot path**
+   (the routing decision is now emitted as a `decide` tool call inside the existing
+   generation; `analyze_for_task` / `DecisionEngine().decide` remain only on the
+   secondary REST streaming path). The raw generation count is comparable to before.
 2. **`message_end` is decoupled** from task creation and media interception, both
    moved to `asyncio.create_task` background coroutines; the real task status is
    delivered via the `task_created` WebSocket event.
