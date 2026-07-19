@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { modelsApi, type PricingMap } from '@/services/models';
 import { getProviderFormGradient, ProviderFormIcon } from '@/constants/providerMeta';
+import { ProviderLogo } from '@/components/models/ProviderLogo';
 import type { ModelConfig, ProviderInfo, ProviderType } from '@/types';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { RateLimitField } from './RateLimitField';
@@ -660,7 +661,7 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
                                                 className={`w-11 h-11 rounded-lg bg-gradient-to-br ${getProviderFormGradient(provider.id)} flex items-center justify-center mb-4 shadow-lg`}
                                                 aria-hidden="true"
                                             >
-                                                <ProviderFormIcon providerId={provider.id} />
+                                                <ProviderLogo provider={provider.id} className="w-6 h-6" />
                                             </div>
 
                                             <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-1">
@@ -738,7 +739,7 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
                             className={`w-12 h-12 rounded-xl bg-gradient-to-br ${getProviderFormGradient(selectedProvider?.id || 'custom')} flex items-center justify-center shadow-lg flex-shrink-0`}
                             aria-hidden="true"
                         >
-                            <ProviderFormIcon providerId={selectedProvider?.id || 'custom'} />
+                            <ProviderLogo provider={selectedProvider?.id || 'custom'} className="w-6 h-6" />
                         </div>
                     )}
                     <div>
