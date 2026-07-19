@@ -47,16 +47,23 @@ Each provider maps to a thinking *strategy*. A single registry
 |-----------------|-----------------------|--------------------------------------------------|
 | `OPENAI`        | `reasoning_effort`    | `o1`, `o3`, `o4`, `gpt-5.*`                    |
 | `AZURE_OPENAI`  | `reasoning_effort`    | same as OPENAI                                   |
-| `ANTHROPIC`     | `anthropic_thinking`  | none (all Claude 4.x support thinking)            |
+| `ANTHROPIC`     | `anthropic_thinking`  | none (Claude Opus/Haiku 4.5 + earlier support thinking) |
 | `GEMINI`        | `gemini_thinking`     | none (Gemini 2.5 Flash/Pro support thinking)     |
-| `DEEPSEEK`      | `deepseek_thinking`   | `reasoner`                                       |
-| `GROQ`          | `reasoning_effort`    | `r1`, `qwq`, `reason`, `thinking`               |
+| `DEEPSEEK`      | `deepseek_thinking`   | `reasoner` (and `v4` reasoning modes)            |
+| `GROQ`          | `reasoning_effort`    | `gpt-oss`, `qwen`, `r1`, `qwq`, `reason`         |
 | `MISTRAL`       | `reasoning_effort`    | `magistral`, `thinking`                          |
-| `TOGETHER`      | `reasoning_effort`    | `r1`, `qwq`, `reasoner`, `thinking`             |
+| `TOGETHER`      | `reasoning_effort`    | `r1`, `qwq`, `reasoner`, `thinking`, `gpt-oss` |
 | `MOONSHOT`      | `deepseek_thinking`   | `k2`, `kimi` (Kimi thinking)                    |
-| `LOCAL`         | `reasoning_effort`    | `qwq`, `r1`, `deepseek`, `thinking`, `z1`       |
-| `CUSTOM`        | `reasoning_effort`    | `o1/o3/o4`, `qwq`, `r1`, `reasoner`, `thinking`|
+| `LOCAL`         | `reasoning_effort`    | `qwq`, `r1`, `deepseek`, `thinking`, `z1`, `qwen3` |
+| `CUSTOM`        | `reasoning_effort`    | `o1/o3/o4`, `qwq`, `r1`, `reasoner`, `thinking`, `gpt-oss` |
 | `COHERE`        | `none`                | — (Command models have no native extended thinking; control hidden) |
+
+> **Implementation note:** Exact parameter *shape* must be verified against the real
+> call site in `model_provider.py` (chat/completions vs Responses API). OpenAI's
+> current API takes `reasoning: {effort: "..."}` on the Responses API but many
+> OpenAI-compatible servers (and older chat/completions) still accept the flat
+> `reasoning_effort` field — the helper is the single choke point, so this is the
+> only place that needs adjustment.
 
 If a provider/model combination is unsupported, the saved value is coerced to `none`
 and no provider param is emitted (no-op). This satisfies the "present only for models
@@ -91,23 +98,28 @@ provider or model is unsupported. Effort → provider-param mapping:
 
 - **`reasoning_effort`** (OpenAI, Azure OpenAI, Groq, Mistral, Together, Local,
   Custom/OpenAI-compatible):
-  `{"reasoning_effort": {"low":"low","medium":"medium","high":"high","xhigh":"high"}[effort]}`.
-  `xhigh` caps at OpenAI's `"high"`. Omitted when `none` or model doesn't match
-  `model_hint`.
+  chat/completions form → `{"reasoning_effort": V}` where
+  `V = {"low":"low","medium":"medium","high":"high","xhigh":"high"}[effort]`;
+  Responses-API form (if `model_provider.py` uses `/responses`) →
+  `{"reasoning": {"effort": V, "summary": "auto"}}`. `xhigh` caps at `"high"`
+  (OpenAI's max for `reasoning_effort`; GPT-OSS on Groq caps at `high` too).
+  Omitted when `none` or the model doesn't match `model_hint`.
 
-- **`anthropic_thinking`** (Anthropic):
+- **`anthropic_thinking`** (Anthropic Claude Opus/Haiku 4.5 and earlier):
   `{"thinking": {"type": "enabled", "budget_tokens": B}}` where
   `B = {"low":2000,"medium":8000,"high":16000,"xhigh":32000}[effort]`.
-  When thinking is on, `temperature` is forced to `1` (required by Anthropic) —
-  applied only in the thinking branch.
+  When thinking is on, `temperature` is forced to `1` (required by Anthropic)
+  — applied only in the thinking branch.
 
 - **`gemini_thinking`** (Gemini):
   `{"thinkingConfig": {"thinkingBudget": B, "includeThoughts": True}}` where
   `B = {"low":1024,"medium":4096,"high":8192,"xhigh":24576}[effort]`.
 
 - **`deepseek_thinking`** (DeepSeek reasoner, Moonshot Kimi):
-  `{"thinking": {"type": "enabled"}}` (DeepSeek/Kimi accept the thinking flag;
-  budget is provider-managed, so effort only toggles enablement).
+  `{"thinking": {"type": "enabled"}, "reasoning_effort": V}` where `V` maps as
+  above (`xhigh`→`high`). Both fields are accepted by the DeepSeek/Kimi
+  OpenAI-compatible API; budget is provider-managed, so effort scales the
+  `reasoning_effort` knob.
 
 - **`none`** (Cohere, and any unsupported provider/model): returns `{}` (no-op).
 
