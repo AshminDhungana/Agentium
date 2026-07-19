@@ -1,89 +1,18 @@
 # Agentium — Verification & Improvement Backlog
 
-- [ ] **Optimize Head of Council chat performance**
-  - **Role clarification:** The Head of Council should never perform tasks directly. Its job is to interpret the user's request, delegate it to the appropriate agent(s) per the system design, monitor execution, and report the result back to the user.
-  - **Problem:** Response times are slow because the Head of Council appears to be spending cycles on work that should be offloaded to other agents.
-  - **Action items:**
-    - [ ] Map out the current request flow (user → Head of Council → agent(s) → back to user) to identify where time is actually being spent.
-    - [ ] Identify any steps where the Head of Council is doing task work itself instead of delegating.
-    - [ ] Define clear boundaries for what the Head of Council should handle directly (routing, monitoring, summarizing) vs. what must always go to a sub-agent.
-    - [ ] Optimize the delegation/monitoring loop (e.g., async handoff, reduced round-trips) so the user gets a fast acknowledgment/response.
-    - [ ] Test end-to-end latency before and after changes to confirm improvement.
 
-
-- [ ] **Full intended workflow (still open)** — When the user says "to head, create me a website", the Head should ask clarifying questions, gather info from web search / knowledge DB, then hand off to a Lead agent which breaks the work into Task agents; Critics verify the Task agents' output; on completion the user sees the resulting files in their host workspace. The persistence half above is built, but the Head→Lead→Task→Critics orchestration + "user sees the files" UX flow is a separate, larger effort not yet implemented.
-
-
-## 3. Core Architecture — Tools & Skills
-
-> See `tool_and_skill_creation.md` for the canonical tool/skill pattern (the `vector_db` tool + skill pair is the reference implementation). Every new tool below should follow that guide: `execute(action=...)` dispatch, dict returns with `success`, lazy-init dependencies, module-level singleton, registered in `tool_registry.py` with correct `authorized_tiers`, and a matching `SKILL.md` under `backend/.agentium/skills/<name>/` that the tool's description/`help` action points to.
-
-### 3.7 — [P2] Task-management tool set
-**Problem:** No first-class set of tools for agents to create/query/update/close tasks programmatically.
-**Task:** Design and implement a minimal task-management tool (`action=create|get|update|list|close`) wired into the existing task/DAG models, registered per the standard pattern.
-**Acceptance criteria:** Tool round-trips a task through all actions in a test; registered with sane tier restrictions (e.g. Lead+ can create/close, Task tier can update status of its own assigned task).
-
-### 3.8 — [P2] Web crawler tool + crawling-best-practices skill
-**Problem:** No tool exists for deep web crawling (beyond a single fetch) — following links, understanding page structure, multi-page traversal.
-**Task:** Add a `web_crawler` tool (cURL-based fetch + link traversal, depth-limited) registered for all tiers per the standard pattern. Pair it with a `.agentium/skills/web_crawling/SKILL.md` skill covering: crawling best practices (robots.txt respect, rate limiting, depth limits) and a reference list of ~100 major websites by category with short descriptions of what each contains, to help agents pick good sources. Follow the tool→skill "pointing" pattern from `tool_and_skill_creation.md` §4: name the skill path in the tool's description and `help` action; name the tool in the skill body; seed the skill into ChromaDB.
-**Acceptance criteria:** Tool successfully crawls a multi-page test site respecting depth limits; skill passes `parse_skill_file` validation and is retrievable via semantic search for a query like "what site should I use to look up X."
-
----
-
-## 4. Onboarding / Genesis Flow
-
-### 4.1 — [P1] Fix Genesis setup sequence ordering
-**Problem:** The nation-naming popup currently appears **before** the Head of Council is active, and no reply is sent after the name is submitted. Correct order should be: API key added → Head of Council connects → welcome message sent → nation-naming popup appears → reply is given after naming.
-**Note:** This is likely the same root cause as "Genesis step doesn't run after API key is added" (see 22.x logging note) — investigate together rather than as two separate bugs.
-**Task:** Trace the genesis state machine from API-key-added to name-submitted. Ensure the popup only renders once Head is confirmed active, and that submitting a name triggers a visible reply from Head.
-**Acceptance criteria:** On a fresh install, the sequence happens in the documented order every time; submitting the nation name always produces a Head reply in the chat.
-
-### 4.2 — [P2] Render the nation-naming notification as Markdown
-**Problem:** The "establishing the AI Nation" notification and the one-time nation-naming popup on the chat page render raw Markdown source instead of formatted output.
-**Task:** Route both notification bodies through the existing Markdown renderer used elsewhere in the chat UI.
-**Acceptance criteria:** Both notifications render headings/bold/lists correctly instead of literal `**`/`#` characters.
-
----
 
 ## 5. Models & Providers
-
-### 5.1 — [P2] Correct pricing display for free models
-**Problem:** Free models show pricing info they shouldn't; pricing should be pulled live from each provider's API.
-**Task:** Suppress pricing display when a model is free. Fetch pricing directly from provider APIs — note most providers use an OpenAI-compatible schema, but Anthropic's differs; handle both explicitly rather than assuming one shape.
-**Acceptance criteria:** Free models show no price; paid models show live, provider-sourced pricing for both an OpenAI-style and an Anthropic provider.
-
-### 5.2 — [P2] Fix uneditable Rate Limit input field
-**Problem:** On the Model page, "Rate limit (requests per minute)" defaults to 60 and can't be typed over or cleared — only the up/down steppers work.
-**Task:** Fix the input binding so it behaves as a normal editable numeric field (clearable, typeable, steppers still functional).
-**Acceptance criteria:** User can clear the field and type an arbitrary value; steppers still increment/decrement correctly.
-
-### 5.3 — [P2] Auto-populate rate limit & max tokens from provider API
-**Problem:** These fields aren't pre-filled from the selected model's provider metadata.
-**Task:** When a model is selected while adding an AI module, fetch rate limit and max tokens from the provider API if exposed, and reflect the same values on the Model Config page. Fall back to current defaults (max tokens: 4000) when unavailable.
-**Acceptance criteria:** Selecting a model with published limits auto-fills both fields; selecting one without falls back to documented defaults without erroring.
-
-### 5.4 — [P3] Model search/filter after fetch
-**Problem:** After clicking "Fetch," the model list has no way to filter by substring.
-**Task:** Add a search box above the fetched model list that filters by substring match (e.g. "openrouter" narrows to `openrouter/...` entries).
-**Acceptance criteria:** Typing a substring live-filters the list; clearing the box restores the full list.
-
-### 5.5 — [P2] Validate all configured model APIs actually work
-**Task:** Systematically test every provider integration exposed on the Model page (auth, list-models, completion call) and fix any that silently fail.
-**Acceptance criteria:** A documented pass/fail matrix across all supported providers; failures either fixed or filed as their own follow-up items.
-
-### 5.6 — [P2] Effort/thinking controls on Model Config
-**Problem:** No UI control for extended/deep-thinking effort on models that support it.
-**Task:** Add an "effort" setting on the Model Config page; wire it through to the provider's extended-thinking/reasoning parameter where supported, no-op where not. When thinking mode is active, replace the animated three-dot typing indicator with a "Thinking…" label in the chat page.
-**Acceptance criteria:** Setting is present only for models that support it (or is a no-op/hidden otherwise); "Thinking…" label appears during an active thinking-mode generation.
-
----
-
+- [] In model page, as well as inside the model config where model are there, before fetch the default shown is of old models, for example antropic has fable and opus and other and google has gemini 3.5 as latest, research web and update the modle page model display as well as the default shown to show the latest models. 
 ## 6. Knowledge Base (ChromaDB) & Agent Ethos
 
-### 6.1 — [P1] Give every agent environment/host context in its Ethos
-**Problem:** Agents lack basic situational grounding: that they run inside a Docker container, where the host is relative to the container, what "the internet" means from inside the container, what part of the host filesystem they're allowed to touch, and how to reach the host. Example failure mode: a user says "create a folder on my desktop" and the agent doesn't understand this means the *host* filesystem, not the container's.
-**Task:** Add this context to both the default Ethos and ChromaDB (constitution-adjacent, read-only collection) so it's available at agent creation and via RAG.
-**Acceptance criteria:** A new agent, without any task-specific context, correctly answers "where does 'my desktop' refer to" and "can you reach the internet."
+## Bug: Inconsistent theme transition animation
+
+When toggling between light/dark mode, UI elements don't transition in sync — 
+some update instantly while others lag behind. This makes the switch feel 
+janky instead of smooth.
+
+**Expected:** All elements should transition together with the same timing/duration.
 
 ### 6.2 — [P2] Seed foundational operating knowledge
 **Task:** Populate the knowledge base with: which tools to use and when, general best practices, host-system access patterns, basic CMD/PowerShell usage, and common CLI utilities (`grep`, `curl`, etc.). Decide the delivery mechanism — baked into ethos/constitution, read from Chroma at startup, or seeded at agent-creation time — and implement it consistently.
