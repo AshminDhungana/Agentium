@@ -9,7 +9,18 @@
  */
 import styles from './TypingIndicator.module.css';
 
-export function TypingIndicator() {
+export function TypingIndicator({ thinking = false }: { thinking?: boolean }) {
+    if (thinking) {
+        return (
+            <div
+                data-testid="typing-indicator"
+                aria-live="polite"
+                className={styles.thinkingLabel}
+            >
+                Thinking…
+            </div>
+        );
+    }
     return (
         <div
             data-testid="typing-indicator"

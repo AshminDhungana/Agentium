@@ -38,6 +38,13 @@
   }
 }
 
+.thinkingLabel {
+    font-size: 0.875rem;
+    color: rgb(107 114 128);
+    font-style: italic;
+    padding: 0.25rem 0;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .bar {
     animation: none;
