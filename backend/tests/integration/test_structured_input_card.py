@@ -18,7 +18,7 @@ def test_post_card_creates_input_card_message(client, db_session, auth_headers):
     assert body["message"]["metadata"]["card"]["card_id"] == "card-1"
 
 
-def test_ws_card_response_persisted(client, db_session, auth_headers, ws_client):
+def test_ws_card_response_persisted(client, db_session, auth_headers, ws_client, mock_ai_provider):
     ws_client.send_json({"type": "auth", "token": auth_headers["Authorization"].split(" ")[1]})
     # receive welcome/system
     ws_client.receive_json()
