@@ -5,6 +5,7 @@ Universal Model Provider Service for Agentium
 
 import asyncio
 import os
+import re
 import time
 import json
 import uuid
@@ -375,6 +376,10 @@ class BaseModelProvider(ABC):
         except:
             return None
 
+    def _thinking_kwargs(self) -> Dict[str, Any]:
+        """Return provider-specific extended-thinking kwargs (or {})."""
+        return _resolve_thinking_kwargs(self.config)
+
     @abstractmethod
     async def generate(self, system_prompt: str, user_message: str, **kwargs) -> Dict[str, Any]:
         """Generate."""
@@ -458,6 +463,82 @@ def _normalize_tool_choice(tool_choice: Any) -> Any:
     return tool_choice
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Extended-thinking wiring (Task 3).
+#
+# A single source of truth that maps a UserModelConfig.effort value to the
+# provider-specific extended-thinking / reasoning parameter shape. Every create
+# call in the provider classes spreads `**self._thinking_kwargs()`; this helper
+# guarantees that ONLY valid combinations are ever produced:
+#   * effort == "none"            -> {}
+#   * unsupported provider        -> {}   (e.g. COHERE is intentionally absent)
+#   * model fails the model_hint  -> {}   (e.g. gpt-4o is not a reasoning model)
+# so nothing invalid is ever sent upstream.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Per-provider extended-thinking strategy. `kind` selects the param shape;
+# `model_hint` (optional regex) gates both UI visibility and param emission.
+PROVIDER_THINKING = {
+    "OPENAI":        {"kind": "openai",   "model_hint": r"(^|[-/])(o1|o3|o4|gpt-5)"},
+    "AZURE_OPENAI": {"kind": "openai",   "model_hint": r"(^|[-/])(o1|o3|o4|gpt-5)"},
+    "ANTHROPIC":     {"kind": "anthropic"},
+    "GEMINI":        {"kind": "gemini"},
+    "DEEPSEEK":      {"kind": "deepseek", "model_hint": r"reasoner|v4"},
+    "GROQ":          {"kind": "openai",   "model_hint": r"gpt-oss|qwen|r1|qwq|reason"},
+    "MISTRAL":       {"kind": "openai",   "model_hint": r"magistral|thinking"},
+    "TOGETHER":      {"kind": "openai",   "model_hint": r"r1|qwq|reasoner|thinking|gpt-oss"},
+    "MOONSHOT":      {"kind": "deepseek", "model_hint": r"k2|kimi"},
+    "LOCAL":         {"kind": "openai",   "model_hint": r"qwq|r1|deepseek|thinking|z1|qwen3"},
+    "CUSTOM":        {"kind": "openai",
+                     "model_hint": r"(^|[-/])(o1|o3|o4|gpt-5)|qwq|r1|reasoner|thinking|gpt-oss"},
+    # COHERE intentionally omitted -> no thinking
+}
+
+_OPENAI_EFFORT = {"low": "low", "medium": "medium", "high": "high", "xhigh": "high"}
+_ANTHROPIC_BUDGET = {"low": 2000, "medium": 8000, "high": 16000, "xhigh": 32000}
+_GEMINI_BUDGET = {"low": 1024, "medium": 4096, "high": 8192, "xhigh": 24576}
+
+
+def _resolve_thinking_kwargs(config) -> Dict[str, Any]:
+    """Return provider-specific thinking kwargs, or {} when disabled/unsupported.
+
+    This is the single source of truth: any provider/model combo that does
+    not support extended thinking yields {}, so nothing is ever sent that the
+    upstream would reject.
+    """
+    effort = (getattr(config, "effort", "none") or "none").lower()
+    if effort == "none":
+        return {}
+    info = PROVIDER_THINKING.get(str(getattr(config, "provider", "")).upper())
+    if not info:
+        return {}
+    model = (getattr(config, "default_model", "") or "").lower()
+    hint = info.get("model_hint")
+    if hint and not re.search(hint, model):
+        return {}
+    kind = info["kind"]
+    if kind == "anthropic":
+        return {
+            "thinking": {"type": "enabled", "budget_tokens": _ANTHROPIC_BUDGET[effort]},
+            "temperature": 1,
+        }
+    if kind == "gemini":
+        return {"extra_body": {"thinkingConfig": {
+            "thinkingBudget": _GEMINI_BUDGET[effort], "includeThoughts": True}}}
+    if kind == "deepseek":
+        return {"extra_body": {
+            "thinking": {"type": "enabled"},
+            "reasoning_effort": _OPENAI_EFFORT[effort],
+        }}
+    # openai-compatible family
+    return {"extra_body": {"reasoning_effort": _OPENAI_EFFORT[effort]}}
+
+
+def is_thinking_config(config) -> bool:
+    """True when the config enables extended thinking for a supported model."""
+    return _resolve_thinking_kwargs(config) != {}
+
+
 class OpenAICompatibleProvider(BaseModelProvider):
     """
     Universal provider for ANY OpenAI-compatible API.
@@ -491,6 +572,7 @@ class OpenAICompatibleProvider(BaseModelProvider):
                 max_tokens=kwargs.get('max_tokens', self.config.max_tokens),
                 temperature=kwargs.get('temperature', self.config.temperature),
                 top_p=kwargs.get('top_p', self.config.top_p),
+                **self._thinking_kwargs(),
             )
 
             await _record_provider_headers(self.config)
@@ -563,6 +645,7 @@ class OpenAICompatibleProvider(BaseModelProvider):
                 stream=True,
                 max_tokens=kwargs.get('max_tokens', self.config.max_tokens),
                 temperature=kwargs.get('temperature', self.config.temperature),
+                **self._thinking_kwargs(),
             )
 
             await _record_provider_headers(self.config)
@@ -741,6 +824,12 @@ class OpenAICompatibleProvider(BaseModelProvider):
                     "openai", "azure", "azure_openai",
                 ):
                     create_kwargs["prompt_cache_key"] = _pc_key
+
+                # ── Extended thinking (Task 3) ─────────────────────────────────
+                # Merge provider-specific reasoning params (extra_body/temperature)
+                # into the call kwargs. Works for both the blocking `create` path
+                # below and the streaming path (which copies create_kwargs).
+                create_kwargs.update(self._thinking_kwargs())
 
                 rpm = getattr(self.config, "requests_per_minute", 60) or 60
                 await provider_rate_limiter.acquire(self.config.id, rpm)
@@ -990,13 +1079,19 @@ class AnthropicProvider(BaseModelProvider):
         try:
             rpm = getattr(self.config, "requests_per_minute", 60) or 60
             await provider_rate_limiter.acquire(self.config.id, rpm)
-            response = await client.messages.create(
-                model=kwargs.get('model', self.config.default_model),
-                max_tokens=kwargs.get('max_tokens', self.config.max_tokens),
-                temperature=kwargs.get('temperature', self.config.temperature),
-                system=system_prompt,
-                messages=[{"role": "user", "content": user_message}]
-            )
+            create_kwargs: Dict[str, Any] = {
+                "model": kwargs.get('model', self.config.default_model),
+                "max_tokens": kwargs.get('max_tokens', self.config.max_tokens),
+                "system": system_prompt,
+                "messages": [{"role": "user", "content": user_message}],
+            }
+            # Extended thinking (Task 3): when active, thinking kwargs already
+            # carry temperature=1 (Anthropic requires that) and must win. When
+            # inactive, fall back to the configured temperature.
+            create_kwargs.update(self._thinking_kwargs())
+            if "temperature" not in create_kwargs:
+                create_kwargs["temperature"] = kwargs.get('temperature', self.config.temperature)
+            response = await client.messages.create(**create_kwargs)
 
             await _record_provider_headers(self.config)
 
@@ -1046,13 +1141,17 @@ class AnthropicProvider(BaseModelProvider):
         try:
             rpm = getattr(self.config, "requests_per_minute", 60) or 60
             await provider_rate_limiter.acquire(self.config.id, rpm)
-            async with client.messages.stream(
-                model=kwargs.get('model', self.config.default_model),
-                max_tokens=kwargs.get('max_tokens', self.config.max_tokens),
-                temperature=kwargs.get('temperature', self.config.temperature),
-                system=system_prompt,
-                messages=[{"role": "user", "content": user_message}]
-            ) as stream:
+            stream_kwargs: Dict[str, Any] = {
+                "model": kwargs.get('model', self.config.default_model),
+                "max_tokens": kwargs.get('max_tokens', self.config.max_tokens),
+                "system": system_prompt,
+                "messages": [{"role": "user", "content": user_message}],
+            }
+            # Extended thinking (Task 3): wins over configured temperature when active.
+            stream_kwargs.update(self._thinking_kwargs())
+            if "temperature" not in stream_kwargs:
+                stream_kwargs["temperature"] = kwargs.get('temperature', self.config.temperature)
+            async with client.messages.stream(**stream_kwargs) as stream:
                 await _record_provider_headers(self.config)
                 async for text in stream.text_stream:
                     yield text
@@ -1154,6 +1253,11 @@ class AnthropicProvider(BaseModelProvider):
                                 _content[-1]["cache_control"] = {"type": "ephemeral"}
                 if tools:
                     create_kwargs["tools"] = tools
+
+                # ── Extended thinking (Task 3) ─────────────────────────────────
+                # Merge provider-specific reasoning params (thinking/temperature
+                # for Anthropic, extra_body otherwise) into the call kwargs.
+                create_kwargs.update(self._thinking_kwargs())
 
                 rpm = getattr(self.config, "requests_per_minute", 60) or 60
                 await provider_rate_limiter.acquire(self.config.id, rpm)
@@ -1326,6 +1430,7 @@ class LocalProvider(OpenAICompatibleProvider):
                 messages=[{"role": "user", "content": combined_prompt}],
                 max_tokens=kwargs.get('max_tokens', self.config.max_tokens),
                 temperature=kwargs.get('temperature', self.config.temperature),
+                **self._thinking_kwargs(),
             )
 
             await _record_provider_headers(self.config)
