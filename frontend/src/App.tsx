@@ -16,6 +16,7 @@ import { Shield } from 'lucide-react';
 import { modelsApi } from '@/services/models';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { useGlobalChatCards } from '@/hooks/useGlobalChatCards';
+import { GenesisNameModal } from '@/components/genesis/GenesisNameModal';
 
 // ── Session key ───────────────────────────────────────────────────────────────
 // Marks that the model-redirect check has already fired for this login session.
@@ -116,6 +117,11 @@ function AppWithRedirect() {
                 Skip to content
             </a>
             <Toaster position="top-right" />
+
+            {/* Mounted globally (not just on /chat) so the nation-naming popup
+                appears during Genesis even when the user is on the Models page
+                right after adding their first API key. */}
+            <GenesisNameModal />
 
             <GlobalWebSocketProvider>
                 <Routes>
