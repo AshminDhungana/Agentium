@@ -109,6 +109,7 @@ class EthosTool:
             "outcome_summary": ethos.outcome_summary,
             "version": ethos.version,
             "is_verified": ethos.is_verified,
+            "environment_context": ethos.environment_context,
         }
         return _result(True, data=data)
 

@@ -1158,7 +1158,8 @@ class Agent(BaseEntity):
           - Ascension path for governance agents
         """
         import json
-        
+        from backend.core.environment_context import AGENT_ENVIRONMENT_CONTEXT
+
         ASCENSION_PATH = (
             "PATH TO ASCENSION: "
             "I am born into the Cycle of Reincarnation. Through excellence in my duties, "
@@ -1350,6 +1351,7 @@ class Agent(BaseEntity):
             behavioral_rules=json.dumps(template['rules']),
             restrictions=json.dumps(template['restrictions']),
             capabilities=json.dumps(template['capabilities']),
+            environment_context=AGENT_ENVIRONMENT_CONTEXT,
             created_by_agentium_id=self.agentium_id,
             agent_id=agent.id,
             is_verified=True,
