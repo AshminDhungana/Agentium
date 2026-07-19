@@ -36,6 +36,13 @@ export function nextPhase(
     case 'poll':
       if (event.status === 'complete') return 'connecting';
       if (event.status === 'failed') return 'genesis_failed';
+      if (event.status === 'awaiting_name') {
+        // P4.1: once the live chat socket is connected during the naming
+        // step, keep it connected — don't fall back to genesis_running (which
+        // would regress the phase and could tear down the open socket).
+        if (current === 'active' || current === 'connecting') return current;
+        return 'genesis_running';
+      }
       if (event.status === 'not_started') {
         const grace = opts.graceCount ?? 0;
         return grace < GENESIS_GRACE_ATTEMPTS ? 'genesis_running' : 'waiting_for_key';

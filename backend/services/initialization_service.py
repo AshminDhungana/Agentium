@@ -487,6 +487,23 @@ class InitializationService:
             results["steps_completed"].append(f"created_default_lead:{default_lead.agentium_id}")
             self._log("INFO", f"Created default Lead Agent {default_lead.agentium_id}")
 
+            # ── EARLY COMMIT (Genesis sequence ordering, todo §4.1) ────────────
+            # Commit Head/Council/Lead now so they are visible to OTHER DB
+            # sessions — in particular the chat WebSocket handshake
+            # (websocket.py:authenticate), which queries Head in a separate
+            # connection. Without this, Head stays uncommitted until the very
+            # end of genesis, so the dashboard cannot open the live chat during
+            # the nation-naming step and the post-naming Head reply is never
+            # delivered live (it only limps back via the post-complete replay).
+            # A failure BEFORE this point still rolls back the whole
+            # transaction and leaves is_system_initialized() False, so genesis
+            # can be retried cleanly. In TESTING we flush only (no commit) so
+            # the fixture savepoint can roll back.
+            if not os.environ.get("TESTING"):
+                self.db.commit()
+            else:
+                self.db.flush()
+
             # Step 3: Determine country name
             if country_name:
                 selected_name = country_name.strip()

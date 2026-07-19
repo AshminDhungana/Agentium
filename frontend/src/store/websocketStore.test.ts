@@ -87,3 +87,47 @@ describe('genesis awaiting name', () => {
     spy.mockRestore();
   });
 });
+
+describe('genesis poll drives live connect during naming (todo 4.1)', () => {
+  let pollSpy: any;
+  beforeEach(() => {
+    useWebSocketStore.setState({
+      genesisAwaitingName: false,
+      genesisNamePrompt: '',
+      genesisNameTimeout: 0,
+      connectionPhase: 'genesis_running',
+      _genesisPollTimeout: null,
+      _ws: null,
+    });
+    // _openSocket() requires a token or it bails to genesis_failed.
+    localStorage.setItem('access_token', 'test-token');
+    pollSpy = vi
+      .spyOn(websocketReplayApi, 'pollGenesisStatus')
+      .mockResolvedValue({
+        status: 'awaiting_name',
+        prompt: 'Name your nation',
+        timeout_seconds: 60,
+      } as any);
+  });
+  afterEach(() => {
+    useWebSocketStore.getState()._stopGenesisPoll();
+    pollSpy.mockRestore();
+  });
+
+  it('awaiting_name surfaces the modal and opens the live socket', async () => {
+    useWebSocketStore.getState()._pollGenesisStatus();
+    await new Promise((r) => setTimeout(r, 10));
+    expect(useWebSocketStore.getState().genesisAwaitingName).toBe(true);
+    expect(useWebSocketStore.getState().genesisNamePrompt).toBe('Name your nation');
+    // The chat must come alive (connecting/active), not stay disconnected.
+    expect(['connecting', 'active']).toContain(
+      useWebSocketStore.getState().connectionPhase,
+    );
+  });
+
+  it('awaiting_name does not regress an already-active phase', () => {
+    useWebSocketStore.setState({ connectionPhase: 'active' });
+    useWebSocketStore.getState()._transition({ type: 'poll', status: 'awaiting_name' });
+    expect(useWebSocketStore.getState().connectionPhase).toBe('active');
+  });
+});

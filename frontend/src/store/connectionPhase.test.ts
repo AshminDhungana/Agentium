@@ -29,6 +29,13 @@ describe('connectionPhase reducer', () => {
   it('poll not_started within grace window stays genesis_running (P5)', () => {
     expect(nextPhase('genesis_running', { type: 'poll', status: 'not_started' }, { graceCount: 2 })).toBe('genesis_running');
   });
+  it('poll awaiting_name from genesis_running stays genesis_running (todo 4.1)', () => {
+    expect(nextPhase('genesis_running', { type: 'poll', status: 'awaiting_name' })).toBe('genesis_running');
+  });
+  it('poll awaiting_name does not regress an active phase (todo 4.1)', () => {
+    expect(nextPhase('active', { type: 'poll', status: 'awaiting_name' })).toBe('active');
+    expect(nextPhase('connecting', { type: 'poll', status: 'awaiting_name' })).toBe('connecting');
+  });
   it('poll not_started after grace window -> waiting_for_key (P5)', () => {
     expect(nextPhase('genesis_running', { type: 'poll', status: 'not_started' }, { graceCount: 5 })).toBe('waiting_for_key');
   });

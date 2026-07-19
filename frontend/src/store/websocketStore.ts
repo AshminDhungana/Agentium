@@ -507,6 +507,15 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
                         genesisNamePrompt: data.prompt ?? '',
                         genesisNameTimeout: data.timeout_seconds ?? 60,
                     });
+                    // P4.1: open the live chat NOW so the nation-naming popup
+                    // renders over an active Head-of-Council session (Head 00001
+                    // is already committed by this point in genesis) and so the
+                    // post-naming reply is delivered live in the chat rather
+                    // than only via the post-complete replay. _connectNow is a
+                    // no-op if the socket is already open/connecting.
+                    if (get().connectionPhase !== 'active') {
+                        get()._connectNow();
+                    }
                 } else if (get().genesisAwaitingName) {
                     set({ genesisAwaitingName: false, genesisNamePrompt: '', genesisNameTimeout: 0 });
                 }
