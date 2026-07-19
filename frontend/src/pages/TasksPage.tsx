@@ -61,6 +61,7 @@ import {
     Monitor,
 } from 'lucide-react';
 import { showToast } from '@/hooks/useToast';
+import { useWebSocketStore } from '@/store/websocketStore';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { SlideOver } from '@/components/ui/SlideOver';
@@ -2134,6 +2135,23 @@ export const TasksPage: React.FC = () => {
             setIsRefreshing(false);
         }
     }, [filterStatus, myTasksOnly, hideSystem]);
+
+    // Governance observability: the Head's task delegation is an agent-internal
+    // event (Head → Council → Lead → Task), so it is surfaced here on the Tasks
+    // dashboard — not in the user-facing chat (per architecture §2/§4).
+    useEffect(() => {
+        const unsub = useWebSocketStore.subscribe((state, prev) => {
+            const msg = state.lastMessage;
+            if (!msg || msg === prev.lastMessage) return;
+            if (msg.type === 'task_created' && (msg as any).task_id) {
+                showToast.info(`New task ${(msg as any).task_id} created via the Head's delegation`);
+                loadTasks(true);
+            } else if (msg.type === 'task_failed') {
+                showToast.error(`Task delegation failed: ${msg.content ?? 'unknown error'}`);
+            }
+        });
+        return unsub;
+    }, [loadTasks]);
 
     const handleCreateTask = async (data: any) => {
         const requestData: CreateTaskRequest = {

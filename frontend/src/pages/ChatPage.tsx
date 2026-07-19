@@ -326,10 +326,6 @@ export function ChatPage() {
                     msg.metadata as MessageMetadata | undefined,
                 );
                 setIsAwaitingReply(false);
-                const endMeta = msg.metadata as MessageMetadata | undefined;
-                if ((endMeta as any)?.task_created) {
-                    showToast.success(`Task ${(endMeta as any).task_id} created`);
-                }
                 return;
             }
 
@@ -354,9 +350,6 @@ export function ChatPage() {
                 setMessages((prev) => [...prev, newMessage]);
                 // Any incoming message means the assistant is no longer "thinking"
                 setIsAwaitingReply(false);
-                if (msg.metadata?.task_created) {
-                    showToast.success(`Task ${msg.metadata.task_id} created`);
-                }
             }
         });
 

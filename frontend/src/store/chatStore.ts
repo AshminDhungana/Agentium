@@ -271,11 +271,6 @@ export const useChatStore = create<ChatState>()(
                         isLoading: false,
                         currentStreamingMessage: ''
                     }));
-
-                    if (response.task_created) {
-                        showToast.success(`Task ${response.task_id} created`);
-                    }
-
                 } catch (error: any) {
                     console.error('Chat error:', error);
 

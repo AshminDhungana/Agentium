@@ -541,7 +541,7 @@ else:
     task_info = {"created": False}
 ```
 
-Keep `task_info` flowing into the return dict as before (the `task_id` may be `None` until the event arrives; the frontend updates on `task_created`).
+Keep `task_info` flowing into the return dict as before (the `task_id` may be `None` until the event arrives). The `task_created` event is consumed by the **Tasks / Monitoring** dashboards for governance observability, **not** the user-facing chat page — the chat page is the Head ↔ Sovereign dialogue only.
 
 - [ ] **Step 4: Run test to verify it passes**
 

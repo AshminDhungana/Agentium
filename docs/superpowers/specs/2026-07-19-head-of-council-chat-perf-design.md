@@ -78,8 +78,13 @@ progress via a **follow-up WebSocket event** rather than blocking `message_end`.
 - `message_end` is sent as soon as the streamed reply + classification are complete.
 - A new `task_created` / `task_progress` WebSocket event (reusing `ConnectionManager`
   broadcast) carries the delegation result when the background task commits.
+- **Routing of the event:** the chat page is the Head ↔ Sovereign dialogue only, so
+  `task_created` / `task_failed` are **not** surfaced in the chat. They are governance
+  observability events consumed by the **Tasks / Monitoring** dashboards (per
+  ARCHITECTURE.md §2/§4), exactly like `task_escalated` / `agent_spawned`.
 - The Head's on-screen reply for execution requests is capped to the 2–3 line ack
-  (already partially enforced at chat.py:544); apply it specifically on the delegate path.
+  (already partially enforced at chat.py:544); `task_created` is never rendered inline
+  in that reply.
 
 ### 3.3 Trim pre-generation overhead
 - **Cache `get_system_context`** with a 20 s TTL. System state (agent
