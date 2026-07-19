@@ -353,8 +353,9 @@ Address the Sovereign respectfully. If they issue a command that requires execut
 
         # ── Task 3: Inject the `decide` tool so routing is classified in the ──
         #    same LLM turn, eliminating the second round-trip in analyze_for_task.
-        #    We MUST include the registry tools too, because generate_with_tools
-        #    replaces (not extends) the Head's normal tool set via the tools kwarg.
+        #    The `decide` tool is already registered in ToolRegistry (0xxxx tier)
+        #    and therefore included by to_openai_tools(), so we do NOT append it
+        #    manually (a duplicate function name is rejected by providers).
         tier = f"{head.agentium_id[0]}xxxx"
         try:
             from backend.core.tool_registry import ToolRegistry
@@ -362,7 +363,7 @@ Address the Sovereign respectfully. If they issue a command that requires execut
         except Exception as _reg_err:
             logger.warning(f"[ChatService] ToolRegistry lookup failed, falling back to empty: {_reg_err}")
             registry_tools = []
-        gen_tools = list(registry_tools) + [LLMClient.DECISION_TOOL]
+        gen_tools = list(registry_tools)
 
         # Instruct the model to always emit the routing decision alongside its reply.
         full_prompt += (
@@ -849,14 +850,19 @@ Progress: {task_progress or 'N/A'}%"""
             from backend.services.media_interceptor import MediaInterceptor
 
             # Own DB session: the caller's session may already be closed by the
-            # time this background task runs.
-            async with httpx.AsyncClient(timeout=MediaInterceptor.DOWNLOAD_TIMEOUT) as http_client:
-                content, media_urls = await MediaInterceptor.intercept_and_store(
-                    text=content,
-                    user_id=user_id,
-                    db=SessionLocal(),
-                    http_client=http_client,
-                )
+            # time this background task runs. Open it in try/finally and close it
+            # after use so the connection is never leaked.
+            db: Session = SessionLocal()
+            try:
+                async with httpx.AsyncClient(timeout=MediaInterceptor.DOWNLOAD_TIMEOUT) as http_client:
+                    content, media_urls = await MediaInterceptor.intercept_and_store(
+                        text=content,
+                        user_id=user_id,
+                        db=db,
+                        http_client=http_client,
+                    )
+            finally:
+                db.close()
         except Exception as exc:
             logger.warning(f"[ChatService] media interception (bg) failed: {exc}")
         await ChatService._persist_head_turn_background(
