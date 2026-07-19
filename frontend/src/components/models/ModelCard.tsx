@@ -227,9 +227,9 @@ export const ModelCard: React.FC<ModelCardProps> = React.memo(({
                             </span>
                         </div>
                     ) : price === null ? null : (
-                        <div className="flex items-center justify-between text-sm opacity-60">
+                        <div className="flex items-center justify-between text-sm">
                             <span className="text-gray-600 dark:text-gray-400">Price / 1M</span>
-                            <span className="font-mono text-xs text-gray-400 dark:text-gray-500">…</span>
+                            <span className="font-mono text-xs text-gray-500 dark:text-gray-400">…</span>
                         </div>
                     )}
                 </div>
