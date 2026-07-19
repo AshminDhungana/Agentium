@@ -1,5 +1,5 @@
 import React from 'react';
-import { normaliseProviderId, getProviderFormGradient, ProviderFormIcon } from '@/constants/providerMeta';
+import { normaliseProviderId, ProviderFormIcon } from '@/constants/providerMeta';
 
 const logoModules = import.meta.glob('@/assets/providers/*.svg', {
   eager: true,
