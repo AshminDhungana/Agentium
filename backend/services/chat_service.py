@@ -840,6 +840,16 @@ Progress: {task_progress or 'N/A'}%"""
                     logger.warning(f"[ChatService] task_created broadcast failed: {exc}")
         except Exception as exc:
             logger.error(f"[ChatService] background task creation failed: {exc}")
+            if ws_manager is None:
+                from backend.api.routes.websocket import manager as ws_manager
+            try:
+                await ws_manager.broadcast({
+                    "type": "task_failed",
+                    "content": f"Task creation failed: {exc}",
+                    "timestamp": datetime.utcnow().isoformat(),
+                })
+            except Exception:
+                pass
 
     @staticmethod
     async def _media_and_persist_background(
