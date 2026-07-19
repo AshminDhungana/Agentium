@@ -102,6 +102,10 @@ class UserModelConfig(BaseEntity):
     top_p = Column(Float, default=1.0)
     timeout_seconds = Column(Integer, default=60)
 
+    # Reasoning effort for extended-thinking providers
+    effort = Column(String(16), default="none", nullable=False,
+                  comment="Reasoning effort: none|low|medium|high|xhigh")
+
     # Status tracking
     status = Column(Enum(ConnectionStatus), default=ConnectionStatus.TESTING)
     last_error = Column(Text, nullable=True)
