@@ -514,6 +514,19 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        // Bail before any network call — the backend rejects these with an
+        // opaque 422 that previously crashed the view (React #31). Surface a
+        // clear, human-readable message instead.
+        if (hasBlockingValidationErrors) {
+            const missing: string[] = [];
+            if (configNameMissing) missing.push('Configuration Name');
+            if (modelMissing) missing.push('Model');
+            if (providerNameMissing) missing.push('Provider Name');
+            if (apiKeyMissing) missing.push('API Key');
+            setError(`Please fill in the required field(s): ${missing.join(', ')}`);
+            setIsLoading(false);
+            return;
+        }
         setIsLoading(true);
         setError(null);
         try {
@@ -559,6 +572,17 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
         formData.provider === 'custom' ||
         (selectedProvider?.requires_api_key ?? false);
     const apiKeyMissing = apiKeyRequired && !formData.api_key?.trim();
+
+    // Required-field validation. The backend rejects an empty `default_model`
+    // (and `config_name`), but that round-trip used to surface as a raw server
+    // error and crash the view (React #31). Block submission up front instead so
+    // the user can never "confirm" an incomplete form — the Create/Update button
+    // is disabled and handleSubmit bails out with a friendly message.
+    const configNameMissing = !formData.config_name.trim();
+    const modelMissing = !formData.default_model.trim();
+    const providerNameMissing = isUniversal && !formData.custom_provider_name.trim();
+    const hasBlockingValidationErrors =
+        apiKeyMissing || configNameMissing || modelMissing || providerNameMissing;
 
     /* ── Shared input class ───────────────────────────────────────────────── */
     const inputCls = 'w-full px-4 py-2.5 text-sm bg-white dark:bg-[#0f1117] border border-gray-200 dark:border-[#1e2535] rounded-lg text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition-colors duration-150';
@@ -1053,7 +1077,7 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
                             </button>
                             <button
                                 type="submit"
-                                disabled={isLoading || apiKeyMissing}
+                                disabled={isLoading || hasBlockingValidationErrors}
                                 aria-label={initialConfig ? 'Update configuration' : 'Create configuration'}
                                 className="flex-1 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 dark:hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors duration-150 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm"
                             >
@@ -1065,6 +1089,16 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
                         {apiKeyMissing && (
                             <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
                                 An API key is required to create this configuration. Enter it above.
+                            </p>
+                        )}
+
+                        {!apiKeyMissing && hasBlockingValidationErrors && (
+                            <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
+                                Fill in all required fields
+                                {configNameMissing ? ' — Configuration Name' : ''}
+                                {modelMissing ? ' — Model' : ''}
+                                {providerNameMissing ? ' — Provider Name' : ''}
+                                {' '}before creating this configuration.
                             </p>
                         )}
                     </form>
