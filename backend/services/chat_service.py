@@ -481,57 +481,31 @@ Address the Sovereign respectfully. If they issue a command that requires execut
         tokens_used = result.get("tokens_used", 0)
         context_status = context_manager.update_usage(head.agentium_id, tokens_used)
 
-        # ── System-Generated Media Interception (Issue #11) ────────────────────
-        # Intercept media URLs in LLM response, download & store permanently,
-        # rewrite content with storage URLs before persistence + broadcast.
+        # ── Defer media interception + Head-turn persistence (Task 5) ──────────
+        # BOTH the (potentially slow) media URL download/rewrite AND the
+        # ChatMessage persistence for the Head-of-Council turn are moved OFF the
+        # critical path. The streamed reply (result["content"]) is returned to
+        # the user immediately; the heavy work runs in a fire-and-forget
+        # background task so it can never block message_end.
         if sovereign_user:
             try:
-                # Reuse a single httpx client for all downloads in this request
-                async with httpx.AsyncClient(timeout=MediaInterceptor.DOWNLOAD_TIMEOUT) as http_client:
-                    result["content"], media_urls = await MediaInterceptor.intercept_and_store(
-                        text=result["content"],
-                        user_id=str(sovereign_user.id),
-                        db=db,
-                        http_client=http_client
+                asyncio.create_task(
+                    ChatService._media_and_persist_background(
+                        str(sovereign_user.id),
+                        result["content"],
+                        head.agentium_id,
+                        result.get("model", model_name),
+                        [],
                     )
-                    # Attach media URLs to result for metadata persistence
-                    if media_urls:
-                        result["media_urls"] = media_urls
-            except Exception as e:
-                # Graceful degradation: log but don't block response
-                logger.warning(f"[ChatService] Media interception failed (non-fatal): {e}")
+                )
+            except Exception as exc:
+                logger.warning(f"[ChatService] media bg schedule failed: {exc}")
         # ────────────────────────────────────────────────────────────────────────
 
         # Broadcast response to user's external channels (Unified Inbox)
         from backend.services.channel_manager import ChannelManager
 
-        # ── Persist the Head-of-Council turn.  The inbound (user) turn is ──
-        #    persisted earlier, before the model round-trip, so it is never lost.
         if sovereign_user:
-            try:
-                msg_id = str(_uuid.uuid4())
-                db.add(ChatMsg(
-                    id=msg_id,
-                    user_id=str(sovereign_user.id),
-                    role="head_of_council",
-                    content=result["content"],
-                    message_metadata={
-                        "agent_id": head.agentium_id,
-                        "model": result.get("model", model_name),
-                        "media_urls": result.get("media_urls", []),
-                    },
-                ))
-                db.commit()
-            except Exception as _persist_err:
-                logger.warning(f"ChatMessage (outbound) persist failed (non-fatal): {_persist_err}")
-                try:
-                    db.rollback()
-                except Exception:
-                    pass
-        # ─────────────────────────────────────────────────────────────────────
-
-        if sovereign_user:
-            import asyncio
             asyncio.create_task(
                 ChannelManager.broadcast_to_channels(
                     user_id=sovereign_user.id,
@@ -846,6 +820,69 @@ Progress: {task_progress or 'N/A'}%"""
                     logger.warning(f"[ChatService] task_created broadcast failed: {exc}")
         except Exception as exc:
             logger.error(f"[ChatService] background task creation failed: {exc}")
+
+    @staticmethod
+    async def _media_and_persist_background(
+        user_id: str,
+        content: str,
+        agent_id: str,
+        model: str,
+        media_urls: list,
+    ) -> None:
+        """
+        Fire-and-forget: download/rewrite media URLs in the Head's reply, then
+        persist the Head-of-Council turn. Runs in its own ``asyncio.create_task``
+        spawned from ``process_message`` so the user-facing stream is not blocked
+        by network downloads or DB writes.
+        """
+        try:
+            import httpx
+            from backend.services.media_interceptor import MediaInterceptor
+
+            # Own DB session: the caller's session may already be closed by the
+            # time this background task runs.
+            async with httpx.AsyncClient(timeout=MediaInterceptor.DOWNLOAD_TIMEOUT) as http_client:
+                content, media_urls = await MediaInterceptor.intercept_and_store(
+                    text=content,
+                    user_id=user_id,
+                    db=SessionLocal(),
+                    http_client=http_client,
+                )
+        except Exception as exc:
+            logger.warning(f"[ChatService] media interception (bg) failed: {exc}")
+        await ChatService._persist_head_turn_background(
+            user_id, content, agent_id, model, media_urls
+        )
+
+    @staticmethod
+    async def _persist_head_turn_background(
+        user_id: str,
+        content: str,
+        agent_id: str,
+        model: str,
+        media_urls: list,
+    ) -> None:
+        """Persist the Head-of-Council turn + media rewrite off the critical path."""
+        try:
+            db: Session = SessionLocal()
+            try:
+                msg_id = str(uuid.uuid4())
+                db.add(ChatMsg(
+                    id=msg_id,
+                    user_id=user_id,
+                    role="head_of_council",
+                    content=content,
+                    message_metadata={
+                        "agent_id": agent_id,
+                        "model": model,
+                        "media_urls": media_urls or [],
+                    },
+                ))
+                db.commit()
+            finally:
+                db.close()
+        except Exception as exc:
+            logger.warning(f"[ChatService] Head turn persist (bg) failed: {exc}")
 
     @staticmethod
     async def analyze_for_task(
