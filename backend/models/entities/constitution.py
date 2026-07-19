@@ -264,6 +264,9 @@ class Ethos(BaseEntity):
     
     # Update tracking (agents can update their own ethos)
     last_updated_by_agent = Column(Boolean, default=False)  # True if agent updated itself
+
+    # Environment / host grounding (6.1) — core identity, set at agent creation
+    environment_context = Column(Text, nullable=True)
     def get_core_values(self) -> List[str]:
         import json
         val = self.core_values
