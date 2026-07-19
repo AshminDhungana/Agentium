@@ -1177,6 +1177,12 @@ export function ChatPage() {
                                                         {message.attachments?.map((att, i) => (
                                                             <div key={i}>{renderAttachment(att, isUser)}</div>
                                                         ))}
+                                                        {message.metadata?.task_created && (
+                                                            <div className="mt-3 pt-3 border-t border-white/20 flex items-center gap-2 text-xs">
+                                                                <CheckCircle className="w-3.5 h-3.5" />
+                                                                Task {message.metadata.task_id} created
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 )}
                                                 <div className={`flex items-center gap-2 mt-1.5 px-1 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>

@@ -652,6 +652,8 @@ async def websocket_chat_endpoint(
                             "metadata": {
                                 "model":        response.get("model"),
                                 "tokens_used":  response.get("tokens_used", 0),
+                                "task_created": response.get("task_created", False),
+                                "task_id":      response.get("task_id"),
                                 "agent_spawned": response.get("agent_spawned"),
                                 "context_compressed": response.get("context_compressed", False),
                                 "raw_turn_count": response.get("raw_turn_count", 0),

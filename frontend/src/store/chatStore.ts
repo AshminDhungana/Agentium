@@ -260,7 +260,9 @@ export const useChatStore = create<ChatState>()(
                         status: 'sent',
                         metadata: {
                             agent_used: response.agent_id,
-                            model: response.model
+                            model: response.model,
+                            task_created: response.task_created,
+                            task_id: response.task_id
                         }
                     };
 
