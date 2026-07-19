@@ -17,6 +17,8 @@ from sqlalchemy.orm import Session
 from backend.models.database import SessionLocal, get_db
 from backend.models.entities import Agent, HeadOfCouncil
 from backend.services.chat_service import ChatService
+from backend.services.model_provider import is_thinking_config
+from backend.models.entities.user_config import UserModelConfig
 from backend.core.config import settings
 from backend.models.entities.user import User
 from backend.api.dependencies.auth import get_current_user
@@ -613,6 +615,16 @@ async def websocket_chat_endpoint(
 
                     extra_metadata = {"card_response": card_response} if card_response else None
 
+                    thinking_enabled = False
+                    if head.preferred_config_id:
+                        head_cfg = (
+                            db.query(UserModelConfig)
+                            .filter_by(id=head.preferred_config_id)
+                            .first()
+                        )
+                        if head_cfg and is_thinking_config(head_cfg):
+                            thinking_enabled = True
+
                     stream_id  = str(uuid.uuid4())
                     message_id = str(uuid.uuid4())
                     cancel_event = asyncio.Event()
@@ -623,6 +635,7 @@ async def websocket_chat_endpoint(
                         "stream_id":  stream_id,
                         "role":       "head_of_council",
                         "message_id": message_id,
+                        "thinking":   thinking_enabled,
                         "timestamp":  datetime.utcnow().isoformat(),
                     })
 
