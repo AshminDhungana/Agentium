@@ -146,8 +146,10 @@ ENV PYTHONPATH=/app \
 
 EXPOSE 8000
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=5 \
-    CMD python -c "import http.client; conn = http.client.HTTPConnection('localhost', 8000); conn.request('GET', '/api/health'); exit(0 if conn.getresponse().status == 200 else 1)" || exit 1
+# NOTE: No HEALTHCHECK here on purpose. This image is shared by both the
+# Celery worker and the Celery beat, which serve different processes (no web
+# server on :8000). Per-service healthchecks are defined in docker-compose.yml
+# (celery inspect ping for the worker, pgrep for the beat scheduler).
 
 COPY scripts/entrypoint.sh /entrypoint.sh
 

@@ -11,7 +11,7 @@ logs.txt
 .vscode/
 .idea/
 .superpowers/
-docs/superpowers/
+#docs/superpowers/
 .superpowers/*
 .claude
 .agents

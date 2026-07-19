@@ -299,9 +299,9 @@ services:
     networks:
       - agentium-network
     healthcheck:
-      test: ["CMD", "python", "-c", "import http.client, sys; c=http.client.HTTPConnection('localhost',8000,timeout=5); c.request('GET','/api/health'); r=c.getresponse(); sys.exit(0 if r.status==200 else 1)"]
+      test: ["CMD", "curl", "-f", "-s", "http://localhost:8000/api/health", "--max-time", "8"]
       interval: 15s
-      timeout: 10s
+      timeout: 12s
       start_period: 90s
       retries: 5
 
@@ -395,6 +395,16 @@ services:
       chromadb:
         condition: service_healthy
     command: celery -A backend.main.celery worker --loglevel=info --concurrency=4
+    # The worker has no web server. A full `celery inspect ping` cold-boots the
+    # entire app (imports every task module + connects to the broker) and takes
+    # ~18s, which is too slow for a health probe. A process liveness check is
+    # fast and sufficient; the worker's own heartbeats prove it is processing.
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'celery.*worker' >/dev/null 2>&1"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 5
     restart: unless-stopped
     networks:
       - agentium-network
@@ -477,6 +487,14 @@ services:
       chromadb:
         condition: service_healthy
     command: celery -A backend.main.celery beat --loglevel=info
+    # The beat scheduler is not a worker, so it does not answer `inspect ping`.
+    # Check the scheduler process is alive instead.
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'celery.*beat' >/dev/null 2>&1"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 5
     restart: unless-stopped
     networks:
       - agentium-network

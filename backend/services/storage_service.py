@@ -92,22 +92,35 @@ class _S3Backend:
     def _ensure_bucket(self):
         """Create the bucket if it does not already exist."""
         from botocore.exceptions import ClientError
+
+        _ALREADY_EXISTS = ("BucketAlreadyOwnedByYou", "BucketAlreadyExists")
+
         try:
             self._client.head_bucket(Bucket=self._bucket)
             logger.info("✅ [Storage/S3] Bucket '%s' confirmed.", self._bucket)
+            return
         except ClientError as exc:
             code = exc.response["Error"]["Code"]
-            if code in ("404", "NoSuchBucket"):
-                if _REGION == "us-east-1":
-                    self._client.create_bucket(Bucket=self._bucket)
-                else:
-                    self._client.create_bucket(
-                        Bucket=self._bucket,
-                        CreateBucketConfiguration={"LocationConstraint": _REGION},
-                    )
-                logger.info("✅ [Storage/S3] Bucket '%s' created.", self._bucket)
+            if code not in ("404", "NoSuchBucket"):
+                raise  # permission errors or network issues bubble up
+
+        # Bucket is missing (or momentarily reported as such under a race) → create it.
+        try:
+            if _REGION == "us-east-1":
+                self._client.create_bucket(Bucket=self._bucket)
             else:
-                raise   # permission errors or network issues bubble up
+                self._client.create_bucket(
+                    Bucket=self._bucket,
+                    CreateBucketConfiguration={"LocationConstraint": _REGION},
+                )
+            logger.info("✅ [Storage/S3] Bucket '%s' created.", self._bucket)
+        except ClientError as exc:
+            # Another process may have created it concurrently (backend + celery
+            # workers/beat all init storage at startup). That is not a failure.
+            if exc.response["Error"]["Code"] in _ALREADY_EXISTS:
+                logger.info("✅ [Storage/S3] Bucket '%s' already exists.", self._bucket)
+            else:
+                raise
 
     # ── Interface ─────────────────────────────────────────────────────────────
 
