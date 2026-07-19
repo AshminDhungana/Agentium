@@ -20,7 +20,12 @@ async def test_head_generation_receives_decide_tool(monkeypatch):
     captured = {}
 
     async def fake_generate_with_tools(self, agent, user_message, *, db, **kwargs):
-        captured.update(kwargs)
+        # Capture only the PRIMARY generation (process_message's own call). When
+        # the model omits the `decide` tool call, the new fallback invokes
+        # DecisionEngine().decide which calls generate_with_tools again; we must
+        # not let that second (fallback) call overwrite the primary kwargs.
+        if not captured:
+            captured.update(kwargs)
         return {"content": "On it.", "tool_calls": [], "model": "x"}
 
     # --- LLMClient: no real network/provider ---

@@ -19,7 +19,7 @@ from backend.services.reincarnation_service import reincarnation_service
 from backend.services.clarification_service import clarification_service
 from backend.services.model_provider import ModelService
 from backend.services.media_interceptor import MediaInterceptor
-from backend.services.decision_engine import DecisionEngine, DecisionAction
+from backend.services.decision_engine import Decision, DecisionEngine, DecisionAction
 from backend.core.llm_client import LLMClient
 from backend.models.entities.user_config import ConnectionStatus
 from backend.models.entities.chat_message import ChatMessage as ChatMsg
@@ -521,6 +521,16 @@ Address the Sovereign respectfully. If they issue a command that requires execut
         #    handed off to a fire-and-forget background task so message_end is not
         #    blocked. The real status arrives via the `task_created` WS event.
         decision = ChatService.classify_action_from_result(result)
+
+        # Fallback: the model may not have emitted the `decide` tool call (tool_choice
+        # is "auto"). Defaulting to REPLY would silently drop task creation for a real
+        # execution request, so run the deterministic decision to be safe.
+        if decision.action is DecisionAction.REPLY and decision.rationale == "no_decide_tool_call":
+            try:
+                decision = await DecisionEngine().decide(head, message, db)
+            except Exception as _fb_exc:
+                logger.warning(f"[ChatService] fallback decision failed: {_fb_exc}")
+                decision = Decision(action=DecisionAction.REPLY, rationale="decide_fallback_error", confidence=0.0)
 
         _delegate_actions = (
             DecisionAction.CREATE_TASK,
