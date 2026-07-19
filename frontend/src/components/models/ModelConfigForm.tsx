@@ -33,6 +33,31 @@ import type { ModelConfig, ProviderInfo, ProviderType } from '@/types';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { RateLimitField } from './RateLimitField';
 
+type Effort = 'none' | 'low' | 'medium' | 'high' | 'xhigh';
+
+// Mirrors backend PROVIDER_THINKING. Controls whether the effort control is shown.
+const THINKING_PROVIDERS: Record<string, RegExp | null> = {
+    OPENAI: /(^|[-/])(o1|o3|o4|gpt-5)/i,
+    AZURE_OPENAI: /(^|[-/])(o1|o3|o4|gpt-5)/i,
+    ANTHROPIC: null,
+    GEMINI: null,
+    DEEPSEEK: /reasoner|v4/i,
+    GROQ: /gpt-oss|qwen|r1|qwq|reason/i,
+    MISTRAL: /magistral|thinking/i,
+    TOGETHER: /r1|qwq|reasoner|thinking|gpt-oss/i,
+    MOONSHOT: /k2|kimi/i,
+    LOCAL: /qwq|r1|deepseek|thinking|z1|qwen3/i,
+    CUSTOM: /(^|[-/])(o1|o3|o4|gpt-5)|qwq|r1|reasoner|thinking|gpt-oss/i,
+    // COHERE: omitted -> hidden
+};
+
+export function supportsThinking(provider: string, model: string): boolean {
+    const hint = THINKING_PROVIDERS[provider?.toUpperCase()];
+    if (!hint) return false;
+    if (hint === null) return true;
+    return hint.test(model || '');
+}
+
 // ─── Error helper ─────────────────────────────────────────────────────────────
 //
 // getErrorMessage from @/utils/errors doesn't handle Pydantic 422 responses,
@@ -264,6 +289,7 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
         timeout: 60,
         is_default: false,
         requests_per_minute: 60,
+        effort: 'none' as Effort,
     });
 
     const [isLoading, setIsLoading] = useState(false);
@@ -324,6 +350,7 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
                 timeout: initialConfig.settings?.timeout ?? 60,
                 is_default: initialConfig.is_default,
                 requests_per_minute: initialConfig.requests_per_minute || 60,
+                effort: (initialConfig.effort || 'none') as Effort,
             });
         }
     }, [initialConfig, providers]);
@@ -470,6 +497,7 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
                 top_p: formData.top_p,
                 timeout_seconds: formData.timeout,
                 requests_per_minute: formData.requests_per_minute,
+                effort: formData.effort,
                 ...(formData.provider === 'local'
                     ? { local_server_url: formData.local_server_url }
                     : formData.api_base_url
@@ -542,6 +570,7 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
                 timeout_seconds: formData.timeout,
                 is_default: formData.is_default,
                 requests_per_minute: formData.requests_per_minute,
+                effort: formData.effort,
                 ...(formData.api_key ? { api_key: formData.api_key } : {}),
                 ...(formData.provider === 'local'
                     ? { local_server_url: formData.local_server_url }
@@ -573,6 +602,8 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
         formData.provider === 'custom' ||
         (selectedProvider?.requires_api_key ?? false);
     const apiKeyMissing = apiKeyRequired && !formData.api_key?.trim();
+
+    const showEffort = supportsThinking(formData.provider, formData.default_model);
 
     // Required-field validation. The backend rejects an empty `default_model`
     // (and `config_name`), but that round-trip used to surface as a raw server
@@ -1034,6 +1065,27 @@ export const ModelConfigForm: React.FC<ModelConfigFormProps> = ({
                                     />
                                 </div>
                             </div>
+
+                            {showEffort && (
+                                <div className="col-span-2">
+                                    <label htmlFor="effort" className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">
+                                        Reasoning Effort
+                                    </label>
+                                    <select
+                                        id="effort"
+                                        name="effort"
+                                        value={formData.effort}
+                                        onChange={handleChange}
+                                        className={inputCls}
+                                    >
+                                        <option value="none">None (disabled)</option>
+                                        <option value="low">Low</option>
+                                        <option value="medium">Medium</option>
+                                        <option value="high">High</option>
+                                        <option value="xhigh">X-High</option>
+                                    </select>
+                                </div>
+                            )}
                         </div>
 
                         {/* Default checkbox */}
