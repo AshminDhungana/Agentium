@@ -272,6 +272,92 @@ def test_no_hardcoded_persistent_ethos_persona():
             assert phrase not in text, f"'{phrase}' still present in {path}"
 
 
+def test_acceptance_edit_constitution_updates_agent_and_voice(test_db):
+    from backend.services.initialization_service import InitializationService
+    from backend.models.entities.agents import Agent, AgentType, Ethos
+    from backend.models.entities.constitution import Constitution
+    from backend.core.constitutional_guard import ConstitutionalGuard
+    import json
+    import datetime
+
+    # 0. Clean slate for constitutions so this acceptance test is self-contained
+    #    even against a shared/persistent test database with leftover rows from
+    #    prior runs (the new-constitution row this test creates can otherwise
+    #    collide on the unique agentium_id / version_number). We deliberately
+    #    leave the agent/ethos rows alone to avoid cascading into live
+    #    violation_reports written by the running backend.
+    test_db.query(Constitution).delete()
+    test_db.commit()
+
+    # 1. Seed a constitution with a unique persona clause.
+    const = InitializationService.create_default_constitution(test_db)
+    articles = const.get_articles_dict()
+    articles["agent_persona_and_conduct"]["content"] = "UNIQUE_CLAUSE_ALPHA speak like Alpha."
+    const.articles = json.dumps(articles)
+    test_db.commit()
+
+    # 2. Fresh agent + ethos.
+    agent = test_db.query(Agent).filter_by(agentium_id="00001").first()
+    if agent is None:
+        agent = Agent(agentium_id="00001", agent_type=AgentType.HEAD_OF_COUNCIL)
+        test_db.add(agent)
+        test_db.flush()
+        ethos = Ethos(
+            agentium_id="E00001",
+            agent_type=AgentType.HEAD_OF_COUNCIL.value,
+            mission_statement="Operational mission only — NOT persona.",
+            core_values=json.dumps([]),
+            behavioral_rules=json.dumps([]),
+            restrictions=json.dumps([]),
+            capabilities=json.dumps([]),
+            created_by_agentium_id="00001",
+            agent_id=agent.id,
+            is_verified=True,
+            verified_by_agentium_id="00001",
+        )
+        test_db.add(ethos)
+        test_db.flush()
+        agent.ethos_id = ethos.id
+        test_db.commit()
+
+    prompt_before = agent.get_system_prompt(db=test_db)
+    assert "UNIQUE_CLAUSE_ALPHA" in prompt_before
+    # Ethos persona must NOT leak (strengthens Task 3's vacuous check).
+    assert "Operational mission only" not in prompt_before
+
+    voice_before = agent.get_system_prompt(db=test_db, channel="voice")
+    assert "UNIQUE_CLAUSE_ALPHA" in voice_before and "text-to-speech" in voice_before
+
+    # 3. Simulate the UI edit: write a NEW active constitution version with a new clause.
+    new_version_number = (const.version_number or 1) + 1
+    articles2 = const.get_articles_dict()
+    articles2["agent_persona_and_conduct"]["content"] = "UNIQUE_CLAUSE_BETA speak like Beta."
+    new_const = Constitution(
+        agentium_id=f"C{new_version_number:04d}",
+        version=f"v{new_version_number}.0.0",
+        version_number=new_version_number,
+        preamble=const.preamble,
+        articles=json.dumps(articles2),
+        prohibited_actions=const.prohibited_actions,
+        sovereign_preferences=const.sovereign_preferences,
+        created_by_agentium_id="00001",
+        is_active=True,
+        effective_date=datetime.datetime.utcnow(),
+    )
+    const.is_active = False
+    test_db.add(new_const)
+    test_db.commit()
+    ConstitutionalGuard.invalidate_active_constitution_cache()
+
+    # 4. A fresh read must reflect the NEW clause, not the old.
+    prompt_after = agent.get_system_prompt(db=test_db)
+    assert "UNIQUE_CLAUSE_BETA" in prompt_after
+    assert "UNIQUE_CLAUSE_ALPHA" not in prompt_after
+
+    voice_after = agent.get_system_prompt(db=test_db, channel="voice")
+    assert "UNIQUE_CLAUSE_BETA" in voice_after
+
+
 def test_preview_persona_renders_draft():
     from backend.core.persona import build_persona_directive
     draft = {
