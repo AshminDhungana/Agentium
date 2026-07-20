@@ -187,6 +187,22 @@ class ConstitutionalGuard:
         self._cache_timestamp: Optional[datetime] = None
 
     # ------------------------------------------------------------------
+    # Cache invalidation — called whenever the active Constitution is
+    # written (UI update or amendment ratification) so persona/governance
+    # changes propagate immediately (spec §6.5).
+    # ------------------------------------------------------------------
+    @staticmethod
+    def invalidate_active_constitution_cache() -> None:
+        import os
+        import redis as _redis
+        url = os.getenv("REDIS_URL", "redis://redis:6379/0")
+        try:
+            r = _redis.from_url(url, decode_responses=True)
+            r.delete("constitutional_guard:active_constitution")
+        except Exception as exc:  # pragma: no cover - best effort
+            logger.warning("Could not invalidate active constitution cache: %s", exc)
+
+    # ------------------------------------------------------------------
     # Lifecycle
     # ------------------------------------------------------------------
 

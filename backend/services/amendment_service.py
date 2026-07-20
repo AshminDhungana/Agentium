@@ -428,6 +428,8 @@ class AmendmentService:
         )
 
         self.db.flush()
+        from backend.core.constitutional_guard import ConstitutionalGuard
+        ConstitutionalGuard.invalidate_active_constitution_cache()
         return result
 
     # ------------------------------------------------------------------

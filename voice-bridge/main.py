@@ -387,7 +387,7 @@ def _fetch_backend_persona() -> Optional[str]:
     if not VOICE_TOKEN:
         return None
     try:
-        url = f"{BACKEND_URL}/api/v1/chat/persona"
+        url = f"{BACKEND_URL}/api/v1/chat/persona?channel=voice"
         req = urllib.request.Request(url, headers=_auth_headers(), method="GET")
         with urllib.request.urlopen(req, timeout=10) as resp:
             body = json.loads(resp.read().decode())
@@ -404,9 +404,9 @@ def _load_persona() -> Optional[str]:
     """Persona resolution order (Fix C — align voice with chat):
 
       1. VOICE_PERSONA env override (explicit operator choice)
-      2. Backend Head persona (/api/v1/chat/persona) — single source of truth,
-         driven by the constitution so editing the constitution updates both
-         chat and voice consistently
+      2. Backend Head persona (/api/v1/chat/persona?channel=voice) — single
+         source of truth, derived from the Constitution so editing the
+         Constitution updates both chat and voice consistently.
       3. Local persona.md fallback
     """
     if VOICE_PERSONA:

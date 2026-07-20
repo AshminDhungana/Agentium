@@ -6,6 +6,7 @@ Also manages structured task-specific templates such as SKILL_CREATION_TEMPLATE,
 which guides agents to generate well-structured, size-compliant skill JSON.
 """
 
+import re
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
 from enum import Enum
@@ -599,6 +600,17 @@ Generate the skill JSON now:"""
         "on their machine. Use the get_workspace tool to discover your exact path."
     )
 
+    _PERSONA_LEAD_RE = re.compile(r"^\s*You are [^.]*\.\s*", re.MULTILINE | re.IGNORECASE)
+
+    @staticmethod
+    def _strip_persona_leads(text: str) -> str:
+        """Remove provider template persona leads (e.g. 'You are Claude...').
+
+        Keeps formatting/instruction content; persona is supplied by the
+        Constitution. Only the first leading sentence is stripped.
+        """
+        return PromptTemplateManager._PERSONA_LEAD_RE.sub("", text, count=1)
+
     # ═══════════════════════════════════════════════════════════════════════
     # Core methods
     # ═══════════════════════════════════════════════════════════════════════
@@ -711,7 +723,8 @@ Generate the skill JSON now:"""
         model_name: str,
         task_description: str,
         agent_ethos: Any,
-        agent_tier: int = 3
+        agent_tier: int = 3,
+        db=None,
     ) -> tuple:
         """
         Build a complete system prompt using templates.
@@ -721,30 +734,40 @@ Generate the skill JSON now:"""
         task_category = self.classify_task(task_description)
         template = self.get_template(provider, model_name, task_category, agent_tier)
 
-        role_context = self._build_role_context(agent_tier, agent_ethos)
+        # Persona is driven entirely by the Constitution (spec §6.3 / #2).
+        # The historical hardcoded tier role is intentionally blanked so no
+        # duplicate identity leaks through alongside the Constitution-derived
+        # role from build_persona_directive().
+        role_context = ""
+        from backend.core.persona import get_active_constitution_dict, build_persona_directive
+        close = False
+        if db is None:
+            from backend.database import SessionLocal
+            db = SessionLocal()
+            close = True
+        try:
+            constitution = get_active_constitution_dict(db)
+            persona = build_persona_directive(constitution, tier=agent_tier, channel="text")
+        finally:
+            if close:
+                db.close()
 
-        behavioral_rules = ""
-        if agent_ethos and hasattr(agent_ethos, 'behavioral_rules'):
-            import json
-            try:
-                rules = json.loads(agent_ethos.behavioral_rules) if agent_ethos.behavioral_rules else []
-                behavioral_rules = "\n".join(f"- {r}" for r in rules[:10])
-            except Exception:
-                pass
-
+        # Provider templates supply FORMATTING only; persona vars are blanked
+        # so no hardcoded persona leaks through.
         system_vars = {
-            "mission_statement": getattr(agent_ethos, 'mission_statement', "You are an AI assistant."),
+            "mission_statement": "",
             "role_context": role_context,
-            "behavioral_rules": behavioral_rules,
+            "behavioral_rules": "",
             "specialization": getattr(agent_ethos, 'specialization', 'general assistance'),
             "working_method": getattr(agent_ethos, 'working_method', ''),
         }
 
         system_prompt, _ = template.format(system_vars, "")
+        system_prompt = self._strip_persona_leads(system_prompt)
 
-        # Append deep_think guidance so every agent — regardless of provider
-        # or task category — knows the tool exists and when to use it.
-        # This is the single injection point; no per-provider template changes needed.
+        # Prepend the Constitution persona as the authority.
+        system_prompt = persona + "\n\n" + system_prompt
+
         system_prompt += self.DEEP_THINK_HINT
         system_prompt += self.HOST_ACCESS_HINT
         system_prompt += self.WORKSPACE_HINT

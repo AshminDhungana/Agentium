@@ -906,11 +906,44 @@ async def update_constitution(
     db.commit()
     db.refresh(new_version)
 
+    from backend.core.constitutional_guard import ConstitutionalGuard
+    ConstitutionalGuard.invalidate_active_constitution_cache()
+
     return {
         "status": "success",
         "message": f"Constitution updated to version {new_version.version}",
         "constitution": new_version.to_dict()
     }
+
+
+@app.post(
+    "/api/v1/constitution/preview-persona",
+    summary="Preview persona from a draft constitution",
+    tags=["Constitution"],
+)
+async def preview_persona(
+    updates: ConstitutionUpdateRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """Render the system-prompt persona from a DRAFT constitution without saving."""
+    import json as _json
+    articles = updates.articles or {}
+    if isinstance(articles, str):
+        try:
+            articles = _json.loads(articles)
+        except Exception:
+            articles = {}
+    draft = {
+        "version": "draft",
+        "version_number": 0,
+        "agentium_id": "DRAFT",
+        "preamble": updates.preamble or "",
+        "articles": articles,
+        "prohibited_actions": updates.prohibited_actions or [],
+        "sovereign_preferences": updates.sovereign_preferences or {},
+    }
+    from backend.core.persona import build_persona_directive
+    return {"persona": build_persona_directive(draft, tier=0, channel="text")}
 
 
 # ── Monitoring & Health ───────────────────────────────────────────────────────
