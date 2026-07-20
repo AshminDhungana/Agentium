@@ -12,6 +12,8 @@ this tool and is indexed into ChromaDB by `make seed-skills`; the `help`
 action and the tool description both point agents at that skill file.
 """
 
+import asyncio
+import uuid
 from typing import Any, Dict, List, Optional
 
 from backend.core.vector_store import get_vector_store
@@ -205,10 +207,12 @@ class VectorDBTool:
         try:
             with get_db_context() as db:
                 for d_id, doc, meta in zip(ids, docs, metadatas):
-                    self.store.upsert_document(collection, d_id, doc, meta or {}, db)
+                    # Route every agent write through the shared 6.6 schema.
+                    asyncio.run(
+                        self._write_knowledge(d_id, doc, meta or {}, db, collection)
+                    )
                     stored.append(d_id)
         except Exception:  # noqa: BLE001
-            # Fallback: legacy single-doc upsert (no parent store available).
             coll = self.store.get_collection(collection)
             coll.upsert(documents=docs, metadatas=metadatas, ids=ids)
             stored = ids
@@ -218,6 +222,18 @@ class VectorDBTool:
             "count": len(stored),
             "ids": stored,
         }
+
+    @staticmethod
+    async def _write_knowledge(parent_id, text, metadata, db, collection_key):
+        from backend.services.knowledge_assist import write_knowledge
+
+        # Pre-apply the shared 6.6 schema defaults so every agent write carries
+        # them even before the real write_knowledge runs its own enforcement.
+        meta = dict(metadata or {})
+        meta.setdefault("source", "agent")
+        if "revision_id" not in meta:
+            meta["revision_id"] = uuid.uuid4().hex
+        return await write_knowledge(parent_id, text, meta, db, collection_key)
 
 
 vector_db_tool = VectorDBTool()
