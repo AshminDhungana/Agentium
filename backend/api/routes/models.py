@@ -334,8 +334,8 @@ async def list_providers():
             requires_api_key=True,
             requires_base_url=False,
             default_base_url="https://api.openai.com/v1",
-            description="GPT-5.6, GPT-5.1, o4-mini and other OpenAI models",
-            popular_models=["gpt-5.6", "gpt-5.6-mini", "gpt-5.1", "o4-mini"]
+            description="GPT-5.6 Sol, Terra, and Luna frontier models",
+            popular_models=["gpt-5.6", "gpt-5.6-terra", "gpt-5.6-luna"]
         ),
         ProviderInfo(
             id=ProviderType.ANTHROPIC.value,
@@ -344,8 +344,8 @@ async def list_providers():
             requires_api_key=True,
             requires_base_url=False,
             default_base_url="https://api.anthropic.com/v1",
-            description="Claude Opus, Sonnet, Haiku - excellent reasoning and coding",
-            popular_models=["claude-opus-4-5", "claude-sonnet-4-5", "claude-haiku-4-5"]
+            description="Claude Opus 4.8, Sonnet 5, Fable 5, Haiku 4.5 - excellent reasoning and coding",
+            popular_models=["claude-opus-4-8", "claude-sonnet-5", "claude-fable-5", "claude-haiku-4-5"]
         ),
         ProviderInfo(
             id=ProviderType.GEMINI.value,
@@ -354,8 +354,8 @@ async def list_providers():
             requires_api_key=True,
             requires_base_url=False,
             default_base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
-            description="Google's multimodal models (Gemini 2.5 Flash, 2.5 Pro)",
-            popular_models=["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash"]
+            description="Google's multimodal models (Gemini 3.5 Pro, 3.5 Flash)",
+            popular_models=["gemini-3.5-pro", "gemini-3.5-flash", "gemini-3.5-flash-lite"]
         ),
         ProviderInfo(
             id=ProviderType.GROQ.value,
@@ -364,8 +364,8 @@ async def list_providers():
             requires_api_key=True,
             requires_base_url=False,
             default_base_url="https://api.groq.com/openai/v1",
-            description="Ultra-fast inference (100+ tokens/sec) with Llama 3.3",
-            popular_models=["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "deepseek-r1-distill-llama-70b"]
+            description="Ultra-fast inference with Llama 4 and DeepSeek R1",
+            popular_models=["llama-4-scout-17b-16e-instruct", "llama-4-maverick-17b-128e-instruct", "deepseek-r1-distill-llama-70b"]
         ),
         ProviderInfo(
             id=ProviderType.MISTRAL.value,
@@ -374,8 +374,8 @@ async def list_providers():
             requires_api_key=True,
             requires_base_url=False,
             default_base_url="https://api.mistral.ai/v1",
-            description="European AI with Mistral, Mixtral, and Codestral",
-            popular_models=["mistral-large-latest", "mistral-small-latest", "codestral-latest"]
+            description="European AI with Mistral Medium 3.5, Small 4, and Codestral",
+            popular_models=["mistral-medium-latest", "mistral-small-latest", "codestral-latest"]
         ),
         ProviderInfo(
             id=ProviderType.TOGETHER.value,
@@ -384,8 +384,8 @@ async def list_providers():
             requires_api_key=True,
             requires_base_url=False,
             default_base_url="https://api.together.xyz/v1",
-            description="Access to 100+ open-source models (Llama 3.3, Qwen 2.5)",
-            popular_models=["meta-llama/Llama-3.3-70B-Instruct-Turbo", "Qwen/Qwen2.5-72B-Instruct-Turbo", "deepseek-ai/DeepSeek-R1"]
+            description="100+ open-source models (Qwen3.7, DeepSeek V4, Llama 3.3)",
+            popular_models=["Qwen/Qwen3.7-Max", "deepseek-ai/DeepSeek-V4-Pro", "meta-llama/Llama-3.3-70B-Instruct-Turbo"]
         ),
         ProviderInfo(
             id=ProviderType.COHERE.value,
@@ -394,8 +394,8 @@ async def list_providers():
             requires_api_key=True,
             requires_base_url=False,
             default_base_url="https://api.cohere.ai/v1",
-            description="Command R+ and Embed models",
-            popular_models=["command-r-plus", "command-r"]
+            description="Command A+, A, and A Reasoning models",
+            popular_models=["command-a-plus-05-2026", "command-a-03-2025", "command-a-reasoning-08-2025"]
         ),
         ProviderInfo(
             id=ProviderType.MOONSHOT.value,
@@ -425,7 +425,7 @@ async def list_providers():
             requires_base_url=True,
             default_base_url="https://{resource}.openai.azure.com",
             description="Enterprise OpenAI through Azure (requires Endpoint URL)",
-            popular_models=["gpt-5.6", "gpt-5.1", "gpt-4o"]
+            popular_models=["gpt-5.6", "gpt-5.6-terra", "gpt-5.6-luna"]
         ),
         ProviderInfo(
             id=ProviderType.LOCAL.value,
@@ -435,7 +435,7 @@ async def list_providers():
             requires_base_url=False,
             default_base_url=settings.OLLAMA_BASE_URL,
             description="Run models locally with Ollama or LM Studio",
-            popular_models=["llama3.1", "mistral", "gemma2", "qwen2"]
+            popular_models=["llama3.3", "qwen2.5", "gemma2", "mistral"]
         ),
     ]
     return providers
