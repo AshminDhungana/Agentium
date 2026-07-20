@@ -1,5 +1,5 @@
 // frontend/src/components/SignatureWatermark.tsx
-import { motion, useReducedMotionConfig } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { SignatureMark } from './SignatureMark';
 
 interface SignatureWatermarkProps {
@@ -12,7 +12,7 @@ interface SignatureWatermarkProps {
  * prefers-reduced-motion by showing the signature instantly.
  */
 export function SignatureWatermark({ className }: SignatureWatermarkProps) {
-  const reduceMotion = useReducedMotionConfig();
+  const reduceMotion = useReducedMotion();
 
   if (reduceMotion) {
     return (

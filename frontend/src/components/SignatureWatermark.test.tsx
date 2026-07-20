@@ -1,7 +1,17 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render } from '@testing-library/react';
-import { MotionConfig } from 'framer-motion';
 import { SignatureWatermark } from './SignatureWatermark';
+
+vi.mock('framer-motion', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('framer-motion')>();
+  return {
+    ...actual,
+    useReducedMotion: () => {
+      if (typeof window === 'undefined' || !window.matchMedia) return false;
+      return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    },
+  };
+});
 
 describe('SignatureWatermark', () => {
   it('renders the signature SVG', () => {
@@ -20,11 +30,20 @@ describe('SignatureWatermark', () => {
   });
 
   it('shows the signature instantly at full opacity under reduced motion', () => {
-    const { container } = render(
-      <MotionConfig reducedMotion="always">
-        <SignatureWatermark className="absolute" />
-      </MotionConfig>
-    );
+    const original = window.matchMedia;
+    window.matchMedia = (query: string) =>
+      ({
+        matches: true,
+        media: query,
+        onchange: null,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        addListener: () => {},
+        removeListener: () => {},
+        dispatchEvent: () => false,
+      }) as unknown as MediaQueryList;
+    const { container } = render(<SignatureWatermark className="absolute" />);
+    window.matchMedia = original;
     const wrapper = container.firstElementChild as HTMLElement;
     expect(wrapper.style.clipPath).toBe('');
     expect(wrapper.className).toContain('opacity-30');
