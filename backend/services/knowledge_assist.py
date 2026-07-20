@@ -98,6 +98,9 @@ async def write_knowledge(
     meta.setdefault("document_type", meta["type"])
     meta.setdefault("decay_score", 1.0)
     meta.setdefault("citation_boost", 1.0)
+    meta.setdefault("source_url", "")
+    meta.setdefault("title", "")
+    meta.setdefault("agent_id", None)
 
     existing = store.get_parent_document(collection_key, parent_id, db)
     if existing and existing.get("metadata"):

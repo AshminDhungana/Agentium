@@ -44,6 +44,8 @@ def test_write_knowledge_enforces_schema_and_dedup():
     assert saved_meta["revision"] == 2
     assert saved_meta["revision_id"]
     assert saved_meta["created_at"] and saved_meta["updated_at"]
+    for key in ("source_url", "title", "agent_id", "document_type", "decay_score", "citation_boost"):
+        assert key in saved_meta, f"missing schema key {key}"
 
 
 def test_retrieve_or_search_web_fallback_on_empty_chroma():
@@ -63,7 +65,8 @@ def test_retrieve_or_search_web_fallback_on_empty_chroma():
     out = asyncio.run(ka.retrieve_or_search("novel query here", FakeAgent(), db=None))
     assert out.wrote_back is True
     assert out.fallback_used is False
-    assert ("web:abc" in store.docs) is False  # parent_id is hashed, not literal
+    from backend.services.knowledge_assist import _parent_id_for_query
+    assert ("web_knowledge", _parent_id_for_query("novel query here")) in store.docs
     # a web_knowledge doc was written
     assert any(k[0] == "web_knowledge" for k in store.docs)
 
