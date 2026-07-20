@@ -492,7 +492,12 @@ async def lifespan(app: FastAPI):
     # The BrowserService owns the Playwright/Chromium process inside FastAPI
     # (tasks run in a separate Celery process and cannot drive the browser).
     try:
-        if settings.BROWSER_ENABLED:
+        # Skipped under TESTING (no Chromium in the headless test runner): the
+        # Playwright process spawned here lingers into lifespan shutdown and
+        # blocks TestClient teardown (playwright.stop() hangs), timing out
+        # fixtures such as `ws_client`. Unit tests exercise BrowserService
+        # directly and are unaffected.
+        if settings.BROWSER_ENABLED and os.environ.get("TESTING") != "true":
             from backend.services.browser_service import get_browser_service
             await get_browser_service().initialize()
             logger.info("✅ Browser service initialized (live screenshot streaming ready)")
@@ -508,7 +513,7 @@ async def lifespan(app: FastAPI):
 
     # Tear down browser service (stop active streams + close Chromium)
     try:
-        if settings.BROWSER_ENABLED:
+        if settings.BROWSER_ENABLED and os.environ.get("TESTING") != "true":
             from backend.services.browser_service import get_browser_service
             await get_browser_service().shutdown()
     except Exception as exc:
