@@ -40,32 +40,46 @@ def wait_for_postgres(host: str = "postgres", port: int = 5432, timeout: int = 6
 
 
 def run_migrations():
-    """Run Alembic migrations."""
+    """Run Alembic migrations.
+
+    Retries with backoff because on some platforms (e.g. Docker Desktop on
+    Windows) the host bind mount can lag behind at container start, so freshly
+    added migration files may not be visible to Alembic on the first attempt
+    (manifests as a spurious "Multiple head revisions" error).
+    """
     logger.info("🔄 Running Alembic migrations...")
-    
+
     # Get alembic.ini path (relative to this script)
     script_dir = os.path.dirname(os.path.abspath(__file__))
     backend_dir = os.path.dirname(script_dir)
     alembic_ini = os.path.join(backend_dir, "alembic", "alembic.ini")
-    
+
     # Or use environment variable
     if not os.path.exists(alembic_ini):
         alembic_ini = os.path.join(backend_dir, "alembic.ini")
-    
-    result = subprocess.run(
-        ["alembic", "-c", alembic_ini, "upgrade", "head"],
-        cwd=backend_dir,
-        capture_output=True,
-        text=True
-    )
-    
-    if result.returncode != 0:
-        logger.error(f"❌ Migration failed:\n{result.stderr}")
-        sys.exit(1)
-    
-    logger.info("✅ Migrations completed!")
-    if result.stdout:
-        logger.info(result.stdout)
+
+    max_attempts = 30
+    for attempt in range(1, max_attempts + 1):
+        result = subprocess.run(
+            ["alembic", "-c", alembic_ini, "upgrade", "head"],
+            cwd=backend_dir,
+            capture_output=True,
+            text=True
+        )
+
+        if result.returncode == 0:
+            logger.info("✅ Migrations completed!")
+            if result.stdout:
+                logger.info(result.stdout)
+            return
+
+        logger.error(f"❌ Migration attempt {attempt}/{max_attempts} failed:")
+        logger.error(result.stderr.strip())
+        if attempt < max_attempts:
+            time.sleep(min(2 * attempt, 10))
+
+    logger.error("❌ Migrations failed after exhausting retries.")
+    sys.exit(1)
 
 
 def stamp_if_fresh():
