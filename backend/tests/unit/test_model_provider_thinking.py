@@ -130,3 +130,8 @@ def test_enforce_max_tokens_noop_without_budget():
     ck = {"max_tokens": 4000}
     _enforce_anthropic_budget_max_tokens(ck)
     assert ck["max_tokens"] == 4000
+
+
+def test_openai_xhigh_maps_to_xhigh():
+    kw = _resolve_thinking_kwargs(_Cfg("OPENAI", "gpt-5.6", "xhigh"))
+    assert kw["extra_body"]["reasoning_effort"] == "xhigh"
