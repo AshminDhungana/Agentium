@@ -43,8 +43,8 @@ type Effort = 'none' | 'low' | 'medium' | 'high' | 'xhigh';
 const THINKING_PROVIDERS: Record<string, RegExp | null> = {
     OPENAI: /(^|[-/])(o1|o3|o4|gpt-5)/i,
     AZURE_OPENAI: /(^|[-/])(o1|o3|o4|gpt-5)/i,
-    ANTHROPIC: /claude-(opus|sonnet|haiku)[- ]?(4|4[-.]5)/i,
-    GEMINI: /gemini-2\.5|gemini-3/i,
+    ANTHROPIC: /claude-(fable|opus|sonnet|haiku)[- ]?(4|4[-.]5|4-8|5)/i,
+    GEMINI: /gemini-(2\.5|3|3\.5)/i,
     DEEPSEEK: /reasoner|v4/i,
     GROQ: /gpt-oss|qwen|r1|qwq|reason/i,
     MISTRAL: /magistral|thinking/i,
