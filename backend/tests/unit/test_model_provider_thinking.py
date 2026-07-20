@@ -135,3 +135,14 @@ def test_enforce_max_tokens_noop_without_budget():
 def test_openai_xhigh_maps_to_xhigh():
     kw = _resolve_thinking_kwargs(_Cfg("OPENAI", "gpt-5.6", "xhigh"))
     assert kw["extra_body"]["reasoning_effort"] == "xhigh"
+
+
+from services.model_provider import _thinking_mode_from_kwargs
+
+def test_thinking_mode_labels():
+    assert _thinking_mode_from_kwargs({}) == "none"
+    assert _thinking_mode_from_kwargs({"thinking": {"type": "enabled", "budget_tokens": 8000}}) == "budget"
+    assert _thinking_mode_from_kwargs({"extra_body": {"thinking": {"type": "adaptive"}, "output_config": {"effort": "high"}}}) == "adaptive"
+    assert _thinking_mode_from_kwargs({"extra_body": {"reasoning_effort": "high"}}) == "openai"
+    assert _thinking_mode_from_kwargs({"extra_body": {"thinkingConfig": {"thinkingBudget": 1024}}}) == "gemini"
+    assert _thinking_mode_from_kwargs({"extra_body": {"thinking": {"type": "enabled"}, "reasoning_effort": "medium"}}) == "deepseek"

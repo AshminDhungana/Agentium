@@ -417,6 +417,18 @@ class BaseModelProvider(ABC):
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
         )
+        tk = self._thinking_kwargs()
+        if tk:
+            logger.info(
+                "[thinking] active mode=%s provider=%s model=%s effort=%s budget=%s latency_ms=%d output_tokens=%d",
+                _thinking_mode_from_kwargs(tk),
+                getattr(self.config, "provider", "?"),
+                model_used,
+                getattr(self.config, "effort", "none") or "none",
+                (tk.get("thinking", {}).get("budget_tokens")
+                 if isinstance(tk.get("thinking"), dict) else None),
+                latency_ms, completion_tokens,
+            )
         try:
             with get_db_context() as db:
                 self.config.increment_usage(total_tokens, cost_usd=cost)
@@ -432,7 +444,16 @@ class BaseModelProvider(ABC):
                     success=success,
                     error_message=error,
                     cost_usd=cost,
-                    request_metadata={"agentium_id": agentium_id},
+                    request_metadata={
+                        "agentium_id": agentium_id,
+                        "thinking_mode": _thinking_mode_from_kwargs(tk),
+                        "effort": getattr(self.config, "effort", "none") or "none",
+                        "budget_tokens": (
+                            tk.get("thinking", {}).get("budget_tokens")
+                            if isinstance(tk.get("thinking"), dict) else None
+                        ),
+                        "output_tokens": completion_tokens,
+                    },
                     agentium_id=agentium_id,
                 ))
                 db.commit()
@@ -514,6 +535,25 @@ _ANTHROPIC_ADAPTIVE = re.compile(
 def _is_anthropic_adaptive(model: str) -> bool:
     """True for Anthropic models that require adaptive thinking (no budget_tokens)."""
     return bool(_ANTHROPIC_ADAPTIVE.search(model or ""))
+
+
+def _thinking_mode_from_kwargs(tk: Dict[str, Any]) -> str:
+    """Classify the resolved thinking shape for logs/metadata."""
+    if not tk:
+        return "none"
+    eb = tk.get("extra_body")
+    if isinstance(eb, dict):
+        if isinstance(eb.get("output_config"), dict) and "effort" in eb["output_config"]:
+            return "adaptive"
+        if "thinking" in eb:
+            return "deepseek"
+        if "reasoning_effort" in eb:
+            return "openai"
+        if "thinkingConfig" in eb:
+            return "gemini"
+    if isinstance(tk.get("thinking"), dict):
+        return "budget"
+    return "none"
 
 
 def _enforce_anthropic_budget_max_tokens(create_kwargs: Dict[str, Any]) -> None:
