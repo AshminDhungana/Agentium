@@ -14,7 +14,7 @@ from sqlalchemy import inspect
 
 
 # revision identifiers
-revision = "018_add_ethos_environment_context"
+revision = "018_add_ethos_env_context"
 down_revision = "017_add_effort"
 branch_labels = None
 depends_on = None
