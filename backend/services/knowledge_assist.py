@@ -90,8 +90,9 @@ def _top_distance(chroma: Optional[Dict[str, Any]]) -> Optional[float]:
     return float(dists[0][0])
 
 
-def _synthesize_web_doc(query: str, results: List[Dict[str, Any]], k: int = 3) -> str:
-    lines = [f"Web search results for: {query}", ""]
+def _synthesize_web_doc(query: str, results: List[Dict[str, Any]], k: int = 3,
+                        heading: str = "Web search results for:") -> str:
+    lines = [f"{heading} {query}", ""]
     for i, r in enumerate(results[:k], 1):
         title = r.get("title") or "(untitled)"
         url = r.get("url") or ""
@@ -234,27 +235,6 @@ def _parent_id_for_checkpoint(stage: str, query: str) -> str:
     return f"ckpt:{stage}:{digest}"
 
 
-def _synthesize_web_doc(query: str, results: List[Dict[str, Any]], k: int = 3) -> str:
-    lines = [f"Checkpoint web search for: {query}", ""]
-    for i, r in enumerate(results[:k], 1):
-        title = r.get("title") or "(untitled)"
-        url = r.get("url") or ""
-        snippet = r.get("snippet") or ""
-        lines.append(f"{i}. {title} ({url})\n   {snippet}")
-    return "\n".join(lines)
-
-
-def _format_context(chroma: Optional[Dict[str, Any]]) -> str:
-    if not chroma or not chroma.get("ids") or not chroma["ids"][0]:
-        return ""
-    out = []
-    for i in range(len(chroma["ids"][0])):
-        doc = chroma.get("documents", [[]])[0][i] if chroma.get("documents") else ""
-        if doc:
-            out.append(doc)
-    return "\n\n".join(out)
-
-
 def parse_knowledge_needed(text: str) -> Optional[str]:
     """Return the agent's stated gap query if ``<<NEED_KNOWLEDGE>>`` is present.
 
@@ -313,7 +293,8 @@ async def checkpoint_write(
     wrote_back = False
     parent_id: Optional[str] = None
     if web_results and web_results.get("results"):
-        body = _synthesize_web_doc(q, web_results["results"])
+        body = _synthesize_web_doc(q, web_results["results"],
+                                   heading="Checkpoint web search for:")
         if chroma_ctx:
             body = chroma_ctx + "\n\n" + body
         parent_id = _parent_id_for_checkpoint(stage, q)

@@ -8,6 +8,9 @@ def test_executor_fires_received_and_completed_checkpoints(monkeypatch):
     async def fake_checkpoint(stage, task, agent, db, *, query=None):
         calls.append((stage, query))
         return type("O", (), {"stage": stage, "parent_id": "p"})()
+    # The executor does `from backend.services.knowledge_assist import
+    # checkpoint_write` at module top, so it calls the name bound in its own
+    # namespace — patch that name to intercept the real invocation.
     monkeypatch.setattr(te, "checkpoint_write", fake_checkpoint)
 
     class FakeTask:
