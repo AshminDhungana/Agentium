@@ -335,25 +335,72 @@ class Agent(BaseEntity):
         
         return result
 
-    def get_system_prompt(self) -> str:
-        """Get effective system prompt for this agent."""
+    def _tier_from_type(self) -> Optional[int]:
+        from backend.models.entities.agents import AgentType
+        mapping = {
+            AgentType.HEAD_OF_COUNCIL: 0,
+            AgentType.COUNCIL_MEMBER: 1,
+            AgentType.LEAD_AGENT: 2,
+            AgentType.TASK_AGENT: 3,
+            AgentType.CODE_CRITIC: 4,
+            AgentType.OUTPUT_CRITIC: 5,
+            AgentType.PLAN_CRITIC: 6,
+        }
+        return mapping.get(self.agent_type)
+
+    def _ethos_operational_context(self) -> str:
+        """Operational working memory ONLY — never persona/values (spec §3)."""
+        e = self.ethos
+        if not e:
+            return ""
+        bits = []
+        obj = getattr(e, "current_objective", None)
+        if obj:
+            bits.append(f"Current objective: {obj}")
+        wm = getattr(e, "working_method", None)
+        if wm:
+            bits.append(f"Standard working method:\n{wm}")
+        caps = e.get_capabilities()
+        if caps:
+            bits.append("Capabilities: " + ", ".join(caps))
+        env = getattr(e, "environment_context", None)
+        if env:
+            bits.append(f"Environment: {env}")
+        return "\n\n".join(bits)
+
+    def get_system_prompt(self, db=None, channel: str = "text") -> str:
+        """Effective system prompt — persona is built from the Constitution."""
         if self.system_prompt_override:
             return self.system_prompt_override
-        
-        if self.ethos:
-            prompt = self.ethos.mission_statement
-            rules = self.ethos.get_behavioral_rules()
-            if rules:
-                prompt += "\n\nBehavioral Rules:\n" + "\n".join(f"- {r}" for r in rules)
-            return prompt
-        
-        base_prompt = "You are an AI assistant operating within the Agentium governance system."
-        
-        # Add idle-specific context for persistent agents
+
+        from backend.core.persona import (
+            get_active_constitution_dict,
+            build_persona_directive,
+        )
+        close = False
+        if db is None:
+            from backend.models.database import SessionLocal
+            db = SessionLocal()
+            close = True
+        try:
+            constitution = get_active_constitution_dict(db)
+            persona = build_persona_directive(
+                constitution, tier=self._tier_from_type(), channel=channel
+            )
+        finally:
+            if close:
+                db.close()
+
+        ethos_ctx = self._ethos_operational_context()
+        if ethos_ctx:
+            persona += "\n\n" + ethos_ctx
+
         if self.is_persistent and self.status == AgentStatus.IDLE_WORKING:
-            base_prompt += "\n\n[IDLE MODE ACTIVE]: You are operating in low-token optimization mode. Focus on efficient local inference and database operations."
-        
-        return base_prompt
+            persona += (
+                "\n\n[IDLE MODE ACTIVE]: You are operating in low-token optimization "
+                "mode. Focus on efficient local inference and database operations."
+            )
+        return persona
 
     def get_context_for_task(self, task_description: str, db: Session) -> Dict[str, Any]:
         """
