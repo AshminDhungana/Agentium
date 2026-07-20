@@ -74,7 +74,7 @@ DEFAULT_WORKING_METHODS = {
     AgentType.TASK_AGENT: (
         "1. Read your Ethos and the active Constitution; confirm the "
         "task is constitutional. "
-        "2. Knowledge Retrieval: consult ChromaDB (vector_db tool) before "
+        "2. Knowledge Retrieval: consult the knowledge base (ChromaDB / vector_db tool) before "
         "acting on anything unfamiliar — if it is missing, web-search and "
         "write the result back via the shared knowledge-write schema. "
         "3. Execute within your authorized scope using approved tools; "
