@@ -11,7 +11,7 @@ import hashlib
 import logging
 import uuid
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
@@ -49,6 +49,9 @@ def _parent_id_for_query(q: str) -> str:
 def _top_distance(chroma: Optional[Dict[str, Any]]) -> Optional[float]:
     if not chroma or not chroma.get("ids") or not chroma["ids"][0]:
         return None
+    eff = chroma.get("effective_distances")
+    if eff and eff[0]:
+        return float(eff[0][0])
     dists = chroma.get("distances")
     if not dists or not dists[0]:
         return None
@@ -70,7 +73,10 @@ def _format_context(chroma: Optional[Dict[str, Any]]) -> str:
         return ""
     out = []
     for i in range(len(chroma["ids"][0])):
-        doc = chroma.get("documents", [[]])[0][i] if chroma.get("documents") else ""
+        docs = chroma.get("documents", [[]])[0]
+        if i >= len(docs):
+            break
+        doc = docs[i] if docs else ""
         if doc:
             out.append(doc)
     return "\n\n".join(out)
@@ -90,7 +96,7 @@ async def write_knowledge(
 ) -> Dict[str, Any]:
     """Enforce the 6.6 write schema and upsert (dedup by parent_id)."""
     store = get_vector_store()
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     meta = dict(metadata or {})
     meta["parent_id"] = parent_id
     meta.setdefault("type", "agent_learning")
@@ -126,7 +132,7 @@ async def retrieve_or_search(
 ) -> RetrievalOutcome:
     store = get_vector_store()
     keys = collection_keys or DEFAULT_RETRIEVAL_KEYS
-    chroma = store.query_knowledge(query, collection_keys=keys, n_results=5, db=db)
+    chroma = store.query_knowledge(query, collection_keys=keys, n_results=max(5, min_results), db=db)
 
     wrote_back = False
     web_results: Optional[Dict[str, Any]] = None
@@ -154,7 +160,7 @@ async def retrieve_or_search(
                 )
                 wrote_back = True
                 # refresh so the new doc is in the returned context
-                chroma = store.query_knowledge(query, collection_keys=keys, n_results=5, db=db)
+                chroma = store.query_knowledge(query, collection_keys=keys, n_results=max(5, min_results), db=db)
             elif web_results.get("status") != "success":
                 logger.warning(
                     "retrieve_or_search: web search returned failure status: %s",

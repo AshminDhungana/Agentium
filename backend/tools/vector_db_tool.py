@@ -211,7 +211,20 @@ class VectorDBTool:
                     stored.append(d_id)
         except Exception:  # noqa: BLE001
             coll = self.store.get_collection(collection)
-            coll.upsert(documents=docs, metadatas=metadatas, ids=ids)
+            enriched = []
+            for m in metadatas:
+                em = dict(m or {})
+                em.setdefault("type", "agent_learning")
+                em.setdefault("source", "agent")
+                em.setdefault("source_url", "")
+                em.setdefault("title", "")
+                em.setdefault("document_type", em.get("type", "agent_learning"))
+                em.setdefault("decay_score", 1.0)
+                em.setdefault("citation_boost", 1.0)
+                em.setdefault("agent_id", None)
+                em.setdefault("revision_id", uuid.uuid4().hex)
+                enriched.append(em)
+            coll.upsert(documents=docs, metadatas=enriched, ids=ids)
             stored = ids
         return {
             "success": True,

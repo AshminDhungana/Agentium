@@ -1,11 +1,9 @@
-import asyncio
 import pytest
 
 pytestmark = pytest.mark.integration
 
 
 def test_novel_task_triggers_retrieval_and_writeback(monkeypatch):
-    from backend.models.entities.agents import Agent
     from backend.services import knowledge_assist as ka
     import backend.services.skill_rag as sr
 

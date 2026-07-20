@@ -532,6 +532,7 @@ class VectorStore:
             "documents": [[e["document"] for e in entries]],
             "metadatas": [[e["metadata"] for e in entries]],
             "distances": [[e["distance"] for e in entries]],
+            "effective_distances": [[e["effective_distance"] for e in entries]],
         }
 
     def query_constitution(
