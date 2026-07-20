@@ -487,8 +487,8 @@ def _normalize_tool_choice(tool_choice: Any) -> Any:
 PROVIDER_THINKING = {
     "OPENAI":        {"kind": "openai",   "model_hint": r"(^|[-/])(o1|o3|o4|gpt-5)"},
     "AZURE_OPENAI": {"kind": "openai",   "model_hint": r"(^|[-/])(o1|o3|o4|gpt-5)"},
-    "ANTHROPIC":     {"kind": "anthropic", "model_hint": r"claude-(opus|sonnet|haiku)[- ]?(4|4[-.]5)"},
-    "GEMINI":        {"kind": "gemini",    "model_hint": r"gemini-2\.5|gemini-3"},
+    "ANTHROPIC":     {"kind": "anthropic", "model_hint": r"claude-(fable|opus|sonnet|haiku)[- ]?(4|4[-.]5|4-8|5)"},
+    "GEMINI":        {"kind": "gemini",    "model_hint": r"gemini-(2\.5|3|3\.5)"},
     "DEEPSEEK":      {"kind": "deepseek", "model_hint": r"reasoner|v4"},
     "GROQ":          {"kind": "openai",   "model_hint": r"gpt-oss|qwen|r1|qwq|reason"},
     "MISTRAL":       {"kind": "openai",   "model_hint": r"magistral|thinking"},

@@ -73,3 +73,27 @@ def test_gemini_thinking_model_still_gated():
     kw = _resolve_thinking_kwargs(_Cfg("GEMINI", "gemini-2.5-flash", "low"))
     assert kw["extra_body"]["thinkingConfig"]["thinkingBudget"] == 1024
     assert kw["extra_body"]["thinkingConfig"]["includeThoughts"] is True
+
+
+def test_anthropic_new_generation_fable5():
+    kw = _resolve_thinking_kwargs(_Cfg("ANTHROPIC", "claude-fable-5", "high"))
+    assert kw["thinking"] == {"type": "enabled", "budget_tokens": 16000}
+    assert kw["temperature"] == 1
+
+
+def test_anthropic_new_generation_opus48():
+    kw = _resolve_thinking_kwargs(_Cfg("ANTHROPIC", "claude-opus-4-8", "high"))
+    assert kw["thinking"] == {"type": "enabled", "budget_tokens": 16000}
+    assert kw["temperature"] == 1
+
+
+def test_anthropic_new_generation_sonnet5():
+    kw = _resolve_thinking_kwargs(_Cfg("ANTHROPIC", "claude-sonnet-5", "high"))
+    assert kw["thinking"] == {"type": "enabled", "budget_tokens": 16000}
+    assert kw["temperature"] == 1
+
+
+def test_gemini_new_generation_35():
+    kw = _resolve_thinking_kwargs(_Cfg("GEMINI", "gemini-3.5-pro", "low"))
+    assert kw["extra_body"]["thinkingConfig"]["thinkingBudget"] == 1024
+    assert kw["extra_body"]["thinkingConfig"]["includeThoughts"] is True
