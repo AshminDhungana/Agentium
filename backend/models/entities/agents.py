@@ -516,7 +516,19 @@ class Agent(BaseEntity):
                 
             except Exception as fallback_exc:
                 logger.error(f"[FATAL] Constitution fallback also failed: {fallback_exc}")
-                return False
+                # Degrade gracefully: record no references rather than failing
+                # alignment. Persona is Constitution-driven at prompt time anyway.
+                try:
+                    ethos = db.query(Ethos).filter_by(id=self.ethos_id).first() if self.ethos_id else None
+                    if ethos:
+                        ethos.set_constitutional_references([])
+                        db.flush()
+                except Exception:
+                    pass
+                self.last_constitution_read_at = datetime.utcnow()
+                self.constitution_read_count = (self.constitution_read_count or 0) + 1
+                self.constitution_version = "vFallback"
+                return True
 
     # -----------------------------------------------------------------------
     # Workflow §2 — Plan-to-Ethos with Retry

@@ -180,3 +180,16 @@ def test_get_system_prompt_is_constitution_driven(test_db, head_agent):
 def test_get_system_prompt_voice_channel(test_db, head_agent):
     prompt = head_agent.get_system_prompt(db=test_db, channel="voice")
     assert "text-to-speech" in prompt
+
+
+def test_read_and_align_constitution_missing_fallback_file_ok(test_db, head_agent):
+    # The fallback text file docs/constitution/core.md is absent in the repo.
+    # Alignment must still succeed (return True) rather than fail.
+    import os
+    fallback = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))),
+        "docs", "constitution", "core.md"
+    )
+    assert not os.path.isfile(fallback), "precondition: fallback file must be absent"
+    result = head_agent.read_and_align_constitution(test_db)
+    assert result is True
