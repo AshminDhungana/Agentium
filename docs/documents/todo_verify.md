@@ -1,35 +1,5 @@
 # Agentium — Verification & Improvement Backlog
 
-
-
-## 5. Models & Providers
-- [] In model page, as well as inside the model config where model are there, before fetch the default shown is of old models, for example antropic has fable and opus and other and google has gemini 3.5 as latest, research web and update the modle page model display as well as the default shown to show the latest models. 
-## 6. Knowledge Base (ChromaDB) & Agent Ethos
-
-## Bug: Inconsistent theme transition animation
-
-When toggling between light/dark mode, UI elements don't transition in sync — 
-some update instantly while others lag behind. This makes the switch feel 
-janky instead of smooth.
-
-**Expected:** All elements should transition together with the same timing/duration.
-
-### 6.2 — [P2] Seed foundational operating knowledge
-**Task:** Populate the knowledge base with: which tools to use and when, general best practices, host-system access patterns, basic CMD/PowerShell usage, and common CLI utilities (`grep`, `curl`, etc.). Decide the delivery mechanism — baked into ethos/constitution, read from Chroma at startup, or seeded at agent-creation time — and implement it consistently.
-**Acceptance criteria:** Decision documented; knowledge retrievable via `search_skills`/RAG query for representative prompts ("how do I fetch a URL," "what's my working directory").
-
-### 6.3 — [P2] Update default agent Ethos with working procedures
-**Task:** Give every agent's default Ethos a basic statement of its working procedure/method and a summary of its own capabilities.
-**Acceptance criteria:** A fresh agent's Ethos, inspected directly, includes both sections.
-
-### 6.4 — [P3] Seed a web-knowledge index (major sites reference)
-**Task:** Add a reference list of major websites and what kind of information each contains, so agents choose better sources when searching the web. (Can be merged with the crawler skill in 3.8 rather than duplicated — check before building twice.)
-**Acceptance criteria:** List seeded into ChromaDB; retrievable via a query like "where would I look up X."
-
-### 6.5 — [P2] Search-before-acting workflow
-**Task:** Before acting on unfamiliar information, an agent should query ChromaDB first; if the knowledge isn't there, perform a web search and write the result back to Chroma before proceeding. If web search is unavailable, fall back to whatever's already in Chroma rather than blocking.
-**Acceptance criteria:** Implemented as a step in the agent's standard task-execution flow (ties into 6.6/6.7 and the Ethos "Read → Update → Compress" discipline described in `architectural_breakdown.md` §7); tested with a query the agent has no prior knowledge of.
-
 ### 6.6 — [P2] Standard structure for knowledge-base writes
 **Problem:** No shared schema for how agents write updates to ChromaDB, risking inconsistent formats and duplicate entries.
 **Task:** Define and document a standard write structure (fields, dedup key strategy, revision metadata — see README's "Revision-Aware" claim) and route all agent writes through it.
@@ -39,6 +9,32 @@ janky instead of smooth.
 **Problem:** The Ethos definition currently has no explicit **knowledge retrieval** step (query ChromaDB + web search) or **knowledge update** step (write back to ChromaDB when required).
 **Task:** Locate where Ethos is constructed/loaded and add both steps explicitly so every agent performs them as part of its standard loop, not as an optional behavior.
 **Acceptance criteria:** Ethos text includes both steps; an agent's task trace shows a retrieval call and (when applicable) an update call.
+
+
+- [ ] when this prompt appears, and i click establish nation name it stays their for a while and then goes away after a time, it should go away after i click it and the processing should happen in the background. Establish Your AI Nation
+🏛️ Welcome to Agentium
+
+I am the Head of Council. Before we establish your AI Nation, what shall we name this sovereign domain?
+
+You have 60 seconds to respond. If no name is provided, I shall designate it 'The Agentium Sovereignty'.
+
+To respond: Reply with name: YourChosenName
+
+Nepal
+You have 60 seconds before a default name is used.
+
+Establish Nation, 
+
+i think the button is not being clicked, and the another problem is that the first message is 🏛️ Nation Established: TestNation
+
+The Council has ratified your chosen name. Welcome to the sovereign domain of TestNation!
+
+02:22
+
+
+🏛️ Nation Established: The Agentium Sovereignty
+
+No name was provided within the allotted time. I have designated this domain as 'The Agentium Sovereignty' by default. You may propose a constitutional amendment to rename it later., where the name appears as testnation , it should be the default name in the message, when no name is selected. 
 
 ### 6.8 — [P2] Verify system-message usage across both LLM APIs
 **Problem:** Agentium talks to both OpenAI-style and Anthropic-style APIs, which handle system prompts differently. Unclear whether system messages are actually being sent/used correctly in both cases.
