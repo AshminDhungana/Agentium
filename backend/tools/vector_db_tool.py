@@ -35,6 +35,7 @@ class VectorDBTool:
         "domain_knowledge",
         "sovereign_prefs",
         "audit_semantic",
+        "web_knowledge",
     ]
 
     def __init__(self) -> None:

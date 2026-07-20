@@ -81,6 +81,11 @@ async def test_query_against_test_store(store, monkeypatch):
     assert match["metadata"]["type"] == "execution_pattern"
 
 
+def test_web_knowledge_is_writable():
+    from backend.tools.vector_db_tool import VectorDBTool
+    assert "web_knowledge" in VectorDBTool.WRITABLE_COLLECTIONS
+
+
 # ── Write actions (Task 2) ────────────────────────────────────────────────────
 
 async def test_add_requires_collection_and_documents(store):
