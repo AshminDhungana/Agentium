@@ -906,6 +906,9 @@ async def update_constitution(
     db.commit()
     db.refresh(new_version)
 
+    from backend.core.constitutional_guard import ConstitutionalGuard
+    ConstitutionalGuard.invalidate_active_constitution_cache()
+
     return {
         "status": "success",
         "message": f"Constitution updated to version {new_version.version}",

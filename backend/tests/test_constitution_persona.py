@@ -48,3 +48,12 @@ def test_build_persona_provenance_footer():
 
 def test_build_persona_none_returns_fallback():
     assert build_persona_directive(None) == FALLBACK_PERSONA
+
+
+def test_invalidate_active_constitution_cache_clears_redis():
+    from backend.core.constitutional_guard import ConstitutionalGuard
+    import os, redis
+    r = redis.from_url(os.getenv("REDIS_URL", "redis://redis:6379/0"), decode_responses=True)
+    r.set("constitutional_guard:active_constitution", '{"stale": true}')
+    ConstitutionalGuard.invalidate_active_constitution_cache()
+    assert r.get("constitutional_guard:active_constitution") is None
