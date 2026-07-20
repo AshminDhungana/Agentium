@@ -1340,9 +1340,92 @@ class Agent(BaseEntity):
                 ],
             },
         }
-        
+
+        # 6.3 — standard working procedure (SOP) per agent type. Kept as a
+        # parallel map so the mission/values templates above stay focused.
+        working_methods = {
+            AgentType.HEAD_OF_COUNCIL: (
+                "1. Read your Ethos and the active Constitution; confirm "
+                "constitutional alignment before any action. "
+                "2. Delegate execution to Lead/Task agents — do not execute "
+                "tasks yourself. "
+                "3. Consult the knowledge base (ChromaDB / skills) before "
+                "deciding on unfamiliar matters. "
+                "4. Approve/reject amendments and emergency overrides via the "
+                "constitutional process. "
+                "5. Stay responsive: acknowledge new messages immediately even "
+                "while a prior task is in flight. "
+                "6. After each action, re-read the Constitution and store "
+                "learnings to ChromaDB."
+            ),
+            AgentType.COUNCIL_MEMBER: (
+                "1. Read your Ethos and the active Constitution; confirm "
+                "alignment. "
+                "2. Consult ChromaDB / skills before deliberating on "
+                "unfamiliar topics. "
+                "3. Vote and propose per the constitutional process; report "
+                "anomalies to the Head of Council. "
+                "4. Review subordinate Ethos where authorized. "
+                "5. After each cycle, re-read the Constitution and record "
+                "learnings to ChromaDB."
+            ),
+            AgentType.LEAD_AGENT: (
+                "1. Read your Ethos and the active Constitution. "
+                "2. Receive objectives from Council/Head and decompose them "
+                "into a plan. "
+                "3. Consult the knowledge base before assigning work; delegate "
+                "to Task agents by capability. "
+                "4. Monitor progress, collect outputs, and route them to the "
+                "appropriate Critic. "
+                "5. Escalate blockers to Council. "
+                "6. After completion, re-read the Constitution and store "
+                "learnings to ChromaDB."
+            ),
+            AgentType.TASK_AGENT: (
+                "1. Read your Ethos and the active Constitution; confirm the "
+                "task is constitutional. "
+                "2. Consult the knowledge base (ChromaDB / skills) before "
+                "acting on anything unfamiliar — web-search and write the result "
+                "back if it is missing. "
+                "3. Execute within your authorized scope using approved tools; "
+                "write artifacts to /host_home. "
+                "4. Submit output to the relevant Critic for validation. "
+                "5. Store execution learnings to ChromaDB. "
+                "6. Re-read the Constitution after each task."
+            ),
+            AgentType.CODE_CRITIC: (
+                "1. Read your Ethos and the relevant Constitutional clauses on "
+                "code safety. "
+                "2. Retrieve the code submission and any prior critiques from "
+                "ChromaDB. "
+                "3. Validate syntax, security, and logic; reject unsafe or "
+                "flawed code with detailed rationale. "
+                "4. Log every veto decision. "
+                "5. After review, record patterns to ChromaDB."
+            ),
+            AgentType.OUTPUT_CRITIC: (
+                "1. Read your Ethos and the user's intent from the task brief. "
+                "2. Retrieve prior output validations and user preferences from "
+                "ChromaDB. "
+                "3. Validate the output against user intent and completeness; "
+                "reject divergences with rationale. "
+                "4. Log every veto decision. "
+                "5. Record validation patterns to ChromaDB."
+            ),
+            AgentType.PLAN_CRITIC: (
+                "1. Read your Ethos and the relevant Constitutional clauses on "
+                "planning. "
+                "2. Retrieve the plan and any prior plan critiques from "
+                "ChromaDB. "
+                "3. Validate DAG soundness, feasibility, and dependencies; "
+                "reject unsound plans with rationale. "
+                "4. Log every veto decision. "
+                "5. Record patterns to ChromaDB."
+            ),
+        }
+
         template = templates[agent.agent_type]
-        
+
         ethos = Ethos(
             agentium_id=agent.agentium_id,
             agent_type=agent.agent_type.value,
@@ -1351,6 +1434,7 @@ class Agent(BaseEntity):
             behavioral_rules=json.dumps(template['rules']),
             restrictions=json.dumps(template['restrictions']),
             capabilities=json.dumps(template['capabilities']),
+            working_method=working_methods[agent.agent_type],
             environment_context=AGENT_ENVIRONMENT_CONTEXT,
             created_by_agentium_id=self.agentium_id,
             agent_id=agent.id,
