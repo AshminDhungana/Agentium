@@ -112,6 +112,8 @@ class VectorStore:
         "best_practices": "best_practices",
         "constitutional_skills": "constitutional_skills",
         "tool_skills": "tool_skills",
+        # Web-search write-backs live here; also serves the 6.4 web-index seed.
+        "web_knowledge": "web_knowledge_v2",
     }
 
     def __init__(
@@ -318,6 +320,11 @@ class VectorStore:
             "type": "execution_pattern",
             "document_type": "learned_behavior",
         }
+        # Enrich with the 6.6 shared schema (additive; parent_id = stable id).
+        from backend.services.knowledge_assist import enrich_knowledge_metadata
+        rich_meta = enrich_knowledge_metadata(
+            rich_meta, parent_id=parent_id, document_type="learned_behavior"
+        )
         if db is not None:
             self.upsert_document("task_patterns", parent_id, description, rich_meta, db)
             return
@@ -530,6 +537,7 @@ class VectorStore:
             "documents": [[e["document"] for e in entries]],
             "metadatas": [[e["metadata"] for e in entries]],
             "distances": [[e["distance"] for e in entries]],
+            "effective_distances": [[e["effective_distance"] for e in entries]],
         }
 
     def query_constitution(

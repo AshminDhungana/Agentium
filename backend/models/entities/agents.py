@@ -22,7 +22,98 @@ class AgentType(str, enum.Enum):
     TASK_AGENT = "task_agent"                # 3xxxx-6xxxx - Workers (expanded range)
     CODE_CRITIC = "code_critic"              # 7xxxx - Code validation
     OUTPUT_CRITIC = "output_critic"          # 8xxxx - Output validation
-    PLAN_CRITIC = "plan_critic"              # 9xxxx - Plan validation
+    PLAN_CRITIC = "plan_critic"        # 9xxxx - Plan validation
+
+# 6.7 — standard working procedure (SOP) per agent type, exposed at module
+# level so it is importable and testable. Every type carries an explicit
+# "Knowledge Retrieval" step and a "Knowledge Update" step.
+DEFAULT_WORKING_METHODS = {
+    AgentType.HEAD_OF_COUNCIL: (
+        "1. Read your Ethos and the active Constitution; confirm "
+        "constitutional alignment before any action. "
+        "2. Delegate execution to Lead/Task agents — do not execute "
+        "tasks yourself. "
+        "3. Knowledge Retrieval: before deciding on anything unfamiliar, "
+        "query ChromaDB (vector_db tool / knowledge service); if the answer "
+        "is missing, web-search and write the result back via the shared "
+        "knowledge-write schema. "
+        "4. Consult the knowledge base (ChromaDB / skills) before "
+        "deliberating on unfamiliar topics. "
+        "5. Approve/reject amendments and emergency overrides via the "
+        "constitutional process. "
+        "6. Stay responsive: acknowledge new messages immediately even "
+        "while a prior task is in flight. "
+        "7. Knowledge Update: after each action, store validated learnings "
+        "to ChromaDB via the shared schema and re-read the Constitution."
+    ),
+    AgentType.COUNCIL_MEMBER: (
+        "1. Read your Ethos and the active Constitution; confirm "
+        "alignment. "
+        "2. Knowledge Retrieval: consult ChromaDB / skills before "
+        "deliberating on unfamiliar topics; web-search and write back any "
+        "missing context via the shared schema. "
+        "3. Vote and propose per the constitutional process; report "
+        "anomalies to the Head of Council. "
+        "4. Review subordinate Ethos where authorized. "
+        "5. Knowledge Update: after each cycle, re-read the Constitution and "
+        "record learnings to ChromaDB."
+    ),
+    AgentType.LEAD_AGENT: (
+        "1. Read your Ethos and the active Constitution. "
+        "2. Receive objectives from Council/Head and decompose them "
+        "into a plan. "
+        "3. Knowledge Retrieval: consult the knowledge base before "
+        "assigning work; web-search and write back missing context via the "
+        "shared schema. "
+        "4. Monitor progress, collect outputs, and route them to the "
+        "appropriate Critic. "
+        "5. Escalate blockers to Council. "
+        "6. Knowledge Update: after completion, re-read the Constitution and "
+        "store learnings to ChromaDB."
+    ),
+    AgentType.TASK_AGENT: (
+        "1. Read your Ethos and the active Constitution; confirm the "
+        "task is constitutional. "
+        "2. Knowledge Retrieval: consult the knowledge base (ChromaDB / vector_db tool) before "
+        "acting on anything unfamiliar — if it is missing, web-search and "
+        "write the result back via the shared knowledge-write schema. "
+        "3. Execute within your authorized scope using approved tools; "
+        "write artifacts to /host_home. "
+        "4. Submit output to the relevant Critic for validation. "
+        "5. Knowledge Update: store execution learnings to ChromaDB via the "
+        "shared schema. "
+        "6. Re-read the Constitution after each task."
+    ),
+    AgentType.CODE_CRITIC: (
+        "1. Read your Ethos and the relevant Constitutional clauses on "
+        "code safety. "
+        "2. Knowledge Retrieval: retrieve the code submission and any prior "
+        "critiques from ChromaDB. "
+        "3. Validate syntax, security, and logic; reject unsafe or "
+        "flawed code with detailed rationale. "
+        "4. Log every veto decision. "
+        "5. Knowledge Update: after review, record patterns to ChromaDB."
+    ),
+    AgentType.OUTPUT_CRITIC: (
+        "1. Read your Ethos and the user's intent from the task brief. "
+        "2. Knowledge Retrieval: retrieve prior output validations and user "
+        "preferences from ChromaDB. "
+        "3. Validate the output against user intent and completeness; "
+        "reject divergences with rationale. "
+        "4. Log every veto decision. "
+        "5. Knowledge Update: record validation patterns to ChromaDB."
+    ),
+    AgentType.PLAN_CRITIC: (
+        "1. Read your Ethos and the relevant Constitutional clauses on "
+        "planning. "
+        "2. Knowledge Retrieval: retrieve the plan and any prior plan "
+        "critiques from ChromaDB. "
+        "3. Validate DAG soundness, feasibility, and dependencies; "
+        "reject unsound plans with rationale. "
+        "4. Log every veto decision. "
+        "5. Knowledge Update: record patterns to ChromaDB."
+    ),
+}
 
 class AgentStatus(str, enum.Enum):
     """Agent lifecycle states."""
@@ -1341,88 +1432,10 @@ class Agent(BaseEntity):
             },
         }
 
-        # 6.3 — standard working procedure (SOP) per agent type. Kept as a
-        # parallel map so the mission/values templates above stay focused.
-        working_methods = {
-            AgentType.HEAD_OF_COUNCIL: (
-                "1. Read your Ethos and the active Constitution; confirm "
-                "constitutional alignment before any action. "
-                "2. Delegate execution to Lead/Task agents — do not execute "
-                "tasks yourself. "
-                "3. Consult the knowledge base (ChromaDB / skills) before "
-                "deciding on unfamiliar matters. "
-                "4. Approve/reject amendments and emergency overrides via the "
-                "constitutional process. "
-                "5. Stay responsive: acknowledge new messages immediately even "
-                "while a prior task is in flight. "
-                "6. After each action, re-read the Constitution and store "
-                "learnings to ChromaDB."
-            ),
-            AgentType.COUNCIL_MEMBER: (
-                "1. Read your Ethos and the active Constitution; confirm "
-                "alignment. "
-                "2. Consult ChromaDB / skills before deliberating on "
-                "unfamiliar topics. "
-                "3. Vote and propose per the constitutional process; report "
-                "anomalies to the Head of Council. "
-                "4. Review subordinate Ethos where authorized. "
-                "5. After each cycle, re-read the Constitution and record "
-                "learnings to ChromaDB."
-            ),
-            AgentType.LEAD_AGENT: (
-                "1. Read your Ethos and the active Constitution. "
-                "2. Receive objectives from Council/Head and decompose them "
-                "into a plan. "
-                "3. Consult the knowledge base before assigning work; delegate "
-                "to Task agents by capability. "
-                "4. Monitor progress, collect outputs, and route them to the "
-                "appropriate Critic. "
-                "5. Escalate blockers to Council. "
-                "6. After completion, re-read the Constitution and store "
-                "learnings to ChromaDB."
-            ),
-            AgentType.TASK_AGENT: (
-                "1. Read your Ethos and the active Constitution; confirm the "
-                "task is constitutional. "
-                "2. Consult the knowledge base (ChromaDB / skills) before "
-                "acting on anything unfamiliar — web-search and write the result "
-                "back if it is missing. "
-                "3. Execute within your authorized scope using approved tools; "
-                "write artifacts to /host_home. "
-                "4. Submit output to the relevant Critic for validation. "
-                "5. Store execution learnings to ChromaDB. "
-                "6. Re-read the Constitution after each task."
-            ),
-            AgentType.CODE_CRITIC: (
-                "1. Read your Ethos and the relevant Constitutional clauses on "
-                "code safety. "
-                "2. Retrieve the code submission and any prior critiques from "
-                "ChromaDB. "
-                "3. Validate syntax, security, and logic; reject unsafe or "
-                "flawed code with detailed rationale. "
-                "4. Log every veto decision. "
-                "5. After review, record patterns to ChromaDB."
-            ),
-            AgentType.OUTPUT_CRITIC: (
-                "1. Read your Ethos and the user's intent from the task brief. "
-                "2. Retrieve prior output validations and user preferences from "
-                "ChromaDB. "
-                "3. Validate the output against user intent and completeness; "
-                "reject divergences with rationale. "
-                "4. Log every veto decision. "
-                "5. Record validation patterns to ChromaDB."
-            ),
-            AgentType.PLAN_CRITIC: (
-                "1. Read your Ethos and the relevant Constitutional clauses on "
-                "planning. "
-                "2. Retrieve the plan and any prior plan critiques from "
-                "ChromaDB. "
-                "3. Validate DAG soundness, feasibility, and dependencies; "
-                "reject unsound plans with rationale. "
-                "4. Log every veto decision. "
-                "5. Record patterns to ChromaDB."
-            ),
-        }
+        # 6.3 — standard working procedure (SOP) per agent type. Delegates to
+        # the module-level DEFAULT_WORKING_METHODS so it is shared, importable,
+        # and testable.
+        working_methods = DEFAULT_WORKING_METHODS
 
         template = templates[agent.agent_type]
 

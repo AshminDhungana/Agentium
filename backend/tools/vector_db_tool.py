@@ -12,6 +12,7 @@ this tool and is indexed into ChromaDB by `make seed-skills`; the `help`
 action and the tool description both point agents at that skill file.
 """
 
+import uuid
 from typing import Any, Dict, List, Optional
 
 from backend.core.vector_store import get_vector_store
@@ -35,6 +36,7 @@ class VectorDBTool:
         "domain_knowledge",
         "sovereign_prefs",
         "audit_semantic",
+        "web_knowledge",
     ]
 
     def __init__(self) -> None:
@@ -69,7 +71,7 @@ class VectorDBTool:
         if action == "get":
             return self._get(doc_id, collection)
         if action == "add":
-            return self._add(collection, documents, metadatas, ids)
+            return await self._add(collection, documents, metadatas, ids)
         if action == "list_collections":
             return self._list_collections()
         if action == "help":
@@ -180,7 +182,7 @@ class VectorDBTool:
 
     # ── Write ─────────────────────────────────────────────────────────────────
 
-    def _add(self, collection, documents, metadatas, ids):
+    async def _add(self, collection, documents, metadatas, ids):
         if not collection:
             return {"success": False, "error": "collection is required for action 'add'"}
         if not documents:
@@ -204,12 +206,25 @@ class VectorDBTool:
         try:
             with get_db_context() as db:
                 for d_id, doc, meta in zip(ids, docs, metadatas):
-                    self.store.upsert_document(collection, d_id, doc, meta or {}, db)
+                    # Route every agent write through the shared 6.6 schema.
+                    await self._write_knowledge(d_id, doc, meta or {}, db, collection)
                     stored.append(d_id)
         except Exception:  # noqa: BLE001
-            # Fallback: legacy single-doc upsert (no parent store available).
             coll = self.store.get_collection(collection)
-            coll.upsert(documents=docs, metadatas=metadatas, ids=ids)
+            enriched = []
+            for m in metadatas:
+                em = dict(m or {})
+                em.setdefault("type", "agent_learning")
+                em.setdefault("source", "agent")
+                em.setdefault("source_url", "")
+                em.setdefault("title", "")
+                em.setdefault("document_type", em.get("type", "agent_learning"))
+                em.setdefault("decay_score", 1.0)
+                em.setdefault("citation_boost", 1.0)
+                em.setdefault("agent_id", None)
+                em.setdefault("revision_id", uuid.uuid4().hex)
+                enriched.append(em)
+            coll.upsert(documents=docs, metadatas=enriched, ids=ids)
             stored = ids
         return {
             "success": True,
@@ -217,6 +232,18 @@ class VectorDBTool:
             "count": len(stored),
             "ids": stored,
         }
+
+    @staticmethod
+    async def _write_knowledge(parent_id, text, metadata, db, collection_key):
+        from backend.services.knowledge_assist import write_knowledge
+
+        # Pre-apply the shared 6.6 schema defaults so every agent write carries
+        # them even before the real write_knowledge runs its own enforcement.
+        meta = dict(metadata or {})
+        meta.setdefault("source", "agent")
+        if "revision_id" not in meta:
+            meta["revision_id"] = uuid.uuid4().hex
+        return await write_knowledge(parent_id, text, meta, db, collection_key)
 
 
 vector_db_tool = VectorDBTool()

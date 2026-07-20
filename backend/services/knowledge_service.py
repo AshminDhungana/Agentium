@@ -348,6 +348,8 @@ class KnowledgeService:
         2. If a similar entry exists (distance < threshold): revise it in place.
         3. If no match: create a new entry.
         """
+        from backend.services.knowledge_assist import enrich_knowledge_metadata
+
         try:
             collection = self.vector_store.get_collection(collection_name)
         except ValueError:
@@ -411,6 +413,10 @@ class KnowledgeService:
                     ),
                     "last_validated_at": datetime.utcnow().isoformat(),
                 }
+                # Apply the 6.6 shared schema (additive; parent_id = stable id).
+                merged_metadata = enrich_knowledge_metadata(
+                    merged_metadata, parent_id=existing_id, source="agent"
+                )
 
                 collection.delete(ids=[existing_id])
                 collection.add(
@@ -441,6 +447,10 @@ class KnowledgeService:
             "decay_score": (metadata or {}).get("decay_score", 1.0),
             "last_validated_at": datetime.utcnow().isoformat(),
         }
+        # Apply the 6.6 shared schema (additive; parent_id = stable id).
+        final_metadata = enrich_knowledge_metadata(
+            final_metadata, parent_id=doc_id, source="agent"
+        )
         collection.add(
             documents=[content],
             metadatas=[final_metadata],
