@@ -500,9 +500,20 @@ PROVIDER_THINKING = {
     # COHERE intentionally omitted -> no thinking
 }
 
-_OPENAI_EFFORT = {"low": "low", "medium": "medium", "high": "high", "xhigh": "high"}
-_ANTHROPIC_BUDGET = {"low": 2000, "medium": 8000, "high": 16000, "xhigh": 32000}
+_OPENAI_EFFORT = {"low": "low", "medium": "medium", "high": "high", "xhigh": "xhigh"}
+_ANTHROPIC_BUDGET = {"low": 2000, "medium": 8000, "high": 16000, "xhigh": 32000}  # legacy (opus-4-5 / haiku-4-5) only
+_ANTHROPIC_EFFORT = {"low": "low", "medium": "medium", "high": "high", "xhigh": "xhigh"}  # adaptive (fable/sonnet5/opus4.6+) models
 _GEMINI_BUDGET = {"low": 1024, "medium": 4096, "high": 8192, "xhigh": 24576}
+
+# New-gen Anthropic models reject manual `budget_tokens` (HTTP 400) and instead
+# use adaptive thinking + an `effort` parameter. Sent via extra_body for SDK 0.84.0.
+_ANTHROPIC_ADAPTIVE = re.compile(
+    r"claude-(fable|mythos|opus[- ]?4[-.]?(6|7|8)|sonnet[- ]?4[-.]?6|sonnet[- ]?5)"
+)
+
+def _is_anthropic_adaptive(model: str) -> bool:
+    """True for Anthropic models that require adaptive thinking (no budget_tokens)."""
+    return bool(_ANTHROPIC_ADAPTIVE.search(model or ""))
 
 
 def _resolve_thinking_kwargs(config) -> Dict[str, Any]:
@@ -524,6 +535,13 @@ def _resolve_thinking_kwargs(config) -> Dict[str, Any]:
         return {}
     kind = info["kind"]
     if kind == "anthropic":
+        if _is_anthropic_adaptive(model):
+            # SDK 0.84.0 lacks output_config/adaptive -> send via extra_body passthrough.
+            return {"extra_body": {
+                "thinking": {"type": "adaptive"},
+                "output_config": {"effort": _ANTHROPIC_EFFORT[effort]},
+            }}
+        # Legacy: manual extended thinking. Call sites enforce max_tokens > budget.
         return {
             "thinking": {"type": "enabled", "budget_tokens": _ANTHROPIC_BUDGET[effort]},
             "temperature": 1,

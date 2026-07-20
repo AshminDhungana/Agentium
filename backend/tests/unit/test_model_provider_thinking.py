@@ -77,20 +77,35 @@ def test_gemini_thinking_model_still_gated():
 
 def test_anthropic_new_generation_fable5():
     kw = _resolve_thinking_kwargs(_Cfg("ANTHROPIC", "claude-fable-5", "high"))
-    assert kw["thinking"] == {"type": "enabled", "budget_tokens": 16000}
-    assert kw["temperature"] == 1
+    assert kw["extra_body"]["thinking"] == {"type": "adaptive"}
+    assert kw["extra_body"]["output_config"] == {"effort": "high"}
 
 
 def test_anthropic_new_generation_opus48():
     kw = _resolve_thinking_kwargs(_Cfg("ANTHROPIC", "claude-opus-4-8", "high"))
-    assert kw["thinking"] == {"type": "enabled", "budget_tokens": 16000}
-    assert kw["temperature"] == 1
+    assert kw["extra_body"]["thinking"] == {"type": "adaptive"}
+    assert kw["extra_body"]["output_config"] == {"effort": "high"}
 
 
 def test_anthropic_new_generation_sonnet5():
     kw = _resolve_thinking_kwargs(_Cfg("ANTHROPIC", "claude-sonnet-5", "high"))
+    assert kw["extra_body"]["thinking"] == {"type": "adaptive"}
+    assert kw["extra_body"]["output_config"] == {"effort": "high"}
+
+
+def test_anthropic_adaptive_effort_levels():
+    for effort, level in [("low", "low"), ("medium", "medium"), ("high", "high"), ("xhigh", "xhigh")]:
+        kw = _resolve_thinking_kwargs(_Cfg("ANTHROPIC", "claude-opus-4-8", effort))
+        assert kw["extra_body"]["output_config"] == {"effort": level}
+
+
+def test_anthropic_legacy_still_budget():
+    # opus-4-5 / haiku-4-5 are legacy -> manual budget_tokens, not adaptive
+    kw = _resolve_thinking_kwargs(_Cfg("ANTHROPIC", "claude-opus-4-5", "high"))
     assert kw["thinking"] == {"type": "enabled", "budget_tokens": 16000}
     assert kw["temperature"] == 1
+    kw2 = _resolve_thinking_kwargs(_Cfg("ANTHROPIC", "claude-haiku-4-5", "xhigh"))
+    assert kw2["thinking"] == {"type": "enabled", "budget_tokens": 32000}
 
 
 def test_gemini_new_generation_35():
