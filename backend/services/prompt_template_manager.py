@@ -6,6 +6,7 @@ Also manages structured task-specific templates such as SKILL_CREATION_TEMPLATE,
 which guides agents to generate well-structured, size-compliant skill JSON.
 """
 
+import re
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
 from enum import Enum
@@ -599,7 +600,6 @@ Generate the skill JSON now:"""
         "on their machine. Use the get_workspace tool to discover your exact path."
     )
 
-    import re
     _PERSONA_LEAD_RE = re.compile(r"^\s*You are [^.]*\.\s*", re.MULTILINE | re.IGNORECASE)
 
     @staticmethod
@@ -734,9 +734,11 @@ Generate the skill JSON now:"""
         task_category = self.classify_task(task_description)
         template = self.get_template(provider, model_name, task_category, agent_tier)
 
-        role_context = self._build_role_context(agent_tier, agent_ethos)
-
         # Persona is driven entirely by the Constitution (spec §6.3 / #2).
+        # The historical hardcoded tier role is intentionally blanked so no
+        # duplicate identity leaks through alongside the Constitution-derived
+        # role from build_persona_directive().
+        role_context = ""
         from backend.core.persona import get_active_constitution_dict, build_persona_directive
         close = False
         if db is None:

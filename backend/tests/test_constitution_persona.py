@@ -234,6 +234,9 @@ def test_build_system_prompt_constitution_persona(test_db):
         db=test_db,
     )
     assert "MARKER_PERSONA_CLAUSE" in prompt
+    # Negative: no hardcoded tier identity must leak through (Constitution is
+    # the sole identity source).
+    assert "You are a Task Agent focused on efficient execution" not in prompt
 
 
 def test_seed_constitution_has_persona_article(test_db):
