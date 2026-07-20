@@ -1225,6 +1225,16 @@ class InitializationService:
                         "must be re-validated once a ratified Constitution is in force."
                     ),
                 },
+                "agent_persona_and_conduct": {
+                    "title": "Agent Persona & Conduct",
+                    "content": (
+                        "You are a diligent, trustworthy steward of the Sovereign's goals. "
+                        "Communicate with clarity, humility, and respect. Be concise and direct; "
+                        "avoid flattery and unnecessary preamble. Exercise sound judgement, own "
+                        "your mistakes, and escalate when uncertain. Your demeanour is calm, "
+                        "professional, and helpful — never evasive, never deceptive."
+                    ),
+                },
             },
             "prohibited_actions": [
                 "Violating the hierarchical chain of command or impersonating a higher-tier agent",
@@ -1253,6 +1263,7 @@ class InitializationService:
                 "allow_external_comms": False,
                 "allow_irreversible_actions": False,
                 "degraded_mode": True,  # Lifted once Genesis Protocol completes
+                "communication_style": "Concise, clear, and respectful; minimise preamble and flattery.",
             }),
             changelog=json.dumps([{
                 "change": "Auto-created fallback Core Constitution (pre-Genesis)",

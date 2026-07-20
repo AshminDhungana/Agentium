@@ -234,3 +234,18 @@ def test_build_system_prompt_constitution_persona(test_db):
         db=test_db,
     )
     assert "MARKER_PERSONA_CLAUSE" in prompt
+
+
+def test_seed_constitution_has_persona_article(test_db):
+    from backend.services.initialization_service import InitializationService
+    # ensure fresh seed
+    from backend.models.entities.constitution import Constitution
+    existing = test_db.query(Constitution).filter_by(is_active=True).all()
+    for e in existing:
+        test_db.delete(e)
+    test_db.commit()
+    const = InitializationService.create_default_constitution(test_db)
+    articles = const.get_articles_dict()
+    assert "agent_persona_and_conduct" in articles
+    prefs = const.get_sovereign_preferences()
+    assert "communication_style" in prefs
