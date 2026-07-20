@@ -406,7 +406,6 @@ class AutonomousLearningEngine:
                 return {"shared": 0}
 
             shared_count = 0
-            fed_coll = vs.get_collection(federated_coll_name)
 
             for i, doc_id in enumerate(all_docs["ids"]):
                 meta = (all_docs.get("metadatas") or [])[i] if all_docs.get("metadatas") else {}
@@ -426,16 +425,27 @@ class AutonomousLearningEngine:
                     continue
 
                 try:
-                    fed_coll.upsert(
-                        ids=[shared_id],
-                        documents=[doc_text],
-                        metadatas=[{
+                    from backend.services.knowledge_assist import (
+                        enrich_knowledge_metadata,
+                    )
+                    # Route through the shared 6.6 write path: enrich with the
+                    # standard schema (parent_id dedup key, revision metadata) and
+                    # upsert via the canonical writer instead of a raw upsert.
+                    shared_meta = enrich_knowledge_metadata(
+                        {
                             **meta,
                             "shared_from": "task_patterns",
                             "shared_at": datetime.utcnow().isoformat(),
                             "original_id": doc_id,
                             "federated": "true",
-                        }],
+                        },
+                        parent_id=shared_id,
+                        source="federation",
+                        document_type="best_practice",
+                        title=meta.get("title", f"federated:{doc_id}"),
+                    )
+                    vs.upsert_document(
+                        federated_coll_name, shared_id, doc_text, shared_meta, db
                     )
                     shared_count += 1
                 except Exception as exc:

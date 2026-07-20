@@ -737,6 +737,7 @@ Generate the skill JSON now:"""
             "role_context": role_context,
             "behavioral_rules": behavioral_rules,
             "specialization": getattr(agent_ethos, 'specialization', 'general assistance'),
+            "working_method": getattr(agent_ethos, 'working_method', ''),
         }
 
         system_prompt, _ = template.format(system_vars, "")
@@ -747,6 +748,18 @@ Generate the skill JSON now:"""
         system_prompt += self.DEEP_THINK_HINT
         system_prompt += self.HOST_ACCESS_HINT
         system_prompt += self.WORKSPACE_HINT
+
+        # 6.7 — surface the Ethos working_method (standard operating loop) in
+        # every agent's system prompt so the explicit "Knowledge Retrieval" and
+        # "Knowledge Update" steps are part of the agent's standard loop, not
+        # optional behavior. This is the single injection point for the SOP.
+        working_method = getattr(agent_ethos, 'working_method', '') or ''
+        if working_method.strip():
+            system_prompt += (
+                "\n\n## Your Standard Working Method\n"
+                "Follow these steps as your default operating loop:\n"
+                f"{working_method.strip()}\n"
+            )
 
         return (
             system_prompt,
