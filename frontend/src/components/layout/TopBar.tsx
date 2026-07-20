@@ -1,5 +1,6 @@
 import { useEffect, useState, type RefObject } from 'react';
 import { Menu, PanelLeftClose, PanelLeftOpen, Sun, Moon } from 'lucide-react';
+import { isDarkMode, setDarkMode } from '../../utils/theme';
 
 interface TopBarProps {
   title: string;
@@ -10,9 +11,7 @@ interface TopBarProps {
 }
 
 export function TopBar({ title, collapsed, onToggleCollapse, onOpenMobile, hamburgerRef }: TopBarProps) {
-  const [isDark, setIsDark] = useState(
-    () => typeof window !== 'undefined' && document.documentElement.classList.contains('dark'),
-  );
+  const [isDark, setIsDark] = useState(() => isDarkMode());
 
   // Keep the toggle in sync with the actual theme, including changes made
   // elsewhere (e.g. the auth-layout toggle) or restored from localStorage.
@@ -25,10 +24,8 @@ export function TopBar({ title, collapsed, onToggleCollapse, onOpenMobile, hambu
 
   const toggleTheme = () => {
     const next = !isDark;
-    document.documentElement.classList.toggle('dark', next);
-    localStorage.setItem('theme', next ? 'dark' : 'light');
+    setDarkMode(next);
     setIsDark(next);
-    window.dispatchEvent(new Event('agentium:theme-change'));
   };
 
   return (

@@ -53,6 +53,28 @@
   --c-brand-fg: #ffffff;
 }
 
+/* Coordinated theme transition.
+   Tailwind `dark:` utilities and the `--c-*` variables flip instantly when the
+   `.dark` class changes, so without this only elements that happen to carry an
+   explicit `transition-*` utility animate — making the light/dark switch feel
+   janky and out of sync. We open a short "theme-transition" window on <html>
+   during a toggle (see src/utils/theme.ts) so every themed property animates
+   with identical timing, then close it so hovers/focus keep their own motion. */
+@media (prefers-reduced-motion: no-preference) {
+  html.theme-transition,
+  html.theme-transition *,
+  html.theme-transition *::before,
+  html.theme-transition *::after {
+    transition:
+      background-color 220ms ease,
+      border-color 220ms ease,
+      color 220ms ease,
+      fill 220ms ease,
+      stroke 220ms ease,
+      box-shadow 220ms ease !important;
+  }
+}
+
 /* Empty state illustration float animation */
 @keyframes float {
   0%, 100% { transform: translateY(0); }

@@ -13,6 +13,7 @@ import { SignupPage } from '@/pages/SignupPage';
 import { SovereignRoute } from '@/components/SovereignRoute';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Shield } from 'lucide-react';
+import { isDarkMode, setDarkMode } from '@/utils/theme';
 import { modelsApi } from '@/services/models';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { useGlobalChatCards } from '@/hooks/useGlobalChatCards';
@@ -217,23 +218,12 @@ function AuthLayout() {
   const location = useLocation();
   const outlet = useOutlet();
   const isSignup = location.pathname === '/signup';
-  const [isDark, setIsDark] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return document.documentElement.classList.contains('dark');
-    }
-    return false;
-  });
+  const [isDark, setIsDark] = useState(() => isDarkMode());
 
   const toggleTheme = () => {
-    const newDark = !isDark;
-    setIsDark(newDark);
-    if (newDark) {
-      document.documentElement.classList.add('dark');
-      localStorage.setItem('theme', 'dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-      localStorage.setItem('theme', 'light');
-    }
+    const next = !isDark;
+    setDarkMode(next);
+    setIsDark(next);
   };
 
     return (
