@@ -130,7 +130,7 @@ Adaptive path needs no bump (no budget). This fixes the 400 on every legacy thin
 
 - `effort="none"` → `{}` everywhere; no behavior change, `is_thinking_config` contract intact.
 - Unsupported provider/model (regex miss) → `{}`; the UI already hides the effort control for those.
-- Adaptive params sent via `extra_body` so the pinned `anthropic==0.84.0` SDK is not required to understand them; if a future SDK version rejects `extra_body` passthrough, the call degrades to a normal (non-thinking) request rather than crashing the loop.
+- Adaptive params sent via `extra_body` so the pinned `anthropic==0.84.0` SDK is not required to understand them; `extra_body` is a stable passthrough in the Anthropic SDK and forwards the new fields verbatim to the API.
 - New-gen Anthropic defaults `display:"omitted"` for thinking text, so raw thinking text is not returned over the wire. **Documented limitation:** the observable trace is latency + token count (thinking tokens counted in `output_tokens`), which satisfies the acceptance criterion. We do not force `display:"summarized"` (adds latency).
 
 ## Testing
