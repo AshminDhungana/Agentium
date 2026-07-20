@@ -198,3 +198,39 @@ def test_ethos_creation_has_no_persona(test_db, head_agent):
     assert ethos.get_restrictions() == []
     # Capabilities (operational) are still present.
     assert ethos.get_capabilities()
+
+
+def _seed_constitution_with_marker(test_db):
+    from backend.models.entities.constitution import Constitution
+    import json
+    prior = test_db.query(Constitution).filter_by(agentium_id="C00001").first()
+    if prior:
+        test_db.delete(prior)
+        test_db.commit()
+    articles = {"agent_persona_and_conduct": {"title": "Persona", "content": "MARKER_PERSONA_CLAUSE be helpful."}}
+    const = Constitution(
+        agentium_id="C00001", version="v1.0.0", version_number=1,
+        preamble="Preamble MARKER.",
+        articles=json.dumps(articles),
+        prohibited_actions=json.dumps([]),
+        sovereign_preferences=json.dumps({}),
+        created_by_agentium_id="00001",
+        is_active=True,
+    )
+    test_db.add(const)
+    test_db.commit()
+    return const
+
+
+def test_build_system_prompt_constitution_persona(test_db):
+    _seed_constitution_with_marker(test_db)
+    from backend.services.prompt_template_manager import prompt_template_manager, ProviderType
+    prompt, _, _ = prompt_template_manager.build_system_prompt(
+        provider=ProviderType.OPENAI,
+        model_name="gpt-4o",
+        task_description="do a thing",
+        agent_ethos=None,
+        agent_tier=3,
+        db=test_db,
+    )
+    assert "MARKER_PERSONA_CLAUSE" in prompt
