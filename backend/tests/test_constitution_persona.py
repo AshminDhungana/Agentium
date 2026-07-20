@@ -270,3 +270,15 @@ def test_no_hardcoded_persistent_ethos_persona():
         text = path.read_text(encoding="utf-8")
         for phrase in legacy_phrases:
             assert phrase not in text, f"'{phrase}' still present in {path}"
+
+
+def test_preview_persona_renders_draft():
+    from backend.core.persona import build_persona_directive
+    draft = {
+        "preamble": "Draft preamble DRAFT_MARKER.",
+        "articles": {"agent_persona_and_conduct": {"title": "Persona", "content": "DRAFT_PERSONA_CLAUSE"}},
+        "prohibited_actions": [],
+        "sovereign_preferences": {"communication_style": "Friendly."},
+    }
+    rendered = build_persona_directive(draft, tier=0, channel="text")
+    assert "DRAFT_MARKER" in rendered and "DRAFT_PERSONA_CLAUSE" in rendered
