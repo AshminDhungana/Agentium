@@ -110,6 +110,8 @@ class EthosTool:
             "version": ethos.version,
             "is_verified": ethos.is_verified,
             "environment_context": ethos.environment_context,
+            "working_method": ethos.working_method,
+            "capabilities": ethos.get_capabilities(),
         }
         return _result(True, data=data)
 

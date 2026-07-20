@@ -82,6 +82,10 @@ def parse_skill_file(path: Path) -> SkillSchema:
         steps=steps,
         validation_criteria=validation,
         creator_tier=_default("creator_tier", fm.get("creator_tier"), "head"),
+        # Optional override of the target ChromaDB collection. Defaults to
+        # "agent_skills"; "best_practices" is used for general operating
+        # knowledge that every agent should be able to retrieve on demand.
+        chroma_collection=_default("chroma_collection", fm.get("chroma_collection"), "agent_skills"),
         creator_id="00001",
         constitution_compliant=True,
         verification_status="verified",

@@ -267,6 +267,9 @@ class Ethos(BaseEntity):
 
     # Environment / host grounding (6.1) — core identity, set at agent creation
     environment_context = Column(Text, nullable=True)
+
+    # Standard working procedure (6.3) — how this agent operates, set at creation
+    working_method = Column(Text, nullable=True)
     def get_core_values(self) -> List[str]:
         import json
         val = self.core_values
@@ -727,6 +730,7 @@ class Ethos(BaseEntity):
             'verified_by': self.verified_by_agentium_id,
             'agent_id': self.agent_id,
             'environment_context': self.environment_context,
+            'working_method': self.working_method,
         })
         return base
 

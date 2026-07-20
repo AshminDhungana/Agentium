@@ -36,6 +36,24 @@ default: it honors `robots.txt`, rate-limits requests, and blocks private hosts
 7. For picking good starting sources by topic, read the curated list in
    `__SKILL_DIR__/datasets/major_sites.md` (~100 major sites by category).
 
+## Major Sites Index (where to look things up)
+Before searching or crawling, pick a good starting source by category. The full
+curated list (≈50 sites with one-line descriptions) lives in
+`__SKILL_DIR__/datasets/major_sites.md`. High-level map:
+- **Docs/reference:** docs.python.org, developer.mozilla.org (MDN), devdocs.io,
+  readthedocs.org, docs.aws.amazon.com, cloud.google.com/docs, learn.microsoft.com
+- **Code & Q&A:** github.com, gitlab.com, stackoverflow.com, news.ycombinator.com
+- **News:** reuters.com, apnews.com, bbc.com, techcrunch.com, theverge.com
+- **Encyclopedic/factual:** wikipedia.org, wikidata.org, britannica.com, wolframalpha.com
+- **Science/academic:** arxiv.org, scholar.google.com, pubmed.ncbi.nlm.nih.gov, kaggle.com, ourworldindata.org
+- **Reference/utilities:** timeanddate.com, openstreetmap.org, imdb.com, worldbank.org
+- **Government/legal:** *.gov, europa.eu, law.cornell.edu, un.org
+- **Commerce/company:** amazon.com, crunchbase.com, appstore.com, play.google.com
+- **Social/community:** reddit.com, x.com, linkedin.com
+Rule of thumb: factual/overview → Wikipedia/Wikidata then a primary source; code
+errors → Stack Overflow / GitHub issues / official docs; current events → Reuters/AP
+(verify with a second source); data → primary sources; academic → arXiv/Scholar.
+
 ## Validation
 - The crawl returns `status: success` with `pages_fetched`, `pages_failed`, and
   per-page `markdown`, `title`, `token_count`.
