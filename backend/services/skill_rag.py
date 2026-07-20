@@ -107,6 +107,11 @@ class SkillRAG:
             fallback_configs=fallback,
         )
 
+        # 8.4: detect agent self-signal of a knowledge gap
+        from backend.services.knowledge_assist import parse_knowledge_needed
+        knowledge_query = parse_knowledge_needed(result.get("content", ""))
+        knowledge_needed = knowledge_query is not None
+
         # Step 4: Record skill usage (optimistic — critics may revise later)
         for skill in skills:
             self.skill_manager.record_skill_usage(
@@ -126,6 +131,8 @@ class SkillRAG:
                 "wrote_back": knowledge_outcome.wrote_back,
                 "fallback_used": knowledge_outcome.fallback_used,
             },
+            "knowledge_needed": knowledge_needed,
+            "knowledge_query": knowledge_query,
         }
 
     # ═══════════════════════════════════════════════════════════
