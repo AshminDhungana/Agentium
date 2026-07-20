@@ -372,7 +372,7 @@ async def send_message(
             # FIX: pass attachments so the streaming path can inject file content
             _stream_response(
                 head.agentium_id,
-                _enrich_with_persona(chat_msg.message, chat_msg.voice_persona),
+                chat_msg,
                 chat_msg.attachments,
             ),
             media_type="text/event-stream",
@@ -383,9 +383,11 @@ async def send_message(
             },
         )
 
-    # FIX: non-streaming path also enriches the message with file content
+    # FIX: non-streaming path also enriches the message with file content.
+    # voice_persona is no longer prepended to the user message — it is merged
+    # into the system prompt by the streaming path for cross-channel consistency.
     enriched_message = _build_enriched_message(
-        chat_msg.message, chat_msg.attachments, chat_msg.voice_persona
+        chat_msg.message, chat_msg.attachments
     )
     extra_metadata = {"card_response": chat_msg.card_response} if chat_msg.card_response else None
     response = await ChatService.process_message(head, enriched_message, db, extra_metadata=extra_metadata)
@@ -441,24 +443,26 @@ class PersonaResponse(BaseModel):
 async def get_persona(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_voice_or_active_user),
+    channel: str = "text",
 ):
     """
     Return the Head of Council's effective persona (system prompt).
 
     The voice bridge calls this so its spoken replies match the chat persona
-    exactly — both are driven by the same Head system prompt / constitution,
-    which keeps behavior consistent across channels.
+    exactly — both are driven by the same Constitution-derived Head system
+    prompt, which keeps behavior consistent across channels. Pass
+    `?channel=voice` to get the spoken-style-adapted persona.
     """
     head = db.query(HeadOfCouncil).filter_by(agentium_id="00001").first()
     if not head:
         return PersonaResponse(persona="", source="none")
-    prompt = head.get_system_prompt()
-    return PersonaResponse(persona=prompt or "", source="head_system_prompt")
+    prompt = head.get_system_prompt(db=db, channel=channel)
+    return PersonaResponse(persona=prompt or "", source="constitution")
 
 
 async def _stream_response(
     agent_id: str,
-    message: str,
+    chat_msg: "ChatMessage",
     attachments: Optional[List[dict]] = None,
 ) -> AsyncGenerator[str, None]:
     """
@@ -516,13 +520,14 @@ async def _stream_response(
             _done_sent = True
             return
 
-        system_prompt = head.get_system_prompt()
-        context       = await ChatService.get_system_context(db)
-        full_prompt   = (
-            f"{system_prompt}\n\nCurrent System State:\n{context}\n\n"
-            "You are speaking directly to the Sovereign. "
-            "Address them respectfully and provide clear, actionable responses."
-        )
+        channel = "voice" if chat_msg.voice_persona else "text"
+        system_prompt = head.get_system_prompt(db=db, channel=channel)
+        # If the voice bridge supplied the constitution-driven persona, prefer it
+        # for cross-channel consistency (spec §6.6).
+        if chat_msg.voice_persona:
+            system_prompt = chat_msg.voice_persona
+        context = await ChatService.get_system_context(db)
+        full_prompt = f"{system_prompt}\n\nCurrent System State:\n{context}"
 
         # ── Governance & Delegation Protocol (Issue 8.1) ─────────────────────
         # Prompt-only guardrail: the Head delegates execution to Lead/Task agents
@@ -544,7 +549,7 @@ async def _stream_response(
 
         # FIX: Enrich message with extracted file content before streaming.
         # This is the missing step that caused the AI to ignore all attachments.
-        enriched_message = _build_enriched_message(message, attachments)
+        enriched_message = _build_enriched_message(chat_msg.message, attachments)
 
         full_response: list[str] = []
         async for chunk in provider.stream_generate(full_prompt, enriched_message):
@@ -554,7 +559,7 @@ async def _stream_response(
         full_text = "".join(full_response)
         # Use original message (without file content) for task analysis
         # to avoid false-positive task creation from extracted PDF keywords.
-        task_info = await ChatService.analyze_for_task(head, message, full_text, db)
+        task_info = await ChatService.analyze_for_task(head, chat_msg.message, full_text, db)
 
         # ── 2–3 line response policy enforcement ─────────────────────────────
         if not task_info.get("created", False):
@@ -572,7 +577,7 @@ async def _stream_response(
 
         yield f"data: {json.dumps({'type': 'complete', 'content': '', 'message_id': message_id, 'metadata': {'agent_id': agent_id, 'model': model_name, 'task_created': task_info['created'], 'task_id': task_info.get('task_id'), 'card': None}})}\n\n"
 
-        await ChatService.log_interaction(agent_id, message, full_text, config_id, db)
+        await ChatService.log_interaction(agent_id, chat_msg.message, full_text, config_id, db)
 
         sovereign_user = db.query(User).filter_by(is_admin=True, is_active=True).first()
 
@@ -596,7 +601,7 @@ async def _stream_response(
                     id=str(uuid.uuid4()),
                     user_id=user_str_id,
                     role="sovereign",
-                    content=message,
+                    content=chat_msg.message,
                     attachments=stored_attachments,
                     message_metadata={"source": "chat"},
                 ))

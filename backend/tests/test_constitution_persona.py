@@ -249,3 +249,8 @@ def test_seed_constitution_has_persona_article(test_db):
     assert "agent_persona_and_conduct" in articles
     prefs = const.get_sovereign_preferences()
     assert "communication_style" in prefs
+
+
+def test_get_persona_channel_voice_contains_tts(test_db, head_agent):
+    prompt = head_agent.get_system_prompt(db=test_db, channel="voice")
+    assert "text-to-speech" in prompt
