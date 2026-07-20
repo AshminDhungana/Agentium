@@ -115,6 +115,13 @@ interface WebSocketState {
     /** Seconds the user has to respond to the awaiting-name request. */
     genesisNameTimeout: number;
     /**
+     * True once genesis has fully completed. ChatPage watches this to guarantee
+     * the persisted Head-of-Council welcome message is loaded from history,
+     * independent of the connection-phase transition (which can be skipped when
+     * the live chat socket was already opened during the naming step).
+     */
+    genesisJustCompleted: boolean;
+    /**
      * Timestamp (ms) of the last API key save. Bumped by `notifyApiKeyAdded()`
      * so dashboard widgets (e.g. Provider Analytics) can auto-refresh without a
      * manual button click when providers become available.
@@ -197,6 +204,8 @@ interface WebSocketState {
     // Internal actions
     _transition: (event: PhaseEvent) => void;
     _connectNow: () => void;
+    _forceReconnect: () => void;
+    ackGenesisChatLoaded: () => void;
     _genesisWatchdog: () => void;
     _setError: (error: string | null) => void;
     _updateStats: (stats: Partial<WebSocketState['connectionStats']>) => void;
@@ -262,6 +271,7 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
     genesisAwaitingName: false,
     genesisNamePrompt: '',
     genesisNameTimeout: 0,
+    genesisJustCompleted: false,
 
     _ws: null,
     _reconnectTimeout: null,
@@ -304,6 +314,34 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
         set({ connectionPhase: 'connecting', _isManualDisconnect: false, _connectionStable: false });
         get()._openSocket();
     },
+    /**
+     * Tear down any existing socket (including a stuck one that is OPEN but
+     * never reached 'active') and open a fresh handshake. Used when genesis
+     * completes so the connection is guaranteed to transition cleanly through
+     * 'connecting' → 'active' (and trigger the welcome-message history reload).
+     * The stale-socket guard in ws.onclose prevents the old socket's async
+     * close from disturbing the new connection's state.
+     */
+    _forceReconnect: () => {
+        const s = get();
+        if (s._ws) {
+            try {
+                s._ws.onopen = null;
+                s._ws.onclose = null;
+                s._ws.onerror = null;
+                s._ws.onmessage = null;
+                if (s._ws.readyState === WebSocket.OPEN || s._ws.readyState === WebSocket.CONNECTING) {
+                    s._ws.close(1000, 'Genesis complete — reconnect');
+                }
+            } catch {
+                // ignore close errors on an already-dead socket
+            }
+            set({ _ws: null });
+        }
+        set({ connectionPhase: 'connecting', _isManualDisconnect: false, _connectionStable: false });
+        get()._openSocket();
+    },
+    ackGenesisChatLoaded: () => set({ genesisJustCompleted: false }),
     _setError: (error) => set({ error }),
     _updateStats: (stats) => set(s => ({ connectionStats: { ...s.connectionStats, ...stats } })),
     _setLastMessage: (message) => set({ lastMessage: message }),
@@ -538,11 +576,14 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
                 set({ _genesisPollTimeout: null });
 
                 if (nextPhase === 'connecting') {
-                    set({ _genesisGraceCount: 0 });
+                    set({ _genesisGraceCount: 0, genesisJustCompleted: true });
                     logger.debug('[WebSocket] Genesis complete — reconnecting now (debounce-exempt)');
                     get()._setError(null);
-                    // P1: use _connectNow so a 1s debounce can't swallow the only reconnect.
-                    get()._connectNow();
+                    // Force a clean handshake so we reliably reach 'active' even if
+                    // a socket was opened during the naming step and is now stuck
+                    // mid-handshake. This also drives the welcome-message history
+                    // reload via the 'connecting' → 'active' transition.
+                    get()._forceReconnect();
                     // P7: watchdog — if we're still not active shortly, retry.
                     get()._genesisWatchdog();
                     return;
@@ -739,11 +780,14 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
 
                     // ── Toast deduplication for Head of Council messages ──
                     if (data.type === 'message' && data.role === 'head_of_council') {
-                        // Only count as unread / toast when the user is NOT on the
-                        // chat page — the chat page clears the counter on entry and
-                        // shows new messages inline, so counting them there would
-                        // re-show a badge for a conversation already being viewed.
-                        if (isHeadMessageUnreadEligible(window.location.pathname)) {
+                        // Genesis-sourced messages (the "Nation Established" welcome)
+                        // are automated system output, not genuine unread replies.
+                        // Never count them as unread or surface a toast for them —
+                        // they are delivered to the chat thread via history reload.
+                        const isGenesisMessage = Boolean(
+                            data.metadata && (data.metadata as Record<string, unknown>).source === 'genesis',
+                        );
+                        if (!isGenesisMessage && isHeadMessageUnreadEligible(window.location.pathname)) {
                             get()._incrementUnread();
                             const existingToastId = get()._activeToastId;
                             if (existingToastId) showToast.dismiss(existingToastId);
@@ -766,6 +810,11 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
             };
 
             ws.onclose = (event) => {
+                // Ignore close events from a socket we've already torn down /
+                // replaced (e.g. a forced reconnect). Without this guard a stale
+                // socket's asynchronous close can flip the phase back to 'offline'
+                // after a fresh handshake has already started.
+                if (get()._ws !== ws) return;
                 get()._clearAllTimers();
                 set({ _ws: null, _connectionStable: false });
 

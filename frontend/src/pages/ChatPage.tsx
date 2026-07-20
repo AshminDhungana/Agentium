@@ -225,6 +225,7 @@ export function ChatPage() {
         reconnect, connectionStats,
         unreadCount, markAsRead,
         messageHistory, lastMessage,
+        genesisJustCompleted,
     } = useWebSocketStore(
         useShallow((s) => ({
             connectionPhase: s.connectionPhase,
@@ -238,6 +239,7 @@ export function ChatPage() {
             markAsRead: s.markAsRead,
             messageHistory: s.messageHistory,
             lastMessage: s.lastMessage,
+            genesisJustCompleted: s.genesisJustCompleted,
         }))
     );
 
@@ -870,6 +872,18 @@ export function ChatPage() {
         loadChatHistory(controller.signal);
         return () => controller.abort();
     }, [connectionPhase, messages.length, loadChatHistory]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Guarantee the Head-of-Council welcome message is shown after genesis even
+    // when the live chat socket was already opened during the naming step (so
+    // the phase never transitions into 'active' and the reload above is skipped).
+    // The persisted welcome lives in chat history, so a reload surfaces it.
+    useEffect(() => {
+        if (!genesisJustCompleted || !isAuthenticated) return;
+        const controller = new AbortController();
+        loadChatHistory(controller.signal);
+        useWebSocketStore.getState().ackGenesisChatLoaded();
+        return () => controller.abort();
+    }, [genesisJustCompleted, isAuthenticated, loadChatHistory]);
 
     // Inbox: load when tab switches — cancelled if the tab changes again quickly
     useEffect(() => {

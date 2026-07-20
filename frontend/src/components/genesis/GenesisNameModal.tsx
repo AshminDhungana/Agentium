@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useWebSocketStore } from '@/store/websocketStore';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { MarkdownMessage } from '@/components/chat/MarkdownMessage';
+import { showToast } from '@/hooks/useToast';
 
 export function GenesisNameModal() {
     const open = useWebSocketStore((s) => s.genesisAwaitingName);
@@ -12,19 +13,35 @@ export function GenesisNameModal() {
 
     const [name, setName] = useState('');
     const [submitting, setSubmitting] = useState(false);
+    // Once the Sovereign submits, hide the modal immediately and don't let a
+    // late `awaiting_name` poll re-show it before genesis leaves the naming step.
+    const submittedRef = useRef(false);
 
-    if (!open) return null;
+    if (!open) {
+        submittedRef.current = false;
+        return null;
+    }
+    if (submittedRef.current) return null;
 
-    const handleSubmit = () => {
-        if (submitting) return;
-        setSubmitting(true);
+    const handleSubmit = async () => {
+        if (submitting || submittedRef.current) return;
         const trimmed = name.trim();
-        // Close the modal immediately and let genesis proceed in the background
-        // instead of blocking on the HTTP round-trip.
+        setSubmitting(true);
+        // Await the result so a rejected submission (genesis already moved past
+        // the prompt, e.g. the 60s timeout elapsed) is surfaced instead of
+        // silently dropping the name and falling back to the default.
+        const accepted = await submitCountryName(trimmed);
+        setSubmitting(false);
+        if (accepted) {
+            submittedRef.current = true; // hidden until genesis clears the flag
+            return;
+        }
+        if (trimmed) {
+            showToast.warning(
+                'Naming timed out — your nation was given the default name.',
+            );
+        }
         dismissGenesisNamePrompt();
-        // Fire-and-forget: failures are non-fatal (genesis uses the default name
-        // or has already moved past the prompt).
-        void submitCountryName(trimmed);
     };
 
     return (

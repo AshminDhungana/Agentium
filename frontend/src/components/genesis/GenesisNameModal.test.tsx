@@ -1,9 +1,9 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, waitForElementToBeRemoved } from '@testing-library/react';
 import { GenesisNameModal } from './GenesisNameModal';
 import { useWebSocketStore } from '@/store/websocketStore';
 
 describe('GenesisNameModal', () => {
-  it('submits the entered name', () => {
+  it('submits the entered name and hides the modal', async () => {
     const submit = vi.fn().mockResolvedValue(true);
     const dismiss = vi.fn();
     useWebSocketStore.setState({
@@ -19,11 +19,12 @@ describe('GenesisNameModal', () => {
     fireEvent.change(input, { target: { value: 'Veridia' } });
     fireEvent.click(screen.getByText('Establish Nation'));
     expect(submit).toHaveBeenCalledWith('Veridia');
-    // Modal is dismissed immediately so processing continues in the background.
-    expect(dismiss).toHaveBeenCalled();
+    // On success the store clears the awaiting flag and the modal hides
+    // (no late `awaiting_name` poll should re-show it).
+    await waitForElementToBeRemoved(() => screen.queryByText('Name your nation'));
   });
 
-  it('uses the default name when the input is empty', () => {
+  it('uses the default name when the input is empty', async () => {
     const submit = vi.fn().mockResolvedValue(true);
     const dismiss = vi.fn();
     useWebSocketStore.setState({
@@ -38,7 +39,27 @@ describe('GenesisNameModal', () => {
     expect(button.disabled).toBe(false);
     fireEvent.click(button);
     expect(submit).toHaveBeenCalledWith('');
-    expect(dismiss).toHaveBeenCalled();
+    await waitForElementToBeRemoved(() => screen.queryByText('Name your nation'));
+  });
+
+  it('surfaces a warning and dismisses when genesis no longer awaits the name', async () => {
+    const submit = vi.fn().mockResolvedValue(false);
+    const dismiss = vi.fn();
+    useWebSocketStore.setState({
+      genesisAwaitingName: true,
+      genesisNamePrompt: 'Name your nation',
+      genesisNameTimeout: 60,
+      submitCountryName: submit,
+      dismissGenesisNamePrompt: dismiss,
+    });
+    render(<GenesisNameModal />);
+    const input = screen.getByPlaceholderText('Enter nation name') as HTMLInputElement;
+    fireEvent.change(input, { target: { value: 'Veridia' } });
+    fireEvent.click(screen.getByText('Establish Nation'));
+    expect(submit).toHaveBeenCalledWith('Veridia');
+    // Rejected (e.g. the 60s prompt timed out) — the failure is surfaced and
+    // the modal is dismissed instead of silently losing the name.
+    await waitFor(() => expect(dismiss).toHaveBeenCalled());
   });
 
   it('renders the prompt as formatted Markdown, not raw source', () => {
