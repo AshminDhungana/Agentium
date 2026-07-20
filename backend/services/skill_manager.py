@@ -4,6 +4,7 @@ Handles creation, retrieval, updating, and governance of skills.
 """
 
 import logging
+import uuid
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session
@@ -145,6 +146,7 @@ class SkillManager:
 
             # Store metadata in PostgreSQL
             skill_db = SkillDB(
+                agentium_id=f"skl_{uuid.uuid4().hex[:12]}",
                 skill_id=skill_id,
                 skill_name=skill.skill_name,
                 display_name=skill.display_name,
@@ -392,6 +394,7 @@ class SkillManager:
                 db.commit()
             else:
                 db.add(SkillDB(
+                    agentium_id=f"skl_{uuid.uuid4().hex[:12]}",
                     skill_id=schema.skill_id,
                     skill_name=schema.skill_name,
                     display_name=schema.display_name,
@@ -495,6 +498,7 @@ class SkillManager:
         )
 
         skill_db = SkillDB(
+            agentium_id=f"skl_{uuid.uuid4().hex[:12]}",
             skill_id=skill_id,
             skill_name=new_skill.skill_name,
             display_name=new_skill.display_name,

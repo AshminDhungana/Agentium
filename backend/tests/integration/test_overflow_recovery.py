@@ -85,7 +85,7 @@ def test_overflow_review_skips_agents_with_active_tasks(db_session: Session, red
     # Give it an active task.
     task = Task(
         agentium_id="T-1",
-        task_type="general",
+        task_type="execution",
         description="active task",
         status=TaskStatus.IN_PROGRESS,
         is_active=True,

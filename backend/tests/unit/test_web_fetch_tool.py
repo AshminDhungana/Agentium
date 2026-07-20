@@ -20,7 +20,7 @@ def test_fetch_success_truncates(monkeypatch):
     # force no extraction lib so it falls back to raw strip
     monkeypatch.setattr(web_fetch_tool, "_extract", lambda html, url: html)
 
-    result = asyncio.get_event_loop().run_until_complete(
+    result = asyncio.run(
         web_fetch_tool.execute("fetch", url="https://example.com", max_tokens=100, use_cache=False)
     )
     assert result["status"] == "success"
@@ -31,7 +31,7 @@ def test_fetch_success_truncates(monkeypatch):
 
 def test_fetch_blocks_disallowed_domain(monkeypatch):
     monkeypatch.setattr(web_fetch_tool, "_client", None)
-    result = asyncio.get_event_loop().run_until_complete(
+    result = asyncio.run(
         web_fetch_tool.execute(
             "fetch", url="https://evil.com", allowed_domains=["good.com"]
         )
@@ -41,7 +41,7 @@ def test_fetch_blocks_disallowed_domain(monkeypatch):
 
 
 def test_help_action():
-    result = asyncio.get_event_loop().run_until_complete(web_fetch_tool.execute("help"))
+    result = asyncio.run(web_fetch_tool.execute("help"))
     assert result["status"] == "success"
     assert "SKILL.md" in result["description"]
 
@@ -53,7 +53,7 @@ class _FakeClient:
 
 def test_ssrf_guard_blocks_metadata_ip(monkeypatch):
     monkeypatch.setattr(web_fetch_tool, "_client", _FakeClient())
-    result = asyncio.get_event_loop().run_until_complete(
+    result = asyncio.run(
         web_fetch_tool.execute(
             "fetch",
             url="http://169.254.169.254/latest/meta-data/",
@@ -66,7 +66,7 @@ def test_ssrf_guard_blocks_metadata_ip(monkeypatch):
 
 def test_ssrf_guard_blocks_localhost(monkeypatch):
     monkeypatch.setattr(web_fetch_tool, "_client", _FakeClient())
-    result = asyncio.get_event_loop().run_until_complete(
+    result = asyncio.run(
         web_fetch_tool.execute(
             "fetch",
             url="http://localhost:5432/",
@@ -79,7 +79,7 @@ def test_ssrf_guard_blocks_localhost(monkeypatch):
 
 def test_ssrf_guard_blocks_ipv6_private(monkeypatch):
     monkeypatch.setattr(web_fetch_tool, "_client", _FakeClient())
-    result = asyncio.get_event_loop().run_until_complete(
+    result = asyncio.run(
         web_fetch_tool.execute(
             "fetch",
             url="http://[fd00::1]/",
