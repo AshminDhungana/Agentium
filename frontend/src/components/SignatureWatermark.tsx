@@ -16,7 +16,7 @@ export function SignatureWatermark({ className }: SignatureWatermarkProps) {
 
   if (reduceMotion) {
     return (
-      <div className={`${className ?? ''} opacity-30`}>
+      <div className={`${className ?? ''} opacity-30 transition-colors duration-700`}>
         <SignatureMark className="w-44 h-auto text-gray-900 dark:text-white" />
       </div>
     );
@@ -24,7 +24,7 @@ export function SignatureWatermark({ className }: SignatureWatermarkProps) {
 
   return (
     <motion.div
-      className={className}
+      className={`${className ?? ''} transition-colors duration-700`}
       initial={{ clipPath: 'inset(0 100% 0 0)', opacity: 0 }}
       animate={{ clipPath: 'inset(0 0% 0 0)', opacity: 0.3 }}
       transition={{ duration: 1.4, ease: [0.22, 1, 0.36, 1], delay: 0.3 }}
