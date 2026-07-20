@@ -68,3 +68,11 @@ document rank higher (decay + citation boost applied at query time).
 - `vector_db(action="add", collection="constitution", documents=["x"], ids=["y"])` returns `{"success": false, "error": "...not writable..."}`.
 - `make seed-skills` prints `Registered skill: vector_db (skill_vector_db)` with no exception.
 - After seeding, `SkillManager.search_skills("how do I use the vector DB tool", ...)` returns the `vector_db` skill.
+
+## Write schema (6.6)
+
+Every `add` is routed through `write_knowledge()`, which enforces a fixed
+metadata schema (see `docs/knowledge_write_schema.md`). You do NOT set
+`parent_id`, `created_at`, `updated_at`, `revision`, `revision_id`,
+`document_type`, `decay_score`, or `citation_boost` yourself — they are
+managed for you. Provide at least `type` and `source`.
