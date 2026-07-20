@@ -17,7 +17,7 @@ def test_add_routes_through_write_knowledge(monkeypatch):
     monkeypatch.setattr(ka, "write_knowledge", fake_write)
 
     tool = VectorDBTool()
-    res = tool._add("web_knowledge", ["some fact"], [{"type": "agent_learning"}], None)
+    res = asyncio.run(tool._add("web_knowledge", ["some fact"], [{"type": "agent_learning"}], None))
     assert res["success"] is True
     assert captured["collection_key"] == "web_knowledge"
     # schema field present

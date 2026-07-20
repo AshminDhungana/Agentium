@@ -12,7 +12,6 @@ this tool and is indexed into ChromaDB by `make seed-skills`; the `help`
 action and the tool description both point agents at that skill file.
 """
 
-import asyncio
 import uuid
 from typing import Any, Dict, List, Optional
 
@@ -72,7 +71,7 @@ class VectorDBTool:
         if action == "get":
             return self._get(doc_id, collection)
         if action == "add":
-            return self._add(collection, documents, metadatas, ids)
+            return await self._add(collection, documents, metadatas, ids)
         if action == "list_collections":
             return self._list_collections()
         if action == "help":
@@ -183,7 +182,7 @@ class VectorDBTool:
 
     # ── Write ─────────────────────────────────────────────────────────────────
 
-    def _add(self, collection, documents, metadatas, ids):
+    async def _add(self, collection, documents, metadatas, ids):
         if not collection:
             return {"success": False, "error": "collection is required for action 'add'"}
         if not documents:
@@ -208,9 +207,7 @@ class VectorDBTool:
             with get_db_context() as db:
                 for d_id, doc, meta in zip(ids, docs, metadatas):
                     # Route every agent write through the shared 6.6 schema.
-                    asyncio.run(
-                        self._write_knowledge(d_id, doc, meta or {}, db, collection)
-                    )
+                    await self._write_knowledge(d_id, doc, meta or {}, db, collection)
                     stored.append(d_id)
         except Exception:  # noqa: BLE001
             coll = self.store.get_collection(collection)
