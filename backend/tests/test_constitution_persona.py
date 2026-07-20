@@ -277,7 +277,7 @@ def test_no_hardcoded_persistent_ethos_persona():
 
 def test_acceptance_edit_constitution_updates_agent_and_voice(test_db):
     from backend.services.initialization_service import InitializationService
-    from backend.models.entities.agents import Agent, AgentType, Ethos
+    from backend.models.entities.agents import Agent, AgentType, Ethos, HeadOfCouncil
     from backend.models.entities.constitution import Constitution
     from backend.core.constitutional_guard import ConstitutionalGuard
     import json
@@ -302,7 +302,10 @@ def test_acceptance_edit_constitution_updates_agent_and_voice(test_db):
     # 2. Fresh agent + ethos.
     agent = test_db.query(Agent).filter_by(agentium_id="00001").first()
     if agent is None:
-        agent = Agent(agentium_id="00001", agent_type=AgentType.HEAD_OF_COUNCIL)
+        # Use the HeadOfCouncil subclass so the single-table polymorphic
+        # identity matches (a base Agent with agent_type=HEAD_OF_COUNCIL
+        # triggers an incompatible-polymorphic-identity flush warning).
+        agent = HeadOfCouncil(agentium_id="00001", name="Head of Council")
         test_db.add(agent)
         test_db.flush()
         ethos = Ethos(
