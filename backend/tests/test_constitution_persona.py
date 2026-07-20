@@ -254,3 +254,19 @@ def test_seed_constitution_has_persona_article(test_db):
 def test_get_persona_channel_voice_contains_tts(test_db, head_agent):
     prompt = head_agent.get_system_prompt(db=test_db, channel="voice")
     assert "text-to-speech" in prompt
+
+
+def test_no_hardcoded_persistent_ethos_persona():
+    from pathlib import Path
+    legacy_phrases = [
+        "Eternal Head of Council",
+        "ultimate decision-making authority in Agentium",
+    ]
+    targets = [
+        Path("backend/services/persistent_council.py"),
+        Path("backend/services/overflow_recovery.py"),
+    ]
+    for path in targets:
+        text = path.read_text(encoding="utf-8")
+        for phrase in legacy_phrases:
+            assert phrase not in text, f"'{phrase}' still present in {path}"

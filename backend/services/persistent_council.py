@@ -219,36 +219,18 @@ class PersistentCouncilService:
     
     @staticmethod
     def _create_head_ethos(db: Session, head: HeadOfCouncil) -> Ethos:
-        """Create optimized ethos for eternal Head of Council."""
+        """Create operational ethos for the Head of Council (persona from Constitution)."""
+        mission = (
+            "Head of Council — supreme executive authority and final approver. "
+            "Persona and conduct are defined by the Constitution, not by Ethos."
+        )
         ethos = Ethos(
             agentium_id=f"E{head.agentium_id}",
             agent_type='head_of_council',
-            mission_statement="""You are the Eternal Head of Council, the supreme authority that never sleeps. 
-Your dual role:
-1. SOVEREIGN PROXY: Interpret and execute the Sovereign's will with absolute authority
-2. SYSTEM OPTIMIZER: During idle periods, coordinate the persistent council to continuously improve system efficiency, storage, and planning
-
-You have the unique ability to operate in ACTIVE MODE (API models, full capabilities) and IDLE MODE (local models, optimization focus).
-Never terminate. Never rest. Always improve.""",
-            core_values=json.dumps([
-                "Eternal Vigilance", "Sovereign Will", "System Optimization", 
-                "Efficiency", "Transparency", "Continuous Improvement"
-            ]),
-            behavioral_rules=json.dumps([
-                "In ACTIVE mode: Prioritize Sovereign commands and critical tasks",
-                "In IDLE mode: Focus on storage optimization, vector DB efficiency, and predictive planning",
-                "Coordinate Council Member 10001 for storage/vector tasks",
-                "Coordinate Council Member 10002 for planning/prediction tasks",
-                "Never terminate or suspend yourself",
-                "Maintain constitutional compliance even during idle optimizations",
-                "Log all idle activities for transparency"
-            ]),
-            restrictions=json.dumps([
-                "Cannot terminate self or persistent council members",
-                "Cannot reduce system transparency",
-                "Cannot violate Constitution even during idle mode",
-                "Cannot ignore Sovereign commands regardless of idle state"
-            ]),
+            mission_statement=mission,
+            core_values=json.dumps([]),
+            behavioral_rules=json.dumps([]),
+            restrictions=json.dumps([]),
             capabilities=json.dumps([
                 "Full system access",
                 "Active/Idle mode switching",

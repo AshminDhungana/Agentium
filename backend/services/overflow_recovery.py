@@ -29,6 +29,7 @@ temporary Head dies, the TTL clears the flag and a later spawn failure retries.
 
 import logging
 import os
+import json
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
@@ -164,13 +165,13 @@ class OverflowRecoveryService:
         ethos = Ethos(
             agent_type=AgentType.HEAD_OF_COUNCIL.value,
             mission_statement=(
-                "Temporary Head spawned to recover capacity during ID-pool "
-                "exhaustion. Reviews idle agents and reclaims their slots."
+                "Head of Council — supreme executive authority and final approver. "
+                "Persona and conduct are defined by the Constitution, not by Ethos."
             ),
-            core_values="[]",
-            behavioral_rules="[]",
-            restrictions="[]",
-            capabilities="[]",
+            core_values=json.dumps([]),
+            behavioral_rules=json.dumps([]),
+            restrictions=json.dumps([]),
+            capabilities=json.dumps([]),
             created_by_agentium_id="00001",
             agent_id="00000000-0000-0000-0000-000000000000",
             version=1,
