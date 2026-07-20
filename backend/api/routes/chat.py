@@ -69,6 +69,18 @@ def _enrich_with_persona(message: str, persona: Optional[str]) -> str:
     return f"[Persona: {persona.strip()}]\n\n{message}"
 
 
+def _build_turn_system_prompt(head, db, channel: str) -> str:
+    """Resolve the Head of Council's system prompt for a chat turn.
+
+    The prompt is ALWAYS derived server-side from the live Constitution via
+    ``head.get_system_prompt``. The voice bridge's ``voice_persona`` payload is
+    used ONLY to select the voice channel/adaptation (handled by the caller) and
+    is NEVER trusted as the system prompt — this prevents a compromised or
+    buggy bridge from injecting arbitrary behaviour into the Head.
+    """
+    return head.get_system_prompt(db=db, channel=channel)
+
+
 def _build_enriched_message(
     message: str,
     attachments: Optional[List[dict]],
@@ -521,11 +533,12 @@ async def _stream_response(
             return
 
         channel = "voice" if chat_msg.voice_persona else "text"
-        system_prompt = head.get_system_prompt(db=db, channel=channel)
-        # If the voice bridge supplied the constitution-driven persona, prefer it
-        # for cross-channel consistency (spec §6.6).
-        if chat_msg.voice_persona:
-            system_prompt = chat_msg.voice_persona
+        # Resolve the system prompt server-side from the live Constitution.
+        # We deliberately do NOT use ``chat_msg.voice_persona`` as the prompt:
+        # it is bridge-supplied and must never be trusted as the Head's system
+        # prompt (see _build_turn_system_prompt). Voice adaptation is applied
+        # via the channel flag above.
+        system_prompt = _build_turn_system_prompt(head, db, channel)
         context = await ChatService.get_system_context(db)
         full_prompt = f"{system_prompt}\n\nCurrent System State:\n{context}"
 

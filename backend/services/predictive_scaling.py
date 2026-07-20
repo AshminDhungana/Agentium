@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 import pytz
 import redis
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 
 from backend.models.entities.task import Task, TaskStatus, TaskPriority
 from backend.models.entities.agents import Agent, AgentStatus, HeadOfCouncil
@@ -215,22 +216,44 @@ class PredictiveScalingService:
         # ── Pre-Liquidation ───────────────────────────────────────────────────
         elif next_6h < current_capacity * 0.3 and current_capacity > 2:
             logger.info(f"PredictiveScaling: next_6h ({next_6h}) < 30% capacity ({current_capacity}). Liquidating idle agents.")
-            # find idle agents > 30 min
+            # Find idle, non-persistent agents that are NOT the Head of Council.
+            # Route each through ReincarnationService.liquidate_agent so they get
+            # proper task reassignment, capability revocation, and audit logging —
+            # and so the Head (00001) is explicitly protected (liquidate_agent
+            # refuses to terminate 00001). We deliberately never terminate an
+            # agent by raw column mutation here: that bypasses every guard.
             idle_cutoff = datetime.utcnow() - timedelta(minutes=30)
             idle_agents = db.query(Agent).filter(
-                Agent.status == AgentStatus.IDLE,
-                Agent.last_active < idle_cutoff,
-                Agent.is_persistent == False
+                Agent.status.in_([
+                    AgentStatus.ACTIVE,
+                    AgentStatus.IDLE_WORKING,
+                    AgentStatus.IDLE_PAUSED,
+                ]),
+                Agent.is_persistent == False,
+                Agent.agentium_id != "00001",
+                or_(
+                    Agent.last_idle_action_at.is_(None),
+                    Agent.last_idle_action_at < idle_cutoff,
+                ),
             ).limit(2).all()
-            
+
             liquidated = 0
             for ag in idle_agents:
-                ag.is_active = False
-                ag.status = AgentStatus.TERMINATED
-                liquidated += 1
-                
+                try:
+                    ReincarnationService.liquidate_agent(
+                        agent_id=ag.agentium_id,
+                        liquidated_by=head,
+                        reason="Predictive auto-scaler: idle agent reclaimed during low-load window",
+                        db=db,
+                    )
+                    liquidated += 1
+                except Exception as exc:
+                    logger.warning(
+                        f"PredictiveScaling: liquidation of {ag.agentium_id} failed: {exc}"
+                    )
+
             db.commit()
-            
+
             if liquidated > 0:
                 entry = AuditLog.log(
                     level=AuditLevel.INFO,

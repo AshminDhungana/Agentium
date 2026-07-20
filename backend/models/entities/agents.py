@@ -1103,8 +1103,37 @@ class Agent(BaseEntity):
         current_constitution = db.query(Constitution).filter_by(
             is_active=True
         ).order_by(Constitution.effective_date.desc()).first()
-        
+
         if not current_constitution:
+            # F4 safety net: the agent cannot re-sync its structural self-model
+            # against the live Constitution. Fail LOUDLY (not silently) so the
+            # drift is observable in logs + audit, rather than drifting unnoticed.
+            logger.error(
+                "CRITICAL: no active Constitution found while agent %s attempted "
+                "constitutional recalibration — structural self-model cannot be "
+                "re-synced against the live Constitution.",
+                self.agentium_id,
+            )
+            try:
+                from backend.models.entities.audit import (
+                    AuditLog, AuditLevel, AuditCategory,
+                )
+                db.add(AuditLog(
+                    level=AuditLevel.ERROR,
+                    category=AuditCategory.GOVERNANCE,
+                    actor_type="agent",
+                    actor_id=self.agentium_id,
+                    action="constitution_recalibration_failed",
+                    target_type="constitution",
+                    description=(
+                        f"Agent {self.agentium_id} could not re-sync against the "
+                        "live Constitution: no active Constitution found."
+                    ),
+                    created_at=datetime.utcnow(),
+                ))
+                db.flush()
+            except Exception:
+                pass
             return False
         
         # Update tracking

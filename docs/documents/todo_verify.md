@@ -1,34 +1,5 @@
 # Agentium — Verification & Improvement Backlog
 
-- [ ] add signature to the login page in right bottom coner, should be white for dark mode and dark for dar mode, current svg has darksignature, should look good and match the display. The file location at , frontend\public\sign.svg
-
-### 6.8 — [P2] Verify system-message usage across both LLM APIs
-**Problem:** Agentium talks to both OpenAI-style and Anthropic-style APIs, which handle system prompts differently. Unclear whether system messages are actually being sent/used correctly in both cases.
-**Task:** Review the request-building code for both provider paths. Confirm a system message is sent in each; if not, determine what belongs in it (ethos, constitution excerpt, role) to measurably improve output quality/reliability, and implement.
-**Acceptance criteria:** Both provider paths send an explicit system message; a before/after comparison (even qualitative) is documented.
-
----
-
-## 7. Autoscaling & Head-of-Council Capacity
-
-### 7.1 — [P2] Head-of-Council overflow handling when agent slots are full
-**Problem:** Only one Head (`00001`) is active at a time. If all 99,999 agent ID slots are full with none free to spawn, there's no defined recovery path.
-**Task:** When no slots remain, have Head spawn a *temporary* secondary Head instance into one of the remaining slots, whose sole job is to review idle agents and report which can be safely liquidated. Pause new task assignment while this review runs. Once complete, the temporary instance terminates itself.
-**Acceptance criteria:** Simulated full-capacity scenario triggers the temporary-Head review flow; idle agents are correctly identified; new-task assignment resumes automatically once slots are freed; temporary instance confirmed terminated afterward.
-
----
-
-## 8. Agent Behavior, Delegation & Persona
-
-### 8.1 — [P1] Head should delegate, not execute — and stay responsive while busy
-**Problem:** Two related issues reported to cause chat slowness: (a) when a user gives Head a task, Head sometimes executes it directly instead of delegating to Lead/Task agents, which blocks it from chatting/reporting; (b) Head can't answer a new question while still processing a previous one.
-**Task:** Enforce that Head's role is control + delegation only — it should hand tasks to the appropriate Lead/Task agents and remain free to converse and report status. Ensure Head's request handling is non-blocking so a new incoming message gets an immediate acknowledgment/response even while a prior task is in flight.
-**Acceptance criteria:** Sending Head a task never blocks the chat channel; Head's own tool/execution activity does not appear inline in normal chat latency; a concurrency test confirms Head answers message #2 while task #1 is still running.
-
-### 8.2 — [P2] Constitution-driven persona for all agents (including voice)
-**Task:** Ensure persona/behavior for every agent — including the voice bridge — is driven entirely by the Constitution, so editing the Constitution updates behavior consistently everywhere. Audit Ethos and system-instruction construction to confirm this is actually true today (not just documented).
-**Acceptance criteria:** Editing a constitutional behavior clause and reseeding is reflected in a fresh agent's response *and* the voice bridge's persona without any other code change.
-
 ### 8.3 — [P2] Enable deep thinking where supported (ties to 5.6)
 **Task:** For models with extended/deep-thinking support, confirm agents actually invoke that mode when configured to.
 **Acceptance criteria:** A thinking-capable model shows thinking traces/latency consistent with the mode being active when enabled via 5.6's setting.

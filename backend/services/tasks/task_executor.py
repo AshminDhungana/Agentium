@@ -316,6 +316,49 @@ def execute_task_async(self, task_id: str, agent_id: str):
                 logger.error(f"Anti-pattern evaluation failed: {eval_exc}")
 
             countdown = min(2 ** self.request.retries, 60)
+
+            # Terminal-state guarantee (contract item 1): once we have exhausted
+            # every retry, the task MUST reach a terminal state. Without this the
+            # generic-exception path raised self.retry() forever until Celery
+            # gave up and left the Task stranded in IN_PROGRESS (a silent stall
+            # that only the escalation-timeout watchdog could eventually catch,
+            # and only if started_at had been set). Mark it FAILED + audit, and
+            # return (do NOT re-raise) so the worker moves on cleanly.
+            if self.request.retries >= self.max_retries:
+                try:
+                    if task is not None:
+                        task.mark_failed(
+                            reason="execution_failed",
+                            error_message=str(exc),
+                        )
+                except Exception as mark_exc:
+                    logger.error(f"mark_failed failed for {task_id}: {mark_exc}")
+
+                try:
+                    entry = AuditLog.log(
+                        level=AuditLevel.CRITICAL,
+                        category=AuditCategory.SYSTEM,
+                        actor_type="system",
+                        actor_id="SYSTEM",
+                        action="task_failed_execution",
+                        description=f"Task {task_id} failed after {self.max_retries} retries: {exc}",
+                        after_state={"reason": "execution_failed"},
+                    )
+                    db.add(entry)
+                except Exception as audit_exc:
+                    logger.error(
+                        f"AuditLog for failed task {task_id} failed: "
+                        f"{type(audit_exc).__name__}: {audit_exc}",
+                        exc_info=True,
+                    )
+                db.commit()
+
+                return {
+                    "status": "failed",
+                    "task_id": task_id,
+                    "reason": "execution_failed",
+                }
+
             logger.info(f"Retrying task {task_id} in {countdown}s (attempt {self.request.retries + 1})")
             raise self.retry(exc=exc, countdown=countdown)
 

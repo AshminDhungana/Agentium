@@ -187,6 +187,75 @@ class SelfHealingService:
                         interrupted_task_id, cp_err,
                     )
 
+            # ── HEAD OF COUNCIL: revive IN PLACE, never mint a new ID ──────────
+            # The rest of the system hardcodes "00001" as the canonical Head
+            # (chat, websocket genesis gate, host access, capability grants,
+            # model assignment, orchestrator parents, …). Minting a fresh ID
+            # (e.g. 00002) orphans every one of those lookups and breaks the
+            # runtime — this is exactly the failure that
+            # scripts/repair_head_incarnation.py was written to repair after the
+            # fact. So a crashed Head is brought back under its SAME identity:
+            # status flipped to ACTIVE, incarnation counter incremented, and any
+            # interrupted task re-queued to itself. The Reincarnation Service
+            # already does this in-place revival for the Head; the crash-
+            # recovery path must do the same.
+            is_head = (
+                agent.agentium_id == "00001"
+                or agent.agent_type == AgentType.HEAD_OF_COUNCIL
+                or (agent.agentium_id and agent.agentium_id.startswith("0"))
+            )
+
+            if is_head:
+                if interrupted_task_id:
+                    task = db.query(Task).filter_by(
+                        id=interrupted_task_id, is_active=True
+                    ).first()
+                    if task and task.status not in (
+                        TaskStatus.COMPLETED, TaskStatus.CANCELLED,
+                    ):
+                        task.status = TaskStatus.ASSIGNED
+                        task.assigned_task_agent_ids = [agent.agentium_id]
+                        agent.current_task_id = interrupted_task_id
+                        result["task_requeued"] = interrupted_task_id
+                        logger.info(
+                            "Re-queued Head task %s → Head %s",
+                            interrupted_task_id, agent.agentium_id,
+                        )
+
+                # Revive the Head in place — same ID, never deactivated.
+                agent.status = AgentStatus.ACTIVE
+                agent.is_active = True
+                agent.terminated_at = None
+                agent.termination_reason = None
+                agent.incarnation_number = (agent.incarnation_number or 1) + 1
+
+                audit = AuditLog.log(
+                    level=AuditLevel.WARNING,
+                    category=AuditCategory.SYSTEM,
+                    actor_type="system",
+                    actor_id="SELF_HEALING",
+                    action="head_crash_recovered_in_place",
+                    target_type="agent",
+                    target_id=agent.agentium_id,
+                    description=(
+                        f"Head of Council {agent.agentium_id} crashed but was "
+                        f"revived in place (same identity) — incarnation "
+                        f"#{agent.incarnation_number}. No new Head ID minted."
+                    ),
+                    after_state={
+                        "revived_in_place": True,
+                        "incarnation": agent.incarnation_number,
+                        "task_requeued": result["task_requeued"],
+                        "checkpoint_restored": checkpoint_restored,
+                    },
+                )
+                db.add(audit)
+                db.commit()
+
+                result["successor_id"] = agent.agentium_id
+                result["recovered"] = True
+                return result
+
             # Step 2: Spawn replacement agent via ReincarnationService
             try:
                 from backend.services.reincarnation_service import ReincarnationService

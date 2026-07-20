@@ -15,8 +15,13 @@ VOICE_ADAPTATION = (
     "no markdown, no bullet lists, short sentences, conversational tone."
 )
 
-# Tier -> human label (improvement #5: tier-aware emphasis).
-TIER_LABELS = {
+# Default tier -> human label. These are the FALLBACK values used only when
+# the active Constitution does not supply its own `role_labels`. Role labels
+# are intentionally Constitution-driven (see get_role_labels) so that a
+# constitutional rename (e.g. "Head of Council" -> "CEO") propagates to every
+# prompt and alert automatically, while the underlying powers (keyed by tier
+# number, not by this string) remain untouched.
+DEFAULT_ROLE_LABELS = {
     0: "Head of Council",
     1: "Council Member",
     2: "Lead Agent",
@@ -25,6 +30,41 @@ TIER_LABELS = {
     5: "Output Critic",
     6: "Plan Critic",
 }
+
+
+def get_role_labels(constitution: Optional[Dict[str, Any]] = None) -> Dict[int, str]:
+    """Resolve tier -> human label.
+
+    Preference order:
+      1. ``role_labels`` carried in the supplied Constitution dict (so a
+         constitutional rename propagates everywhere persona/alerts render a
+         label).
+      2. A live read of the active Constitution (when no dict is passed).
+      3. ``DEFAULT_ROLE_LABELS`` (hardcoded safety net).
+
+    The returned mapping is keyed by integer tier. This function never raises:
+    any malformed override is ignored in favour of the defaults.
+    """
+    labels: Dict[int, str] = dict(DEFAULT_ROLE_LABELS)
+    source = constitution
+    if source is None:
+        try:
+            from backend.models.database import SessionLocal
+            db = SessionLocal()
+            try:
+                source = get_active_constitution_dict(db)
+            finally:
+                db.close()
+        except Exception:
+            source = None
+    if source:
+        override = source.get("role_labels") or {}
+        for key, value in override.items():
+            try:
+                labels[int(key)] = str(value)
+            except (ValueError, TypeError):
+                continue
+    return labels
 
 
 def get_active_constitution_dict(db) -> Optional[Dict[str, Any]]:
@@ -104,7 +144,8 @@ def build_persona_directive(
         )
 
     if tier is not None:
-        label = TIER_LABELS.get(tier, "Agent")
+        labels = get_role_labels(constitution)
+        label = labels.get(tier, "Agent")
         parts.append(f"# Your Role\nYou serve as the {label} in the Agentium hierarchy.")
         emphasised = []
         for key, data in articles.items():
