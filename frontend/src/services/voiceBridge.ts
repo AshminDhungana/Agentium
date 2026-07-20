@@ -7,7 +7,6 @@
  *
  */
 
-import { showToast } from '@/hooks/useToast';
 import { api } from './api';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -48,7 +47,6 @@ class VoiceBridgeService {
   private ws:           WebSocket | null = null;
   private retryCount    = 0;
   private retryTimer:   ReturnType<typeof setTimeout> | null = null;
-  private disconnectedToastShown = false;
   private handlers      = new Set<InteractionHandler>();
   private statusListeners = new Set<(s: BridgeStatus) => void>();
   private stateListeners = new Set<StateHandler>();
@@ -93,7 +91,6 @@ class VoiceBridgeService {
 
       // Any other error (401, 503, parse failure) — surface to the user.
       console.warn('[voiceBridge] Could not fetch voice token:', err);
-      showToast.error('Voice bridge: failed to get token — running in text mode');
       this._setStatus('error');
       return;
     }
@@ -162,7 +159,6 @@ class VoiceBridgeService {
     this.ws.onopen = () => {
       console.info('[voiceBridge] Connected to bridge at', WS_URL);
       this.retryCount = 0;
-      this.disconnectedToastShown = false;
       this._setStatus('connected');
       // Deliver a long-lived host token to the bridge so it can authenticate
       // to the backend even after this browser session is closed.
@@ -228,13 +224,8 @@ class VoiceBridgeService {
         this.retryTimer = setTimeout(() => this._openSocket(token), delay);
       } else {
         console.warn('[voiceBridge] Max reconnect attempts reached — going offline');
-        // Show the disconnect notification at most once per connection
-        // episode. A genuine later reconnect (onopen) re-arms the guard, so
-        // a real drop after a successful session will still notify once.
-        if (!this.disconnectedToastShown) {
-          this.disconnectedToastShown = true;
-          showToast.error('Voice bridge disconnected — text chat unaffected');
-        }
+        // The bottom-left install notification (VoiceIndicator) already
+        // surfaces the offline state, so no duplicate top-right toast here.
         this._setStatus('offline');
       }
     };

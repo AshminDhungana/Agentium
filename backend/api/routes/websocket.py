@@ -639,60 +639,89 @@ async def websocket_chat_endpoint(
                         "timestamp":  datetime.utcnow().isoformat(),
                     })
 
-                    async def on_delta(text: str) -> None:
-                        await websocket.send_json({
-                            "type":      "message_delta",
-                            "stream_id": stream_id,
-                            "delta":     text,
-                        })
+                    # Run the (potentially long) generation in a background task
+                    # instead of awaiting it inside the receive loop. Awaiting
+                    # here would block the server from answering heartbeat pings
+                    # while the model streams a reply, causing the client's
+                    # pong-timeout to wrongly drop a healthy — but busy —
+                    # connection ("Head of Council goes offline mid-chat").
+                    # Defaults capture this iteration's values to avoid the
+                    # Python late-binding closure pitfall across loop iterations.
+                    head_id = head.id
 
-                    try:
-                        stream_task = asyncio.create_task(
-                            ChatService.process_message(
-                                head, enriched_message, db,
-                                extra_metadata=extra_metadata,
-                                on_delta=on_delta,
-                                cancel_event=cancel_event,
-                            )
-                        )
-                        response = await stream_task
+                    async def on_delta(text: str, sid: str = stream_id) -> None:
+                        try:
+                            await websocket.send_json({
+                                "type":      "message_delta",
+                                "stream_id": sid,
+                                "delta":     text,
+                            })
+                        except Exception:
+                            pass  # socket may be closing; the task handles it
 
-                        finish = response.get("finish_reason", "stop") or "stop"
-                        await websocket.send_json({
-                            "type":         "message_end",
-                            "stream_id":    stream_id,
-                            "content":      response.get("content", ""),
-                            "metadata": {
-                                "model":        response.get("model"),
-                                "tokens_used":  response.get("tokens_used", 0),
-                                "task_created": response.get("task_created", False),
-                                "task_id":      response.get("task_id"),
-                                "agent_spawned": response.get("agent_spawned"),
-                                "context_compressed": response.get("context_compressed", False),
-                                "raw_turn_count": response.get("raw_turn_count", 0),
-                                "estimated_tokens": response.get("estimated_tokens", 0),
-                                "card": (response.get("metadata") or {}).get("card")
-                                if isinstance(response.get("metadata"), dict) else None,
-                                "media_urls": (response.get("metadata") or {}).get("media_urls", [])
-                                if isinstance(response.get("metadata"), dict) else [],
-                            },
-                            "finish_reason": finish,
-                            "timestamp":    datetime.utcnow().isoformat(),
-                        })
-                    except asyncio.CancelledError:
-                        raise
-                    except Exception as exc:
-                        logger.error(f"[WebSocket] process_message failed: {exc}")
-                        await websocket.send_json({
-                            "type":         "message_end",
-                            "stream_id":    stream_id,
-                            "content":      "",
-                            "metadata":     {},
-                            "finish_reason": "error",
-                            "timestamp":    datetime.utcnow().isoformat(),
-                        })
-                    finally:
-                        active_streams.pop(stream_id, None)
+                    async def _run_generation(
+                        sid: str = stream_id,
+                        msg: str = enriched_message,
+                        meta: Optional[dict] = extra_metadata,
+                        hid: Any = head_id,
+                        cevent: asyncio.Event = cancel_event,
+                    ) -> None:
+                        try:
+                            with get_fresh_db() as gen_db:
+                                gen_head = gen_db.query(HeadOfCouncil).filter_by(id=hid).first()
+                                if not gen_head:
+                                    await websocket.send_json({
+                                        "type":      "error",
+                                        "content":   "Head of Council is unavailable. Check system status.",
+                                        "timestamp": datetime.utcnow().isoformat(),
+                                    })
+                                    return
+
+                                response = await ChatService.process_message(
+                                    gen_head, msg, gen_db,
+                                    extra_metadata=meta,
+                                    on_delta=on_delta,
+                                    cancel_event=cevent,
+                                )
+
+                                finish = response.get("finish_reason", "stop") or "stop"
+                                await websocket.send_json({
+                                    "type":         "message_end",
+                                    "stream_id":    sid,
+                                    "content":      response.get("content", ""),
+                                    "metadata": {
+                                        "model":        response.get("model"),
+                                        "tokens_used":  response.get("tokens_used", 0),
+                                        "task_created": response.get("task_created", False),
+                                        "task_id":      response.get("task_id"),
+                                        "agent_spawned": response.get("agent_spawned"),
+                                        "context_compressed": response.get("context_compressed", False),
+                                        "raw_turn_count": response.get("raw_turn_count", 0),
+                                        "estimated_tokens": response.get("estimated_tokens", 0),
+                                        "card": (response.get("metadata") or {}).get("card")
+                                        if isinstance(response.get("metadata"), dict) else None,
+                                        "media_urls": (response.get("metadata") or {}).get("media_urls", [])
+                                        if isinstance(response.get("metadata"), dict) else [],
+                                    },
+                                    "finish_reason": finish,
+                                    "timestamp":    datetime.utcnow().isoformat(),
+                                })
+                        except asyncio.CancelledError:
+                            raise
+                        except Exception as exc:
+                            logger.error(f"[WebSocket] process_message failed: {exc}")
+                            await websocket.send_json({
+                                "type":         "message_end",
+                                "stream_id":    sid,
+                                "content":      "",
+                                "metadata":     {},
+                                "finish_reason": "error",
+                                "timestamp":    datetime.utcnow().isoformat(),
+                            })
+                        finally:
+                            active_streams.pop(sid, None)
+
+                    asyncio.create_task(_run_generation())
                 continue
 
             # ── Unknown message type ──────────────────────────────────────────

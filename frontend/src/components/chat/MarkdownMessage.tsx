@@ -69,7 +69,21 @@ export function MarkdownMessage({
       </span>
     ) : null;
 
-  // Attach a copy button to every <pre> block. No-op when rendering plain text.
+  // Find the element the streaming caret should be appended to so it sits
+  // right after the final word instead of wrapping onto its own line.
+  // Walks to the deepest last descendant; if that leaf is an inline element
+  // (e.g. <strong>), the caret is appended to its parent so it stays inline.
+  const lastCaretHost = (root: HTMLElement): HTMLElement => {
+    let el: Element | null = root.lastElementChild;
+    while (el && el.lastElementChild) el = el.lastElementChild;
+    if (!el) return root;
+    const display = getComputedStyle(el as HTMLElement).display;
+    if (display.startsWith('inline')) return el.parentElement ?? root;
+    return el as HTMLElement;
+  };
+
+  // Attach a copy button to every <pre> block, and (while streaming) append the
+  // caret inline to the last block. No-op when rendering plain text.
   useEffect(() => {
     if (isPlain) return;
     const root = ref.current;
@@ -97,8 +111,22 @@ export function MarkdownMessage({
       cleanups.push(() => btn.remove());
     });
 
+    // Append the streaming caret inline so it follows the last word instead of
+    // wrapping onto its own line (a block-level sibling always forces a break).
+    if (showCaret) {
+      const host = lastCaretHost(root);
+      const caret = document.createElement('span');
+      caret.setAttribute('data-testid', 'stream-caret');
+      caret.setAttribute('aria-hidden', 'true');
+      caret.className =
+        styles['stream-caret'] + (caretFading ? ` ${styles['stream-caret--fading']}` : '');
+      caret.textContent = '_';
+      host.appendChild(caret);
+      cleanups.push(() => caret.remove());
+    }
+
     return () => cleanups.forEach((fn) => fn());
-  }, [html, isPlain]);
+  }, [html, isPlain, showCaret, caretFading]);
 
   if (isPlain) {
     return (
@@ -112,7 +140,6 @@ export function MarkdownMessage({
   return (
     <div className={`markdown-body text-[15px] leading-relaxed ${className}`}>
       <div ref={ref} dangerouslySetInnerHTML={{ __html: html }} />
-      {renderCaret()}
     </div>
   );
 }

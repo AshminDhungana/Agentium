@@ -23,6 +23,14 @@ export function isHeadMessageUnreadEligible(pathname: string): boolean {
     return pathname !== '/chat';
 }
 
+/**
+ * Timestamp (ms) of the last data frame received on the live socket. Kept
+ * outside the store so streaming deltas don't trigger a store update on every
+ * token. Used by the heartbeat pong-timeout to tell a *busy* connection (still
+ * streaming a reply) apart from a *dead* one.
+ */
+let lastDataReceivedTs = 0;
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 /**
@@ -464,6 +472,16 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
             // entirely, producing an immediate reconnect on every pong failure
             // and causing the rapid 499 loop visible in nginx logs.
             const pongTimeout = setTimeout(() => {
+                // BUG FIX: a connection that is still streaming a reply cannot
+                // answer heartbeat pings — the server's receive loop is blocked
+                // while generating. If we've received any frame within the pong
+                // window, the socket is alive; don't tear down a healthy
+                // connection just because the model is taking its time.
+                const sinceData = Date.now() - lastDataReceivedTs;
+                if (sinceData < WS_CONFIG.PONG_TIMEOUT_MS) {
+                    logger.debug('[WebSocket] Pong timeout but data recently received — connection alive, skipping reconnect');
+                    return;
+                }
                 logger.warn('[WebSocket] Pong timeout — scheduling reconnect with backoff');
                 get()._setError('Connection lost (pong timeout)');
                 get()._stopHeartbeat();
@@ -696,6 +714,10 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
             ws.onmessage = (event) => {
                 try {
                     const data: WebSocketMessage = JSON.parse(event.data);
+                    // Any frame from the server proves the socket is alive —
+                    // record it so the pong-timeout can distinguish a busy
+                    // (streaming) connection from a truly dead one.
+                    lastDataReceivedTs = Date.now();
 
                     if (data.type === 'pong') {
                         get()._handlePong(String(data.timestamp ?? ''));
