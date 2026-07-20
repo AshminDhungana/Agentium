@@ -365,6 +365,29 @@ Address the Sovereign respectfully. If they issue a command that requires execut
             registry_tools = []
         gen_tools = list(registry_tools)
 
+        # ── Governance & Delegation Protocol (Issue 8.1) ───────────────────────
+        # Prompt-only guardrail: the Head is control + delegation ONLY. It must
+        # never call execution tools (execute_command, read_file, write_file,
+        # browser, git) inline during a chat turn — that work is performed by
+        # Lead/Task agents off the critical path. Governance/control tools
+        # (create_task, cast_vote, propose_amendment, spawn_agent, decide) remain
+        # allowed. This keeps the chat turn non-blocking and responsive.
+        full_prompt += (
+            "\n\nGOVERNANCE & DELEGATION PROTOCOL — you are the Head of Council. "
+            "Your role is control and delegation only; you are NOT an execution worker.\n"
+            "1. Always classify your action with the `decide` tool in the same turn "
+            "as your reply (reply / create_task / delegate / dispatch_task / spawn_agent).\n"
+            "2. For ANY work that requires execution — running shell commands, "
+            "reading or writing files, browsing the web, or git operations — emit a "
+            "create_task / dispatch_task / delegate / spawn_agent decision. That work "
+            "is performed by Lead/Task agents in the background, OFF your critical path. "
+            "Never perform it yourself.\n"
+            "3. You MUST NOT call execution tools (execute_command, read_file, "
+            "write_file, browser, git) directly during this chat turn.\n"
+            "4. Governance tools (create_task, cast_vote, propose_amendment, "
+            "spawn_agent) are allowed and encouraged."
+        )
+
         # Instruct the model to always emit the routing decision alongside its reply.
         full_prompt += (
             "\n\nAlways call the `decide` tool to classify your action "

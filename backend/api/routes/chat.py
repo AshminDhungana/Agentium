@@ -524,6 +524,21 @@ async def _stream_response(
             "Address them respectfully and provide clear, actionable responses."
         )
 
+        # ── Governance & Delegation Protocol (Issue 8.1) ─────────────────────
+        # Prompt-only guardrail: the Head delegates execution to Lead/Task agents
+        # and must never call execution tools inline during a chat turn.
+        full_prompt += (
+            "\n\nGOVERNANCE & DELEGATION PROTOCOL — you are the Head of Council. "
+            "Your role is control and delegation only; you are NOT an execution worker. "
+            "For ANY work that requires execution (shell commands, file read/write, "
+            "browsing, git) emit a create_task / dispatch_task / delegate / spawn_agent "
+            "decision so Lead/Task agents perform it in the background. "
+            "You MUST NOT call execution tools (execute_command, read_file, write_file, "
+            "browser, git) directly during this chat turn. "
+            "Governance tools (create_task, cast_vote, propose_amendment, spawn_agent) "
+            "are allowed."
+        )
+
         from backend.services.prompt_template_manager import prompt_template_manager
         full_prompt += prompt_template_manager.DEEP_THINK_HINT
 
