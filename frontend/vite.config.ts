@@ -60,6 +60,7 @@ export default defineConfig({
           'src/services/**/*.test.{ts,tsx}',
           'src/utils/**/*.test.{ts,tsx}',
           'src/**/*.a11y.test.{ts,tsx}',
+          'src/components/**/*.test.{ts,tsx}',
         ],
       },
     }, {
