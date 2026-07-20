@@ -112,3 +112,21 @@ def test_gemini_new_generation_35():
     kw = _resolve_thinking_kwargs(_Cfg("GEMINI", "gemini-3.5-pro", "low"))
     assert kw["extra_body"]["thinkingConfig"]["thinkingBudget"] == 1024
     assert kw["extra_body"]["thinkingConfig"]["includeThoughts"] is True
+
+
+from services.model_provider import _enforce_anthropic_budget_max_tokens
+
+def test_enforce_max_tokens_bumps_when_below_budget():
+    ck = {"thinking": {"type": "enabled", "budget_tokens": 32000}, "max_tokens": 4000}
+    _enforce_anthropic_budget_max_tokens(ck)
+    assert ck["max_tokens"] == 34048  # 32000 + 2048
+
+def test_enforce_max_tokens_keeps_larger_value():
+    ck = {"thinking": {"type": "enabled", "budget_tokens": 2000}, "max_tokens": 8000}
+    _enforce_anthropic_budget_max_tokens(ck)
+    assert ck["max_tokens"] == 8000
+
+def test_enforce_max_tokens_noop_without_budget():
+    ck = {"max_tokens": 4000}
+    _enforce_anthropic_budget_max_tokens(ck)
+    assert ck["max_tokens"] == 4000

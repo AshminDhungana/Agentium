@@ -516,6 +516,21 @@ def _is_anthropic_adaptive(model: str) -> bool:
     return bool(_ANTHROPIC_ADAPTIVE.search(model or ""))
 
 
+def _enforce_anthropic_budget_max_tokens(create_kwargs: Dict[str, Any]) -> None:
+    """Legacy manual thinking requires max_tokens > budget_tokens (else HTTP 400).
+
+    Bumps max_tokens to budget_tokens + 2048 (headroom for the final answer) when
+    too small. Adaptive thinking carries no budget, so it is unaffected.
+    """
+    thinking = create_kwargs.get("thinking")
+    if isinstance(thinking, dict):
+        budget = thinking.get("budget_tokens")
+        if isinstance(budget, int):
+            min_max = budget + 2048
+            if create_kwargs.get("max_tokens", 0) < min_max:
+                create_kwargs["max_tokens"] = min_max
+
+
 def _resolve_thinking_kwargs(config) -> Dict[str, Any]:
     """Return provider-specific thinking kwargs, or {} when disabled/unsupported.
 
@@ -1113,6 +1128,7 @@ class AnthropicProvider(BaseModelProvider):
             # carry temperature=1 (Anthropic requires that) and must win. When
             # inactive, fall back to the configured temperature.
             create_kwargs.update(self._thinking_kwargs())
+            _enforce_anthropic_budget_max_tokens(create_kwargs)
             if "temperature" not in create_kwargs:
                 create_kwargs["temperature"] = kwargs.get('temperature', self.config.temperature)
             response = await client.messages.create(**create_kwargs)
@@ -1173,6 +1189,7 @@ class AnthropicProvider(BaseModelProvider):
             }
             # Extended thinking (Task 3): wins over configured temperature when active.
             stream_kwargs.update(self._thinking_kwargs())
+            _enforce_anthropic_budget_max_tokens(stream_kwargs)
             if "temperature" not in stream_kwargs:
                 stream_kwargs["temperature"] = kwargs.get('temperature', self.config.temperature)
             async with client.messages.stream(**stream_kwargs) as stream:
@@ -1282,6 +1299,7 @@ class AnthropicProvider(BaseModelProvider):
                 # Merge provider-specific reasoning params (thinking/temperature
                 # for Anthropic, extra_body otherwise) into the call kwargs.
                 create_kwargs.update(self._thinking_kwargs())
+                _enforce_anthropic_budget_max_tokens(create_kwargs)
 
                 rpm = getattr(self.config, "requests_per_minute", 60) or 60
                 await provider_rate_limiter.acquire(self.config.id, rpm)
