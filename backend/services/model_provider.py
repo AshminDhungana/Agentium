@@ -417,6 +417,18 @@ class BaseModelProvider(ABC):
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
         )
+        tk = self._thinking_kwargs()
+        if tk:
+            logger.info(
+                "[thinking] active mode=%s provider=%s model=%s effort=%s budget=%s latency_ms=%d output_tokens=%d",
+                _thinking_mode_from_kwargs(tk),
+                getattr(self.config, "provider", "?"),
+                model_used,
+                getattr(self.config, "effort", "none") or "none",
+                (tk.get("thinking", {}).get("budget_tokens")
+                 if isinstance(tk.get("thinking"), dict) else None),
+                latency_ms, completion_tokens,
+            )
         try:
             with get_db_context() as db:
                 self.config.increment_usage(total_tokens, cost_usd=cost)
@@ -432,7 +444,16 @@ class BaseModelProvider(ABC):
                     success=success,
                     error_message=error,
                     cost_usd=cost,
-                    request_metadata={"agentium_id": agentium_id},
+                    request_metadata={
+                        "agentium_id": agentium_id,
+                        "thinking_mode": _thinking_mode_from_kwargs(tk),
+                        "effort": getattr(self.config, "effort", "none") or "none",
+                        "budget_tokens": (
+                            tk.get("thinking", {}).get("budget_tokens")
+                            if isinstance(tk.get("thinking"), dict) else None
+                        ),
+                        "output_tokens": completion_tokens,
+                    },
                     agentium_id=agentium_id,
                 ))
                 db.commit()
@@ -500,9 +521,54 @@ PROVIDER_THINKING = {
     # COHERE intentionally omitted -> no thinking
 }
 
-_OPENAI_EFFORT = {"low": "low", "medium": "medium", "high": "high", "xhigh": "high"}
-_ANTHROPIC_BUDGET = {"low": 2000, "medium": 8000, "high": 16000, "xhigh": 32000}
+_OPENAI_EFFORT = {"low": "low", "medium": "medium", "high": "high", "xhigh": "xhigh"}
+_ANTHROPIC_BUDGET = {"low": 2000, "medium": 8000, "high": 16000, "xhigh": 32000}  # legacy (opus-4-5 / haiku-4-5) only
+_ANTHROPIC_EFFORT = {"low": "low", "medium": "medium", "high": "high", "xhigh": "xhigh"}  # adaptive (fable/sonnet5/opus4.6+) models
 _GEMINI_BUDGET = {"low": 1024, "medium": 4096, "high": 8192, "xhigh": 24576}
+
+# New-gen Anthropic models reject manual `budget_tokens` (HTTP 400) and instead
+# use adaptive thinking + an `effort` parameter. Sent via extra_body for SDK 0.84.0.
+_ANTHROPIC_ADAPTIVE = re.compile(
+    r"claude-(fable|mythos|opus[- ]?4[-.]?(6|7|8)|sonnet[- ]?4[-.]?6|sonnet[- ]?5)"
+)
+
+def _is_anthropic_adaptive(model: str) -> bool:
+    """True for Anthropic models that require adaptive thinking (no budget_tokens)."""
+    return bool(_ANTHROPIC_ADAPTIVE.search(model or ""))
+
+
+def _thinking_mode_from_kwargs(tk: Dict[str, Any]) -> str:
+    """Classify the resolved thinking shape for logs/metadata."""
+    if not tk:
+        return "none"
+    eb = tk.get("extra_body")
+    if isinstance(eb, dict):
+        if isinstance(eb.get("output_config"), dict) and "effort" in eb["output_config"]:
+            return "adaptive"
+        if "thinking" in eb:
+            return "deepseek"
+        if "reasoning_effort" in eb:
+            return "openai"
+        if "thinkingConfig" in eb:
+            return "gemini"
+    if isinstance(tk.get("thinking"), dict):
+        return "budget"
+    return "none"
+
+
+def _enforce_anthropic_budget_max_tokens(create_kwargs: Dict[str, Any]) -> None:
+    """Legacy manual thinking requires max_tokens > budget_tokens (else HTTP 400).
+
+    Bumps max_tokens to budget_tokens + 2048 (headroom for the final answer) when
+    too small. Adaptive thinking carries no budget, so it is unaffected.
+    """
+    thinking = create_kwargs.get("thinking")
+    if isinstance(thinking, dict):
+        budget = thinking.get("budget_tokens")
+        if isinstance(budget, int):
+            min_max = budget + 2048
+            if create_kwargs.get("max_tokens", 0) < min_max:
+                create_kwargs["max_tokens"] = min_max
 
 
 def _resolve_thinking_kwargs(config) -> Dict[str, Any]:
@@ -524,6 +590,13 @@ def _resolve_thinking_kwargs(config) -> Dict[str, Any]:
         return {}
     kind = info["kind"]
     if kind == "anthropic":
+        if _is_anthropic_adaptive(model):
+            # SDK 0.84.0 lacks output_config/adaptive -> send via extra_body passthrough.
+            return {"extra_body": {
+                "thinking": {"type": "adaptive"},
+                "output_config": {"effort": _ANTHROPIC_EFFORT[effort]},
+            }}
+        # Legacy: manual extended thinking. Call sites enforce max_tokens > budget.
         return {
             "thinking": {"type": "enabled", "budget_tokens": _ANTHROPIC_BUDGET[effort]},
             "temperature": 1,
@@ -1095,6 +1168,7 @@ class AnthropicProvider(BaseModelProvider):
             # carry temperature=1 (Anthropic requires that) and must win. When
             # inactive, fall back to the configured temperature.
             create_kwargs.update(self._thinking_kwargs())
+            _enforce_anthropic_budget_max_tokens(create_kwargs)
             if "temperature" not in create_kwargs:
                 create_kwargs["temperature"] = kwargs.get('temperature', self.config.temperature)
             response = await client.messages.create(**create_kwargs)
@@ -1155,6 +1229,7 @@ class AnthropicProvider(BaseModelProvider):
             }
             # Extended thinking (Task 3): wins over configured temperature when active.
             stream_kwargs.update(self._thinking_kwargs())
+            _enforce_anthropic_budget_max_tokens(stream_kwargs)
             if "temperature" not in stream_kwargs:
                 stream_kwargs["temperature"] = kwargs.get('temperature', self.config.temperature)
             async with client.messages.stream(**stream_kwargs) as stream:
@@ -1264,6 +1339,7 @@ class AnthropicProvider(BaseModelProvider):
                 # Merge provider-specific reasoning params (thinking/temperature
                 # for Anthropic, extra_body otherwise) into the call kwargs.
                 create_kwargs.update(self._thinking_kwargs())
+                _enforce_anthropic_budget_max_tokens(create_kwargs)
 
                 rpm = getattr(self.config, "requests_per_minute", 60) or 60
                 await provider_rate_limiter.acquire(self.config.id, rpm)

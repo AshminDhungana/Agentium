@@ -1,5 +1,10 @@
 import pytest
-from services.model_provider import _resolve_thinking_kwargs, PROVIDER_THINKING
+from services.model_provider import (
+    _resolve_thinking_kwargs,
+    _enforce_anthropic_budget_max_tokens,
+    _thinking_mode_from_kwargs,
+    PROVIDER_THINKING,
+)
 
 
 class _Cfg:
@@ -77,23 +82,68 @@ def test_gemini_thinking_model_still_gated():
 
 def test_anthropic_new_generation_fable5():
     kw = _resolve_thinking_kwargs(_Cfg("ANTHROPIC", "claude-fable-5", "high"))
-    assert kw["thinking"] == {"type": "enabled", "budget_tokens": 16000}
-    assert kw["temperature"] == 1
+    assert kw["extra_body"]["thinking"] == {"type": "adaptive"}
+    assert kw["extra_body"]["output_config"] == {"effort": "high"}
 
 
 def test_anthropic_new_generation_opus48():
     kw = _resolve_thinking_kwargs(_Cfg("ANTHROPIC", "claude-opus-4-8", "high"))
-    assert kw["thinking"] == {"type": "enabled", "budget_tokens": 16000}
-    assert kw["temperature"] == 1
+    assert kw["extra_body"]["thinking"] == {"type": "adaptive"}
+    assert kw["extra_body"]["output_config"] == {"effort": "high"}
 
 
 def test_anthropic_new_generation_sonnet5():
     kw = _resolve_thinking_kwargs(_Cfg("ANTHROPIC", "claude-sonnet-5", "high"))
+    assert kw["extra_body"]["thinking"] == {"type": "adaptive"}
+    assert kw["extra_body"]["output_config"] == {"effort": "high"}
+
+
+def test_anthropic_adaptive_effort_levels():
+    for effort, level in [("low", "low"), ("medium", "medium"), ("high", "high"), ("xhigh", "xhigh")]:
+        kw = _resolve_thinking_kwargs(_Cfg("ANTHROPIC", "claude-opus-4-8", effort))
+        assert kw["extra_body"]["output_config"] == {"effort": level}
+
+
+def test_anthropic_legacy_still_budget():
+    # opus-4-5 / haiku-4-5 are legacy -> manual budget_tokens, not adaptive
+    kw = _resolve_thinking_kwargs(_Cfg("ANTHROPIC", "claude-opus-4-5", "high"))
     assert kw["thinking"] == {"type": "enabled", "budget_tokens": 16000}
     assert kw["temperature"] == 1
+    kw2 = _resolve_thinking_kwargs(_Cfg("ANTHROPIC", "claude-haiku-4-5", "xhigh"))
+    assert kw2["thinking"] == {"type": "enabled", "budget_tokens": 32000}
 
 
 def test_gemini_new_generation_35():
     kw = _resolve_thinking_kwargs(_Cfg("GEMINI", "gemini-3.5-pro", "low"))
     assert kw["extra_body"]["thinkingConfig"]["thinkingBudget"] == 1024
     assert kw["extra_body"]["thinkingConfig"]["includeThoughts"] is True
+
+
+def test_enforce_max_tokens_bumps_when_below_budget():
+    ck = {"thinking": {"type": "enabled", "budget_tokens": 32000}, "max_tokens": 4000}
+    _enforce_anthropic_budget_max_tokens(ck)
+    assert ck["max_tokens"] == 34048  # 32000 + 2048
+
+def test_enforce_max_tokens_keeps_larger_value():
+    ck = {"thinking": {"type": "enabled", "budget_tokens": 2000}, "max_tokens": 8000}
+    _enforce_anthropic_budget_max_tokens(ck)
+    assert ck["max_tokens"] == 8000
+
+def test_enforce_max_tokens_noop_without_budget():
+    ck = {"max_tokens": 4000}
+    _enforce_anthropic_budget_max_tokens(ck)
+    assert ck["max_tokens"] == 4000
+
+
+def test_openai_xhigh_maps_to_xhigh():
+    kw = _resolve_thinking_kwargs(_Cfg("OPENAI", "gpt-5.6", "xhigh"))
+    assert kw["extra_body"]["reasoning_effort"] == "xhigh"
+
+
+def test_thinking_mode_labels():
+    assert _thinking_mode_from_kwargs({}) == "none"
+    assert _thinking_mode_from_kwargs({"thinking": {"type": "enabled", "budget_tokens": 8000}}) == "budget"
+    assert _thinking_mode_from_kwargs({"extra_body": {"thinking": {"type": "adaptive"}, "output_config": {"effort": "high"}}}) == "adaptive"
+    assert _thinking_mode_from_kwargs({"extra_body": {"reasoning_effort": "high"}}) == "openai"
+    assert _thinking_mode_from_kwargs({"extra_body": {"thinkingConfig": {"thinkingBudget": 1024}}}) == "gemini"
+    assert _thinking_mode_from_kwargs({"extra_body": {"thinking": {"type": "enabled"}, "reasoning_effort": "medium"}}) == "deepseek"
