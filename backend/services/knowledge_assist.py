@@ -9,6 +9,7 @@ Owns two public coroutines:
 """
 import hashlib
 import logging
+import re
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -89,8 +90,9 @@ def _top_distance(chroma: Optional[Dict[str, Any]]) -> Optional[float]:
     return float(dists[0][0])
 
 
-def _synthesize_web_doc(query: str, results: List[Dict[str, Any]], k: int = 3) -> str:
-    lines = [f"Web search results for: {query}", ""]
+def _synthesize_web_doc(query: str, results: List[Dict[str, Any]], k: int = 3,
+                        heading: str = "Web search results for:") -> str:
+    lines = [f"{heading} {query}", ""]
     for i, r in enumerate(results[:k], 1):
         title = r.get("title") or "(untitled)"
         url = r.get("url") or ""
@@ -209,4 +211,160 @@ async def retrieve_or_search(
         wrote_back=wrote_back,
         context_text=_format_context(chroma),
         fallback_used=fallback_used,
+    )
+
+
+CHECKPOINT_STAGES = ("received", "completed", "mid")
+
+
+@dataclass
+class CheckpointOutcome:
+    stage: str
+    queried_chroma: bool = False
+    searched_web: bool = False
+    wrote_back: bool = False
+    fallback_used: bool = False
+    parent_id: Optional[str] = None
+
+
+_NEED_KNOWLEDGE_TAG = "<<NEED_KNOWLEDGE>>"
+
+
+def _parent_id_for_checkpoint(stage: str, query: str) -> str:
+    digest = hashlib.sha256(_normalize_query(query).encode("utf-8")).hexdigest()[:16]
+    return f"ckpt:{stage}:{digest}"
+
+
+def parse_knowledge_needed(text: str) -> Optional[str]:
+    """Return the agent's stated gap query if ``<<NEED_KNOWLEDGE>>`` is present.
+
+    The marker may be followed by a question on the same line, e.g.
+    ``<<NEED_KNOWLEDGE>> how does X work?``. Returns None when absent.
+    """
+    m = re.search(re.escape(_NEED_KNOWLEDGE_TAG) + r"\s*(.*)", text)
+    if not m:
+        return None
+    q = m.group(1).strip()
+    return q or None
+
+
+async def checkpoint_write(
+    stage: str,
+    task: Any,
+    agent: Any,
+    db: Any,
+    *,
+    query: Optional[str] = None,
+) -> CheckpointOutcome:
+    if stage not in CHECKPOINT_STAGES:
+        raise ValueError(f"Unknown checkpoint stage: {stage!r}")
+    store = get_vector_store()
+    q = query or getattr(task, "description", "") or ""
+    if not q:
+        q = stage
+
+    # 1. READ from ChromaDB (non-fatal)
+    chroma_ctx = ""
+    queried_chroma = False
+    try:
+        chroma = store.query_knowledge(
+            q, collection_keys=DEFAULT_RETRIEVAL_KEYS, n_results=5, db=db
+        )
+        queried_chroma = True
+        chroma_ctx = _format_context(chroma)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("checkpoint_write[%s]: ChromaDB query failed: %s", stage, exc)
+
+    # 2. ALWAYS web-search (non-fatal)
+    searched_web = False
+    web_results: Optional[Dict[str, Any]] = None
+    fallback_used = False
+    try:
+        web_results = await web_search_tool.execute(query=q, provider="auto")
+        searched_web = True
+        if web_results.get("status") != "success":
+            fallback_used = True
+            web_results = None
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("checkpoint_write[%s]: web search unavailable: %s", stage, exc)
+        fallback_used = True
+
+    # 3 + 4. FOLD + WRITE (graceful)
+    wrote_back = False
+    parent_id: Optional[str] = None
+    if web_results and web_results.get("results"):
+        body = _synthesize_web_doc(q, web_results["results"],
+                                   heading="Checkpoint web search for:")
+        if chroma_ctx:
+            body = chroma_ctx + "\n\n" + body
+        parent_id = _parent_id_for_checkpoint(stage, q)
+        try:
+            await write_knowledge(
+                parent_id,
+                body,
+                {
+                    "type": "agent_learning",
+                    "source": "agent",
+                    "source_url": web_results["results"][0].get("url"),
+                    "title": web_results["results"][0].get("title"),
+                    "stage": stage,
+                    "task_id": getattr(task, "agentium_id", None),
+                    "agent_id": getattr(agent, "agentium_id", None),
+                },
+                db,
+                collection_key="web_knowledge",
+            )
+            wrote_back = True
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("checkpoint_write[%s]: write-back failed: %s", stage, exc)
+    elif chroma_ctx:
+        # Web failed but we have Chroma context — still record the checkpoint.
+        parent_id = _parent_id_for_checkpoint(stage, q)
+        try:
+            await write_knowledge(
+                parent_id,
+                chroma_ctx,
+                {
+                    "type": "agent_learning",
+                    "source": "agent",
+                    "stage": stage,
+                    "task_id": getattr(task, "agentium_id", None),
+                    "agent_id": getattr(agent, "agentium_id", None),
+                },
+                db,
+                collection_key="web_knowledge",
+            )
+            wrote_back = True
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("checkpoint_write[%s]: chroma-only write failed: %s", stage, exc)
+    else:
+        # Neither Chroma nor web yielded content — still record the checkpoint
+        # so every task shows the interaction (query + search) in the trace.
+        parent_id = _parent_id_for_checkpoint(stage, q)
+        try:
+            await write_knowledge(
+                parent_id,
+                f"Checkpoint {stage}: no knowledge retrieved (query={q!r}).",
+                {
+                    "type": "agent_learning",
+                    "source": "agent",
+                    "stage": stage,
+                    "task_id": getattr(task, "agentium_id", None),
+                    "agent_id": getattr(agent, "agentium_id", None),
+                    "empty": True,
+                },
+                db,
+                collection_key="web_knowledge",
+            )
+            wrote_back = True
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("checkpoint_write[%s]: empty-marker write failed: %s", stage, exc)
+
+    return CheckpointOutcome(
+        stage=stage,
+        queried_chroma=queried_chroma,
+        searched_web=searched_web,
+        wrote_back=wrote_back,
+        fallback_used=fallback_used,
+        parent_id=parent_id,
     )

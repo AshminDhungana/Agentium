@@ -30,6 +30,7 @@ from backend.models.entities.task_events import TaskEvent, TaskEventType
 from backend.models.entities.agents import Agent, AgentStatus, CouncilMember, HeadOfCouncil, LeadAgent, AgentType
 from backend.models.entities.audit import AuditLog, AuditCategory, AuditLevel
 from backend.services.reincarnation_service import ReincarnationService
+from backend.services.knowledge_assist import checkpoint_write
 
 logger = logging.getLogger(__name__)
 
@@ -129,6 +130,12 @@ def execute_task_async(self, task_id: str, agent_id: str):
             if not agent:
                 raise ValueError(f"No active agent found for task {task_id}")
 
+            # 8.4: received checkpoint — query Chroma + web-search + write-back
+            try:
+                asyncio.run(checkpoint_write("received", task, agent, db))
+            except Exception as cp_exc:  # noqa: BLE001
+                logger.warning(f"received checkpoint failed for {task_id}: {cp_exc}")
+
             # Execute with skill RAG
             result = agent.execute_with_skill_rag(task, db)
             
@@ -144,7 +151,6 @@ def execute_task_async(self, task_id: str, agent_id: str):
                 result_data["workspace_path"] = ws_path
                 result_data["artifacts"] = arts
                 try:
-                    import asyncio
                     from backend.api.routes.websocket import manager
                     asyncio.run(manager.broadcast({
                         "type": "workspace_ready",
@@ -159,7 +165,23 @@ def execute_task_async(self, task_id: str, agent_id: str):
                 result_summary=result["content"][:500],
                 result_data=result_data
             )
-            
+
+            # 8.4: completed checkpoint — query Chroma + web-search + write-back
+            try:
+                asyncio.run(checkpoint_write("completed", task, agent, db))
+            except Exception as cp_exc:  # noqa: BLE001
+                logger.warning(f"completed checkpoint failed for {task_id}: {cp_exc}")
+
+            # 8.4: mid checkpoint — only when the agent self-signaled a gap
+            if isinstance(result, dict) and result.get("knowledge_needed"):
+                try:
+                    asyncio.run(checkpoint_write(
+                        "mid", task, agent, db,
+                        query=result.get("knowledge_query"),
+                    ))
+                except Exception as cp_exc:  # noqa: BLE001
+                    logger.warning(f"mid checkpoint failed for {task_id}: {cp_exc}")
+
             # Record success for used skills
             for skill in result.get("skills_used", []):
                 from backend.services.skill_manager import skill_manager
@@ -244,7 +266,6 @@ def execute_task_async(self, task_id: str, agent_id: str):
             # user instead of a stack trace. The task is already terminal; this
             # just tells any connected dashboard that the provider is exhausted.
             try:
-                import asyncio
                 from backend.api.routes.websocket import manager
                 friendly = (
                     "The AI provider is temporarily unavailable or rate-limited; "
@@ -268,7 +289,6 @@ def execute_task_async(self, task_id: str, agent_id: str):
             try:
                 from backend.core.vector_store import get_vector_store
                 from backend.api.routes.websocket import manager
-                import asyncio
                 
                 vs = get_vector_store()
                 try:

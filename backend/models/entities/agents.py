@@ -333,6 +333,8 @@ class Agent(BaseEntity):
                 )
                 result["suggested_new_skill"] = new_skill_id
         
+        result["knowledge_needed"] = bool(result.get("knowledge_needed"))
+        result["knowledge_query"] = result.get("knowledge_query")
         return result
 
     def _tier_from_type(self) -> Optional[int]:
