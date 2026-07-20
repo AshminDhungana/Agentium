@@ -123,30 +123,20 @@ def head_agent(test_db):
     test_db.add(constitution)
     test_db.commit()
 
-    ethos = Ethos(
-        agentium_id="E000001",
-        agent_type="head_of_council",
-        mission_statement="Test mission",
-        core_values=json.dumps(["honesty"]),
-        behavioral_rules=json.dumps(["be helpful"]),
-        restrictions=json.dumps(["do no harm"]),
-        capabilities=json.dumps(["reason", "delegate"]),
-        current_objective="Oversee the council.",
-        working_method="Read the Constitution, then delegate.",
-        environment_context="Host: localhost",
-        created_by_agentium_id="00001",
-        agent_id="00000000-0000-0000-0000-000000000001",
-    )
-    test_db.add(ethos)
-    test_db.commit()
-
     agent = HeadOfCouncil(
         agentium_id="00001",
         name="Test Head",
         status="active",
-        ethos_id=ethos.id,
     )
     test_db.add(agent)
+    test_db.commit()
+    test_db.refresh(agent)
+
+    # Build the Ethos from the operational templates (Task 5) so the agent's
+    # Ethos reflects the live template values.
+    ethos = agent._create_default_ethos(agent, test_db)
+    test_db.flush()
+    agent.ethos_id = ethos.id
     test_db.commit()
     test_db.refresh(agent)
 
@@ -157,10 +147,11 @@ def head_agent(test_db):
         # then the constitution.
         leftover = test_db.query(HeadOfCouncil).filter_by(agentium_id="00001").first()
         if leftover:
+            if leftover.ethos_id:
+                linked_ethos = test_db.query(Ethos).filter_by(id=leftover.ethos_id).first()
+                if linked_ethos:
+                    test_db.delete(linked_ethos)
             test_db.delete(leftover)
-        leftover_ethos = test_db.query(Ethos).filter_by(agentium_id="E000001").first()
-        if leftover_ethos:
-            test_db.delete(leftover_ethos)
         leftover_const = test_db.query(Constitution).filter_by(agentium_id="C90001").first()
         if leftover_const:
             test_db.delete(leftover_const)
@@ -193,3 +184,17 @@ def test_read_and_align_constitution_missing_fallback_file_ok(test_db, head_agen
     assert not os.path.isfile(fallback), "precondition: fallback file must be absent"
     result = head_agent.read_and_align_constitution(test_db)
     assert result is True
+
+
+def test_ethos_creation_has_no_persona(test_db, head_agent):
+    ethos = head_agent.ethos
+    assert ethos is not None
+    # No hardcoded identity persona phrasing in the Ethos mission.
+    assert "ultimate decision-making authority" not in (ethos.mission_statement or "")
+    assert "Eternal Head of Council" not in (ethos.mission_statement or "")
+    # Persona values are no longer seeded as Ethos values.
+    assert ethos.get_core_values() == []
+    assert ethos.get_behavioral_rules() == []
+    assert ethos.get_restrictions() == []
+    # Capabilities (operational) are still present.
+    assert ethos.get_capabilities()
