@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 
 from backend.services.skill_manager import skill_manager
 from backend.services.model_provider import ModelService
+from backend.core.llm_client import LLMClient
 from backend.models.entities.agents import Agent
 
 logger = logging.getLogger(__name__)
@@ -62,6 +63,12 @@ class SkillRAG:
         4. Record skill usage
         5. Return result with attribution
         """
+        # ── 6.5: search-before-acting step ──────────────────────────────────────
+        from backend.services.knowledge_assist import retrieve_or_search
+        knowledge_outcome = await retrieve_or_search(
+            task_description, agent, db
+        )
+
         # Step 1: Retrieve relevant skills
         skills = self.skill_manager.search_skills(
             query=task_description,
@@ -74,11 +81,19 @@ class SkillRAG:
         # Step 2: Build RAG prompt with context budget enforcement
         rag_context = self._build_rag_context(skills, task_description)
 
+        augmented = rag_context["augmented_prompt"]
+        if knowledge_outcome.context_text:
+            augmented = (
+                "<<RETRIEVED KNOWLEDGE>>\n"
+                + knowledge_outcome.context_text
+                + "\n<</RETRIEVED KNOWLEDGE>>\n\n"
+                + augmented
+            )
+
         # Step 3: Generate with context — route through LLMClient so provider
         # exhaustion (all keys invalid / rate-limited / unreachable) is handled
         # via failover to fallback configs, raising a clean RuntimeError that the
         # executor catches (Task 12). Fallback order comes from APIKeyManager.
-        from backend.core.llm_client import LLMClient
         from backend.services.api_key_manager import api_key_manager
         fallback = (
             api_key_manager.get_fallback_config_ids(model_config_id)
@@ -87,7 +102,7 @@ class SkillRAG:
         llm = LLMClient(db=db)
         result = await llm.generate(
             agent=agent,
-            user_message=rag_context["augmented_prompt"],
+            user_message=augmented,
             config_id=model_config_id,
             fallback_configs=fallback,
         )
@@ -106,7 +121,11 @@ class SkillRAG:
             "tokens_used": result["tokens_used"],
             "skills_used": rag_context["skills_used"],
             "rag_context": rag_context["context_text"],
-            "latency_ms": result["latency_ms"]
+            "latency_ms": result["latency_ms"],
+            "knowledge_outcome": {
+                "wrote_back": knowledge_outcome.wrote_back,
+                "fallback_used": knowledge_outcome.fallback_used,
+            },
         }
 
     # ═══════════════════════════════════════════════════════════
