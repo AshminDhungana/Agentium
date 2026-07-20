@@ -1,40 +1,6 @@
 # Agentium — Verification & Improvement Backlog
 
-### 6.6 — [P2] Standard structure for knowledge-base writes
-**Problem:** No shared schema for how agents write updates to ChromaDB, risking inconsistent formats and duplicate entries.
-**Task:** Define and document a standard write structure (fields, dedup key strategy, revision metadata — see README's "Revision-Aware" claim) and route all agent writes through it.
-**Acceptance criteria:** All agent code paths that write to Chroma use the shared structure; a duplicate-write test confirms deduplication works.
-
-### 6.7 — [P2] Ethos knowledge-retrieval/update steps
-**Problem:** The Ethos definition currently has no explicit **knowledge retrieval** step (query ChromaDB + web search) or **knowledge update** step (write back to ChromaDB when required).
-**Task:** Locate where Ethos is constructed/loaded and add both steps explicitly so every agent performs them as part of its standard loop, not as an optional behavior.
-**Acceptance criteria:** Ethos text includes both steps; an agent's task trace shows a retrieval call and (when applicable) an update call.
-
-
-- [ ] when this prompt appears, and i click establish nation name it stays their for a while and then goes away after a time, it should go away after i click it and the processing should happen in the background. Establish Your AI Nation
-🏛️ Welcome to Agentium
-
-I am the Head of Council. Before we establish your AI Nation, what shall we name this sovereign domain?
-
-You have 60 seconds to respond. If no name is provided, I shall designate it 'The Agentium Sovereignty'.
-
-To respond: Reply with name: YourChosenName
-
-Nepal
-You have 60 seconds before a default name is used.
-
-Establish Nation, 
-
-i think the button is not being clicked, and the another problem is that the first message is 🏛️ Nation Established: TestNation
-
-The Council has ratified your chosen name. Welcome to the sovereign domain of TestNation!
-
-02:22
-
-
-🏛️ Nation Established: The Agentium Sovereignty
-
-No name was provided within the allotted time. I have designated this domain as 'The Agentium Sovereignty' by default. You may propose a constitutional amendment to rename it later., where the name appears as testnation , it should be the default name in the message, when no name is selected. 
+- [ ] add signature to the login page in right bottom coner, should be white for dark mode and dark for dar mode, current svg has darksignature, should look good and match the display. The file location at , frontend\public\sign.svg
 
 ### 6.8 — [P2] Verify system-message usage across both LLM APIs
 **Problem:** Agentium talks to both OpenAI-style and Anthropic-style APIs, which handle system prompts differently. Unclear whether system messages are actually being sent/used correctly in both cases.
