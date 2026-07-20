@@ -1,5 +1,10 @@
 import pytest
-from services.model_provider import _resolve_thinking_kwargs, PROVIDER_THINKING
+from services.model_provider import (
+    _resolve_thinking_kwargs,
+    _enforce_anthropic_budget_max_tokens,
+    _thinking_mode_from_kwargs,
+    PROVIDER_THINKING,
+)
 
 
 class _Cfg:
@@ -114,8 +119,6 @@ def test_gemini_new_generation_35():
     assert kw["extra_body"]["thinkingConfig"]["includeThoughts"] is True
 
 
-from services.model_provider import _enforce_anthropic_budget_max_tokens
-
 def test_enforce_max_tokens_bumps_when_below_budget():
     ck = {"thinking": {"type": "enabled", "budget_tokens": 32000}, "max_tokens": 4000}
     _enforce_anthropic_budget_max_tokens(ck)
@@ -136,8 +139,6 @@ def test_openai_xhigh_maps_to_xhigh():
     kw = _resolve_thinking_kwargs(_Cfg("OPENAI", "gpt-5.6", "xhigh"))
     assert kw["extra_body"]["reasoning_effort"] == "xhigh"
 
-
-from services.model_provider import _thinking_mode_from_kwargs
 
 def test_thinking_mode_labels():
     assert _thinking_mode_from_kwargs({}) == "none"
