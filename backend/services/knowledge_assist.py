@@ -37,6 +37,37 @@ class RetrievalOutcome:
     fallback_used: bool
 
 
+def enrich_knowledge_metadata(
+    metadata: Optional[Dict[str, Any]],
+    *,
+    parent_id: Optional[str] = None,
+    source: str = "agent",
+    document_type: Optional[str] = None,
+    agent_id: Optional[str] = None,
+    title: str = "",
+) -> Dict[str, Any]:
+    """
+    Fill the 6.6 shared write schema defaults onto arbitrary metadata.
+
+    Used by write paths that do NOT go through ``write_knowledge`` (e.g. the
+    agent-learning pipeline's semantic revise-in-place logic) so that every
+    agent write to ChromaDB still carries the full schema. ``parent_id`` is the
+    dedup key and should be set to the call site's stable identifier.
+    """
+    meta = dict(metadata or {})
+    if parent_id is not None:
+        meta["parent_id"] = parent_id
+    meta.setdefault("type", document_type or meta.get("document_type") or "agent_learning")
+    meta.setdefault("source", source)
+    meta.setdefault("source_url", "")
+    meta.setdefault("title", title)
+    meta.setdefault("agent_id", agent_id)
+    meta.setdefault("document_type", meta["type"])
+    meta.setdefault("decay_score", 1.0)
+    meta.setdefault("citation_boost", 1.0)
+    return meta
+
+
 def _normalize_query(q: str) -> str:
     return " ".join((q or "").lower().split())
 

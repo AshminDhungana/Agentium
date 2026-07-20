@@ -119,21 +119,19 @@ async def test_add_rejects_unknown_collection(store):
 async def test_add_writes_to_writable_collection(store, monkeypatch):
     captured = {}
 
-    class FakeColl:
-        def upsert(self, documents, metadatas=None, ids=None):
-            captured["documents"] = documents
-            captured["metadatas"] = metadatas
-            captured["ids"] = ids
+    # Monkeypatch write_knowledge directly so the test is deterministic and
+    # independent of the real Chroma client / get_vector_store singleton
+    # (which other test modules perturb). This verifies `_add` routes agent
+    # writes through the 6.6 schema funnel with the correct collection key.
+    import backend.services.knowledge_assist as ka
 
-    class FakeStore:
-        COLLECTIONS = {"task_patterns": "execution_patterns"}
+    async def fake_write_knowledge(parent_id, text, metadata, db, collection_key="web_knowledge"):
+        captured["collection_key"] = collection_key
+        captured["parent_id"] = parent_id
+        captured["metadata"] = metadata
+        return {"parent_id": parent_id}
 
-        def get_collection(self, key, version=None):
-            return FakeColl()
-
-    monkeypatch.setattr(
-        "backend.tools.vector_db_tool.get_vector_store", lambda: FakeStore()
-    )
+    monkeypatch.setattr(ka, "write_knowledge", fake_write_knowledge)
     monkeypatch.setattr(
         "backend.tools.vector_db_tool.VectorDBTool.WRITABLE_COLLECTIONS",
         ["task_patterns"],
@@ -149,5 +147,6 @@ async def test_add_writes_to_writable_collection(store, monkeypatch):
     assert result["collection"] == "task_patterns"
     assert result["count"] == 1
     assert result["ids"] == ["pattern_docker_1"]
-    assert captured["ids"] == ["pattern_docker_1"]
-    assert captured["documents"] == ["Use Docker sandbox for untrusted code."]
+    assert captured["collection_key"] == "task_patterns"
+    assert captured["parent_id"] == "pattern_docker_1"
+    assert "revision_id" in captured["metadata"]

@@ -320,6 +320,11 @@ class VectorStore:
             "type": "execution_pattern",
             "document_type": "learned_behavior",
         }
+        # Enrich with the 6.6 shared schema (additive; parent_id = stable id).
+        from backend.services.knowledge_assist import enrich_knowledge_metadata
+        rich_meta = enrich_knowledge_metadata(
+            rich_meta, parent_id=parent_id, document_type="learned_behavior"
+        )
         if db is not None:
             self.upsert_document("task_patterns", parent_id, description, rich_meta, db)
             return

@@ -1,6 +1,4 @@
 import asyncio
-from dataclasses import dataclass
-from typing import Dict, Any, Optional, List
 
 class FakeStore:
     def __init__(self):
@@ -35,8 +33,8 @@ def test_write_knowledge_enforces_schema_and_dedup():
     store = FakeStore()
     ka.get_vector_store = lambda: store
     meta = {"type": "web_result", "source": "web", "source_url": "http://x", "title": "T", "agent_id": "30001"}
-    r1 = asyncio.run(ka.write_knowledge("web:abc", "body", meta, db=None))
-    r2 = asyncio.run(ka.write_knowledge("web:abc", "body2", meta, db=None))
+    asyncio.run(ka.write_knowledge("web:abc", "body", meta, db=None))
+    asyncio.run(ka.write_knowledge("web:abc", "body2", meta, db=None))
     # single row -> dedup worked
     assert len(store.docs) == 1
     saved_text, saved_meta = store.docs[("web_knowledge", "web:abc")]
@@ -111,3 +109,23 @@ def test_retrieve_or_search_never_blocks_on_web_failure():
     out = asyncio.run(ka.retrieve_or_search("novel query", FakeAgent(), db=None))
     assert out.wrote_back is False
     assert out.fallback_used is True
+
+
+def test_enrich_knowledge_metadata_fills_schema():
+    from backend.services.knowledge_assist import enrich_knowledge_metadata
+
+    meta = enrich_knowledge_metadata(
+        {"type": "execution_pattern"}, parent_id="pattern_42", source="agent"
+    )
+    for key in (
+        "parent_id", "type", "source", "source_url", "title", "agent_id",
+        "document_type", "decay_score", "citation_boost",
+    ):
+        assert key in meta, f"missing schema key {key}"
+    assert meta["parent_id"] == "pattern_42"
+    assert meta["document_type"] == "execution_pattern"
+    assert meta["source_url"] == ""
+    # caller-supplied values win over defaults
+    assert enrich_knowledge_metadata(
+        {"source_url": "http://x"}, parent_id="p"
+    )["source_url"] == "http://x"
