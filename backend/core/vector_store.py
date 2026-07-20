@@ -112,6 +112,8 @@ class VectorStore:
         "best_practices": "best_practices",
         "constitutional_skills": "constitutional_skills",
         "tool_skills": "tool_skills",
+        # Web-search write-backs live here; also serves the 6.4 web-index seed.
+        "web_knowledge": "web_knowledge_v2",
     }
 
     def __init__(
