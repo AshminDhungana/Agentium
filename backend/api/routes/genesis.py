@@ -8,7 +8,7 @@ name here.
 """
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from backend.core.auth import get_current_user
@@ -38,12 +38,9 @@ async def set_country_name(
     (already finished, not started, or past the prompt step).
     """
     name = (payload.name or "").strip()
-    if not name:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Nation name must not be empty.",
-        )
-
+    # An empty name means "use the default" — submit_country_name treats an
+    # empty/None value as a timeout (genesis falls back to the default name),
+    # so we pass it through rather than rejecting it.
     accepted = initialization_service.submit_country_name(name)
     if accepted:
         return SetCountryNameResponse(accepted=True)

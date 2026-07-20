@@ -278,14 +278,20 @@ class InitializationService:
                 f"You may propose a constitutional amendment to rename it later."
             )
 
-        message_id = await self._persist_head_message(message)
+        message_id = await self._persist_head_message(message, dedup_event="country_name_decision")
         await self._broadcast_head_message(message, message_id)
 
-    async def _persist_head_message(self, content: str) -> Optional[str]:
+    async def _persist_head_message(
+        self, content: str, dedup_event: Optional[str] = None
+    ) -> Optional[str]:
         """
         Persist a Head-of-Council message to chat history so it shows up in the
         dashboard conversation log. Returns the created message id (also used as
         the WebSocket message_id for client-side dedup).
+
+        When ``dedup_event`` is provided, any previously persisted genesis
+        message with the same event is removed first so a re-run of genesis
+        cannot stack duplicate naming/welcome messages in the chat history.
 
         Uses its OWN fresh DB session + commit rather than genesis's shared
         transaction.  The live WebSocket broadcast fires while the chat socket
@@ -308,13 +314,26 @@ class InitializationService:
                 self._log("WARNING", "No sovereign user found — cannot persist welcome message")
                 return None
 
+            # De-duplicate prior genesis messages of the same event (e.g. an old
+            # "Nation Established" line from a previous run) before inserting.
+            if dedup_event:
+                prior = fresh_db.query(ChatMsg).filter_by(
+                    user_id=str(sovereign_user.id),
+                    role="head_of_council",
+                    agent_id="00001",
+                ).all()
+                for m in prior:
+                    meta = m.message_metadata or {}
+                    if meta.get("source") == "genesis" and meta.get("event") == dedup_event:
+                        fresh_db.delete(m)
+
             fresh_db.add(ChatMsg(
                 id=message_id,
                 user_id=str(sovereign_user.id),
                 role="head_of_council",
                 content=content,
                 agent_id="00001",
-                message_metadata={"source": "genesis", "event": "country_name_decision"},
+                message_metadata={"source": "genesis", "event": dedup_event or "head_message"},
             ))
             fresh_db.commit()
         return message_id

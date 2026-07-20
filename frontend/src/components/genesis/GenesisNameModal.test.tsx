@@ -5,11 +5,13 @@ import { useWebSocketStore } from '@/store/websocketStore';
 describe('GenesisNameModal', () => {
   it('submits the entered name', () => {
     const submit = vi.fn().mockResolvedValue(true);
+    const dismiss = vi.fn();
     useWebSocketStore.setState({
       genesisAwaitingName: true,
       genesisNamePrompt: 'Name your nation',
       genesisNameTimeout: 60,
       submitCountryName: submit,
+      dismissGenesisNamePrompt: dismiss,
     });
     render(<GenesisNameModal />);
     expect(screen.getByText('Name your nation')).toBeTruthy();
@@ -17,6 +19,26 @@ describe('GenesisNameModal', () => {
     fireEvent.change(input, { target: { value: 'Veridia' } });
     fireEvent.click(screen.getByText('Establish Nation'));
     expect(submit).toHaveBeenCalledWith('Veridia');
+    // Modal is dismissed immediately so processing continues in the background.
+    expect(dismiss).toHaveBeenCalled();
+  });
+
+  it('uses the default name when the input is empty', () => {
+    const submit = vi.fn().mockResolvedValue(true);
+    const dismiss = vi.fn();
+    useWebSocketStore.setState({
+      genesisAwaitingName: true,
+      genesisNamePrompt: 'Name your nation',
+      genesisNameTimeout: 60,
+      submitCountryName: submit,
+      dismissGenesisNamePrompt: dismiss,
+    });
+    render(<GenesisNameModal />);
+    const button = screen.getByText('Use Default Name') as HTMLButtonElement;
+    expect(button.disabled).toBe(false);
+    fireEvent.click(button);
+    expect(submit).toHaveBeenCalledWith('');
+    expect(dismiss).toHaveBeenCalled();
   });
 
   it('renders the prompt as formatted Markdown, not raw source', () => {

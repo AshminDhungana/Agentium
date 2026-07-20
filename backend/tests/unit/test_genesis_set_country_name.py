@@ -31,13 +31,17 @@ def test_endpoint_accepts_name_when_awaiting(client, monkeypatch):
     assert resp.json()["accepted"] is True
 
 
-def test_endpoint_rejects_empty_name(client, monkeypatch):
+def test_endpoint_accepts_empty_name_as_default(client, monkeypatch):
+    # An empty name is no longer rejected with 422 — it is passed through so
+    # genesis falls back to the default nation name. When genesis isn't awaiting
+    # the name, the endpoint still returns 200 with accepted=False.
     monkeypatch.setattr(
         "backend.services.initialization_service.submit_country_name",
         lambda name: False,
     )
     resp = client.post("/api/v1/genesis/set-country-name", json={"name": "  "})
-    assert resp.status_code == 422
+    assert resp.status_code == 200
+    assert resp.json()["accepted"] is False
 
 
 def test_endpoint_reports_not_awaiting(client, monkeypatch):

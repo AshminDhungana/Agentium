@@ -187,6 +187,13 @@ interface WebSocketState {
      */
     submitCountryName: (name: string) => Promise<boolean>;
 
+    /**
+     * Immediately dismiss the nation-name prompt (used when the Sovereign
+     * submits the name — the modal closes at once and genesis proceeds in the
+     * background rather than waiting on the HTTP round-trip).
+     */
+    dismissGenesisNamePrompt: () => void;
+
     // Internal actions
     _transition: (event: PhaseEvent) => void;
     _connectNow: () => void;
@@ -328,11 +335,18 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
                 set({ genesisAwaitingName: false, genesisNamePrompt: '', genesisNameTimeout: 0 });
                 return true;
             }
+            // Genesis is no longer awaiting a name (already finished or moved
+            // past the prompt) — nothing left to prompt for, so dismiss.
+            set({ genesisAwaitingName: false, genesisNamePrompt: '', genesisNameTimeout: 0 });
             return false;
         } catch (err) {
             logger.error('[WebSocket] submitCountryName failed:', err);
             return false;
         }
+    },
+
+    dismissGenesisNamePrompt: () => {
+        set({ genesisAwaitingName: false, genesisNamePrompt: '', genesisNameTimeout: 0 });
     },
 
     /** Keep the dedup set bounded to MAX_PROCESSED_IDS */

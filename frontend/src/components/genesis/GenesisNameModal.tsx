@@ -8,18 +8,23 @@ export function GenesisNameModal() {
     const prompt = useWebSocketStore((s) => s.genesisNamePrompt);
     const timeout = useWebSocketStore((s) => s.genesisNameTimeout);
     const submitCountryName = useWebSocketStore((s) => s.submitCountryName);
+    const dismissGenesisNamePrompt = useWebSocketStore((s) => s.dismissGenesisNamePrompt);
 
     const [name, setName] = useState('');
     const [submitting, setSubmitting] = useState(false);
 
     if (!open) return null;
 
-    const handleSubmit = async () => {
-        const trimmed = name.trim();
-        if (!trimmed || submitting) return;
+    const handleSubmit = () => {
+        if (submitting) return;
         setSubmitting(true);
-        await submitCountryName(trimmed);
-        setSubmitting(false);
+        const trimmed = name.trim();
+        // Close the modal immediately and let genesis proceed in the background
+        // instead of blocking on the HTTP round-trip.
+        dismissGenesisNamePrompt();
+        // Fire-and-forget: failures are non-fatal (genesis uses the default name
+        // or has already moved past the prompt).
+        void submitCountryName(trimmed);
     };
 
     return (
@@ -48,11 +53,11 @@ export function GenesisNameModal() {
                 </p>
                 <button
                     onClick={handleSubmit}
-                    disabled={!name.trim() || submitting}
+                    disabled={submitting}
                     className="mt-4 w-full rounded-xl bg-violet-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-violet-500 disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                     {submitting ? <LoadingSpinner size="sm" /> : null}
-                    {submitting ? 'Establishing…' : 'Establish Nation'}
+                    {submitting ? 'Establishing…' : name.trim() ? 'Establish Nation' : 'Use Default Name'}
                 </button>
             </div>
         </div>
