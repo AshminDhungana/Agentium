@@ -69,11 +69,11 @@ def test_checkpoint_write_web_failure_falls_back(monkeypatch):
     class FakeAgent:
         agentium_id = "30001"
 
-    # must NOT raise
+    # must NOT raise; empty Chroma + web failure still records a marker checkpoint
     out = asyncio.run(ka.checkpoint_write("completed", FakeTask(), FakeAgent(), db=None))
     assert out.searched_web is True
     assert out.fallback_used is True
-    assert out.wrote_back is False  # no Chroma context to write
+    assert out.wrote_back is True  # empty-marker checkpoint recorded for traceability
 
 
 def test_checkpoint_write_mid_uses_provided_query(monkeypatch):
@@ -114,3 +114,28 @@ def test_checkpoint_write_rejects_unknown_stage():
         assert False, "expected ValueError"
     except ValueError:
         pass
+
+
+def test_checkpoint_write_records_marker_when_both_empty(monkeypatch):
+    from backend.services import knowledge_assist as ka
+    store = FakeStore()
+    ka.get_vector_store = lambda: store
+
+    class FakeWeb:
+        async def execute(self, query, provider="auto", max_results=5):
+            return {"status": "error", "error": "all providers failed"}
+    ka.web_search_tool = FakeWeb()
+
+    class FakeTask:
+        agentium_id = "task_empty"
+        description = "a query with no knowledge anywhere"
+    class FakeAgent:
+        agentium_id = "30001"
+
+    out = asyncio.run(ka.checkpoint_write("received", FakeTask(), FakeAgent(), db=None))
+    # Chroma empty + web failed -> still records the checkpoint (traceability)
+    assert out.wrote_back is True
+    assert out.fallback_used is True
+    (text, meta), = [v for k, v in store.docs.items() if k[0] == "web_knowledge"]
+    assert meta["empty"] is True
+    assert meta["stage"] == "received"

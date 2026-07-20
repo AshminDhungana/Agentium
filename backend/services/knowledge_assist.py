@@ -356,6 +356,28 @@ async def checkpoint_write(
             wrote_back = True
         except Exception as exc:  # noqa: BLE001
             logger.warning("checkpoint_write[%s]: chroma-only write failed: %s", stage, exc)
+    else:
+        # Neither Chroma nor web yielded content — still record the checkpoint
+        # so every task shows the interaction (query + search) in the trace.
+        parent_id = _parent_id_for_checkpoint(stage, q)
+        try:
+            await write_knowledge(
+                parent_id,
+                f"Checkpoint {stage}: no knowledge retrieved (query={q!r}).",
+                {
+                    "type": "agent_learning",
+                    "source": "agent",
+                    "stage": stage,
+                    "task_id": getattr(task, "agentium_id", None),
+                    "agent_id": getattr(agent, "agentium_id", None),
+                    "empty": True,
+                },
+                db,
+                collection_key="web_knowledge",
+            )
+            wrote_back = True
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("checkpoint_write[%s]: empty-marker write failed: %s", stage, exc)
 
     return CheckpointOutcome(
         stage=stage,
