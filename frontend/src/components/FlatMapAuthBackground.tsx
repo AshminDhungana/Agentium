@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import * as THREE from 'three';
 import { HealthIndicator } from './HealthIndicator';
+import { SignatureMark } from './SignatureMark';
 import earthTextureUrl from '../assets/earth-dark.jpg';
 
 interface FlatMapAuthBackgroundProps {
@@ -545,11 +546,9 @@ export function FlatMapAuthBackground({ variant = 'login' }: FlatMapAuthBackgrou
           style={{ borderColor: isSignup ? 'rgba(255, 255, 255, 0.3)' : '#8B6F47' }} 
         />
       </div>
-      <div className="absolute bottom-6 right-6 pointer-events-none">
-        <div 
-          className="w-16 h-16 border-r border-b opacity-20 transition-colors duration-700" 
-          style={{ borderColor: isSignup ? 'rgba(255, 255, 255, 0.3)' : '#8B6F47' }} 
-        />
+      {/* Signature watermark - bottom-right, faint, theme-aware (dark in light mode, white in dark mode) */}
+      <div className="absolute bottom-1 right-8 pointer-events-none z-10 opacity-30 transition-colors duration-700">
+        <SignatureMark className="w-44 h-auto text-gray-900 dark:text-white" />
       </div>
 
       {/* Bottom line - color transitions */}
