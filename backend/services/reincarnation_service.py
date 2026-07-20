@@ -793,7 +793,18 @@ class ReincarnationService:
         agent.termination_reason = f"Liquidated by {liquidated_by.agentium_id}. Reason: {reason}"
         agent.is_active = False
         agent.current_task_id = None
-        
+
+        # STEP 5.5: Remove the agent's Ethos so no orphaned working-memory row
+        # remains in PostgreSQL after liquidation (audit spec §D4 — Ethos
+        # Hygiene). We delete the row and detach the FK; the agent is being
+        # terminated, so its Ethos can no longer be referenced.
+        if agent.ethos_id:
+            ethos = db.query(Ethos).filter_by(id=agent.ethos_id).first()
+            if ethos:
+                db.delete(ethos)
+            agent.ethos_id = None
+            liquidation_summary["ethos_deleted"] = True
+
         # Store archive in custom field if available
         if hasattr(agent, 'liquidation_archive'):
             agent.liquidation_archive = json.dumps(archive_state)

@@ -11,7 +11,7 @@ import uuid
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
-from sqlalchemy import func, and_
+from sqlalchemy import func, and_, or_
 import logging
 
 logger = logging.getLogger(__name__)
@@ -310,7 +310,11 @@ class EnhancedIdleGovernanceEngine:
                 Agent.is_active == True,
                 Agent.status == AgentStatus.ACTIVE,
                 Agent.is_persistent == False,  # Don't auto-terminate persistent agents
-                Agent.last_idle_action_at < threshold
+                Agent.agentium_id != "00001",  # Head of Council is NEVER auto-terminated
+                or_(
+                    Agent.last_idle_action_at.is_(None),  # never ran an idle task
+                    Agent.last_idle_action_at < threshold,
+                ),
             )
         ).all()
         
@@ -352,7 +356,11 @@ class EnhancedIdleGovernanceEngine:
                 Agent.is_active == True,
                 Agent.status == AgentStatus.ACTIVE,
                 Agent.is_persistent == False,
-                Agent.last_idle_action_at < threshold
+                Agent.agentium_id != "00001",  # Head of Council is NEVER auto-terminated
+                or_(
+                    Agent.last_idle_action_at.is_(None),  # never ran an idle task
+                    Agent.last_idle_action_at < threshold,
+                ),
             )
         ).all()
         
@@ -427,7 +435,35 @@ class EnhancedIdleGovernanceEngine:
             logger.info(f"   Skipped: {len(skipped)} agents (have active tasks or errors)")
         
         return summary
-    
+
+    @staticmethod
+    def is_eligible_for_auto_liquidation(agent: Agent, threshold: datetime) -> bool:
+        """
+        Single source of truth for whether an agent may be auto-liquidated for
+        idleness. Centralised so every auto-termination path (idle governance,
+        predictive scaling, tests) applies the SAME rules:
+
+          * must be active and in ACTIVE status
+          * must NOT be a persistent agent
+          * must NOT be the Head of Council (00001)
+          * must have no idle activity for > threshold days OR never have run
+            an idle task at all (last_idle_action_at IS NULL)
+
+        The Head of Council is explicitly excluded here so that "no auto-
+        termination path can ever target 00001" is guaranteed in one place
+        rather than by accident of the `is_persistent` flag alone.
+        """
+        return (
+            agent.is_active
+            and agent.status == AgentStatus.ACTIVE
+            and not agent.is_persistent
+            and agent.agentium_id != "00001"
+            and (
+                agent.last_idle_action_at is None
+                or agent.last_idle_action_at < threshold
+            )
+        )
+
     async def resource_rebalancing(self, db: Session) -> Dict[str, Any]:
         """
         Redistribute work from overloaded agents to underutilized ones.

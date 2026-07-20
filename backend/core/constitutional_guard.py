@@ -31,6 +31,8 @@ from enum import Enum
 
 from sqlalchemy.orm import Session
 
+from backend.core.persona import get_role_labels
+
 logger = logging.getLogger(__name__)
 
 
@@ -562,7 +564,9 @@ class ConstitutionalGuard:
         self, agent_id: str, action: str, context: Dict[str, Any]
     ) -> str:
         """Build a natural-language description for semantic comparison."""
-        tier_names = {"0": "Head of Council", "1": "Council Member", "2": "Lead Agent", "3": "Task Agent"}
+        # Tier labels are Constitution-driven (fall back to defaults) so a
+        # constitutional rename propagates to alert/action descriptions too.
+        tier_names = {str(k): v for k, v in get_role_labels(self._constitution_cache).items()}
         tier = agent_id[0] if agent_id else "3"
         agent_type = tier_names.get(tier, "Unknown Agent")
 
