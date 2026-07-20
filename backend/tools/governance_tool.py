@@ -216,6 +216,16 @@ async def dispatch_task(
     WHEN NOT to use: If no Task exists yet, use create_task first. Never call
     from a Task agent (3xxxx) -- it is withheld.
     """
+    # PAUSE GATE: while the Head of Council reclaims ID slots during an overflow
+    # review, hold new task dispatch so capacity frees up without new load.
+    from backend.services.overflow_recovery import OverflowRecoveryService
+    if OverflowRecoveryService.is_review_in_progress():
+        return _result(
+            False,
+            error="Task dispatch is paused while the Head of Council recovers "
+                  "capacity (ID-pool overflow). Please retry shortly.",
+        )
+
     caller = _caller(db, agent_id) if db and agent_id else None
     if caller is None:
         return _result(False, error="caller agent not found")

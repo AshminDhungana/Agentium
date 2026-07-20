@@ -338,9 +338,30 @@ class ReincarnationService:
                 f"Agent {parent.agentium_id} cannot spawn Task Agents "
                 "(requires SPAWN_TASK_AGENT capability)"
             )
-        
+
+        # PAUSE GATE: while a Head-of-Council overflow review reclaims ID slots,
+        # new Task-Agent spawns are paused so capacity frees up without new load.
+        from backend.services.overflow_recovery import (
+            OverflowRecoveryService,
+            CapacityRecoveryInProgress,
+        )
+        if OverflowRecoveryService.is_review_in_progress():
+            raise CapacityRecoveryInProgress(
+                "Task-Agent spawning is paused while the Head of Council recovers "
+                "capacity (ID-pool overflow). Retry once slots are freed."
+            )
+
         # Generate unique ID with retry logic
-        new_id = ReincarnationService.generate_id_with_retry("task", db)
+        try:
+            new_id = ReincarnationService.generate_id_with_retry("task", db)
+        except ValueError as e:
+            # ID pool exhausted -> trigger overflow recovery, then re-raise so the
+            # original caller still receives a clean failure.
+            try:
+                OverflowRecoveryService.maybe_trigger_overflow_review(db, reason="exhausted")
+            except Exception:
+                logger.exception("overflow: failed to trigger recovery on exhaustion")
+            raise
         
         # Create Task Agent
         task_agent = TaskAgent(
@@ -429,9 +450,30 @@ class ReincarnationService:
                 f"Agent {parent.agentium_id} cannot spawn Lead Agents "
                 "(requires SPAWN_LEAD capability)"
             )
-        
+
+        # PAUSE GATE: while a Head-of-Council overflow review reclaims ID slots,
+        # new Lead-Agent spawns are paused (Task spawns already gated). Lead/Council
+        # spawns remain possible elsewhere so the review can act, but a full
+        # exhaustion also blocks lead growth.
+        from backend.services.overflow_recovery import (
+            OverflowRecoveryService,
+            CapacityRecoveryInProgress,
+        )
+        if OverflowRecoveryService.is_review_in_progress():
+            raise CapacityRecoveryInProgress(
+                "Lead-Agent spawning is paused while the Head of Council recovers "
+                "capacity (ID-pool overflow). Retry once slots are freed."
+            )
+
         # Generate unique ID with retry logic
-        new_id = ReincarnationService.generate_id_with_retry("lead", db)
+        try:
+            new_id = ReincarnationService.generate_id_with_retry("lead", db)
+        except ValueError as e:
+            try:
+                OverflowRecoveryService.maybe_trigger_overflow_review(db, reason="exhausted")
+            except Exception:
+                logger.exception("overflow: failed to trigger recovery on exhaustion")
+            raise
         
         # Create Lead Agent
         lead_agent = LeadAgent(

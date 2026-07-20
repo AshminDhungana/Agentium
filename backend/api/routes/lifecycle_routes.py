@@ -561,3 +561,31 @@ async def get_lifecycle_stats(
         "active_agents_by_tier": active_by_tier,
         "capacity": reincarnation_service.get_available_capacity(db)
     }
+
+
+# ═══════════════════════════════════════════════════════════
+# OVERFLOW RECOVERY STATUS (Task 7.1)
+# ═══════════════════════════════════════════════════════════
+
+@router.get(
+    "/overflow/status",
+    summary="Get Overflow Recovery Status",
+    description=(
+        "Report whether a Head-of-Council overflow review is currently running "
+        "(pausing new Task-Agent spawns and task dispatch) and the last completed "
+        "recovery report."
+    ),
+    responses=build_responses(None),
+)
+async def get_overflow_status(
+    current_user: dict = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Status of the ID-pool overflow recovery flow (Task 7.1)."""
+    from backend.services.overflow_recovery import OverflowRecoveryService
+    free = OverflowRecoveryService.capacity_free_slots(db)
+    return {
+        "review_in_progress": OverflowRecoveryService.is_review_in_progress(),
+        "free_slots": free,
+        "last_report": OverflowRecoveryService.get_last_report(),
+    }

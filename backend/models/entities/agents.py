@@ -188,6 +188,11 @@ class Agent(BaseEntity):
     current_idle_task_id = Column(String(36), nullable=True)
     persistent_role = Column(String(50), nullable=True)
 
+    # Overflow recovery: marks the temporary secondary Head spawned during
+    # ID-pool exhaustion so it can be excluded from normal governance/idle loops
+    # and scoped for safe self-termination.
+    is_temporary_overflow_head = Column(Boolean, default=False, nullable=False, index=True)
+
     # Constitution & Ethos tracking
     last_constitution_read_at = Column(DateTime, nullable=True)
     constitution_read_count = Column(Integer, default=0)
@@ -1488,6 +1493,7 @@ class Agent(BaseEntity):
             'constitution_version': self.constitution_version,
             'is_terminated': self.status == AgentStatus.TERMINATED,
             'is_persistent': self.is_persistent,
+            'is_temporary_overflow_head': self.is_temporary_overflow_head,
             'idle_mode_enabled': self.idle_mode_enabled,
             'persistent_role': self.persistent_role,
             'idle_stats': {

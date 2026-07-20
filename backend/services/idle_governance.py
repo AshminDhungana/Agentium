@@ -285,6 +285,17 @@ class EnhancedIdleGovernanceEngine:
             (now - self.last_rebalancing).total_seconds() >= self.REBALANCING_INTERVAL):
             await self.resource_rebalancing(db)
             self.last_rebalancing = now
+
+        # Task 4: Proactive overflow recovery (Task 7.1)
+        # When free Task-Agent slots drop to/below the proactive threshold,
+        # spawn a temporary secondary Head to reclaim idle agents before the
+        # pool is fully exhausted. Cheap no-op while capacity is healthy
+        # (single COUNT query); guarded against concurrent reviews.
+        try:
+            from backend.services.overflow_recovery import OverflowRecoveryService
+            OverflowRecoveryService.maybe_trigger_overflow_review(db, reason="capacity_check")
+        except Exception as e:  # pragma: no cover - defensive
+            logger.warning(f"⚠️ Proactive overflow check failed: {e}")
     
     async def detect_idle_agents(self, db: Session) -> List[str]:
         """
