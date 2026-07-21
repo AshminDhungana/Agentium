@@ -4,14 +4,15 @@ import QtQuick.Effects 6.5
 
 Window {
     id: overlay
-    width: 280
-    height: 280
+    width: 320
+    height: 320
     flags: Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.WindowTransparentForInput
     color: "transparent"
     visible: false
 
     property real micLevel: 0.0
     property string voiceState: "idle"
+    property color orbColor: "#3b82f6"
 
     opacity: 0
 
@@ -23,88 +24,97 @@ Window {
         visible = opacity > 0;
     }
 
-    Rectangle {
-        id: glassBg
-        anchors.fill: parent
-        radius: 140
-        color: "#CC161B27"
-        border.color: "#1A3B82F6"
-        border.width: 1
+    onVoiceStateChanged: {
+        if (voiceState === "listening") orbColor = "#3b82f6";
+        else if (voiceState === "thinking") orbColor = "#8b5cf6";
+        else if (voiceState === "speaking") orbColor = "#10b981";
+        else orbColor = "#3b82f6";
+    }
 
-        layer.enabled: true
-        layer.effect: MultiEffect {
-            blurEnabled: true
-            blur: 1.0
-            blurMax: 64
-            saturation: 0.5
+    // Outer glow halo
+    Rectangle {
+        anchors.centerIn: parent
+        width: 340
+        height: 340
+        radius: 170
+        color: "transparent"
+        border.color: {
+            if (voiceState === "listening") return Qt.rgba(0.23, 0.51, 0.96, 0.3);
+            if (voiceState === "speaking") return Qt.rgba(0.06, 0.72, 0.51, 0.3);
+            if (voiceState === "thinking") return Qt.rgba(0.55, 0.24, 0.96, 0.3);
+            return Qt.rgba(0.23, 0.51, 0.96, 0.15);
+        }
+        border.width: 2
+
+        NumberAnimation on scale {
+            running: overlay.voiceState !== "idle"
+            from: 1.0; to: 1.03
+            duration: 1500; easing.type: Easing.InOutSine
         }
     }
 
+    // Canvas orb
     Canvas {
-        id: waveformCanvas
+        id: orbCanvas
         anchors.fill: parent
         anchors.margins: 10
 
         property real time: 0
 
+        function simplex2D(x, y) {
+            return Math.sin(x * 3.0 + time) * 0.3 + Math.cos(y * 4.0 + time * 0.7) * 0.3;
+        }
+
         onPaint: {
             var ctx = getContext("2d");
-            var w = width;
-            var h = height;
+            var w = width, h = height;
             ctx.clearRect(0, 0, w, h);
 
-            var cx = w / 2;
-            var cy = h / 2;
-            var radius = 90;
-            var barCount = 48;
-            var barWidth = 4;
+            var cx = w / 2, cy = h / 2;
+            var baseR = 90;
+            var pointCount = 48;
+            var amplitude = voiceState === "idle" ? 5 : 10 + micLevel * 25;
 
             time += 0.02;
 
-            for (var i = 0; i < barCount; i++) {
-                var angle = (i / barCount) * Math.PI * 2 - Math.PI / 2;
-
-                var level = 0.0;
-                if (voiceState === "listening") {
-                    level = micLevel * (0.6 + 0.4 * Math.sin(time * 3 + i * 0.4));
+            // Build blob path
+            ctx.beginPath();
+            for (var i = 0; i <= pointCount; i++) {
+                var angle = (i / pointCount) * Math.PI * 2 - Math.PI / 2;
+                var noise = 0;
+                if (voiceState === "listening" || voiceState === "speaking") {
+                    noise = simplex2D(cx + baseR * Math.cos(angle), cy + baseR * Math.sin(angle)) * amplitude;
                 } else if (voiceState === "thinking") {
-                    var wavePos = ((time * 1.5 + i / barCount) % 1.0);
-                    level = Math.sin(wavePos * Math.PI) * 0.5;
+                    noise = Math.sin(time * 2 + i * 0.5) * 12;
                 }
-
-                var barHeight = 6 + level * 30;
-                var glowSize = level * 8;
-
-                // Glow layer
-                ctx.strokeStyle = "rgba(59, 130, 246, 0.15)";
-                ctx.lineWidth = barWidth + glowSize;
-                ctx.lineCap = "round";
-                ctx.beginPath();
-                var gx1 = cx + Math.cos(angle) * (radius - glowSize / 2);
-                var gy1 = cy + Math.sin(angle) * (radius - glowSize / 2);
-                var gx2 = cx + Math.cos(angle) * (radius + barHeight + glowSize / 2);
-                var gy2 = cy + Math.sin(angle) * (radius + barHeight + glowSize / 2);
-                ctx.moveTo(gx1, gy1);
-                ctx.lineTo(gx2, gy2);
-                ctx.stroke();
-
-                // Main bar
-                ctx.strokeStyle = "#3b82f6";
-                ctx.lineWidth = barWidth;
-                ctx.beginPath();
-                var x1 = cx + Math.cos(angle) * radius;
-                var y1 = cy + Math.sin(angle) * radius;
-                var x2 = cx + Math.cos(angle) * (radius + barHeight);
-                var y2 = cy + Math.sin(angle) * (radius + barHeight);
-                ctx.moveTo(x1, y1);
-                ctx.lineTo(x2, y2);
-                ctx.stroke();
+                var r = baseR + noise;
+                var px = cx + Math.cos(angle) * r;
+                var py = cy + Math.sin(angle) * r;
+                if (i === 0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
             }
+            ctx.closePath();
+
+            // Fill with gradient
+            var gradient = ctx.createRadialGradient(cx - 20, cy - 20, 10, cx, cy, baseR + 20);
+            gradient.addColorStop(0, orbColor);
+            gradient.addColorStop(0.5, orbColor + "cc");
+            gradient.addColorStop(1, orbColor + "44");
+            ctx.fillStyle = gradient;
+            ctx.fill();
+
+            // Inner glow highlight
+            var innerGlow = ctx.createRadialGradient(cx, cy, 0, cx, cy, baseR * 0.4);
+            innerGlow.addColorStop(0, "rgba(255,255,255,0.15)");
+            innerGlow.addColorStop(1, "rgba(255,255,255,0)");
+            ctx.fillStyle = innerGlow;
+            ctx.fill();
         }
 
         Connections {
             target: overlay
-            function onMicLevelChanged() { waveformCanvas.requestPaint(); }
+            function onMicLevelChanged() { orbCanvas.requestPaint(); }
+            function onVoiceStateChanged() { orbCanvas.requestPaint(); }
         }
     }
 
@@ -113,27 +123,27 @@ Window {
         running: opacity > 0
         repeat: true
         onTriggered: {
-            waveformCanvas.time += 0.02;
-            waveformCanvas.requestPaint();
+            orbCanvas.time += 0.02;
+            orbCanvas.requestPaint();
         }
     }
 
-    // Core circle
+    // Center dot
     Rectangle {
-        width: 16
-        height: 16
-        radius: 8
-        color: "#3b82f6"
-        anchors.centerIn: parent
+        width: 20
+        height: 20
+        radius: 10
+        color: "#ffffff"
         opacity: 0.9
+        anchors.centerIn: parent
 
         Rectangle {
             width: 8
             height: 8
             radius: 4
             color: "#ffffff"
-            anchors.centerIn: parent
             opacity: 0.4
+            anchors.centerIn: parent
         }
     }
 
@@ -143,15 +153,13 @@ Window {
         Rectangle {
             x: parent.width / 2 - width / 2
             y: parent.height / 2 - height / 2
-            width: 180 + index * 20
-            height: 180 + index * 20
+            width: 200 + index * 20
+            height: 200 + index * 20
             radius: (width + height) / 4
             color: "transparent"
             border.color: "#143B82F6"
             border.width: 1
-            rotation: waveformCanvas.time * (index === 0 ? 15 : -10)
-
-            Behavior on rotation { NumberAnimation { duration: 100 } }
+            rotation: orbCanvas.time * (index === 0 ? 15 : -10)
         }
     }
 }
