@@ -1089,6 +1089,13 @@ async def _run_session() -> None:
         turn += 1
         logger.info("[bridge] Session turn %d: '%s'", turn, command)
 
+        await _broadcast({
+            "type": "transcript",
+            "role": "user",
+            "text": command,
+            "ts":   time.time(),
+        })
+
         # Query the backend
         reply = await query_backend(command)
         if not reply:
@@ -1099,6 +1106,13 @@ async def _run_session() -> None:
 
         # Speak the reply and broadcast to any connected browser tabs
         await speak(reply)
+
+        await _broadcast({
+            "type": "transcript",
+            "role": "agent",
+            "text": reply,
+            "ts":   time.time(),
+        })
 
         await _broadcast({
             "type":  "voice_interaction",
