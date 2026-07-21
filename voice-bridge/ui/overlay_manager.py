@@ -117,13 +117,22 @@ class OverlayManager(QObject):
         if state == "listening":
             self.show_overlay()
             self._auto_hide_timer.stop()
+            if self._indicator_root:
+                self._indicator_root.setProperty("stateLabel", "Listening...")
         elif state == "speaking":
             self.hide_overlay()
             self.show_indicator()
+            if self._indicator_root:
+                self._indicator_root.setProperty("stateLabel", "Speaking...")
+        elif state == "thinking":
+            if self._indicator_root:
+                self._indicator_root.setProperty("stateLabel", "Thinking...")
         elif state == "interrupted":
             self.hide_indicator()
             self.show_overlay()
             self._auto_hide_timer.stop()
+            if self._indicator_root:
+                self._indicator_root.setProperty("stateLabel", "Listening...")
         elif state == "idle":
             self.hide_indicator()
             if self._overlay_visible:

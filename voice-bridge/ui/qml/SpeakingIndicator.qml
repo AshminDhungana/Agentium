@@ -4,13 +4,14 @@ import QtQuick.Effects 6.5
 
 Window {
     id: indicator
-    width: 120
-    height: 36
+    width: 170
+    height: 46
     flags: Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.WindowTransparentForInput
     color: "transparent"
     visible: false
 
     property bool active: false
+    property string stateLabel: "Speaking..."
 
     opacity: 0
 
@@ -25,7 +26,7 @@ Window {
     Rectangle {
         id: glassBg
         anchors.fill: parent
-        radius: 18
+        radius: 23
         color: "#D9161B27"
         border.color: "#4D3B82F6"
         border.width: 1
@@ -42,7 +43,7 @@ Window {
     Item {
         anchors.centerIn: parent
         width: childrenRect.width
-        height: 16
+        height: 20
 
         property real time: 0
 
@@ -56,18 +57,18 @@ Window {
         }
 
         Row {
-            spacing: 5
+            spacing: 6
             Repeater {
-                model: 3
+                model: 5
                 Rectangle {
                     y: parent.parent.height / 2 - height / 2
-                    width: 3
-                    radius: 1.5
-                    color: "#3b82f6"
+                    width: 4
+                    radius: 2
+                    color: indicator.active ? "#3b82f6" : "#888888"
 
-                    property real baseHeight: 8
+                    property real baseHeight: 10
                     height: indicator.active
-                        ? baseHeight + Math.sin(parent.parent.time * 4 + index * 1.5) * 6 + 4
+                        ? baseHeight + Math.sin(parent.parent.time * 4 + index * 1.2) * 7 + 4
                         : baseHeight
 
                     Behavior on height {
@@ -78,13 +79,24 @@ Window {
         }
     }
 
+    Text {
+        anchors.left: parent.left
+        anchors.leftMargin: 46
+        anchors.verticalCenter: parent.verticalCenter
+        color: "#cccccc"
+        font.pixelSize: 11
+        font.weight: Font.DemiBold
+        text: indicator.stateLabel
+        visible: indicator.active
+    }
+
     Rectangle {
         anchors.right: parent.right
+        anchors.rightMargin: 10
         anchors.verticalCenter: parent.verticalCenter
-        anchors.rightMargin: 8
-        width: 8
-        height: 8
-        radius: 4
+        width: 10
+        height: 10
+        radius: 5
         color: indicator.active ? "#3b82f6" : "transparent"
 
         Behavior on color {
