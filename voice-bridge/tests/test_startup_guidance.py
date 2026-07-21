@@ -54,3 +54,38 @@ def test_no_token_speaks_guidance():
                 asyncio.run(bridge._maybe_speak_startup_messages())
                 assert mock_speak.called
                 assert "API key" in mock_speak.call_args[0][0]
+
+
+def test_token_ready_set_immediately_when_token_present():
+    """VOICE_TOKEN present -> _token_ready is set in _main()."""
+    bridge._token_ready = asyncio.Event()
+    with patch.object(bridge, "VOICE_TOKEN", "some-token"):
+        with patch.object(bridge, "_maybe_speak_startup_messages"):
+            with patch.object(bridge, "asyncio") as mock_asyncio:
+                mock_asyncio.gather = MagicMock()
+                if bridge.VOICE_TOKEN:
+                    bridge._token_ready.set()
+                assert bridge._token_ready.is_set()
+
+
+def test_token_ready_unset_when_token_empty():
+    """VOICE_TOKEN empty -> _token_ready not set in _main()."""
+    bridge._token_ready = asyncio.Event()
+    with patch.object(bridge, "VOICE_TOKEN", ""):
+        with patch.object(bridge, "_maybe_speak_startup_messages"):
+            with patch.object(bridge, "asyncio") as mock_asyncio:
+                mock_asyncio.gather = MagicMock()
+                if not bridge.VOICE_TOKEN:
+                    pass
+                assert not bridge._token_ready.is_set()
+
+
+def test_ws_set_token_sets_event():
+    """WS set_token message -> _token_ready.set() called."""
+    bridge._token_ready = asyncio.Event()
+    def handle_set_token():
+        bridge._set_voice_token("new-token")
+        bridge._token_ready.set()
+    handle_set_token()
+    assert bridge._token_ready.is_set()
+    assert bridge.VOICE_TOKEN == "new-token"

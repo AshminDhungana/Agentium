@@ -189,6 +189,9 @@ async def _maybe_speak_startup_messages() -> None:
             logger.warning("[WARN] Could not speak startup guidance: %s", exc)
 
 
+_token_ready: Optional["asyncio.Event"] = None
+
+
 # ── Optional dependency guards ─────────────────────────────────────────────────
 
 SR_AVAILABLE     = False
@@ -962,6 +965,8 @@ async def _ws_handler(websocket) -> None:
                 token = msg.get("token")
                 if token:
                     _set_voice_token(token)
+                    if _token_ready is not None:
+                        _token_ready.set()
                     await _broadcast({"type": "voice_token_set", "ts": time.time()})
     except Exception:
         pass
@@ -1352,6 +1357,9 @@ async def _run_voice_loop_once() -> None:
     An unhandled exception propagates to the supervisor (_supervise) instead of
     being swallowed, so recurring failures stay visible.
     """
+    # Wait for a voice token before starting the mic loop
+    if _token_ready is not None:
+        await _token_ready.wait()
     logger.info("[bridge] Voice loop started")
 
     if not SR_AVAILABLE:
@@ -1453,6 +1461,13 @@ async def _main() -> None:
     logger.info("  Persona   : %s", "default" if _load_persona() else "none")
     logger.info("  Proactive : %s", "enabled" if VOICE_PROACTIVE_ENABLED else "disabled")
     logger.info("=" * 60)
+
+    # ── Startup guidance + token gating ─────────────────────────────────────
+    await _maybe_speak_startup_messages()
+    global _token_ready
+    _token_ready = asyncio.Event()
+    if VOICE_TOKEN:
+        _token_ready.set()
 
     # B5: each subsystem is supervised independently now instead of sharing
     # a single asyncio.gather() that dies as one unit. The proactive WS client
