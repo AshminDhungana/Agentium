@@ -154,6 +154,41 @@ logger.info(
     SESSION_PAUSE_THRESHOLD, SESSION_NO_SPEECH_TIMEOUT, SESSION_MAX_DURATION,
 )
 
+# ── Startup counter ──────────────────────────────────────────────────────────
+_COUNTER_PATH = Path.home() / ".agentium" / ".voice-startup-count"
+
+
+async def _maybe_speak_startup_messages() -> None:
+    """Read/increment startup counter, speak welcome (every 5 runs) and/or
+    guidance (no token). Called once from _main() before asyncio.gather()."""
+    count = 0
+    try:
+        if _COUNTER_PATH.is_file():
+            count = int(_COUNTER_PATH.read_text().strip())
+    except (ValueError, OSError):
+        pass
+    count += 1
+    try:
+        _COUNTER_PATH.parent.mkdir(parents=True, exist_ok=True)
+        _COUNTER_PATH.write_text(str(count))
+    except OSError as exc:
+        logger.warning("[bridge] Could not write startup counter: %s", exc)
+
+    parts: list[str] = []
+    if count == 1 or count % 5 == 0:
+        parts.append("Welcome back, voice is ready.")
+    if not VOICE_TOKEN:
+        parts.append("Please add an API key in the Agentium dashboard to start using voice.")
+
+    if parts:
+        text = " ".join(parts)
+        logger.info("[bridge] Startup guidance: %s", text)
+        try:
+            await speak(text)
+        except Exception as exc:
+            logger.warning("[WARN] Could not speak startup guidance: %s", exc)
+
+
 # ── Optional dependency guards ─────────────────────────────────────────────────
 
 SR_AVAILABLE     = False
