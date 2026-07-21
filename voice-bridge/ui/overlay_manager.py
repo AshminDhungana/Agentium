@@ -69,6 +69,15 @@ class OverlayManager(QObject):
         self._indicator_view.setFlag(Qt.WindowType.WindowTransparentForInput, True)
         self._indicator_root = self._indicator_view.rootObject()
 
+        self._transcript_view = QQuickView()
+        self._transcript_view.setSource(
+            QUrl.fromLocalFile(__file__).resolved(QUrl("./qml/TranscriptOverlay.qml"))
+        )
+        self._transcript_view.setResizeMode(QQuickView.SizeRootObjectToView)
+        self._transcript_view.setColor("transparent")
+        self._transcript_view.setFlag(Qt.WindowType.WindowTransparentForInput, True)
+        self._transcript_root = self._transcript_view.rootObject()
+
     @Slot()
     def toggle_overlay(self):
         if self._overlay_visible:
@@ -116,11 +125,13 @@ class OverlayManager(QObject):
             self._overlay_root.setProperty("voiceState", state)
         if state == "listening":
             self.show_overlay()
+            self.show_transcript()
             self._auto_hide_timer.stop()
             if self._indicator_root:
                 self._indicator_root.setProperty("stateLabel", "Listening...")
         elif state == "speaking":
             self.hide_overlay()
+            self.hide_transcript()
             self.show_indicator()
             if self._indicator_root:
                 self._indicator_root.setProperty("stateLabel", "Speaking...")
@@ -130,11 +141,13 @@ class OverlayManager(QObject):
         elif state == "interrupted":
             self.hide_indicator()
             self.show_overlay()
+            self.show_transcript()
             self._auto_hide_timer.stop()
             if self._indicator_root:
                 self._indicator_root.setProperty("stateLabel", "Listening...")
         elif state == "idle":
             self.hide_indicator()
+            self.hide_transcript()
             if self._overlay_visible:
                 self._auto_hide_timer.start()
 
@@ -142,6 +155,24 @@ class OverlayManager(QObject):
     def on_mic_level(self, level: float):
         if self._overlay_root:
             self._overlay_root.setProperty("micLevel", level)
+
+    @Slot(str, str)
+    def on_transcript(self, text: str, role: str):
+        if self._transcript_root:
+            self._transcript_root.setProperty("transcriptText", text)
+            self._transcript_root.setProperty("transcriptRole", role)
+            self._transcript_root.setProperty("isVisible", True)
+
+    def show_transcript(self):
+        self._position_under_orb()
+        self._transcript_view.show()
+        if self._transcript_root:
+            self._transcript_root.setProperty("isVisible", True)
+
+    def hide_transcript(self):
+        if self._transcript_root:
+            self._transcript_root.setProperty("isVisible", False)
+        self._transcript_view.hide()
 
     def _on_auto_hide(self):
         self.hide_overlay()
@@ -151,6 +182,13 @@ class OverlayManager(QObject):
         self._overlay_view.setPosition(
             int(cursor_pos.x() - self._overlay_view.width() / 2),
             int(cursor_pos.y() - self._overlay_view.height() / 2),
+        )
+
+    def _position_under_orb(self):
+        cursor_pos = QCursor.pos()
+        self._transcript_view.setPosition(
+            int(cursor_pos.x() - self._transcript_view.width() / 2),
+            int(cursor_pos.y() + 170),
         )
 
     def _position_bottom_right(self):
