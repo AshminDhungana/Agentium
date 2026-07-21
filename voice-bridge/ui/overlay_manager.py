@@ -1,5 +1,5 @@
 import sys
-from PySide6.QtCore import QObject, Slot, QTimer, QUrl, Property
+from PySide6.QtCore import QObject, Slot, QTimer, QUrl
 from PySide6.QtGui import QGuiApplication, QScreen
 from PySide6.QtQuick import QQuickView
 from PySide6.QtCore import Qt
@@ -51,6 +51,7 @@ class OverlayManager(QObject):
         )
         self._overlay_view.setResizeMode(QQuickView.SizeRootObjectToView)
         self._overlay_view.setColor("transparent")
+        self._overlay_view.setFlag(Qt.WindowType.WindowTransparentForInput, True)
 
         self._overlay_root = self._overlay_view.rootObject()
         if self._overlay_root:
@@ -63,6 +64,7 @@ class OverlayManager(QObject):
         )
         self._indicator_view.setResizeMode(QQuickView.SizeRootObjectToView)
         self._indicator_view.setColor("transparent")
+        self._indicator_view.setFlag(Qt.WindowType.WindowTransparentForInput, True)
         self._indicator_root = self._indicator_view.rootObject()
 
     @Slot()
