@@ -173,6 +173,7 @@ class OverflowRecoveryService:
             restrictions=json.dumps([]),
             capabilities=json.dumps([]),
             created_by_agentium_id="00001",
+            agentium_id=f"E{new_id}",
             agent_id="00000000-0000-0000-0000-000000000000",
             version=1,
         )
@@ -193,8 +194,9 @@ class OverflowRecoveryService:
             ethos_id=ethos.id,
             created_by_agentium_id="00001",
         )
-        ethos.agent_id = head.id
         db.add(head)
+        db.flush()
+        ethos.agent_id = head.id
         db.flush()
 
         AuditLog.log(

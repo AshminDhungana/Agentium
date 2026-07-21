@@ -263,6 +263,7 @@ export const voiceApi = {
     requireWakeWord: boolean;
     ttsVoice: string;
     proactiveEnabled: boolean;
+    speakerIdentification: boolean;
   }): Promise<void> => {
     await api.put('/api/v1/voice/config', config);
   },

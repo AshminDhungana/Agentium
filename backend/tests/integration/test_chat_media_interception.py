@@ -17,6 +17,32 @@ from backend.models.entities.user import User
 from backend.models.entities.user_config import UserModelConfig, ProviderType, ConnectionStatus
 from backend.models.database import get_db_context
 from backend.services.model_provider import ModelService, OpenAICompatibleProvider
+from backend.models.database import SessionLocal
+
+
+def _commit_sovereign_user(user_id: str, username: str, email: str) -> None:
+    """Commit the admin (sovereign) user to the REAL database.
+
+    The media-interception background task opens its own ``SessionLocal()``
+    connection, so it cannot see rows committed only to a test's savepoint
+    transaction. Committing the sovereign user for real lets the background
+    task's ``ChatMessage.user_id`` FK resolve. Idempotent so the 3 media tests
+    can each call it without colliding on the (per-test unique) username.
+    """
+    db = SessionLocal()
+    try:
+        if db.query(User).filter_by(username=username).first() is None:
+            db.add(User(
+                id=user_id,
+                username=username,
+                email=email,
+                hashed_password="fake-hash-for-test",
+                is_admin=True,
+                is_active=True,
+            ))
+            db.commit()
+    finally:
+        db.close()
 
 
 class MockProvider(OpenAICompatibleProvider):
@@ -73,16 +99,11 @@ class TestChatServiceMediaInterception:
         seeded_db.add(head)
 
         # Use unique username and ID to avoid conflict with seeded_db fixture's admin user
-        admin = User(
-            id="user-admin-media-1",
-            username="admin_media_1",
-            email="admin_media_1@agentium.test",
-            hashed_password="fake-hash-for-test",
-            is_admin=True,
-            is_active=True
+        # Sovereign user committed to the REAL db so the background media task
+        # (separate SessionLocal() connection) can resolve ChatMessage.user_id FK.
+        _commit_sovereign_user(
+            "user-admin-media-1", "admin_media_1", "admin_media_1@agentium.test"
         )
-        seeded_db.add(admin)
-        seeded_db.commit()
 
         # Create and configure default model config for the head
         model = UserModelConfig(
@@ -142,6 +163,7 @@ class TestChatServiceMediaInterception:
         # Verify the persisted Head-of-Council ChatMessage has the rewritten storage URL
         from backend.models.entities.chat_message import ChatMessage
         msgs = seeded_db.query(ChatMessage).filter_by(role="head_of_council").all()
+        import sys; print("DEBUG_MSGS", [(m.id, repr(m.content), m.message_metadata) for m in msgs], file=sys.stderr, flush=True)
         assert any("https://s3.bucket/files/user-admin-media-1/abc123.png" in m.content for m in msgs)
         assert any("https://charts.example.com/sales.png" not in m.content for m in msgs)
         assert any("![Sales Chart]" in m.content for m in msgs)  # alt text preserved
@@ -151,9 +173,7 @@ class TestChatServiceMediaInterception:
         """Bare https://.../image.jpg URL gets replaced."""
         head = HeadOfCouncil(agentium_id="HEAD00001", name="Test", is_active=True)
         seeded_db.add(head)
-        admin = User(id="user-admin-media-2", username="admin_media_2", email="admin_media_2@agentium.test", hashed_password="fake-hash-for-test", is_admin=True, is_active=True)
-        seeded_db.add(admin)
-        seeded_db.commit()
+        _commit_sovereign_user("user-admin-media-2", "admin_media_2", "admin_media_2@agentium.test")
 
         # Create and configure default model config for the head
         model = UserModelConfig(
@@ -313,9 +333,7 @@ class TestChatServiceMediaInterception:
         """New storage URLs stored in ChatMessage metadata.media_urls."""
         head = HeadOfCouncil(agentium_id="HEAD00001", name="Test", is_active=True)
         seeded_db.add(head)
-        admin = User(id="user-admin-media-5", username="admin_media_5", email="admin_media_5@agentium.test", hashed_password="fake-hash-for-test", is_admin=True, is_active=True)
-        seeded_db.add(admin)
-        seeded_db.commit()
+        _commit_sovereign_user("user-admin-media-5", "admin_media_5", "admin_media_5@agentium.test")
 
         # Create and configure default model config for the head
         model = UserModelConfig(
@@ -332,6 +350,13 @@ class TestChatServiceMediaInterception:
         # Associate with the Head of Council
         head.preferred_config_id = str(model.id)
         seeded_db.commit()
+        # The fire-and-forget background media-interception task opens its OWN
+        # SessionLocal() connection, so it cannot see rows committed only to this
+        # test's savepoint transaction. Flush the setup to the real DB so the
+        # background task's FK check on user_id succeeds. (Teardown still rolls
+        # back the outer test transaction; the committed rows are reconciled by
+        # the session-scoped db_engine drop_all at suite end.)
+        seeded_db.connection().commit()
 
         mock_llm_result = {
             "content": "![Chart](https://charts.example.com/chart.png)",

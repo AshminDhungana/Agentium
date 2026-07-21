@@ -16,10 +16,14 @@ logger = logging.getLogger(__name__)
 
 # ── Config ─────────────────────────────────────────────────────────────────────
 
-_VOICE_SECRET: Optional[str] = os.getenv("VOICE_JWT_SECRET")
 _DURATION_MINUTES: int = int(os.getenv("VOICE_TOKEN_DURATION_MINUTES", "30"))
 _ALGORITHM = "HS256"
 _TOKEN_TYPE = "voice"
+
+
+def _get_voice_secret() -> Optional[str]:
+    """Re-read VOICE_JWT_SECRET from env so startup auto-generation is visible."""
+    return os.getenv("VOICE_JWT_SECRET")
 
 
 # ── Public helpers ──────────────────────────────────────────────────────────────
@@ -54,7 +58,8 @@ def create_host_voice_token(username: str, user_id: Optional[str] = None,
 
 
 def _encode_voice_token(username: str, user_id: Optional[str], minutes: int) -> str:
-    if not _VOICE_SECRET:
+    secret = _get_voice_secret()
+    if not secret:
         raise RuntimeError(
             "VOICE_JWT_SECRET is not set. "
             "Set the VOICE_JWT_SECRET environment variable before using the voice bridge."
@@ -69,7 +74,7 @@ def _encode_voice_token(username: str, user_id: Optional[str], minutes: int) -> 
         "exp": now + timedelta(minutes=minutes),
     }
 
-    token = jwt.encode(payload, _VOICE_SECRET, algorithm=_ALGORITHM)
+    token = jwt.encode(payload, secret, algorithm=_ALGORITHM)
     logger.info("[voice_auth] Issued voice token for user '%s' (expires in %dm)", username, minutes)
     return token
 
@@ -82,12 +87,13 @@ def verify_voice_token(token: str) -> Optional[dict]:
     wrong secret, wrong type, etc.).  Never raises — the caller decides
     what to do with a None result.
     """
-    if not _VOICE_SECRET:
+    secret = _get_voice_secret()
+    if not secret:
         logger.warning("[voice_auth] VOICE_JWT_SECRET not set — token verification skipped")
         return None
 
     try:
-        payload = jwt.decode(token, _VOICE_SECRET, algorithms=[_ALGORITHM])
+        payload = jwt.decode(token, secret, algorithms=[_ALGORITHM])
         if payload.get("type") != _TOKEN_TYPE:
             logger.warning("[voice_auth] Token type mismatch: expected '%s', got '%s'", _TOKEN_TYPE, payload.get("type"))
             return None

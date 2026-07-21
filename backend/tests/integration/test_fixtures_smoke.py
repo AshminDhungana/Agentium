@@ -24,7 +24,15 @@ async def test_seeded_db(seeded_db):
     assert head is not None
     assert head.is_active is True
     
-    council_count = seeded_db.query(CouncilMember).count()
+    # Genesis creates exactly two council members (10001, 10002).
+    # The seeded_db fixture also provisions a separate admin council agent
+    # (10003) used by other integration tests, so count the genesis
+    # members explicitly rather than every CouncilMember row.
+    council_count = (
+        seeded_db.query(CouncilMember)
+        .filter(CouncilMember.agentium_id.in_(["10001", "10002"]))
+        .count()
+    )
     assert council_count == 2
     
     constitution = seeded_db.query(Constitution).filter_by(is_active=True).first()

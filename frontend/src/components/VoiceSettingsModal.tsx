@@ -42,6 +42,7 @@ export function VoiceSettingsModal({ onClose }: VoiceSettingsModalProps) {
     const [ttsVoice, setTtsVoice] = useState('af_bella');
     const [proactiveEnabled, setProactiveEnabled] = useState(false);
     const [isSavingConfig, setIsSavingConfig] = useState(false);
+    const [speakerIdentification, setSpeakerIdentification] = useState(false);
 
     useEffect(() => {
         const saved = localStorage.getItem('voice_engine_config');
@@ -51,6 +52,7 @@ export function VoiceSettingsModal({ onClose }: VoiceSettingsModalProps) {
                 setRequireWakeWord(cfg.requireWakeWord ?? true);
                 setTtsVoice(cfg.ttsVoice ?? 'af_bella');
                 setProactiveEnabled(cfg.proactiveEnabled ?? false);
+                setSpeakerIdentification(cfg.speakerIdentification ?? false);
             } catch {
                 /* ignore malformed */
             }
@@ -60,19 +62,19 @@ export function VoiceSettingsModal({ onClose }: VoiceSettingsModalProps) {
                 setRequireWakeWord(cfg.requireWakeWord ?? requireWakeWord);
                 setTtsVoice(cfg.ttsVoice ?? ttsVoice);
                 setProactiveEnabled(cfg.proactiveEnabled ?? proactiveEnabled);
+                setSpeakerIdentification(cfg.speakerIdentification ?? speakerIdentification);
             }
         }).catch(() => { /* best-effort */ });
     }, []);
 
     const saveConfig = async () => {
         setIsSavingConfig(true);
-        const cfg = { requireWakeWord, ttsVoice, proactiveEnabled };
+        const cfg = { requireWakeWord, ttsVoice, proactiveEnabled, speakerIdentification };
         localStorage.setItem('voice_engine_config', JSON.stringify(cfg));
         try {
             await voiceApi.setVoiceConfig(cfg);
             showToast.success('Voice engine settings saved');
         } catch {
-            // Backend route may not exist yet; local persistence is enough.
             showToast.success('Voice engine settings saved locally');
         } finally {
             setIsSavingConfig(false);
@@ -226,6 +228,15 @@ export function VoiceSettingsModal({ onClose }: VoiceSettingsModalProps) {
 
                     <div className="mb-8">
                         <h3 className="text-md font-semibold text-gray-900 dark:text-white mb-1">Speaker Identification</h3>
+                        <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 mb-3">
+                            <input
+                                type="checkbox"
+                                checked={speakerIdentification}
+                                onChange={(e) => setSpeakerIdentification(e.target.checked)}
+                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            />
+                            Enable speaker identification
+                        </label>
                         <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
                             Enroll voices so the AI can identify who is speaking in multi-user settings.
                         </p>

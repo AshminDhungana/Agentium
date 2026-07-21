@@ -47,11 +47,13 @@ $artifacts = @(
     (Join-Path $startupFolder "agentium-voice-setup.hta")
     (Join-Path $startupFolder "agentium-voice-bridge.bat")
     (Join-Path $startupFolder "AgentiumVoiceBridge.lnk")
+    (Join-Path $startupFolder "AgentiumVoiceUI.lnk")
     (Join-Path $CONF_DIR     "bootstrap-voice.cmd")
     (Join-Path $CONF_DIR     "prompt.vbs")
     (Join-Path $CONF_DIR     "run-prompt.cmd")
     (Join-Path $CONF_DIR     "agentium-runonce.reg")
     (Join-Path $CONF_DIR     "voice-installed.marker")
+    (Join-Path $CONF_DIR     "start-voice-ui.vbs")
     (Join-Path ([Environment]::GetFolderPath("Desktop")) "Install Agentium Voice Bridge.cmd")
 )
 foreach ($a in $artifacts) {
@@ -72,6 +74,13 @@ if ($task) {
     Write-Log "Scheduled task '$TaskName' removed."
 } else {
     Write-Log "Scheduled task '$TaskName' not found -- skipping."
+}
+
+# --- Remove UI companion directory ---
+$UIDir = Join-Path $CONF_DIR "voice-ui"
+if (Test-Path $UIDir) {
+    Remove-Item $UIDir -Recurse -Force -ErrorAction SilentlyContinue
+    Write-Log "Removed UI companion: $UIDir"
 }
 
 Write-Log "Venv and conf files left in $CONF_DIR (remove manually if desired)"

@@ -88,58 +88,97 @@ function Test-PythonOk($bin) {
     } catch { return $false }
 }
 
-# Candidate list â€” real install locations first, Store stub last
-$candidates = @(
-    # Explicit version-named commands (real installs usually register these)
-    "python3.13","python3.12","python3.11","python3.10",
-    # Generic names
-    "python3","python"
-)
-
-# First pass: prefer non-Store Python
-foreach ($candidate in $candidates) {
-    $cmd = Get-Command $candidate -ErrorAction SilentlyContinue
-    if (-not $cmd) { continue }
-    $exePath = $cmd.Source
-
-    # Resolve the real executable path (handles aliases/shims)
+# Helper: return the major.minor version tuple for sorting.
+function Get-PythonVersion($bin) {
     try {
-        $resolved = & $exePath -c "import sys; print(sys.executable)" 2>$null
-        if ($resolved -and (Test-Path $resolved)) { $exePath = $resolved }
-    } catch {}
+        $parts = (& $bin -c "import sys; print(f'{sys.version_info[0]}.{sys.version_info[1]}')" 2>$null) -split '\.'
+        return @{ major = [int]$parts[0]; minor = [int]$parts[1] }
+    } catch { return $null }
+}
 
-    if (Test-IsStorePython $exePath) { continue }   # skip Store stubs in first pass
-    if (Test-PythonOk $exePath) {
-        $PYTHON_BIN = $exePath
-        break
+# Helper: discover valid Python.exe paths (non-Store) from a name list.
+function Find-PythonPaths($names) {
+    $found = @()
+    foreach ($name in $names) {
+        $cmd = Get-Command $name -ErrorAction SilentlyContinue
+        if (-not $cmd) { continue }
+        $exePath = $cmd.Source
+        try {
+            $resolved = & $exePath -c "import sys; print(sys.executable)" 2>$null
+            if ($resolved -and (Test-Path $resolved)) { $exePath = $resolved }
+        } catch {}
+        if (-not (Test-IsStorePython $exePath) -and (Test-PythonOk $exePath)) {
+            $found += $exePath
+        }
+    }
+    return $found
+}
+
+# Candidate name lists: prefer pre-3.14 versions, fall back to 3.14+ last.
+$preferNames = @("python3.13","python3.12","python3.11","python3.10","python3","python")
+$fallbackNames = @("python3.14","python3")
+
+# --- First pass: find real (non-Store) Python, preferring < 3.14 ---
+
+# Collect all candidates and pick the best one.
+$allCandidates = @()
+foreach ($p in (Find-PythonPaths $preferNames)) { $allCandidates += $p }
+foreach ($p in (Find-PythonPaths $fallbackNames)) { $allCandidates += $p }
+
+# Common real-install directories (add 314 as last-resort path).
+$directPaths = @(
+    "$env:LOCALAPPDATA\Programs\Python\Python313\python.exe",
+    "$env:LOCALAPPDATA\Programs\Python\Python312\python.exe",
+    "$env:LOCALAPPDATA\Programs\Python\Python311\python.exe",
+    "$env:LOCALAPPDATA\Programs\Python\Python310\python.exe",
+    "C:\Python313\python.exe",
+    "C:\Python312\python.exe",
+    "C:\Python311\python.exe",
+    "C:\Python310\python.exe",
+    "$env:ProgramFiles\Python313\python.exe",
+    "$env:ProgramFiles\Python312\python.exe",
+    # Last-resort: 3.14 (has no PyAudio wheels)
+    "$env:LOCALAPPDATA\Programs\Python\Python314\python.exe",
+    "C:\Python314\python.exe",
+    "$env:ProgramFiles\Python314\python.exe"
+)
+foreach ($p in $directPaths) {
+    if (Test-PythonOk $p -and -not (Test-IsStorePython $p)) {
+        $allCandidates += $p
     }
 }
 
-# Second pass: also check common real-install directories directly
-if (-not $PYTHON_BIN) {
-    $directPaths = @(
-        "$env:LOCALAPPDATA\Programs\Python\Python313\python.exe",
-        "$env:LOCALAPPDATA\Programs\Python\Python312\python.exe",
-        "$env:LOCALAPPDATA\Programs\Python\Python311\python.exe",
-        "$env:LOCALAPPDATA\Programs\Python\Python310\python.exe",
-        "C:\Python313\python.exe",
-        "C:\Python312\python.exe",
-        "C:\Python311\python.exe",
-        "C:\Python310\python.exe",
-        "$env:ProgramFiles\Python313\python.exe",
-        "$env:ProgramFiles\Python312\python.exe"
-    )
-    foreach ($p in $directPaths) {
-        if (Test-PythonOk $p) {
-            $PYTHON_BIN = $p
-            break
-        }
+# Deduplicate (same exe may appear from both name and direct-path scans).
+$seen = @{}
+$unique = @()
+foreach ($p in $allCandidates) {
+    $normalized = (Resolve-Path $p -ErrorAction SilentlyContinue).Path
+    if (-not $normalized) { $normalized = $p }
+    if (-not $seen.ContainsKey($normalized)) {
+        $seen[$normalized] = $true
+        $unique += , @{ path = $p; normalized = $normalized }
     }
+}
+
+# Score: lower is better.  3.10-3.13 get score == minor, 3.14+ get score = 99 + minor.
+$scored = @()
+foreach ($entry in $unique) {
+    $v = Get-PythonVersion $entry.path
+    if (-not $v) { continue }
+    $score = if ($v.major -eq 3 -and $v.minor -le 13) { $v.minor } else { 99 + $v.minor }
+    $scored += , @{ path = $entry.path; score = $score; version = "$($v.major).$($v.minor)" }
+}
+$scored = $scored | Sort-Object score
+
+if ($scored.Count -gt 0) {
+    $PYTHON_BIN = $scored[0].path
+    Write-Log "  Chosen Python: $PYTHON_BIN (v$($scored[0].version), score $($scored[0].score))"
 }
 
 # Third pass: fall back to Store Python if nothing else found
+$storeCandidates = @("python3.13","python3.12","python3.11","python3.10","python3.14","python3","python")
 if (-not $PYTHON_BIN) {
-    foreach ($candidate in $candidates) {
+    foreach ($candidate in $storeCandidates) {
         $cmd = Get-Command $candidate -ErrorAction SilentlyContinue
         if (-not $cmd) { continue }
         $exePath = $cmd.Source

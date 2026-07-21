@@ -45,6 +45,21 @@ case "${SVC_MGR:-none}" in
     ;;
 esac
 
+# Remove UI companion (macOS launchd + files)
+if [[ "${SVC_MGR:-}" == "launchd" ]]; then
+    launchctl bootout "gui/$(id -u)/com.agentium.voice-ui" 2>/dev/null || warn "UI bootout failed"
+    rm -f "$HOME/Library/LaunchAgents/com.agentium.voice-ui.plist"
+    log "UI launchd plist removed"
+fi
+rm -rf "$HOME/.agentium/voice-ui"
+log "UI companion files removed"
+
+# Clean UI entries from rc files (Linux nohup path)
+for rc in "$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.profile"; do
+    [[ -f "$rc" ]] || continue
+    sed -i '/voice-ui\/run_voice_ui/d' "$rc" 2>/dev/null || true
+done
+
 log "Venv and conf files left in $HOME/.agentium (remove manually if desired)"
 rm -f "$HOME/.agentium/voice-installed.marker"
 log "install marker removed"

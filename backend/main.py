@@ -483,6 +483,18 @@ async def lifespan(app: FastAPI):
         except Exception as e:  # noqa: BLE001
             logger.warning("⚠️ Skill seeding on boot failed: %s", e)
 
+    # ─────────────────────────────────────────────────────────────
+    # 9c. Auto-generate VOICE_JWT_SECRET if missing
+    # ─────────────────────────────────────────────────────────────
+    # The voice bridge needs a JWT secret to authenticate its WebSocket
+    # against the backend.  If not explicitly configured, generate a random
+    # one so the /voice-token endpoints work out of the box.
+    if not os.environ.get("VOICE_JWT_SECRET"):
+        import secrets
+        random_secret = "voice_" + secrets.token_hex(32)
+        os.environ["VOICE_JWT_SECRET"] = random_secret
+        logger.info("🔊 VOICE_JWT_SECRET auto-generated (random, ephemeral)")
+
     logger.info("🎉 Agentium startup complete!")
     logger.info("   Phase 17.1: DDoS hardening active — unified RateLimitMiddleware + blocklist + payload limits")
 
@@ -492,12 +504,7 @@ async def lifespan(app: FastAPI):
     # The BrowserService owns the Playwright/Chromium process inside FastAPI
     # (tasks run in a separate Celery process and cannot drive the browser).
     try:
-        # Skipped under TESTING (no Chromium in the headless test runner): the
-        # Playwright process spawned here lingers into lifespan shutdown and
-        # blocks TestClient teardown (playwright.stop() hangs), timing out
-        # fixtures such as `ws_client`. Unit tests exercise BrowserService
-        # directly and are unaffected.
-        if settings.BROWSER_ENABLED and os.environ.get("TESTING") != "true":
+        if settings.BROWSER_ENABLED:
             from backend.services.browser_service import get_browser_service
             await get_browser_service().initialize()
             logger.info("✅ Browser service initialized (live screenshot streaming ready)")
@@ -513,7 +520,7 @@ async def lifespan(app: FastAPI):
 
     # Tear down browser service (stop active streams + close Chromium)
     try:
-        if settings.BROWSER_ENABLED and os.environ.get("TESTING") != "true":
+        if settings.BROWSER_ENABLED:
             from backend.services.browser_service import get_browser_service
             await get_browser_service().shutdown()
     except Exception as exc:

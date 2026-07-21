@@ -12,6 +12,7 @@ async def test_system_context_cache_avoids_second_query(monkeypatch):
         return "- Head of Council: Active"
 
     monkeypatch.setattr(cs.ChatService, "get_system_context", staticmethod(fake_context))
+    cs._system_context_cache.update({"ts": 0.0, "value": None})
 
     # First call hits the source.
     await cs.ChatService.get_cached_system_context(None)
@@ -30,6 +31,7 @@ async def test_system_context_cache_expires(monkeypatch):
 
     monkeypatch.setattr(cs.ChatService, "get_system_context", staticmethod(fake_context))
     monkeypatch.setattr(cs, "_SYSTEM_CONTEXT_TTL", -1.0)  # force expiry
+    cs._system_context_cache.update({"ts": 0.0, "value": None})
 
     await cs.ChatService.get_cached_system_context(None)
     await cs.ChatService.get_cached_system_context(None)

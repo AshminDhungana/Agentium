@@ -233,7 +233,8 @@ class SkillDB(BaseEntity):
     chroma_id = Column(String(100), nullable=False)
     chroma_collection = Column(String(50), default="agent_skills")
     embedding_model = Column(
-        String(100), default="BAAI/bge-base-en-v1.5"
+        String(100), default="BAAI/bge-base-en-v1.5",
+        server_default="BAAI/bge-base-en-v1.5"
     )
 
     # Provenance

@@ -1,5 +1,6 @@
 """skill_creator — let Head/Council agents author and persist new Skills (SKILL.md)."""
 
+import logging
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List
@@ -10,6 +11,8 @@ from backend.services.skill_manager import skill_manager
 
 SKILLS_ROOT = Path(__file__).resolve().parents[1] / ".agentium" / "skills"
 ALLOWED_TIERS = {"0", "1"}
+
+logger = logging.getLogger(__name__)
 
 
 def _tier_to_creator_tier(agent_id: str) -> str:
@@ -65,6 +68,9 @@ def _build_skill_md(name: str, display_name: str, description: str,
 
 class SkillCreatorTool:
     """Agent-callable tool to author and persist new skills (Head/Council only)."""
+
+    def _log(self, level: str, msg: str) -> None:
+        getattr(logger, level.lower(), logger.info)(msg)
 
     def execute(self, action: str = "help", **kwargs) -> Dict[str, Any]:
         if action == "help":
@@ -139,14 +145,21 @@ class SkillCreatorTool:
         )
 
         # 2) Index into ChromaDB + Postgres (force-compliant trusted skill).
-        with get_db_context() as db:
-            skill_manager.upsert_skill_from_markdown(schema, db=db)
+        # Indexing is best-effort: the SKILL.md file is the durable source of
+        # truth, so a transient DB/vector-store outage must not fail creation.
+        indexed = False
+        try:
+            with get_db_context() as db:
+                skill_manager.upsert_skill_from_markdown(schema, db=db)
+            indexed = True
+        except Exception as exc:  # never crash the agent loop on indexing failure
+            self._log("WARNING", f"Skill '{name}' written but indexing failed: {exc}")
 
         return {
             "success": True,
             "skill_id": schema.skill_id,
             "skill_name": schema.skill_name,
-            "indexed": True,
+            "indexed": indexed,
             "md_path": str(md_path),
         }
 

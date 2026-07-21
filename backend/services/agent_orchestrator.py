@@ -867,10 +867,11 @@ class AgentOrchestrator:
 
         # Step 3: Extract output and run all critics
         output_content = ""
-        if result.success and result.metadata:
+        if result.success:
+            _meta = getattr(result, "metadata", None) or {}
             output_content = (
-                result.metadata.get("output")
-                or result.metadata.get("result")
+                _meta.get("output")
+                or _meta.get("result")
                 or ""
             )
 

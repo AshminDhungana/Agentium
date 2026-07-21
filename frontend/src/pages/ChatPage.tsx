@@ -274,12 +274,13 @@ export function ChatPage() {
         if (location.pathname === '/chat') markAsRead();
     }, [location.pathname, markAsRead]);
 
-    // FIX #8: fetch voice options only once per connection, skip on reconnect
+    // FIX #8: fetch voice options on mount regardless of WebSocket state
     useEffect(() => {
-        if (isConnected && !voiceOptionsFetched.current) {
+        if (!voiceOptionsFetched.current) {
             checkVoiceAvailability();
         }
-    }, [isConnected]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     // FIX: if the WebSocket drops (or goes into reconnect) while a reply is
     // still streaming, the server never sends `message_end`, so `activeStreamId`

@@ -318,7 +318,7 @@ class ConstitutionalGuard:
         agent_tier = agent_id[0] if agent_id else "3"
         allowed_actions = TIER_CAPABILITIES.get(agent_tier, [])
 
-        if action not in allowed_actions and action != "query":
+        if action not in allowed_actions and action not in ("query", "process_intent"):
             return ConstitutionalDecision(
                 verdict=Verdict.BLOCK,
                 severity=ViolationSeverity.MEDIUM,

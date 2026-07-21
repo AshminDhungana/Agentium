@@ -742,7 +742,7 @@ Generate the skill JSON now:"""
         from backend.core.persona import get_active_constitution_dict, build_persona_directive
         close = False
         if db is None:
-            from backend.database import SessionLocal
+            from backend.models.database import SessionLocal
             db = SessionLocal()
             close = True
         try:

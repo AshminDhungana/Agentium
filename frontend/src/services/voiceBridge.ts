@@ -29,8 +29,11 @@ type StateHandler = (s: VoiceState) => void;
 // ── Config ─────────────────────────────────────────────────────────────────────
 
 const WS_URL       = 'ws://127.0.0.1:9999';
-const MAX_RETRIES  = 5;
 const RETRY_DELAYS = [1000, 2000, 4000, 8000, 15000]; // ms, base delay per attempt (before jitter)
+
+// Token-fetch retries (backend may not be up at install time)
+const TOKEN_RETRIES    = 8;
+const TOKEN_BASE_DELAY = 2000; // ms, doubles each attempt: 2s, 4s, 8s, …, ~4min
 
 /**
  * R4: apply ±20% jitter to a base delay so multiple tabs reconnecting after
@@ -51,6 +54,8 @@ class VoiceBridgeService {
   private statusListeners = new Set<(s: BridgeStatus) => void>();
   private stateListeners = new Set<StateHandler>();
   private voiceToken:   string | null = null;
+  private tokenRetryCount = 0;
+  private tokenRetryTimer: ReturnType<typeof setTimeout> | null = null;
 
   status: BridgeStatus = 'offline';
 
@@ -60,47 +65,63 @@ class VoiceBridgeService {
   async connect(): Promise<void> {
     if (this.status === 'connecting' || this.status === 'connected') return;
 
-    // Fresh connection attempt — reset the retry budget and the one-shot
-    // disconnect toast guard so a new attempt re-arms both. Without this,
-    // a manual reconnect (or re-mount) after the first failed sequence
-    // would see retryCount already at MAX_RETRIES and re-fire the toast
-    // instantly on every connect() call.
     this.retryCount = 0;
+    this.tokenRetryCount = 0;
     this._setStatus('connecting');
 
-    let token: string | null = null;
+    this._retryTokenFetch();
+  }
+
+  /**
+   * Retry fetching a voice token with exponential backoff.
+   * No warnings/notifications until connected — the bridge silently retries
+   * so post-install startup backends aren't spammed with console noise.
+   */
+  private async _retryTokenFetch(): Promise<void> {
     try {
-      token = await this._fetchVoiceToken();
+      const token = await this._fetchVoiceToken();
+      // Success — clear retry state and open the socket.
+      this._clearTokenRetry();
+      this.tokenRetryCount = 0;
+      this.voiceToken = token;
+      this._openSocket(token);
+      return;
     } catch (err) {
       const errMsg = String(err);
 
+      // Non-transient errors: give up immediately.
       if (errMsg.includes('HTTP 404')) {
-        // Endpoint not registered — VOICE_JWT_SECRET not configured server-side.
-        // This is a deployment config issue, not a user-actionable error.
-        console.warn('[voiceBridge] Voice token endpoint not found — VOICE_JWT_SECRET may not be configured');
+        this._clearTokenRetry();
         this._setStatus('offline');
         return;
       }
 
-      if (err instanceof TypeError) {
-        // fetch() network failure — backend unreachable or CORS issue.
-        console.warn('[voiceBridge] Network error fetching voice token:', err);
-        this._setStatus('offline');
+      // Transient errors (network, 503, etc) — retry with backoff.
+      const isLastAttempt = this.tokenRetryCount >= TOKEN_RETRIES;
+      if (!isLastAttempt) {
+        const delay = TOKEN_BASE_DELAY * Math.pow(2, this.tokenRetryCount);
+        this.tokenRetryCount++;
+        this.tokenRetryTimer = setTimeout(() => this._retryTokenFetch(), delay);
         return;
       }
 
-      // Any other error (401, 503, parse failure) — surface to the user.
-      console.warn('[voiceBridge] Could not fetch voice token:', err);
-      this._setStatus('error');
-      return;
+      // All retries exhausted — give up silently.
+      this._clearTokenRetry();
+      this.tokenRetryCount = 0;
+      this._setStatus('offline');
     }
+  }
 
-    this.voiceToken = token;
-    this._openSocket(token);
+  private _clearTokenRetry(): void {
+    if (this.tokenRetryTimer) {
+      clearTimeout(this.tokenRetryTimer);
+      this.tokenRetryTimer = null;
+    }
   }
 
   disconnect(): void {
     this._clearRetry();
+    this._clearTokenRetry();
     this.ws?.close();
     this.ws = null;
     this._setStatus('offline');
@@ -209,19 +230,30 @@ class VoiceBridgeService {
       );
     };
 
-    this.ws.onclose = () => {
+    this.ws.onclose = (closeEvt) => {
       this.ws = null;
+
+      // If the bridge rejected our token (code 1008 / policy violation), do
+      // NOT reconnect with the same stale token — it will be rejected again.
+      // Connect without a token instead; _pushHostToken will deliver a fresh
+      // one after the socket opens.
+      if (closeEvt?.code === 1008) {
+        console.warn('[voiceBridge] Bridge rejected token — reconnecting without one');
+      }
+
       if (this.status === 'offline') return; // intentional disconnect
 
-      if (this.retryCount < MAX_RETRIES) {
+      if (this.retryCount < RETRY_DELAYS.length) {
         // R4: jitter applied so multiple tabs don't reconnect in lockstep
         // after the host bridge restarts.
         const baseDelay = RETRY_DELAYS[this.retryCount] ?? 15000;
         const delay = withJitter(baseDelay);
         this.retryCount++;
-        console.info(`[voiceBridge] Reconnecting in ${delay}ms (attempt ${this.retryCount}/${MAX_RETRIES})`);
+        console.info(`[voiceBridge] Reconnecting in ${delay}ms (attempt ${this.retryCount}/${RETRY_DELAYS.length})`);
         this._setStatus('connecting');
-        this.retryTimer = setTimeout(() => this._openSocket(token), delay);
+        // Use empty token on reconnect — the bridge accepts connections
+        // without a token, and _pushHostToken will set it after connecting.
+        this.retryTimer = setTimeout(() => this._openSocket(''), delay);
       } else {
         console.warn('[voiceBridge] Max reconnect attempts reached — going offline');
         // The bottom-left install notification (VoiceIndicator) already
@@ -248,6 +280,9 @@ class VoiceBridgeService {
       token = this.voiceToken;
     }
     if (token) {
+      // Guard: the WebSocket may have closed during the async HTTP call
+      // above. onclose nulls this.ws, so check before calling send().
+      if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
       try {
         this.ws.send(JSON.stringify({ type: 'set_token', token }));
         console.info('[voiceBridge] Pushed voice token to host bridge');

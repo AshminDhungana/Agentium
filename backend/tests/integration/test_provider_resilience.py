@@ -80,7 +80,7 @@ class TestExhaustionFailsCleanly:
         db_session.flush()
 
         with patch(
-            "backend.core.llm_client.LLMClient"
+            "backend.services.skill_rag.LLMClient"
         ) as MockLLM, patch(
             "backend.services.tasks.task_executor.get_task_db", _fake_get_task_db
         ):
@@ -262,7 +262,7 @@ class TestExhaustionBroadcastsDegradation:
         db_session.flush()
 
         with patch(
-            "backend.core.llm_client.LLMClient"
+            "backend.services.skill_rag.LLMClient"
         ) as MockLLM, patch(
             "backend.services.tasks.task_executor.get_task_db", _fake_get_task_db
         ), patch(

@@ -3,6 +3,7 @@
 import ast
 import importlib.util
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Dict, Any, List, Optional
@@ -14,9 +15,14 @@ class ToolFactory:
     Includes security validation, code generation, and approval workflow.
     """
     
-    def __init__(self, tools_directory: str = "/app/backend/tools/generated"):
+    def __init__(self, tools_directory: Optional[str] = None):
         """Init."""
 
+        if tools_directory is None:
+            tools_directory = os.environ.get(
+                "AGENTIUM_GENERATED_TOOLS_DIR",
+                str(Path(__file__).resolve().parent.parent / "tools" / "generated"),
+            )
         self.tools_directory = Path(tools_directory)
         self.tools_directory.mkdir(parents=True, exist_ok=True)
         

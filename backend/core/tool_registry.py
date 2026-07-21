@@ -532,7 +532,7 @@ class ToolRegistry:
                 "limit":     {"type": "integer", "description": "Number of commits for log (default 10)", "optional": True},
                 "remote":    {"type": "string",  "description": "Remote name for push (default: origin)", "optional": True},
             },
-            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
+            authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx"],
         )
 
         # ══════════════════════════════════════════════════════════════════════

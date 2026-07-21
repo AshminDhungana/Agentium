@@ -14,12 +14,6 @@ from backend.core.auth import get_current_active_user
 from backend.models.database import get_db
 
 
-class _FakeUser:
-    def __init__(self, uid):
-        self.id = uid
-        self.is_admin = False
-
-
 class _FakeDB:
     pass
 
@@ -31,7 +25,8 @@ def client(tmp_path, monkeypatch):
     app.include_router(voice_route.router, prefix="/api/v1")
 
     def _user():
-        return _FakeUser("user-123")
+        # get_current_active_user returns a normalized JWT dict in production.
+        return {"sub": "user-123", "is_admin": False, "is_active": True}
 
     def _db():
         return _FakeDB()
@@ -61,8 +56,8 @@ def test_put_config_persists_and_get_returns_it(client, tmp_path):
     assert saved["ttsVoice"] == "am_adam"
     assert saved["proactiveEnabled"] is True
 
-    # File persisted under <home>/voice_config/user-123.json
-    cfg_file = tmp_path / "voice_config" / "user-123.json"
+    # File persisted under <home>/.agentium/voice_config/user-123.json
+    cfg_file = tmp_path / ".agentium" / "voice_config" / "user-123.json"
     assert cfg_file.is_file()
     assert json.loads(cfg_file.read_text())["ttsVoice"] == "am_adam"
 

@@ -67,7 +67,8 @@ def test_invalidate_active_constitution_cache_clears_redis():
 import os
 import json
 from sqlalchemy import create_engine
-from backend.models.database import SessionLocal
+from sqlalchemy.orm import Session
+from backend.models.database import SessionLocal, engine
 from backend.models.entities.base import Base
 from backend.models.entities.constitution import Constitution, Ethos
 from backend.models.entities.agents import HeadOfCouncil, AgentType
@@ -75,17 +76,27 @@ from backend.models.entities.agents import HeadOfCouncil, AgentType
 
 def _ensure_tables(db):
     import backend.models.entities  # noqa: F401  (register all models)
-    engine = db.get_bind()
     Base.metadata.create_all(bind=engine)
 
 
 @pytest.fixture
 def test_db():
-    """Fresh DB session with tables created; cleans up after the test."""
-    db = SessionLocal()
+    """Fresh DB session with tables created.
+
+    Wrapped in an outer transaction that is rolled back at teardown so no
+    test data is ever committed to the shared database.  Tests/fixtures may
+    call ``commit()`` (releasing savepoints) but the outer rollback keeps
+    the live database clean between runs — preventing cross-test and
+    cross-run constraint violations (e.g. duplicate ``Ethos E00001``).
+    """
+    connection = engine.connect()
+    transaction = connection.begin()
+    db = Session(bind=connection, join_transaction_mode="create_savepoint")
     _ensure_tables(db)
     yield db
     db.close()
+    transaction.rollback()
+    connection.close()
 
 
 @pytest.fixture
@@ -265,9 +276,13 @@ def test_no_hardcoded_persistent_ethos_persona():
         "Eternal Head of Council",
         "ultimate decision-making authority in Agentium",
     ]
+    # Resolve paths relative to the project root (repo layout:
+    # <root>/backend/tests/test_constitution_persona.py) so the test is
+    # independent of the current working directory.
+    repo_root = Path(__file__).resolve().parent.parent.parent
     targets = [
-        Path("backend/services/persistent_council.py"),
-        Path("backend/services/overflow_recovery.py"),
+        repo_root / "backend" / "services" / "persistent_council.py",
+        repo_root / "backend" / "services" / "overflow_recovery.py",
     ]
     for path in targets:
         text = path.read_text(encoding="utf-8")

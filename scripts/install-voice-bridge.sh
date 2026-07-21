@@ -113,6 +113,9 @@ else
     run_or_warn "install PyAudio"       "$VENV_PIP" install "PyAudio>=0.2.14"
     run_or_warn "install pyttsx3"       "$VENV_PIP" install "pyttsx3>=2.90"
     run_or_warn "install python-jose"   "$VENV_PIP" install "python-jose[cryptography]>=3.3.0"
+    # sounddevice: neural TTS playback + microphone fallback when PyAudio
+    # lacks a wheel for the host Python version (e.g. 3.12+).
+    run_or_warn "install sounddevice"   "$VENV_PIP" install "sounddevice>=0.4.6"
 
     # Write venv path so main.py can find it
     grep -q "^VENV_PYTHON=" "$CONF_FILE" 2>/dev/null || \
@@ -357,6 +360,90 @@ EOF
         start_bridge_now
         ;;
 esac
+
+# =============================================================================
+# Phase 4  Desktop UI companion (optional)
+# =============================================================================
+log "Phase 4 -- Installing Desktop UI companion"
+install_voice_ui() {
+    if [[ ! -f "$VENV_PIP" ]]; then
+        warn "pip not found at $VENV_PIP -- cannot install UI dependencies"
+        return 1
+    fi
+    if [[ ! -d "$BRIDGE_DIR" ]]; then
+        warn "voice-bridge dir not found -- cannot copy UI files"
+        return 1
+    fi
+
+    log "  Installing PySide6 (this may take a while)..."
+    if [[ "$OS_FAMILY" == "linux" ]] && [[ "$PKG_MGR" == "apt" ]]; then
+        run_or_warn "install libgl1"      $SUDO apt-get install -y -qq libgl1 libegl1 libxkbcommon0 2>/dev/null || true
+    fi
+
+    if ! run_or_warn "install PySide6" "$VENV_PIP" install "PySide6>=6.5"; then
+        warn "PySide6 install failed -- UI not available. Bridge works fine without it."
+        return 1
+    fi
+
+    UI_DEST="$CONF_DIR/voice-ui"
+    mkdir -p "$UI_DEST"
+    if cp -r "$BRIDGE_DIR/ui/"* "$UI_DEST/" 2>/dev/null; then
+        log "  UI files copied to $UI_DEST"
+    else
+        warn "Failed to copy UI files from $BRIDGE_DIR/ui"
+        return 1
+    fi
+    if [[ -f "$BRIDGE_DIR/run_voice_ui.py" ]]; then
+        cp "$BRIDGE_DIR/run_voice_ui.py" "$UI_DEST/"
+    fi
+
+    if [[ "$OS_FAMILY" == "macos" ]]; then
+        UI_PLIST="$HOME/Library/LaunchAgents/com.agentium.voice-ui.plist"
+        cat > "$UI_PLIST" << EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>             <string>com.agentium.voice-ui</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>${VENV_DIR}/bin/python</string>
+    <string>${UI_DEST}/run_voice_ui.py</string>
+  </array>
+  <key>RunAtLoad</key>         <true/>
+  <key>KeepAlive</key>         <false/>
+  <key>StandardOutPath</key>   <string>${CONF_DIR}/voice-ui.log</string>
+  <key>StandardErrorPath</key> <string>${CONF_DIR}/voice-ui.log</string>
+</dict>
+</plist>
+EOF
+        chmod 644 "$UI_PLIST"
+        chown "$USER" "$UI_PLIST" 2>/dev/null || true
+        launchctl bootout "gui/$(id -u)/com.agentium.voice-ui" >> "$LOG_FILE" 2>&1 || true
+        if launchctl bootstrap "gui/$(id -u)" "$UI_PLIST" >> "$LOG_FILE" 2>&1; then
+            launchctl kickstart "gui/$(id -u)/com.agentium.voice-ui" >> "$LOG_FILE" 2>&1 || true
+            log "  launchd UI agent bootstrapped."
+        else
+            warn "launchctl bootstrap for UI failed -- starting via nohup instead"
+            nohup "$VENV_DIR/bin/python" "$UI_DEST/run_voice_ui.py" >> "$CONF_DIR/voice-ui.log" 2>&1 &
+            log "  UI started via nohup (PID $!)"
+        fi
+    elif [[ "$OS_FAMILY" == "linux" ]]; then
+        # Linux: best-effort start via nohup. Desktop environments without systemd
+        # tray support will simply not show the UI; the bridge still works.
+        nohup "$VENV_DIR/bin/python" "$UI_DEST/run_voice_ui.py" >> "$CONF_DIR/voice-ui.log" 2>&1 &
+        log "  UI started via nohup (PID $!)"
+        # Add to rc files for persistence on next login
+        for rc in "$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.profile"; do
+            if [[ -f "$rc" ]] || [[ "$rc" == "$HOME/.bashrc" ]]; then
+                add_to_rc "$rc" "nohup '$VENV_DIR/bin/python' '$UI_DEST/run_voice_ui.py' >> '$CONF_DIR/voice-ui.log' 2>&1 &"
+            fi
+        done
+    fi
+    log "  UI companion installed."
+}
+install_voice_ui || true
 
 # Signal successful install (consumed by voice-autoinstall guard + launchers)
 touch "$CONF_DIR/voice-installed.marker"

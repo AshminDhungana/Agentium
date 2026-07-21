@@ -242,6 +242,7 @@ class InitializationService:
 
         self.awaiting_country_name = True
         self.country_name_prompt = prompt_message
+        name: Optional[str] = None
         try:
             await self._broadcast_to_user(prompt_message, is_urgent=True)
             try:
@@ -249,14 +250,20 @@ class InitializationService:
                     self._country_name_event.wait(),
                     timeout=timeout
                 )
-                return self._pending_country_name
+                name = self._pending_country_name
             except asyncio.TimeoutError:
-                return None
+                # The user may have submitted a name concurrently with the
+                # timeout — _set_country_name (called from the HTTP handler)
+                # sets _country_name_event and _pending_country_name.  Check
+                # _pending_country_name so we don't silently discard it.
+                if self._pending_country_name:
+                    name = self._pending_country_name
         finally:
             self.awaiting_country_name = False
             self.country_name_prompt = ""
             self._country_name_event = None
             self._pending_country_name = None
+        return name
 
     async def _notify_country_name_decision(
         self,
@@ -293,49 +300,44 @@ class InitializationService:
         message with the same event is removed first so a re-run of genesis
         cannot stack duplicate naming/welcome messages in the chat history.
 
-        Uses its OWN fresh DB session + commit rather than genesis's shared
-        transaction.  The live WebSocket broadcast fires while the chat socket
-        is still gated (no clients connected), so the only way the welcome
-        survives is via the post-genesis history reload.  Committing it
-        independently guarantees it lands in the DB even if a later genesis
+        Uses the service's own DB session (``self.db``) and commits
+        independently so the welcome lands in the DB even if a later genesis
         step fails and rolls back the shared transaction — otherwise the
         welcome would disappear entirely.
         """
         from backend.models.entities.chat_message import ChatMessage as ChatMsg
-        from backend.models.database import get_db_context
         import uuid
 
         message_id = str(uuid.uuid4())
-        with get_db_context() as fresh_db:
-            sovereign_user = fresh_db.query(User).filter_by(
-                is_admin=True, is_active=True
-            ).first()
-            if not sovereign_user:
-                self._log("WARNING", "No sovereign user found — cannot persist welcome message")
-                return None
+        sovereign_user = self.db.query(User).filter_by(
+            is_admin=True, is_active=True
+        ).first()
+        if not sovereign_user:
+            self._log("WARNING", "No sovereign user found — cannot persist welcome message")
+            return None
 
-            # De-duplicate prior genesis messages of the same event (e.g. an old
-            # "Nation Established" line from a previous run) before inserting.
-            if dedup_event:
-                prior = fresh_db.query(ChatMsg).filter_by(
-                    user_id=str(sovereign_user.id),
-                    role="head_of_council",
-                    agent_id="00001",
-                ).all()
-                for m in prior:
-                    meta = m.message_metadata or {}
-                    if meta.get("source") == "genesis" and meta.get("event") == dedup_event:
-                        fresh_db.delete(m)
-
-            fresh_db.add(ChatMsg(
-                id=message_id,
+        # De-duplicate prior genesis messages of the same event (e.g. an old
+        # "Nation Established" line from a previous run) before inserting.
+        if dedup_event:
+            prior = self.db.query(ChatMsg).filter_by(
                 user_id=str(sovereign_user.id),
                 role="head_of_council",
-                content=content,
                 agent_id="00001",
-                message_metadata={"source": "genesis", "event": dedup_event or "head_message"},
-            ))
-            fresh_db.commit()
+            ).all()
+            for m in prior:
+                meta = m.message_metadata or {}
+                if meta.get("source") == "genesis" and meta.get("event") == dedup_event:
+                    self.db.delete(m)
+
+        self.db.add(ChatMsg(
+            id=message_id,
+            user_id=str(sovereign_user.id),
+            role="head_of_council",
+            content=content,
+            agent_id="00001",
+            message_metadata={"source": "genesis", "event": dedup_event or "head_message"},
+        ))
+        self.db.commit()
         return message_id
 
     async def _broadcast_head_message(self, content: str, message_id: Optional[str]) -> None:
@@ -1078,8 +1080,24 @@ class InitializationService:
                 # Use DELETE (row-level locks) instead of TRUNCATE
                 # (ACCESS EXCLUSIVE lock) and flush instead of commit
                 # so the test fixture's savepoint can roll it back.
-                self.db.execute(text("DELETE FROM agents"))
-                self.db.execute(text("DELETE FROM constitutions"))
+                # Clear every table genesis populates (in FK-safe order:
+                # children before parents) so a force re-init — or leftover
+                # rows from another test — cannot collide on a unique
+                # constraint (e.g. ethos_agentium_id_key).
+                for tbl in (
+                    "ethos",
+                    "lead_agents",
+                    "task_agents",
+                    "critic_agents",
+                    "council_members",
+                    "constitutions",
+                    "agents",
+                ):
+                    try:
+                        self.db.execute(text(f"DELETE FROM {tbl}"))
+                    except Exception:  # noqa: BLE001
+                        # Table may not exist in every schema revision.
+                        pass
                 self.db.flush()
             else:
                 self.db.execute(text("TRUNCATE TABLE agents CASCADE"))

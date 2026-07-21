@@ -62,7 +62,10 @@ def enrich_knowledge_metadata(
     meta.setdefault("source", source)
     meta.setdefault("source_url", "")
     meta.setdefault("title", title)
-    meta.setdefault("agent_id", agent_id)
+    # ChromaDB's metadata values must be strings/numbers/bools — never None.
+    # Default to an empty string and coerce any provided value to str.
+    resolved_agent_id = agent_id if agent_id is not None else meta.get("agent_id")
+    meta["agent_id"] = "" if resolved_agent_id is None else str(resolved_agent_id)
     meta.setdefault("document_type", meta["type"])
     meta.setdefault("decay_score", 1.0)
     meta.setdefault("citation_boost", 1.0)
@@ -139,7 +142,7 @@ async def write_knowledge(
     meta.setdefault("citation_boost", 1.0)
     meta.setdefault("source_url", "")
     meta.setdefault("title", "")
-    meta.setdefault("agent_id", None)
+    meta.setdefault("agent_id", "")
 
     existing = store.get_parent_document(collection_key, parent_id, db)
     if existing and existing.get("metadata"):

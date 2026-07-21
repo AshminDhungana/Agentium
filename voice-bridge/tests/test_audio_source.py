@@ -1,8 +1,13 @@
 import sys, os
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import audio_source as src
 
-import pyaudio  # noqa: E402
+try:
+    import pyaudio  # noqa: E402
+    _HAS_PYAUDIO = True
+except ImportError:
+    _HAS_PYAUDIO = False
 
 
 class FakeStream:
@@ -45,22 +50,39 @@ class FakePyAudio:
         pass
 
 
+def test_available_true_when_pyaudio_present(monkeypatch):
+    monkeypatch.setattr(src, "_PYAUDIO_AVAILABLE", True)
+    monkeypatch.setattr(src, "_SOUNDDEVICE_AVAILABLE", False)
+    ms = src.MicrophoneSource()
+    assert ms.available is True
+
+
+def test_available_true_when_sounddevice_present(monkeypatch):
+    monkeypatch.setattr(src, "_PYAUDIO_AVAILABLE", False)
+    monkeypatch.setattr(src, "_SOUNDDEVICE_AVAILABLE", True)
+    ms = src.MicrophoneSource()
+    assert ms.available is True
+
+
+def test_available_false_when_both_missing(monkeypatch):
+    monkeypatch.setattr(src, "_PYAUDIO_AVAILABLE", False)
+    monkeypatch.setattr(src, "_SOUNDDEVICE_AVAILABLE", False)
+    ms = src.MicrophoneSource()
+    assert ms.available is False
+
+
 def test_read_frame_returns_fixed_size(monkeypatch):
-    frame = b"\x01\x00" * 1280  # 2560 bytes = 80ms @16k/16bit
+    if not _HAS_PYAUDIO:
+        return
+    frame = b"\x01\x00" * 1280
     fake = FakePyAudio([frame, frame])
+    monkeypatch.setattr(src, "pyaudio", pyaudio)
     monkeypatch.setattr(pyaudio, "PyAudio", lambda: fake)
-    src.MicrophoneSource.RATE = 16000
-    src.MicrophoneSource.FRAME_BYTES = 2560
+    monkeypatch.setattr(src, "_PYAUDIO_AVAILABLE", True)
+    monkeypatch.setattr(src, "_SOUNDDEVICE_AVAILABLE", False)
     ms = src.MicrophoneSource()
     ms.open()
     got = ms.read_frame()
     ms.close()
     assert len(got) == 2560
     assert got == frame
-
-
-def test_available_false_when_pyaudio_missing(monkeypatch):
-    # _PYAUDIO_AVAILABLE is cached at import time; patch the flag directly.
-    monkeypatch.setattr(src, "_PYAUDIO_AVAILABLE", False)
-    ms = src.MicrophoneSource()
-    assert ms.available is False

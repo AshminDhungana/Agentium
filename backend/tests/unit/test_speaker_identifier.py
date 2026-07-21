@@ -66,7 +66,7 @@ def _cfg(**kw):
 @pytest.fixture
 def session():
     eng = create_engine("sqlite://")
-    Base.metadata.create_all(eng)
+    SpeakerProfile.__table__.create(eng, checkfirst=True)
     Session = sessionmaker(bind=eng)
     s = Session()
     yield s

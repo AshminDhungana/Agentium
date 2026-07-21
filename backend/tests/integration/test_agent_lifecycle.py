@@ -119,6 +119,14 @@ async def test_agent_lifecycle_full_flow(seeded_db: Session):
     task_agent.is_active = True
     seeded_db.commit()
 
+    # Protect the seeded/founding agents from the idle auto-liquidator so this
+    # test only observes the lifecycle of its own spawned task agent.
+    for ag in seeded_db.query(Agent).filter(
+        Agent.agentium_id != task_agent.agentium_id
+    ).all():
+        ag.is_persistent = True
+    seeded_db.flush()
+
     # 7. Execute Auto-Termination (Auto-Liquidation)
     liquidation_summary = await idle_governance.auto_liquidate_expired(seeded_db)
     

@@ -228,7 +228,12 @@ class TestComplexityScoringTierMapping:
 
         assert result["complexity_score"] >= 8
         assert result["delegation_metadata"]["target_tier"] == "2"
-        assert result["assigned_to"] == lead.agentium_id
+        # Routed to a Lead-tier agent (2xxxx). The seeded DB already contains a
+        # Lead (20001); AgentRanker picks the best-scored lead, so we assert on
+        # tier membership rather than a specific agentium_id.
+        assert result["assigned_to"] is not None
+        assert result["assigned_to"].startswith("2")
+        assert any(c["agentium_id"] == lead.agentium_id for c in result.get("candidates", []))
 
     @pytest.mark.asyncio
     async def test_decision_trail_records_complexity_and_tier(self, seeded_db: Session):

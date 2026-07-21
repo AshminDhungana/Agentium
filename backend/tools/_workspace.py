@@ -62,7 +62,7 @@ def resolve_in_workspace(path: str, agent_id: str) -> str:
         return path
     if path.startswith("/host/") or path.startswith("/host_home/"):
         return path
-    if path.startswith("/tmp") or path.startswith("/"):
+    if os.path.isabs(path):
         return path
     return _join(agent_workspace_path(agent_id), path)
 

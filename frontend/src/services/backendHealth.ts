@@ -7,7 +7,7 @@ export interface BackendHealthResponse {
 
 export const backendHealthApi = {
     check: async (): Promise<BackendHealthResponse> => {
-        const { data } = await api.get<BackendHealthResponse>('/health', { timeout: 5000 });
+        const { data } = await api.get<BackendHealthResponse>('/api/health', { timeout: 5000 });
         return data;
     },
 };

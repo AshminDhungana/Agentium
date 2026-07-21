@@ -96,16 +96,25 @@ conf "PKG_MGR" "$PKG_MGR"
 log "  PKG_MGR=$PKG_MGR"
 
 # -- Step 1.4  Python ---------------------------------------------------------
-log "Step 1.4 -- Locating Python >= 3.10"
+log "Step 1.4 -- Locating Python >= 3.10 (preferring 3.10-3.13 over 3.14+)"
 find_python() {
-    for candidate in python3.13 python3.12 python3.11 python3.10 python3 python; do
-        if command -v "$candidate" &>/dev/null; then
-            local ver
-            ver=$("$candidate" -c "import sys; print(sys.version_info >= (3,10))" 2>/dev/null) || continue
-            [[ "$ver" == "True" ]] && { echo "$candidate"; return; }
+    local best=""
+    local best_score=999
+    for candidate in python3 python3.14 python3.13 python3.12 python3.11 python3.10; do
+        local bin_path
+        bin_path=$(command -v "$candidate" 2>/dev/null) || continue
+        local ver_ok minor
+        ver_ok=$("$bin_path" -c "import sys; print(sys.version_info >= (3,10))" 2>/dev/null) || continue
+        [[ "$ver_ok" != "True" ]] && continue
+        minor=$("$bin_path" -c "import sys; print(sys.version_info[1])" 2>/dev/null) || continue
+        # Score: 3.10-3.13 get score == minor (10-13), 3.14+ get 99+minor
+        local score=$(( minor <= 13 ? minor : 99 + minor ))
+        if [[ $score -lt $best_score ]]; then
+            best_score=$score
+            best="$bin_path"
         fi
     done
-    echo ""
+    echo "$best"
 }
 PYTHON_BIN=$(find_python)
 if [[ -z "$PYTHON_BIN" ]]; then

@@ -1,18 +1,11 @@
 # Agentium — Verification & Improvement Backlog
-
-### 8.3 — [P2] Enable deep thinking where supported (ties to 5.6)
-**Task:** For models with extended/deep-thinking support, confirm agents actually invoke that mode when configured to.
-**Acceptance criteria:** A thinking-capable model shows thinking traces/latency consistent with the mode being active when enabled via 5.6's setting.
-
-### 8.4 — [P2] Vector DB read/write checkpoints during task execution
-**Task:** Query and update ChromaDB at three points: after receiving a task, after completing it, and mid-task if needed. Before writing an update, do a web search first and fold the result into the update; skip the search step gracefully if web search is unavailable.
-**Acceptance criteria:** A traced task shows all three checkpoint interactions with Chroma; missing web search doesn't block the update.
-
 ---
+
+- [ ] Their is voice setting in chatpage wich is not showing, and their we have setting to add speaker voice so that only that voice is recognized. i want to add the feature in such a way that when the voice setting and spearker profile is not set and user try to use voice bridge, then a voice reply should be given saying what user needs to do, like, complete the steps go to chatpage and add speaker voice for recognistion. 
 
 ## 9. Chat Page — Bugs
 
-- **9.1 — [P2]** "Voice Bridge Not Running" notification should fire once per session (after login), not repeat on every reconnect attempt or status flip. *(Cross-reference: this is the same root cause as 15.2/15.3 below — fix once, verify in both places.)*
+
 - **9.2 — [P2]** Voice input bugs: starting voice input doesn't appear in the chat transcript; opening voice settings throws a frontend console error. Reproduce both, fix root causes.
 - **9.3 — [P1]** A task can get stuck showing "Deliberating" indefinitely. Reproduce via logs, identify the stall point (likely a Council micro-vote or Lead handoff that never resolves), and add a timeout/escalation so it can't hang forever.
 - **9.4 — [P3]** Add a follow-up icon next to the existing hover "copy" icon on chat messages, which copies the message into the compose box for editing and resending.

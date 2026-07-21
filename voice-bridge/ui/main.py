@@ -26,9 +26,9 @@ _TOOLTIP_MAP = {
 }
 
 _ICON_MAP = {
-    "idle": "tray_idle.png",
-    "listening": "tray_listening.png",
-    "speaking": "tray_speaking.png",
+    "idle": "tray_idle.svg",
+    "listening": "tray_listening.svg",
+    "speaking": "tray_speaking.svg",
 }
 
 

@@ -196,6 +196,17 @@ def reset_resilience():
     provider_rate_limiter._last_headers.clear()
 
 
+@pytest.fixture(scope="module", autouse=True)
+def _ensure_test_db(db_engine):
+    """This module's tests talk to a real (committed) test DB through their own
+    engines and never request ``db_session``/``db_engine`` directly. The
+    session-scoped ``db_engine`` fixture only runs when something depends on it,
+    so without this the tables would not exist when the file is run in
+    isolation (every test would fail with "relation does not exist"). Trigger it.
+    """
+    yield
+
+
 @pytest.fixture(scope="module")
 def seeded_once():
     """Run genesis at most ONCE for this module and reuse it across every
@@ -570,6 +581,18 @@ async def test_llm_client_forwards_on_delta(monkeypatch):
     from backend.services import model_provider as mp
 
     captured = {}
+    # The circuit breaker consults APIKeyManager.is_config_healthy, which is
+    # DB-backed. This unit test uses a fake config id ("cfg-stream") with no DB
+    # row, so the breaker would otherwise block it as "unhealthy". The health
+    # gate is orthogonal to the on_delta-forwarding concern being verified here
+    # (cf. test_chat_service_forwards_on_delta, which similarly isolates
+    # api_key_manager), so treat the fake config as healthy.
+    from backend.services import api_key_manager as _akm
+    monkeypatch.setattr(
+        _akm.api_key_manager, "is_config_healthy",
+        lambda config_id, **kw: True,
+    )
+
     async def fake_gen_with_agent_tools(**kwargs):
         captured["on_delta"] = kwargs.get("on_delta")
         captured["cancel_event"] = kwargs.get("cancel_event")

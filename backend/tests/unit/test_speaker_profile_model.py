@@ -9,7 +9,7 @@ from backend.models.entities.speaker_profile import SpeakerProfile
 @pytest.fixture
 def session():
     eng = create_engine("sqlite://")
-    Base.metadata.create_all(eng)
+    SpeakerProfile.__table__.create(eng, checkfirst=True)
     Session = sessionmaker(bind=eng)
     s = Session()
     yield s
@@ -18,7 +18,7 @@ def session():
 
 
 def test_is_deleted_column_is_mapped(session):
-    p = SpeakerProfile(id="p1", name="Alice", embedding=[0.1, 0.2], is_deleted=False)
+    p = SpeakerProfile(id="p1", agentium_id="30001", name="Alice", embedding=[0.1, 0.2], is_deleted=False)
     session.add(p)
     session.commit()
     got = session.query(SpeakerProfile).filter(SpeakerProfile.is_deleted == False).first()
@@ -27,7 +27,7 @@ def test_is_deleted_column_is_mapped(session):
 
 
 def test_soft_delete_sets_flag(session):
-    p = SpeakerProfile(id="p2", name="Bob", embedding=[0.3], is_deleted=False)
+    p = SpeakerProfile(id="p2", agentium_id="30002", name="Bob", embedding=[0.3], is_deleted=False)
     session.add(p)
     session.commit()
     p.soft_delete()
@@ -38,7 +38,7 @@ def test_soft_delete_sets_flag(session):
 
 
 def test_to_dict_includes_is_deleted(session):
-    p = SpeakerProfile(id="p3", name="Cara", embedding=[0.4], is_deleted=True)
+    p = SpeakerProfile(id="p3", agentium_id="30003", name="Cara", embedding=[0.4], is_deleted=True)
     session.add(p)
     session.commit()
     assert p.to_dict()["is_deleted"] is True

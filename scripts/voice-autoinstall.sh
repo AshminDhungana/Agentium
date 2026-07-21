@@ -149,6 +149,9 @@ if [ "$IS_WINDOWS" = "true" ]; then
     echo "[voice-autoinstall]  Windows setup complete."
     echo "[voice-autoinstall]  Installs on next login (UAC prompt once),"
     echo "[voice-autoinstall]  or double-click: Desktop\\Install Agentium Voice Bridge.cmd"
+    echo "[voice-autoinstall]"
+    echo "[voice-autoinstall]  The Desktop UI companion (system tray + waveform overlay)"
+    echo "[voice-autoinstall]  will install automatically alongside the voice bridge."
     echo "[voice-autoinstall] ================================================================"
 
 # =============================================================================
@@ -167,6 +170,7 @@ else
     bash /scripts/install-voice-bridge.sh
 
     echo "[voice-autoinstall] Voice bridge installed and running."
+    echo "[voice-autoinstall] Desktop UI companion installed (macOS: launchd agent, Linux: nohup)."
 fi
 
 echo "[voice-autoinstall] Done. The host installer creates voice-installed.marker on success."

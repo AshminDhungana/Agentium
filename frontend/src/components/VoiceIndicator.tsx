@@ -209,11 +209,20 @@ export function VoiceIndicator({ iconOnly = false }: VoiceIndicatorProps) {
   const [showNotif, setShowNotif]     = useState(false);
   const [notifInfo, setNotifInfo]     = useState<InstallInfo | null>(null);
   const connectAttempted              = useRef(false);
+  const notifShownOnce                = useRef(false);
+  const everSawConnecting             = useRef(false);
 
   // Keep status in sync with the singleton
   useEffect(() => {
     return voiceBridgeService.onStatusChange(setStatus);
   }, []);
+
+  // Track whether we've ever exited the initial offline — guards against the
+  // race where connectAttempted is set true before status transitions to
+  // connecting, causing a false notification flash.
+  useEffect(() => {
+    if (status === 'connecting') everSawConnecting.current = true;
+  }, [status]);
 
   // Auto-connect on login (once)
   useEffect(() => {
@@ -222,27 +231,39 @@ export function VoiceIndicator({ iconOnly = false }: VoiceIndicatorProps) {
     voiceBridgeService.connect().catch(() => {});
   }, [isAuthenticated, isDisabled]);
 
-  // Show install notification when status goes to error/offline after a connect attempt
+  // Show install notification once per session when the bridge stays offline after
+  // a connect attempt.  Hides on dismiss, manual reconnect, or disabling voice.
+  // Requires everSawConnecting so we don't flash the notification before the
+  // status even transitions out of the initial 'offline'.
   useEffect(() => {
+    if (!isAuthenticated) {
+      setShowNotif(false);
+      return;
+    }
+
+    if (isDisabled) {
+      setShowNotif(false);
+      return;
+    }
+
     if (
       connectAttempted.current &&
-      !isDisabled &&
+      everSawConnecting.current &&
       (status === 'error' || status === 'offline') &&
-      isAuthenticated
+      !notifShownOnce.current
     ) {
-      const info = getInstallInfo(detectOS());
-      setNotifInfo(info);
+      notifShownOnce.current = true;
+      setNotifInfo(getInstallInfo(detectOS()));
       setShowNotif(true);
-    } else {
-      setShowNotif(false);
     }
   }, [status, isDisabled, isAuthenticated]);
 
   const handleClick = useCallback(() => {
     if (isDisabled) {
-      // Re-enable and try to connect
       setIsDisabled(false);
       setShowNotif(false);
+      notifShownOnce.current = false;
+      everSawConnecting.current = false;
       connectAttempted.current = false;
       setTimeout(() => {
         voiceBridgeService.connect().catch(() => {});
@@ -259,9 +280,11 @@ export function VoiceIndicator({ iconOnly = false }: VoiceIndicatorProps) {
       return;
     }
 
-    // Offline or error — retry
+    // Offline or error — retry (don't reset notifShownOnce so the
+    // notification doesn't reappear on every failed attempt)
     setShowNotif(false);
     voiceBridgeService.connect().catch(() => {});
+    connectAttempted.current = true;
   }, [status, isDisabled]);
 
   // Effective display

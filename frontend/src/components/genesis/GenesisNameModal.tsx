@@ -18,7 +18,9 @@ export function GenesisNameModal() {
     const submittedRef = useRef(false);
 
     if (!open) {
-        submittedRef.current = false;
+        // Do NOT reset submittedRef here — a late `awaiting_name` poll response
+        // (racing with the user's submission) could toggle open back to true
+        // and re-show the modal after the user already submitted.
         return null;
     }
     if (submittedRef.current) return null;
@@ -36,6 +38,9 @@ export function GenesisNameModal() {
             submittedRef.current = true; // hidden until genesis clears the flag
             return;
         }
+        // Also lock on rejection — otherwise a late `awaiting_name` poll
+        // racing with the timeout response could re-show the modal.
+        submittedRef.current = true;
         if (trimmed) {
             showToast.warning(
                 'Naming timed out — your nation was given the default name.',

@@ -181,14 +181,24 @@ async def seeded_db(db_session: Session) -> Session:
 
         # Ensure there is an Agent with a valid agentium_id for test runs.
         # (IDs must start with a digit after recent validation changes.)
-        from backend.models.entities.agents import Agent, AgentType, AgentStatus
+        from backend.models.entities.agents import (
+            Agent,
+            AgentType,
+            AgentStatus,
+            CouncilMember,
+        )
+
         admin_agent = db_session.query(Agent).filter_by(agentium_id="10003").first()
         if not admin_agent:
-            admin_agent = Agent(
+            # Must be instantiated as the CouncilMember subclass (not the base
+            # Agent) so the polymorphic identity matches agent_type; otherwise
+            # a later attribute refresh raises ObjectDeletedError.
+            admin_agent = CouncilMember(
                 agentium_id="10003",
                 name="Admin User Agent",
                 agent_type=AgentType.COUNCIL_MEMBER,
                 status=AgentStatus.ACTIVE,
+                is_persistent=True,
             )
             db_session.add(admin_agent)
             db_session.flush()
@@ -224,6 +234,8 @@ def redis_client():
 @pytest.fixture(scope="function")
 def vector_store():
     """Provide a clean ChromaDB instance for testing."""
+    import backend.core.vector_store as _vs_module
+
     # Use the test host/port
     vs = VectorStore(
         host=os.environ["CHROMA_HOST"],
@@ -231,47 +243,48 @@ def vector_store():
     )
 
     # Prefix all collection names so test data is fully isolated from production.
+    # _collection_name() resolves v2 keys from the module-level COLLECTIONS_V2
+    # constant (NOT from the instance's self.COLLECTIONS), so both must be
+    # prefixed, otherwise tests silently hit the live (non-prefixed) collections.
     original_names = vs.COLLECTIONS.copy()
+    original_v2 = _vs_module.COLLECTIONS_V2.copy()
     for key in list(vs.COLLECTIONS.keys()):
         vs.COLLECTIONS[key] = f"test_{vs.COLLECTIONS[key]}"
+    for key in list(_vs_module.COLLECTIONS_V2.keys()):
+        _vs_module.COLLECTIONS_V2[key] = f"test_{_vs_module.COLLECTIONS_V2[key]}"
 
-    # Purge any leftover test collections from a previous run BEFORE calling
-    # initialize().  The previous order was:
-    #
-    #   initialize()  → creates collections, caches Collection objects (UUID-A)
-    #   delete loop   → removes UUID-A from the server
-    #   initialize()  → may not refresh the internal cache; objects still hold
-    #                    UUID-A → every subsequent .add()/.query() returns 404
-    #
-    # Deleting first means initialize() runs exactly once and the cached
-    # Collection objects always point at live, valid server UUIDs.
-    for coll_name in vs.COLLECTIONS.values():
+    # Connect so we can purge any leftover test collections from a previous run.
+    _ = vs.client
+
+    # Purge any leftover test collections (resolved names) BEFORE re-initialising
+    # so the fresh collections start empty.
+    for key in vs.COLLECTIONS.keys():
         try:
-            vs.client.delete_collection(name=coll_name)
+            vs.client.delete_collection(name=vs._collection_name(key))
         except Exception:
             pass
 
-    # Reset client and collection cache so that initialize() runs fully and
-    # re-populates _collections with live UUIDs.  Without this reset the
-    # early-return guard inside initialize() ("if self._client is not None:
-    #   return") would skip re-creation, leaving _collections full of stale
-    # UUID references pointing at the collections we just deleted.
+    # Reset client and collection caches so that initialize() runs fully and
+    # re-populates the caches with live UUIDs pointing at the (now recreated)
+    # empty test collections.
     vs._client = None
     vs._collections = {}
+    vs._collections_by_name = {}
     # Single initialize — creates fresh, empty collections with correct UUIDs.
     vs.initialize()
 
     yield vs
 
     # Teardown: remove test collections so the next run starts clean.
-    for coll_name in vs.COLLECTIONS.values():
+    for key in vs.COLLECTIONS.keys():
         try:
-            vs.client.delete_collection(name=coll_name)
+            vs.client.delete_collection(name=vs._collection_name(key))
         except Exception:
             pass
 
     # Restore original collection names so production code is unaffected.
     vs.COLLECTIONS.update(original_names)
+    _vs_module.COLLECTIONS_V2.update(original_v2)
 
 
 @pytest.fixture(scope="session")

@@ -1,14 +1,14 @@
 from unittest.mock import patch, MagicMock
 
+import numpy as np
+
 from backend.core.vector_store import BgeEmbeddingFunction
 
 PREFIX = "Represent this sentence for searching relevant passages: "
 
 
 def _fake_encode():
-    arr = MagicMock()
-    arr.tolist.return_value = [[0.1] * 768]
-    return arr
+    return np.array([[0.1] * 768])
 
 
 def test_query_path_prefixed():
@@ -43,9 +43,7 @@ def test_embed_query_accepts_list_like_chromadb():
     fake = MagicMock()
 
     def _multi(texts, **kwargs):
-        arr = MagicMock()
-        arr.tolist.return_value = [[0.1] * 768 for _ in texts]
-        return arr
+        return np.array([[0.1] * 768 for _ in texts])
 
     fake.encode.side_effect = _multi
     with patch("backend.core.vector_store.SentenceTransformer", return_value=fake):

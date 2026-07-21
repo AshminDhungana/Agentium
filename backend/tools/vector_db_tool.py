@@ -221,7 +221,7 @@ class VectorDBTool:
                 em.setdefault("document_type", em.get("type", "agent_learning"))
                 em.setdefault("decay_score", 1.0)
                 em.setdefault("citation_boost", 1.0)
-                em.setdefault("agent_id", None)
+                em.setdefault("agent_id", "")
                 em.setdefault("revision_id", uuid.uuid4().hex)
                 enriched.append(em)
             coll.upsert(documents=docs, metadatas=enriched, ids=ids)

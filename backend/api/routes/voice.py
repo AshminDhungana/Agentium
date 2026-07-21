@@ -602,6 +602,7 @@ _DEFAULT_VOICE_CONFIG = {
     "requireWakeWord": True,
     "ttsVoice": "af_bella",
     "proactiveEnabled": False,
+    "speakerIdentification": False,
 }
 
 
@@ -609,6 +610,7 @@ class VoiceConfigRequest(BaseModel):
     requireWakeWord: Optional[bool] = Field(default=None)
     ttsVoice: Optional[str] = Field(default=None)
     proactiveEnabled: Optional[bool] = Field(default=None)
+    speakerIdentification: Optional[bool] = Field(default=None)
 
 
 def _voice_config_path(user_id: str) -> Path:
@@ -661,6 +663,8 @@ async def update_voice_config(
         current["ttsVoice"] = config.ttsVoice
     if config.proactiveEnabled is not None:
         current["proactiveEnabled"] = config.proactiveEnabled
+    if config.speakerIdentification is not None:
+        current["speakerIdentification"] = config.speakerIdentification
     try:
         _voice_config_path(str(current_user["sub"])).write_text(json.dumps(current, indent=2))
     except Exception as exc:

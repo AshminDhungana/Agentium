@@ -24,6 +24,20 @@ from backend.services.mcp_tool_bridge import init_bridge
 pytestmark = pytest.mark.integration
 
 
+@pytest.fixture(autouse=True)
+def _force_mcp_mock(monkeypatch):
+    """Force MCP client mock mode.
+
+    These tests use fake server_url command names (e.g. 'revoke_cmd') and
+    assert behaviour that only holds when the MCP client runs in its built-in
+    mock mode (mcp package absent). The test environment has the mcp package
+    installed, so we force mock mode to match the test's documented intent.
+    """
+    import backend.services.mcp_client as mcp_client
+
+    monkeypatch.setattr(mcp_client, "MCP_AVAILABLE", False)
+
+
 @pytest.fixture(scope="module")
 def bridge():
     """Initialise the live bridge so sync_one registers into tool_registry."""

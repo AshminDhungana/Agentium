@@ -120,7 +120,7 @@ class Task(BaseEntity):
     status = Column(Enum(TaskStatus, values_callable=lambda obj: [e.value for e in obj], create_constraint=True), default=TaskStatus.PENDING, nullable=False)
     status_history = Column(JSON, default=list)
     
-    created_by = Column(String(10), nullable=False)
+    created_by = Column(String(10), nullable=False, default="system")
     head_of_council_id = Column(String(36), ForeignKey('agents.id'), nullable=True)
     assigned_council_ids = Column(JSON, default=list)
     lead_agent_id = Column(String(36), ForeignKey('agents.id'), nullable=True)

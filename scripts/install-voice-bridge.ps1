@@ -7,7 +7,8 @@
 
 param(
     [string]$RepoRoot = "",
-    [switch]$VbsOnly
+    [switch]$VbsOnly,
+    [switch]$StartUI
 )
 
 $ErrorActionPreference = "Continue"
@@ -108,6 +109,19 @@ if ($MainPy -and -not (Test-Path $MainPy)) {
     Write-Log "  main.py found at $MainPy"
 }
 
+# Quick path: --StartUI skips the bridge install and only installs/starts the UI
+if ($StartUI) {
+    $VENV_PIP    = Join-Path $VENV_DIR "Scripts\pip.exe"
+    $VENV_PYTHON = Join-Path $VENV_DIR "Scripts\python.exe"
+    if (-not (Test-Path $VENV_PIP)) {
+        Write-Warn "Venv not found at $VENV_DIR -- run the installer first without -StartUI"
+        exit 1
+    }
+    Write-Log "=== Installing / restarting Desktop UI only ==="
+    Install-VoiceUI | Out-Null
+    exit $LASTEXITCODE
+}
+
 # =============================================================================
 # Step 2.1  System audio (PyAudio ships PortAudio pre-compiled on Windows)
 # =============================================================================
@@ -143,6 +157,10 @@ if (-not (Test-Path $VENV_PIP)) {
     Run-Or-Warn "install python-jose" { & $VENV_PIP install "python-jose[cryptography]>=3.3.0" --quiet }
     Run-Or-Warn "install pyttsx3"     { & $VENV_PIP install "pyttsx3>=2.90" --quiet }
     Run-Or-Warn "install numpy"       { & $VENV_PIP install "numpy>=1.24" --quiet }
+    # sounddevice is used for both neural TTS playback (kokoro) and as a
+    # PyAudio alternative for mic capture.  It ships wheels for Python 3.12+,
+    # so this should work even where PyAudio fails (e.g. Python 3.14).
+    Run-Or-Warn "install sounddevice" { & $VENV_PIP install "sounddevice>=0.4.6" --quiet }
 
     # PyAudio â€” official wheel first, pipwin fallback
     Write-Log "  Installing PyAudio..."
@@ -262,7 +280,6 @@ function Start-BridgeDirect {
             Write-Warn "cmd start fallback also failed: $_"
             return $false
         }
-    }
     }
 }
 
@@ -494,6 +511,98 @@ else {
     ) | Set-Content -Path $startupBat -Encoding ASCII
     Write-Log "  Startup bat written for persistence: $startupBat"
 }
+
+# =============================================================================
+# Phase 4  Desktop UI companion (optional)
+# =============================================================================
+Write-Log "Phase 4 - Installing Desktop UI companion"
+
+$UI_DEST = Join-Path $CONF_DIR "voice-ui"
+$UI_LOG  = Join-Path $CONF_DIR "voice-ui.log"
+
+function Install-VoiceUI {
+    if (-not (Test-Path $VENV_PIP)) {
+        Write-Warn "pip not found at $VENV_PIP -- cannot install UI dependencies"
+        return $false
+    }
+    if (-not (Test-Path $BRIDGE_DIR)) {
+        Write-Warn "voice-bridge dir not found -- cannot copy UI files"
+        return $false
+    }
+
+    Write-Log "  Installing PySide6 (this may take a while)..."
+    $pysideOk = Run-Or-Warn "install PySide6" { & $VENV_PIP install "PySide6>=6.5" --quiet }
+    if (-not $pysideOk) {
+        Write-Warn "PySide6 install failed -- UI not available. The bridge works fine without it."
+        return $false
+    }
+
+    $UI_SRC = Join-Path $BRIDGE_DIR "ui"
+    if (-not (Test-Path $UI_SRC)) {
+        Write-Warn "UI source not found at $UI_SRC -- skipping"
+        return $false
+    }
+
+    if (Test-Path $UI_DEST) {
+        Remove-Item "$UI_DEST\*" -Recurse -Force -ErrorAction SilentlyContinue
+    } else {
+        New-Item -ItemType Directory -Force -Path $UI_DEST | Out-Null
+    }
+    Copy-Item "$UI_SRC\*" $UI_DEST -Recurse -Force -ErrorAction Stop
+    Write-Log "  UI files copied to $UI_DEST"
+
+    $runUiSrc = Join-Path $BRIDGE_DIR "run_voice_ui.py"
+    if (Test-Path $runUiSrc) {
+        Copy-Item $runUiSrc (Join-Path $UI_DEST "run_voice_ui.py") -Force
+    }
+
+    $venvPyEsc = $VENV_PYTHON -replace '\\', '\\'
+    $uiDirEsc  = $UI_DEST -replace '\\', '\\'
+
+    $vbsUiPath = Join-Path $CONF_DIR "start-voice-ui.vbs"
+    $vbsUi = @"
+' Agentium Voice UI launcher -- auto-generated
+Dim sh
+Set sh = CreateObject("WScript.Shell")
+Dim cmd : cmd = Chr(34) & "$venvPyEsc" & Chr(34) & " " & Chr(34) & "$uiDirEsc\run_voice_ui.py" & Chr(34)
+sh.Run cmd, 0, False
+"@
+    $vbsUi | Set-Content $vbsUiPath -Encoding ASCII
+    Write-Log "  UI VBS launcher: $vbsUiPath"
+
+    $uiLnkPath = Join-Path $StartupDir "AgentiumVoiceUI.lnk"
+    try {
+        $wshell   = New-Object -ComObject WScript.Shell
+        $shortcut = $wshell.CreateShortcut($uiLnkPath)
+        $shortcut.TargetPath  = "wscript.exe"
+        $shortcut.Arguments   = "`"$vbsUiPath`""
+        $shortcut.WindowStyle = 7
+        $shortcut.Description = "Agentium Voice Bridge UI (auto-start)"
+        $shortcut.Save()
+        Write-Log "  UI Startup shortcut written: $uiLnkPath"
+    } catch {
+        Write-Warn "Could not write UI Startup shortcut: $_"
+    }
+
+    try {
+        $uiProc = Start-Process `
+            -FilePath       "cmd.exe" `
+            -ArgumentList   "/c `"`"$VENV_PYTHON`" `"$UI_DEST\run_voice_ui.py`" >> `"$UI_LOG`" 2>&1`"" `
+            -WindowStyle    Hidden `
+            -PassThru `
+            -ErrorAction    Stop
+        Write-Log "  UI process started (PID $($uiProc.Id))"
+    } catch {
+        Write-Warn "UI start failed (will auto-start on next login): $_"
+    }
+
+    return $true
+}
+
+# Phase 4 always installs dependencies + startup shortcut + launches the UI.
+# The UI's bridge_client handles reconnection, so it works fine even if the
+# bridge isn't up yet.  Only the launch is best-effort.
+Install-VoiceUI | Out-Null
 
 # --- Signal successful install ONLY when the bridge is actually listening ---
 # (so a failed start does not mark "done" and silently disable re-prompting)
