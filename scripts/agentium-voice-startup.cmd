@@ -1,4 +1,4 @@
-@echo off
+﻿@echo off
 :: Agentium Voice Bridge - auto-start on Windows login (single trigger)
 :: If already installed, do nothing. Otherwise run the bootstrap
 :: (which shows the UAC prompt exactly once).

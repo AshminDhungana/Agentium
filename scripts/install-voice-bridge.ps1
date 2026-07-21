@@ -1,12 +1,13 @@
-# scripts/install-voice-bridge.ps1 - Agentium voice bridge installer (Windows)
+﻿# scripts/install-voice-bridge.ps1 - Agentium voice bridge installer (Windows)
 # Reads $env:USERPROFILE\.agentium\env.conf written by detect-host.ps1
 # Supports two launch strategies:
-#   task_scheduler — real Python install, registers Windows Task Scheduler + starts immediately
-#   vbs_startup    — Windows Store Python, uses VBScript + Startup folder shortcut
+#   task_scheduler â€” real Python install, registers Windows Task Scheduler + starts immediately
+#   vbs_startup    â€” Windows Store Python, uses VBScript + Startup folder shortcut
 # NOTE: Called from setup.ps1 which already handles UAC elevation.
 
 param(
-    [string]$RepoRoot = ""
+    [string]$RepoRoot = "",
+    [switch]$VbsOnly
 )
 
 $ErrorActionPreference = "Continue"
@@ -120,10 +121,11 @@ Write-Log "Step 2.2 - Creating Python venv at $VENV_DIR"
 if ($PYTHON_BIN -eq "python3_missing" -or [string]::IsNullOrWhiteSpace($PYTHON_BIN)) {
     Write-Warn "Python 3.10+ not found -- skipping venv and pip installs"
     Write-Warn "Install Python from https://www.python.org/downloads/ then re-run setup.ps1"
-    exit 1
+    Write-Warn "Continuing without voice bridge installation..."
+    # Don't exit - let setup.ps1 continue to show the error and wait for input
+} else {
+    Run-Or-Warn "create venv" { & $PYTHON_BIN -m venv $VENV_DIR }
 }
-
-Run-Or-Warn "create venv" { & $PYTHON_BIN -m venv $VENV_DIR }
 
 # =============================================================================
 # Step 2.3  Python packages
@@ -140,8 +142,9 @@ if (-not (Test-Path $VENV_PIP)) {
     Run-Or-Warn "install SpeechRecog" { & $VENV_PIP install "SpeechRecognition>=3.10.4" --quiet }
     Run-Or-Warn "install python-jose" { & $VENV_PIP install "python-jose[cryptography]>=3.3.0" --quiet }
     Run-Or-Warn "install pyttsx3"     { & $VENV_PIP install "pyttsx3>=2.90" --quiet }
+    Run-Or-Warn "install numpy"       { & $VENV_PIP install "numpy>=1.24" --quiet }
 
-    # PyAudio — official wheel first, pipwin fallback
+    # PyAudio â€” official wheel first, pipwin fallback
     Write-Log "  Installing PyAudio..."
     $pyaudioOk = $false
     try {
@@ -214,7 +217,7 @@ function Wait-ForBridge {
     return $false
 }
 
-# Direct Start-Process launch — used as primary start AND as fallback
+# Direct Start-Process launch â€” used as primary start AND as fallback
 # This is the ONLY method guaranteed to work immediately in all situations.
 function Start-BridgeDirect {
     param([string]$Label = "direct")
@@ -232,35 +235,34 @@ function Start-BridgeDirect {
 
     Write-Log "  Launching bridge ($Label): $VENV_PYTHON $MainPy"
 
-    # Start-Process with -RedirectStandardOutput writes to a file and keeps the
-    # process alive. Do NOT redirect into a pipeline — that blocks on Windows.
+    # Launch via cmd.exe /c so both stdout and stderr go to a single log file.
+    # PowerShell's Start-Process does not allow -RedirectStandardOutput and
+    # -RedirectStandardError to point to the same path (error in PS 7+), so
+    # we use cmd.exe redirection instead — this is reliable on all versions.
     try {
+        $cmdArgs = "/c `"`"$VENV_PYTHON`" `"$MainPy`" >> `"$BridgeLog`" 2>&1`""
         $proc = Start-Process `
-            -FilePath       $VENV_PYTHON `
-            -ArgumentList   "`"$MainPy`"" `
-            -RedirectStandardOutput $BridgeLog `
-            -RedirectStandardError  $BridgeLog `
+            -FilePath       "cmd.exe" `
+            -ArgumentList   $cmdArgs `
             -WindowStyle    Hidden `
             -PassThru `
             -ErrorAction    Stop
 
-        # Save PID so uninstaller / restart scripts can find it
         $proc.Id | Set-Content $PidFile
         Write-Log "  Bridge process started (PID $($proc.Id))"
         return $true
     } catch {
-        Write-Warn "Start-Process failed: $_ -- trying fallback via cmd /c start"
-
-        # Last-resort fallback: cmd /c start /min
+        Write-Warn "Direct start failed: $_ -- trying cmd /c start fallback"
         try {
             $cmdArgs = "/c start /min `"`" `"$VENV_PYTHON`" `"$MainPy`" >> `"$BridgeLog`" 2>&1"
             Start-Process "cmd.exe" -ArgumentList $cmdArgs -WindowStyle Hidden -ErrorAction Stop
-            Write-Log "  Bridge started via cmd fallback"
+            Write-Log "  Bridge started via cmd start fallback"
             return $true
         } catch {
-            Write-Warn "cmd fallback also failed: $_"
+            Write-Warn "cmd start fallback also failed: $_"
             return $false
         }
+    }
     }
 }
 
@@ -269,10 +271,14 @@ function Start-BridgeDirect {
 # =============================================================================
 Write-Log "Step 3 - Registering launch method (SVC_MGR=$SVC_MGR)"
 
-# ─────────────────────────────────────────────────────────────────────────────
-# PATH A: VBScript + Startup shortcut (Store Python)
-# ─────────────────────────────────────────────────────────────────────────────
-if ($SVC_MGR -eq "vbs_startup" -or $IS_STORE_PYTHON -eq "true") {
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# PATH A: VBScript + Startup shortcut (no admin needed)
+# Used for: Store Python OR when -VbsOnly is passed
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+if ($SVC_MGR -eq "vbs_startup" -or $IS_STORE_PYTHON -eq "true" -or $VbsOnly) {
+    if ($VbsOnly) {
+        Write-Log "  Using VBScript launcher (VbsOnly mode - no admin required)"
+    }
     Write-Log "  Using VBScript launcher (Store Python detected)"
 
     # Remove any old scheduled task
@@ -348,7 +354,7 @@ Next
         Write-Warn "Could not write Startup shortcut: $_ -- bridge won't auto-start on login"
     }
 
-    # ── Start RIGHT NOW ──────────────────────────────────────────────────────
+    # â”€â”€ Start RIGHT NOW â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     # Prefer Start-BridgeDirect (reliable) -- VBScript path as secondary.
     $started = Start-BridgeDirect -Label "Store-Python/direct"
     if (-not $started) {
@@ -360,7 +366,7 @@ Next
     $up = Wait-ForBridge -TimeoutSeconds 20
     $BridgeUp = $up
     if ($up) {
-        Write-Log "  Bridge is UP on port 9999 ✓"
+        Write-Log "  Bridge is UP on port 9999 [OK]"
     } else {
         Write-Warn "Bridge did NOT come up within 20s -- check $BridgeLog"
     }
@@ -369,9 +375,9 @@ Next
     Write-Log "  Manual start: wscript.exe `"$vbsPath`""
 }
 
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # PATH B: Task Scheduler (real Python install)
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 elseif ($SVC_MGR -eq "task_scheduler") {
     Write-Log "  Using Task Scheduler (real Python install)"
 
@@ -424,7 +430,7 @@ elseif ($SVC_MGR -eq "task_scheduler") {
         Write-Log "  Startup bat written: $startupBat"
     }
 
-    # ── Start RIGHT NOW via Start-Process (most reliable) ────────────────────
+    # â”€â”€ Start RIGHT NOW via Start-Process (most reliable) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     # Do NOT rely on Start-ScheduledTask here -- on many systems the task enters
     # "Ready" but the process never actually starts because there is no
     # interactive logon session available to the scheduler at that moment.
@@ -445,7 +451,7 @@ elseif ($SVC_MGR -eq "task_scheduler") {
     $up = Wait-ForBridge -TimeoutSeconds 20
     $BridgeUp = $up
     if ($up) {
-        Write-Log "  Bridge is UP on port 9999 ✓"
+        Write-Log "  Bridge is UP on port 9999 [OK]"
     } else {
         Write-Warn "Bridge did NOT come up within 20s"
 
@@ -455,7 +461,7 @@ elseif ($SVC_MGR -eq "task_scheduler") {
         $up = Wait-ForBridge -TimeoutSeconds 15
         $BridgeUp = $up
         if ($up) {
-            Write-Log "  Bridge is UP after last-resort launch ✓"
+            Write-Log "  Bridge is UP after last-resort launch [OK]"
         } else {
             Write-Warn "Bridge still not up -- check $BridgeLog"
             if (Test-Path $BridgeLog) {
@@ -466,16 +472,16 @@ elseif ($SVC_MGR -eq "task_scheduler") {
     }
 }
 
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # PATH C: Unknown SVC_MGR -- best-effort direct launch only
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 else {
     Write-Warn "Unknown SVC_MGR='$SVC_MGR' -- attempting direct launch (no persistence)"
 
     $started = Start-BridgeDirect -Label "unknown-svc-mgr"
     $up = Wait-ForBridge -TimeoutSeconds 15
     if ($up) {
-        Write-Log "  Bridge is UP on port 9999 ✓"
+        Write-Log "  Bridge is UP on port 9999 [OK]"
     } else {
         Write-Warn "Bridge not up within 15s -- check $BridgeLog"
     }

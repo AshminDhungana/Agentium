@@ -10,7 +10,12 @@ import os
 from pathlib import Path
 from typing import Dict, Optional
 
-import numpy as np
+try:
+    import numpy as np
+    _NUMPY_AVAILABLE = True
+except ImportError:
+    np = None
+    _NUMPY_AVAILABLE = False
 
 _WAKE_MODEL_ENV = os.getenv("WAKE_WORD_MODEL") or (Path.home() / ".agentium" / "openwakeword").as_posix()
 _WAKE_WORD_THRESHOLD = float(os.getenv("WAKE_WORD_THRESHOLD", "0.5"))
@@ -30,8 +35,8 @@ def _load_model(model_path: Optional[str]):
 class WakeWordDetector:
     def __init__(self, model_path: Optional[str] = None):
         self._model = _load_model(model_path or _WAKE_MODEL_ENV)
-        self.available = self._model is not None
-        self._buf = np.zeros(0, dtype=np.int16)
+        self.available = self._model is not None and _NUMPY_AVAILABLE
+        self._buf = np.zeros(0, dtype=np.int16) if _NUMPY_AVAILABLE else None
         self.threshold = _WAKE_WORD_THRESHOLD
 
     def push_frame(self, frame: bytes) -> Optional[float]:

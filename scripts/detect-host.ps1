@@ -1,4 +1,4 @@
-# scripts/detect-host.ps1 - Agentium OS probe for Windows
+﻿# scripts/detect-host.ps1 - Agentium OS probe for Windows
 # Writes $env:USERPROFILE\.agentium\env.conf
 # Usage: detect-host.ps1 [-RepoRoot <path>]
 
@@ -88,7 +88,7 @@ function Test-PythonOk($bin) {
     } catch { return $false }
 }
 
-# Candidate list — real install locations first, Store stub last
+# Candidate list â€” real install locations first, Store stub last
 $candidates = @(
     # Explicit version-named commands (real installs usually register these)
     "python3.13","python3.12","python3.11","python3.10",
@@ -150,14 +150,14 @@ if (-not $PYTHON_BIN) {
         if (Test-PythonOk $exePath) {
             $PYTHON_BIN     = $exePath
             $IS_STORE_PYTHON = "true"
-            Write-Warn "Only Windows Store Python found — will use VBScript launcher instead of scheduled task"
+            Write-Warn "Only Windows Store Python found - will use VBScript launcher instead of scheduled task"
             break
         }
     }
 }
 
 if (-not $PYTHON_BIN) {
-    Write-Warn "No Python 3.10+ found — voice bridge venv will not be created"
+    Write-Warn "No Python 3.10+ found - voice bridge venv will not be created"
     Write-Warn "Install Python from https://www.python.org/downloads/ then re-run setup.ps1"
     Write-Conf "PYTHON_BIN" "python3_missing"
     Write-Conf "IS_STORE_PYTHON" "false"
@@ -196,7 +196,7 @@ Write-Log "  BACKEND_URL=$BACKEND_URL"
 Write-Log "Step 1.7 - Detecting service manager"
 if ($IS_STORE_PYTHON -eq "true") {
     Write-Conf "SVC_MGR" "vbs_startup"
-    Write-Log "  SVC_MGR=vbs_startup (Store Python detected — scheduled task won't work)"
+    Write-Log "  SVC_MGR=vbs_startup (Store Python detected - scheduled task won't work)"
 } else {
     Write-Conf "SVC_MGR" "task_scheduler"
     Write-Log "  SVC_MGR=task_scheduler"

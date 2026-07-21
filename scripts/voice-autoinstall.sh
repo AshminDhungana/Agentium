@@ -50,26 +50,70 @@ if [ "$IS_WINDOWS" = "true" ]; then
 
     # -- Resolve Windows repo root from Docker Desktop mount ------------------
     SCRIPTS_SRC=$(awk '$2=="/scripts"{print $1}' /proc/mounts 2>/dev/null | head -1 || true)
+    echo "[voice-autoinstall] DEBUG: /scripts mount source = '$SCRIPTS_SRC'"
+    echo "[voice-autoinstall] DEBUG: /proc/mounts lines matching scripts:"
+    awk '$2~"scripts"' /proc/mounts 2>/dev/null | head -5 || echo "(none)"
+
     WIN_REPO=""
+    UNIX_REPO=""
     if echo "$SCRIPTS_SRC" | grep -qE "^/run/desktop/mnt/host/"; then
+        echo "[voice-autoinstall] Matched pattern: /run/desktop/mnt/host/"
         UNIX_REPO=$(echo "$SCRIPTS_SRC" | sed 's|/run/desktop/mnt/host/||; s|/scripts$||')
         DRIVE=$(echo "$UNIX_REPO" | cut -d/ -f1 | tr '[:lower:]' '[:upper:]')
         REST=$(echo "$UNIX_REPO" | cut -d/ -f2- | tr '/' '\\')
         WIN_REPO="${DRIVE}:\\${REST}"
     elif echo "$SCRIPTS_SRC" | grep -qE "^/host_mnt/"; then
+        echo "[voice-autoinstall] Matched pattern: /host_mnt/"
         UNIX_REPO=$(echo "$SCRIPTS_SRC" | sed 's|/host_mnt/||; s|/scripts$||')
         DRIVE=$(echo "$UNIX_REPO" | cut -d/ -f1 | tr '[:lower:]' '[:upper:]')
         REST=$(echo "$UNIX_REPO" | cut -d/ -f2- | tr '/' '\\')
         WIN_REPO="${DRIVE}:\\${REST}"
     elif echo "$SCRIPTS_SRC" | grep -qE "^//wsl\.localhost/"; then
+        echo "[voice-autoinstall] Matched pattern: //wsl.localhost/"
         UNIX_REPO=$(echo "$SCRIPTS_SRC" | sed 's|^//wsl\.localhost/[^/]*/||; s|/scripts$||')
         WIN_REPO=$(wslpath -w "/$UNIX_REPO" 2>/dev/null || echo "")
+    elif echo "$SCRIPTS_SRC" | grep -qE "^/mnt/"; then
+        echo "[voice-autoinstall] Matched pattern: /mnt/"
+        UNIX_REPO=$(echo "$SCRIPTS_SRC" | sed 's|/scripts$||')
+        DRIVE=$(echo "$UNIX_REPO" | cut -d/ -f1 | cut -c2-3 | tr '[:lower:]' '[:upper:]')
+        REST=$(echo "$UNIX_REPO" | cut -d/ -f2- | tr '/' '\\')
+        WIN_REPO="${DRIVE}:\\${REST}"
+    else
+        # Generic fallback: check /proc/mounts for any Docker-style mount of scripts
+        echo "[voice-autoinstall] No standard pattern matched — trying generic detection"
+        for src in $(awk '$2=="/scripts"{print $1}' /proc/mounts 2>/dev/null); do
+            # Skip non-path sources (tmpfs, overlay, etc.)
+            echo "$src" | grep -qE "^/" || continue
+            # Try to extract a Windows path from any remaining pattern
+            # Strip common prefixes
+            CLEAN=$(echo "$src" | sed 's|^/run/desktop/mnt/host/||; s|^/host_mnt/||; s|^/mnt/||')
+            if [ "$CLEAN" != "$src" ]; then
+                DRIVE=$(echo "$CLEAN" | cut -d/ -f1 | tr '[:lower:]' '[:upper:]')
+                REST=$(echo "$CLEAN" | cut -d/ -f2- | tr '/' '\\' | sed 's|\\scripts$||')
+                WIN_REPO="${DRIVE}:\\${REST}"
+                break
+            fi
+        done
     fi
+
     if [ -z "$WIN_REPO" ]; then
-        echo "[voice-autoinstall] WARN: Could not auto-detect repo root -- falling back"
-        WIN_REPO='%USERPROFILE%\agentium'
+        echo "[voice-autoinstall] WARN: Could not auto-detect repo root — bootstrap will search for it"
+        echo "[voice-autoinstall]        Run setup.ps1 directly from PowerShell:"
+        echo "[voice-autoinstall]          powershell -ExecutionPolicy Bypass -File scripts\\setup.ps1"
+        WIN_REPO=''
+        # Write minimal env.conf — setup.ps1 will update values
+        echo "BACKEND_URL=http://127.0.0.1:8000" > "$AGENTIUM_DIR/env.conf"
+        echo "WS_PORT=9999" >> "$AGENTIUM_DIR/env.conf"
+        echo "WAKE_WORD=agentium" >> "$AGENTIUM_DIR/env.conf"
+        echo "IS_WINDOWS=true" >> "$AGENTIUM_DIR/env.conf"
+    else
+        echo "[voice-autoinstall] Resolved Windows repo root: $WIN_REPO"
+        echo "REPO_ROOT=$WIN_REPO" > "$AGENTIUM_DIR/env.conf"
+        echo "BACKEND_URL=http://127.0.0.1:8000" >> "$AGENTIUM_DIR/env.conf"
+        echo "WS_PORT=9999" >> "$AGENTIUM_DIR/env.conf"
+        echo "WAKE_WORD=agentium" >> "$AGENTIUM_DIR/env.conf"
+        echo "IS_WINDOWS=true" >> "$AGENTIUM_DIR/env.conf"
     fi
-    echo "[voice-autoinstall] Resolved Windows repo root: $WIN_REPO"
 
     STARTUP_DIR="/host_home/AppData/Roaming/Microsoft/Windows/Start Menu/Programs/Startup"
 
@@ -79,7 +123,7 @@ if [ "$IS_WINDOWS" = "true" ]; then
     if [ -f "$BOOTSTRAP_TEMPLATE" ]; then
         sed "s|AGENTIUM_REPO_ROOT|${WIN_REPO}|g" "$BOOTSTRAP_TEMPLATE" > "$BOOTSTRAP_DEST"
     else
-        printf '@echo off\r\nsetlocal\r\nset LOG=%%USERPROFILE%%\\.agentium\\bootstrap.log\r\npowershell -NoProfile -ExecutionPolicy Bypass -File "%s\\voice-bridge\\setup.ps1" >> "%%LOG%%" 2>&1\r\n' \
+        printf '@echo off\r\nsetlocal\r\nset LOG=%%USERPROFILE%%\\.agentium\\bootstrap.log\r\npowershell -NoProfile -ExecutionPolicy Bypass -File "%s\\scripts\\setup.ps1" >> "%%LOG%%" 2>&1\r\n' \
             "$WIN_REPO" > "$BOOTSTRAP_DEST"
     fi
     echo "[voice-autoinstall] bootstrap-voice.cmd written."
