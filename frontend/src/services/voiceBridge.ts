@@ -15,7 +15,7 @@ export type BridgeStatus = 'offline' | 'connecting' | 'connected' | 'error';
 
 // Live agent state broadcast by the bridge (Jarvis upgrade, Phase H): the tab
 // can show a live indicator instead of only the after-the-fact transcript.
-export type VoiceState = 'listening' | 'thinking' | 'speaking' | 'interrupted';
+export type VoiceState = 'idle' | 'listening' | 'thinking' | 'speaking' | 'interrupted';
 
 export interface VoiceInteractionEvent {
   user:  string;   // what the user said
@@ -23,8 +23,15 @@ export interface VoiceInteractionEvent {
   ts:    number;   // unix timestamp
 }
 
+export interface TranscriptEvent {
+  role: 'user' | 'agent';
+  text: string;
+  ts: number;
+}
+
 type InteractionHandler = (event: VoiceInteractionEvent) => void;
 type StateHandler = (s: VoiceState) => void;
+type TranscriptHandler = (event: TranscriptEvent) => void;
 
 // ── Config ─────────────────────────────────────────────────────────────────────
 
@@ -53,6 +60,7 @@ class VoiceBridgeService {
   private handlers      = new Set<InteractionHandler>();
   private statusListeners = new Set<(s: BridgeStatus) => void>();
   private stateListeners = new Set<StateHandler>();
+  private transcriptHandlers = new Set<TranscriptHandler>();
   private voiceToken:   string | null = null;
   private tokenRetryCount = 0;
   private tokenRetryTimer: ReturnType<typeof setTimeout> | null = null;
@@ -142,6 +150,11 @@ class VoiceBridgeService {
     return () => this.stateListeners.delete(listener);
   }
 
+  onTranscript(handler: TranscriptHandler): () => void {
+    this.transcriptHandlers.add(handler);
+    return () => this.transcriptHandlers.delete(handler);
+  }
+
   // ── Private ─────────────────────────────────────────────────────────────────
 
   private async _fetchVoiceToken(): Promise<string> {
@@ -199,10 +212,18 @@ class VoiceBridgeService {
             try { h(event); } catch (e) { console.warn('[voiceBridge] handler error:', e); }
           });
         } else if (msg?.type === 'voice_state' && msg.state) {
-          // Live indicator: listening / thinking / speaking / interrupted.
           const state = msg.state as VoiceState;
           this.stateListeners.forEach((h) => {
             try { h(state); } catch (e) { console.warn('[voiceBridge] state handler error:', e); }
+          });
+        } else if (msg?.type === 'transcript' && msg.text && msg.role) {
+          const event: TranscriptEvent = {
+            role: msg.role,
+            text: msg.text,
+            ts:   msg.ts ?? Date.now() / 1000,
+          };
+          this.transcriptHandlers.forEach((h) => {
+            try { h(event); } catch (e) { console.warn('[voiceBridge] transcript handler error:', e); }
           });
         }
       } catch (e) {
