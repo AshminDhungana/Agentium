@@ -1,4 +1,10 @@
-"""Generate tray icons for the voice bridge UI."""
+"""Generate tray icons for the voice bridge UI.
+
+SVGs in assets/ are the primary source (tray_idle.svg, etc.).
+This script generates fallback PNGs for OS tray backends that
+do not support SVG rendering.  Run `python -m ui.generate_icons`
+after changing any SVG to regenerate the PNGs.
+"""
 import struct
 import zlib
 import os
@@ -70,6 +76,7 @@ def generate_icons():
         "tray_idle.png": _mic_pixels(size, blue),
         "tray_listening.png": _mic_pixels(size, green),
         "tray_speaking.png": _mic_pixels(size, white),
+        "tray_error.png": _mic_pixels(size, (239, 68, 68, 255)),
     }
 
     for name, pixels in icons.items():
