@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { X, Mic, MicOff, Settings2 } from 'lucide-react';
-import { voiceBridgeService, BridgeStatus, VoiceState, TranscriptEvent } from '@/services/voiceBridge';
-import { VoiceOrb } from '@/components/VoiceOrb';
+import { voiceBridgeService, BridgeStatus, VoiceState as ServiceVoiceState, TranscriptEvent } from '@/services/voiceBridge';
+import { VoiceOrb } from '@/components/voice-bridge/VoiceOrb';
+import type { VoiceState as ComponentVoiceState } from '@/components/voice-bridge/types';
 
 interface VoiceModePanelProps {
   onClose: () => void;
@@ -23,11 +24,30 @@ const STATE_COLORS: Record<string, string> = {
   interrupted: 'text-amber-400',
 };
 
+const mapServiceStateToComponentState = (serviceState: ServiceVoiceState): ComponentVoiceState => {
+  switch (serviceState) {
+    case 'idle':
+      return 'idle';
+    case 'listening':
+      return 'listening';
+    case 'thinking':
+      return 'processing';
+    case 'speaking':
+      return 'speaking';
+    case 'interrupted':
+      return 'error';
+    default:
+      return 'idle';
+  }
+};
+
 export function VoiceModePanel({ onClose }: VoiceModePanelProps) {
   const [bridgeStatus, setBridgeStatus] = useState<BridgeStatus>(voiceBridgeService.status);
-  const [voiceState, setVoiceState] = useState<VoiceState>('idle');
+  const [serviceVoiceState, setServiceVoiceState] = useState<ServiceVoiceState>('idle');
   const [transcripts, setTranscripts] = useState<TranscriptEvent[]>([]);
   const [isMuted, setIsMuted] = useState(false);
+
+  const componentVoiceState: ComponentVoiceState = mapServiceStateToComponentState(serviceVoiceState);
 
   useEffect(() => {
     return voiceBridgeService.onStatusChange(setBridgeStatus);
@@ -35,7 +55,7 @@ export function VoiceModePanel({ onClose }: VoiceModePanelProps) {
 
   useEffect(() => {
     return voiceBridgeService.onStateChange((s) => {
-      if (s) setVoiceState(s);
+      if (s) setServiceVoiceState(s);
     });
   }, []);
 
@@ -75,8 +95,8 @@ export function VoiceModePanel({ onClose }: VoiceModePanelProps) {
         </button>
 
         <div className="flex items-center gap-2">
-          <span className={`text-xs font-medium ${STATE_COLORS[voiceState]}`}>
-            {STATE_LABELS[voiceState]}
+          <span className={`text-xs font-medium ${STATE_COLORS[serviceVoiceState]}`}>
+            {STATE_LABELS[serviceVoiceState]}
           </span>
           <span className={`w-2 h-2 rounded-full ${
             bridgeStatus === 'connected' ? 'bg-emerald-500'
@@ -97,7 +117,7 @@ export function VoiceModePanel({ onClose }: VoiceModePanelProps) {
       {/* Center: Orb */}
       <div className="flex-1 flex flex-col items-center justify-center gap-8 px-6">
         <div className="relative">
-          <VoiceOrb size={240} state={isActive ? voiceState : 'idle'} />
+           <VoiceOrb size={240} state={isActive ? componentVoiceState : 'idle'} micLevel={0} />
 
           {/* Connecting overlay */}
           {bridgeStatus === 'connecting' && (
@@ -118,12 +138,12 @@ export function VoiceModePanel({ onClose }: VoiceModePanelProps) {
 
         {/* State label */}
         <div className="text-center">
-          <p className={`text-lg font-semibold ${STATE_COLORS[voiceState]} transition-colors duration-500`}>
-            {isActive ? STATE_LABELS[voiceState] : 'Voice Bridge Offline'}
+          <p className={`text-lg font-semibold ${STATE_COLORS[serviceVoiceState]} transition-colors duration-500`}>
+            {isActive ? STATE_LABELS[serviceVoiceState] : 'Voice Bridge Offline'}
           </p>
           <p className="text-sm text-gray-500 mt-1">
             {!isActive ? 'Run the voice bridge to start speaking'
-            : voiceState === 'idle' ? 'Say "Hey Agentium" or tap the mic'
+            : serviceVoiceState === 'idle' ? 'Say "Hey Agentium" or tap the mic'
             : ''}
           </p>
         </div>
@@ -134,7 +154,7 @@ export function VoiceModePanel({ onClose }: VoiceModePanelProps) {
           className={`w-20 h-20 rounded-full flex items-center justify-center transition-all duration-300 ${
             isMuted || !isActive
               ? 'bg-gray-800 text-gray-500 hover:bg-gray-700'
-              : voiceState === 'listening'
+              : serviceVoiceState === 'listening'
                 ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/40 scale-110'
                 : 'bg-gray-800 text-white hover:bg-gray-700'
           }`}
@@ -148,25 +168,25 @@ export function VoiceModePanel({ onClose }: VoiceModePanelProps) {
         </button>
 
         {/* Transcripts */}
-        {transcripts.length > 0 && (
-          <div className="w-full max-w-lg max-h-40 overflow-y-auto space-y-2 px-4">
-            {transcripts.slice(-5).map((t, i) => (
-              <div
-                key={`${t.timestamp}-${i}`}
-                className={`px-4 py-2 rounded-xl text-sm ${
-                  t.user_text
-                    ? 'bg-blue-500/10 text-blue-300 ml-12'
-                    : 'bg-gray-800/50 text-gray-300 mr-12'
-                }`}
-              >
-                <span className="text-xs font-medium opacity-60 mr-2">
-                  {t.user_text ? 'You' : 'Agentium'}
-                </span>
-                {t.user_text || t.agent_text}
-              </div>
-            ))}
-          </div>
-        )}
+          {transcripts.length > 0 && (
+            <div className="w-full max-w-lg max-h-40 overflow-y-auto space-y-2 px-4">
+              {transcripts.slice(-5).map((t, i) => (
+                <div
+                  key={`${t.ts}-${i}`}
+                  className={`px-4 py-2 rounded-xl text-sm ${
+                    t.role === 'user'
+                      ? 'bg-blue-500/10 text-blue-300 ml-12'
+                      : 'bg-gray-800/50 text-gray-300 mr-12'
+                  }`}
+                >
+                  <span className="text-xs font-medium opacity-60 mr-2">
+                    {t.role === 'user' ? 'You' : 'Agentium'}
+                  </span>
+                  {t.text}
+                </div>
+              ))}
+            </div>
+          )}
       </div>
 
       {/* Bottom bar */}
@@ -180,15 +200,15 @@ export function VoiceModePanel({ onClose }: VoiceModePanelProps) {
           : 'Bridge offline'}
         </div>
         <span className="text-gray-700">·</span>
-        <span className="text-xs text-gray-500">
-          {isActive
-            ? voiceState === 'idle' ? 'Tap mic to speak'
-              : voiceState === 'listening' ? 'Speak now'
-              : voiceState === 'thinking' ? 'Processing\u2026'
-              : voiceState === 'speaking' ? 'Agentium is speaking'
-              : ''
-            : 'Connect the voice bridge'}
-        </span>
+         <span className="text-xs text-gray-500">
+           {isActive
+             ? serviceVoiceState === 'idle' ? 'Tap mic to speak'
+               : serviceVoiceState === 'listening' ? 'Speak now'
+               : serviceVoiceState === 'thinking' ? 'Processing\u2026'
+               : serviceVoiceState === 'speaking' ? 'Agentium is speaking'
+               : ''
+             : 'Connect the voice bridge'}
+         </span>
       </div>
     </div>
   );
