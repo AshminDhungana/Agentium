@@ -34,7 +34,9 @@ import { chatApi } from '@/services/chatApi';
 import { localVoice } from '@/services/localVoice';
 import { useVoiceBridge } from '@/hooks/useVoiceBridge';
 import { VoiceInteractionEvent } from '@/services/voiceBridge';
+import { VoiceIndicator } from '@/components/VoiceIndicator';
 import { VoiceSettingsModal } from '@/components/VoiceSettingsModal';
+import { VoiceModePanel } from '@/components/VoiceModePanel';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
@@ -139,6 +141,7 @@ export function ChatPage() {
     const [isLocalMode, setIsLocalMode] = useState(false);
     const [interimTranscript, setInterimTranscript] = useState('');
     const [showVoiceSettings, setShowVoiceSettings] = useState(false);
+    const [showVoiceMode, setShowVoiceMode] = useState(false);
     // Issue 1: initialise to '' so that the API-provided default voice can be applied
     const [selectedVoice, setSelectedVoice] = useState('');
     const [selectedLanguage, setSelectedLanguage] = useState('');
@@ -271,8 +274,17 @@ export function ChatPage() {
     // navigation — react to the route pathname instead.
     const location = useLocation();
     useEffect(() => {
-        if (location.pathname === '/chat') markAsRead();
-    }, [location.pathname, markAsRead]);
+            if (location.pathname === '/chat') markAsRead();
+
+            const onOpenSettings = () => setShowVoiceSettings(true);
+            const onOpenVoiceMode = () => setShowVoiceMode(true);
+            window.addEventListener('open-voice-settings', onOpenSettings);
+            window.addEventListener('open-voice-mode', onOpenVoiceMode);
+            return () => {
+                window.removeEventListener('open-voice-settings', onOpenSettings);
+                window.removeEventListener('open-voice-mode', onOpenVoiceMode);
+            };
+        }, [location.pathname, markAsRead]);
 
     // FIX #8: fetch voice options on mount regardless of WebSocket state
     useEffect(() => {
@@ -1078,20 +1090,8 @@ export function ChatPage() {
                                     </button>
                                 )}
 
-                                {/* Voice Bridge status pill */}
-                                {activeTab === 'ai' && (
-                                    <div className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border ${bridgeStatus === 'connected'
-                                            ? 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-500/10 border-green-200 dark:border-green-500/20'
-                                            : bridgeStatus === 'connecting'
-                                                ? 'text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-500/10 border-yellow-200 dark:border-yellow-500/20'
-                                                : 'text-gray-600 dark:text-gray-500 bg-gray-50 dark:bg-[#1e2535] border-gray-200 dark:border-[#1e2535]'
-                                        }`} title={`Voice bridge: ${bridgeStatus}`}>
-                                        {bridgeStatus === 'connecting' ? <LoadingSpinner size="xs" />
-                                            : bridgeStatus === 'connected' ? <Mic className="w-3 h-3" />
-                                                : <MicOff className="w-3 h-3" />}
-                                        <span className="capitalize">{bridgeStatus === 'connected' ? 'Voice' : bridgeStatus}</span>
-                                    </div>
-                                )}
+                                {/* Voice indicator */}
+                                {activeTab === 'ai' && <VoiceIndicator />}
 
                                 {/* Tab switcher */}
                                 <div className="flex items-center bg-gray-100 dark:bg-[#0f1117] rounded-xl p-1 border border-gray-200 dark:border-[#1e2535]">
@@ -1339,10 +1339,7 @@ export function ChatPage() {
                                                                     }`} title={isRecording ? 'Stop recording' : 'Start voice input'} aria-label={isRecording ? 'Stop recording' : 'Start voice input'}>
                                                             {isRecording ? <Pause className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
                                                         </button>
-                                                        <button type="button" onClick={() => setShowVoiceSettings(true)}
-                                                            className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-[#1e2535] text-gray-600 dark:text-gray-500 transition-colors" title="Voice Settings" aria-label="Voice Settings">
-                                                            <Settings2 className="w-4 h-4" />
-                                                        </button>
+
                                                     </>
                                                 )}
                                                 {isRecording && (
@@ -1611,6 +1608,11 @@ export function ChatPage() {
                 {/* ── Voice Settings Modal ────────────────────────────────────── */}
                 {showVoiceSettings && (
                     <VoiceSettingsModal onClose={() => setShowVoiceSettings(false)} />
+                )}
+
+                {/* ── Voice Mode Panel ─────────────────────────────────────────── */}
+                {showVoiceMode && (
+                    <VoiceModePanel onClose={() => setShowVoiceMode(false)} />
                 )}
             </div>
         </div>

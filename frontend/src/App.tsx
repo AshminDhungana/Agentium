@@ -10,6 +10,7 @@ import { MainLayout } from '@/components/layout/MainLayout';
 import { FlatMapAuthBackground } from '@/components/FlatMapAuthBackground';
 import { LoginPage } from '@/pages/LoginPage';
 import { SignupPage } from '@/pages/SignupPage';
+
 import { SovereignRoute } from '@/components/SovereignRoute';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Shield } from 'lucide-react';
@@ -169,6 +170,7 @@ function AppWithRedirect() {
                         <Route path="settings" element={<SettingsPage />} />
                         <Route path="workflows" element={<WorkflowsPage />} />
                         <Route path="workflows/:id" element={<WorkflowDesignerPage />} />
+                        <Route path="voice-bridge" element={<VoiceBridgePage />} />
                     </Route>
 
                     <Route path="*" element={<Navigate to="/" replace />} />
@@ -196,6 +198,7 @@ const MessageLogPage   = lazy(() => import('@/pages/MessageLogPage').then(m => (
 const ABTestingPage    = lazy(() => import('@/pages/ABTestingPage').then(m => ({ default: m.ABTestingPage })));
 const WorkflowDesignerPage = lazy(() => import('@/pages/WorkflowDesignerPage').then(m => ({ default: m.WorkflowDesignerPage })));
 const WorkflowsPage = lazy(() => import('@/pages/WorkflowsPage').then(m => ({ default: m.WorkflowsPage })));
+const VoiceBridgePage = lazy(() => import('@/pages/VoiceBridgePage').then(m => ({ default: m.VoiceBridgePage })));
 
 // Full-screen spinner shown while checkAuth() is in-flight on page load
 function AppLoader() {
