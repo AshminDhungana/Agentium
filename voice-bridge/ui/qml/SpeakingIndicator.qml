@@ -48,7 +48,7 @@ Window {
 
         Timer {
             interval: 16
-            running: true
+            running: indicator.active
             repeat: true
             onTriggered: {
                 parent.time += 0.05;
