@@ -19,6 +19,19 @@ def _icon_from_asset(name: str) -> QIcon:
     return QIcon(path) if os.path.exists(path) else QIcon()
 
 
+_TOOLTIP_MAP = {
+    "listening": "Agentium Voice — Listening...",
+    "speaking": "Agentium Voice — Speaking...",
+    "idle": "Agentium Voice — Idle",
+}
+
+_ICON_MAP = {
+    "idle": "tray_idle.png",
+    "listening": "tray_listening.png",
+    "speaking": "tray_speaking.png",
+}
+
+
 def main():
     app = QApplication(sys.argv)
     app.setApplicationName("Agentium Voice")
@@ -35,12 +48,28 @@ def main():
     tray_icon = QSystemTrayIcon()
     tray_icon.setToolTip("Agentium Voice")
 
-    idle_icon = _icon_from_asset("tray_idle.png")
+    state_icons = {
+        "idle": _icon_from_asset("tray_idle.png"),
+        "listening": _icon_from_asset("tray_listening.png"),
+        "speaking": _icon_from_asset("tray_speaking.png"),
+    }
+
+    def _update_tray_state(state: str):
+        tip = _TOOLTIP_MAP.get(state, "Agentium Voice")
+        tray_icon.setToolTip(tip)
+        icon = state_icons.get(state)
+        if icon and not icon.isNull():
+            tray_icon.setIcon(icon)
+
+    bridge.voice_state_changed.connect(_update_tray_state)
+
+    idle_icon = state_icons["idle"]
     tray_icon.setIcon(idle_icon if not idle_icon.isNull() else app.style().standardIcon(48))
 
     show_action = QAction("Show Overlay")
     show_action.setCheckable(True)
     show_action.triggered.connect(overlay.toggle_overlay)
+    overlay.overlay_visible_changed.connect(show_action.setChecked)
 
     dashboard_action = QAction("Open Dashboard")
     dashboard_action.triggered.connect(

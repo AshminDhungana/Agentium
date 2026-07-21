@@ -216,7 +216,7 @@ class TestMain:
         with patch.object(sys, "exit"):
             main()
 
-        bridge.voice_state_changed.connect.assert_called_once_with(
+        bridge.voice_state_changed.connect.assert_any_call(
             overlay.on_voice_state
         )
         mic.mic_level.connect.assert_called_once_with(
@@ -512,7 +512,7 @@ class TestMainIntegration:
         overlay_cls.assert_called_once()
         bridge_cls.assert_called_once()
         mic_cls.assert_called_once()
-        bridge.voice_state_changed.connect.assert_called_once_with(
+        bridge.voice_state_changed.connect.assert_any_call(
             overlay.on_voice_state
         )
         mic.mic_level.connect.assert_called_once_with(
@@ -562,7 +562,7 @@ class TestMainIntegration:
         with patch.object(sys, "exit"):
             main()
 
-        bridge.voice_state_changed.connect.assert_called_once_with(
+        bridge.voice_state_changed.connect.assert_any_call(
             overlay.on_voice_state
         )
 

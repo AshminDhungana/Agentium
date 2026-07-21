@@ -110,7 +110,7 @@ Window {
 
     Timer {
         interval: 16
-        running: true
+        running: opacity > 0
         repeat: true
         onTriggered: {
             waveformCanvas.time += 0.02;

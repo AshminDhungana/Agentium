@@ -376,45 +376,28 @@ class TestAutoHide:
 
 
 class TestCenterOnCursor:
-    def test_centers_on_cursor(self, overlay, mock_qguiapplication):
+    def test_centers_on_cursor(self, overlay):
         mgr, view, root, timer = overlay
-        screen = MagicMock()
-        screen.virtualGeometry().center.return_value = MagicMock()
-        screen.virtualGeometry().center().x.return_value = 100
-        screen.virtualGeometry().center().y.return_value = 100
-        mock_qguiapplication.primaryScreen.return_value = screen
-        mock_qguiapplication.screens.return_value = []
         view.width.return_value = 280
         view.height.return_value = 280
-        mgr._center_on_cursor()
+        with patch("ui.overlay_manager.QCursor.pos") as mock_pos:
+            pos = MagicMock()
+            pos.x.return_value = 100
+            pos.y.return_value = 100
+            mock_pos.return_value = pos
+            mgr._center_on_cursor()
         view.setPosition.assert_called_once_with(-40, -40)
 
-    def test_safe_when_no_screen(self, overlay, mock_qguiapplication):
+    def test_always_uses_qcursor_pos(self, overlay):
         mgr, view, root, timer = overlay
-        mock_qguiapplication.primaryScreen.return_value = None
-        mgr._center_on_cursor()
-        view.setPosition.assert_not_called()
-
-    def test_uses_cursor_position(self, overlay, mock_qguiapplication):
-        mgr, view, root, timer = overlay
-        primary = MagicMock()
-        primary.virtualGeometry().center.return_value = MagicMock()
-        primary.virtualGeometry().center().x.return_value = 500
-        primary.virtualGeometry().center().y.return_value = 500
-        mock_qguiapplication.primaryScreen.return_value = primary
-
-        screen = MagicMock()
-        screen.geometry.return_value = MagicMock()
-        screen.geometry().contains.return_value = True
-        cursor = MagicMock()
-        cursor.x.return_value = 1000
-        cursor.y.return_value = 600
-        screen.cursorPos.return_value = cursor
-        mock_qguiapplication.screens.return_value = [screen]
-
         view.width.return_value = 280
         view.height.return_value = 280
-        mgr._center_on_cursor()
+        with patch("ui.overlay_manager.QCursor.pos") as mock_pos:
+            pos = MagicMock()
+            pos.x.return_value = 1000
+            pos.y.return_value = 600
+            mock_pos.return_value = pos
+            mgr._center_on_cursor()
         view.setPosition.assert_called_once_with(860, 460)
 
 
