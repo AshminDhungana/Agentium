@@ -41,6 +41,13 @@
   --c-brand: #2563eb;
   --c-brand-soft: #dbeafe;
   --c-brand-fg: #ffffff;
+  --c-voice-listening: #2563eb;
+  --c-voice-speaking: #059669;
+  --c-voice-thinking: #7c3aed;
+  --c-voice-error: #dc2626;
+  --c-voice-glow: rgba(37, 99, 235, 0.2);
+  --c-glass-bg: rgba(255, 255, 255, 0.85);
+  --c-glass-border: rgba(37, 99, 235, 0.12);
 }
 .dark {
   --c-canvas: #0f1117;
@@ -51,6 +58,13 @@
   --c-brand: #3b82f6;
   --c-brand-soft: rgba(59, 130, 246, 0.12);
   --c-brand-fg: #ffffff;
+  --c-voice-listening: #3b82f6;
+  --c-voice-speaking: #10b981;
+  --c-voice-thinking: #8b5cf6;
+  --c-voice-error: #ef4444;
+  --c-voice-glow: rgba(59, 130, 246, 0.3);
+  --c-glass-bg: rgba(22, 27, 39, 0.85);
+  --c-glass-border: rgba(59, 130, 246, 0.15);
 }
 
 /* Coordinated theme transition.
