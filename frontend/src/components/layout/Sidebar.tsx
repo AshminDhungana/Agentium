@@ -111,7 +111,7 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar(
         )}
       </div>
 
-      <nav className="flex-1 space-y-4 overflow-y-auto px-3 py-3" aria-label="Main navigation">
+      <nav className="flex-1 space-y-4 overflow-y-auto px-3 py-3 scrollbar-thin" aria-label="Main navigation">
         {groups.map((group) => (
           <div key={group.id} className="space-y-0.5">
             {!collapsed && (

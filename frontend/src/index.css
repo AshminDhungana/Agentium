@@ -67,6 +67,13 @@
   --c-glass-border: rgba(59, 130, 246, 0.15);
 }
 
+/* Thin custom scrollbar for sidebar nav */
+.scrollbar-thin { scrollbar-width: thin; }
+.scrollbar-thin::-webkit-scrollbar { width: 4px; }
+.scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+.scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(156, 163, 175, 0.3); border-radius: 4px; }
+.scrollbar-thin::-webkit-scrollbar-thumb:hover { background: rgba(156, 163, 175, 0.5); }
+
 /* Coordinated theme transition.
    Tailwind `dark:` utilities and the `--c-*` variables flip instantly when the
    `.dark` class changes, so without this only elements that happen to carry an
