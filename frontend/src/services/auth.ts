@@ -1,4 +1,5 @@
 import { api } from './api';
+import { logger } from '@/utils/logger';
 
 export interface LoginCredentials {
     username: string;
@@ -63,7 +64,7 @@ export const authService = {
             );
             return response.data?.valid === true;
         } catch (error) {
-            console.warn('Token verification failed:', error);
+            logger.debug('Token verification failed:', error);
             return false;
         }
     },

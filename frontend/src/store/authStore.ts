@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { api } from '@/services/api';
 import { jwtDecode } from 'jwt-decode';
+import { logger } from '@/utils/logger';
 
 // B6: extended role type to match the backend RBAC system
 type UserRole =
@@ -281,7 +282,7 @@ export const useAuthStore = create<AuthState>()(
                         return false;
                     }
                 } catch (error) {
-                    console.error('Token verification failed:', error);
+                    logger.warn('Token verification failed:', error);
 
                     // Fallback: decode locally if server is temporarily down
                     try {
@@ -302,7 +303,7 @@ export const useAuthStore = create<AuthState>()(
                             return true;
                         }
                     } catch (decodeError) {
-                        console.error('Token decode failed:', decodeError);
+                        logger.warn('Token decode failed:', decodeError);
                     }
 
                     if (!hasPersistedUser) {

@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { BackendStatus } from '@/types';
 import { backendHealthApi } from '@/services/backendHealth';
 import { channelMetricsApi } from '@/services/channelMetrics';
+import { logger } from '@/utils/logger';
 import type {
   AllChannelsMetricsResponse,
   ChannelMetricsResponse,
@@ -107,7 +108,7 @@ export const useBackendStore = create<BackendState>()((set, get) => ({
         isLoadingChannelMetrics: false 
       });
     } catch (error) {
-      console.error('Failed to fetch channel metrics:', error);
+      logger.warn('Failed to fetch channel metrics:', error);
       set({ isLoadingChannelMetrics: false });
     }
   },
@@ -140,7 +141,7 @@ export const useBackendStore = create<BackendState>()((set, get) => ({
 
       return data;
     } catch (error) {
-      console.error(`Failed to fetch metrics for channel ${channelId}:`, error);
+      logger.warn(`Failed to fetch metrics for channel ${channelId}:`, error);
       
       set(state => ({
         isLoadingSingleChannel: {
@@ -166,7 +167,7 @@ export const useBackendStore = create<BackendState>()((set, get) => ({
       
       return true;
     } catch (error) {
-      console.error(`Failed to reset channel ${channelId}:`, error);
+      logger.warn(`Failed to reset channel ${channelId}:`, error);
       return false;
     }
   },

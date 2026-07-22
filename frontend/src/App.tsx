@@ -1,13 +1,12 @@
 // src/App.tsx
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useOutlet, useNavigate } from 'react-router-dom';
-import { useEffect, useState, useRef, lazy } from 'react';
+import { useEffect, useState, useRef, lazy, Suspense } from 'react';
 import { Toaster } from 'react-hot-toast';
 import { useAuthStore } from '@/store/authStore';
 import { useBackendStore } from '@/store/backendStore';
 import { GlobalWebSocketProvider } from '@/components/GlobalWebSocketProvider';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import { MainLayout } from '@/components/layout/MainLayout';
-import { FlatMapAuthBackground } from '@/components/FlatMapAuthBackground';
 import { LoginPage } from '@/pages/LoginPage';
 import { SignupPage } from '@/pages/SignupPage';
 
@@ -200,6 +199,9 @@ const WorkflowDesignerPage = lazy(() => import('@/pages/WorkflowDesignerPage').t
 const WorkflowsPage = lazy(() => import('@/pages/WorkflowsPage').then(m => ({ default: m.WorkflowsPage })));
 const VoiceBridgePage = lazy(() => import('@/pages/VoiceBridgePage').then(m => ({ default: m.VoiceBridgePage })));
 
+// Lazy-loaded auth background (Three.js scene — kept out of initial bundle)
+const FlatMapAuthBackground = lazy(() => import('@/components/FlatMapAuthBackground').then(m => ({ default: m.FlatMapAuthBackground })));
+
 // Full-screen spinner shown while checkAuth() is in-flight on page load
 function AppLoader() {
   return (
@@ -231,7 +233,9 @@ function AuthLayout() {
 
     return (
         <div id="main-content" tabIndex={-1} className="min-h-screen relative flex flex-col items-center justify-center p-4 outline-none">
-            <FlatMapAuthBackground variant={isSignup ? 'signup' : 'login'} />
+            <Suspense fallback={<div className="absolute inset-0 bg-gradient-to-br from-[#0A0D12] to-[#141A23]" />}>
+                <FlatMapAuthBackground variant={isSignup ? 'signup' : 'login'} />
+            </Suspense>
 
       <div className="text-center mb-8 relative z-10">
         <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-blue-600 text-white mb-4 transition-transform duration-500 hover:scale-110">
