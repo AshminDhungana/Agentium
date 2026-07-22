@@ -21,7 +21,7 @@ import { api } from '@/services/api';
 import {
     Send, Crown, User, UserRoundSearch, AlertCircle, Wifi, WifiOff, CheckCircle,
     RefreshCw, Paperclip, Image as ImageIcon, File, X, Mic, MicOff, Pause, Square,
-    Download, Copy, Sparkles, Code, FileText, Video, Music, Archive,
+    Download, Copy, PenLine, Sparkles, Code, FileText, Video, Music, Archive,
     Maximize2, MoreHorizontal, Smile, Plus, MessageCircle, Smartphone,
     Slack, Mail, Inbox, Volume2, VolumeX, Settings2, ChevronDown, Globe,
     FolderOpen, Trash2, Eye, UploadCloud, HardDrive, Search, Filter,
@@ -720,6 +720,12 @@ export function ChatPage() {
         showToast.success('Copied');
     };
 
+    const followUpMessage = (content: string, ref: React.RefObject<HTMLTextAreaElement | null>) => {
+        setInput(content);
+        ref.current?.focus();
+        ref.current?.setSelectionRange(content.length, content.length);
+    };
+
     // ── File upload ───────────────────────────────────────────────────────────
 
     const handleFileSelect = async (files: FileList | null) => {
@@ -1209,6 +1215,10 @@ export function ChatPage() {
                                                             <button onClick={() => copyMessage(message.content)}
                                                                 className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-[#1e2535] text-gray-600 dark:text-gray-500 transition-colors" title="Copy" aria-label="Copy">
                                                                 <Copy className="w-3 h-3" />
+                                                            </button>
+                                                            <button onClick={() => followUpMessage(message.content, textareaRef)}
+                                                                className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-[#1e2535] text-gray-600 dark:text-gray-500 transition-colors" title="Follow up" aria-label="Follow up">
+                                                                <PenLine className="w-3 h-3" />
                                                             </button>
                                                             {!isUser && voiceAvailable && (
                                                                 <button onClick={() => handleSpeakMessage(message.id, message.content)}
