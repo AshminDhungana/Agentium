@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, useReducer } from 'react';
 import { Mic, MicOff, ChevronDown, Settings2, Maximize2 } from 'lucide-react';
 import { voiceBridgeService, BridgeStatus, VoiceState } from '@/services/voiceBridge';
 import { useAuthStore } from '@/store/authStore';
@@ -19,6 +19,35 @@ const VOICE_STATE_RING: Record<string, string> = {
   interrupted: 'border-amber-500/60',
 };
 
+type Platform = 'windows' | 'macos' | 'linux' | 'unknown';
+
+function getPlatform(): Platform {
+  const p = navigator.platform;
+  if (p.includes('Win')) return 'windows';
+  if (p.includes('Mac')) return 'macos';
+  if (p.includes('Linux')) return 'linux';
+  return 'unknown';
+}
+
+function getInstallCommand(os: Platform): string {
+  switch (os) {
+    case 'windows':
+      return 'powershell -ExecutionPolicy Bypass -File ".\\scripts\\setup.ps1"';
+    case 'macos':
+    case 'linux':
+      return './scripts/install-voice-bridge.sh';
+    default:
+      return 'powershell -ExecutionPolicy Bypass -File ".\\scripts\\setup.ps1"';
+  }
+}
+
+const stageLabels: Record<string, string> = {
+  'token-fetch': 'Token fetch — POST /api/v1/auth/voice-token',
+  'socket-open': 'WebSocket connection — ws://127.0.0.1:9999',
+  'token-rejected': 'Token rejected by bridge (code 1008)',
+  'unknown': 'Unknown error',
+};
+
 interface VoiceIndicatorProps {
   iconOnly?: boolean;
 }
@@ -32,6 +61,7 @@ export function VoiceIndicator({ iconOnly = false }: VoiceIndicatorProps) {
   const [isDisabled, setIsDisabled] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const connectAttempted = useRef(false);
+  const [, forceUpdate] = useReducer((x: number) => x + 1, 0);
 
   useEffect(() => {
     return voiceBridgeService.onStatusChange(setStatus);
@@ -41,6 +71,10 @@ export function VoiceIndicator({ iconOnly = false }: VoiceIndicatorProps) {
     return voiceBridgeService.onStateChange((s) => {
       if (s) setVoiceState(s);
     });
+  }, []);
+
+  useEffect(() => {
+    return voiceBridgeService.onErrorChange(() => forceUpdate());
   }, []);
 
   useEffect(() => {
@@ -73,6 +107,9 @@ export function VoiceIndicator({ iconOnly = false }: VoiceIndicatorProps) {
 
   const isConnecting = effectiveStatus === 'connecting';
   const isConnected = effectiveStatus === 'connected';
+  const platform = useMemo(() => getPlatform(), []);
+  const installCommand = useMemo(() => getInstallCommand(platform), [platform]);
+  const connectionError = voiceBridgeService.connectionError;
 
   return (
     <div className="relative flex items-center gap-0.5">
@@ -124,7 +161,7 @@ export function VoiceIndicator({ iconOnly = false }: VoiceIndicatorProps) {
       )}
 
       {dropdownOpen && (
-        <div className="absolute top-full right-0 mt-1 w-56 bg-white dark:bg-[#161b27] border border-gray-200 dark:border-[#1e2535] rounded-xl shadow-lg z-50 p-2 space-y-1">
+        <div className="absolute bottom-full right-0 mb-1 w-56 bg-white dark:bg-[#161b27] border border-gray-200 dark:border-[#1e2535] rounded-xl shadow-lg z-50 p-2 space-y-1">
           <div className="px-3 py-2 text-xs text-gray-500 dark:text-gray-400 flex items-center gap-2">
             <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-500' : 'bg-gray-500'}`} />
             {label}
@@ -133,15 +170,27 @@ export function VoiceIndicator({ iconOnly = false }: VoiceIndicatorProps) {
             <div className="px-3 py-2 text-xs text-gray-600 dark:text-gray-500 bg-gray-50 dark:bg-black/30 rounded-lg">
               <p className="mb-1">Bridge not running.</p>
               <div className="flex items-center gap-1">
-                <code className="text-[10px] text-green-500 flex-1 truncate">powershell -File ".\scripts\setup.ps1"</code>
+                <code className="text-[10px] text-green-500 flex-1 truncate">{installCommand}</code>
                 <button
-                  onClick={() => navigator.clipboard.writeText('powershell -ExecutionPolicy Bypass -File ".\\scripts\\setup.ps1"')}
+                  onClick={() => navigator.clipboard.writeText(installCommand)}
                   className="text-blue-500 hover:text-blue-400 shrink-0"
                   aria-label="Copy install command"
                 >
                   Copy
                 </button>
               </div>
+              {connectionError && (
+                <details className="mt-2 border-t border-gray-200 dark:border-gray-700 pt-2">
+                  <summary className="cursor-pointer text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300">
+                    Connection details
+                  </summary>
+                  <div className="mt-1 space-y-0.5">
+                    <p>{stageLabels[connectionError.stage] ?? connectionError.stage}</p>
+                    <p>Message: {connectionError.message}</p>
+                    {connectionError.statusCode && <p>HTTP {connectionError.statusCode}</p>}
+                  </div>
+                </details>
+              )}
             </div>
           )}
           <button
