@@ -121,14 +121,8 @@ class AudioService:
         return OpenAI(api_key=api_key)
 
     def _is_kokoro_available(self) -> bool:
-        """Check if Kokoro TTS is available."""
-        try:
-            from kokoro import KPipeline
-            return True
-        except ImportError:
-            return False
-        except Exception:
-            return False
+        """Kokoro is always reported as available — TTS runs on the host bridge, not in Docker."""
+        return True
 
     # ── Availability ─────────────────────────────────────────────────────
 
