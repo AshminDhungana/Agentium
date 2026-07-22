@@ -922,9 +922,22 @@ async def _stream_chat(text: str, persona: Optional[str] = None,
                 evt = json.loads(payload_str)
             except json.JSONDecodeError:
                 continue
-            if evt.get("type") == "content" and evt.get("content"):
+            evt_type = evt.get("type")
+            if evt_type == "ack":
+                continue
+            if evt_type == "summary" and evt.get("content"):
                 yield evt["content"]
-            elif evt.get("type") in ("done", "complete"):
+            elif evt_type == "detail" and evt.get("content"):
+                yield evt["content"]
+            elif evt_type == "content" and evt.get("content"):
+                yield evt["content"]
+            elif evt_type == "part_end":
+                yield "\n"
+            elif evt_type in ("complete", "done"):
+                yield ""
+                break
+            elif evt_type == "error":
+                yield ""
                 break
     finally:
         try:

@@ -243,21 +243,21 @@ class _NoopTTS:
 def test_stream_chat_yields_sentences(monkeypatch):
     import asyncio, json
 
-    sse = (
-        b'data: {"type":"content","content":"The time is "}\n\n'
-        b'data: {"type":"content","content":"ten o\'clock."}\n\n'
-        b'data: {"type":"done"}\n\n'
-    )
+    lines = [
+        b'data: {"type":"content","content":"The time is "}',
+        b"data: {\"type\":\"content\",\"content\":\"ten o'clock.\"}",
+        b'data: {"type":"done"}',
+    ]
 
     class FakeResp:
         def __init__(self):
-            self._it = iter([sse])
+            self._it = iter(lines)
 
-        def read(self, n=-1):
-            try:
-                return next(self._it)
-            except StopIteration:
-                return b""
+        def __iter__(self):
+            return self
+
+        def __next__(self):
+            return next(self._it)
 
     def _fake_urlopen(req, timeout=None):
         body = req.data.decode()
@@ -419,3 +419,45 @@ def test_stream_chat_includes_speaker_id(monkeypatch):
 
     asyncio.run(go())
     assert captured["body"].get("speaker_id") == "s1"
+
+
+def test_stream_chat_handles_envelope_events(monkeypatch):
+    import asyncio, json
+
+    lines = [
+        b'data: {"type":"ack","stream_id":"s1","seq":1,"content":"Thinking..."}',
+        b'data: {"type":"summary","stream_id":"s1","seq":2,"content":"Battery at 42%."}',
+        b'data: {"type":"part_end","stream_id":"s1","seq":3,"part":"summary"}',
+        b'data: {"type":"detail","stream_id":"s1","seq":4,"content":"Discharging at 5%/h."}',
+        b'data: {"type":"part_end","stream_id":"s1","seq":5,"part":"detail"}',
+        b'data: {"type":"complete","stream_id":"s1","seq":6,"content":"Battery at 42%. Discharging at 5%/h."}',
+    ]
+
+    class FakeResp:
+        def __init__(self):
+            self._it = iter(lines)
+
+        def __iter__(self):
+            return self
+
+        def __next__(self):
+            return next(self._it)
+
+    def _fake_urlopen(req, timeout=None):
+        r = FakeResp()
+        r.__enter__ = lambda: r
+        r.__exit__ = lambda *a: None
+        return r
+
+    monkeypatch.setattr(bridge, "VOICE_TOKEN", "t")
+    monkeypatch.setattr("urllib.request.urlopen", _fake_urlopen)
+
+    async def go():
+        out = [c async for c in bridge._stream_chat("battery?")]
+        return out
+
+    out = asyncio.run(go())
+    text = "".join(out)
+    assert "Battery at 42%" in text
+    assert "Discharging at 5%/h" in text
+    assert "Thinking..." not in text
