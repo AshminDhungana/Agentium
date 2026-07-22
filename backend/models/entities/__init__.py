@@ -13,17 +13,17 @@ Hierarchy:
 - Monitoring: Hierarchical oversight and agent health tracking
 - MCP Tools: Constitutional MCP server registry (Phase 6.7)
 """
-from backend.models.entities.channels import (
+from .channels import (
     ExternalChannel,
     ExternalMessage,
     ChannelType,
     ChannelStatus
 )
 
-from backend.models.entities.skill import SkillSchema, SkillDB, SkillSubmission
-from backend.models.entities.chat_message import ChatMessage, Conversation
+from .skill import SkillSchema, SkillDB, SkillSubmission
+from .chat_message import ChatMessage, Conversation
 
-from backend.models.entities.scheduled_task import (
+from .scheduled_task import (
     ScheduledTask, 
     ScheduledTaskExecution,
     ScheduledTaskStatus,
@@ -32,7 +32,7 @@ from backend.models.entities.scheduled_task import (
 
 from .reasoning_trace import ReasoningTraceModel, ReasoningStepModel
 
-from backend.models.entities.task import (
+from .task import (
     Task,
     SubTask,
     TaskAuditLog,
@@ -42,12 +42,12 @@ from backend.models.entities.task import (
     TaskDependency,
 )
 
-from backend.models.entities.task_events import (
+from .task_events import (
     TaskEvent,
     TaskEventType
 )
 
-from backend.models.entities.user_config import (
+from .user_config import (
     UserModelConfig,
     ProviderType,
     ConnectionStatus,
@@ -59,18 +59,18 @@ from .ab_testing import (
     ModelPerformanceCache, ExperimentStatus, RunStatus, TaskComplexity
 )
 
-from backend.models.entities.base import Base, BaseEntity
+from .base import Base, BaseEntity
 
-from backend.models.entities.user import User
-from backend.models.entities.delegation import Delegation
+from .user import User
+from .delegation import Delegation
 
-from backend.models.entities.constitution import (
+from .constitution import (
     Constitution, 
     Ethos, 
     DocumentType
 )
 
-from backend.models.entities.agents import (
+from .agents import (
     Agent,
     HeadOfCouncil,
     CouncilMember,
@@ -81,7 +81,7 @@ from backend.models.entities.agents import (
     AGENT_TYPE_MAP
 )
 
-from backend.models.entities.voting import (
+from .voting import (
     TaskDeliberation,
     IndividualVote,
     VotingRecord,
@@ -91,7 +91,7 @@ from backend.models.entities.voting import (
     AmendmentStatus
 )
 
-from backend.models.entities.audit import (
+from .audit import (
     AuditLog,
     ConstitutionViolation,
     SessionLog,
@@ -100,8 +100,8 @@ from backend.models.entities.audit import (
     AuditCategory
 )
 
-from backend.models.entities.monitoring import (
-    AgentHealthReport,
+from .monitoring import (
+    AgentHealthReport, 
     ViolationReport,
     ViolationSeverity,
     TaskVerification,
@@ -110,21 +110,21 @@ from backend.models.entities.monitoring import (
     MonitoringStatus
 )
 
-from backend.models.entities.critics import (
+from .critics import (
     CriticAgent,
     CritiqueReview,
     CriticType,
     CriticVerdict
 )
 
-from backend.models.entities.system_settings import SystemSetting
+from .system_settings import SystemSetting
 
-from backend.models.entities.checkpoint import (
+from .checkpoint import (
     ExecutionCheckpoint,
     CheckpointPhase
 )
 
-from backend.models.entities.remote_execution import (
+from .remote_execution import (
     RemoteExecutionRecord,
     SandboxRecord,
     ExecutionSummary,
@@ -133,36 +133,37 @@ from backend.models.entities.remote_execution import (
 )
 
 # Phase 6.7 — MCP Server Integration
-from backend.models.entities.mcp_tool import MCPTool
+from .mcp_tool import MCPTool
 
 # Phase 11 — Ecosystem Expansion
-from backend.models.entities.federation import FederatedInstance, FederatedTask, FederatedVote
-from backend.models.entities.plugin import Plugin, PluginInstallation, PluginReview
-from backend.models.entities.mobile import DeviceToken, NotificationPreference
+from .federation import FederatedInstance, FederatedTask, FederatedVote
+from .plugin import Plugin, PluginInstallation, PluginReview
+from .mobile import DeviceToken, NotificationPreference
 
 # Phase 12 — SDK & External Interface
-from backend.models.entities.webhook import WebhookSubscription, WebhookDeliveryLog
+from .webhook import WebhookSubscription, WebhookDeliveryLog
 
 # Phase 13.5 — Workflow Automation Pipeline
-from backend.models.entities.workflow import (Workflow, WorkflowExecution, WorkflowStep, WorkflowVersion, WorkflowExecutionStatus, WorkflowStepType)
+from .workflow import (Workflow, WorkflowExecution, WorkflowStep, WorkflowVersion, WorkflowExecutionStatus, WorkflowStepType)
 
 # Phase 16 — Wait & Poll
-from backend.models.entities.wait_condition import (
+from .wait_condition import (
     WaitCondition,
     WaitStrategy,
     WaitConditionStatus,
 )
 
 # Phase 13.6 — Intelligent Event Processing
-from backend.models.entities.event_trigger import EventTrigger, EventLog, TriggerType, EventLogStatus
+from .event_trigger import EventTrigger, EventLog, TriggerType, EventLogStatus
 
 # Phase 15.4 — Speaker Identification
-from backend.models.entities.speaker_profile import SpeakerProfile
+from .speaker_profile import SpeakerProfile
+from .voice_config import VoiceConfig
 
 # Phase 16.3 — Cross-Document Citation Graph
-from backend.models.entities.citation_edge import CitationEdge
+from .citation_edge import CitationEdge
 
-from backend.models.entities.model_pricing import ModelPricing
+from .model_pricing import ModelPricing
 
 # All models for Alembic/database creation
 __all__ = [
@@ -303,6 +304,7 @@ __all__ = [
 
     # Phase 15.4 — Speaker Identification
     'SpeakerProfile',
+    'VoiceConfig',
 
     # Phase 16.3 — Cross-Document Citation Graph
     'CitationEdge',

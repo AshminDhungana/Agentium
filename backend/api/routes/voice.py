@@ -7,13 +7,14 @@ import os
 import json
 import uuid
 import tempfile
+import io
 from pathlib import Path
 from typing import Optional
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, UploadFile, File, Depends, status, Form
 from pydantic import BaseModel, Field
-from backend.core.exceptions import BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, TooLargeError, RateLimitError, InternalServerError, ServiceUnavailableError, ServerSTTUnavailable
+from backend.core.exceptions import BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, TooLargeError, RateLimitError, InternalServerError, ServiceUnavailableError, ServerSTTUnavailable, ProviderUnavailableError
 from fastapi.responses import FileResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
@@ -122,7 +123,7 @@ def get_whisper_client(api_key: str):
 @router.get(
     "/enhanced-status",
     summary="Get Enhanced Voice Status",
-    description="Get detailed voice status including local fallback availability. Frontend uses this to decide between OpenAI and local voice.",
+    description="Get detailed voice status including local fallback availability and TTS provider status.",
     responses=build_responses(None),
 )
 async def get_enhanced_voice_status(
@@ -130,38 +131,63 @@ async def get_enhanced_voice_status(
     current_user: User = Depends(get_current_active_user)
 ):
     """
-    Get detailed voice status including local fallback availability.
-    Frontend uses this to decide between OpenAI and local voice.
+    Get detailed voice status including local fallback availability and TTS provider status.
+    Frontend uses this to decide between different voice options.
     """
+    from backend.services.audio_service import AudioService
+    from backend.services.voice.voice_config_service import VoiceConfigService
+    
     user_id = str(current_user["sub"])
-
-    # Check OpenAI availability
-    openai_status = check_voice_available(db, user_id)
-
+    audio_service = AudioService()
+    
+    # Get voice configuration
+    voice_config = VoiceConfigService.get_or_create_default(db, user_id)
+    
+    # Get audio service status
+    status = audio_service.get_status(db, user_id)
+    
     # Check whisper.cpp availability
     from backend.services.whisper_cpp_service import get_whisper_cpp_service
     whisper_available = get_whisper_cpp_service().is_available()
 
     return {
-        "whisper_cpp": {
-            "available": whisper_available,
-            "message": "Local whisper.cpp STT (primary)" if whisper_available
-                       else "whisper.cpp not built into this image",
-            "supports_recognition": whisper_available,
+        "stt": {
+            "whisper_cpp": {
+                "available": whisper_available,
+                "message": "Local whisper.cpp STT (primary)" if whisper_available
+                           else "whisper.cpp not built into this image",
+                "supports_recognition": whisper_available,
+            },
+            "openai": {
+                "available": status["openai_available"],
+                "message": "OpenAI Whisper STT" if status["openai_available"] else "OpenAI API key required",
+                "action_required": "add_openai_provider" if not status["openai_available"] else None,
+            },
+            "local": {
+                "available": True,  # Browser API is always "available" as a concept
+                "message": "Browser-native Web Speech API (fallback)",
+                "supports_recognition": True,
+            },
+            "recommended": "whisper_cpp" if whisper_available else ("openai" if status["openai_available"] else "local"),
+            "current": "whisper_cpp" if whisper_available else ("openai" if status["openai_available"] else "local"),
         },
-        "openai": {
-            "available": openai_status["available"],
-            "message": openai_status["message"],
-            "action_required": openai_status.get("action_required"),
+        "tts": {
+            "kokoro": {
+                "available": status["kokoro_available"],
+                "message": "Kokoro TTS (offline)" if status["kokoro_available"] else "Kokoro TTS not available",
+                "supports_synthesis": status["kokoro_available"],
+            },
+            "openai": {
+                "available": status["openai_available"],
+                "message": "OpenAI TTS (cloud)" if status["openai_available"] else "OpenAI API key required",
+                "supports_synthesis": status["openai_available"],
+            },
+            "recommended": status["tts_provider"],  # Use user's configured provider
+            "current": status["tts_provider"],
+            "current_voice": status["current_voice"],
         },
-        "local": {
-            "available": True,  # Browser API is always "available" as a concept
-            "message": "Browser-native Web Speech API (fallback)",
-            "supports_recognition": True,
-            "supports_synthesis": True,
-        },
-        "recommended": "whisper_cpp" if whisper_available else ("openai" if openai_status["available"] else "local"),
-        "current": "whisper_cpp" if whisper_available else ("openai" if openai_status["available"] else "local"),
+        "voice_config": VoiceConfigService.to_dict(voice_config),
+        "available_voices": audio_service.get_available_voices(),
     }
 
     
@@ -280,30 +306,26 @@ async def transcribe_audio(
 @router.post(
     "/synthesize",
     summary="Text To Speech",
-    description="Convert text to speech using OpenAI TTS. Requires active OpenAI provider configuration.",
+    description="Convert text to speech using the configured TTS provider. Supports Kokoro (offline) and OpenAI (cloud) with fallback.",
     responses=build_responses(None),
 )
 async def text_to_speech(
     text: str = Form(...),
-    voice: str = Form("alloy"),
+    voice: str = Form(None),  # Use user's configured voice if not specified
     speed: float = Form(1.0),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
     """
-    Convert text to speech using OpenAI TTS.
-    Requires active OpenAI provider configuration.
-    """
-    user_id = str(current_user["sub"])
+    Convert text to speech using the configured TTS provider.
     
-    # Check voice availability first
-    voice_status = check_voice_available(db, user_id)
-    if not voice_status["available"]:
-        raise ServiceUnavailableError(error={
-                "message": voice_status["message"],
-                "action_required": voice_status.get("action_required"),
-                "needs_provider": True
-            }, code="ERROR")
+    Supports Kokoro (offline) and OpenAI (cloud) with automatic fallback.
+    Uses the user's configured voice and provider from voice configuration.
+    """
+    from backend.services.audio_service import AudioService
+    
+    user_id = str(current_user["sub"])
+    audio_service = AudioService()
     
     # Validate input
     if not text.strip():
@@ -312,64 +334,44 @@ async def text_to_speech(
     if len(text) > 4096:
         raise BadRequestError(error="Text exceeds 4096 character limit", code="TEXT_EXCEEDS_4096_CHARACTER_LIMIT")
     
-    # Validate voice
-    allowed_voices = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer']
-    if voice not in allowed_voices:
-        voice = 'alloy'
-    
-    # Get API key
-    api_key = get_openai_api_key(db, user_id)
-    if not api_key:
-        raise ServiceUnavailableError(error="OpenAI API key not available. Please configure OpenAI provider in Models page.", code="OPENAI_API_KEY_NOT_AVAILABLE")
-    
-    # Get client
-    client = get_whisper_client(api_key)
-    if not client:
-        raise ServiceUnavailableError(error="Voice service temporarily unavailable.", code="VOICE_SERVICE_TEMPORARILY_UNAVAILABLE")
-    
     try:
-        # Generate speech
-        response = client.audio.speech.create(
-            model="tts-1",
+        # Use AudioService to synthesize speech with fallback logic
+        audio_data = await audio_service.synthesize(
+            db=db,
+            user_id=user_id,
+            text=text,
             voice=voice,
-            input=text,
             speed=speed
         )
         
-        # stream_to_file needs a local file path
+        # Generate unique filename
         audio_id = str(uuid.uuid4())
-        audio_filename = f"{audio_id}.mp3"
+        audio_filename = f"{audio_id}.wav"  # Using WAV format for consistency
         
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp_file:
-            tmp_path = tmp_file.name
-        
-        try:
-            # Write audio to temp file (must be closed first on Windows/some Linux fs)
-            response.stream_to_file(tmp_path)
+        # Upload to StorageService
+        object_name = f"voice/{user_id}/{audio_filename}"
+        with io.BytesIO(audio_data) as f:
+            url = storage_service.upload_file(f, object_name=object_name, content_type="audio/wav")
             
-            # Upload to StorageService
-            object_name = f"voice/{user_id}/{audio_filename}"
-            with open(tmp_path, "rb") as f:
-                url = storage_service.upload_file(f, object_name=object_name, content_type="audio/mpeg")
-                
-            if not url:
-                raise Exception("StorageService returned None")
-        finally:
-            if os.path.exists(tmp_path):
-                try:
-                    os.remove(tmp_path)
-                except:
-                    pass
+        if not url:
+            raise Exception("StorageService returned None")
         
         return {
             "success": True,
             "audio_url": f"/api/v1/voice/audio/{user_id}/{audio_filename}",
             "duration_estimate": len(text) / 15,
-            "voice": voice,
+            "voice": voice or "user_configured",  # Show the voice used
             "speed": speed,
             "generated_at": datetime.now(timezone.utc).isoformat()
         }
         
+    except ProviderUnavailableError as e:
+        raise ServiceUnavailableError(error={
+            "message": str(e),
+            "code": e.code,
+            "detail": e._detail,
+            "needs_provider": e.code == "OPENAI_KEY_MISSING"
+        }, code=e.code)
     except Exception as e:
         raise InternalServerError(error=f"Speech synthesis failed: {str(e)}", code="SPEECH_SYNTHESIS_FAILED")
 
@@ -432,21 +434,35 @@ async def list_supported_languages():
 @router.get(
     "/voices",
     summary="List Tts Voices",
-    description="List available TTS voices.",
+    description="List available TTS voices for the current user's configured provider.",
     responses=build_responses(None),
 )
-async def list_tts_voices():
-    """List available TTS voices."""
+async def list_tts_voices(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """List available TTS voices for the current user's configured provider."""
+    from backend.services.audio_service import AudioService
+    from backend.services.voice.voice_config_service import VoiceConfigService
+    
+    user_id = str(current_user["sub"])
+    audio_service = AudioService()
+    
+    # Get user's configured provider
+    voice_config = VoiceConfigService.get_or_create_default(db, user_id)
+    provider = voice_config.tts_provider
+    
+    # Get available voices for the provider
+    voices = audio_service.get_available_voices(provider)
+    
+    # Get default voice for the provider
+    default_voice = "am_adam" if provider == "kokoro" else "alloy"
+    
     return {
-        "voices": [
-            {"id": "alloy", "name": "Alloy", "description": "Neutral, balanced"},
-            {"id": "echo", "name": "Echo", "description": "Male, warm"},
-            {"id": "fable", "name": "Fable", "description": "Male, British accent"},
-            {"id": "onyx", "name": "Onyx", "description": "Male, deep"},
-            {"id": "nova", "name": "Nova", "description": "Female, professional"},
-            {"id": "shimmer", "name": "Shimmer", "description": "Female, bright"},
-        ],
-        "default": "alloy"
+        "voices": voices,
+        "default": default_voice,
+        "current_provider": provider,
+        "current_voice": voice_config.tts_voice
     }
 
 
@@ -655,7 +671,10 @@ async def update_voice_config(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
-    """Persist voice-bridge engine config for this user (merged over defaults)."""
+    """Persist voice-bridge engine config for this user (merged over defaults).
+    
+    Note: This endpoint is deprecated. Use the new /voice-config endpoints instead.
+    """
     current = _load_voice_config(str(current_user["sub"]))
     if config.requireWakeWord is not None:
         current["requireWakeWord"] = config.requireWakeWord
@@ -670,3 +689,147 @@ async def update_voice_config(
     except Exception as exc:
         raise InternalServerError(error=f"Failed to persist voice config: {exc}", code="VOICE_CONFIG_WRITE_FAILED")
     return current
+
+
+# ── New Database-Backed Voice Configuration Endpoints ────────────────────────
+
+class VoiceConfigResponse(BaseModel):
+    """Voice configuration response schema."""
+    user_id: str
+    require_wake_word: bool
+    tts_voice: str
+    tts_provider: str
+    proactive_enabled: bool
+    speaker_identification: bool
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
+class VoiceConfigUpdateRequest(BaseModel):
+    """Voice configuration update request schema."""
+    require_wake_word: Optional[bool] = Field(default=None, description="Whether wake word is required")
+    tts_voice: Optional[str] = Field(default=None, description="TTS voice to use")
+    tts_provider: Optional[str] = Field(default=None, description="TTS provider (kokoro or openai)")
+    proactive_enabled: Optional[bool] = Field(default=None, description="Whether proactive voice is enabled")
+    speaker_identification: Optional[bool] = Field(default=None, description="Whether speaker identification is enabled")
+
+
+@router.get(
+    "/voice-config",
+    summary="Get Voice Configuration",
+    description="Get the current voice configuration for the authenticated user.",
+    responses=build_responses(None),
+)
+async def get_voice_configuration(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Get the current voice configuration for the authenticated user."""
+    from backend.services.voice.voice_config_service import VoiceConfigService
+    
+    user_id = str(current_user["sub"])
+    config = VoiceConfigService.get_or_create_default(db, user_id)
+    
+    return VoiceConfigService.to_dict(config)
+
+
+@router.put(
+    "/voice-config",
+    summary="Update Voice Configuration",
+    description="Update the voice configuration for the authenticated user.",
+    responses=build_responses(None),
+)
+async def update_voice_configuration(
+    update_data: VoiceConfigUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Update the voice configuration for the authenticated user."""
+    from backend.services.voice.voice_config_service import VoiceConfigService
+    
+    user_id = str(current_user["sub"])
+    
+    # Update the configuration
+    config = VoiceConfigService.update(
+        db=db,
+        user_id=user_id,
+        require_wake_word=update_data.require_wake_word,
+        tts_voice=update_data.tts_voice,
+        tts_provider=update_data.tts_provider,
+        proactive_enabled=update_data.proactive_enabled,
+        speaker_identification=update_data.speaker_identification
+    )
+    
+    return VoiceConfigService.to_dict(config)
+
+
+@router.get(
+    "/voice-config/status",
+    summary="Get Voice Configuration Status",
+    description="Get detailed status of voice configuration including provider availability.",
+    responses=build_responses(None),
+)
+async def get_voice_configuration_status(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Get detailed status of voice configuration including provider availability."""
+    from backend.services.audio_service import AudioService
+    from backend.services.voice.voice_config_service import VoiceConfigService
+    
+    user_id = str(current_user["sub"])
+    audio_service = AudioService()
+    
+    # Get voice configuration
+    voice_config = VoiceConfigService.get_or_create_default(db, user_id)
+    
+    # Get audio service status
+    status = audio_service.get_status(db, user_id)
+    
+    # Combine with voice config
+    result = {
+        **status,
+        "current_config": VoiceConfigService.to_dict(voice_config)
+    }
+    
+    return result
+
+
+@router.get(
+    "/voice-config/providers",
+    summary="List Available TTS Providers",
+    description="List available TTS providers and their voices.",
+    responses=build_responses(None),
+)
+async def list_tts_providers(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """List available TTS providers and their voices."""
+    from backend.services.audio_service import AudioService
+    
+    audio_service = AudioService()
+    
+    # Get available voices for all providers
+    all_voices = audio_service.get_available_voices()
+    
+    # Check provider availability
+    kokoro_available = audio_service._is_kokoro_available()
+    openai_key = audio_service._get_openai_api_key(db, str(current_user["sub"]))
+    openai_available = openai_key is not None
+    
+    return {
+        "providers": {
+            "kokoro": {
+                "available": kokoro_available,
+                "voices": all_voices.get("kokoro", []),
+                "default_voice": "am_adam"
+            },
+            "openai": {
+                "available": openai_available,
+                "voices": all_voices.get("openai", []),
+                "default_voice": "alloy"
+            }
+        },
+        "current_provider": "kokoro" if kokoro_available else ("openai" if openai_available else None)
+    }

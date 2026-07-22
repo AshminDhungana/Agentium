@@ -86,3 +86,13 @@ class ServerSTTUnavailable(ServiceUnavailableError):
     The frontend should fall back to the browser-native Web Speech API.
     Rendered by the global handler as HTTP 503 with code STT_UNAVAILABLE.
     """
+
+
+class ProviderUnavailableError(ServiceUnavailableError):
+    """A specific provider (TTS, STT, etc.) is unavailable.
+    
+    Used for multi-provider fallback logic. The caller should try the next
+    available provider in the chain.
+    
+    Rendered by the global handler as HTTP 503 with the specific provider error code.
+    """

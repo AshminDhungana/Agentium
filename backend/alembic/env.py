@@ -13,16 +13,16 @@ from alembic import context
 # Add backend to path
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
-from backend.models.entities.base import Base
-from backend.models.entities.agents import Agent, HeadOfCouncil, CouncilMember, LeadAgent, TaskAgent
-from backend.models.entities.constitution import Constitution, Ethos
-from backend.models.entities.voting import AmendmentVoting
-from backend.models.entities.task import Task, SubTask, TaskAuditLog
-from backend.models.entities.voting import TaskDeliberation
-from backend.models.entities.voting import IndividualVote, VotingRecord
-from backend.models.entities.audit import AuditLog, ConstitutionViolation, SessionLog, HealthCheck
-from backend.models.entities.channels import ExternalChannel, ExternalMessage, ChannelType, ChannelStatus
-from backend.models.entities.monitoring import (
+from models.entities.base import Base
+from models.entities.agents import Agent, HeadOfCouncil, CouncilMember, LeadAgent, TaskAgent
+from models.entities.constitution import Constitution, Ethos
+from models.entities.voting import AmendmentVoting
+from models.entities.task import Task, SubTask, TaskAuditLog
+from models.entities.voting import TaskDeliberation
+from models.entities.voting import IndividualVote, VotingRecord
+from models.entities.audit import AuditLog, ConstitutionViolation, SessionLog, HealthCheck
+from models.entities.channels import ExternalChannel, ExternalMessage, ChannelType, ChannelStatus
+from models.entities.monitoring import (
     AgentHealthReport, 
     ViolationReport, 
     TaskVerification, 
@@ -31,8 +31,9 @@ from backend.models.entities.monitoring import (
     MonitoringStatus,
     ViolationSeverity
 )
-from backend.models.entities.user import User
-from backend.models.entities.user_config import UserModelConfig
+from models.entities.user import User
+from models.entities.user_config import UserModelConfig
+from models.entities.voice_config import VoiceConfig  # NEW
 
 # Phase 6.1 — Tool Management
 from backend.models.entities.tool_staging import ToolStaging

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Mic, Trash2, Square, Settings2, UserPlus, Info, Radio, Volume2, Ear, Wifi, WifiOff, RefreshCw, ChevronRight } from 'lucide-react';
-import { voiceApi } from '@/services/voiceApi';
+import { voiceApi, type VoiceProvidersResponse, type VoiceDbConfig } from '@/services/voiceApi';
 import { voiceBridgeService, BridgeStatus } from '@/services/voiceBridge';
 import { showToast } from '@/hooks/useToast';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
@@ -21,15 +21,6 @@ interface VoiceSettingsModalProps {
 
 type SettingsTab = 'engine' | 'speaker' | 'about';
 
-const TTS_VOICES = [
-  { id: 'af_bella', label: 'Bella (Female)' },
-  { id: 'am_adam', label: 'Adam (Male)' },
-  { id: 'bf_emma', label: 'Emma (Female, British)' },
-  { id: 'bm_george', label: 'George (Male, British)' },
-  { id: 'af_nicole', label: 'Nicole (Female)' },
-  { id: 'af_sarah', label: 'Sarah (Female)' },
-];
-
 const TABS: { key: SettingsTab; label: string; icon: typeof Settings2 }[] = [
   { key: 'engine', label: 'Engine', icon: Radio },
   { key: 'speaker', label: 'Speaker ID', icon: Ear },
@@ -42,10 +33,15 @@ export function VoiceSettingsModal({ onClose }: VoiceSettingsModalProps) {
   // ── Engine state ──
   const [requireWakeWord, setRequireWakeWord] = useState(true);
   const [ttsVoice, setTtsVoice] = useState('af_bella');
+  const [ttsProvider, setTtsProvider] = useState<'kokoro' | 'openai'>('kokoro');
   const [proactiveEnabled, setProactiveEnabled] = useState(false);
   const [speakerIdentification, setSpeakerIdentification] = useState(false);
   const [voiceMode, setVoiceMode] = useState<'push-to-talk' | 'open-mic'>('push-to-talk');
   const [isSavingConfig, setIsSavingConfig] = useState(false);
+
+  // ── Provider/voice data ──
+  const [providersData, setProvidersData] = useState<VoiceProvidersResponse | null>(null);
+  const [selectedProvider, setSelectedProvider] = useState<'all' | 'kokoro' | 'openai'>('all');
 
   // ── Speaker state ──
   const [speakers, setSpeakers] = useState<SpeakerProfile[]>([]);
@@ -72,18 +68,25 @@ export function VoiceSettingsModal({ onClose }: VoiceSettingsModalProps) {
         const cfg = JSON.parse(saved);
         setRequireWakeWord(cfg.requireWakeWord ?? true);
         setTtsVoice(cfg.ttsVoice ?? 'af_bella');
+        setTtsProvider(cfg.ttsProvider ?? 'kokoro');
         setProactiveEnabled(cfg.proactiveEnabled ?? false);
         setSpeakerIdentification(cfg.speakerIdentification ?? false);
         setVoiceMode(cfg.voiceMode ?? 'push-to-talk');
       } catch { /* ignore */ }
     }
-    voiceApi.getVoiceConfig().then((cfg: any) => {
+    Promise.all([
+      voiceApi.getVoiceConfigDb(),
+      voiceApi.getVoiceProviders(),
+    ]).then(([cfg, providers]) => {
       if (cfg) {
-        if (cfg.requireWakeWord !== undefined) setRequireWakeWord(cfg.requireWakeWord);
-        if (cfg.ttsVoice) setTtsVoice(cfg.ttsVoice);
-        if (cfg.proactiveEnabled !== undefined) setProactiveEnabled(cfg.proactiveEnabled);
-        if (cfg.speakerIdentification !== undefined) setSpeakerIdentification(cfg.speakerIdentification);
-        if (cfg.voiceMode) setVoiceMode(cfg.voiceMode);
+        setRequireWakeWord(cfg.require_wake_word);
+        setTtsVoice(cfg.tts_voice);
+        setTtsProvider(cfg.tts_provider);
+        setProactiveEnabled(cfg.proactive_enabled);
+        setSpeakerIdentification(cfg.speaker_identification);
+      }
+      if (providers) {
+        setProvidersData(providers);
       }
     }).catch(() => {});
     loadSpeakers();
@@ -92,10 +95,16 @@ export function VoiceSettingsModal({ onClose }: VoiceSettingsModalProps) {
 
   const saveConfig = async () => {
     setIsSavingConfig(true);
-    const cfg = { requireWakeWord, ttsVoice, proactiveEnabled, speakerIdentification, voiceMode };
+    const cfg = { requireWakeWord, ttsVoice, ttsProvider, proactiveEnabled, speakerIdentification, voiceMode };
     localStorage.setItem('voice_engine_config', JSON.stringify(cfg));
     try {
-      await voiceApi.setVoiceConfig(cfg);
+      await voiceApi.setVoiceConfigDb({
+        require_wake_word: requireWakeWord,
+        tts_voice: ttsVoice,
+        tts_provider: ttsProvider,
+        proactive_enabled: proactiveEnabled,
+        speaker_identification: speakerIdentification,
+      });
       showToast.success('Voice engine settings saved');
     } catch {
       showToast.success('Voice engine settings saved locally');
@@ -284,18 +293,73 @@ export function VoiceSettingsModal({ onClose }: VoiceSettingsModalProps) {
             </div>
           </div>
 
-          {/* TTS Voice */}
+          {/* TTS Provider & Voice */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">TTS Voice</label>
-            <select
-              value={ttsVoice}
-              onChange={(e) => setTtsVoice(e.target.value)}
-              className="w-full bg-white dark:bg-[#0f1117] border border-gray-200 dark:border-[#1e2535] rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-blue-500"
-            >
-              {TTS_VOICES.map((v) => (
-                <option key={v.id} value={v.id}>{v.label}</option>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">TTS Provider</label>
+            <div className="flex gap-1 mb-4">
+              {(['all', 'kokoro', 'openai'] as const).map((p) => (
+                <button
+                  key={p}
+                  onClick={() => setSelectedProvider(p)}
+                  className={`px-3 py-1.5 text-xs rounded-lg border transition-colors ${
+                    selectedProvider === p
+                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400'
+                      : 'border-gray-200 dark:border-[#1e2535] text-gray-500 dark:text-gray-500 hover:border-gray-300 dark:hover:border-gray-600'
+                  }`}
+                >
+                  {p === 'all' ? 'All' : p === 'kokoro' ? 'Kokoro (Offline)' : 'OpenAI (Cloud)'}
+                </button>
               ))}
-            </select>
+            </div>
+
+            {providersData && (
+              <>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Voice</label>
+                <select
+                  value={ttsVoice}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setTtsVoice(val);
+                    const provider = val.startsWith('af_') || val.startsWith('am_') || val.startsWith('bf_') || val.startsWith('bm_')
+                      ? 'kokoro' : 'openai';
+                    setTtsProvider(provider);
+                  }}
+                  className="w-full bg-white dark:bg-[#0f1117] border border-gray-200 dark:border-[#1e2535] rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-blue-500"
+                >
+                  {Object.entries(providersData.providers)
+                    .filter(([name]) => selectedProvider === 'all' || name === selectedProvider)
+                    .filter(([, info]) => info.available)
+                    .flatMap(([name, info]) =>
+                      info.voices.map((v) => (
+                        <option key={`${name}:${v.id}`} value={v.id}>
+                          {v.name} ({v.gender}) — {name === 'openai' ? 'Cloud' : 'Offline'}
+                        </option>
+                      ))
+                    )}
+                </select>
+
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                  {ttsProvider === 'openai'
+                    ? 'Requires OpenAI API key configured in Models page'
+                    : 'Offline Kokoro TTS — always available'}
+                </p>
+              </>
+            )}
+
+            {!providersData && (
+              <select
+                value={ttsVoice}
+                onChange={(e) => setTtsVoice(e.target.value)}
+                className="w-full bg-white dark:bg-[#0f1117] border border-gray-200 dark:border-[#1e2535] rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-blue-500"
+              >
+                <option value="af_bella">Bella (Female)</option>
+                <option value="am_adam">Adam (Male)</option>
+                <option value="bf_emma">Emma (Female, British)</option>
+                <option value="bm_george">George (Male, British)</option>
+                <option value="af_nicole">Nicole (Female)</option>
+                <option value="af_sarah">Sarah (Female)</option>
+              </select>
+            )}
           </div>
 
           {/* Save */}

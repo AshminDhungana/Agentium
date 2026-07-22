@@ -2,12 +2,15 @@
  * voiceApi.ts — Voice feature API service
  *
  * Covers:
- *  - GET  /api/v1/voice/status          (existing)
- *  - GET  /api/v1/voice/enhanced-status (NEW)
- *  - POST /api/v1/voice/transcribe      (existing)
- *  - POST /api/v1/voice/synthesize      (existing)
- *  - GET  /api/v1/voice/voices          (existing)
- *  - GET  /api/v1/voice/languages       (existing)
+ *  - GET  /api/v1/voice/status                  (existing)
+ *  - GET  /api/v1/voice/enhanced-status         (NEW)
+ *  - POST /api/v1/voice/transcribe              (existing)
+ *  - POST /api/v1/voice/synthesize              (existing)
+ *  - GET  /api/v1/voice/voices                  (existing)
+ *  - GET  /api/v1/voice/languages               (existing)
+ *  - GET  /api/v1/voice/voice-config            (DB-backed)
+ *  - PUT  /api/v1/voice/voice-config            (DB-backed)
+ *  - GET  /api/v1/voice/voice-config/providers  (providers + voices)
  */
 
 import { api } from './api';
@@ -50,8 +53,48 @@ export interface TranscribeResponse {
 
 export interface SynthesizeRequest {
   text: string;
-  voice?: 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer';
+  voice?: string;
   speed?: number;
+}
+
+export interface VoiceDbConfig {
+  user_id: string;
+  require_wake_word: boolean;
+  tts_voice: string;
+  tts_provider: 'kokoro' | 'openai';
+  proactive_enabled: boolean;
+  speaker_identification: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface VoiceProviderVoice {
+  id: string;
+  name: string;
+  gender: string;
+  description?: string;
+}
+
+export interface VoiceProviderInfo {
+  available: boolean;
+  voices: VoiceProviderVoice[];
+  default_voice: string;
+}
+
+export interface VoiceProvidersResponse {
+  providers: {
+    kokoro: VoiceProviderInfo;
+    openai: VoiceProviderInfo;
+  };
+  current_provider: 'kokoro' | 'openai' | null;
+}
+
+export interface VoiceDbConfigUpdate {
+  require_wake_word?: boolean;
+  tts_voice?: string;
+  tts_provider?: 'kokoro' | 'openai';
+  proactive_enabled?: boolean;
+  speaker_identification?: boolean;
 }
 
 // ─── Language mapping helper ──────────────────────────────────────────────────
@@ -247,9 +290,36 @@ export const voiceApi = {
     await api.delete(`/api/v1/audio/speakers/${id}`);
   },
 
-  // ── Voice engine config (Jarvis upgrade, Phase H) ───────────────────────────
-  // Best-effort: the backend route is a fast-follow. The modal persists locally
-  // so the UI is functional even before the endpoint exists.
+  // ── DB-backed voice config ──────────────────────────────────────────────────
+
+  getVoiceConfigDb: async (): Promise<VoiceDbConfig | null> => {
+    try {
+      const response = await api.get<VoiceDbConfig>(`${API_BASE}/voice-config`);
+      return response.data;
+    } catch {
+      return null;
+    }
+  },
+
+  setVoiceConfigDb: async (config: VoiceDbConfigUpdate): Promise<VoiceDbConfig | null> => {
+    try {
+      const response = await api.put<VoiceDbConfig>(`${API_BASE}/voice-config`, config);
+      return response.data;
+    } catch {
+      return null;
+    }
+  },
+
+  getVoiceProviders: async (): Promise<VoiceProvidersResponse | null> => {
+    try {
+      const response = await api.get<VoiceProvidersResponse>(`${API_BASE}/voice-config/providers`);
+      return response.data;
+    } catch {
+      return null;
+    }
+  },
+
+  // ── Voice engine config (legacy JSON-file, deprecated) ──────────────────────
   getVoiceConfig: async (): Promise<any> => {
     try {
       const response = await api.get('/api/v1/voice/config');

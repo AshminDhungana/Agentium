@@ -8,6 +8,8 @@ via a local WebSocket server on 127.0.0.1:9999.
 
 Start:  python voice-bridge/main.py
 
+
+
 ── Session-mode wake word behaviour ──────────────────────────────────────────
 When REQUIRE_WAKE_WORD=true (default):
 
@@ -42,6 +44,7 @@ Timing constants (all configurable via env.conf or environment variables):
 """
 from __future__ import annotations
 
+import aiohttp
 import asyncio
 import json
 import logging
@@ -76,6 +79,8 @@ _executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="voice-io")
 # ── Read env.conf ──────────────────────────────────────────────────────────────
 
 _ENV_CONF = Path.home() / ".agentium" / "env.conf"
+
+# VOICE_REQUIRE_WAKE_WORD is initialized from config at module level
 
 
 def _load_env_conf() -> dict:
@@ -115,7 +120,9 @@ WAKE_CHIME_PATH:      str   = _conf.get("WAKE_CHIME_PATH",      os.getenv("WAKE_
 WAKE_WORD_MODEL:      str   = _conf.get("WAKE_WORD_MODEL",      os.getenv("WAKE_WORD_MODEL",      ""))
 WAKE_WORD_THRESHOLD:  float = float(_conf.get("WAKE_WORD_THRESHOLD", os.getenv("WAKE_WORD_THRESHOLD", "0.5")))
 VAD_SILENCE_MS:       float = float(_conf.get("VAD_SILENCE_MS",       os.getenv("VAD_SILENCE_MS",       "700")))
-VOICE_TTS_VOICE:      str   = _conf.get("VOICE_TTS_VOICE",      os.getenv("VOICE_TTS_VOICE",      "af_bella"))
+VOICE_TTS_VOICE:      str   = _conf.get("VOICE_TTS_VOICE",      os.getenv("VOICE_TTS_VOICE",      "am_adam"))
+VOICE_TTS_PROVIDER:   str   = _conf.get("VOICE_TTS_PROVIDER",   os.getenv("VOICE_TTS_PROVIDER",   "kokoro"))
+VOICE_REQUIRE_WAKE_WORD: bool = _conf.get("REQUIRE_WAKE_WORD", os.getenv("REQUIRE_WAKE_WORD", "true")).lower() == "true"
 VOICE_PERSONA:        str   = _conf.get("VOICE_PERSONA",        os.getenv("VOICE_PERSONA",        ""))
 VOICE_PROACTIVE_ENABLED: bool = _conf.get("VOICE_PROACTIVE_ENABLED", os.getenv("VOICE_PROACTIVE_ENABLED", "false")).lower() == "true"
 VOICE_PROACTIVE_COOLDOWN_S: float = float(_conf.get("VOICE_PROACTIVE_COOLDOWN_S", os.getenv("VOICE_PROACTIVE_COOLDOWN_S", "300")))
@@ -147,7 +154,7 @@ SUPERVISOR_RESTART_DELAY: float = float(_conf.get("SUPERVISOR_RESTART_DELAY", os
 
 logger.info(
     "[bridge] BACKEND_URL=%s  WS_PORT=%d  WAKE_WORD='%s'  REQUIRE_WAKE_WORD=%s",
-    BACKEND_URL, WS_PORT, WAKE_WORD, REQUIRE_WAKE_WORD,
+    BACKEND_URL, WS_PORT, WAKE_WORD, VOICE_REQUIRE_WAKE_WORD,
 )
 logger.info(
     "[bridge] Session timing — pause_threshold=%.1fs  no_speech_timeout=%.1fs  max_duration=%.0fs",
@@ -398,14 +405,18 @@ def _play_wake_chime() -> None:
 
 
 _tts_engine_instance = None
+_token_ready = None
+VOICE_TTS_VOICE = "am_adam"
+VOICE_TTS_PROVIDER = "kokoro"
+VOICE_PROACTIVE_ENABLED = False
 
 
 def _get_tts_engine() -> "TTSEngine":
-    """Lazily construct and cache the Kokoro-backed TTS engine."""
+    """Lazily construct and cache the TTS engine (Kokoro or OpenAI)."""
     global _tts_engine_instance
     if _tts_engine_instance is None:
         from tts_engine import TTSEngine
-        _tts_engine_instance = TTSEngine(VOICE_TTS_VOICE)
+        _tts_engine_instance = TTSEngine(VOICE_TTS_VOICE, VOICE_TTS_PROVIDER)
     return _tts_engine_instance
 
 
@@ -436,6 +447,34 @@ def _fetch_backend_persona() -> Optional[str]:
     except Exception as exc:
         logger.debug("[bridge] Could not fetch backend persona: %s", exc)
     return None
+
+
+async def _fetch_voice_config() -> Optional[dict]:
+    """Fetch voice configuration from the backend.
+    
+    Returns the voice configuration from the new database-backed endpoint,
+    or None if the request fails.
+    """
+    if not VOICE_TOKEN:
+        logger.debug("[bridge] No VOICE_TOKEN — cannot fetch voice config from backend")
+        return None
+    
+    try:
+        headers = {"Authorization": f"Bearer {VOICE_TOKEN}"}
+        url = f"{BACKEND_URL}/api/v1/voice/voice-config"
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, headers=headers, timeout=10.0) as resp:
+                if resp.status == 200:
+                    config = await resp.json()
+                    logger.info("[bridge] Fetched voice config from backend: %s", config)
+                    return config
+                else:
+                    logger.warning("[bridge] Failed to fetch voice config: HTTP %d", resp.status)
+                    return None
+    except Exception as exc:
+        logger.warning("[bridge] Failed to fetch voice config: %s", exc)
+        return None
 
 
 def _load_persona() -> Optional[str]:
@@ -1390,12 +1429,12 @@ async def _run_voice_loop_once() -> None:
 
     from vad import VAD
     from tts_engine import TTSEngine
-    detector = WakeWordDetector(WAKE_WORD_MODEL) if REQUIRE_WAKE_WORD else None
+    detector = WakeWordDetector(WAKE_WORD_MODEL) if VOICE_REQUIRE_WAKE_WORD else None
     vad = VAD()
     tts = _get_tts_engine()
     loop = asyncio.get_event_loop()
 
-    if REQUIRE_WAKE_WORD:
+    if VOICE_REQUIRE_WAKE_WORD:
         logger.info("[bridge] Wake word mode ON — say '%s' to start a session", WAKE_WORD)
     else:
         logger.info("[bridge] Wake word mode OFF — speaking directly starts a session")
@@ -1403,7 +1442,7 @@ async def _run_voice_loop_once() -> None:
     try:
         while True:
             frame = await loop.run_in_executor(_executor, mic.read_frame)
-            if REQUIRE_WAKE_WORD and detector is not None:
+            if VOICE_REQUIRE_WAKE_WORD and detector is not None:
                 if detector.available:
                     score = await loop.run_in_executor(_executor, detector.push_frame, frame)
                     if detector.is_triggered(score):
@@ -1460,12 +1499,14 @@ async def _supervise(name: str, coro_factory) -> None:
 # ── Entry point ────────────────────────────────────────────────────────────────
 
 async def _main() -> None:
+    """Entry point.  Sets up logging, validates config, and starts the voice loop."""
+    global _token_ready, VOICE_REQUIRE_WAKE_WORD
     logger.info("=" * 60)
     logger.info("  Agentium SecureVoiceBridge starting")
     logger.info("  Backend   : %s", BACKEND_URL)
     logger.info("  Chat API  : %s", _RESOLVED_CHAT_ENDPOINT)
     logger.info("  WS port   : %d", WS_PORT)
-    logger.info("  Wake word : '%s' (required=%s)", WAKE_WORD, REQUIRE_WAKE_WORD)
+    logger.info("  Wake word : '%s' (required=%s)", WAKE_WORD, VOICE_REQUIRE_WAKE_WORD)
     logger.info("  STT       : whisper.cpp (backend relay) + Vosk fallback" if SR_AVAILABLE else "DISABLED")
     logger.info("  STT backend: %s", STT_BACKEND_URL)
     logger.info("  TTS       : %s", "pyttsx3" if TTS_AVAILABLE else "DISABLED")
@@ -1478,10 +1519,30 @@ async def _main() -> None:
 
     # ── Startup guidance + token gating ─────────────────────────────────────
     await _maybe_speak_startup_messages()
-    global _token_ready
     _token_ready = asyncio.Event()
     if VOICE_TOKEN:
         _token_ready.set()
+        
+        # Fetch voice configuration from backend
+        config = await _fetch_voice_config()
+        if config:
+            if "tts_voice" in config:
+                VOICE_TTS_VOICE = config["tts_voice"]
+                logger.info("[bridge] Updated TTS voice from backend: %s", VOICE_TTS_VOICE)
+
+            if "tts_provider" in config:
+                VOICE_TTS_PROVIDER = config["tts_provider"]
+                logger.info("[bridge] Updated TTS provider from backend: %s", VOICE_TTS_PROVIDER)
+
+            # Update wake word requirement
+            if "require_wake_word" in config:
+                VOICE_REQUIRE_WAKE_WORD = config["require_wake_word"]
+                logger.info("[bridge] Updated require wake word from backend: %s", VOICE_REQUIRE_WAKE_WORD)
+
+            # Update proactive mode
+            if "proactive_enabled" in config:
+                VOICE_PROACTIVE_ENABLED = config["proactive_enabled"]
+                logger.info("[bridge] Updated proactive enabled from backend: %s", VOICE_PROACTIVE_ENABLED)
 
     # B5: each subsystem is supervised independently now instead of sharing
     # a single asyncio.gather() that dies as one unit. The proactive WS client

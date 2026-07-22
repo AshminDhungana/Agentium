@@ -1,10 +1,12 @@
 """
 Audio Service for Agentium — Phase 10.3.
 
-Wraps OpenAI Whisper (STT) and OpenAI TTS APIs into a reusable service
-layer. The existing ``voice.py`` route provides HTTP endpoints; this
-service is the logic layer that can also be called by the ChannelManager
-for voice messages on external platforms.
+Wraps speech processing (STT and TTS) with multi-provider support:
+- Speech-to-Text: OpenAI Whisper (cloud) + whisper.cpp (local)
+- Text-to-Speech: OpenAI TTS (cloud) + Kokoro (offline)
+
+The service uses VoiceConfig to determine which TTS provider to use
+and implements fallback logic between providers.
 """
 
 import io
@@ -13,16 +15,18 @@ import logging
 import tempfile
 import uuid
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from sqlalchemy.orm import Session
 
 from backend.models.entities.speaker_profile import SpeakerProfile
+from backend.models.entities.voice_config import VoiceConfig
 from backend.services.whisper_cpp_service import (
     get_whisper_cpp_service,
     LocalSTTError,
 )
-from backend.core.exceptions import ServerSTTUnavailable
+from backend.services.voice.voice_config_service import VoiceConfigService
+from backend.core.exceptions import ServerSTTUnavailable, ProviderUnavailableError
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +42,8 @@ SUPPORTED_AUDIO_TYPES = [
     "audio/webm", "audio/ogg", "audio/m4a", "audio/flac",
 ]
 
-AVAILABLE_TTS_VOICES = [
+# OpenAI TTS voices
+OPENAI_TTS_VOICES = [
     {"id": "alloy", "name": "Alloy", "description": "Neutral and balanced"},
     {"id": "echo", "name": "Echo", "description": "Warm and confident"},
     {"id": "fable", "name": "Fable", "description": "British and expressive"},
@@ -46,6 +51,32 @@ AVAILABLE_TTS_VOICES = [
     {"id": "nova", "name": "Nova", "description": "Young and bright"},
     {"id": "shimmer", "name": "Shimmer", "description": "Soft and gentle"},
 ]
+
+# Kokoro TTS voices
+KOKORO_TTS_VOICES = [
+    {"id": "am_adam", "name": "Adam (American)", "description": "Neutral American male"},
+    {"id": "am_bella", "name": "Bella (American)", "description": "Neutral American female"},
+    {"id": "am_charlie", "name": "Charlie (American)", "description": "Young American male"},
+    {"id": "am_diana", "name": "Diana (American)", "description": "Mature American female"},
+    {"id": "bf_bianca", "name": "Bianca (British)", "description": "British female"},
+    {"id": "bf_charlotte", "name": "Charlotte (British)", "description": "British female child"},
+    {"id": "bf_david", "name": "David (British)", "description": "British male"},
+    {"id": "bf_emma", "name": "Emma (British)", "description": "British female"},
+    {"id": "cf_amelie", "name": "Amelie (Canadian)", "description": "Canadian French female"},
+    {"id": "cf_olivier", "name": "Olivier (Canadian)", "description": "Canadian French male"},
+    {"id": "af_zahra", "name": "Zahra (African)", "description": "African female"},
+    {"id": "af_abdul", "name": "Abdul (African)", "description": "African male"},
+    {"id": "in_aditi", "name": "Aditi (Indian)", "description": "Indian female"},
+    {"id": "in_rahul", "name": "Rahul (Indian)", "description": "Indian male"},
+    {"id": "au_olivia", "name": "Olivia (Australian)", "description": "Australian female"},
+    {"id": "au_jack", "name": "Jack (Australian)", "description": "Australian male"},
+]
+
+# All available TTS voices by provider
+AVAILABLE_TTS_VOICES = {
+    "openai": OPENAI_TTS_VOICES,
+    "kokoro": KOKORO_TTS_VOICES
+}
 
 
 # ---------------------------------------------------------------------------
@@ -89,6 +120,16 @@ class AudioService:
         from openai import OpenAI
         return OpenAI(api_key=api_key)
 
+    def _is_kokoro_available(self) -> bool:
+        """Check if Kokoro TTS is available."""
+        try:
+            from kokoro import KPipeline
+            return True
+        except ImportError:
+            return False
+        except Exception:
+            return False
+
     # ── Availability ─────────────────────────────────────────────────────
 
     def is_available(self, db: Session, user_id: str) -> bool:
@@ -100,19 +141,40 @@ class AudioService:
     def get_status(self, db: Session, user_id: str) -> Dict[str, Any]:
         """Detailed availability status."""
         whisper_available = get_whisper_cpp_service().is_available()
-        key = self._get_openai_api_key(db, user_id)
-        provider = "whisper_cpp" if whisper_available else ("openai" if key else None)
+        openai_key = self._get_openai_api_key(db, user_id)
+        
+        # Get voice configuration
+        voice_config = VoiceConfigService.get_or_create_default(db, user_id)
+        
+        # Check provider availability
+        kokoro_available = self._is_kokoro_available()
+        openai_available = openai_key is not None
+        
+        # Determine current TTS provider
+        tts_provider = voice_config.tts_provider
+        tts_available = (
+            (tts_provider == "kokoro" and kokoro_available) or
+            (tts_provider == "openai" and openai_available)
+        )
+        
         si = get_speaker_identifier()
         return {
-            "available": provider is not None,
-            "provider": provider,
+            "available": tts_available,
+            "stt_available": whisper_available or openai_available,
+            "stt_provider": "whisper_cpp" if whisper_available else ("openai" if openai_available else None),
+            "tts_provider": tts_provider,
             "whisper_cpp_available": whisper_available,
+            "kokoro_available": kokoro_available,
+            "openai_available": openai_available,
             "stt_model": "ggml-base.en" if whisper_available else "whisper-1",
-            "tts_model": "tts-1",
+            "tts_model": "tts-1" if tts_provider == "openai" else "kokoro-82M",
             "voices": AVAILABLE_TTS_VOICES,
+            "current_voice": voice_config.tts_voice,
             "max_audio_size_mb": MAX_AUDIO_SIZE // (1024 * 1024),
             "speaker_id_enabled": si._config.enabled,
             "speaker_id_available": si.is_available(),
+            "require_wake_word": voice_config.require_wake_word,
+            "proactive_enabled": voice_config.proactive_enabled,
         }
 
     # ── Speech-to-Text ───────────────────────────────────────────────────
@@ -202,61 +264,256 @@ class AudioService:
         db: Session,
         user_id: str,
         text: str,
-        voice: str = "alloy",
+        voice: Optional[str] = None,
         speed: float = 1.0,
     ) -> bytes:
         """
-        Synthesize text to speech using OpenAI TTS.
-
+        Synthesize text to speech using the configured TTS provider.
+        
+        Implements fallback logic: tries the configured provider first,
+        then falls back to the other provider if available.
+        
         Args:
-            db: Database session (for key lookup)
+            db: Database session
             user_id: User requesting synthesis
             text: Text to convert to speech
-            voice: TTS voice ID (alloy, echo, fable, onyx, nova, shimmer)
+            voice: TTS voice ID (uses user's configured voice if not specified)
             speed: Speed multiplier (0.25 – 4.0)
-
+            
         Returns:
-            MP3 audio bytes.
-
+            WAV audio bytes.
+            
         Raises:
-            ValueError: If no API key is configured.
+            ProviderUnavailableError: If no TTS provider is available
         """
-        api_key = self._get_openai_api_key(db, user_id)
-        if not api_key:
-            raise ValueError("No OpenAI API key configured for voice features")
-
         if not text or not text.strip():
             raise ValueError("Text cannot be empty")
 
         # Clamp speed
         speed = max(0.25, min(4.0, speed))
 
-        # Validate voice
-        valid_voices = [v["id"] for v in AVAILABLE_TTS_VOICES]
+        # Get user's voice configuration
+        voice_config = VoiceConfigService.get_or_create_default(db, user_id)
+        
+        # Use configured voice if not specified
+        if voice is None:
+            voice = voice_config.tts_voice
+            
+        # Try primary provider first
+        primary_provider = voice_config.tts_provider
+        fallback_provider = "openai" if primary_provider == "kokoro" else "kokoro"
+        
+        providers_to_try = [primary_provider]
+        
+        # Only try fallback if it's different from primary
+        if fallback_provider != primary_provider:
+            providers_to_try.append(fallback_provider)
+            
+        last_error = None
+        
+        for provider in providers_to_try:
+            try:
+                if provider == "openai":
+                    audio_data = await self._synthesize_openai(db, user_id, text, voice, speed)
+                    return audio_data
+                elif provider == "kokoro":
+                    audio_data = await self._synthesize_kokoro(db, user_id, text, voice, speed)
+                    return audio_data
+            except ProviderUnavailableError as e:
+                last_error = e
+                logger.warning(f"TTS provider {provider} failed: {e}. Trying fallback...")
+                continue
+            except Exception as e:
+                last_error = ProviderUnavailableError(
+                    f"TTS provider {provider} failed: {str(e)}",
+                    code=f"TTS_{provider.upper()}_FAILED",
+                    detail={"provider": provider, "error": str(e)}
+                )
+                logger.error(f"TTS provider {provider} failed: {e}")
+                continue
+        
+        # If we get here, all providers failed
+        if last_error:
+            raise last_error
+        else:
+            raise ProviderUnavailableError(
+                "No TTS providers available",
+                code="TTS_UNAVAILABLE",
+                detail={"providers_tried": providers_to_try}
+            )
+
+    async def _synthesize_openai(
+        self,
+        db: Session,
+        user_id: str,
+        text: str,
+        voice: str,
+        speed: float
+    ) -> bytes:
+        """
+        Synthesize text to speech using OpenAI TTS.
+        
+        Args:
+            db: Database session
+            user_id: User requesting synthesis
+            text: Text to convert to speech
+            voice: TTS voice ID
+            speed: Speed multiplier
+            
+        Returns:
+            MP3 audio bytes converted to WAV format
+            
+        Raises:
+            ProviderUnavailableError: If OpenAI is not available or fails
+        """
+        api_key = self._get_openai_api_key(db, user_id)
+        if not api_key:
+            raise ProviderUnavailableError(
+                "OpenAI API key not configured",
+                code="OPENAI_KEY_MISSING",
+                detail={"provider": "openai"}
+            )
+
+        # Validate OpenAI voice
+        valid_voices = [v["id"] for v in OPENAI_TTS_VOICES]
         if voice not in valid_voices:
+            logger.warning(f"Invalid OpenAI voice {voice}, using 'alloy' instead")
             voice = "alloy"
 
         client = self._get_openai_client(api_key)
 
-        response = client.audio.speech.create(
-            model="tts-1",
-            voice=voice,
-            input=text,
-            speed=speed,
-        )
+        try:
+            response = client.audio.speech.create(
+                model="tts-1",
+                voice=voice,
+                input=text,
+                speed=speed,
+            )
 
-        # Collect the audio bytes
-        audio_data = b""
-        for chunk in response.iter_bytes(chunk_size=4096):
-            audio_data += chunk
+            # Collect the audio bytes (MP3 format)
+            mp3_data = b""
+            for chunk in response.iter_bytes(chunk_size=4096):
+                mp3_data += chunk
 
-        return audio_data
+            # Convert MP3 to WAV for consistency with Kokoro
+            return self._convert_mp3_to_wav(mp3_data)
+            
+        except Exception as e:
+            logger.error(f"OpenAI TTS failed: {e}")
+            raise ProviderUnavailableError(
+                f"OpenAI TTS failed: {str(e)}",
+                code="OPENAI_TTS_FAILED",
+                detail={"provider": "openai", "error": str(e)}
+            )
+
+    async def _synthesize_kokoro(
+        self,
+        db: Session,
+        user_id: str,
+        text: str,
+        voice: str,
+        speed: float
+    ) -> bytes:
+        """
+        Synthesize text to speech using Kokoro TTS.
+        
+        Args:
+            db: Database session
+            user_id: User requesting synthesis
+            text: Text to convert to speech
+            voice: TTS voice ID
+            speed: Speed multiplier (ignored by Kokoro, kept for API consistency)
+            
+        Returns:
+            WAV audio bytes
+            
+        Raises:
+            ProviderUnavailableError: If Kokoro is not available or fails
+        """
+        # Check if Kokoro is available
+        if not self._is_kokoro_available():
+            raise ProviderUnavailableError(
+                "Kokoro TTS not available",
+                code="KOKORO_UNAVAILABLE",
+                detail={"provider": "kokoro"}
+            )
+
+        # Validate Kokoro voice
+        valid_voices = [v["id"] for v in KOKORO_TTS_VOICES]
+        if voice not in valid_voices:
+            logger.warning(f"Invalid Kokoro voice {voice}, using 'am_adam' instead")
+            voice = "am_adam"
+
+        try:
+            # Import and use Kokoro TTS
+            from kokoro import KPipeline
+            
+            # Create pipeline with the appropriate language code
+            lang_code = voice[0]  # First character indicates language (a=african, b=british, etc.)
+            pipeline = KPipeline(lang_code=lang_code)
+            
+            import io
+            import soundfile as sf
+            
+            out = io.BytesIO()
+            for _, _, audio in pipeline(text, voice=voice):
+                arr = audio.cpu().numpy() if hasattr(audio, "cpu") else audio
+                sf.write(out, arr, 24000, format="WAV")
+            
+            return out.getvalue()
+            
+        except ImportError:
+            logger.error("Kokoro TTS failed: kokoro package not installed")
+            raise ProviderUnavailableError(
+                "Kokoro TTS not installed",
+                code="KOKORO_NOT_INSTALLED",
+                detail={"provider": "kokoro"}
+            )
+        except Exception as e:
+            logger.error(f"Kokoro TTS failed: {e}")
+            raise ProviderUnavailableError(
+                f"Kokoro TTS failed: {str(e)}",
+                code="KOKORO_TTS_FAILED",
+                detail={"provider": "kokoro", "error": str(e)}
+            )
+
+    def _convert_mp3_to_wav(self, mp3_data: bytes) -> bytes:
+        """
+        Convert MP3 audio data to WAV format for consistency.
+        
+        Args:
+            mp3_data: MP3 audio bytes
+            
+        Returns:
+            WAV audio bytes
+        """
+        try:
+            import io
+            import soundfile as sf
+            import librosa
+            
+            # Load MP3 data
+            audio, sample_rate = librosa.load(io.BytesIO(mp3_data), sr=None, mono=True)
+            
+            # Convert to 16-bit PCM
+            audio = (audio * 32767).astype("int16")
+            
+            # Write to WAV format
+            out = io.BytesIO()
+            sf.write(out, audio, sample_rate, format="WAV", subtype="PCM_16")
+            return out.getvalue()
+            
+        except Exception as e:
+            logger.error(f"MP3 to WAV conversion failed: {e}")
+            # Return original MP3 data as fallback
+            return mp3_data
 
     # ── Voice List ─────────────────────────────────────────────────────────
 
-    @staticmethod
-    def get_available_voices() -> List[Dict[str, str]]:
-        """Return list of available TTS voices."""
+    def get_available_voices(self, provider: Optional[str] = None) -> List[Dict[str, str]]:
+        """Return list of available TTS voices for the specified provider."""
+        if provider:
+            return AVAILABLE_TTS_VOICES.get(provider, [])
         return AVAILABLE_TTS_VOICES
 
     # ── Speaker Identification (Phase 10.3) ───────────────────────────────
