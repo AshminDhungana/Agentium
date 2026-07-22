@@ -13,3 +13,12 @@ if (!window.matchMedia) {
     dispatchEvent: () => false,
   }) as unknown as MediaQueryList;
 }
+
+// ResizeObserver polyfill for jsdom
+if (!window.ResizeObserver) {
+  window.ResizeObserver = class ResizeObserver {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
+}

@@ -2,11 +2,6 @@
 
 ## 10. Chat Page — UX
 
-- [ ] Improvements in how ai message are sent to the user, currently the ai sends small messages as reply to the user, this was intended design but it is too small. think of what can be done to imporve on that, do web serch for ideas and improvement.
-
-- [ ] Improvement in display of animation in the chatpage, right now only three dot animation is shown, for thinking that should be shown and for tools use or processing number of tools use or something else should be shown to the user so it keeps user engaging.
-
-- **10.2 — [P2]** When a user pastes long text into the compose box, collapse it to a `[x lines pasted]` placeholder; after sending, show the same collapsed form in the message with an expand button to view the full text.
 - **10.3 — [P2]** Typing indicator: animated three-dot indicator while a reply is generating (distinct from the "Thinking…" label in 5.6, which is for active extended-thinking mode specifically). for thinking the three dot will be fine, and for tool use add no of tools used +count or somthing similar, the goal is to make the chat user engaging. 
 - **10.4 — [P1]** Investigate and fix cases where Head disconnects mid-chat and a sent message never receives a reply — trace via logs, likely a WebSocket/session lifecycle bug.
 - **10.5 — [P2]** Auto-prune chat history older than 7 days, but always retain the last few messages regardless of age if there's been no further activity.

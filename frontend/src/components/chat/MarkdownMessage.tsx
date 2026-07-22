@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { marked } from 'marked';
 import { sanitizeMarkdown } from '../../utils/markdown/sanitizeMarkdown';
 import styles from './MarkdownMessage.module.css';
@@ -11,6 +11,9 @@ interface MarkdownMessageProps {
   isUser?: boolean;
   status?: string;
   role?: string;
+  isCollapsed?: boolean; // controlled collapse state
+  /** Test-only: override measured line count */
+  testLineCount?: number;
 }
 
 /**
@@ -19,14 +22,18 @@ interface MarkdownMessageProps {
  * - User messages are rendered as plain text (never markdown-parsed).
  * - Fenced code blocks get an overlay copy button (vector icon, no layout shift).
  * - If parsing fails, falls back to plain text (never blank).
+ * - Long messages (>10 lines) collapse with "Show more/less" toggle.
  */
 export function MarkdownMessage({
   content,
   className = '',
   isUser = false,
   status,
+  isCollapsed: controlledCollapsed,
+  testLineCount,
 }: MarkdownMessageProps) {
-  const ref = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const ref = useRef<HTMLDivElement>(null); // for backward compat with caret logic
 
   // Compute sanitized HTML (empty string = plain-text fallback).
   const html = useMemo(() => {
@@ -57,6 +64,63 @@ export function MarkdownMessage({
       return () => clearTimeout(t);
     }
   }, [isStreaming, showCaret, caretFading]);
+
+  // Collapse/expand state - default to collapsed for long content
+  // Use testLineCount if provided (tests), otherwise will be set after measurement
+  const initialCollapsed = testLineCount !== undefined ? testLineCount > 10 : false;
+  const [isCollapsed, setIsCollapsed] = useState(initialCollapsed);
+  const [lineCount, setLineCount] = useState(0);
+  const prefersReducedMotionRef = useRef(false);
+
+  // Detect prefers-reduced-motion
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    prefersReducedMotionRef.current = mediaQuery.matches;
+    const handler = (e: MediaQueryListEvent) => { prefersReducedMotionRef.current = e.matches; };
+    mediaQuery.addEventListener('change', handler);
+    return () => mediaQuery.removeEventListener('change', handler);
+  }, []);
+
+  // Measure content height and line count (runs in effect for real DOM measurement)
+  const measureContent = useCallback(() => {
+    const el = contentRef.current;
+    if (!el) return;
+    const lineHeight = parseFloat(getComputedStyle(el).lineHeight) || 24;
+    const lines = Math.round(el.scrollHeight / lineHeight);
+    setLineCount(lines);
+  }, []);
+
+  useEffect(() => {
+    measureContent();
+    const ro = new ResizeObserver(measureContent);
+    if (contentRef.current) ro.observe(contentRef.current);
+    return () => ro.disconnect();
+  }, [content, measureContent]);
+
+  // Derive shouldCollapse from testLineCount (sync) or lineCount (async from measurement)
+  const effectiveLineCount = testLineCount !== undefined ? testLineCount : lineCount;
+  const shouldCollapse = effectiveLineCount > 10 && !isUser;
+
+  // Sync with controlled prop if provided
+  useEffect(() => {
+    if (controlledCollapsed !== undefined) {
+      setIsCollapsed(controlledCollapsed);
+    }
+  }, [controlledCollapsed]);
+
+  const toggleCollapse = () => {
+    if (shouldCollapse) setIsCollapsed(prev => !prev);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      toggleCollapse();
+    }
+  };
+
+  const maxHeight = (isCollapsed && shouldCollapse && !isStreaming) ? '120px' : 'none';
+  const transition = prefersReducedMotionRef.current ? 'none' : 'max-height 200ms ease';
 
   const renderCaret = () =>
     showCaret ? (
@@ -138,8 +202,42 @@ export function MarkdownMessage({
   }
 
   return (
-    <div className={`markdown-body text-[15px] leading-relaxed ${className}`}>
+    <div
+      ref={contentRef}
+      role={shouldCollapse ? 'region' : undefined}
+      aria-label={shouldCollapse ? 'Message content' : undefined}
+      aria-expanded={shouldCollapse ? !isCollapsed : undefined}
+      data-collapsed={shouldCollapse ? String(isCollapsed) : undefined}
+      data-status={status}
+      data-testid="collapsible-message"
+      onClick={shouldCollapse ? toggleCollapse : undefined}
+      onKeyDown={shouldCollapse ? handleKeyDown : undefined}
+      tabIndex={shouldCollapse ? 0 : undefined}
+      className={`markdown-body text-[15px] leading-relaxed ${className}`}
+      style={{
+        maxHeight: maxHeight,
+        overflow: shouldCollapse ? 'hidden' : 'visible',
+        transition: transition,
+        position: 'relative',
+      }}
+    >
       <div ref={ref} dangerouslySetInnerHTML={{ __html: html }} />
+      
+      {shouldCollapse && (
+        <div className={styles['collapse-fade']} aria-hidden="true" />
+      )}
+      
+      {shouldCollapse && (
+        <button
+          type="button"
+          className={styles['collapse-toggle']}
+          onClick={(e) => { e.stopPropagation(); toggleCollapse(); }}
+          aria-expanded={!isCollapsed}
+          aria-controls={contentRef.current?.id}
+        >
+          {isCollapsed ? 'Show more' : 'Show less'}
+        </button>
+      )}
     </div>
   );
 }
