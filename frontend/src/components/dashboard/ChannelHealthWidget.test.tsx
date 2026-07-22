@@ -6,7 +6,7 @@ import { useBackendStore } from '@/store/backendStore';
 
 describe('ChannelHealthWidget', () => {
   it('shows the shared empty state when no channels', () => {
-    useBackendStore.setState({ channelMetrics: [], isLoadingChannelMetrics: false, fetchChannelMetrics: vi.fn() } as any);
+    useBackendStore.setState({ channelMetrics: { channels: [] } as any, isLoadingChannelMetrics: false, fetchChannelMetrics: vi.fn() } as any);
     render(
       <MemoryRouter>
         <ChannelHealthWidget />

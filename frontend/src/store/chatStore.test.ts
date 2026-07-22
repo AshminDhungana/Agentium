@@ -1,5 +1,19 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi, beforeAll, afterAll } from 'vitest';
 import { useChatStore } from './chatStore';
+
+beforeAll(() => {
+  vi.stubGlobal('matchMedia', (query: string) => ({
+    matches: query === '(prefers-reduced-motion: reduce)',
+    media: query,
+    onchange: null,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  }));
+});
+afterAll(() => {
+  vi.unstubAllGlobals();
+});
 
 describe('chatStore streaming', () => {
   beforeEach(() => {

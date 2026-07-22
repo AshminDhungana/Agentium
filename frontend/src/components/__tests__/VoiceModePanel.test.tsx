@@ -13,7 +13,7 @@ vi.mock('@/services/voiceBridge', () => ({
   },
 }));
 
-vi.mock('@/components/VoiceOrb', () => ({
+vi.mock('@/components/voice-bridge/VoiceOrb', () => ({
   VoiceOrb: vi.fn(() => <div data-testid="voice-orb" />),
 }));
 

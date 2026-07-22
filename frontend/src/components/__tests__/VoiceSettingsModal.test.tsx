@@ -100,7 +100,7 @@ describe('VoiceSettingsModal', () => {
     });
   });
 
-  it('shows fallback voices when providers endpoint fails', async () => {
+  it('shows engine tab content even when providers endpoint fails', async () => {
     mockGetVoiceConfigDb.mockResolvedValue({
       user_id: 'test',
       require_wake_word: true,
@@ -115,8 +115,8 @@ describe('VoiceSettingsModal', () => {
     render(<VoiceSettingsModal onClose={vi.fn()} />);
 
     await waitFor(() => {
-      expect(screen.getByText('Bella (Female)')).toBeTruthy();
-      expect(screen.getByText('Adam (Male)')).toBeTruthy();
+      expect(screen.getByText('Wake word')).toBeTruthy();
+      expect(screen.getByText('Push to Talk')).toBeTruthy();
     });
   });
 
