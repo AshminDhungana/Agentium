@@ -564,31 +564,69 @@ async def _stream_response(
         # This is the missing step that caused the AI to ignore all attachments.
         enriched_message = _build_enriched_message(chat_msg.message, attachments)
 
+        from backend.core.config import get_settings
+        use_envelope = get_settings().RESPONSE_DELIVERY_ENVELOPE
+        stream_id = str(uuid.uuid4()) if use_envelope else None
+
+        if use_envelope:
+            yield f"data: {json.dumps({'type': 'ack', 'stream_id': stream_id, 'seq': 1, 'content': 'Processing your request...'})}\n\n"
+
         full_response: list[str] = []
+        seq = 2 if use_envelope else 0
         async for chunk in provider.stream_generate(full_prompt, enriched_message):
             full_response.append(chunk)
-            yield f"data: {json.dumps({'type': 'content', 'content': chunk})}\n\n"
+            if not use_envelope:
+                yield f"data: {json.dumps({'type': 'content', 'content': chunk})}\n\n"
 
         full_text = "".join(full_response)
         # Use original message (without file content) for task analysis
         # to avoid false-positive task creation from extracted PDF keywords.
         task_info = await ChatService.analyze_for_task(head, chat_msg.message, full_text, db)
 
-        # ── 2–3 line response policy enforcement ─────────────────────────────
-        if not task_info.get("created", False):
-            original_length = len(full_text)
-            non_empty_lines = [ln for ln in full_text.split("\n") if ln.strip()]
-            if len(non_empty_lines) > 3:
-                full_text = "\n".join(non_empty_lines[:3])
-                logger.debug(
-                    f"[chat.py] Response truncated for 2-3 line policy: "
-                    f"{original_length} chars → {len(full_text)} chars"
-                )
-        # ── end enforcement ───────────────────────────────────────────────────
+        summary_text = ""
+        detail_text = ""
+
+        if use_envelope:
+            if task_info.get("created", False):
+                yield f"data: {json.dumps({'type': 'summary', 'stream_id': stream_id, 'seq': seq, 'content': full_text})}\n\n"; seq += 1
+                yield f"data: {json.dumps({'type': 'part_end', 'stream_id': stream_id, 'seq': seq, 'part': 'summary'})}\n\n"; seq += 1
+            else:
+                non_empty_lines = [ln for ln in full_text.split("\n") if ln.strip()]
+                if len(non_empty_lines) <= 3:
+                    summary_text = full_text
+                    detail_text = ""
+                else:
+                    boundary = full_text.find("\n\n")
+                    if boundary == -1 or boundary == 0:
+                        summary_text = "\n".join(non_empty_lines[:3])
+                        detail_text = "\n".join(non_empty_lines[3:])
+                    else:
+                        summary_text = full_text[:boundary].strip()
+                        detail_text = full_text[boundary:].strip()
+                        summary_lines = [ln for ln in summary_text.split("\n") if ln.strip()]
+                        if len(summary_lines) > 3:
+                            summary_text = "\n".join(summary_lines[:3])
+                            detail_text = "\n".join(summary_lines[3:]) + "\n" + detail_text
+
+                yield f"data: {json.dumps({'type': 'summary', 'stream_id': stream_id, 'seq': seq, 'content': summary_text})}\n\n"; seq += 1
+                yield f"data: {json.dumps({'type': 'part_end', 'stream_id': stream_id, 'seq': seq, 'part': 'summary'})}\n\n"; seq += 1
+                if detail_text:
+                    yield f"data: {json.dumps({'type': 'detail', 'stream_id': stream_id, 'seq': seq, 'content': detail_text})}\n\n"; seq += 1
+                    yield f"data: {json.dumps({'type': 'part_end', 'stream_id': stream_id, 'seq': seq, 'part': 'detail'})}\n\n"; seq += 1
+        else:
+            if not task_info.get("created", False):
+                original_length = len(full_text)
+                non_empty_lines = [ln for ln in full_text.split("\n") if ln.strip()]
+                if len(non_empty_lines) > 3:
+                    full_text = "\n".join(non_empty_lines[:3])
+                    logger.debug(
+                        f"[chat.py] Response truncated for 2-3 line policy: "
+                        f"{original_length} chars → {len(full_text)} chars"
+                    )
 
         message_id = str(uuid.uuid4())
 
-        yield f"data: {json.dumps({'type': 'complete', 'content': '', 'message_id': message_id, 'metadata': {'agent_id': agent_id, 'model': model_name, 'task_created': task_info['created'], 'task_id': task_info.get('task_id'), 'card': None}})}\n\n"
+        yield f"data: {json.dumps({'type': 'complete', 'stream_id': stream_id, 'seq': seq if use_envelope else 0, 'content': full_text, 'message_id': message_id, 'metadata': {'agent_id': agent_id, 'model': model_name, 'task_created': task_info['created'], 'task_id': task_info.get('task_id'), 'card': None}})}\n\n"
 
         await ChatService.log_interaction(agent_id, chat_msg.message, full_text, config_id, db)
 
@@ -639,7 +677,14 @@ async def _stream_response(
                     pass
         # ─────────────────────────────────────────────────────────────────────
 
-        if sovereign_user:
+        if sovereign_user and use_envelope:
+            broadcast_payload = {
+                "user_id": sovereign_user.id,
+                "content": full_text,
+                "summary": summary_text if not task_info.get("created", False) else full_text,
+                "detail": detail_text if not task_info.get("created", False) else "",
+            }
+        elif sovereign_user:
             broadcast_payload = {
                 "user_id": sovereign_user.id,
                 "content": full_text,
