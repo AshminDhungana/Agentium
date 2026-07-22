@@ -1389,6 +1389,8 @@ class VoiceSession:
         return False
 
     async def _broadcast_state(self, state: str):
+        global _current_state
+        _current_state = state
         await _broadcast({"type": "voice_state", "state": state, "ts": time.time()})
 
 
