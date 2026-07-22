@@ -113,6 +113,7 @@ else
     run_or_warn "install PyAudio"       "$VENV_PIP" install "PyAudio>=0.2.14"
     run_or_warn "install pyttsx3"       "$VENV_PIP" install "pyttsx3>=2.90"
     run_or_warn "install python-jose"   "$VENV_PIP" install "python-jose[cryptography]>=3.3.0"
+    run_or_warn "install numpy"         "$VENV_PIP" install "numpy>=1.24"
     # sounddevice: neural TTS playback + microphone fallback when PyAudio
     # lacks a wheel for the host Python version (e.g. 3.12+).
     run_or_warn "install sounddevice"   "$VENV_PIP" install "sounddevice>=0.4.6"
