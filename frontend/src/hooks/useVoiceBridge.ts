@@ -11,6 +11,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { voiceBridgeService, BridgeStatus, VoiceInteractionEvent } from '@/services/voiceBridge';
 import { useAuthStore } from '@/store/authStore';
+import { useWebSocketStore } from '@/store/websocketStore';
 
 const STATUS_MESSAGES: Record<BridgeStatus, string> = {
   offline:    'Voice bridge not running',
@@ -62,10 +63,12 @@ export function useVoiceBridge(
       }
     });
 
-    // Connect (no-op if already connected)
-    voiceBridgeService.connect().catch((err) => {
-      console.warn('[useVoiceBridge] connect() error:', err);
-    });
+    // Connect only when the system is ready (has API key configured)
+    if (useWebSocketStore.getState().connectionPhase !== 'waiting_for_key') {
+      voiceBridgeService.connect().catch((err) => {
+        console.warn('[useVoiceBridge] connect() error:', err);
+      });
+    }
 
     return () => {
       unsubStatus();
