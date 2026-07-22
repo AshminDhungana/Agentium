@@ -981,6 +981,18 @@ async def _ws_handler(websocket) -> None:
 
     _connected_browsers.add(websocket)
     logger.info("[bridge][WS] Browser connected (%d total)", len(_connected_browsers))
+
+    # Sync current state to newly connected client so it doesn't
+    # miss events that happened before it connected.
+    try:
+        await websocket.send(json.dumps({
+            "type": "voice_state",
+            "state": _current_state,
+            "ts": time.time(),
+        }))
+    except Exception:
+        pass
+
     try:
         async for raw in websocket:
             try:
