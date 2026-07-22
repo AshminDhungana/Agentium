@@ -223,36 +223,35 @@ catch (error) {
 
 2. **Backend always reports unavailable** — `audio_service.py:_is_kokoro_available()` checks `from kokoro import KPipeline` inside the Docker container, where `kokoro` is NEVER installed. This is by design (TTS runs on the host bridge, not in Docker), but it means the `/api/v1/voice/voice-config/providers` endpoint always returns `kokoro.available: false`.
 
-### Fix 1: Update Host Install Scripts
+### Fix 1: Fix Missing Critical Dependencies
 
-Both scripts need `kokoro` added to their pip install command. Kokoro pulls in `torch` and `huggingface_hub` automatically as dependencies.
+The bridge has two missing deps that cause it to crash immediately on startup:
 
-#### `install-voice-bridge.sh` (Phase 2.3, line ~111–118):
+**`aiohttp`** — imported at `main.py:47` as a bare top-level import. Missing from both install scripts AND `requirements.txt`. Added to all three.
 
-Add to the existing pip install:
-```diff
-  "${VENV_DIR}/bin/pip" install --quiet \
-    websockets SpeechRecognition PyAudio pyttsx3 \
-    python-jose[cryptography] sounddevice \
-+   kokoro soundfile huggingface_hub
+**`numpy`** — imported at `vad.py:15` as a bare `import numpy`. The PS1 script installed it (Windows), but the bash script did NOT (Linux/macOS crash). Added to the bash script.
+
+### Fix 2: Move Kokoro Install to Detached Background Process
+
+`kokoro` pulls in `torch` (~250MB CPU wheel), making the pip install take 5-15 minutes. Sequential pip install blocks the installer and triggers the 20s bridge startup timeout.
+
+Both scripts now install kokoro+soundfile as a **detached background process** after everything else is done:
+
+#### `install-voice-bridge.sh` — after Phase 4:
+```bash
+nohup "$VENV_DIR/bin/pip" install kokoro soundfile --quiet >> "$LOG_FILE" 2>&1 &
+log "  Kokoro install running detached (PID $!)"
 ```
 
-Also add `espeak-ng` to system package install (Phase 2.1):
-- `apt`: add `espeak-ng`
-- `brew`: add `espeak-ng`
-- `dnf`/`pacman`/`zypper`/`apk`: add `espeak-ng`
-
-#### `install-voice-bridge.ps1` (Phase 2+3, line ~154–163):
-
-Add to the existing pip install:
-```diff
-  & "$venv\Scripts\pip" install --quiet `
-    websockets SpeechRecognition pyttsx3 `
-    python-jose[cryptography] numpy sounddevice `
-+   kokoro soundfile huggingface_hub
+#### `install-voice-bridge.ps1` — after Phase 4:
+```powershell
+$kokoroScript = @"
+& '$VENV_PIP' install kokoro soundfile --quiet
+"@ | Out-File "$CONF_DIR\install-kokoro.ps1" -Encoding ascii
+Start-Process powershell "-NoProfile -ExecutionPolicy Bypass -File `"$CONF_DIR\install-kokoro.ps1`"" -WindowStyle Hidden
 ```
 
-Windows espeak-ng is optional — Kokoro can use misaki's built-in G2P for English without it.
+The bridge starts immediately (it gracefully degrades to pyttsx3 when kokoro is missing). The background install survives the setup window being closed. On the next bridge restart, kokoro is available.
 
 ### Fix 2: Backend Availability Check
 
@@ -285,8 +284,9 @@ After the pip package is installed, the first voice synthesis triggers the downl
 | `frontend/src/components/VoiceSettingsModal.tsx` | Relax provider filter, add availability notice, fix prefix detection, remove stale fallback |
 | `frontend/src/services/voiceApi.ts` | Add error logging to `getVoiceProviders()` |
 | `voice-bridge/main.py` | Defer welcome message to after TTS engine init |
-| `scripts/install-voice-bridge.sh` | Add `kokoro`, `soundfile`, `huggingface_hub` to pip install; add `espeak-ng` to system deps |
-| `scripts/install-voice-bridge.ps1` | Add `kokoro`, `soundfile`, `huggingface_hub` to pip install |
+| `voice-bridge/requirements.txt` | Add `aiohttp` (missing dep, bridge crashes at startup without it) |
+| `scripts/install-voice-bridge.sh` | Add `aiohttp`, `numpy` to pip install; move `kokoro`+`soundfile` to detached nohup background process |
+| `scripts/install-voice-bridge.ps1` | Add `aiohttp` to pip install; move `kokoro`+`soundfile` to detached `Start-Process` background job |
 | `backend/services/audio_service.py` | `_is_kokoro_available()` returns `True` unconditionally |
 
 ---
@@ -299,4 +299,4 @@ Each fix is independently testable:
 - **Issue 3:** Open the dropdown on Windows → shows PowerShell command. Open on macOS → shows shell command.
 - **Issue 4:** Delete `~/.agentium/.voice-startup-count`, start the bridge. Verify "Welcome back, voice is ready." plays after the voice loop starts.
 - **Issue 5:** Open Voice Settings with no Kokoro package and no OpenAI key. Verify voices are still listed with an availability notice.
-- **Issue 6:** Re-run `install-voice-bridge.sh` or `.ps1`. Verify `kokoro` is now in the venv. Verify backend `/api/v1/voice/voice-config/providers` returns `kokoro.available: true`. On first voice synthesis, verify model weights auto-download (visible in bridge logs: `hf_hub_download` messages).
+- **Issue 6:** Re-run `install-voice-bridge.sh` or `.ps1`. Verify bridge starts immediately (port 9999 listening within 20s). Verify `aiohttp` and `numpy` are in the venv. Verify kokoro install is running in background (visible via `ps`/Task Manager). After background install completes, restart bridge and verify kokoro TTS works. Verify backend `/api/v1/voice/voice-config/providers` returns `kokoro.available: true`.
