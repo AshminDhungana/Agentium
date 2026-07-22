@@ -14,7 +14,7 @@ Users pasting long text into the chat input creates messages that dominate the c
 ## Requirements
 
 ### Functional
-- **Trigger:** Collapse messages exceeding **5 lines** of rendered content
+- **Trigger:** Collapse messages exceeding **10 lines** of rendered content
 - **Visual indicator:** Fade-out gradient at bottom of collapsed message (bottom 40px)
 - **Interaction:** "Show more" button appears on **hover** (matching existing copy/follow-up/read-aloud button behavior)
 - **Toggle:** Click button to expand/collapse with smooth animation
@@ -34,8 +34,8 @@ Users pasting long text into the chat input creates messages that dominate the c
 ### Component Changes
 
 **`frontend/src/components/chat/MarkdownMessage.tsx`** (primary change)
-- Add `expandedMessageIds` Set in Zustand chatStore or local component state
-- Measure content height via `ref` + `scrollHeight`
+- Add local component state: `isExpanded` (boolean) + `contentRef` (HTMLDivElement)
+- Measure content height via `ref` + `scrollHeight` in `useEffect`
 - Render gradient overlay when collapsed
 - Render toggle button on hover (collapsed) or always (expanded)
 - Handle click → toggle state → animate `max-height`
@@ -152,7 +152,7 @@ MarkdownMessage renders
 
 ## Open Questions (Resolved)
 
-- ✅ Threshold: **5 lines**
-- ✅ Interaction: **Hover → button → click toggle**
+- ✅ Threshold: **10 lines**
+- ✅ Interaction: **Click anywhere to expand + "Show more" button (both)**
 - ✅ Animation: **CSS `max-height` transition (200ms)**
 - ✅ Approach: **JS-controlled with CSS transitions**
