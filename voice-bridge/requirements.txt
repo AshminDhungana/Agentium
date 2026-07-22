@@ -30,6 +30,9 @@ openwakeword
 silero-vad
 onnxruntime
 
+# HTTP client for backend API calls (voice config, speaker ID, STT relay).
+aiohttp
+
 # Local neural TTS (Kokoro-82M). Apache 2.0, ~327MB weights, real-time on CPU.
 # Pulls in torch. Plays via sounddevice; soundfile writes the WAV chunks.
 kokoro

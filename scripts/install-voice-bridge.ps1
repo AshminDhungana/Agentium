@@ -161,7 +161,7 @@ if (-not (Test-Path $VENV_PIP)) {
     # PyAudio alternative for mic capture.  It ships wheels for Python 3.12+,
     # so this should work even where PyAudio fails (e.g. Python 3.14).
     Run-Or-Warn "install sounddevice" { & $VENV_PIP install "sounddevice>=0.4.6" --quiet }
-    Run-Or-Warn "install kokoro"      { & $VENV_PIP install "kokoro" "soundfile" --quiet }
+    Run-Or-Warn "install aiohttp"     { & $VENV_PIP install "aiohttp>=3.9" --quiet }
 
     # PyAudio â€” official wheel first, pipwin fallback
     Write-Log "  Installing PyAudio..."
@@ -604,6 +604,25 @@ sh.Run cmd, 0, False
 # The UI's bridge_client handles reconnection, so it works fine even if the
 # bridge isn't up yet.  Only the launch is best-effort.
 Install-VoiceUI | Out-Null
+
+# --- Background: install Kokoro TTS (large deps, torch ~250MB) ---
+# Launched as a completely detached PowerShell process so the installer can
+# exit and the setup window can be closed while the download continues.
+Write-Log "  Launching background kokoro install (detached, may take several minutes)..."
+$kokoroScript = @"
+`$VENV_PIP = "$VENV_PIP"
+`$LOG_FILE = "$LOG_FILE"
+& `$VENV_PIP install kokoro soundfile --quiet 2>> `$LOG_FILE
+if (`$LASTEXITCODE -eq 0) {
+    Add-Content -Path `$LOG_FILE -Value "$(Get-Date -Format HH:mm:ss)   OK: install kokoro (background)"
+} else {
+    Add-Content -Path `$LOG_FILE -Value "$(Get-Date -Format HH:mm:ss)   WARN: kokoro install failed (background)"
+}
+"@
+$kokoroScriptPath = Join-Path $CONF_DIR "install-kokoro.ps1"
+$kokoroScript | Out-File -FilePath $kokoroScriptPath -Encoding ascii -Force
+Start-Process -FilePath "powershell" -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$kokoroScriptPath`"" -WindowStyle Hidden
+Write-Log "  Kokoro install running detached (PID: see install-kokoro.ps1 log)"
 
 # --- Signal successful install ONLY when the bridge is actually listening ---
 # (so a failed start does not mark "done" and silently disable re-prompting)

@@ -116,7 +116,7 @@ else
     # sounddevice: neural TTS playback + microphone fallback when PyAudio
     # lacks a wheel for the host Python version (e.g. 3.12+).
     run_or_warn "install sounddevice"   "$VENV_PIP" install "sounddevice>=0.4.6"
-    run_or_warn "install kokoro"        "$VENV_PIP" install "kokoro" "soundfile"
+    run_or_warn "install aiohttp"       "$VENV_PIP" install "aiohttp>=3.9"
 
     # Write venv path so main.py can find it
     grep -q "^VENV_PYTHON=" "$CONF_FILE" 2>/dev/null || \
@@ -445,6 +445,12 @@ EOF
     log "  UI companion installed."
 }
 install_voice_ui || true
+
+# --- Background: install Kokoro TTS (large deps, torch ~250MB) ---
+# Runs via nohup so the installer can exit while the download continues.
+log "  Launching background kokoro install (detached, may take several minutes)..."
+nohup "$VENV_DIR/bin/pip" install kokoro soundfile --quiet >> "$LOG_FILE" 2>&1 &
+log "  Kokoro install running detached (PID $!)"
 
 # Signal successful install (consumed by voice-autoinstall guard + launchers)
 touch "$CONF_DIR/voice-installed.marker"
