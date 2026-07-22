@@ -63,8 +63,8 @@ export function useVoiceBridge(
       }
     });
 
-    // Connect only when the system is ready (has API key configured)
-    if (useWebSocketStore.getState().connectionPhase !== 'waiting_for_key') {
+    // Only auto-connect when the system is fully active (API key configured + WS connected)
+    if (useWebSocketStore.getState().connectionPhase === 'active') {
       voiceBridgeService.connect().catch((err) => {
         console.warn('[useVoiceBridge] connect() error:', err);
       });

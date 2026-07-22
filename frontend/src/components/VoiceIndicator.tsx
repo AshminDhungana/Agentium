@@ -65,7 +65,6 @@ export function VoiceIndicator({ iconOnly = false }: VoiceIndicatorProps) {
   const [isDisabled, setIsDisabled] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const connectAttempted = useRef(false);
-  const wasWaitingForKey = useRef(false);
   const triggerRef = useRef<HTMLDivElement>(null);
   const [, forceUpdate] = useReducer((x: number) => x + 1, 0);
 
@@ -84,13 +83,8 @@ export function VoiceIndicator({ iconOnly = false }: VoiceIndicatorProps) {
   }, []);
 
   useEffect(() => {
-    if (connectionPhase === 'waiting_for_key') {
-      wasWaitingForKey.current = true;
-      return;
-    }
-    if (!isAuthenticated || isDisabled) return;
-    if (connectAttempted.current && !wasWaitingForKey.current) return;
-    if (wasWaitingForKey.current) wasWaitingForKey.current = false;
+    if (!isAuthenticated || connectAttempted.current || isDisabled) return;
+    if (connectionPhase !== 'active') return;
     connectAttempted.current = true;
     voiceBridgeService.connect().catch(() => {});
   }, [isAuthenticated, isDisabled, connectionPhase]);
