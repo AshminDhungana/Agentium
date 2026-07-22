@@ -1614,7 +1614,7 @@ class ChannelManager:
         }
 
     @staticmethod
-    async def broadcast_to_channels(user_id: int, content: str, db: Session) -> int:
+    async def broadcast_to_channels(user_id: int, content: str, db: Session, detail: str = "") -> int:
         """
         Broadcast a Web-Dashboard-originated message out to all active external channels 
         owned by the user. Supports silent delivery to avoid notification duplication loops.

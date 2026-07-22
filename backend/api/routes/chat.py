@@ -710,8 +710,9 @@ async def _stream_response(
                 try:
                     await ChannelManager.broadcast_to_channels(
                         user_id=broadcast_payload["user_id"],
-                        content=broadcast_payload["content"],
+                        content=broadcast_payload.get("summary", broadcast_payload["content"]),
                         db=broadcast_db,
+                        detail=broadcast_payload.get("detail", ""),
                     )
                 finally:
                     broadcast_db.close()
