@@ -11,6 +11,15 @@ import { api } from './api';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
+export type ConnectionErrorStage = 'token-fetch' | 'socket-open' | 'token-rejected' | 'unknown';
+
+export interface ConnectionError {
+  stage: ConnectionErrorStage;
+  message: string;
+  statusCode?: number;
+  lastAttempt: number;
+}
+
 export type BridgeStatus = 'offline' | 'connecting' | 'connected' | 'error';
 
 // Live agent state broadcast by the bridge (Jarvis upgrade, Phase H): the tab
@@ -64,8 +73,14 @@ class VoiceBridgeService {
   private voiceToken:   string | null = null;
   private tokenRetryCount = 0;
   private tokenRetryTimer: ReturnType<typeof setTimeout> | null = null;
+  private _connectionError: ConnectionError | null = null;
+  private _errorListeners: Array<(err: ConnectionError | null) => void> = [];
 
   status: BridgeStatus = 'offline';
+
+  get connectionError(): ConnectionError | null {
+    return this._connectionError;
+  }
 
   // ── Public API ──────────────────────────────────────────────────────────────
 
@@ -96,6 +111,14 @@ class VoiceBridgeService {
       return;
     } catch (err) {
       const errMsg = String(err);
+      const errStatus = (err as any)?.response?.status as number | undefined;
+
+      this._setConnectionError({
+        stage: 'token-fetch',
+        message: err instanceof Error ? err.message : errMsg,
+        statusCode: errStatus,
+        lastAttempt: Date.now(),
+      });
 
       // Non-transient errors: give up immediately.
       if (errMsg.includes('HTTP 404')) {
@@ -127,6 +150,13 @@ class VoiceBridgeService {
     }
   }
 
+  private _setConnectionError(err: ConnectionError | null): void {
+    this._connectionError = err;
+    for (const listener of this._errorListeners) {
+      try { listener(err); } catch { /* ignore */ }
+    }
+  }
+
   disconnect(): void {
     this._clearRetry();
     this._clearTokenRetry();
@@ -153,6 +183,13 @@ class VoiceBridgeService {
   onTranscript(handler: TranscriptHandler): () => void {
     this.transcriptHandlers.add(handler);
     return () => this.transcriptHandlers.delete(handler);
+  }
+
+  onErrorChange(listener: (err: ConnectionError | null) => void): () => void {
+    this._errorListeners.push(listener);
+    return () => {
+      this._errorListeners = this._errorListeners.filter(l => l !== listener);
+    };
   }
 
   // ── Private ─────────────────────────────────────────────────────────────────
@@ -193,9 +230,8 @@ class VoiceBridgeService {
     this.ws.onopen = () => {
       console.info('[voiceBridge] Connected to bridge at', WS_URL);
       this.retryCount = 0;
+      this._setConnectionError(null);
       this._setStatus('connected');
-      // Deliver a long-lived host token to the bridge so it can authenticate
-      // to the backend even after this browser session is closed.
       this._pushHostToken();
     };
 
@@ -231,12 +267,8 @@ class VoiceBridgeService {
       }
     };
 
-    this.ws.onerror = (evt) => {
-      // The native WebSocket error event carries no detail; surface what we
-      // can so "connection refused" vs "auth rejected" vs "timeout" is at
-      // least distinguishable in the console instead of a bare Event object.
-      const ws = this.ws;
-      const readyState = ws ? ws.readyState : 'unknown';
+    this.ws.onerror = () => {
+      const readyState = this.ws ? this.ws.readyState : 'unknown';
       const stateLabel =
         readyState === WebSocket.CONNECTING ? 'CONNECTING'
         : readyState === WebSocket.OPEN ? 'OPEN'
@@ -246,20 +278,25 @@ class VoiceBridgeService {
       console.warn(
         `[voiceBridge] WebSocket error (state=${stateLabel}). ` +
         `Likely causes: bridge process not running on ${WS_URL} (connection refused), ` +
-        `invalid/expired token (auth rejected), or network timeout. ` +
-        `Raw event:`, evt,
+        `invalid/expired token (auth rejected), or network timeout.`,
       );
+      this._setConnectionError({
+        stage: 'socket-open',
+        message: `Bridge at ${WS_URL} unreachable (state=${stateLabel})`,
+        lastAttempt: Date.now(),
+      });
     };
 
     this.ws.onclose = (closeEvt) => {
       this.ws = null;
 
-      // If the bridge rejected our token (code 1008 / policy violation), do
-      // NOT reconnect with the same stale token — it will be rejected again.
-      // Connect without a token instead; _pushHostToken will deliver a fresh
-      // one after the socket opens.
       if (closeEvt?.code === 1008) {
         console.warn('[voiceBridge] Bridge rejected token — reconnecting without one');
+        this._setConnectionError({
+          stage: 'token-rejected',
+          message: 'Bridge rejected the voice token (code 1008)',
+          lastAttempt: Date.now(),
+        });
       }
 
       if (this.status === 'offline') return; // intentional disconnect
