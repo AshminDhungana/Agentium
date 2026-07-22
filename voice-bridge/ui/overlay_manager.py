@@ -89,6 +89,7 @@ class OverlayManager(QObject):
     def show_overlay(self):
         self._center_on_cursor()
         self._overlay_view.show()
+        self._overlay_view.raise_()
         if self._overlay_root:
             self._overlay_root.setProperty("opacity", 1.0)
         self._overlay_visible = True
@@ -107,6 +108,7 @@ class OverlayManager(QObject):
     def show_indicator(self):
         self._position_bottom_right()
         self._indicator_view.show()
+        self._indicator_view.raise_()
         if self._indicator_root:
             self._indicator_root.setProperty("opacity", 1.0)
             self._indicator_root.setProperty("active", True)
@@ -166,6 +168,7 @@ class OverlayManager(QObject):
     def show_transcript(self):
         self._position_under_orb()
         self._transcript_view.show()
+        self._transcript_view.raise_()
         if self._transcript_root:
             self._transcript_root.setProperty("isVisible", True)
 
