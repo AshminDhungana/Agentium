@@ -934,7 +934,6 @@ async def _stream_chat(text: str, persona: Optional[str] = None,
             elif evt_type == "part_end":
                 yield "\n"
             elif evt_type in ("complete", "done"):
-                yield ""
                 break
             elif evt_type == "error":
                 yield ""

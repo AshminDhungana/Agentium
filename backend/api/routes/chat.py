@@ -626,7 +626,10 @@ async def _stream_response(
 
         message_id = str(uuid.uuid4())
 
-        yield f"data: {json.dumps({'type': 'complete', 'stream_id': stream_id, 'seq': seq if use_envelope else 0, 'content': full_text, 'message_id': message_id, 'metadata': {'agent_id': agent_id, 'model': model_name, 'task_created': task_info['created'], 'task_id': task_info.get('task_id'), 'card': None}})}\n\n"
+        if use_envelope:
+            yield f"data: {json.dumps({'type': 'complete', 'stream_id': stream_id, 'seq': seq, 'content': full_text, 'message_id': message_id, 'metadata': {'agent_id': agent_id, 'model': model_name, 'task_created': task_info['created'], 'task_id': task_info.get('task_id'), 'card': None}})}\n\n"
+        else:
+            yield f"data: {json.dumps({'type': 'complete', 'content': '', 'message_id': message_id, 'metadata': {'agent_id': agent_id, 'model': model_name, 'task_created': task_info['created'], 'task_id': task_info.get('task_id'), 'card': None}})}\n\n"
 
         await ChatService.log_interaction(agent_id, chat_msg.message, full_text, config_id, db)
 
