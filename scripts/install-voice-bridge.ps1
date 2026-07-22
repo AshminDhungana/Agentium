@@ -161,6 +161,7 @@ if (-not (Test-Path $VENV_PIP)) {
     # PyAudio alternative for mic capture.  It ships wheels for Python 3.12+,
     # so this should work even where PyAudio fails (e.g. Python 3.14).
     Run-Or-Warn "install sounddevice" { & $VENV_PIP install "sounddevice>=0.4.6" --quiet }
+    Run-Or-Warn "install kokoro"      { & $VENV_PIP install "kokoro" "soundfile" --quiet }
 
     # PyAudio â€” official wheel first, pipwin fallback
     Write-Log "  Installing PyAudio..."

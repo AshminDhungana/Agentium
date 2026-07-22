@@ -116,6 +116,7 @@ else
     # sounddevice: neural TTS playback + microphone fallback when PyAudio
     # lacks a wheel for the host Python version (e.g. 3.12+).
     run_or_warn "install sounddevice"   "$VENV_PIP" install "sounddevice>=0.4.6"
+    run_or_warn "install kokoro"        "$VENV_PIP" install "kokoro" "soundfile"
 
     # Write venv path so main.py can find it
     grep -q "^VENV_PYTHON=" "$CONF_FILE" 2>/dev/null || \
