@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo, useReducer } from 'react';
-import { Mic, MicOff, ChevronDown, Settings2, Maximize2 } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { Mic, MicOff, ChevronDown } from 'lucide-react';
+import { VoiceDropdownPanel } from './VoiceDropdownPanel';
 import { voiceBridgeService, BridgeStatus, VoiceState } from '@/services/voiceBridge';
 import { useAuthStore } from '@/store/authStore';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
@@ -61,6 +63,7 @@ export function VoiceIndicator({ iconOnly = false }: VoiceIndicatorProps) {
   const [isDisabled, setIsDisabled] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const connectAttempted = useRef(false);
+  const triggerRef = useRef<HTMLDivElement>(null);
   const [, forceUpdate] = useReducer((x: number) => x + 1, 0);
 
   useEffect(() => {
@@ -112,7 +115,7 @@ export function VoiceIndicator({ iconOnly = false }: VoiceIndicatorProps) {
   const connectionError = voiceBridgeService.connectionError;
 
   return (
-    <div className="relative flex items-center gap-0.5">
+    <div ref={triggerRef} className="relative flex items-center gap-0.5">
       <button
         type="button"
         onClick={handleToggle}
@@ -160,62 +163,19 @@ export function VoiceIndicator({ iconOnly = false }: VoiceIndicatorProps) {
         </button>
       )}
 
-      {dropdownOpen && (
-        <div className="absolute top-full right-0 mt-1 w-56 bg-white dark:bg-[#161b27] border border-gray-200 dark:border-[#1e2535] rounded-xl shadow-lg z-50 p-2 space-y-1">
-          <div className="px-3 py-2 text-xs text-gray-500 dark:text-gray-400 flex items-center gap-2">
-            <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-500' : 'bg-gray-500'}`} />
-            {label}
-          </div>
-          {effectiveStatus === 'offline' && !isDisabled && (
-            <div className="px-3 py-2 text-xs text-gray-600 dark:text-gray-500 bg-gray-50 dark:bg-black/30 rounded-lg">
-              <p className="mb-1">Bridge not running.</p>
-              <div className="flex items-center gap-1">
-                <code className="text-[10px] text-green-500 flex-1 truncate">{installCommand}</code>
-                <button
-                  onClick={() => navigator.clipboard.writeText(installCommand)}
-                  className="text-blue-500 hover:text-blue-400 shrink-0"
-                  aria-label="Copy install command"
-                >
-                  Copy
-                </button>
-              </div>
-              {connectionError && (
-                <details className="mt-2 border-t border-gray-200 dark:border-gray-700 pt-2">
-                  <summary className="cursor-pointer text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300">
-                    Connection details
-                  </summary>
-                  <div className="mt-1 space-y-0.5">
-                    <p>{stageLabels[connectionError.stage] ?? connectionError.stage}</p>
-                    <p>Message: {connectionError.message}</p>
-                    {connectionError.statusCode && <p>HTTP {connectionError.statusCode}</p>}
-                  </div>
-                </details>
-              )}
-            </div>
-          )}
-          <button
-            onClick={() => {
-              setDropdownOpen(false);
-              window.dispatchEvent(new CustomEvent('open-voice-settings'));
-            }}
-            className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg transition-colors"
-          >
-            <Settings2 className="w-3.5 h-3.5" />
-            Voice Settings
-          </button>
-          {isConnected && (
-            <button
-              onClick={() => {
-                setDropdownOpen(false);
-                window.dispatchEvent(new CustomEvent('open-voice-mode'));
-              }}
-              className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg transition-colors"
-            >
-              <Maximize2 className="w-3.5 h-3.5" />
-              Open Voice Mode
-            </button>
-          )}
-        </div>
+      {dropdownOpen && triggerRef.current && (
+        <VoiceDropdownPanel
+          buttonRect={triggerRef.current.getBoundingClientRect()}
+          isConnected={isConnected}
+          effectiveStatus={effectiveStatus}
+          isDisabled={isDisabled}
+          label={label}
+          installCommand={installCommand}
+          connectionError={connectionError}
+          onClose={() => setDropdownOpen(false)}
+          onOpenSettings={() => window.dispatchEvent(new CustomEvent('open-voice-settings'))}
+          onOpenVoiceMode={() => window.dispatchEvent(new CustomEvent('open-voice-mode'))}
+        />
       )}
     </div>
   );
