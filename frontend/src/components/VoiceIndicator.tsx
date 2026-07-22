@@ -161,7 +161,7 @@ export function VoiceIndicator({ iconOnly = false }: VoiceIndicatorProps) {
       )}
 
       {dropdownOpen && (
-        <div className="absolute top-full right-0 mt-1 w-56 bg-white dark:bg-[#161b27] border border-gray-200 dark:border-[#1e2535] rounded-xl shadow-lg z-50 p-2 space-y-1">
+        <div className="absolute left-full top-0 ml-2 w-56 bg-white dark:bg-[#161b27] border border-gray-200 dark:border-[#1e2535] rounded-xl shadow-lg z-50 p-2 space-y-1">
           <div className="px-3 py-2 text-xs text-gray-500 dark:text-gray-400 flex items-center gap-2">
             <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-500' : 'bg-gray-500'}`} />
             {label}
