@@ -511,6 +511,7 @@ async def websocket_chat_endpoint(
     # Per-connection registry of in-flight streams so a later `cancel` message
     # can signal an ongoing generation via its asyncio.Event.
     active_streams: Dict[str, asyncio.Event] = {}
+    pending_tasks: Dict[str, asyncio.Task] = {}
 
     if token:
         user_info = await manager.authenticate(websocket, token)
@@ -720,8 +721,10 @@ async def websocket_chat_endpoint(
                             })
                         finally:
                             active_streams.pop(sid, None)
+                            pending_tasks.pop(sid, None)
 
-                    asyncio.create_task(_run_generation())
+                    task = asyncio.create_task(_run_generation())
+                    pending_tasks[stream_id] = task
                 continue
 
             # ── Unknown message type ──────────────────────────────────────────
@@ -732,9 +735,15 @@ async def websocket_chat_endpoint(
             })
 
     except WebSocketDisconnect:
+        for t in pending_tasks.values():
+            t.cancel()
+        pending_tasks.clear()
         manager.disconnect(websocket)
     except Exception as exc:
         logger.error(f"[WebSocket] Unexpected error: {exc}")
+        for t in pending_tasks.values():
+            t.cancel()
+        pending_tasks.clear()
         manager.disconnect(websocket)
         try:
             await websocket.close(code=1011, reason="Internal server error")
