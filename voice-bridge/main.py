@@ -196,6 +196,7 @@ async def _maybe_speak_startup_messages() -> None:
 
 _token_ready: Optional["asyncio.Event"] = None
 _deferred_greeting: Optional[str] = None
+_current_state: str = "idle"
 
 
 # ── Optional dependency guards ─────────────────────────────────────────────────
@@ -1424,8 +1425,14 @@ async def _run_voice_loop_once() -> None:
     detector = WakeWordDetector(WAKE_WORD_MODEL) if VOICE_REQUIRE_WAKE_WORD else None
     vad = VAD()
     tts = _get_tts_engine()
-    global _deferred_greeting
+    global _deferred_greeting, _current_state
     if _deferred_greeting:
+        _current_state = "speaking"
+        await _broadcast({"type": "voice_state", "state": "speaking", "ts": time.time()})
+
+        await _broadcast({"type": "transcript", "role": "agent",
+                           "text": _deferred_greeting, "ts": time.time()})
+
         logger.info("[bridge] Speaking deferred startup message")
         try:
             audio = tts.synth(_deferred_greeting)
@@ -1433,6 +1440,11 @@ async def _run_voice_loop_once() -> None:
                 tts.play(audio)
         except Exception as exc:
             logger.warning("[bridge] Could not speak deferred greeting: %s", exc)
+
+        await asyncio.sleep(1.0)
+
+        _current_state = "idle"
+        await _broadcast({"type": "voice_state", "state": "idle", "ts": time.time()})
         _deferred_greeting = None
     loop = asyncio.get_event_loop()
 
