@@ -188,15 +188,14 @@ async def _maybe_speak_startup_messages() -> None:
         parts.append("Please add an API key in the Agentium dashboard to start using voice.")
 
     if parts:
+        global _deferred_greeting
         text = " ".join(parts)
-        logger.info("[bridge] Startup guidance: %s", text)
-        try:
-            await speak(text)
-        except Exception as exc:
-            logger.warning("[WARN] Could not speak startup guidance: %s", exc)
+        logger.info("[bridge] Startup guidance (deferred): %s", text)
+        _deferred_greeting = text
 
 
 _token_ready: Optional["asyncio.Event"] = None
+_deferred_greeting: Optional[str] = None
 
 
 # ── Optional dependency guards ─────────────────────────────────────────────────
@@ -1432,6 +1431,16 @@ async def _run_voice_loop_once() -> None:
     detector = WakeWordDetector(WAKE_WORD_MODEL) if VOICE_REQUIRE_WAKE_WORD else None
     vad = VAD()
     tts = _get_tts_engine()
+    global _deferred_greeting
+    if _deferred_greeting:
+        logger.info("[bridge] Speaking deferred startup message")
+        try:
+            audio = tts.synth(_deferred_greeting)
+            if audio:
+                tts.play(audio)
+        except Exception as exc:
+            logger.warning("[bridge] Could not speak deferred greeting: %s", exc)
+        _deferred_greeting = None
     loop = asyncio.get_event_loop()
 
     if VOICE_REQUIRE_WAKE_WORD:
