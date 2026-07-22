@@ -133,6 +133,15 @@ def build_persona_directive(
         style_bits.append(str(comm))
     if channel == "voice":
         style_bits.append(VOICE_ADAPTATION)
+    # Summary-first hint for response envelope (non-voice channels)
+    if channel != "voice":
+        from backend.core.config import get_settings
+        if get_settings().RESPONSE_DELIVERY_ENVELOPE:
+            style_bits.append(
+                "Start responses with a concise standalone summary "
+                "(1-3 sentences) that can stand alone as the full answer, "
+                "then provide detail."
+            )
     if style_bits:
         parts.append("# Communication Style\n" + "\n".join(f"- {s}" for s in style_bits))
 

@@ -219,6 +219,15 @@ class Settings(BaseSettings):
         ),
     )
 
+    RESPONSE_DELIVERY_ENVELOPE: bool = Field(
+        default=True,
+        env="RESPONSE_DELIVERY_ENVELOPE",
+        description=(
+            "Emit structured response envelope (ack/summary/detail/complete) "
+            "instead of raw content events. Set to false for legacy behavior."
+        ),
+    )
+
     @property
     def cors_origins(self) -> list:
         """Parse CORS origins string to list."""
