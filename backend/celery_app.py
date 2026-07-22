@@ -100,6 +100,11 @@ celery_app.conf.beat_schedule = {
         'task': 'agentium.tasks.task_executor.handle_task_escalation',
         'schedule': 300.0,
     },
+    'chat-history-prune-daily': {
+        'task': 'agentium.tasks.task_executor.chat_prune_task',
+        'schedule': 86400.0,
+        'options': {'queue': 'maintenance'},
+    },
     'sovereign-data-retention': {
         'task': 'agentium.tasks.task_executor.sovereign_data_retention',
         'schedule': 86400.0,

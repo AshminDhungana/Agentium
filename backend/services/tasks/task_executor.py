@@ -31,6 +31,7 @@ from backend.models.entities.agents import Agent, AgentStatus, CouncilMember, He
 from backend.models.entities.audit import AuditLog, AuditCategory, AuditLevel
 from backend.services.reincarnation_service import ReincarnationService
 from backend.services.knowledge_assist import checkpoint_write
+from backend.services.chat_prune_service import run_chat_prune_task
 
 logger = logging.getLogger(__name__)
 
@@ -1799,6 +1800,45 @@ def detect_suspicious_patterns(self):
             r.close()
         except Exception:
             pass
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Chat History Auto-Pruning Task
+# ──────────────────────────────────────────────────────────────────────────────
+
+@celery_app.task(name="agentium.tasks.task_executor.chat_prune_task", bind=True, max_retries=3, default_retry_delay=300)
+def chat_prune_task(self, dry_run: bool = False, override_inactivity_days: int = None, override_hard_delete_days: int = None, override_retain_count: int = None):
+    """
+    Daily chat history auto-pruning task.
+
+    Runs via Celery Beat (default 03:00 UTC, configurable via chat.prune_schedule_cron).
+
+    Two-tier pruning:
+    1. Soft-delete (is_deleted='Y') messages older than `inactivity_days` of conversation inactivity,
+       but always retain last `retain_count` messages per conversation.
+    2. Hard-delete (DELETE) soft-deleted messages older than `hard_delete_days`.
+
+    Args:
+        dry_run: If True, only report what would be deleted without making changes.
+        override_inactivity_days: Override chat.prune_inactivity_days preference.
+        override_hard_delete_days: Override chat.prune_hard_delete_days preference.
+        override_retain_count: Override chat.prune_retain_count preference.
+
+    Returns:
+        Dict with soft_deleted_count, hard_deleted_count, conversations_affected, dry_run.
+    """
+    try:
+        result = run_chat_prune_task(
+            dry_run=dry_run,
+            override_inactivity_days=override_inactivity_days,
+            override_hard_delete_days=override_hard_delete_days,
+            override_retain_count=override_retain_count,
+        )
+        logger.info(f"chat_prune_task completed: {result}")
+        return result
+    except Exception as exc:
+        logger.error(f"chat_prune_task failed: {exc}")
+        raise self.retry(exc=exc)
 
 
 # ──────────────────────────────────────────────────────────────────────────────

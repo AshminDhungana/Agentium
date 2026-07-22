@@ -923,3 +923,76 @@ async def sync_model_pricing(
         _log.getLogger(__name__).warning("sync_model_pricing: audit log write failed (non-fatal): %s", audit_exc)
         
     return result
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# POST /api/v1/admin/chat/prune
+# ──────────────────────────────────────────────────────────────────────────────
+
+class ChatPruneRequest(BaseModel):
+    """Request schema for manual chat prune trigger."""
+    dry_run: bool = Field(default=False, description="If true, only report what would be deleted")
+    inactivity_days: Optional[int] = Field(default=None, ge=1, description="Override chat.prune_inactivity_days")
+    hard_delete_days: Optional[int] = Field(default=None, ge=1, description="Override chat.prune_hard_delete_days")
+    retain_count: Optional[int] = Field(default=None, ge=1, le=100, description="Override chat.prune_retain_count")
+
+
+@router.post(
+    "/admin/chat/prune",
+    summary="Manually trigger chat history pruning",
+    description=(
+        "Manually trigger the two-tier chat history pruning task. "
+        "Use dry_run=true to preview what would be deleted without making changes. "
+        "Parameters override the chat.prune_* user preferences for this run only."
+    ),
+    responses=build_responses(None),
+)
+async def trigger_chat_prune(
+    request: ChatPruneRequest,
+    admin: dict = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Manually trigger the chat prune task (admin only)."""
+    from backend.services.chat_prune_service import run_chat_prune_task
+    
+    try:
+        result = run_chat_prune_task(
+            dry_run=request.dry_run,
+            override_inactivity_days=request.inactivity_days,
+            override_hard_delete_days=request.hard_delete_days,
+            override_retain_count=request.retain_count,
+        )
+    except Exception as exc:
+        raise InternalServerError(
+            error=f"Chat prune task failed: {exc}",
+            code="CHAT_PRUNE_TASK_FAILED"
+        )
+
+    # Audit log
+    try:
+        audit_entry = AuditLog.log(
+            level=AuditLevel.INFO,
+            category=AuditCategory.SYSTEM,
+            actor_type="admin",
+            actor_id=admin.get("username", "unknown"),
+            action="chat_prune_triggered",
+            target_type="system",
+            target_id="chat_history",
+            description=f"Admin manually triggered chat prune (dry_run={request.dry_run})",
+            meta_data={
+                "dry_run": request.dry_run,
+                "params": result.get("params", {}),
+                "result": {
+                    "soft_deleted_count": result.get("soft_deleted_count", 0),
+                    "hard_deleted_count": result.get("hard_deleted_count", 0),
+                    "conversations_affected": result.get("conversations_affected", 0),
+                },
+            },
+        )
+        db.add(audit_entry)
+        db.commit()
+    except Exception as audit_exc:
+        import logging as _log
+        _log.getLogger(__name__).warning("trigger_chat_prune: audit log write failed (non-fatal): %s", audit_exc)
+
+    return result

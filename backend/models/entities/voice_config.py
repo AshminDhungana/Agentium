@@ -1,7 +1,7 @@
 from sqlalchemy import Column, String, Boolean, Text, DateTime, func
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
-from models.entities.base import Base
+from .base import Base
 
 class VoiceConfig(Base):
     """User voice configuration preferences."""
