@@ -403,13 +403,6 @@ def _play_wake_chime() -> None:
         logger.debug("[bridge] wake chime play failed: %s", exc)
 
 
-_tts_engine_instance = None
-_token_ready = None
-VOICE_TTS_VOICE = "am_adam"
-VOICE_TTS_PROVIDER = "kokoro"
-VOICE_PROACTIVE_ENABLED = False
-
-
 def _get_tts_engine() -> "TTSEngine":
     """Lazily construct and cache the TTS engine (Kokoro or OpenAI)."""
     global _tts_engine_instance
@@ -621,7 +614,7 @@ def _listen_sync(
         with sr.Microphone() as source:
             recognizer.adjust_for_ambient_noise(source, duration=0.3)
             logger.info(
-                "[bridge] 🎙 Listening (timeout=%.1fs, phrase_limit=%.1fs, pause=%.1fs)…",
+                "[bridge] Listening (timeout=%.1fs, phrase_limit=%.1fs, pause=%.1fs)...",
                 timeout, phrase_time_limit, pause_threshold,
             )
             audio = recognizer.listen(source, timeout=timeout, phrase_time_limit=phrase_time_limit)
@@ -1509,7 +1502,7 @@ async def _supervise(name: str, coro_factory) -> None:
 
 async def _main() -> None:
     """Entry point.  Sets up logging, validates config, and starts the voice loop."""
-    global _token_ready, VOICE_REQUIRE_WAKE_WORD
+    global _token_ready, VOICE_REQUIRE_WAKE_WORD, VOICE_TTS_VOICE, VOICE_TTS_PROVIDER, VOICE_PROACTIVE_ENABLED
     logger.info("=" * 60)
     logger.info("  Agentium SecureVoiceBridge starting")
     logger.info("  Backend   : %s", BACKEND_URL)
