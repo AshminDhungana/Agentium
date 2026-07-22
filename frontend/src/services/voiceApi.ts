@@ -314,7 +314,8 @@ export const voiceApi = {
     try {
       const response = await api.get<VoiceProvidersResponse>(`${API_BASE}/voice-config/providers`);
       return response.data;
-    } catch {
+    } catch (error) {
+      console.warn('[voiceApi] Failed to fetch voice providers:', error);
       return null;
     }
   },

@@ -32,7 +32,7 @@ export function VoiceSettingsModal({ onClose }: VoiceSettingsModalProps) {
 
   // ── Engine state ──
   const [requireWakeWord, setRequireWakeWord] = useState(true);
-  const [ttsVoice, setTtsVoice] = useState('af_bella');
+  const [ttsVoice, setTtsVoice] = useState('am_adam');
   const [ttsProvider, setTtsProvider] = useState<'kokoro' | 'openai'>('kokoro');
   const [proactiveEnabled, setProactiveEnabled] = useState(false);
   const [speakerIdentification, setSpeakerIdentification] = useState(false);
@@ -67,7 +67,7 @@ export function VoiceSettingsModal({ onClose }: VoiceSettingsModalProps) {
       try {
         const cfg = JSON.parse(saved);
         setRequireWakeWord(cfg.requireWakeWord ?? true);
-        setTtsVoice(cfg.ttsVoice ?? 'af_bella');
+        setTtsVoice(cfg.ttsVoice ?? 'am_adam');
         setTtsProvider(cfg.ttsProvider ?? 'kokoro');
         setProactiveEnabled(cfg.proactiveEnabled ?? false);
         setSpeakerIdentification(cfg.speakerIdentification ?? false);
@@ -320,23 +320,39 @@ export function VoiceSettingsModal({ onClose }: VoiceSettingsModalProps) {
                   onChange={(e) => {
                     const val = e.target.value;
                     setTtsVoice(val);
-                    const provider = val.startsWith('af_') || val.startsWith('am_') || val.startsWith('bf_') || val.startsWith('bm_')
-                      ? 'kokoro' : 'openai';
+                    const kokoroPrefixes = ['af_', 'am_', 'bf_', 'bm_', 'cf_', 'in_', 'au_'];
+                    const provider = kokoroPrefixes.some(p => val.startsWith(p)) ? 'kokoro' : 'openai';
                     setTtsProvider(provider);
                   }}
                   className="w-full bg-white dark:bg-[#0f1117] border border-gray-200 dark:border-[#1e2535] rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-blue-500"
                 >
-                  {Object.entries(providersData.providers)
-                    .filter(([name]) => selectedProvider === 'all' || name === selectedProvider)
-                    .filter(([, info]) => info.available)
-                    .flatMap(([name, info]) =>
+                  {(() => {
+                    const allEntries = Object.entries(providersData.providers)
+                      .filter(([name]) => selectedProvider === 'all' || name === selectedProvider);
+                    const availableEntries = allEntries.filter(([, info]) => info.available);
+                    const providerEntries = availableEntries.length > 0 ? availableEntries : allEntries;
+                    return providerEntries.flatMap(([name, info]) =>
                       info.voices.map((v) => (
                         <option key={`${name}:${v.id}`} value={v.id}>
                           {v.name} ({v.gender}) — {name === 'openai' ? 'Cloud' : 'Offline'}
                         </option>
                       ))
-                    )}
+                    );
+                  })()}
                 </select>
+
+                {(() => {
+                  const allEntries = Object.entries(providersData.providers)
+                    .filter(([name]) => selectedProvider === 'all' || name === selectedProvider);
+                  const unavailable = allEntries.filter(([, info]) => !info.available);
+                  return unavailable.map(([name]) => (
+                    <p key={`notice:${name}`} className="text-xs text-amber-500 mt-2">
+                      {name === 'kokoro'
+                        ? 'Kokoro engine not installed on the server. Configure an OpenAI API key or install Kokoro.'
+                        : 'OpenAI API key not configured. Add one in Models settings or use Kokoro.'}
+                    </p>
+                  ));
+                })()}
 
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
                   {ttsProvider === 'openai'
@@ -344,21 +360,6 @@ export function VoiceSettingsModal({ onClose }: VoiceSettingsModalProps) {
                     : 'Offline Kokoro TTS — always available'}
                 </p>
               </>
-            )}
-
-            {!providersData && (
-              <select
-                value={ttsVoice}
-                onChange={(e) => setTtsVoice(e.target.value)}
-                className="w-full bg-white dark:bg-[#0f1117] border border-gray-200 dark:border-[#1e2535] rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-blue-500"
-              >
-                <option value="af_bella">Bella (Female)</option>
-                <option value="am_adam">Adam (Male)</option>
-                <option value="bf_emma">Emma (Female, British)</option>
-                <option value="bm_george">George (Male, British)</option>
-                <option value="af_nicole">Nicole (Female)</option>
-                <option value="af_sarah">Sarah (Female)</option>
-              </select>
             )}
           </div>
 
@@ -539,7 +540,7 @@ export function VoiceSettingsModal({ onClose }: VoiceSettingsModalProps) {
           <div className="bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-[#1e2535] rounded-2xl p-4">
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium text-gray-900 dark:text-white">Agentium Voice</span>
-              <span className="text-xs text-gray-500 dark:text-gray-400">Phase H · Jarvis Upgrade</span>
+              <span className="text-xs text-gray-500 dark:text-gray-400">New</span>
             </div>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
               Powered by Kokoro TTS · Whisper STT · WebSocket streaming
