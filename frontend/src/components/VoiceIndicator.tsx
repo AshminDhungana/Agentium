@@ -4,6 +4,7 @@ import { Mic, MicOff, ChevronDown } from 'lucide-react';
 import { VoiceDropdownPanel } from './VoiceDropdownPanel';
 import { voiceBridgeService, BridgeStatus, VoiceState } from '@/services/voiceBridge';
 import { useAuthStore } from '@/store/authStore';
+import { useWebSocketStore } from '@/store/websocketStore';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 const STATUS_CFG: Record<BridgeStatus, { label: string; color: string; ringColor: string }> = {
@@ -56,6 +57,7 @@ interface VoiceIndicatorProps {
 
 export function VoiceIndicator({ iconOnly = false }: VoiceIndicatorProps) {
   const user = useAuthStore((s) => s.user);
+  const connectionPhase = useWebSocketStore((s) => s.connectionPhase);
   const isAuthenticated = user?.isAuthenticated ?? false;
 
   const [status, setStatus] = useState<BridgeStatus>(voiceBridgeService.status);
@@ -63,6 +65,7 @@ export function VoiceIndicator({ iconOnly = false }: VoiceIndicatorProps) {
   const [isDisabled, setIsDisabled] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const connectAttempted = useRef(false);
+  const wasWaitingForKey = useRef(false);
   const triggerRef = useRef<HTMLDivElement>(null);
   const [, forceUpdate] = useReducer((x: number) => x + 1, 0);
 
@@ -81,10 +84,16 @@ export function VoiceIndicator({ iconOnly = false }: VoiceIndicatorProps) {
   }, []);
 
   useEffect(() => {
-    if (!isAuthenticated || connectAttempted.current || isDisabled) return;
+    if (connectionPhase === 'waiting_for_key') {
+      wasWaitingForKey.current = true;
+      return;
+    }
+    if (!isAuthenticated || isDisabled) return;
+    if (connectAttempted.current && !wasWaitingForKey.current) return;
+    if (wasWaitingForKey.current) wasWaitingForKey.current = false;
     connectAttempted.current = true;
     voiceBridgeService.connect().catch(() => {});
-  }, [isAuthenticated, isDisabled]);
+  }, [isAuthenticated, isDisabled, connectionPhase]);
 
   const effectiveStatus: BridgeStatus = isDisabled ? 'offline' : status;
   const { label, color, ringColor } = STATUS_CFG[effectiveStatus];
