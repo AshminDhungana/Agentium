@@ -4,7 +4,7 @@ Staging table for proposed tools pending approval.
 Extracted from tool_creation_service.py into its own model file.
 """
 from sqlalchemy import Column, String, Integer, Text, Boolean, DateTime, JSON
-from backend.models.entities.base import BaseEntity
+from .base import BaseEntity
 from datetime import datetime
 
 

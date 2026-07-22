@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Optional, Dict, Any
 from sqlalchemy import Column, String, Text, Integer, DateTime, ForeignKey, Enum, Boolean, JSON, Index
 from sqlalchemy.orm import relationship
-from backend.models.entities.base import BaseEntity
+from .base import BaseEntity
 import enum
 import uuid as _uuid
 

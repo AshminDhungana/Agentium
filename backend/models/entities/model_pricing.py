@@ -6,7 +6,7 @@ import random
 from datetime import datetime
 from sqlalchemy import Column, String, Float
 
-from backend.models.entities.base import BaseEntity
+from .base import BaseEntity
 
 
 class ModelPricing(BaseEntity):

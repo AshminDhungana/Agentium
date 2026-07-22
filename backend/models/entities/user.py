@@ -7,7 +7,7 @@ from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, func
 from sqlalchemy.orm import Session, relationship
 from passlib.context import CryptContext
 
-from backend.models.entities.base import Base
+from .base import Base
 
 
 # Valid RBAC roles

@@ -2,7 +2,7 @@ from sqlalchemy import Column, String, Integer, JSON, ForeignKey, DateTime, Bool
 from sqlalchemy.orm import relationship
 from datetime import datetime
 
-from backend.models.entities.base import BaseEntity
+from .base import BaseEntity
 
 
 class SpeakerProfile(BaseEntity):

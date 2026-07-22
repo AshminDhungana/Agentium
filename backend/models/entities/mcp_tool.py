@@ -7,7 +7,7 @@ from typing import List, Optional
 from sqlalchemy import (
     Column, String, Boolean, Integer, DateTime, JSON, Text
 )
-from backend.models.entities.base import Base, BaseEntity
+from .base import Base, BaseEntity
 
 
 class MCPTool(BaseEntity):

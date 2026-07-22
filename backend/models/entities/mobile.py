@@ -9,7 +9,7 @@ from datetime import datetime
 from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, func
 from sqlalchemy.orm import relationship
 
-from backend.models.entities.base import Base
+from .base import Base
 
 def _new_uuid() -> str:
     return str(uuid.uuid4())

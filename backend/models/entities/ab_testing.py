@@ -13,7 +13,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSON
 from sqlalchemy.orm import relationship
 
-from backend.models.entities.base import Base
+from .base import Base
 
 
 # ── Enums ─────────────────────────────────────────────────────────────────────

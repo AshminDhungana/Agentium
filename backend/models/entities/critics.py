@@ -8,8 +8,8 @@ from datetime import datetime
 from typing import Optional, Dict, Any, List
 from sqlalchemy import Column, String, Text, DateTime, ForeignKey, Integer, Enum, Float, JSON
 from sqlalchemy.orm import relationship, Session
-from backend.models.entities.base import BaseEntity
-from backend.models.entities.agents import Agent, AgentType, AgentStatus
+from .base import BaseEntity
+from .agents import Agent, AgentType, AgentStatus
 import enum
 
 

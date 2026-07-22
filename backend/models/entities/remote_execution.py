@@ -5,7 +5,7 @@ from sqlalchemy import Column, String, Text, DateTime, JSON, Integer, Float, For
 from sqlalchemy.orm import relationship
 import enum
 
-from backend.models.entities.base import BaseEntity
+from .base import BaseEntity
 
 
 class ExecutionStatus(str, enum.Enum):

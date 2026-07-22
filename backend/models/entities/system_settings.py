@@ -1,5 +1,5 @@
 from sqlalchemy import Column, String, Text, DateTime, func
-from backend.models.entities.base import Base
+from .base import Base
 
 class SystemSetting(Base):
     """

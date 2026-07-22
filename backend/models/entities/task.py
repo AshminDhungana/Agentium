@@ -10,8 +10,8 @@ from typing import List, Dict, Any
 from sqlalchemy import Column, String, Text, DateTime, ForeignKey, Integer, Enum, Boolean, JSON
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship, validates
-from backend.models.entities.base import BaseEntity
-from backend.models.entities.agents import Agent  
+from .base import BaseEntity
+from .agents import Agent  
 import enum
 
 class TaskPriority(str, enum.Enum):
@@ -300,7 +300,7 @@ class Task(BaseEntity):
         """Creates a system state checkpoint at key phase boundaries."""
         from sqlalchemy.orm import object_session
         from backend.services.checkpoint_service import CheckpointService
-        from backend.models.entities.checkpoint import CheckpointPhase
+        from .checkpoint import CheckpointPhase
 
         session = object_session(self)
         if not session:
@@ -331,7 +331,7 @@ class Task(BaseEntity):
     
     def _emit_status_event(self, old_status: TaskStatus, new_status: TaskStatus, actor_id: str, note: str = None):
         """Emit event for event sourcing."""
-        from backend.models.entities.task_events import TaskEvent, TaskEventType
+        from .task_events import TaskEvent, TaskEventType
         
         event = TaskEvent(
             task_id=self.id,
@@ -382,7 +382,7 @@ class Task(BaseEntity):
         if not self.requires_deliberation:
             raise ValueError("This task does not require deliberation")
         
-        from backend.models.entities.voting import TaskDeliberation
+        from .voting import TaskDeliberation
         
         self.set_status(TaskStatus.DELIBERATING, "System", f"Council members: {', '.join(council_member_ids)}")
         self.assigned_council_ids = council_member_ids

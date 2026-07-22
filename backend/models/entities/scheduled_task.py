@@ -8,7 +8,7 @@ from datetime import datetime
 from typing import Optional, Dict, Any, List
 from sqlalchemy import Column, String, Text, DateTime, ForeignKey, Integer, Enum, Index
 from sqlalchemy.orm import relationship, validates
-from backend.models.entities.base import BaseEntity
+from .base import BaseEntity
 import enum
 import json
 

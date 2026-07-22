@@ -4,7 +4,7 @@ Persistent analytics table recording every tool invocation.
 Queryable for dashboards, rate limiting, and per-tool performance reports.
 """
 from sqlalchemy import Column, String, Integer, Float, Boolean, DateTime, Text, JSON, Index
-from backend.models.entities.base import BaseEntity
+from .base import BaseEntity
 from datetime import datetime
 
 

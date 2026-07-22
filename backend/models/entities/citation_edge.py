@@ -13,7 +13,7 @@ from datetime import datetime
 
 from sqlalchemy import Column, DateTime, Float, ForeignKey, Index, String
 
-from backend.models.entities.base import Base
+from .base import Base
 
 
 class CitationEdge(Base):

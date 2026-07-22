@@ -9,7 +9,7 @@ from datetime import datetime
 
 from sqlalchemy import Column, String, Text, JSON, Integer, DateTime, UniqueConstraint
 
-from backend.models.entities.base import Base
+from .base import Base
 
 
 class KnowledgeDocument(Base):

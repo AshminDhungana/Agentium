@@ -21,7 +21,7 @@ from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import Column, String, DateTime, JSON, Float, Integer, Boolean, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import relationship
 
-from backend.models.entities.base import Base, BaseEntity
+from .base import Base, BaseEntity
 
 # ---------------------------------------------------------------------------
 # Preview size guard

@@ -1,11 +1,6 @@
 # Agentium — Verification & Improvement Backlog
----
 
-- [ ] When playing the defualt messages by the voice bridge no animation is displayed in the window, 
-
-- [ ] the current voice is not proper, i want to add a proper tts which sounds like human do web search find one and use that. for voice in voice bridge as well as inside system.  one male and one female voice that sound like human should be used. 
-
-- [ ] Their is voice setting in chatpage wich is not showing, and their we have setting to add speaker voice so that only that voice is recognized. i want to add the feature in such a way that when the voice setting and spearker profile is not set and user try to use voice bridge, then a voice reply should be given saying what user needs to do, like, complete the steps go to chatpage and add speaker voice for recognistion. 
+ 
 
 ## 9. Chat Page — Bugs
 

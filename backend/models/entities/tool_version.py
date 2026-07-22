@@ -3,7 +3,7 @@ Tool Version Entity
 Tracks every code revision of a generated tool, enabling rollback and diff history.
 """
 from sqlalchemy import Column, String, Integer, Text, Boolean, DateTime, ForeignKey
-from backend.models.entities.base import BaseEntity
+from .base import BaseEntity
 from datetime import datetime
 
 

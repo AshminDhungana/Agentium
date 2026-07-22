@@ -9,7 +9,7 @@ import uuid
 from sqlalchemy import Column, String, DateTime, Text, ForeignKey, JSON, Integer, Index, Boolean
 from sqlalchemy.orm import relationship
 
-from backend.models.entities.base import Base   
+from .base import Base   
 
 
 class ChatMessage(Base):

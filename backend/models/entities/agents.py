@@ -9,10 +9,10 @@ from datetime import datetime
 from typing import Optional, List, Dict, Any, Type, Union
 from sqlalchemy import Column, String, Text, DateTime, ForeignKey, Integer, Enum, Boolean, event, select, Index
 from sqlalchemy.orm import relationship, validates, Session, foreign
-from backend.models.entities.base import BaseEntity
-from backend.models.entities.constitution import Ethos
+from .base import BaseEntity
+from .constitution import Ethos
 import enum
-from backend.models.entities.user_config import ConnectionStatus
+from .user_config import ConnectionStatus
 
 class AgentType(str, enum.Enum):
     """Agent tiers: 4 governance + 3 critic types."""
@@ -279,7 +279,7 @@ class Agent(BaseEntity):
         )
         
         # Log submission
-        from backend.models.entities.audit import AuditLog, AuditCategory, AuditLevel
+        from .audit import AuditLog, AuditCategory, AuditLevel
         AuditLog.log(
             db=db,
             level=AuditLevel.INFO,
@@ -338,7 +338,7 @@ class Agent(BaseEntity):
         return result
 
     def _tier_from_type(self) -> Optional[int]:
-        from backend.models.entities.agents import AgentType
+        from .agents import AgentType
         mapping = {
             AgentType.HEAD_OF_COUNCIL: 0,
             AgentType.COUNCIL_MEMBER: 1,
@@ -424,7 +424,7 @@ class Agent(BaseEntity):
         Called in post_task_ritual.
         """
         from backend.services.knowledge_service import get_knowledge_service
-        from backend.models.entities.task import Task
+        from .task import Task
         
         # Execution patterns are recorded via Task object
         # This is called by Task completion handler
@@ -445,7 +445,7 @@ class Agent(BaseEntity):
 
         Returns True if alignment succeeded (via DB or gracefully degraded).
         """
-        from backend.models.entities.constitution import Constitution, Ethos
+        from .constitution import Constitution, Ethos
         import os
 
         try:
@@ -547,7 +547,7 @@ class Agent(BaseEntity):
 
         Returns True on success, raises RuntimeError after exhausting retries.
         """
-        from backend.models.entities.constitution import Ethos
+        from .constitution import Ethos
         import json
 
         for attempt in range(1, max_retries + 1):
@@ -606,7 +606,7 @@ class Agent(BaseEntity):
         """
         import json
         import asyncio
-        from backend.models.entities.constitution import Ethos
+        from .constitution import Ethos
 
         if not self.ethos_id:
             return
@@ -753,7 +753,7 @@ class Agent(BaseEntity):
         Higher-tier agents can view subordinate Ethos.
         Lower-tier agents cannot view higher-tier Ethos.
         """
-        from backend.models.entities.constitution import Ethos
+        from .constitution import Ethos
 
         subordinate = db.query(Agent).filter_by(agentium_id=subordinate_id, is_active=True).first()
         if not subordinate:
@@ -781,8 +781,8 @@ class Agent(BaseEntity):
         Allowed updates: mission_statement, behavioral_rules, restrictions,
         current_objective, active_plan, reasoning_artifacts.
         """
-        from backend.models.entities.constitution import Ethos
-        from backend.models.entities.audit import AuditLog, AuditLevel, AuditCategory
+        from .constitution import Ethos
+        from .audit import AuditLog, AuditLevel, AuditCategory
         import json
 
         subordinate = db.query(Agent).filter_by(agentium_id=subordinate_id, is_active=True).first()
@@ -854,8 +854,8 @@ class Agent(BaseEntity):
         Returns dict with execution results.
         """
         from datetime import datetime  # noqa: F811 — re-import within method scope for clarity
-        from backend.models.entities.constitution import Ethos
-        from backend.models.entities.audit import AuditLog, AuditLevel, AuditCategory
+        from .constitution import Ethos
+        from .audit import AuditLog, AuditLevel, AuditCategory
         
         results = {
             "ethos_refreshed": False,
@@ -1002,8 +1002,8 @@ class Agent(BaseEntity):
 
         This ensures constitutional recalibration between tasks.
         """
-        from backend.models.entities.constitution import Ethos
-        from backend.models.entities.audit import AuditLog, AuditLevel, AuditCategory
+        from .constitution import Ethos
+        from .audit import AuditLog, AuditLevel, AuditCategory
         import json
         
         results = {
@@ -1091,8 +1091,8 @@ class Agent(BaseEntity):
         Returns True if read was performed.
         """
         from datetime import datetime, timedelta
-        from backend.models.entities.constitution import Constitution
-        from backend.models.entities.audit import AuditLog, AuditLevel, AuditCategory
+        from .constitution import Constitution
+        from .audit import AuditLog, AuditLevel, AuditCategory
         
         now = datetime.utcnow()
         
@@ -1117,7 +1117,7 @@ class Agent(BaseEntity):
                 self.agentium_id,
             )
             try:
-                from backend.models.entities.audit import (
+                from .audit import (
                     AuditLog, AuditLevel, AuditCategory,
                 )
                 db.add(AuditLog(
@@ -1166,7 +1166,7 @@ class Agent(BaseEntity):
             if self.preferred_config.status == ConnectionStatus.ACTIVE:
                 return self.preferred_config
         
-        from backend.models.entities.user_config import UserModelConfig
+        from .user_config import UserModelConfig
 
         # 1. Try sovereign-owned default configs (created via Settings UI)
         default_config = session.query(UserModelConfig).filter_by(
@@ -1544,7 +1544,7 @@ class HeadOfCouncil(Agent):
         if self.status not in [AgentStatus.ACTIVE, AgentStatus.IDLE_WORKING]:
             return []
         
-        from backend.models.entities.agents import CouncilMember
+        from .agents import CouncilMember
         council_members = db.query(CouncilMember).filter_by(
             is_persistent=True,
             is_active=True
@@ -1639,7 +1639,7 @@ class TaskAgent(Agent):
 
 
 # Import CriticAgent here to avoid circular imports
-from backend.models.entities.critics import (
+from .critics import (
     CriticAgent,
     OutputCriticAgent,
     PlanCriticAgent,

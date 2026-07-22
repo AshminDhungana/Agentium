@@ -4,7 +4,7 @@ from typing import Dict, Any
 from sqlalchemy import Column, String, Integer, Text, JSON, DateTime, Enum, ForeignKey, Boolean
 from sqlalchemy.orm import relationship
 
-from backend.models.entities.base import BaseEntity
+from .base import BaseEntity
 
 class WorkflowExecutionStatus(str, enum.Enum):
     """Lifecycle states for a workflow execution."""

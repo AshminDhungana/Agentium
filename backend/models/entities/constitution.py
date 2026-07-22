@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Optional, List, Dict, Any
 from sqlalchemy import Column, String, Text, DateTime, ForeignKey, Integer, Enum, Boolean, event, Index
 from sqlalchemy.orm import relationship, validates
-from backend.models.entities.base import BaseEntity
+from .base import BaseEntity
 from sqlalchemy.orm import remote
 from sqlalchemy.orm import remote, foreign
 import enum
@@ -738,7 +738,7 @@ class Ethos(BaseEntity):
 @event.listens_for(Constitution, 'after_insert')
 def log_constitution_creation(mapper, connection, target):
     """Log when a new constitution is created."""
-    from backend.models.entities.audit import AuditLog, AuditLevel, AuditCategory
+    from .audit import AuditLog, AuditLevel, AuditCategory
     audit = AuditLog(
         level=AuditLevel.INFO,
         category=AuditCategory.GOVERNANCE,

@@ -10,7 +10,7 @@ from datetime import datetime
 from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, JSON, func
 from sqlalchemy.orm import relationship
 
-from backend.models.entities.base import Base
+from .base import Base
 
 
 def _new_uuid() -> str:

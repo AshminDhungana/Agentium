@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 from sqlalchemy import Column, String, Text, DateTime, Index, ForeignKey, event
 from sqlalchemy.orm import validates, Session
-from backend.models.entities.base import BaseEntity
+from .base import BaseEntity
 
 
 class PreferenceCategory:

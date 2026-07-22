@@ -4,7 +4,7 @@ Represents a tool published to (or imported from) the Agentium marketplace.
 Enables tool sharing between Agentium instances.
 """
 from sqlalchemy import Column, String, Integer, Text, Boolean, DateTime, Float, JSON
-from backend.models.entities.base import BaseEntity
+from .base import BaseEntity
 from datetime import datetime
 
 
