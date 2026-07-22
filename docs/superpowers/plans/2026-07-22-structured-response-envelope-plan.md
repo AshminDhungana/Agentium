@@ -1,6 +1,6 @@
 # Structured Response Envelope — Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Replace the hard 2-3 line truncation in the REST/SSE chat path with a typed event envelope (ack, summary, detail, complete) for per-channel delivery.
 
@@ -24,7 +24,7 @@
 - Consumes: `get_settings()` from `backend.core.config`
 - Produces: `RESPONSE_DELIVERY_ENVELOPE` env var (default `true`), persona hint injected into system prompt at line 136
 
-- [ ] **Step 1: Add RESPONSE_DELIVERY_ENVELOPE to Settings**
+- [x] **Step 1: Add RESPONSE_DELIVERY_ENVELOPE to Settings**
 
 In `backend/core/config.py`, add the field after `VISION_ENABLED` (line 220):
 
@@ -39,7 +39,7 @@ In `backend/core/config.py`, add the field after `VISION_ENABLED` (line 220):
     )
 ```
 
-- [ ] **Step 2: Add summary-first hint to build_system_prompt**
+- [x] **Step 2: Add summary-first hint to build_system_prompt**
 
 In `backend/core/persona.py`, modify the style_bits section (lines 130-137) to append the summary hint when the envelope feature is active:
 
@@ -63,12 +63,12 @@ In `backend/core/persona.py`, modify the style_bits section (lines 130-137) to a
         parts.append("# Communication Style\n" + "\n".join(f"- {s}" for s in style_bits))
 ```
 
-- [ ] **Step 3: Verify tests still pass**
+- [x] **Step 3: Verify tests still pass**
 
 Run: `pytest backend/tests/test_constitution_persona.py -v`
 Expected: all tests pass (the hint is appended to the persona but doesn't change any existing behavior)
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add backend/core/config.py backend/core/persona.py
@@ -87,7 +87,7 @@ git commit -m "feat: add RESPONSE_DELIVERY_ENVELOPE config and summary-first per
 - Consumes: `RESPONSE_DELIVERY_ENVELOPE` from settings, `stream_generate()` from provider
 - Produces: SSE events of type `ack` (immediate), `summary` + `detail` (after generation) + `complete`; or legacy `content` events when envelope is disabled
 
-- [ ] **Step 1: Write the integration test**
+- [x] **Step 1: Write the integration test**
 
 Add to `backend/tests/integration/test_provider_mock_wiring.py` after the existing streaming tests. Model it after `test_chat_service_forwards_on_delta` (line 617) which already exercises the streaming path:
 
@@ -127,12 +127,12 @@ async def test_stream_response_emits_envelope_events(db_session, mock_provider):
     assert events[0].get("content"), "ack should have content"
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `pytest backend/tests/integration/test_provider_mock_wiring.py::test_stream_response_emits_envelope_events -v`
 Expected: FAIL (envelope emission not yet implemented)
 
-- [ ] **Step 3: Modify _stream_response() to emit envelope events**
+- [x] **Step 3: Modify _stream_response() to emit envelope events**
 
 Replace lines 567-591 in `backend/api/routes/chat.py`. The key change:
 
@@ -201,7 +201,7 @@ Replace lines 567-591 in `backend/api/routes/chat.py`. The key change:
         # ── end envelope / truncation ─────────────────────────────────────────
 ```
 
-- [ ] **Step 4: Update the complete event emission**
+- [x] **Step 4: Update the complete event emission**
 
 The existing `complete` event at line 591 should still emit after the envelope, but now carries the full text in `content` instead of empty string when envelope is enabled:
 
@@ -213,7 +213,7 @@ The existing `complete` event at line 591 should still emit after the envelope, 
 
 Note: The existing `full_text` following line 593 and the persistence at 613-632 must still use the **full** `full_text` (not the summary-only text), because the DB stores the complete response. The `full_text` variable is never truncated in envelope mode — the split only affects what's sent over SSE.
 
-- [ ] **Step 5: Update the broadcast_payload to pass envelope parts**
+- [x] **Step 5: Update the broadcast_payload to pass envelope parts**
 
 In the broadcast_payload dict (lines 643-646), include the summary/detail split so external channel adapters can use structured delivery:
 
@@ -232,12 +232,12 @@ In the broadcast_payload dict (lines 643-646), include the summary/detail split 
             }
 ```
 
-- [ ] **Step 6: Run tests to verify they pass**
+- [x] **Step 6: Run tests to verify they pass**
 
 Run: `pytest backend/tests/integration/test_provider_mock_wiring.py -v`
 Expected: PASS
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add backend/api/routes/chat.py backend/tests/integration/test_provider_mock_wiring.py
@@ -256,7 +256,7 @@ git commit -m "feat: replace 3-line truncation with structured response envelope
 - Consumes: SSE events of type `ack`, `summary`, `detail`, `complete`, `error`, `part_end`
 - Produces: yields text to caller (for TTS), ignores unknown event types
 
-- [ ] **Step 1: Write failing test**
+- [x] **Step 1: Write failing test**
 
 In `voice-bridge/tests/test_session.py`, add a test for envelope events:
 
@@ -291,12 +291,12 @@ async def test_stream_chat_handles_envelope_events():
     assert all("Thinking..." not in r for r in results)
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `pytest voice-bridge/tests/test_session.py::test_stream_chat_handles_envelope_events -v`
 Expected: FAIL (current code only handles `content` and `done`/`complete` types)
 
-- [ ] **Step 3: Update _stream_chat event parsing**
+- [x] **Step 3: Update _stream_chat event parsing**
 
 In `voice-bridge/main.py`, replace the event parsing block (lines 925-928):
 
@@ -326,12 +326,12 @@ In `voice-bridge/main.py`, replace the event parsing block (lines 925-928):
         # All other event types (thinking, etc.) silently ignored
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `pytest voice-bridge/tests/test_session.py -v`
 Expected: all tests pass (existing test_stream_chat_yields_sentences still works with legacy `content` events, new test passes with envelope events)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add voice-bridge/main.py voice-bridge/tests/test_session.py
@@ -350,7 +350,7 @@ git commit -m "feat: handle structured response envelope events in voice bridge"
 - Consumes: `broadcast_payload` dict with optional `summary`/`detail` keys (from Task 2)
 - Produces: `broadcast_to_channels()` passes summary as the primary content, detail as secondary
 
-- [ ] **Step 1: Write a unit test for broadcast_to_channels with envelope payload**
+- [x] **Step 1: Write a unit test for broadcast_to_channels with envelope payload**
 
 Add to an existing test file or create `backend/tests/unit/test_channel_manager_envelope.py`:
 
@@ -382,12 +382,12 @@ async def test_broadcast_to_channels_uses_summary_when_available(db_session):
         assert call_content == payload["summary"]
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `pytest backend/tests/unit/test_channel_manager_envelope.py -v`
 Expected: FAIL (broadcast_to_channels does not accept `detail` parameter)
 
-- [ ] **Step 3: Update broadcast_to_channels signature**
+- [x] **Step 3: Update broadcast_to_channels signature**
 
 In `backend/services/channel_manager.py`, modify `broadcast_to_channels` to accept an optional `detail` parameter and pass it through to adapters:
 
@@ -403,7 +403,7 @@ In `backend/services/channel_manager.py`, modify `broadcast_to_channels` to acce
 
 The method signature change is additive (default `detail=""`), so existing callers (line 667 in chat.py and any other callers) continue to work unchanged. The `detail` string is available for adapters that want to use it for follow-up delivery.
 
-- [ ] **Step 4: Update call site in chat.py**
+- [x] **Step 4: Update call site in chat.py**
 
 The broadcast call at line 666-670 in `chat.py` passes `detail` when available:
 
@@ -416,12 +416,12 @@ The broadcast call at line 666-670 in `chat.py` passes `detail` when available:
                     )
 ```
 
-- [ ] **Step 5: Run tests**
+- [x] **Step 5: Run tests**
 
 Run: `pytest backend/tests/unit/test_channel_manager_envelope.py backend/tests/integration/test_provider_mock_wiring.py -v`
 Expected: PASS
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add backend/services/channel_manager.py backend/api/routes/chat.py backend/tests/unit/test_channel_manager_envelope.py

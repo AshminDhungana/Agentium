@@ -1,16 +1,5 @@
 # Agentium — Verification & Improvement Backlog
 
- 
-
-## 9. Chat Page — Bugs
-
-
-- **9.2 — [P2]** Voice input bugs: starting voice input doesn't appear in the chat transcript; opening voice settings throws a frontend console error. Reproduce both, fix root causes.
-- **9.3 — [P1]** A task can get stuck showing "Deliberating" indefinitely. Reproduce via logs, identify the stall point (likely a Council micro-vote or Lead handoff that never resolves), and add a timeout/escalation so it can't hang forever.
-- **9.4 — [P3]** Add a follow-up icon next to the existing hover "copy" icon on chat messages, which copies the message into the compose box for editing and resending.
-
----
-
 ## 10. Chat Page — UX
 
 - [ ] Improvements in how ai message are sent to the user, currently the ai sends small messages as reply to the user, this was intended design but it is too small. think of what can be done to imporve on that, do web serch for ideas and improvement.
