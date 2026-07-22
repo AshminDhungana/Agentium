@@ -6,6 +6,8 @@ import { TopBar } from './TopBar';
 import { KeepAliveOutlet } from './KeepAliveOutlet';
 import { getVisibleGroups, SOVEREIGN_ITEM, getPageTitle } from './navConfig';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
+import { VoiceSettingsModal } from '@/components/VoiceSettingsModal';
+import { VoiceModePanel } from '@/components/VoiceModePanel';
 
 const COLLAPSE_KEY = 'agentium:sidebar-collapsed';
 
@@ -20,12 +22,25 @@ export function MainLayout() {
     return window.localStorage.getItem(COLLAPSE_KEY) === 'true';
   });
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [showVoiceSettings, setShowVoiceSettings] = useState(false);
+  const [showVoiceMode, setShowVoiceMode] = useState(false);
   const hamburgerRef = useRef<HTMLButtonElement>(null);
   const sidebarRef = useRef<HTMLElement>(null);
 
   const groups = getVisibleGroups(isAdmin);
   const sovereign = isAdmin ? SOVEREIGN_ITEM : undefined;
   const title = getPageTitle(location.pathname);
+
+  useEffect(() => {
+    const onOpenSettings = () => setShowVoiceSettings(true);
+    const onOpenVoiceMode = () => setShowVoiceMode(true);
+    window.addEventListener('open-voice-settings', onOpenSettings);
+    window.addEventListener('open-voice-mode', onOpenVoiceMode);
+    return () => {
+      window.removeEventListener('open-voice-settings', onOpenSettings);
+      window.removeEventListener('open-voice-mode', onOpenVoiceMode);
+    };
+  }, []);
 
   useEffect(() => {
     if (isDesktop && mobileOpen) {
@@ -96,6 +111,14 @@ export function MainLayout() {
           <KeepAliveOutlet />
         </main>
       </div>
+
+      {showVoiceSettings && (
+        <VoiceSettingsModal onClose={() => setShowVoiceSettings(false)} />
+      )}
+
+      {showVoiceMode && (
+        <VoiceModePanel onClose={() => setShowVoiceMode(false)} />
+      )}
     </div>
   );
 }
