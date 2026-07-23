@@ -36,6 +36,7 @@ def _make_agent_with_ethos(db: Session, agentium_id: str) -> Agent:
     db.flush()
     agent.ethos_id = ethos.id
     db.flush()
+    db.commit()
     return agent
 
 

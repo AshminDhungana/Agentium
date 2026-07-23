@@ -31,6 +31,7 @@ def _seed(db, agentium_id, ethos_id_suffix):
     db.flush()
     agent.ethos_id = ethos.id
     db.flush()
+    db.commit()
     return agent
 
 

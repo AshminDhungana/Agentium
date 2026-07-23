@@ -119,7 +119,10 @@ class TestChatServiceMediaInterception:
 
         # Associate with the Head of Council
         head.preferred_config_id = str(model.id)
-        seeded_db.commit()
+        seeded_db.flush()
+        # Commit the outer transaction so the background task (using its own
+        # SessionLocal()) can see the genesis admin user and this test's data.
+        seeded_db.connection().commit()
 
         # Mock LLM response with markdown image
         mock_llm_result = {
@@ -163,7 +166,6 @@ class TestChatServiceMediaInterception:
         # Verify the persisted Head-of-Council ChatMessage has the rewritten storage URL
         from backend.models.entities.chat_message import ChatMessage
         msgs = seeded_db.query(ChatMessage).filter_by(role="head_of_council").all()
-        import sys; print("DEBUG_MSGS", [(m.id, repr(m.content), m.message_metadata) for m in msgs], file=sys.stderr, flush=True)
         assert any("https://s3.bucket/files/user-admin-media-1/abc123.png" in m.content for m in msgs)
         assert any("https://charts.example.com/sales.png" not in m.content for m in msgs)
         assert any("![Sales Chart]" in m.content for m in msgs)  # alt text preserved
@@ -189,7 +191,10 @@ class TestChatServiceMediaInterception:
 
         # Associate with the Head of Council
         head.preferred_config_id = str(model.id)
-        seeded_db.commit()
+        seeded_db.flush()
+        # Commit the outer transaction so the background task (using its own
+        # SessionLocal()) can see the genesis admin user and this test's data.
+        seeded_db.connection().commit()
 
         mock_llm_result = {
             "content": "See this photo: https://cdn.example.com/photo.jpg",

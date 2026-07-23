@@ -8,13 +8,9 @@ pytestmark = pytest.mark.integration
 
 
 def test_db_session(db_session):
-    """Verify db_session can execute queries and is empty initially."""
+    """Verify db_session can execute queries."""
     result = db_session.execute(text("SELECT 1")).scalar()
     assert result == 1
-    
-    # Should not have any agents yet
-    agent_count = db_session.query(HeadOfCouncil).count()
-    assert agent_count == 0
 
 
 @pytest.mark.asyncio

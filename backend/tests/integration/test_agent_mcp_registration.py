@@ -44,14 +44,14 @@ def bridge():
     return init_bridge(tool_registry, SessionLocal)
 
 
-def _make_council(db, n=2):
+def _make_council(db, n=2, start=10010):
     members = []
     for i in range(n):
         a = Agent(
             agent_type=AgentType.COUNCIL_MEMBER,
-            agentium_id=f"1{i:04d}",
+            agentium_id=str(start + i),
             status=AgentStatus.ACTIVE,
-            name=f"Council{i}",
+            name=f"Council{start + i}",
         )
         db.add(a)
         members.append(a)
@@ -85,6 +85,15 @@ def test_head_fast_path_registers_live(bridge, db_session):
 
 
 def test_council_vote_flow_registers_live(bridge, db_session):
+    from backend.models.entities.constitution import Constitution
+    con = Constitution(
+        preamble="test",
+        articles=[],
+        is_active=True,
+        version="1.0",
+    )
+    db_session.add(con)
+    db_session.commit()
     members = _make_council(db_session)
     out = asyncio.run(
         _propose(

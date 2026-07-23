@@ -4,6 +4,8 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from unittest.mock import AsyncMock
+
 from backend.main import app
 from backend.models.entities.agents import Agent, AgentType, AgentStatus
 from backend.models.entities.audit import AuditLog, AuditCategory, AuditLevel
@@ -21,17 +23,14 @@ def _bypass_auth():
         "is_active": True,
     }
 
-def test_reassign_agent_allow(client, db_session):
+def test_reassign_agent_allow(client, seeded_db):
     """Test ALLOW: valid reassignment of a task agent to a new Lead."""
     _bypass_auth()
+    db_session = seeded_db
 
-    # Create a Head of Council (00001)
-    head = Agent(
-        agentium_id="00001",
-        name="Head of Council",
-        agent_type=AgentType.HEAD_OF_COUNCIL,
-        status=AgentStatus.ACTIVE,
-    )
+    # Reuse the Head (00001) created by genesis
+    head = db_session.query(Agent).filter_by(agentium_id="00001").first()
+    assert head is not None, "Genesis should have created Head 00001"
     # Create Lead A (20001)
     lead_a = Agent(
         agentium_id="20001",
@@ -57,7 +56,7 @@ def test_reassign_agent_allow(client, db_session):
         parent=lead_a,
     )
 
-    db_session.add_all([head, lead_a, lead_b, task])
+    db_session.add_all([lead_a, lead_b, task])
     db_session.commit()
 
     response = client.patch(
@@ -122,7 +121,7 @@ def test_reassign_agent_block(client, db_session):
 
     with patch("backend.api.routes.reassign_routes.ConstitutionalGuard") as MockGuard:
         mock_guard = MockGuard.return_value
-        mock_guard.initialize.return_value = None
+        mock_guard.initialize = AsyncMock()
 
         async def mock_check(*args, **kwargs):
             from backend.core.constitutional_guard import ConstitutionalDecision, Verdict, ViolationSeverity
@@ -206,7 +205,7 @@ def test_reassign_guard_vote_required(client, db_session):
 
     with patch("backend.api.routes.reassign_routes.ConstitutionalGuard") as MockGuard:
         mock_guard = MockGuard.return_value
-        mock_guard.initialize.return_value = None
+        mock_guard.initialize = AsyncMock()
 
         async def mock_check(*args, **kwargs):
             from backend.core.constitutional_guard import ConstitutionalDecision, Verdict, ViolationSeverity

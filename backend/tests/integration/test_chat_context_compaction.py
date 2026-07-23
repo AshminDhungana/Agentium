@@ -19,7 +19,8 @@ from backend.services.chat_context import (
 
 
 @pytest.mark.integration
-def test_long_conversation_compaction(db_session):
+def test_long_conversation_compaction(seeded_db):
+    db_session = seeded_db
     user = db_session.query(User).filter_by(is_admin=True, is_active=True).first()
     assert user is not None, "needs an admin/sovereign user in the test DB"
 

@@ -122,7 +122,7 @@ def test_exhaustion_triggers_recovery_in_spawn(db_session: Session, redis_client
         created_by_agentium_id="10001",
     )
     db_session.add(lead)
-    db_session.flush()
+    db_session.commit()
 
     # Bypass capability check without genesis.
     import backend.services.reincarnation_service as rs

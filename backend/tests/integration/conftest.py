@@ -32,6 +32,8 @@ os.environ.setdefault("CELERY_TASK_ALWAYS_EAGER", "true")
 os.environ.setdefault("EMBEDDING_MODEL", "BAAI/bge-base-en-v1.5")
 os.environ.setdefault("EMBEDDING_DIM", "768")
 os.environ.setdefault("EMBEDDING_ACTIVE_VERSION", "v2")
+# Disable browser service in tests to avoid Playwright/Chromium hanging TestClient shutdown
+os.environ.setdefault("BROWSER_ENABLED", "false")
 os.environ["TESTING"] = "true"
 
 
@@ -416,18 +418,17 @@ def ws_client(db_session, redis_client, vector_store, celery_eager):
 
     @contextmanager
     def _shared_fresh_db():
-        # Yield the test's shared session directly.  Do NOT commit/close it
-        # here — process_message() manages its own commits (savepoints under
-        # the test's outer transaction) and the session is owned by the
-        # db_session fixture, which rolls back at teardown.
         yield db_session
 
     ws_module.get_fresh_db = _shared_fresh_db
 
+    # Create TestClient WITHOUT the context manager to avoid triggering the
+    # full lifespan shutdown (which can hang on background tasks / browser
+    # service). Manually close the WebSocket; the TestClient is garbage-collected.
     try:
-        with TestClient(app) as test_client:
-            with test_client.websocket_connect("/ws/chat") as ws:
-                yield ws
+        test_client = TestClient(app)
+        with test_client.websocket_connect("/ws/chat") as ws:
+            yield ws
     finally:
         ws_module.get_fresh_db = original_get_fresh_db
         backend.core.vector_store.get_vector_store = original_get_vector_store
