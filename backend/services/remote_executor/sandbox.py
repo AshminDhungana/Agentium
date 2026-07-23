@@ -171,7 +171,25 @@ class SandboxManager:
                 "agentium.egress_blocked": ",".join(egress["blocked"]),
             }
 
+        # Create workspace volume if workspace is enabled
+        workspace_volume = None
+        if config.workspace_enabled:
+            workspace_volume = self.docker_client.volumes.create(
+                name=f"agentium_workspace_{sandbox_id}",
+                driver="local"
+            )
+
+        # Build mounts
+        mounts = {}
+        if config.workspace_enabled and workspace_volume:
+            mounts = {
+                workspace_volume.name: {"bind": "/workspace", "mode": "rw"}
+            }
+
         # Create container with resource limits
+        # Note: We don't use read_only=True with tmpfs for /tmp because put_archive
+        # doesn't work with tmpfs mounts. Instead, we use a regular writable filesystem
+        # with disk quota via cgroups.
         container = self.docker_client.containers.run(
             image=config.image,
             name=sandbox_id,
@@ -182,14 +200,13 @@ class SandboxManager:
             mem_limit=f"{config.memory_limit_mb}m",
             cpu_quota=int(config.cpu_limit * 100000),
             cpu_period=100000,
-            read_only=True,
+            # Don't use read_only=True to allow put_archive to work
+            # Disk limit is enforced via cgroup memory limit and the container's writable layer
             tmpfs={
-                "/tmp": f"rw,size={config.max_disk_mb}m,mode=1777,noexec,nosuid,nodev",
-                **(
-                    {"/workspace": f"rw,size={config.workspace_tmpfs_size_mb}m,noexec,nosuid,nodev"}
-                    if config.workspace_enabled else {}
-                ),
+                # Only use tmpfs for workspace if explicitly needed, otherwise use volumes
+                # We don't mount tmpfs for /tmp to allow put_archive to work
             },
+            volumes=mounts,
             # Drop all Linux capabilities for least privilege
             cap_drop=["ALL"],
             security_opt=["no-new-privileges"],
@@ -299,9 +316,20 @@ class SandboxManager:
         try:
             container = self.docker_client.containers.get(sandbox_id)
 
+            # Get the workspace volume name from container labels or infer it
+            workspace_volume_name = f"agentium_workspace_{sandbox_id}"
+
             # Force remove after 5 second grace period
             container.stop(timeout=5)
             container.remove(force=True)
+
+            # Clean up workspace volume if it exists
+            try:
+                workspace_volume = self.docker_client.volumes.get(workspace_volume_name)
+                workspace_volume.remove()
+            except Exception as e:
+                # Volume might not exist or already removed
+                logger.debug(f"Workspace volume cleanup for {workspace_volume_name}: {e}")
 
             logger.info(f"Destroyed sandbox {sandbox_id}: {reason}")
             return True

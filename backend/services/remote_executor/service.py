@@ -198,19 +198,34 @@ class RemoteExecutorService:
                 record.execution_time_ms = result.execution_time_ms
                 self.db.commit()
 
-            # Copy artifacts from the sandbox /workspace to the host-mounted dir.
+            # Copy artifacts from the sandbox /workspace using docker-py get_archive.
             if config.workspace_enabled and host_dir:
                 try:
-                    sp.run(
-                        ["docker", "cp", f"{sandbox_id}:/workspace/.", host_dir],
-                        check=False,
-                        capture_output=True,
-                        timeout=60,
-                    )
+                    container = self.sandbox_manager.docker_client.containers.get(sandbox_id)
+                    # Get the workspace directory as a tar archive
+                    tar_data, stat = container.get_archive("/workspace")
+                    
+                    # Extract the tar archive to host_dir, stripping the leading 'workspace/' directory
+                    import tarfile
+                    import io
+                    tar_stream = io.BytesIO()
+                    for chunk in tar_data:
+                        tar_stream.write(chunk)
+                    tar_stream.seek(0)
+                    
+                    with tarfile.open(fileobj=tar_stream, mode='r') as tar:
+                        # Extract each member, stripping the leading 'workspace/' component
+                        for member in tar.getmembers():
+                            if member.name.startswith("workspace/"):
+                                # Strip the first path component
+                                member.name = member.name[len("workspace/"):]
+                                if member.name:  # Skip the directory entry itself
+                                    tar.extract(member, host_dir)
+                    
                     artifacts = _manifest(host_dir)
                     workspace_path = host_visible_path(host_dir)
                 except Exception as cp_err:  # pragma: no cover - best-effort copy
-                    logger.warning(f"workspace cp failed for {execution_id}: {cp_err}")
+                    logger.warning(f"workspace get_archive failed for {execution_id}: {cp_err}")
 
             # Cleanup sandbox
             await self.sandbox_manager.destroy_sandbox(sandbox_id, "execution_complete")
@@ -280,90 +295,75 @@ class RemoteExecutorService:
         """
         Execute code inside a sandbox container.
 
-        This method copies the executor script and code into the container,
-        runs it, and retrieves the results.
+        This method copies the executor script and code into the container
+        using docker-py put_archive, runs it, and retrieves the results.
         """
         import tempfile
-        import subprocess as sp
+        import tarfile
+        import io
 
         try:
-            with tempfile.TemporaryDirectory() as tmpdir:
-                # Write code to file
-                code_file = os.path.join(tmpdir, "code.py")
-                with open(code_file, 'w') as f:
-                    f.write(code)
+            container = self.sandbox_manager.docker_client.containers.get(sandbox_id)
 
-                # Write input data to file
-                input_file = os.path.join(tmpdir, "input.json")
-                with open(input_file, 'w') as f:
-                    json.dump(input_data if input_data is not None else {}, f)
+            # Create tar archives for code, input, and executor
+            def create_tar(filename: str, content: bytes) -> bytes:
+                tar_stream = io.BytesIO()
+                with tarfile.open(fileobj=tar_stream, mode='w') as tar:
+                    tarinfo = tarfile.TarInfo(name=filename)
+                    tarinfo.size = len(content)
+                    tar.addfile(tarinfo, io.BytesIO(content))
+                tar_stream.seek(0)
+                return tar_stream.read()
 
-                # Write executor script that runs inside the container
-                executor_script = self._build_executor_script()
-                executor_file = os.path.join(tmpdir, "executor.py")
-                with open(executor_file, 'w') as f:
-                    f.write(executor_script)
+            # Copy code.py
+            code_tar = create_tar("code.py", code.encode('utf-8'))
+            container.put_archive("/tmp", code_tar)
 
-                # Copy files to container
-                for src, dst in [
-                    (code_file, f"{sandbox_id}:/tmp/code.py"),
-                    (input_file, f"{sandbox_id}:/tmp/input.json"),
-                    (executor_file, f"{sandbox_id}:/tmp/executor.py"),
-                ]:
-                    sp.run(
-                        ["docker", "cp", src, dst],
-                        check=True,
-                        capture_output=True
-                    )
+            # Copy input.json
+            input_tar = create_tar("input.json", json.dumps(input_data if input_data is not None else {}).encode('utf-8'))
+            container.put_archive("/tmp", input_tar)
 
-                # Install dependencies inside container if needed
-                if dependencies:
-                    dep_str = " ".join(dependencies)
-                    sp.run(
-                        [
-                            "docker", "exec", sandbox_id,
-                            "pip", "install", "--quiet", *dependencies
-                        ],
-                        capture_output=True,
-                        timeout=120
-                    )
+            # Copy executor.py
+            executor_script = self._build_executor_script()
+            executor_tar = create_tar("executor.py", executor_script.encode('utf-8'))
+            container.put_archive("/tmp", executor_tar)
 
-                # Execute in container
-                proc = sp.run(
-                    ["docker", "exec", sandbox_id, "python", "/tmp/executor.py"],
-                    capture_output=True,
-                    timeout=timeout
+            # Install dependencies inside container if needed
+            if dependencies:
+                result = container.exec_run(
+                    ["pip", "install", "--quiet", *dependencies],
+                    timeout=120
+                )
+                if result.exit_code != 0:
+                    logger.warning(f"Dependency install failed: {result.output.decode('utf-8')}")
+
+            # Execute in container
+            proc = container.exec_run(
+                ["python", "/tmp/executor.py"]
+            )
+
+            # Parse result
+            if proc.exit_code == 0:
+                output = json.loads(proc.output.decode('utf-8'))
+                return ExecutionResult(
+                    success=output.get('success', False),
+                    output_schema=output.get('output_schema', {}),
+                    row_count=output.get('row_count', 0),
+                    sample=output.get('sample', []),
+                    stats=output.get('stats', {}),
+                    stdout=output.get('stdout', ''),
+                    stderr=output.get('stderr', ''),
+                    execution_time_ms=output.get('execution_time_ms', 0),
+                    error_message=output.get('error')
+                )
+            else:
+                return ExecutionResult(
+                    success=False,
+                    output_schema={},
+                    error_message=f"Container execution failed: {proc.output.decode('utf-8')}",
+                    execution_time_ms=0
                 )
 
-                # Parse result
-                if proc.returncode == 0:
-                    output = json.loads(proc.stdout.decode('utf-8'))
-                    return ExecutionResult(
-                        success=output.get('success', False),
-                        output_schema=output.get('output_schema', {}),
-                        row_count=output.get('row_count', 0),
-                        sample=output.get('sample', []),
-                        stats=output.get('stats', {}),
-                        stdout=output.get('stdout', ''),
-                        stderr=output.get('stderr', ''),
-                        execution_time_ms=output.get('execution_time_ms', 0),
-                        error_message=output.get('error')
-                    )
-                else:
-                    return ExecutionResult(
-                        success=False,
-                        output_schema={},
-                        error_message=f"Container execution failed: {proc.stderr.decode('utf-8')}",
-                        execution_time_ms=0
-                    )
-
-        except sp.TimeoutExpired:
-            return ExecutionResult(
-                success=False,
-                output_schema={},
-                error_message=f"Execution timed out after {timeout} seconds",
-                execution_time_ms=timeout * 1000
-            )
         except Exception as e:
             return ExecutionResult(
                 success=False,
@@ -457,7 +457,8 @@ try:
     output['execution_time_ms'] = execution_time
     output['success'] = True
 
-    logger.debug(json.dumps(output))
+    # Print JSON result to stdout for the host to capture
+    print(json.dumps(output))
 
 except Exception as e:
     output = {
@@ -470,5 +471,5 @@ except Exception as e:
         'sample': [],
         'stats': {}
     }
-    logger.debug(json.dumps(output))
+    print(json.dumps(output))
 '''

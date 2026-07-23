@@ -88,7 +88,13 @@ class AmendmentVoting(BaseEntity):
         if self.status != AmendmentStatus.VOTING:
             raise ValueError("Voting is not currently open")
             
-        if council_member_id not in self.eligible_voters:
+        # Parse eligible_voters if it's a JSON string (SQLAlchemy JSON column may return string)
+        voters = self.eligible_voters
+        if isinstance(voters, str):
+            import json as _json
+            voters = _json.loads(voters)
+            
+        if council_member_id not in voters:
             raise PermissionError("Agent is not eligible to vote on this amendment")
             
         # Check if already voted
