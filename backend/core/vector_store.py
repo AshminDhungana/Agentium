@@ -9,7 +9,10 @@ import os
 from contextlib import contextmanager
 from typing import Any, Dict, Generator, List, Optional, Union
 
+import time
+
 import chromadb
+import httpx as _httpx
 import numpy as np
 from chromadb.api.types import EmbeddingFunction, QueryResult
 from sentence_transformers import SentenceTransformer
@@ -131,9 +134,24 @@ class VectorStore:
         self._collections: Dict[str, chromadb.Collection] = {}
         self._collections_by_name: Dict[str, chromadb.Collection] = {}
 
-    # ------------------------------------------------------------------
-    # Initialisation
-    # ------------------------------------------------------------------
+    def _patch_http_timeouts(self) -> None:
+        """Replace chromadb's internal httpx session with one that has timeouts.
+
+        ChromaDB 1.x creates ``httpx.Client(timeout=None)`` under the hood,
+        which hangs indefinitely on connection resets (``WinError 10054``).
+        This method swaps in a session with sensible timeouts so failures
+        surface promptly instead of blocking the caller forever.
+        """
+        session: _httpx.Client = getattr(self._client, '_session', None)  # type: ignore[attr-defined]
+        if session is None:
+            return
+        base_url = session.base_url
+        self._client._session = _httpx.Client(  # type: ignore[attr-defined]
+            base_url=str(base_url) if base_url else f"http://{self._host}:{self._port}",
+            timeout=_httpx.Timeout(30.0, connect=10.0, read=30.0, write=30.0, pool=10.0),
+            limits=session._limits,
+            headers=dict(session.headers),
+        )
 
     def initialize(self) -> chromadb.ClientAPI:
         """
@@ -153,10 +171,42 @@ class VectorStore:
                 self._host,
                 self._port,
             )
-            self._client = chromadb.HttpClient(
-                host=self._host,
-                port=self._port,
-            )
+
+            # ChromaDB 1.x creates httpx.Client(timeout=None) internally,
+            # causing indefinite hangs on connection resets.
+            # Create a timed session and apply retry on transient failure.
+            last_error: Optional[Exception] = None
+            for attempt in range(3):
+                try:
+                    self._client = chromadb.HttpClient(
+                        host=self._host,
+                        port=self._port,
+                        settings=chromadb.config.Settings(
+                            chroma_http_keepalive_secs=30,
+                        ),
+                    )
+                    self._patch_http_timeouts()
+                    last_error = None
+                    break
+                except _httpx.TransportError as exc:
+                    logger.warning(
+                        "ChromaDB connect attempt %d/3 failed: %s",
+                        attempt + 1, exc,
+                    )
+                    last_error = exc
+                    time.sleep(2 ** attempt)
+                    if self._client is not None:
+                        try:
+                            self._client._session.close()
+                        except Exception:  # noqa: BLE001
+                            pass
+                        self._client = None
+
+            if last_error is not None:
+                raise RuntimeError(
+                    f"Cannot connect to ChromaDB at {self._host}:{self._port} "
+                    f"after 3 attempts — {last_error}"
+                ) from last_error
         else:
             # Development / CI: local persistent storage
             os.makedirs(CHROMA_PERSIST_DIR, exist_ok=True)

@@ -254,7 +254,7 @@ def test_task_reaches_terminal_state_on_retry_exhaustion(seeded_db: Session):
     seeded_db.add(task)
     seeded_db.flush()
 
-    with patch("backend.core.llm_client.LLMClient") as MockLLM, patch(
+    with patch("backend.services.skill_rag.LLMClient") as MockLLM, patch(
         "backend.services.tasks.task_executor.get_task_db", _fake_get_task_db
     ):
         inst = MockLLM.return_value

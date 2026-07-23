@@ -92,20 +92,32 @@ class EventTrigger(BaseEntity):
 
     def _generate_trigger_id(self) -> str:
         """Generate trigger ID: ET + 5-digit sequence."""
-        from backend.models.database import get_db_context
-        from sqlalchemy import text
-        with get_db_context() as db:
-            result = db.execute(text("""
-                SELECT agentium_id FROM event_triggers
-                WHERE agentium_id ~ '^ET[0-9]+$'
-                ORDER BY CAST(SUBSTRING(agentium_id FROM 3) AS INTEGER) DESC
-                LIMIT 1
-            """)).scalar()
-            if result:
-                next_num = int(result[2:]) + 1
-            else:
-                next_num = 1
-            return f"ET{next_num:05d}"
+        from sqlalchemy import text, create_engine
+        from sqlalchemy.pool import NullPool
+        from backend.core.config import settings
+        engine = create_engine(
+            settings.DATABASE_URL,
+            poolclass=NullPool,
+            connect_args={"connect_timeout": 10},
+        )
+        try:
+            with engine.connect() as conn:
+                result = conn.execute(text("""
+                    SELECT agentium_id FROM event_triggers
+                    WHERE agentium_id ~ '^ET[0-9]+$'
+                    ORDER BY CAST(SUBSTRING(agentium_id FROM 3) AS INTEGER) DESC
+                    LIMIT 1
+                """)).scalar()
+                if result:
+                    next_num = int(result[2:]) + 1
+                else:
+                    next_num = 1
+                return f"ET{next_num:05d}"
+        except Exception:
+            import uuid
+            return f"ET{uuid.uuid4().hex[:5].upper()}"
+        finally:
+            engine.dispose()
 
     def to_dict(self) -> Dict[str, Any]:
         base = super().to_dict()
@@ -156,20 +168,32 @@ class EventLog(BaseEntity):
 
     def _generate_log_id(self) -> str:
         """Generate log ID: EL + 5-digit sequence."""
-        from backend.models.database import get_db_context
-        from sqlalchemy import text
-        with get_db_context() as db:
-            result = db.execute(text("""
-                SELECT agentium_id FROM event_logs
-                WHERE agentium_id ~ '^EL[0-9]+$'
-                ORDER BY CAST(SUBSTRING(agentium_id FROM 3) AS INTEGER) DESC
-                LIMIT 1
-            """)).scalar()
-            if result:
-                next_num = int(result[2:]) + 1
-            else:
-                next_num = 1
-            return f"EL{next_num:05d}"
+        from sqlalchemy import text, create_engine
+        from sqlalchemy.pool import NullPool
+        from backend.core.config import settings
+        engine = create_engine(
+            settings.DATABASE_URL,
+            poolclass=NullPool,
+            connect_args={"connect_timeout": 10},
+        )
+        try:
+            with engine.connect() as conn:
+                result = conn.execute(text("""
+                    SELECT agentium_id FROM event_logs
+                    WHERE agentium_id ~ '^EL[0-9]+$'
+                    ORDER BY CAST(SUBSTRING(agentium_id FROM 3) AS INTEGER) DESC
+                    LIMIT 1
+                """)).scalar()
+                if result:
+                    next_num = int(result[2:]) + 1
+                else:
+                    next_num = 1
+                return f"EL{next_num:05d}"
+        except Exception:
+            import uuid
+            return f"EL{uuid.uuid4().hex[:5].upper()}"
+        finally:
+            engine.dispose()
 
     def to_dict(self) -> Dict[str, Any]:
         base = super().to_dict()

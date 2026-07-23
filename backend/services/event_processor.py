@@ -34,7 +34,17 @@ def _get_redis() -> redis.Redis:
     """Return a shared Redis client initialised from the configured REDIS_URL."""
     global _redis
     if _redis is None:
-        _redis = redis.Redis.from_url(REDIS_URL, decode_responses=True)
+        _redis = redis.Redis.from_url(
+            REDIS_URL, decode_responses=True,
+            socket_connect_timeout=5, socket_timeout=5,
+        )
+    try:
+        _redis.ping()
+    except (redis.ConnectionError, redis.TimeoutError):
+        _redis = redis.Redis.from_url(
+            REDIS_URL, decode_responses=True,
+            socket_connect_timeout=5, socket_timeout=5,
+        )
     return _redis
 
 
