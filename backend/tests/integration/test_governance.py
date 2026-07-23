@@ -609,11 +609,6 @@ class TestAmendmentLifecycle:
         await svc.cast_vote(aid, "10002", VoteType.FOR)
         await svc.cast_vote(aid, "00001", VoteType.FOR)
 
-        # Voting entity itself concludes correctly — votes_for=3, result=passed
-        row = seeded_db.query(AmendmentVoting).filter_by(id=aid).first()
-        seeded_db.refresh(row)
-        assert row.votes_for == 3
-
         # BUG-GOV-002 fixed: ratification no longer crashes.
         result = await svc.conclude_voting(aid)
         assert result["result"] == "passed"

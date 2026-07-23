@@ -144,7 +144,11 @@ class AmendmentVoting(BaseEntity):
              self.final_result = "rejected"
         else:
             # Quorum check: at least 60% of eligible voters must participate
-            quorum_pct = (total_votes / len(self.eligible_voters)) * 100 if self.eligible_voters else 0
+            voters = self.eligible_voters
+            if isinstance(voters, str):
+                import json as _json
+                voters = _json.loads(voters)
+            quorum_pct = (total_votes / len(voters)) * 100 if voters else 0
             if quorum_pct < 60:
                 self.status = AmendmentStatus.REJECTED
                 self.final_result = "rejected"

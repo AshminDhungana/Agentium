@@ -222,8 +222,9 @@ def test_ethos_creation_has_no_persona(test_db, head_agent):
 
 def _seed_constitution_with_marker(test_db):
     from backend.models.entities.constitution import Constitution
-    from backend.models.entities.voting import AmendmentVoting
+    from backend.models.entities.voting import AmendmentVoting, IndividualVote
     import json
+    test_db.query(IndividualVote).delete()
     test_db.query(AmendmentVoting).delete()
     prior = test_db.query(Constitution).filter_by(agentium_id="C00001").first()
     if prior:
@@ -265,7 +266,8 @@ def test_seed_constitution_has_persona_article(test_db):
     from backend.services.initialization_service import InitializationService
     # ensure fresh seed
     from backend.models.entities.constitution import Constitution
-    from backend.models.entities.voting import AmendmentVoting
+    from backend.models.entities.voting import AmendmentVoting, IndividualVote
+    test_db.query(IndividualVote).delete()
     test_db.query(AmendmentVoting).delete()
     existing = test_db.query(Constitution).filter_by(is_active=True).all()
     for e in existing:
@@ -317,6 +319,7 @@ def test_acceptance_edit_constitution_updates_agent_and_voice(test_db):
     #    collide on the unique agentium_id / version_number). We deliberately
     #    leave the agent/ethos rows alone to avoid cascading into live
     #    violation_reports written by the running backend.
+    test_db.query(IndividualVote).delete()
     test_db.query(AmendmentVoting).delete()
     test_db.query(Constitution).delete()
     test_db.commit()
