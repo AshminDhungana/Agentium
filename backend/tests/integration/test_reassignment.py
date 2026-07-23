@@ -31,9 +31,9 @@ def test_reassign_agent_allow(client, seeded_db):
     # Reuse the Head (00001) created by genesis
     head = db_session.query(Agent).filter_by(agentium_id="00001").first()
     assert head is not None, "Genesis should have created Head 00001"
-    # Create Lead A (20001)
+    # Create Lead A (20011)
     lead_a = Agent(
-        agentium_id="20001",
+        agentium_id="20011",
         name="Lead A",
         agent_type=AgentType.LEAD_AGENT,
         status=AgentStatus.ACTIVE,
@@ -67,7 +67,7 @@ def test_reassign_agent_allow(client, seeded_db):
     assert response.status_code == 200
     data = response.json()
     assert data["constitutional_verdict"] == "ALLOW"
-    assert data["old_parent_id"] == "20001"
+    assert data["old_parent_id"] == "20011"
     assert data["new_parent_id"] == "20002"
     assert data["success"] is True
 
@@ -92,21 +92,21 @@ def test_reassign_agent_block(client, db_session):
     _bypass_auth()
 
     head = Agent(
-        agentium_id="00001",
+        agentium_id="00999",
         name="Head",
         agent_type=AgentType.HEAD_OF_COUNCIL,
         status=AgentStatus.ACTIVE,
     )
     # Create a Council Member (1xxxx) and a Lead (2xxxx)
     council = Agent(
-        agentium_id="10001",
+        agentium_id="10999",
         name="Council Member",
         agent_type=AgentType.COUNCIL_MEMBER,
         status=AgentStatus.ACTIVE,
         parent=head,
     )
     lead = Agent(
-        agentium_id="20001",
+        agentium_id="20999",
         name="Lead",
         agent_type=AgentType.LEAD_AGENT,
         status=AgentStatus.ACTIVE,
@@ -136,8 +136,8 @@ def test_reassign_agent_block(client, db_session):
 
         # Attempt: Move Council under Lead (lower tier → higher tier is illegal)
         response = client.patch(
-            "/api/v1/agents/10001/parent",
-            json={"new_parent_id": "20001", "reason": "Test block"},
+            "/api/v1/agents/10999/parent",
+            json={"new_parent_id": "20999", "reason": "Test block"},
         )
 
     assert response.status_code == 403
@@ -148,7 +148,7 @@ def test_reassign_agent_block(client, db_session):
 
     # Verify no DB mutation
     db_session.refresh(council)
-    assert council.parent.agentium_id == "00001"
+    assert council.parent.agentium_id == "00999"
 
     # Verify constitutional audit log
     audit = (
@@ -170,20 +170,20 @@ def test_reassign_guard_vote_required(client, db_session):
     # In a real scenario, the guard would return VOTE_REQUIRED for
     # reassignments affecting >3 agents.
     head = Agent(
-        agentium_id="00001",
+        agentium_id="00998",
         name="Head",
         agent_type=AgentType.HEAD_OF_COUNCIL,
         status=AgentStatus.ACTIVE,
     )
     lead_a = Agent(
-        agentium_id="20001",
+        agentium_id="20998",
         name="Lead A",
         agent_type=AgentType.LEAD_AGENT,
         status=AgentStatus.ACTIVE,
         parent=head,
     )
     lead_b = Agent(
-        agentium_id="20002",
+        agentium_id="20997",
         name="Lead B",
         agent_type=AgentType.LEAD_AGENT,
         status=AgentStatus.ACTIVE,
@@ -220,7 +220,7 @@ def test_reassign_guard_vote_required(client, db_session):
 
         response = client.patch(
             "/api/v1/agents/30101/parent",
-            json={"new_parent_id": "20002", "reason": "Test vote required"},
+            json={"new_parent_id": "20997", "reason": "Test vote required"},
         )
 
     assert response.status_code == 200
@@ -231,4 +231,4 @@ def test_reassign_guard_vote_required(client, db_session):
 
     # Verify no DB mutation (agent stays under original parent)
     db_session.refresh(task)
-    assert task.parent.agentium_id == "20001"
+    assert task.parent.agentium_id == "20998"

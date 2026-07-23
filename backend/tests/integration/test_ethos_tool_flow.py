@@ -54,9 +54,9 @@ async def test_task_agent_full_flow(db_session):
     r = await tool_registry.execute_tool_async("ethos", action="verify_identity",
                                               db=db_session, agent_id="30001")
     assert r["success"] is False
-    _seed(db_session, "20001", "20001")
+    _seed(db_session, "20099", "20099")
     r = await tool_registry.execute_tool_async("ethos", action="verify_identity",
-                                              db=db_session, agent_id="20001")
+                                              db=db_session, agent_id="20099")
     assert r["success"] is True
     ethos = _load_ethos(db_session, "30001")
     assert ethos.get_restrictions() == ["no prod deletes"]

@@ -112,7 +112,7 @@ def test_exhaustion_triggers_recovery_in_spawn(db_session: Session, redis_client
     """A full-capacity (ID-pool exhaustion) spawn failure triggers the review."""
     # Parent lead that passes the permission check.
     lead = LeadAgent(
-        agentium_id="20001",
+        agentium_id="20010",
         name="Lead",
         description="lead",
         agent_type=AgentType.LEAD_AGENT,

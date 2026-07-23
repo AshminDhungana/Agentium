@@ -520,10 +520,10 @@ class InitializationService:
             # transaction and leaves is_system_initialized() False, so genesis
             # can be retried cleanly. In TESTING we flush only (no commit) so
             # the fixture savepoint can roll back.
-            if not os.environ.get("TESTING"):
-                self.db.commit()
-            else:
+            if os.environ.get("TESTING") == "true":
                 self.db.flush()
+            else:
+                self.db.commit()
 
             # Step 3: Determine country name
             if country_name:
@@ -610,10 +610,10 @@ class InitializationService:
             except Exception as e:
                 logger.warning(f"⚠️ Could not assign model config to Head during genesis: {e}")
                 
-            if not os.environ.get("TESTING"):
-                self.db.commit()
-            else:
+            if os.environ.get("TESTING") == "true":
                 self.db.flush()
+            else:
+                self.db.commit()
             results["message"] = f"Agentium initialized: {selected_name}"
             return results
 
@@ -1076,32 +1076,24 @@ class InitializationService:
     async def _clear_existing_data(self) -> None:
         """Clear existing data."""
         try:
+            # Disable FK triggers so we can delete in any order
+            self.db.execute(text("SET session_replication_role = 'replica'"))
+            for tbl in (
+                "agents",
+                "constitutions",
+                "ethos",
+                "tasks",
+                "amendment_votings",
+                "individual_votes",
+            ):
+                try:
+                    self.db.execute(text(f"DELETE FROM {tbl}"))
+                except Exception:  # noqa: BLE001
+                    pass
+            self.db.execute(text("SET session_replication_role = 'origin'"))
             if os.environ.get("TESTING") == "true":
-                # Use DELETE (row-level locks) instead of TRUNCATE
-                # (ACCESS EXCLUSIVE lock) and flush instead of commit
-                # so the test fixture's savepoint can roll it back.
-                # Clear every table genesis populates (in FK-safe order:
-                # children before parents) so a force re-init — or leftover
-                # rows from another test — cannot collide on a unique
-                # constraint (e.g. ethos_agentium_id_key).
-                for tbl in (
-                    "ethos",
-                    "lead_agents",
-                    "task_agents",
-                    "critic_agents",
-                    "council_members",
-                    "constitutions",
-                    "agents",
-                ):
-                    try:
-                        self.db.execute(text(f"DELETE FROM {tbl}"))
-                    except Exception:  # noqa: BLE001
-                        # Table may not exist in every schema revision.
-                        pass
                 self.db.flush()
             else:
-                self.db.execute(text("TRUNCATE TABLE agents CASCADE"))
-                self.db.execute(text("TRUNCATE TABLE constitutions CASCADE"))
                 self.db.commit()
         except Exception as e:
             self._log("ERROR", f"Clear failed: {e}")

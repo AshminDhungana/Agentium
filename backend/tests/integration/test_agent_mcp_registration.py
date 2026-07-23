@@ -90,7 +90,7 @@ def test_council_vote_flow_registers_live(bridge, db_session):
         preamble="test",
         articles=[],
         is_active=True,
-        version="1.0",
+        version="v1.0",
     )
     db_session.add(con)
     db_session.commit()

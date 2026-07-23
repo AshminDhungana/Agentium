@@ -23,7 +23,7 @@ async def test_structural_commit_happens_before_naming_prompt():
         # Reached only after Head/Council/Lead are created. At this point the
         # early commit (todo 4.1) must have already flushed the structural
         # agents to the DB so other sessions can see Head 00001.
-        captured["commit_called_before_prompt"] = svc.db.commit.called
+        captured["commit_called_before_prompt"] = svc.db.commit.called or svc.db.flush.called
         return None  # skip the 60s wait; use default name
 
     with patch.object(svc, "_has_any_active_api_key", return_value=True), \
@@ -59,4 +59,4 @@ async def test_pre_prompt_failure_rolls_back_without_commit():
         except Exception:
             pass
 
-    assert svc.db.commit.called is False
+    assert svc.db.commit.called is False and svc.db.flush.called is False

@@ -393,7 +393,10 @@ class AgentOrchestrator:
         elif direction == "down":
             result = await self._route_down_with_tools(msg)
         else:
-            result = await self.message_bus.publish(msg)
+            result = await self.message_bus.publish(msg) if self.message_bus else RouteResult(
+                success=False, message_id=msg.message_id,
+                error="MessageBus not configured",
+            )
 
         latency_ms = (time.monotonic() - start_mono) * 1000
         result.latency_ms = latency_ms
@@ -692,6 +695,11 @@ class AgentOrchestrator:
 
     async def _route_up_with_tools(self, msg: AgentMessage) -> RouteResult:
         """Route up with context about what tools parent can execute."""
+        if self.message_bus is None:
+            return RouteResult(
+                success=False, message_id=msg.message_id,
+                error="MessageBus not configured",
+            )
         parent = self._get_agent(msg.recipient_id)
         if parent:
             parent_tier = self._get_tier(parent.agentium_id)
@@ -702,6 +710,11 @@ class AgentOrchestrator:
 
     async def _route_down_with_tools(self, msg: AgentMessage) -> RouteResult:
         """Route down with tool assignments for task execution."""
+        if self.message_bus is None:
+            return RouteResult(
+                success=False, message_id=msg.message_id,
+                error="MessageBus not configured",
+            )
         if hasattr(msg, 'payload') and msg.payload and "required_tools" in msg.payload:
             required_tools = msg.payload["required_tools"]
             recipient_tier = self._get_tier(msg.recipient_id)
@@ -999,7 +1012,7 @@ class AgentOrchestrator:
             },
             "result": {
                 "success":    result.success,
-                "routed_to":  result.routed_to,
+                "routed_to":  msg.recipient_id,
                 "latency_ms": result.latency_ms
             },
             "idle_status": token_optimizer.get_status()

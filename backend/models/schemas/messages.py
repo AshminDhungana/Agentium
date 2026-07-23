@@ -94,24 +94,25 @@ class AgentMessage(BaseModel):
     
     @field_validator("sender_id", "recipient_id")
     def validate_agentium_id_format(cls, v):
-        """Ensure ID follows 0xxxx – 6xxxx format.
+        """Ensure ID follows 0xxxx – 9xxxx format.
 
         Valid prefixes:
           0 – Head of Council
           1 – Council Member
           2 – Lead Agent
           3 – Task Agent
-          4 – Code Critic   (Section 6.4)
-          5 – Output Critic (Section 6.4)
-          6 – Plan Critic   (Section 6.4)
+          4–6 – Reserved critic tiers
+          7 – Code Critic
+          8 – Output Critic
+          9 – Plan Critic
         """
         if v == "broadcast":  # Special case for Head broadcasts
             return v
         if len(v) != 5 or not v.isdigit():
             raise ValueError("Agentium ID must be exactly 5 digits")
         prefix = v[0]
-        if prefix not in ["0", "1", "2", "3", "4", "5", "6"]:
-            raise ValueError("ID must start with 0–6 (0=Head, 1=Council, 2=Lead, 3=Task, 4-6=Critic)")
+        if prefix not in ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]:
+            raise ValueError("ID must start with 0–9 (0=Head, 1=Council, 2=Lead, 3=Task, 7=Code Critic, 8=Output Critic, 9=Plan Critic)")
         return v
     
     def get_tier(self, agent_id: str) -> int:
@@ -191,5 +192,6 @@ class RouteResult(BaseModel):
     path_taken: List[str] = Field(default_factory=list)  # List of agent IDs traversed
     latency_ms: float = 0.0
     error: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
     vector_context_injected: bool = False
     constitutional_articles: List[str] = Field(default_factory=list)

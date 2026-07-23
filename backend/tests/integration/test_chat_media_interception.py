@@ -92,20 +92,16 @@ class TestChatServiceMediaInterception:
         """LLM response with ![alt](url) gets URL replaced with storage URL."""
         # Setup: Create Head agent and admin user
         head = HeadOfCouncil(
-            agentium_id="HEAD00001",
-            name="Test Head",
+            agentium_id="MEDIAH01",
+            name="Test Head 1",
             is_active=True
         )
         seeded_db.add(head)
 
-        # Use unique username and ID to avoid conflict with seeded_db fixture's admin user
-        # Sovereign user committed to the REAL db so the background media task
-        # (separate SessionLocal() connection) can resolve ChatMessage.user_id FK.
         _commit_sovereign_user(
             "user-admin-media-1", "admin_media_1", "admin_media_1@agentium.test"
         )
 
-        # Create and configure default model config for the head
         model = UserModelConfig(
             provider=ProviderType.OPENAI_COMPATIBLE,
             config_name="test-config",
@@ -117,33 +113,26 @@ class TestChatServiceMediaInterception:
         seeded_db.add(model)
         seeded_db.flush()
 
-        # Associate with the Head of Council
         head.preferred_config_id = str(model.id)
         seeded_db.flush()
-        # Commit the outer transaction so the background task (using its own
-        # SessionLocal()) can see the genesis admin user and this test's data.
         seeded_db.connection().commit()
 
-        # Mock LLM response with markdown image
         mock_llm_result = {
             "content": "Here is your chart: ![Sales Chart](https://charts.example.com/sales.png)",
             "model": "test-model",
             "tokens_used": 50
         }
 
-        # Mock LLMClient.generate_with_tools
         with patch("backend.services.chat_service.LLMClient") as mock_llm_class:
             mock_llm = AsyncMock()
             mock_llm.generate_with_tools = AsyncMock(return_value=mock_llm_result)
             mock_llm_class.return_value = mock_llm
 
-            # Mock StorageService.upload_file to return fake S3 URL
             from backend.services.storage_service import storage_service
             storage_service.upload_file = MagicMock(
                 return_value="https://s3.bucket/files/user-admin-media-1/abc123.png"
             )
 
-            # Mock httpx download
             with patch("backend.services.media_interceptor.httpx.AsyncClient") as mock_client_class:
                 mock_client = AsyncMock()
                 mock_response = AsyncMock()
@@ -153,31 +142,26 @@ class TestChatServiceMediaInterception:
                 mock_client.get = AsyncMock(return_value=mock_response)
                 mock_client_class.return_value.__aenter__.return_value = mock_client
 
-                # Execute
                 result = await ChatService.process_message(head, "Show me sales", seeded_db)
 
-        # Synchronous result still carries the ORIGINAL external URL (not yet rewritten)
         assert "https://charts.example.com/sales.png" in result["content"]
         assert "https://s3.bucket/files/user-admin-media-1/abc123.png" not in result["content"]
 
-        # Drive the background media interception + Head-turn persistence
         await asyncio.sleep(0.1)
 
-        # Verify the persisted Head-of-Council ChatMessage has the rewritten storage URL
         from backend.models.entities.chat_message import ChatMessage
         msgs = seeded_db.query(ChatMessage).filter_by(role="head_of_council").all()
         assert any("https://s3.bucket/files/user-admin-media-1/abc123.png" in m.content for m in msgs)
         assert any("https://charts.example.com/sales.png" not in m.content for m in msgs)
-        assert any("![Sales Chart]" in m.content for m in msgs)  # alt text preserved
+        assert any("![Sales Chart]" in m.content for m in msgs)
 
     @pytest.mark.asyncio
     async def test_raw_image_url_intercepted_and_stored(self, seeded_db, monkeypatch):
         """Bare https://.../image.jpg URL gets replaced."""
-        head = HeadOfCouncil(agentium_id="HEAD00001", name="Test", is_active=True)
+        head = HeadOfCouncil(agentium_id="MEDIAH02", name="Test Head 2", is_active=True)
         seeded_db.add(head)
         _commit_sovereign_user("user-admin-media-2", "admin_media_2", "admin_media_2@agentium.test")
 
-        # Create and configure default model config for the head
         model = UserModelConfig(
             provider=ProviderType.OPENAI_COMPATIBLE,
             config_name="test-config-2",
@@ -189,11 +173,8 @@ class TestChatServiceMediaInterception:
         seeded_db.add(model)
         seeded_db.flush()
 
-        # Associate with the Head of Council
         head.preferred_config_id = str(model.id)
         seeded_db.flush()
-        # Commit the outer transaction so the background task (using its own
-        # SessionLocal()) can see the genesis admin user and this test's data.
         seeded_db.connection().commit()
 
         mock_llm_result = {
@@ -223,14 +204,11 @@ class TestChatServiceMediaInterception:
 
                 result = await ChatService.process_message(head, "Show photo", seeded_db)
 
-        # Synchronous result still carries the ORIGINAL external URL (not yet rewritten)
         assert "https://cdn.example.com/photo.jpg" in result["content"]
         assert "https://s3.bucket/files/user-admin-media-2/xyz789.jpg" not in result["content"]
 
-        # Drive the background media interception + Head-turn persistence
         await asyncio.sleep(0.1)
 
-        # Verify the persisted Head-of-Council ChatMessage has the rewritten storage URL
         from backend.models.entities.chat_message import ChatMessage
         msgs = seeded_db.query(ChatMessage).filter_by(role="head_of_council").all()
         assert any("https://s3.bucket/files/user-admin-media-2/xyz789.jpg" in m.content for m in msgs)
@@ -239,13 +217,12 @@ class TestChatServiceMediaInterception:
     @pytest.mark.asyncio
     async def test_non_media_text_passthrough(self, seeded_db):
         """Text without media URLs passes through unchanged."""
-        head = HeadOfCouncil(agentium_id="HEAD00001", name="Test", is_active=True)
+        head = HeadOfCouncil(agentium_id="MEDIAH03", name="Test Head 3", is_active=True)
         seeded_db.add(head)
         admin = User(id="user-admin-media-3", username="admin_media_3", email="admin_media_3@agentium.test", hashed_password="fake-hash-for-test", is_admin=True, is_active=True)
         seeded_db.add(admin)
         seeded_db.commit()
 
-        # Create and configure default model config for the head
         model = UserModelConfig(
             provider=ProviderType.OPENAI_COMPATIBLE,
             config_name="test-config-3",
@@ -257,7 +234,6 @@ class TestChatServiceMediaInterception:
         seeded_db.add(model)
         seeded_db.flush()
 
-        # Associate with the Head of Council
         head.preferred_config_id = str(model.id)
         seeded_db.commit()
 
@@ -272,7 +248,6 @@ class TestChatServiceMediaInterception:
             mock_llm.generate_with_tools = AsyncMock(return_value=mock_llm_result)
             mock_llm_class.return_value = mock_llm
 
-            # Storage should NOT be called
             from backend.services.storage_service import storage_service
             storage_service.upload_file = MagicMock()
 
@@ -284,13 +259,12 @@ class TestChatServiceMediaInterception:
     @pytest.mark.asyncio
     async def test_failed_download_graceful_fallback(self, seeded_db):
         """Failed media download preserves original URL, doesn't crash."""
-        head = HeadOfCouncil(agentium_id="HEAD00001", name="Test", is_active=True)
+        head = HeadOfCouncil(agentium_id="MEDIAH04", name="Test Head 4", is_active=True)
         seeded_db.add(head)
         admin = User(id="user-admin-media-4", username="admin_media_4", email="admin_media_4@agentium.test", hashed_password="fake-hash-for-test", is_admin=True, is_active=True)
         seeded_db.add(admin)
         seeded_db.commit()
 
-        # Create and configure default model config for the head
         model = UserModelConfig(
             provider=ProviderType.OPENAI_COMPATIBLE,
             config_name="test-config-4",
@@ -302,7 +276,6 @@ class TestChatServiceMediaInterception:
         seeded_db.add(model)
         seeded_db.flush()
 
-        # Associate with the Head of Council
         head.preferred_config_id = str(model.id)
         seeded_db.commit()
 
@@ -317,7 +290,6 @@ class TestChatServiceMediaInterception:
             mock_llm.generate_with_tools = AsyncMock(return_value=mock_llm_result)
             mock_llm_class.return_value = mock_llm
 
-            # Mock download to fail (404)
             with patch("backend.services.media_interceptor.httpx.AsyncClient") as mock_client_class:
                 mock_client = AsyncMock()
                 mock_response = AsyncMock()
@@ -327,20 +299,17 @@ class TestChatServiceMediaInterception:
 
                 result = await ChatService.process_message(head, "Show broken", seeded_db)
 
-        # Original markdown preserved
         assert result["content"] == "![Broken](https://gone.example.com/missing.png)"
-        # No storage upload attempted
         from backend.services.storage_service import storage_service
         storage_service.upload_file.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_media_urls_persisted_in_chat_message_metadata(self, seeded_db):
         """New storage URLs stored in ChatMessage metadata.media_urls."""
-        head = HeadOfCouncil(agentium_id="HEAD00001", name="Test", is_active=True)
+        head = HeadOfCouncil(agentium_id="MEDIAH05", name="Test Head 5", is_active=True)
         seeded_db.add(head)
         _commit_sovereign_user("user-admin-media-5", "admin_media_5", "admin_media_5@agentium.test")
 
-        # Create and configure default model config for the head
         model = UserModelConfig(
             provider=ProviderType.OPENAI_COMPATIBLE,
             config_name="test-config-5",
@@ -352,15 +321,8 @@ class TestChatServiceMediaInterception:
         seeded_db.add(model)
         seeded_db.flush()
 
-        # Associate with the Head of Council
         head.preferred_config_id = str(model.id)
         seeded_db.commit()
-        # The fire-and-forget background media-interception task opens its OWN
-        # SessionLocal() connection, so it cannot see rows committed only to this
-        # test's savepoint transaction. Flush the setup to the real DB so the
-        # background task's FK check on user_id succeeds. (Teardown still rolls
-        # back the outer test transaction; the committed rows are reconciled by
-        # the session-scoped db_engine drop_all at suite end.)
         seeded_db.connection().commit()
 
         mock_llm_result = {

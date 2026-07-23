@@ -31,6 +31,7 @@ def _make_agent_with_ethos(db: Session, agentium_id: str) -> Agent:
         capabilities="[]",
         created_by_agentium_id="00001",
         agent_id=agent.id,
+        last_updated_by_agent=True,
     )
     db.add(ethos)
     db.flush()
