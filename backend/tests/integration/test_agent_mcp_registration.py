@@ -85,10 +85,17 @@ def test_head_fast_path_registers_live(bridge, db_session):
 
 
 def test_council_vote_flow_registers_live(bridge, db_session):
+    import json
+    from datetime import datetime
     from backend.models.entities.constitution import Constitution
     con = Constitution(
+        agentium_id="C00099",
         preamble="test",
-        articles=[],
+        articles=json.dumps({}),
+        prohibited_actions=json.dumps([]),
+        sovereign_preferences=json.dumps({}),
+        created_by_agentium_id="00001",
+        effective_date=datetime.utcnow(),
         is_active=True,
         version="v1.0",
     )

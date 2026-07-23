@@ -143,6 +143,7 @@ async def test_api_manager_dynamic_cost(db_session):
     """Verify that APIManager dynamically resolves cost_per_1k_tokens using pricing database."""
     db_session.execute(text("DELETE FROM model_usage_logs"))
     db_session.execute(text("DELETE FROM model_pricings"))
+    db_session.execute(text("UPDATE agents SET preferred_config_id = NULL WHERE preferred_config_id IS NOT NULL"))
     db_session.execute(text("DELETE FROM user_model_configs"))
     db_session.commit()
     
