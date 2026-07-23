@@ -71,6 +71,7 @@ from sqlalchemy.orm import Session
 from backend.models.database import SessionLocal, engine
 from backend.models.entities.base import Base
 from backend.models.entities.constitution import Constitution, Ethos
+from backend.models.entities.voting import IndividualVote
 from backend.models.entities.agents import HeadOfCouncil, AgentType
 
 
@@ -103,15 +104,19 @@ def test_db():
 def head_agent(test_db):
     """A HeadOfCouncil linked to an active Constitution with a marker clause."""
     # Clear any leftovers from a prior (possibly failed) run.
-    prior = test_db.query(HeadOfCouncil).filter_by(agentium_id="00001").first()
-    if prior:
-        test_db.delete(prior)
-    prior_ethos = test_db.query(Ethos).filter_by(agentium_id="E000001").first()
-    if prior_ethos:
-        test_db.delete(prior_ethos)
-    prior_const = test_db.query(Constitution).filter_by(agentium_id="C90001").first()
-    if prior_const:
-        test_db.delete(prior_const)
+    with test_db.no_autoflush:
+        prior = test_db.query(HeadOfCouncil).filter_by(agentium_id="00001").first()
+        if prior:
+            test_db.query(IndividualVote).filter_by(
+                voter_agentium_id="00001"
+            ).delete(synchronize_session=False)
+            test_db.delete(prior)
+        prior_ethos = test_db.query(Ethos).filter_by(agentium_id="E000001").first()
+        if prior_ethos:
+            test_db.delete(prior_ethos)
+        prior_const = test_db.query(Constitution).filter_by(agentium_id="C90001").first()
+        if prior_const:
+            test_db.delete(prior_const)
     test_db.commit()
 
     constitution = Constitution(
@@ -154,18 +159,22 @@ def head_agent(test_db):
     try:
         yield agent
     finally:
-        # Tear down in FK-safe order: agent first (clears ethos_id), then ethos,
-        # then the constitution.
-        leftover = test_db.query(HeadOfCouncil).filter_by(agentium_id="00001").first()
-        if leftover:
-            if leftover.ethos_id:
-                linked_ethos = test_db.query(Ethos).filter_by(id=leftover.ethos_id).first()
-                if linked_ethos:
-                    test_db.delete(linked_ethos)
-            test_db.delete(leftover)
-        leftover_const = test_db.query(Constitution).filter_by(agentium_id="C90001").first()
-        if leftover_const:
-            test_db.delete(leftover_const)
+        # Tear down in FK-safe order: delete votes first, then agent (clears
+        # ethos_id), then ethos, then the constitution.
+        with test_db.no_autoflush:
+            leftover = test_db.query(HeadOfCouncil).filter_by(agentium_id="00001").first()
+            if leftover:
+                test_db.query(IndividualVote).filter_by(
+                    voter_agentium_id="00001"
+                ).delete(synchronize_session=False)
+                if leftover.ethos_id:
+                    linked_ethos = test_db.query(Ethos).filter_by(id=leftover.ethos_id).first()
+                    if linked_ethos:
+                        test_db.delete(linked_ethos)
+                test_db.delete(leftover)
+            leftover_const = test_db.query(Constitution).filter_by(agentium_id="C90001").first()
+            if leftover_const:
+                test_db.delete(leftover_const)
         test_db.commit()
 
 
