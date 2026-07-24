@@ -472,34 +472,48 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
             // entirely, producing an immediate reconnect on every pong failure
             // and causing the rapid 499 loop visible in nginx logs.
             const pongTimeout = setTimeout(() => {
-                // BUG FIX: a connection that is still streaming a reply cannot
-                // answer heartbeat pings — the server's receive loop is blocked
-                // while generating. If we've received any frame within the pong
-                // window, the socket is alive; don't tear down a healthy
-                // connection just because the model is taking its time.
                 const sinceData = Date.now() - lastDataReceivedTs;
                 if (sinceData < WS_CONFIG.PONG_TIMEOUT_MS) {
                     logger.debug('[WebSocket] Pong timeout but data recently received — connection alive, skipping reconnect');
                     return;
                 }
-                logger.warn('[WebSocket] Pong timeout — scheduling reconnect with backoff');
-                get()._setError('Connection lost (pong timeout)');
-                get()._stopHeartbeat();
-                // Cleanly close the socket without triggering the onclose
-                // reconnect path (disconnect() nulls the handlers). The
-                // reconnect is instead handled by _scheduleReconnect() below.
-                const ws = get()._ws;
-                if (ws) {
-                    ws.onopen = null;
-                    ws.onclose = null;
-                    ws.onerror = null;
-                    ws.onmessage = null;
-                    if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
-                        ws.close(1000, 'Pong timeout');
+
+                // Secondary health check before tearing down the socket.
+                // A single missed pong is not enough evidence to kill a healthy
+                // connection — transient network glitches and brief server-side
+                // processing delays can cause it. Only proceed with reconnect
+                // when both the WS pong AND the HTTP health check fail.
+                (async () => {
+                    try {
+                        const controller = new AbortController();
+                        const healthTimeout = setTimeout(() => controller.abort(), 5000);
+                        const resp = await fetch('/api/health', { signal: controller.signal });
+                        clearTimeout(healthTimeout);
+                        if (resp.ok) {
+                            logger.debug('[WebSocket] Pong timeout but server healthy — extending grace period');
+                            lastDataReceivedTs = Date.now();
+                            return;
+                        }
+                    } catch {
+                        // Server unreachable — proceed with reconnect
                     }
-                }
-                set({ _ws: null, _connectionStable: false, connectionPhase: 'offline' });
-                get()._scheduleReconnect();
+
+                    logger.warn('[WebSocket] Pong timeout — scheduling reconnect with backoff');
+                    get()._setError('Connection lost (pong timeout)');
+                    get()._stopHeartbeat();
+                    const ws = get()._ws;
+                    if (ws) {
+                        ws.onopen = null;
+                        ws.onclose = null;
+                        ws.onerror = null;
+                        ws.onmessage = null;
+                        if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+                            ws.close(1000, 'Pong timeout');
+                        }
+                    }
+                    set({ _ws: null, _connectionStable: false, connectionPhase: 'offline' });
+                    get()._scheduleReconnect();
+                })();
             }, WS_CONFIG.PONG_TIMEOUT_MS);
             set({ _pongTimeout: pongTimeout });
         }, WS_CONFIG.PING_INTERVAL_MS);
@@ -940,6 +954,7 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
         if (s._ws?.readyState === WebSocket.OPEN) {
             try {
                 const ts = new Date().toISOString();
+                lastDataReceivedTs = Date.now();  // fresh timestamp for busy-connection guard
                 s._ws.send(JSON.stringify({ type: 'ping', timestamp: ts }));
                 set({ _lastPingTime: ts });
                 get()._updateStats({ lastPingTime: ts });
