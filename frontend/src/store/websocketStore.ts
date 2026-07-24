@@ -8,6 +8,7 @@ import { showToast } from '@/hooks/useToast';
 import { websocketReplayApi } from '@/services/websocketReplay';
 import { logger } from '@/utils/logger';
 import type { StructuredInputAnswer } from '../types/structuredInput';
+import { useChatStore } from './chatStore';
 import {
   ConnectionPhase, PhaseEvent, nextPhase,
   isActive, isConnectingPhase, canReconnect, isGenesisProgress, phaseFromGenesisStatus,
@@ -173,6 +174,8 @@ interface WebSocketState {
      */
     _connectionStable: boolean;
     _lastMessageTimestamp: string | null;
+    /** True while an orphan message retry is in flight (prevents duplicates). */
+    _orphanRetryInFlight: boolean;
 
     // Public actions
     connect: () => void;
@@ -229,6 +232,7 @@ interface WebSocketState {
     _pollGenesisStatus: (attempt?: number) => void;
     _stopGenesisPoll: () => void;
     _openSocket: () => void;
+    _retryOrphanMessages: () => void;
 }
 
 // ── Config ────────────────────────────────────────────────────────────────────
@@ -297,6 +301,7 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
     _genesisGraceCount: 0,
     _connectionStable: false,   // BUG 2 FIX
     _lastMessageTimestamp: null,
+    _orphanRetryInFlight: false,
 
     // ── Derived helpers (Spec §1: status derives from connectionPhase) ─────
     isConnected: () => get().connectionPhase === 'active',
@@ -463,6 +468,27 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
         set({ _reconnectTimeout: t });
     },
 
+    _retryOrphanMessages: () => {
+        const chatMessages = useChatStore.getState().messages;
+        const orphaned = [...chatMessages]
+            .reverse()
+            .slice(0, 5)
+            .filter(m => m.role === 'sovereign')
+            .find(m => {
+                const idx = chatMessages.indexOf(m);
+                const next = chatMessages[idx + 1];
+                return !next || next.role !== 'head_of_council';
+            });
+
+        if (orphaned && !get()._orphanRetryInFlight) {
+            set({ _orphanRetryInFlight: true });
+            logger.info('[WebSocket] Retrying orphaned message:', orphaned.content.slice(0, 50));
+            showToast.info('Retrying last message...');
+            get().sendMessage(orphaned.content, (orphaned as any).metadata?.attachments);
+            setTimeout(() => set({ _orphanRetryInFlight: false }), 10000);
+        }
+    },
+
     _startHeartbeat: () => {
         get()._stopHeartbeat();
         const interval = setInterval(() => {
@@ -536,6 +562,7 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
             get()._updateStats({ reconnectAttempts: 0 });
             logger.debug('[WebSocket] Connection stable — backoff counter reset');
             get()._fetchReplay();
+            get()._retryOrphanMessages();
         }
     },
 
@@ -939,11 +966,11 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
                 }));
                 return true;
             } catch (e) {
-                logger.error('[WebSocket] Send error:', e);
-                return false;
+                logger.error('[WebSocket] Send error — queuing for retry:', e);
             }
+        } else {
+            logger.warn('[WebSocket] Not connected — queuing message');
         }
-        logger.warn('[WebSocket] Not connected — queuing message');
         set({ _messageQueue: [...get()._messageQueue, { content, timestamp: Date.now(), attachments }] });
         return false;
     },
