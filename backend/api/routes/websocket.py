@@ -620,10 +620,10 @@ async def websocket_chat_endpoint(
                             )
                             if head_cfg and is_thinking_config(head_cfg):
                                 thinking_enabled = True
-                        return head, thinking_enabled
+                        return head.id, thinking_enabled
 
-                head, thinking_enabled = await loop.run_in_executor(None, _lookup_head_and_config)
-                if not head:
+                head_id, thinking_enabled = await loop.run_in_executor(None, _lookup_head_and_config)
+                if not head_id:
                     await websocket.send_json({
                         "type":      "error",
                         "content":   "Head of Council is unavailable. Check system status.",
@@ -655,7 +655,6 @@ async def websocket_chat_endpoint(
                 # connection ("Head of Council goes offline mid-chat").
                 # Defaults capture this iteration's values to avoid the
                 # Python late-binding closure pitfall across loop iterations.
-                head_id = head.id
 
                 async def on_delta(text: str, sid: str = stream_id) -> None:
                     try:
