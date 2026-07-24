@@ -132,7 +132,7 @@ interface TypingIndicatorProps {
 | any | 0 or undefined | Three bouncing dots only |
 | any | > 0 | Dots + inline `+N` (e.g. `+2`) |
 
-The `thinking` prop is preserved so the server can distinguish extended-thinking mode from normal generation, but both modes use the same dot animation (no separate "Thinking…" label). The `toolCount` takes visual priority when > 0.
+The `thinking` prop is preserved as an informational flag (the server still sends it in `message_start`) but both modes render identically — bouncing dots. The "Thinking…" label and shimmer bars are removed entirely. Clients that don't pass `thinking` work fine; it's a no-op visually. The `toolCount` takes visual priority when > 0.
 
 **Counter visual:** A `<span className="tool-count">+2</span>` rendered immediately after the dots, styled with the same color/weight as the bubble text. Small scale animation (1.0 → 1.15 → 1.0 over 200ms) when the number changes.
 
@@ -195,6 +195,26 @@ The TypingIndicator is shown in two places (both need the `toolCount` prop):
      <TypingIndicator thinking={isThinking} toolCount={toolCount} />
    )}
    ```
+
+### Cleanup on WS Disconnect
+
+The existing connection-drop effect (~line 289) must also reset `toolCount`:
+
+```typescript
+useEffect(() => {
+    if (connectionPhase !== 'active') {
+        if (activeStreamId) useChatStore.getState().resetStream();
+        setIsAwaitingReply(false);
+        setToolCount(0);   // reset tool counter on disconnect
+    }
+}, [connectionPhase, activeStreamId]);
+```
+
+### CSS Module Rewrite
+
+`TypingIndicator.module.css` is substantially rewritten:
+- Remove `.shimmer`, `.bar`, `.shimmer-sweep` keyframes, `.thinkingLabel`
+- Add `.dot`, `.dot:nth-child(N)`, `@keyframes dot-bounce`, `@keyframes dot-pulse`, `.toolCount`
 
 ## No chatStore Changes
 
