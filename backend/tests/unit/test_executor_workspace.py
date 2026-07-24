@@ -48,7 +48,7 @@ class _FakeContainer:
 
     def get_archive(self, path):
         return (
-            [_make_tar("result.txt", "hello")],
+            [_make_tar("workspace/result.txt", "hello")],
             {"name": "workspace"},
         )
 
