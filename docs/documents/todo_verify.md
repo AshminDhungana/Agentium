@@ -1,9 +1,6 @@
 # Agentium — Verification & Improvement Backlog
 
 ## 10. Chat Page — UX
-
-- **10.3 — [P2]** Typing indicator: animated three-dot indicator while a reply is generating (distinct from the "Thinking…" label in 5.6, which is for active extended-thinking mode specifically). for thinking the three dot will be fine, and for tool use add no of tools used +count or somthing similar, the goal is to make the chat user engaging. 
-- **10.4 — [P1]** Investigate and fix cases where Head disconnects mid-chat and a sent message never receives a reply — trace via logs, likely a WebSocket/session lifecycle bug.
 - **10.5 — [P2]** Auto-prune chat history older than 7 days, but always retain the last few messages regardless of age if there's been no further activity.
 - **10.6 — [P3]** Addressing convention: Head addresses the admin as "Sovereign"; all other users are addressed by username, or "sir" if no username context is available.
 
