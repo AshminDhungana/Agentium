@@ -659,7 +659,7 @@ class TestCriterion07HealthRings:
         data = response.json()
 
         # All 5 rings: agents, tasks, workflows, events, budget
-        assert data["agents"]["health_pct"] >= 90
+        assert data["agents"]["avg_health"] >= 90
         assert data["tasks"]["health_pct"] >= 90
         assert data["workflows"]["health_pct"] >= 90
         assert data["events"]["health_pct"] >= 90

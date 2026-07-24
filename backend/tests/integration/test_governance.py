@@ -602,12 +602,12 @@ class TestAmendmentLifecycle:
             rationale="reason",
         )
         aid = proposed["amendment_id"]
+        eligible = list(proposed["eligible_voters"])
         await svc.sponsor_amendment(aid, "10002")
         await svc.start_voting(aid)
 
-        await svc.cast_vote(aid, "10001", VoteType.FOR)
-        await svc.cast_vote(aid, "10002", VoteType.FOR)
-        await svc.cast_vote(aid, "00001", VoteType.FOR)
+        for voter_id in eligible:
+            await svc.cast_vote(aid, voter_id, VoteType.FOR)
 
         # BUG-GOV-002 fixed: ratification no longer crashes.
         result = await svc.conclude_voting(aid)
@@ -631,12 +631,12 @@ class TestAmendmentLifecycle:
             rationale="reason",
         )
         aid = proposed["amendment_id"]
+        eligible = list(proposed["eligible_voters"])
         await svc.sponsor_amendment(aid, "10002")
         await svc.start_voting(aid)
 
-        await svc.cast_vote(aid, "10001", VoteType.FOR)
-        await svc.cast_vote(aid, "10002", VoteType.FOR)
-        await svc.cast_vote(aid, "00001", VoteType.FOR)
+        for voter_id in eligible:
+            await svc.cast_vote(aid, voter_id, VoteType.FOR)
 
         current_constitution = (
             seeded_db.query(Constitution).filter_by(is_active=True).first()
@@ -733,11 +733,11 @@ class TestConstitutionImmutability:
             rationale="reason",
         )
         aid = proposed["amendment_id"]
+        eligible = list(proposed["eligible_voters"])
         await svc.sponsor_amendment(aid, "10002")
         await svc.start_voting(aid)
-        await svc.cast_vote(aid, "10001", VoteType.FOR)
-        await svc.cast_vote(aid, "10002", VoteType.FOR)
-        await svc.cast_vote(aid, "00001", VoteType.FOR)
+        for voter_id in eligible:
+            await svc.cast_vote(aid, voter_id, VoteType.FOR)
 
         async def _patched_ratify(amendment_obj, actor_id="system"):
             current = seeded_db.query(Constitution).filter_by(id=amendment_obj.amendment_id).first()
