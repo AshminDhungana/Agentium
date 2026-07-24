@@ -158,6 +158,7 @@ export function ChatPage() {
     const [showScrollToBottom, setShowScrollToBottom] = useState(false);
     const [isAwaitingReply, setIsAwaitingReply] = useState(false);
     const [isThinking, setIsThinking] = useState(false);
+    const [toolCount, setToolCount] = useState(0);
 
     /**
      * Dedup set lives in a ref (not React state) — no re-renders,
@@ -290,6 +291,7 @@ export function ChatPage() {
         if (connectionPhase !== 'active') {
             if (activeStreamId) useChatStore.getState().resetStream();
             setIsAwaitingReply(false);
+            setToolCount(0);
         }
     }, [connectionPhase, activeStreamId]);
 
@@ -312,14 +314,20 @@ export function ChatPage() {
                     (msg.role as Message['role']) || 'head_of_council',
                 );
                 setIsThinking(Boolean((msg as any).thinking));
+                setToolCount(0);
                 // Keep isAwaitingReply true so the typing indicator still shows
                 // during the thinking/tool phase; it clears on the first delta.
+                return;
+            }
+            if (msg.type === 'tool_progress') {
+                setToolCount(msg.tool_count as number);
                 return;
             }
             if (msg.type === 'message_delta') {
                 useChatStore.getState().appendDelta(msg.stream_id as string, msg.delta as string);
                 setIsAwaitingReply(false);
                 setIsThinking(false);
+                setToolCount(0);
                 return;
             }
             if (msg.type === 'message_end') {
@@ -331,6 +339,7 @@ export function ChatPage() {
                 );
                 setIsAwaitingReply(false);
                 setIsThinking(false);
+                setToolCount(0);
                 return;
             }
 
@@ -1182,7 +1191,7 @@ export function ChatPage() {
                                                                     : 'bg-white dark:bg-[#161b27] border border-gray-200 dark:border-[#1e2535] text-gray-900 dark:text-gray-100 shadow-sm dark:shadow-[0_2px_12px_rgba(0,0,0,0.2)]'
                                                         }`}>
                                                         {isAwaitingReply && message.status === 'streaming' && !message.content ? (
-                                                            <TypingIndicator thinking={isThinking} />
+                                                            <TypingIndicator thinking={isThinking} toolCount={toolCount} />
                                                         ) : (
                                                             <MarkdownMessage content={message.content as string} isUser={isUser} status={message.status} />
                                                         )}
@@ -1245,7 +1254,7 @@ export function ChatPage() {
                                             <UserRoundSearch className="w-4 h-4" />
                                         </div>
                                         <div className="px-4 py-3.5 rounded-2xl bg-white dark:bg-[#161b27] border border-gray-200 dark:border-[#1e2535]">
-                                            <TypingIndicator thinking={isThinking} />
+                                            <TypingIndicator thinking={isThinking} toolCount={toolCount} />
                                         </div>
                                     </div>
                                 )}

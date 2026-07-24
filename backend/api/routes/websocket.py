@@ -660,6 +660,20 @@ async def websocket_chat_endpoint(
                         except Exception:
                             pass  # socket may be closing; the task handles it
 
+                    async def on_tool_start(
+                        tool_calls: List[Dict],
+                        cumulative: int,
+                        sid: str = stream_id,
+                    ) -> None:
+                        try:
+                            await websocket.send_json({
+                                "type":       "tool_progress",
+                                "stream_id":  sid,
+                                "tool_count": cumulative,
+                            })
+                        except Exception:
+                            pass
+
                     async def _run_generation(
                         sid: str = stream_id,
                         msg: str = enriched_message,
@@ -682,6 +696,7 @@ async def websocket_chat_endpoint(
                                     gen_head, msg, gen_db,
                                     extra_metadata=meta,
                                     on_delta=on_delta,
+                                    on_tool_start=on_tool_start,
                                     cancel_event=cevent,
                                 )
 

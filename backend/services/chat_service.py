@@ -121,7 +121,7 @@ class ChatService:
         return msg.to_dict()
 
     @staticmethod
-    async def process_message(head: HeadOfCouncil, message: str, db: Session, extra_metadata: Optional[dict] = None, on_delta: Optional[Callable[[str], Awaitable[None]]] = None, cancel_event: Optional[asyncio.Event] = None):
+    async def process_message(head: HeadOfCouncil, message: str, db: Session, extra_metadata: Optional[dict] = None, on_delta: Optional[Callable[[str], Awaitable[None]]] = None, cancel_event: Optional[asyncio.Event] = None, on_tool_start: Optional[Callable[[List[Dict], int], Awaitable[None]]] = None):
         """
         Process message with context management and potential reincarnation.
         Preserves task state across reincarnations.
@@ -424,6 +424,7 @@ Address the Sovereign respectfully. If they issue a command that requires execut
                 agent_tier=tier,
                 history=history,
                 on_delta=on_delta,
+                on_tool_start=on_tool_start,
                 cancel_event=cancel_event,
                 prompt_cache_key=cache_key,
                 tools=gen_tools,

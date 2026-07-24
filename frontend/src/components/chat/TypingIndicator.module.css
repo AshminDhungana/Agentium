@@ -1,52 +1,55 @@
-.shimmer {
+.container {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
 }
 
-.bar {
-  width: 30px;
+.dot {
+  width: 8px;
   height: 8px;
-  border-radius: 999px;
-  /* Neutral slate gradient — visible on both light and dark bubbles. */
-  background: linear-gradient(
-    90deg,
-    rgba(148, 163, 184, 0.2) 25%,
-    rgba(148, 163, 184, 0.55) 37%,
-    rgba(148, 163, 184, 0.2) 63%
-  );
-  background-size: 400% 100%;
-  animation: shimmer-sweep 1.4s ease-in-out infinite;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.5;
+  animation: dot-bounce 1.4s ease-in-out infinite;
 }
 
-.bar:nth-child(2) {
-  width: 38px;
+.dot:nth-child(2) {
   animation-delay: 0.18s;
 }
 
-.bar:nth-child(3) {
-  width: 24px;
+.dot:nth-child(3) {
   animation-delay: 0.36s;
 }
 
-@keyframes shimmer-sweep {
-  0% {
-    background-position: 100% 0;
-  }
-  100% {
-    background-position: 0 0;
-  }
+@keyframes dot-bounce {
+  0%, 80%, 100% { transform: translateY(0); opacity: 0.5; }
+  40% { transform: translateY(-6px); opacity: 1; }
 }
 
-.thinkingLabel {
-    font-size: 0.875rem;
-    color: rgb(107 114 128);
-    font-style: italic;
-    padding: 0.25rem 0;
+.toolCount {
+  font-size: 0.75rem;
+  font-weight: 500;
+  opacity: 0.7;
+  margin-left: 2px;
+  animation: count-pop 0.2s ease-out;
+}
+
+@keyframes count-pop {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+  100% { transform: scale(1); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .bar {
-    animation: none;
+  .dot {
+    animation: dot-pulse 1.5s ease-in-out infinite;
   }
+  .dot:nth-child(2) { animation-delay: 0.3s; }
+  .dot:nth-child(3) { animation-delay: 0.6s; }
+  .toolCount { animation: none; }
+}
+
+@keyframes dot-pulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.7; }
 }

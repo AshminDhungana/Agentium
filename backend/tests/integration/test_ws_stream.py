@@ -26,7 +26,13 @@ async def test_ws_emits_stream_events_and_cancel():
     async def fake_process_message(head, message, db, **kwargs):
         on_delta = kwargs.get("on_delta")
         cancel_event = kwargs.get("cancel_event")
+        on_tool_start = kwargs.get("on_tool_start")
         assert on_delta is not None and cancel_event is not None
+
+        # Simulate a tool call phase before streaming text
+        if on_tool_start is not None:
+            await on_tool_start([{"name": "search", "id": "tc_1"}], 1)
+
         await on_delta("Hello ")
         await on_delta("world")
         return {
@@ -75,6 +81,12 @@ async def test_ws_emits_stream_events_and_cancel():
     # stream events begin with the first `message_start` and end with the
     # final `message_end`.
     assert "message_start" in types, types
+    assert "tool_progress" in types, f"expected tool_progress in {types}"
+    tp_idx = types.index("tool_progress")
+    start_idx = types.index("message_start")
+    delta_idx = types.index("message_delta")
+    assert start_idx < tp_idx < delta_idx, \
+        f"tool_progress should be after message_start but before message_delta: {types}"
     assert types.index("message_start") < types.index("message_end"), types
     assert types[-1] == "message_end", types
     assert "message_delta" in types, types

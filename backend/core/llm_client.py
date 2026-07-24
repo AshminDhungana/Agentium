@@ -363,6 +363,7 @@ class LLMClient:
         history: Optional[List[Dict[str, str]]] = None,
         on_delta: Optional[Callable[[str], Awaitable[None]]] = None,
         cancel_event: Optional[asyncio.Event] = None,
+        on_tool_start: Optional[Callable[[List[Dict], int], Awaitable[None]]] = None,
         **kwargs,
     ) -> Dict[str, Any]:
         """Tool-aware generation with retry, failover, and CB integration."""
@@ -408,6 +409,7 @@ class LLMClient:
                         max_tool_iterations=max_tool_iterations,
                         history=history,
                         on_delta=on_delta,
+                        on_tool_start=on_tool_start,
                         cancel_event=cancel_event,
                         **kwargs,
                     )

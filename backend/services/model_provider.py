@@ -825,6 +825,7 @@ class OpenAICompatibleProvider(BaseModelProvider):
         max_iterations: int = 10,
         on_delta: Optional[Callable[[str], Awaitable[None]]] = None,
         cancel_event: Optional[asyncio.Event] = None,
+        on_tool_start: Optional[Callable[[List[Dict], int], Awaitable[None]]] = None,
         **kwargs,
     ) -> Dict[str, Any]:
         """
@@ -876,6 +877,7 @@ class OpenAICompatibleProvider(BaseModelProvider):
 
         try:
             loop_finish_reason = "stop"
+            _tool_call_counter = 0
 
             for _ in range(max_iterations):
                 create_kwargs: Dict[str, Any] = dict(
@@ -975,6 +977,9 @@ class OpenAICompatibleProvider(BaseModelProvider):
                         break
 
                     if finish_reason == "tool_calls" and norm_tool_calls:
+                        _tool_call_counter += len(norm_tool_calls)
+                        if on_tool_start is not None:
+                            await on_tool_start(norm_tool_calls, _tool_call_counter)
                         # Execute ALL tool calls in this response in parallel
                         results = await asyncio.gather(
                             *[
@@ -1040,6 +1045,9 @@ class OpenAICompatibleProvider(BaseModelProvider):
                         break
 
                     if finish_reason == "tool_calls" and msg_tool_calls:
+                        _tool_call_counter += len(msg_tool_calls)
+                        if on_tool_start is not None:
+                            await on_tool_start(msg_tool_calls, _tool_call_counter)
                         # Execute ALL tool calls in this response in parallel,
                         # mirroring the blocking branch exactly.
                         results = await asyncio.gather(
@@ -1248,6 +1256,7 @@ class AnthropicProvider(BaseModelProvider):
         max_iterations: int = 10,
         on_delta: Optional[Callable[[str], Awaitable[None]]] = None,
         cancel_event: Optional[asyncio.Event] = None,
+        on_tool_start: Optional[Callable[[List[Dict], int], Awaitable[None]]] = None,
         **kwargs,
     ) -> Dict[str, Any]:
         """
@@ -1297,6 +1306,7 @@ class AnthropicProvider(BaseModelProvider):
 
         try:
             loop_finish_reason = "stop"
+            _tool_call_counter = 0
 
             for _ in range(max_iterations):
                 create_kwargs: Dict[str, Any] = dict(
@@ -1414,6 +1424,12 @@ class AnthropicProvider(BaseModelProvider):
 
                 if response.stop_reason == "tool_use":
                     tool_blocks = [b for b in response.content if b.type == "tool_use"]
+                    _tool_call_counter += len(tool_blocks)
+                    if on_tool_start is not None:
+                        await on_tool_start(
+                            [{"name": b.name, "id": b.id, "input": b.input} for b in tool_blocks],
+                            _tool_call_counter,
+                        )
 
                     # Execute all tool calls in parallel
                     results = await asyncio.gather(
@@ -1700,6 +1716,7 @@ class ModelService:
         history: Optional[List[Dict[str, str]]] = None,
         on_delta: Optional[Callable[[str], Awaitable[None]]] = None,
         cancel_event: Optional[asyncio.Event] = None,
+        on_tool_start: Optional[Callable[[List[Dict], int], Awaitable[None]]] = None,
         **kwargs,
     ) -> Dict[str, Any]:
         """
@@ -1825,6 +1842,7 @@ class ModelService:
                 max_iterations=max_tool_iterations,
                 agentium_id=agent_id,
                 on_delta=on_delta,
+                on_tool_start=on_tool_start,
                 cancel_event=run_event,
                 **({"tool_choice": caller_tool_choice} if caller_tool_choice else {}),
                 **kwargs,

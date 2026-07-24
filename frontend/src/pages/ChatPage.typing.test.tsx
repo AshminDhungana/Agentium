@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { useChatStore } from '@/store/chatStore';
 import { TypingIndicator } from '@/components/chat/TypingIndicator';
@@ -9,36 +9,41 @@ describe('ChatPage streaming polish', () => {
     });
 
     it('shows typing indicator for an empty streaming placeholder while awaiting', () => {
-        // Simulate the thinking phase: a streaming placeholder with empty content
-        // and isAwaitingReply true (driven via the store + a lightweight render).
         useChatStore.getState().beginStream('s1', 'head_of_council');
-        // NOTE: rendering full ChatPage may be heavy; if so, assert the store state
-        // invariants instead: placeholder exists with status 'streaming' and empty
-        // content, which is what the typing indicator keys off of.
         const m = useChatStore.getState().messages[0];
         expect(m.status).toBe('streaming');
         expect(m.content).toBe('');
     });
 
-    it('renders the typing indicator with the expected test id and is aria-hidden', () => {
+    it('renders three bouncing dots with the expected test id', () => {
         const { container } = render(<TypingIndicator />);
         const indicator = screen.getByTestId('typing-indicator');
         expect(indicator).toBeTruthy();
         expect(indicator.getAttribute('aria-hidden')).toBe('true');
-        // Three animated dots.
+        // Three dot spans (CSS modules mangle classes, so just count descendants)
         expect(container.querySelectorAll('span').length).toBe(3);
     });
 
-    it('renders the Thinking label when thinking prop is true', () => {
-        const { container, getByText } = render(<TypingIndicator thinking />);
-        expect(container.querySelector('[data-testid="typing-indicator"]')).toBeInTheDocument();
-        expect(getByText('Thinking…')).toBeInTheDocument();
+    it('shows +N count when toolCount > 0', () => {
+        const { container } = render(<TypingIndicator toolCount={2} />);
+        expect(container.textContent).toContain('+2');
     });
 
-    it('still renders the three-dot shimmer when thinking is false', () => {
-        const { container } = render(<TypingIndicator thinking={false} />);
-        expect(container.querySelector('[data-testid="typing-indicator"]')).toBeInTheDocument();
-        expect(container.querySelectorAll('span').length).toBe(3);
-        expect(container.textContent).not.toContain('Thinking…');
+    it('hides +N count when toolCount is 0', () => {
+        const { container } = render(<TypingIndicator toolCount={0} />);
+        expect(container.textContent).not.toContain('+');
+    });
+
+    it('hides +N count when toolCount is undefined', () => {
+        const { container } = render(<TypingIndicator />);
+        expect(container.textContent).not.toContain('+');
+    });
+
+    it('thinking prop is a no-op visually (same dots, no label)', () => {
+        const { container: t1 } = render(<TypingIndicator />);
+        const { container: t2 } = render(<TypingIndicator thinking />);
+        expect(t1.querySelectorAll('span').length).toBe(3);
+        expect(t2.querySelectorAll('span').length).toBe(3);
+        expect(t2.textContent).not.toContain('Thinking…');
     });
 });
