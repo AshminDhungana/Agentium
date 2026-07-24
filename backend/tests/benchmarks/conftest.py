@@ -10,7 +10,7 @@ from __future__ import annotations
 import os
 import pytest
 
-from backend.core.vector_store import VectorStore
+from backend.core.vector_store import COLLECTIONS_V2, VectorStore
 
 
 @pytest.fixture(scope="function")
@@ -26,9 +26,9 @@ def vector_store():
     for key in list(vs.COLLECTIONS.keys()):
         vs.COLLECTIONS[key] = f"bench_{vs.COLLECTIONS[key]}"
     # Also prefix the v2 (bge) collection names for the same isolation.
-    original_names_v2 = vs.COLLECTIONS_V2.copy()
-    for key in list(vs.COLLECTIONS_V2.keys()):
-        vs.COLLECTIONS_V2[key] = f"bench_{vs.COLLECTIONS_V2[key]}"
+    v2_orig = COLLECTIONS_V2.copy()
+    for key in list(COLLECTIONS_V2.keys()):
+        COLLECTIONS_V2[key] = f"bench_{COLLECTIONS_V2[key]}"
 
     # Delete stale collections *before* initialize() so cached Collection
     # objects always point at live server UUIDs.
@@ -50,11 +50,12 @@ def vector_store():
             vs.client.delete_collection(name=coll_name)
         except Exception:
             pass
-    for coll_name in vs.COLLECTIONS_V2.values():
+    for coll_name in COLLECTIONS_V2.values():
         try:
             vs.client.delete_collection(name=coll_name)
         except Exception:
             pass
 
     vs.COLLECTIONS.update(original_names)
-    vs.COLLECTIONS_V2.update(original_names_v2)
+    COLLECTIONS_V2.clear()
+    COLLECTIONS_V2.update(v2_orig)
