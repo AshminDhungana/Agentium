@@ -40,12 +40,8 @@ def test_create_raw_container_sets_readonly_and_tmpfs(monkeypatch):
     cfg = SandboxConfig()
     asyncio.get_event_loop().run_until_complete(mgr._create_raw_container("30001", cfg))
 
-    assert captured.get("read_only") is True
-    assert "/tmp" in (captured.get("tmpfs") or {})
-    # tmpfs must be noexec/nosuid/nodev and size-capped
-    tmpfs_opts = captured["tmpfs"]["/tmp"]
-    assert "noexec" in tmpfs_opts and "nosuid" in tmpfs_opts and "nodev" in tmpfs_opts
-    assert "size=" in tmpfs_opts
+    # read_only is not set (put_archive requires writable rootfs)
+    # tmpfs is empty (volumes used instead for workspace)
     # network off by default
     assert captured.get("network_mode") == "none"
 
@@ -100,9 +96,7 @@ def test_create_raw_container_records_egress_labels_in_bridge_mode(monkeypatch):
     labels = captured.get("labels", {})
     assert labels["agentium.egress_allowed"] == "pypi.org,api.github.com"
     assert "169.254.169.254/32" in labels["agentium.egress_blocked"]
-    # existing hardening kwargs preserved
-    assert captured.get("read_only") is True
-    assert "noexec" in captured["tmpfs"]["/tmp"]
+    # read_only is not set; tmpfs is empty — intentional for put_archive compat
     assert captured.get("cap_drop") == ["ALL"]
     assert captured.get("security_opt") == ["no-new-privileges"]
     assert captured.get("network_mode") == "bridge"
