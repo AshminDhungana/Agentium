@@ -757,8 +757,11 @@ async def websocket_chat_endpoint(
             })
 
     except WebSocketDisconnect:
-        for t in pending_tasks.values():
-            t.cancel()
+        # Don't cancel generation tasks — let them complete so the
+        # reply is persisted to DB. The client's send_json calls fail
+        # silently (handled by on_delta / message_end try/except).
+        # On reconnect, the frontend loads the persisted reply from
+        # chat history.
         pending_tasks.clear()
         manager.disconnect(websocket)
     except Exception as exc:
