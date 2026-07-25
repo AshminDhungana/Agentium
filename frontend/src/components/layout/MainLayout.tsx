@@ -9,7 +9,6 @@ import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { VoiceSettingsModal } from '@/components/VoiceSettingsModal';
 import { VoiceModePanel } from '@/components/VoiceModePanel';
 import { FloatingChatWidget } from '@/components/chat';
-import { voiceBridgeService } from '@/services/voiceBridge';
 
 const COLLAPSE_KEY = 'agentium:sidebar-collapsed';
 
@@ -70,14 +69,7 @@ export function MainLayout() {
     return () => window.removeEventListener('keydown', onKey);
   }, [mobileOpen]);
 
-  // Voice mode sync on route change
-  useEffect(() => {
-    if (location.pathname === '/chat') {
-      voiceBridgeService.setVoiceMode('chat');
-    } else {
-      voiceBridgeService.setVoiceMode('system');
-    }
-  }, [location.pathname]);
+  // REMOVED: Voice mode sync on route change - let ChatPage and FloatingChatWidget handle voice mode
 
   const toggleCollapse = () => {
     setCollapsed((c) => {

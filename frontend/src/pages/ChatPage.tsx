@@ -35,6 +35,7 @@ import { localVoice } from '@/services/localVoice';
 import { useVoiceBridge } from '@/hooks/useVoiceBridge';
 import { VoiceInteractionEvent } from '@/services/voiceBridge';
 import { VoiceIndicator } from '@/components/VoiceIndicator';
+import { voiceBridgeService } from '@/services/voiceBridge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
@@ -280,6 +281,14 @@ export function ChatPage() {
             checkVoiceAvailability();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // Set voice mode to 'chat' when ChatPage is active
+    useEffect(() => {
+        voiceBridgeService.setVoiceMode('chat');
+        return () => {
+            // Don't reset here - MainLayout handles route changes
+        };
     }, []);
 
     // FIX: if the WebSocket drops (or goes into reconnect) while a reply is
