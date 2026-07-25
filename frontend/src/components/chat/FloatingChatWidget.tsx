@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { motion, useReducedMotion, AnimatePresence } from 'motion/react';
-import { useShallow } from 'zustand/react/shallow';
 import { MessageCircle, Minimize, Maximize, X, Bot, Mic } from 'lucide-react';
 import { useChatStore } from '@/store/chatStore';
 import type { Message as ChatMessage } from '@/store/chatStore';
@@ -19,13 +18,13 @@ type WidgetState = 'collapsed' | 'hovered' | 'expanded' | 'minimized';
 export function FloatingChatWidget() {
   const location = useLocation();
   const isChatPage = location.pathname === '/chat';
-  const isAuthenticated = useAuthStore(useShallow((s) => s.user?.isAuthenticated));
+  const isAuthenticated = useAuthStore((s) => s.user?.isAuthenticated);
 
   if (!isAuthenticated || isChatPage) return null;
 
-  const messages = useChatStore(useShallow((s) => s.messages));
-  const unreadCount = useWebSocketStore(useShallow((s) => s.unreadCount));
-  const wsSendMessage = useWebSocketStore(useShallow((s) => s.sendMessage));
+  const messages = useChatStore((s) => s.messages);
+  const unreadCount = useWebSocketStore((s) => s.unreadCount);
+  const wsSendMessage = useWebSocketStore((s) => s.sendMessage);
 
   const [state, setState] = useState<WidgetState>('collapsed');
   const [voiceMode, setVoiceMode] = useState<VoiceMode>('system');
