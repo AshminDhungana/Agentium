@@ -1,21 +1,5 @@
 # Agentium — Verification & Improvement Backlog
 
-## 11. Floating Chat Widget
-
-**Current behavior:** Chat only works from the Chat page. Messages arriving while the user is elsewhere trigger a notification requiring a page switch to reply. If the browser is minimized/closed, the voice bridge is the only remaining channel.
-
-**Desired behavior (build as one cohesive feature):**
-- Chat page keeps its full chat + voice experience, unchanged.
-- Navigating away from the Chat page surfaces a small floating messenger-style icon in the bottom-right corner.
-- New messages: clicking the icon opens a popup window with reply + voice support.
-- Minimizing the popup hands communication back to the voice bridge.
-- Returning to the Chat page hides the popup — it only mirrors the chat box while the user is elsewhere.
-- Closing the browser falls back to the voice bridge.
-- The popup lives in the main layout above all pages, stays fixed while scrolling, and never interferes with other pages' interactions.
-- Default state: small dot in the corner → expands to a chat icon on hover → opens the full popup on click.
-
-**Acceptance criteria:** All eight behaviors above verified manually across at least two pages other than Chat; popup and voice-bridge handoff tested in both directions (popup→minimize→voice, and voice→open popup).
-
 ---
 
 ## 12. Agents Page — UI Bugs

@@ -1,6 +1,6 @@
 import { motion } from 'motion/react';
 import { useRef } from 'react';
-import { Bot, Minimize, Maximize, X, Wifi, WifiOff, Loader2 } from 'lucide-react';
+import { User, Minimize, Maximize, X, Wifi, WifiOff, Loader2 } from 'lucide-react';
 
 interface ChatHeaderProps {
   voiceStatus: 'offline' | 'connecting' | 'connected' | 'error';
@@ -23,7 +23,7 @@ export function ChatHeader({ voiceStatus, onMinimize, onClose, closeButtonRef }:
     <header className="floating-chat-header">
       <div className="floating-chat-header-left">
         <div className="floating-chat-bot-icon">
-          <Bot className="w-4 h-4" aria-hidden="true" />
+          <User className="w-4 h-4" aria-hidden="true" />
         </div>
         <span className="floating-chat-title">Agentium</span>
       </div>

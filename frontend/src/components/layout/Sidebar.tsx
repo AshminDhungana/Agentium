@@ -64,7 +64,7 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar(
         onMouseEnter={() => prefetch(item.path)}
         onClick={mobileOpen ? onCloseMobile : undefined}
         className={({ isActive: a }) =>
-          `flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200 ${
+          `flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-[13px] font-medium transition-all duration-200 ${
             danger
               ? a
                 ? 'border border-red-200 bg-red-50 text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300'
@@ -75,7 +75,7 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar(
           } ${collapsed ? 'justify-center' : ''}`
         }
       >
-        <item.icon className={`h-[18px] w-[18px] flex-shrink-0 ${danger ? 'text-red-600' : ''}`} aria-hidden="true" />
+        <item.icon className={`h-4 w-4 flex-shrink-0 ${danger ? 'text-red-600' : ''}`} aria-hidden="true" />
         {!collapsed && <span className="flex-1 truncate">{item.label}</span>}
         {!collapsed && badge !== undefined && (
           <span aria-live="polite" className="min-w-[18px] rounded-full bg-red-500 px-1.5 py-0.5 text-center text-xs font-bold text-white">
@@ -99,7 +99,7 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar(
         mobileOpen ? 'translate-x-0' : '-translate-x-full',
       ].join(' ')}
     >
-      <div className="flex h-14 flex-shrink-0 items-center gap-2 border-b border-gray-200 px-4 dark:border-[#1e2535]">
+      <div className="flex h-12 flex-shrink-0 items-center gap-2 border-b border-gray-200 px-4 dark:border-[#1e2535]">
         <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-blue-600 text-white">
           <Shield className="h-5 w-5" aria-hidden="true" />
         </div>
@@ -111,11 +111,11 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar(
         )}
       </div>
 
-      <nav className="flex-1 space-y-4 overflow-y-auto px-3 py-3 scrollbar-thin" aria-label="Main navigation">
+      <nav className="flex-1 space-y-2 overflow-y-auto px-3 py-2 scrollbar-thin" aria-label="Main navigation">
         {groups.map((group) => (
           <div key={group.id} className="space-y-0.5">
             {!collapsed && (
-              <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+              <p className="px-3 pb-0.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
                 {group.label}
               </p>
             )}
@@ -123,13 +123,13 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar(
           </div>
         ))}
         {sovereignItem && (
-          <div className="space-y-0.5 border-t border-gray-200 pt-3 dark:border-[#1e2535]">
+          <div className="space-y-0.5 border-t border-gray-200 pt-2 dark:border-[#1e2535]">
             {renderItem(sovereignItem)}
           </div>
         )}
       </nav>
 
-      <div className="flex-shrink-0 border-t border-gray-200 px-4 py-3 dark:border-[#1e2535]">
+      <div className="flex-shrink-0 border-t border-gray-200 px-4 py-2 dark:border-[#1e2535]">
         <div className={collapsed ? 'flex justify-center' : 'flex items-center gap-3'}>
           <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-purple-500 to-pink-500 text-sm font-bold text-white">
             {user?.avatar_url ? (
@@ -151,7 +151,7 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar(
         {!collapsed && (
           <button
             onClick={handleLogout}
-            className="mt-2 flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-sm text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10"
+            className="mt-1.5 flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-sm text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10"
           >
             <LogOut className="h-4 w-4" aria-hidden="true" />
             Logout

@@ -123,7 +123,7 @@ export function MainLayout() {
         <VoiceModePanel onClose={() => setShowVoiceMode(false)} />
       )}
 
-      <FloatingChatWidget />
+      {location.pathname !== '/chat' && <FloatingChatWidget />}
     </div>
   );
 }

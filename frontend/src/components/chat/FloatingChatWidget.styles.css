@@ -14,150 +14,28 @@
   --spring-magnetic: 300 25;
 }
 
-/* Screen reader only utility */
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border-width: 0;
-}
-
-/* Collapsed: 8px pulsing dot */
-.floating-chat-collapsed {
-  position: fixed;
-  bottom: 1rem;
-  right: 1rem;
-  z-index: 50;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--color-primary);
-  border: none;
-  padding: 0;
-  cursor: pointer;
-  transition: transform 200ms var(--motion-spring-gentle);
-}
-
-.floating-chat-collapsed:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px var(--color-primary);
-}
-
-.floating-chat-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--color-primary);
-  display: block;
-}
-
-/* Hovered: 32px chat icon with magnetic follow */
-.floating-chat-hovered {
-  position: fixed;
-  bottom: 1rem;
-  right: 1rem;
-  z-index: 50;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: var(--color-primary);
-  border: none;
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
-  transition: transform 200ms var(--motion-spring-gentle), box-shadow 200ms ease;
-}
-
-.floating-chat-hovered:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px var(--color-primary), 0 10px 25px rgba(0, 0, 0, 0.15);
-}
-
-/* Expanded: native <dialog> */
-.floating-chat-dialog {
-  position: fixed;
-  bottom: 1rem;
-  right: 1rem;
-  z-index: 50;
-  width: 360px;
-  max-height: 520px;
-  border: none;
-  border-radius: 1rem;
-  box-shadow: var(--shadow-2xl);
-  background: var(--color-surface-elevated);
-  color: var(--color-text-primary);
-  padding: 0;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-
-/* Native <dialog> animations via @starting-style */
-@media (prefers-reduced-motion: no-preference) {
-  .floating-chat-dialog {
-    opacity: 0;
-    transform: scale(0.95) translateY(20px);
-    transition:
-      opacity 300ms var(--motion-spring-gentle),
-      transform 300ms var(--motion-spring-gentle),
-      overlay 300ms allow-discrete,
-      display 300ms allow-discrete;
-  }
-
-  .floating-chat-dialog:open {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-  }
-
-  @starting-style {
-    .floating-chat-dialog:open {
-      opacity: 0;
-      transform: scale(0.95) translateY(20px);
-    }
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .floating-chat-dialog {
-    transition: none;
-  }
-}
-
-/* No backdrop for non-modal dialog */
-.floating-chat-dialog::backdrop {
-  display: none;
-}
-
-/* Mobile responsiveness */
-@media (max-width: 480px) {
-  .floating-chat-dialog {
-    width: calc(100vw - 2rem);
-    max-height: 80vh;
-    left: 1rem;
-    right: 1rem;
-    bottom: 1rem;
-  }
-
-  .floating-chat-collapsed,
-  .floating-chat-hovered {
-    left: auto;
-    right: 1rem;
-  }
-}
-
-@media (max-width: 480px) and (orientation: landscape) {
-  .floating-chat-dialog {
-    max-height: 85vh;
-  }
-}
+/*
+ * NOTE on what moved out of this file:
+ *
+ * - .sr-only was deleted. Tailwind's built-in `sr-only` utility produces
+ *   byte-identical CSS, so this was a dead duplicate as soon as Tailwind
+ *   was loaded app-wide (see MainLayout.tsx). Any component using
+ *   className="sr-only" keeps working unchanged.
+ *
+ * - .floating-chat-collapsed, .floating-chat-hovered, .floating-chat-dot,
+ *   and .floating-chat-dialog (plus its @starting-style / ::backdrop /
+ *   allow-discrete block) were removed. They're now Tailwind utility
+ *   classes + Framer Motion variants directly in FloatingChatWidget.tsx.
+ *   The old native-<dialog> transition only ever worked on entry — the
+ *   component unmounted the whole subtree on close, so the exit half of
+ *   that CSS never had a chance to run. Framer Motion's AnimatePresence
+ *   now owns both directions for all four widget states, so this file
+ *   doesn't need to carry animation timing for them anymore.
+ *
+ * Everything below is unchanged. It's consumed by ChatHeader, MessageList,
+ * ChatInput, and MinimizedWidget, which weren't part of this fix — upload
+ * those and the same Tailwind conversion can be applied there too.
+ */
 
 /* ChatHeader */
 .floating-chat-header {
@@ -391,7 +269,7 @@
 .floating-chat-minimized {
   position: fixed;
   bottom: 1rem;
-  right: 1rem;
+  right: 1.5rem;
   z-index: 50;
   width: 48px;
   height: 48px;

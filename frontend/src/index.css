@@ -48,6 +48,21 @@
   --c-voice-glow: rgba(37, 99, 235, 0.2);
   --c-glass-bg: rgba(255, 255, 255, 0.85);
   --c-glass-border: rgba(37, 99, 235, 0.12);
+
+  --color-primary: var(--c-brand);
+  --color-primary-hover: #1d4ed8;
+  --color-secondary: #7c3aed;
+  --color-surface: var(--c-panel);
+  --color-surface-elevated: var(--c-panel-2);
+  --color-background: var(--c-canvas);
+  --color-border: var(--c-hairline);
+  --color-text-primary: #111827;
+  --color-text-secondary: #374151;
+  --color-text-muted: #9ca3af;
+  --color-muted: var(--c-subtle);
+  --color-ring: var(--c-brand-soft);
+  --color-destructive: #dc2626;
+  --color-destructive-hover: #b91c1c;
 }
 .dark {
   --c-canvas: #0f1117;
@@ -65,6 +80,21 @@
   --c-voice-glow: rgba(59, 130, 246, 0.3);
   --c-glass-bg: rgba(22, 27, 39, 0.85);
   --c-glass-border: rgba(59, 130, 246, 0.15);
+
+  --color-primary: var(--c-brand);
+  --color-primary-hover: #2563eb;
+  --color-secondary: #a78bfa;
+  --color-surface: var(--c-panel);
+  --color-surface-elevated: var(--c-panel-2);
+  --color-background: var(--c-canvas);
+  --color-border: var(--c-hairline);
+  --color-text-primary: #f9fafb;
+  --color-text-secondary: #d1d5db;
+  --color-text-muted: #9ca3af;
+  --color-muted: var(--c-subtle);
+  --color-ring: var(--c-brand-soft);
+  --color-destructive: #ef4444;
+  --color-destructive-hover: #dc2626;
 }
 
 /* Thin custom scrollbar for sidebar nav */
