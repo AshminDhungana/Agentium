@@ -1,0 +1,64 @@
+/* frontend/src/styles/chat-tokens.css */
+/* Floating Chat Widget Design Tokens */
+
+:root {
+  /* Glassmorphism surfaces */
+  --c-chat-glass-bg: rgba(255, 255, 255, 0.88);
+  --c-chat-glass-border: rgba(37, 99, 235, 0.10);
+  --c-chat-glow-ring: rgba(37, 99, 235, 0.35);
+  --c-chat-glow-strong: rgba(37, 99, 235, 0.55);
+
+  /* Shadows */
+  --shadow-chat-float: 0 4px 14px rgba(0, 0, 0, 0.08), 0 0 0 1px var(--c-chat-glass-border);
+  --shadow-chat-elevated: 0 25px 50px -12px rgba(0, 0, 0, 0.18), 0 0 0 1px var(--c-chat-glass-border);
+  --shadow-chat-magnetic: 0 0 0 4px var(--c-chat-glow-ring), 0 8px 30px rgba(37, 99, 235, 0.25);
+
+  /* Motion tokens */
+  --spring-gentle: cubic-bezier(0.22, 1, 0.36, 1);
+  --spring-snappy: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --spring-magnetic: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Sizing */
+  --chat-radius-panel: 1.5rem;     /* 24px */
+  --chat-radius-button: 50%;
+  --chat-panel-width: 384px;
+  --chat-panel-height: 520px;
+  --chat-dot-size: 12px;
+  --chat-button-size: 40px;
+  --chat-minimized-size: 48px;
+}
+
+.dark {
+  --c-chat-glass-bg: rgba(22, 27, 39, 0.92);
+  --c-chat-glass-border: rgba(59, 130, 246, 0.14);
+  --c-chat-glow-ring: rgba(59, 130, 246, 0.45);
+  --c-chat-glow-strong: rgba(59, 130, 246, 0.65);
+  --shadow-chat-float: 0 4px 14px rgba(0, 0, 0, 0.35), 0 0 0 1px var(--c-chat-glass-border);
+  --shadow-chat-elevated: 0 25px 50px -12px rgba(0, 0, 0, 0.55), 0 0 0 1px var(--c-chat-glass-border);
+  --shadow-chat-magnetic: 0 0 0 4px var(--c-chat-glow-ring), 0 8px 30px rgba(59, 130, 246, 0.35);
+}
+
+/* Breathing pulse keyframe (reduced-motion respects) */
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes chat-breathe {
+    0%, 100% { 
+      transform: scale(1); 
+      box-shadow: 0 0 0 0 var(--c-chat-glow-ring);
+    }
+    50% { 
+      transform: scale(1.06); 
+      box-shadow: 0 0 0 8px transparent;
+    }
+  }
+}
+
+/* Reduced motion: disable all chat animations */
+@media (prefers-reduced-motion: reduce) {
+  .chat-animate *,
+  .chat-animate *::before,
+  .chat-animate *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

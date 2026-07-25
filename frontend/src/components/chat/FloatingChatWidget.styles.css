@@ -268,8 +268,8 @@
 /* MinimizedWidget */
 .floating-chat-minimized {
   position: fixed;
-  bottom: 1rem;
-  right: 1.5rem;
+  bottom: 1.5rem;  /* 24px — matches CHAT_POSITION in FloatingChatWidget.tsx */
+  right: 2rem;     /* 32px — clears the scrollbar with real breathing room */
   z-index: 50;
   width: 48px;
   height: 48px;
@@ -288,6 +288,13 @@
 .floating-chat-minimized:focus-visible {
   outline: none;
   box-shadow: 0 0 0 3px var(--color-primary), 0 10px 25px rgba(0, 0, 0, 0.15);
+}
+
+@media (max-width: 480px) {
+  .floating-chat-minimized {
+    bottom: 1rem;   /* 16px — matches CHAT_POSITION_MOBILE */
+    right: 1rem;    /* 16px */
+  }
 }
 
 .floating-chat-badge {

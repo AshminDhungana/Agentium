@@ -15,9 +15,25 @@ type WidgetState = 'collapsed' | 'hovered' | 'expanded' | 'minimized';
 
 const SPRING_GENTLE = [0.22, 1, 0.36, 1] as const;
 
+const CHAT_POSITION = {
+  bottom: 'bottom-6',   // 24px
+  right: 'right-8',     // 32px
+} as const;
+
+const CHAT_POSITION_MOBILE = {
+  bottom: 'bottom-4',   // 16px
+  right: 'right-4',     // 16px
+} as const;
+
+// Single source of truth for widget placement, used by every state below.
+// Desktop keeps the widget clear of the scrollbar and viewport edge;
+// the max-[480px] variants fall back to the tighter mobile spacing.
+const WIDGET_POSITION =
+  `${CHAT_POSITION.bottom} ${CHAT_POSITION.right} ` +
+  `max-[480px]:${CHAT_POSITION_MOBILE.bottom} max-[480px]:${CHAT_POSITION_MOBILE.right}`;
+
 // NOTE: this component no longer checks auth state or the current route
 // itself. Both were previously an internal `if (!isAuthenticated ||
-// isChatPage) return null;` bail-out — which meant a wrong/stale value from
 // either check could silently hide the widget with no visible error.
 // MainLayout now owns both concerns instead: it only renders
 // <FloatingChatWidget /> at all on an authenticated route, and it excludes
@@ -81,7 +97,7 @@ export function FloatingChatWidget() {
       {state === 'collapsed' && (
         <motion.button
           key="collapsed"
-          className="fixed bottom-4 right-6 z-50 h-2 w-2 cursor-pointer rounded-full border-none bg-[var(--color-primary)] p-0 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--color-primary)]"
+          className={`fixed ${WIDGET_POSITION} z-50 h-2 w-2 cursor-pointer rounded-full border-none bg-[var(--color-primary)] p-0 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--color-primary)]`}
           aria-label="Open Agentium Chat"
           onMouseEnter={() => setState('hovered')}
           onClick={() => setState('expanded')}
@@ -103,7 +119,7 @@ export function FloatingChatWidget() {
       {state === 'hovered' && (
         <motion.button
           key="hovered"
-          className="fixed bottom-4 right-6 z-50 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border-none bg-[var(--color-primary)] text-white shadow-[0_10px_25px_rgba(0,0,0,0.15)] focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--color-primary)]"
+          className={`fixed ${WIDGET_POSITION} z-50 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border-none bg-[var(--color-primary)] text-white shadow-[0_10px_25px_rgba(0,0,0,0.15)] focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--color-primary)]`}
           aria-label="Open Agentium Chat"
           onMouseLeave={() => setState('collapsed')}
           onClick={() => setState('expanded')}
@@ -136,7 +152,7 @@ export function FloatingChatWidget() {
           aria-label="Agentium Chat"
           aria-describedby="chat-desc"
           onKeyDown={handleKeyDown}
-          className="fixed bottom-4 right-6 z-50 flex max-h-[520px] w-[360px] flex-col overflow-hidden rounded-2xl bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] shadow-2xl max-[480px]:inset-x-4 max-[480px]:w-auto max-[480px]:max-h-[80vh] max-[480px]:landscape:max-h-[85vh]"
+          className={`fixed ${WIDGET_POSITION} z-50 flex max-h-[520px] w-[360px] flex-col overflow-hidden rounded-2xl bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] shadow-2xl max-[480px]:inset-x-4 max-[480px]:w-auto max-[480px]:max-h-[80vh] max-[480px]:landscape:max-h-[85vh]`}
           initial={reduceMotion ? false : { opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.95, y: 20 }}
