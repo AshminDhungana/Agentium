@@ -1,11 +1,5 @@
 # Agentium — Verification & Improvement Backlog
 
-## 10. Chat Page — UX
-- **10.5 — [P2]** Auto-prune chat history older than 7 days, but always retain the last few messages regardless of age if there's been no further activity.
-- **10.6 — [P3]** Addressing convention: Head addresses the admin as "Sovereign"; all other users are addressed by username, or "sir" if no username context is available.
-
----
-
 ## 11. Floating Chat Widget
 
 **Current behavior:** Chat only works from the Chat page. Messages arriving while the user is elsewhere trigger a notification requiring a page switch to reply. If the browser is minimized/closed, the voice bridge is the only remaining channel.

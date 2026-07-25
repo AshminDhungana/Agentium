@@ -26,6 +26,9 @@ export type BridgeStatus = 'offline' | 'connecting' | 'connected' | 'error';
 // can show a live indicator instead of only the after-the-fact transcript.
 export type VoiceState = 'idle' | 'listening' | 'thinking' | 'speaking' | 'interrupted';
 
+// Voice ownership mode: who controls the microphone
+export type VoiceMode = 'chat' | 'popup' | 'system';
+
 export interface VoiceInteractionEvent {
   user:  string;   // what the user said
   reply: string;   // what the Head of Council replied
@@ -77,6 +80,21 @@ class VoiceBridgeService {
   private _errorListeners: Array<(err: ConnectionError | null) => void> = [];
 
   status: BridgeStatus = 'offline';
+  private _voiceMode: VoiceMode = 'system';
+
+  get voiceMode(): VoiceMode {
+    return this._voiceMode;
+  }
+
+  setVoiceMode(mode: VoiceMode): void {
+    if (this._voiceMode === mode) return;
+    this._voiceMode = mode;
+    this._updateMicState();
+    // Notify status listeners so UI can react
+    this.statusListeners.forEach((l) => {
+      try { l(this.status); } catch { /* ignore */ }
+    });
+  }
 
   get connectionError(): ConnectionError | null {
     return this._connectionError;
@@ -163,6 +181,21 @@ class VoiceBridgeService {
     this.ws?.close();
     this.ws = null;
     this._setStatus('offline');
+  }
+
+  /**
+   * Update microphone state based on current voiceMode.
+   * - 'chat' or 'popup': mic enabled (bridge streams to Head)
+   * - 'system': mic disabled (host handles wake-word)
+   */
+  private _updateMicState(): void {
+    const shouldConnect = this._voiceMode === 'chat' || this._voiceMode === 'popup';
+    if (shouldConnect && this.status !== 'connected') {
+      this.connect();
+    } else if (!shouldConnect && this.status === 'connected') {
+      // Keep WS open but mute mic — bridge handles wake-word in 'system' mode
+      this.ws?.send(JSON.stringify({ type: 'set_mic', enabled: false }));
+    }
   }
 
   onInteraction(handler: InteractionHandler): () => void {
