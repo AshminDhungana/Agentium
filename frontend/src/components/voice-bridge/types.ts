@@ -108,6 +108,10 @@ export interface ConnectionStatusProps {
   className?: string;
   showLabel?: boolean;
   compact?: boolean;
+  /** Called when the Connect button is pressed (shown while disconnected/error). */
+  onConnect?: () => void;
+  /** Called when the Disconnect button is pressed (shown while connected). */
+  onDisconnect?: () => void;
 }
 
 export interface ConnectionStatusConfig {

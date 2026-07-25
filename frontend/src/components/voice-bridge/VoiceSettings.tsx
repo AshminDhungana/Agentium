@@ -17,9 +17,9 @@ type TabKey = (typeof TABS)[number]['key'];
 
 const SECTION_LABEL = 'text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider';
 const FIELD_LABEL = 'text-gray-600 dark:text-gray-300';
-const RANGE_TRACK = 'w-full h-2 bg-gray-200 dark:bg-slate-700 rounded-lg appearance-none accent-blue-500';
-const SELECT_FIELD = 'w-full bg-gray-50 dark:bg-slate-800/50 border border-gray-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-blue-500';
-const TOGGLE_ROW = 'flex items-center gap-3 cursor-pointer p-3 rounded-xl bg-gray-50 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors';
+const RANGE_TRACK = 'w-full h-2 bg-gray-200 dark:bg-[#2a3347] rounded-lg appearance-none accent-blue-500';
+const SELECT_FIELD = 'w-full bg-gray-50 dark:bg-[#1c2333] border border-gray-200 dark:border-[#1e2535] rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-blue-500';
+const TOGGLE_ROW = 'flex items-center gap-3 cursor-pointer p-3 rounded-xl bg-gray-50 dark:bg-[#1c2333] hover:bg-gray-100 dark:hover:bg-[#2a3347] transition-colors';
 const CHECKBOX = 'w-5 h-5 rounded border-gray-300 dark:border-gray-600 text-blue-500 focus:ring-blue-500';
 
 function EngineTab({ settings, onChange }: { settings: VoiceSettings; onChange: (key: keyof VoiceSettings, value: any) => void }) {
@@ -75,7 +75,7 @@ function EngineTab({ settings, onChange }: { settings: VoiceSettings; onChange: 
               className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium border transition-all ${
                 settings.voiceMode === mode
                   ? 'border-blue-500 bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400'
-                  : 'border-gray-200 dark:border-white/10 text-gray-500 dark:text-gray-400 hover:border-gray-300 dark:hover:border-white/20 hover:text-gray-700 dark:hover:text-gray-300 bg-white dark:bg-white/5'
+                  : 'border-gray-200 dark:border-[#1e2535] text-gray-500 dark:text-gray-400 hover:border-gray-300 dark:hover:border-[#2a3347] hover:text-gray-700 dark:hover:text-gray-300 bg-white dark:bg-[#1c2333]'
               }`}
             >
               {mode === 'push-to-talk' ? <Mic className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
@@ -242,7 +242,7 @@ function AdvancedTab({ settings, onChange, availableInputDevices, availableOutpu
         </label>
       </div>
 
-      <div className="space-y-4 pt-4 border-t border-gray-200 dark:border-white/10">
+      <div className="space-y-4 pt-4 border-t border-gray-200 dark:border-[#1e2535]">
         <h3 className={SECTION_LABEL}>Voice Activity Detection</h3>
         <label className="block">
           <div className="flex justify-between text-sm mb-2">
@@ -278,7 +278,7 @@ function AdvancedTab({ settings, onChange, availableInputDevices, availableOutpu
         </label>
       </div>
 
-      <div className="space-y-4 pt-4 border-t border-gray-200 dark:border-white/10">
+      <div className="space-y-4 pt-4 border-t border-gray-200 dark:border-[#1e2535]">
         <h3 className={SECTION_LABEL}>Privacy & Data</h3>
         <label className={TOGGLE_ROW}>
           <input
@@ -409,20 +409,20 @@ export function VoiceSettings({
         onKeyDown={handleKeyDown}
       >
         <motion.div
-          className="w-full max-w-lg bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-gray-200 dark:border-white/10 rounded-3xl shadow-2xl overflow-hidden"
+          className="w-full max-w-lg bg-white dark:bg-[#161b27] border border-gray-200 dark:border-[#1e2535] rounded-3xl shadow-2xl overflow-hidden"
           initial={{ opacity: 0, y: '100%' }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: '100%' }}
           transition={{ type: prefersReduced ? 'tween' : 'spring', stiffness: 300, damping: 30, duration: 0.4 }}
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-white/10">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-[#1e2535]">
             <h2 id="voice-settings-title" className="text-lg font-semibold text-gray-900 dark:text-white">
               Voice Settings
             </h2>
             <motion.button
               onClick={onClose}
-              className="p-2 rounded-xl text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
+              className="p-2 rounded-xl text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-[#2a3347] transition-colors"
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
               aria-label="Close settings"
@@ -431,7 +431,7 @@ export function VoiceSettings({
             </motion.button>
           </div>
 
-          <div className="flex gap-1 px-4 pb-4 border-b border-gray-200 dark:border-white/10" role="tablist" aria-label="Settings categories">
+          <div className="flex gap-1 px-4 pb-4 border-b border-gray-200 dark:border-[#1e2535]" role="tablist" aria-label="Settings categories">
             {TABS.map(({ key, label, icon: Icon }) => (
               <motion.button
                 key={key}
@@ -440,7 +440,7 @@ export function VoiceSettings({
                 onClick={() => setActiveTab(key)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 flex-1 justify-center ${
                   activeTab === key
-                    ? 'bg-gray-100 dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm'
+                    ? 'bg-gray-100 dark:bg-[#1c2333] text-blue-600 dark:text-blue-400 shadow-sm'
                     : 'text-gray-500 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
                 }`}
                 whileHover={{ scale: 1.02 }}
@@ -456,10 +456,10 @@ export function VoiceSettings({
             {tabsContent[activeTab]}
           </div>
 
-          <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200 dark:border-white/10">
+          <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200 dark:border-[#1e2535]">
             <motion.button
               onClick={handleReset}
-              className="px-4 py-2 rounded-xl text-sm font-medium text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-white/5 hover:bg-gray-200 dark:hover:bg-white/10 hover:text-gray-900 dark:hover:text-white border border-gray-200 dark:border-white/10 transition-colors"
+              className="px-4 py-2 rounded-xl text-sm font-medium text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-[#1c2333] hover:bg-gray-200 dark:hover:bg-[#2a3347] hover:text-gray-900 dark:hover:text-white border border-gray-200 dark:border-[#1e2535] transition-colors"
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
             >

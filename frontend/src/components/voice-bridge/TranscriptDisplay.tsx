@@ -58,11 +58,6 @@ export function TranscriptDisplay({
     setTimeout(() => setCopiedIndex(null), 2000);
   };
 
-  const handleClear = () => {
-    // This will be handled by parent via onClear prop if needed
-    window.dispatchEvent(new CustomEvent('voice-bridge-clear-transcripts'));
-  };
-
   if (transcripts.length === 0) {
     return (
       <div

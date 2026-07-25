@@ -1,5 +1,5 @@
 import { motion, type Variants } from 'framer-motion';
-import { Wifi, WifiOff, Loader2, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
+import { WifiOff, Loader2, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
 import type { ConnectionStatusProps, ConnectionStatus, ConnectionStatusConfig } from './types';
 
 const STATUS_CONFIG: Record<ConnectionStatus, ConnectionStatusConfig> = {
@@ -73,6 +73,8 @@ export function ConnectionStatus({
   className = '',
   showLabel = true,
   compact = false,
+  onConnect,
+  onDisconnect,
 }: ConnectionStatusProps) {
   const config = STATUS_CONFIG[status];
   const prefersReduced = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -98,7 +100,7 @@ export function ConnectionStatus({
 
   return (
     <motion.div
-      className={`flex items-center gap-3 px-4 py-3 rounded-2xl bg-white dark:bg-white/5 backdrop-blur-md border shadow-sm dark:shadow-none ${config.ringColor} ${className}`}
+      className={`flex items-center gap-3 px-4 py-3 rounded-2xl bg-white dark:bg-[#161b27] border shadow-sm dark:shadow-none ${config.ringColor} ${className}`}
       variants={statusVariants}
       initial="hidden"
       animate="visible"
@@ -139,8 +141,9 @@ export function ConnectionStatus({
         </p>
       </div>
 
-      {(status === 'disconnected' || status === 'error') && (
+      {(status === 'disconnected' || status === 'error') && onConnect && (
         <button
+          onClick={onConnect}
           className="px-4 py-2 rounded-xl text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors whitespace-nowrap"
           aria-label="Connect to voice bridge"
         >
@@ -148,8 +151,9 @@ export function ConnectionStatus({
         </button>
       )}
 
-      {status === 'connected' && (
+      {status === 'connected' && onDisconnect && (
         <button
+          onClick={onDisconnect}
           className="p-2 rounded-xl text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
           aria-label="Disconnect from voice bridge"
         >

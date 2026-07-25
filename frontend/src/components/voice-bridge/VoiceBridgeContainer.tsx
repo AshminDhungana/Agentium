@@ -1,19 +1,19 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Mic, Loader2, AlertCircle, Trash2 } from 'lucide-react';
 import { VoiceOrb } from './VoiceOrb';
 import { WaveformVisualizer } from './WaveformVisualizer';
 import { FrequencyBars } from './FrequencyBars';
 import { VoiceControls } from './VoiceControls';
-import { ConnectionStatus, ConnectionStatusCompact } from './ConnectionStatus';
+import { ConnectionStatusCompact } from './ConnectionStatus';
 import { MicrophoneLevel } from './MicrophoneLevel';
 import { TranscriptDisplay } from './TranscriptDisplay';
 import { VoiceSettings } from './VoiceSettings';
 import { useVoiceBridge } from './hooks/useVoiceBridge';
 import { useAudioVisualization } from './hooks/useAudioVisualization';
-import type { VoiceState, ConnectionStatus as ConnectionStatusType } from './types';
+import type { VoiceState } from './types';
 
 const VISUALIZATION_WIDTH = 600;
-const VISUALIZATION_HEIGHT = 100;
 
 export function VoiceBridgeContainer({ className = '' }: { className?: string }) {
   const {
@@ -21,7 +21,6 @@ export function VoiceBridgeContainer({ className = '' }: { className?: string })
     voiceState,
     isRecording,
     isMuted,
-    isProcessing,
     micLevel,
     timeDomainData,
     frequencyData,
@@ -35,7 +34,6 @@ export function VoiceBridgeContainer({ className = '' }: { className?: string })
     stopRecording,
     toggleMute,
     updateSettings,
-    addTranscript,
     clearTranscripts,
     setMicLevel,
     setTimeDomainData,
@@ -108,17 +106,13 @@ export function VoiceBridgeContainer({ className = '' }: { className?: string })
     }
   }, [status, connect, disconnect]);
 
-  const handleSettingsOpen = useCallback(() => {
-    setIsSettingsOpen(true);
-  }, []);
+  const handleSettingsOpen = useCallback(() => setIsSettingsOpen(true), []);
+  const handleSettingsClose = useCallback(() => setIsSettingsOpen(false), []);
 
-  const handleSettingsClose = useCallback(() => {
-    setIsSettingsOpen(false);
-  }, []);
-
-  const handleSettingsChange = useCallback((newSettings: Partial<typeof settings>) => {
-    updateSettings(newSettings);
-  }, [updateSettings]);
+  const handleSettingsChange = useCallback(
+    (newSettings: Partial<typeof settings>) => updateSettings(newSettings),
+    [updateSettings]
+  );
 
   const handleClearTranscripts = useCallback(() => {
     clearTranscripts();
@@ -143,83 +137,77 @@ export function VoiceBridgeContainer({ className = '' }: { className?: string })
 
   const vizColor = getVisualizationColor(voiceState);
   const showVisualization = voiceState === 'listening' || voiceState === 'speaking';
+  const isBusy = status === 'connecting' || status === 'reconnecting';
 
   return (
-    <div
-      className={`relative min-h-screen flex flex-col bg-gray-50 dark:bg-slate-950 transition-colors duration-300 ${className}`}
-    >
-      {/*
-        NOTE (fix): this ambient glow used to be a `style.background` on the
-        root element itself. Inline `background` overrides the Tailwind
-        `bg-*` class on the same element, so the page never actually painted
-        its own solid surface — it just showed whatever was behind it. That's
-        why the page looked fine over a dark shell but would go patchy/see
-        -through anywhere else (e.g. light mode). Moving it to its own
-        absolutely-positioned decorative layer keeps the real background
-        (`bg-gray-50 dark:bg-slate-950`) intact.
-      */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0"
-        style={{
-          background: 'radial-gradient(ellipse at center, rgba(59, 130, 246, 0.10) 0%, transparent 70%)',
-        }}
-      />
-      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full blur-3xl bg-blue-400/10 dark:bg-blue-500/10" />
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 rounded-full blur-3xl bg-purple-400/10 dark:bg-purple-500/10" />
+    <div className={`h-full flex flex-col bg-gray-50 dark:bg-[#0f1117] transition-colors duration-200 ${className}`}>
+      {/* ── Header ─────────────────────────────────────────────────────── */}
+      <div className="flex-shrink-0 bg-white dark:bg-[#161b27] border-b border-gray-200 dark:border-[#1e2535] shadow-sm dark:shadow-none">
+        <div className="max-w-2xl mx-auto px-6 py-4 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center flex-shrink-0 shadow-lg shadow-blue-500/25 dark:shadow-blue-900/40">
+              <Mic className="w-5 h-5 text-white" aria-hidden="true" />
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-base font-semibold text-gray-900 dark:text-white leading-tight">
+                Voice Bridge
+              </h1>
+              <p className="text-xs text-gray-600 dark:text-gray-400 truncate">
+                Talk to Agentium in real time
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <ConnectionStatusCompact status={status} />
+            <button
+              onClick={handleConnect}
+              disabled={isBusy}
+              className={
+                status === 'connected'
+                  ? 'inline-flex items-center justify-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-[#1e2535] dark:hover:bg-[#2a3347] text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg transition-colors duration-150'
+                  : 'inline-flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors duration-150 shadow-sm dark:shadow-blue-900/30'
+              }
+            >
+              {isBusy && <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />}
+              {status === 'connected' ? 'Disconnect' : isBusy ? 'Connecting…' : 'Connect'}
+            </button>
+          </div>
+        </div>
       </div>
 
-      <div className="relative z-10 flex-1 flex flex-col items-center justify-center p-4 sm:p-6 lg:p-10">
-        <motion.div
-          className="w-full max-w-4xl flex flex-col items-center gap-8"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, type: prefersReduced ? 'tween' : 'spring', stiffness: 100, damping: 20 }}
-        >
-          <motion.div
-            className="flex items-center justify-between w-full"
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-          >
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white tracking-tight">
-              Voice Bridge
-            </h1>
-            <ConnectionStatusCompact status={status} />
-          </motion.div>
-
-          <motion.div
-            className="relative flex flex-col items-center gap-6 w-full"
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.2, type: prefersReduced ? 'tween' : 'spring', stiffness: 200, damping: 20 }}
-          >
-            <div className="relative w-full max-w-md mx-auto flex items-center justify-center py-4">
-              <VoiceOrb
-                size={240}
-                state={voiceState}
-                micLevel={micLevel}
-                reducedMotion={prefersReduced}
-              />
+      {/* ── Scrollable content ─────────────────────────────────────────── */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-2xl mx-auto px-6 py-8 flex flex-col items-center gap-5">
+          {status === 'error' && (
+            <div className="w-full p-4 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-xl flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" aria-hidden="true" />
+              <div>
+                <p className="text-sm font-medium text-red-700 dark:text-red-400">Connection error</p>
+                <p className="text-xs text-red-600/80 dark:text-red-400/70 mt-0.5">
+                  Unable to connect. Is the voice bridge running?
+                </p>
+              </div>
             </div>
+          )}
 
-            <AnimatePresence mode="wait">
-              {showVisualization && (
-                <motion.div
-                  key="visualizations"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  transition={{ duration: 0.3 }}
-                  className="w-full max-w-2xl space-y-4"
-                >
-                  {timeDomainData && (
-                  <motion.div
-                    initial={{ opacity: 0, scaleY: 0.8 }}
-                    animate={{ opacity: 1, scaleY: 1 }}
-                    className="bg-white dark:bg-white/5 backdrop-blur-md border border-gray-200 dark:border-white/10 rounded-2xl p-4 shadow-sm dark:shadow-none"
-                  >
+          {/* Orb */}
+          <div className="w-full bg-white dark:bg-[#161b27] rounded-2xl border border-gray-200 dark:border-[#1e2535] shadow-sm dark:shadow-none p-8 flex items-center justify-center">
+            <VoiceOrb size={180} state={voiceState} micLevel={micLevel} reducedMotion={prefersReduced} />
+          </div>
+
+          {/* Visualizations — only while actively listening or speaking */}
+          <AnimatePresence>
+            {showVisualization && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: prefersReduced ? 0 : 0.2 }}
+                className="w-full flex flex-col items-center gap-4 overflow-hidden"
+              >
+                {timeDomainData && (
+                  <div className="w-full bg-white dark:bg-[#161b27] rounded-xl border border-gray-200 dark:border-[#1e2535] shadow-sm dark:shadow-none p-4">
                     <WaveformVisualizer
                       timeDomainData={timeDomainData}
                       color={vizColor}
@@ -227,99 +215,58 @@ export function VoiceBridgeContainer({ className = '' }: { className?: string })
                       height={60}
                       reducedMotion={prefersReduced}
                     />
-                  </motion.div>
-                  )}
-                  {frequencyData && (
-                  <motion.div
-                    initial={{ opacity: 0, scaleY: 0.8 }}
-                    animate={{ opacity: 1, scaleY: 1 }}
-                    transition={{ delay: 0.1 }}
-                    className="bg-white dark:bg-white/5 backdrop-blur-md border border-gray-200 dark:border-white/10 rounded-2xl p-4 shadow-sm dark:shadow-none"
-                  >
+                  </div>
+                )}
+                {frequencyData && (
+                  <div className="w-full bg-white dark:bg-[#161b27] rounded-xl border border-gray-200 dark:border-[#1e2535] shadow-sm dark:shadow-none p-4">
                     <FrequencyBars
                       frequencyData={frequencyData}
                       color={vizColor}
                       width={VISUALIZATION_WIDTH}
-                      height={80}
+                      height={70}
                       reducedMotion={prefersReduced}
                     />
-                  </motion.div>
-                  )}
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.2 }}
-                    className="flex justify-center"
-                  >
-                    <MicrophoneLevel
-                      level={micLevel}
-                      className="w-64"
-                      reducedMotion={prefersReduced}
-                    />
-                  </motion.div>
-                </motion.div>
+                  </div>
+                )}
+                <MicrophoneLevel level={micLevel} className="w-64" reducedMotion={prefersReduced} />
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Transcript */}
+          <div className="w-full bg-white dark:bg-[#161b27] rounded-2xl border border-gray-200 dark:border-[#1e2535] shadow-sm dark:shadow-none overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 dark:border-[#1e2535]">
+              <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Conversation</h2>
+              {transcripts.length > 0 && (
+                <button
+                  onClick={handleClearTranscripts}
+                  className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors duration-150"
+                >
+                  <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
+                  Clear
+                </button>
               )}
-            </AnimatePresence>
+            </div>
+            <TranscriptDisplay transcripts={transcripts} maxHeight={320} className="p-4" />
+          </div>
+        </div>
+      </div>
 
-            <motion.div
-              className="w-full max-w-2xl"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-            >
-              <TranscriptDisplay
-                transcripts={transcripts}
-                maxHeight={300}
-                className="bg-white dark:bg-white/5 backdrop-blur-md border border-gray-200 dark:border-white/10 rounded-2xl shadow-sm dark:shadow-none"
-              />
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 }}
-            >
-              <VoiceControls
-                voiceState={voiceState}
-                isConnected={status === 'connected'}
-                isMuted={isMuted}
-                isRecording={isRecording}
-                onRecord={handleRecord}
-                onStop={handleStop}
-                onMuteToggle={handleMuteToggle}
-                onSettings={handleSettingsOpen}
-                onClose={() => handleSettingsClose()}
-                reducedMotion={prefersReduced}
-              />
-            </motion.div>
-
-            <motion.div
-              className="flex items-center justify-center gap-4 text-xs text-gray-600 dark:text-gray-500"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.5 }}
-            >
-              <span className="flex items-center gap-1.5">
-                <span className={`w-1.5 h-1.5 rounded-full ${status === 'connected' ? 'bg-emerald-500' : 'bg-gray-400 dark:bg-gray-600'}`} />
-                {status === 'connected' ? 'Bridge connected' : 'Bridge offline'}
-              </span>
-              <span className="hidden sm:inline">·</span>
-              <span>
-                {status === 'connected'
-                  ? voiceState === 'idle'
-                    ? 'Tap mic or say "Hey Agentium"'
-                    : voiceState === 'listening'
-                    ? 'Listening...'
-                    : voiceState === 'speaking'
-                    ? 'Speaking...'
-                    : voiceState === 'processing'
-                    ? 'Processing...'
-                    : 'Ready'
-                  : 'Connect the voice bridge to start'}
-              </span>
-            </motion.div>
-          </motion.div>
-        </motion.div>
+      {/* ── Controls ───────────────────────────────────────────────────── */}
+      <div className="flex-shrink-0 bg-white dark:bg-[#161b27] border-t border-gray-200 dark:border-[#1e2535] px-6 py-5">
+        <div className="max-w-2xl mx-auto">
+          <VoiceControls
+            voiceState={voiceState}
+            isConnected={status === 'connected'}
+            isMuted={isMuted}
+            isRecording={isRecording}
+            onRecord={handleRecord}
+            onStop={handleStop}
+            onMuteToggle={handleMuteToggle}
+            onSettings={handleSettingsOpen}
+            reducedMotion={prefersReduced}
+          />
+        </div>
       </div>
 
       <VoiceSettings
