@@ -13,28 +13,40 @@ export function MinimizedWidget({ unreadCount, onClick, reduceMotion }: Minimize
 
   return (
     <motion.button
-      className="floating-chat-minimized"
-      role="button"
-      tabIndex={0}
-      aria-label="Open Agentium Chat"
+      type="button"
+      className="fixed bottom-6 right-8 z-50 flex h-14 items-center gap-2 rounded-full border border-white/10 bg-[var(--color-surface-elevated)] pl-1.5 pr-4 text-[var(--color-text-primary)] shadow-[0_2px_6px_rgba(15,23,42,0.12),0_16px_32px_-8px_rgba(15,23,42,0.35)] outline-none focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2 max-[480px]:bottom-4 max-[480px]:right-4"
+      aria-label={
+        unreadCount > 0
+          ? `Resume Agentium Chat, ${unreadCount} unread message${unreadCount === 1 ? '' : 's'}`
+          : 'Resume Agentium Chat'
+      }
       onClick={onClick}
-      whileHover={{ scale: 1.05 }}
-      whileTap={{ scale: 0.95 }}
-      initial={shouldReduce ? undefined : { scale: 0, rotate: -90 }}
-      animate={shouldReduce ? undefined : { scale: 1, rotate: 0 }}
-      transition={{ type: 'spring', stiffness: 250, damping: 25 }}
+      whileHover={shouldReduce ? {} : { scale: 1.03 }}
+      whileTap={{ scale: 0.96 }}
+      initial={shouldReduce ? false : { opacity: 0, scale: 0.85, y: 12 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      exit={
+        shouldReduce
+          ? { opacity: 0 }
+          : { opacity: 0, scale: 0.85, y: 8, transition: { duration: 0.15 } }
+      }
+      transition={{ type: 'spring', stiffness: 300, damping: 26 }}
     >
-      <MessageCircle className="w-6 h-6" aria-hidden="true" />
-
-      {unreadCount > 0 && (
-        <motion.span
-          className="floating-chat-badge"
-          animate={shouldReduce ? {} : { scale: [1, 1.2, 1] }}
-          transition={{ duration: 1, repeat: Infinity, ease: 'easeInOut' }}
-        >
-          {unreadCount > 9 ? '9+' : unreadCount}
-        </motion.span>
-      )}
+      <span className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--color-primary)] text-white">
+        <MessageCircle className="h-4 w-4" aria-hidden="true" />
+        {unreadCount > 0 && (
+          <motion.span
+            className="absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[var(--color-destructive)] px-1 text-[10px] font-semibold leading-none text-white"
+            animate={shouldReduce ? {} : { scale: [1, 1.15, 1] }}
+            transition={{ duration: 1, repeat: Infinity, ease: 'easeInOut' }}
+          >
+            {unreadCount > 9 ? '9+' : unreadCount}
+          </motion.span>
+        )}
+      </span>
+      <span className="whitespace-nowrap text-sm font-medium">
+        {unreadCount > 0 ? `${unreadCount} new message${unreadCount === 1 ? '' : 's'}` : 'Resume chat'}
+      </span>
     </motion.button>
   );
 }

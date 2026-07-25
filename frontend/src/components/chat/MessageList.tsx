@@ -1,7 +1,7 @@
 import { motion, useReducedMotion } from 'motion/react';
 import { useRef, useEffect } from 'react';
+import { MessageCircle } from 'lucide-react';
 import { MarkdownMessage } from '@/components/chat/MarkdownMessage';
-import { TypingIndicator } from '@/components/chat/TypingIndicator';
 import type { Message } from '@/store/chatStore';
 
 interface MessageListProps {
@@ -27,8 +27,14 @@ export function MessageList({ messages, reduceMotion }: MessageListProps) {
 
   if (messages.length === 0) {
     return (
-      <div className="floating-chat-empty">
-        <p>No messages yet. Start a conversation!</p>
+      <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 py-10 text-center">
+        <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[var(--color-muted)] text-[var(--color-text-muted)]">
+          <MessageCircle className="h-5 w-5" aria-hidden="true" />
+        </div>
+        <p className="text-sm font-medium text-[var(--color-text-primary)]">Start a conversation</p>
+        <p className="max-w-[220px] text-xs text-[var(--color-text-muted)]">
+          Ask Agentium anything — questions, tasks, or just say hello.
+        </p>
       </div>
     );
   }
@@ -46,10 +52,12 @@ export function MessageList({ messages, reduceMotion }: MessageListProps) {
         animate={{ opacity: 1 }}
         transition={{ staggerChildren: reduceMotion || reduceMotionPref ? 0 : 0.05 }}
       >
-{messages.map((msg, index) => (
+        {messages.map((msg) => {
+          const isUser = msg.role === 'sovereign';
+          return (
             <motion.div
               key={msg.id}
-              className={`floating-chat-message ${msg.role}`}
+              className={`mb-2 flex last:mb-0 ${isUser ? 'justify-end' : 'justify-start'}`}
               variants={{
                 hidden: { opacity: 0, y: 20 },
                 visible: { opacity: 1, y: 0 },
@@ -57,13 +65,18 @@ export function MessageList({ messages, reduceMotion }: MessageListProps) {
               initial="hidden"
               animate="visible"
             >
-              <MarkdownMessage
-                content={msg.content}
-                isUser={msg.role === 'sovereign'}
-                status={msg.status}
-              />
+              <div
+                className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 shadow-sm ${
+                  isUser
+                    ? 'rounded-br-md bg-[var(--color-primary)] text-white'
+                    : 'rounded-bl-md border border-[var(--color-border)] bg-[var(--color-muted)] text-[var(--color-text-primary)]'
+                }`}
+              >
+                <MarkdownMessage content={msg.content} isUser={isUser} status={msg.status} />
+              </div>
             </motion.div>
-          ))}
+          );
+        })}
       </motion.div>
       <div ref={messagesEndRef} />
     </div>

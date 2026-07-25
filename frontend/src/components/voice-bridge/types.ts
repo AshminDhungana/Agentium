@@ -116,6 +116,10 @@ export interface ConnectionStatusConfig {
   icon: React.ReactNode;
   bgColor: string;
   ringColor: string;
+  /** Real CSS color (hex) for the animated pulse ring — Tailwind class names
+   * like "text-amber-400" aren't valid `style.borderColor` values, so this
+   * is kept separate from the `color` class string used elsewhere. */
+  dotHex: string;
 }
 
 export interface VoiceSettingsProps {

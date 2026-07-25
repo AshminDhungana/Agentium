@@ -2,6 +2,8 @@
 
 ---
 
+
+
 ## 12. Agents Page — UI Bugs
 
 - **12.1 — [P3]** Scrollbar renders black in light mode; should adapt to the active theme.

@@ -67,7 +67,7 @@ function VoiceBridgeSignInGate({ loginHref }: { loginHref: string }) {
           </span>
         </div>
 
-        <h1 className="text-xl font-semibold tracking-tight text-white">Voice Bridge</h1>
+        <h1 className="text-xl font-semibold tracking-tight text-white">Voice</h1>
         <p className="mt-2 text-sm leading-relaxed text-slate-400">
           Sign in to start bridging your call.
         </p>

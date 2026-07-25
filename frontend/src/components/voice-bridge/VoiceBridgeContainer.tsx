@@ -146,14 +146,28 @@ export function VoiceBridgeContainer({ className = '' }: { className?: string })
 
   return (
     <div
-      className={`min-h-screen bg-slate-950 flex flex-col ${className}`}
-      style={{
-        background: 'radial-gradient(ellipse at center, rgba(59, 130, 246, 0.08) 0%, transparent 70%)',
-      }}
+      className={`relative min-h-screen flex flex-col bg-gray-50 dark:bg-slate-950 transition-colors duration-300 ${className}`}
     >
-      <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full blur-3xl bg-blue-500/10" />
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 rounded-full blur-3xl bg-purple-500/10" />
+      {/*
+        NOTE (fix): this ambient glow used to be a `style.background` on the
+        root element itself. Inline `background` overrides the Tailwind
+        `bg-*` class on the same element, so the page never actually painted
+        its own solid surface — it just showed whatever was behind it. That's
+        why the page looked fine over a dark shell but would go patchy/see
+        -through anywhere else (e.g. light mode). Moving it to its own
+        absolutely-positioned decorative layer keeps the real background
+        (`bg-gray-50 dark:bg-slate-950`) intact.
+      */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background: 'radial-gradient(ellipse at center, rgba(59, 130, 246, 0.10) 0%, transparent 70%)',
+        }}
+      />
+      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full blur-3xl bg-blue-400/10 dark:bg-blue-500/10" />
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 rounded-full blur-3xl bg-purple-400/10 dark:bg-purple-500/10" />
       </div>
 
       <div className="relative z-10 flex-1 flex flex-col items-center justify-center p-4 sm:p-6 lg:p-10">
@@ -169,7 +183,9 @@ export function VoiceBridgeContainer({ className = '' }: { className?: string })
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
           >
-            <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">Voice Bridge</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white tracking-tight">
+              Voice Bridge
+            </h1>
             <ConnectionStatusCompact status={status} />
           </motion.div>
 
@@ -179,7 +195,7 @@ export function VoiceBridgeContainer({ className = '' }: { className?: string })
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.2, type: prefersReduced ? 'tween' : 'spring', stiffness: 200, damping: 20 }}
           >
-            <div className="relative w-full max-w-md mx-auto">
+            <div className="relative w-full max-w-md mx-auto flex items-center justify-center py-4">
               <VoiceOrb
                 size={240}
                 state={voiceState}
@@ -202,7 +218,7 @@ export function VoiceBridgeContainer({ className = '' }: { className?: string })
                   <motion.div
                     initial={{ opacity: 0, scaleY: 0.8 }}
                     animate={{ opacity: 1, scaleY: 1 }}
-                    className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-4"
+                    className="bg-white dark:bg-white/5 backdrop-blur-md border border-gray-200 dark:border-white/10 rounded-2xl p-4 shadow-sm dark:shadow-none"
                   >
                     <WaveformVisualizer
                       timeDomainData={timeDomainData}
@@ -218,7 +234,7 @@ export function VoiceBridgeContainer({ className = '' }: { className?: string })
                     initial={{ opacity: 0, scaleY: 0.8 }}
                     animate={{ opacity: 1, scaleY: 1 }}
                     transition={{ delay: 0.1 }}
-                    className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-4"
+                    className="bg-white dark:bg-white/5 backdrop-blur-md border border-gray-200 dark:border-white/10 rounded-2xl p-4 shadow-sm dark:shadow-none"
                   >
                     <FrequencyBars
                       frequencyData={frequencyData}
@@ -254,7 +270,7 @@ export function VoiceBridgeContainer({ className = '' }: { className?: string })
               <TranscriptDisplay
                 transcripts={transcripts}
                 maxHeight={300}
-                className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl"
+                className="bg-white dark:bg-white/5 backdrop-blur-md border border-gray-200 dark:border-white/10 rounded-2xl shadow-sm dark:shadow-none"
               />
             </motion.div>
 
@@ -278,13 +294,13 @@ export function VoiceBridgeContainer({ className = '' }: { className?: string })
             </motion.div>
 
             <motion.div
-              className="flex items-center justify-center gap-4 text-xs text-gray-500"
+              className="flex items-center justify-center gap-4 text-xs text-gray-600 dark:text-gray-500"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.5 }}
             >
               <span className="flex items-center gap-1.5">
-                <span className={`w-1.5 h-1.5 rounded-full ${status === 'connected' ? 'bg-emerald-500' : 'bg-gray-600'}`} />
+                <span className={`w-1.5 h-1.5 rounded-full ${status === 'connected' ? 'bg-emerald-500' : 'bg-gray-400 dark:bg-gray-600'}`} />
                 {status === 'connected' ? 'Bridge connected' : 'Bridge offline'}
               </span>
               <span className="hidden sm:inline">·</span>

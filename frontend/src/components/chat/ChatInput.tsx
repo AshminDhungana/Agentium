@@ -107,7 +107,8 @@ export function ChatInput({ onSend, reduceMotion }: ChatInputProps) {
           <Send className="w-5 h-5" />
         </motion.button>
       </div>
-      <input type="file" ref={fileInputRef} onChange={handleFileSelect} className="sr-only" multiple />
+
+      <p className="floating-chat-disclaimer">Build By Ashmin Dhungana</p>
     </form>
   );
 }

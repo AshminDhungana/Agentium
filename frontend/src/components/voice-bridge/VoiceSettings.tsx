@@ -15,51 +15,58 @@ const TABS = [
 
 type TabKey = (typeof TABS)[number]['key'];
 
+const SECTION_LABEL = 'text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider';
+const FIELD_LABEL = 'text-gray-600 dark:text-gray-300';
+const RANGE_TRACK = 'w-full h-2 bg-gray-200 dark:bg-slate-700 rounded-lg appearance-none accent-blue-500';
+const SELECT_FIELD = 'w-full bg-gray-50 dark:bg-slate-800/50 border border-gray-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-blue-500';
+const TOGGLE_ROW = 'flex items-center gap-3 cursor-pointer p-3 rounded-xl bg-gray-50 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors';
+const CHECKBOX = 'w-5 h-5 rounded border-gray-300 dark:border-gray-600 text-blue-500 focus:ring-blue-500';
+
 function EngineTab({ settings, onChange }: { settings: VoiceSettings; onChange: (key: keyof VoiceSettings, value: any) => void }) {
   return (
     <div className="space-y-6">
       <div className="space-y-4">
-        <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider">Wake Word & Mode</h3>
-        <label className="flex items-center gap-3 cursor-pointer p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors">
+        <h3 className={SECTION_LABEL}>Wake Word & Mode</h3>
+        <label className={TOGGLE_ROW}>
           <input
             type="checkbox"
             checked={settings.requireWakeWord}
             onChange={(e) => onChange('requireWakeWord', e.target.checked)}
-            className="w-5 h-5 rounded border-gray-600 text-blue-500 focus:ring-blue-500"
+            className={CHECKBOX}
           />
           <div>
-            <div className="font-medium text-white">Require Wake Word</div>
-            <div className="text-xs text-gray-500">Listen for "Hey Agentium" before recording</div>
+            <div className="font-medium text-gray-900 dark:text-white">Require Wake Word</div>
+            <div className="text-xs text-gray-500 dark:text-gray-500">Listen for "Hey Agentium" before recording</div>
           </div>
         </label>
-        <label className="flex items-center gap-3 cursor-pointer p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors">
+        <label className={TOGGLE_ROW}>
           <input
             type="checkbox"
             checked={settings.proactiveEnabled}
             onChange={(e) => onChange('proactiveEnabled', e.target.checked)}
-            className="w-5 h-5 rounded border-gray-600 text-blue-500 focus:ring-blue-500"
+            className={CHECKBOX}
           />
           <div>
-            <div className="font-medium text-white">Proactive Mode</div>
-            <div className="text-xs text-gray-500">AI-initiated announcements and suggestions</div>
+            <div className="font-medium text-gray-900 dark:text-white">Proactive Mode</div>
+            <div className="text-xs text-gray-500 dark:text-gray-500">AI-initiated announcements and suggestions</div>
           </div>
         </label>
-        <label className="flex items-center gap-3 cursor-pointer p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors">
+        <label className={TOGGLE_ROW}>
           <input
             type="checkbox"
             checked={settings.speakerIdentification}
             onChange={(e) => onChange('speakerIdentification', e.target.checked)}
-            className="w-5 h-5 rounded border-gray-600 text-blue-500 focus:ring-blue-500"
+            className={CHECKBOX}
           />
           <div>
-            <div className="font-medium text-white">Speaker Identification</div>
-            <div className="text-xs text-gray-500">Enroll voices so AI can identify speakers</div>
+            <div className="font-medium text-gray-900 dark:text-white">Speaker Identification</div>
+            <div className="text-xs text-gray-500 dark:text-gray-500">Enroll voices so AI can identify speakers</div>
           </div>
         </label>
       </div>
 
       <div className="space-y-4">
-        <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider">Voice Mode</h3>
+        <h3 className={SECTION_LABEL}>Voice Mode</h3>
         <div className="flex gap-2">
           {(['push-to-talk', 'open-mic'] as const).map((mode) => (
             <button
@@ -67,8 +74,8 @@ function EngineTab({ settings, onChange }: { settings: VoiceSettings; onChange: 
               onClick={() => onChange('voiceMode', mode)}
               className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium border transition-all ${
                 settings.voiceMode === mode
-                  ? 'border-blue-500 bg-blue-500/10 text-blue-400'
-                  : 'border-white/10 text-gray-400 hover:border-white/20 hover:text-gray-300 bg-white/5'
+                  ? 'border-blue-500 bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400'
+                  : 'border-gray-200 dark:border-white/10 text-gray-500 dark:text-gray-400 hover:border-gray-300 dark:hover:border-white/20 hover:text-gray-700 dark:hover:text-gray-300 bg-white dark:bg-white/5'
               }`}
             >
               {mode === 'push-to-talk' ? <Mic className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
@@ -85,11 +92,11 @@ function VoiceTab({ settings, onChange }: { settings: VoiceSettings; onChange: (
   return (
     <div className="space-y-6">
       <div className="space-y-4">
-        <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider">TTS Voice</h3>
+        <h3 className={SECTION_LABEL}>TTS Voice</h3>
         <select
           value={settings.ttsVoice || 'af_bella'}
           onChange={(e) => onChange('ttsVoice', e.target.value)}
-          className="w-full bg-slate-800/50 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-blue-500"
+          className={SELECT_FIELD}
         >
           <option value="af_bella">Bella (Female)</option>
           <option value="am_adam">Adam (Male)</option>
@@ -101,7 +108,7 @@ function VoiceTab({ settings, onChange }: { settings: VoiceSettings; onChange: (
       </div>
 
       <div className="space-y-4">
-        <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider">Speech Rate</h3>
+        <h3 className={SECTION_LABEL}>Speech Rate</h3>
         <input
           type="range"
           min="0.5"
@@ -109,9 +116,9 @@ function VoiceTab({ settings, onChange }: { settings: VoiceSettings; onChange: (
           step="0.1"
           value={settings.speechRate || 1}
           onChange={(e) => onChange('speechRate', parseFloat(e.target.value))}
-          className="w-full h-2 bg-slate-700 rounded-lg appearance-none accent-blue-500"
+          className={RANGE_TRACK}
         />
-        <div className="flex justify-between text-xs text-gray-500">
+        <div className="flex justify-between text-xs text-gray-500 dark:text-gray-500">
           <span>0.5x</span>
           <span>{settings.speechRate || 1}x</span>
           <span>2x</span>
@@ -119,7 +126,7 @@ function VoiceTab({ settings, onChange }: { settings: VoiceSettings; onChange: (
       </div>
 
       <div className="space-y-4">
-        <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider">Pitch</h3>
+        <h3 className={SECTION_LABEL}>Pitch</h3>
         <input
           type="range"
           min="-20"
@@ -127,9 +134,9 @@ function VoiceTab({ settings, onChange }: { settings: VoiceSettings; onChange: (
           step="1"
           value={settings.pitch || 0}
           onChange={(e) => onChange('pitch', parseInt(e.target.value))}
-          className="w-full h-2 bg-slate-700 rounded-lg appearance-none accent-blue-500"
+          className={RANGE_TRACK}
         />
-        <div className="flex justify-between text-xs text-gray-500">
+        <div className="flex justify-between text-xs text-gray-500 dark:text-gray-500">
           <span>-20</span>
           <span>{settings.pitch || 0}</span>
           <span>+20</span>
@@ -143,11 +150,11 @@ function NetworkTab({ settings, onChange }: { settings: VoiceSettings; onChange:
   return (
     <div className="space-y-6">
       <div className="space-y-4">
-        <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider">WebSocket Connection</h3>
+        <h3 className={SECTION_LABEL}>WebSocket Connection</h3>
         <label className="block">
           <div className="flex justify-between text-sm mb-2">
-            <span className="text-gray-400">Reconnect Delay (ms)</span>
-            <span className="text-white">{settings.reconnectDelay || 2000}</span>
+            <span className="text-gray-500 dark:text-gray-400">Reconnect Delay (ms)</span>
+            <span className="text-gray-900 dark:text-white">{settings.reconnectDelay || 2000}</span>
           </div>
           <input
             type="range"
@@ -156,13 +163,13 @@ function NetworkTab({ settings, onChange }: { settings: VoiceSettings; onChange:
             step="500"
             value={settings.reconnectDelay || 2000}
             onChange={(e) => onChange('reconnectDelay', parseInt(e.target.value))}
-            className="w-full h-2 bg-slate-700 rounded-lg appearance-none accent-blue-500"
+            className={RANGE_TRACK}
           />
         </label>
         <label className="block">
           <div className="flex justify-between text-sm mb-2">
-            <span className="text-gray-400">Max Reconnect Attempts</span>
-            <span className="text-white">{settings.maxReconnectAttempts || 5}</span>
+            <span className="text-gray-500 dark:text-gray-400">Max Reconnect Attempts</span>
+            <span className="text-gray-900 dark:text-white">{settings.maxReconnectAttempts || 5}</span>
           </div>
           <input
             type="range"
@@ -171,13 +178,13 @@ function NetworkTab({ settings, onChange }: { settings: VoiceSettings; onChange:
             step="1"
             value={settings.maxReconnectAttempts || 5}
             onChange={(e) => onChange('maxReconnectAttempts', parseInt(e.target.value))}
-            className="w-full h-2 bg-slate-700 rounded-lg appearance-none accent-blue-500"
+            className={RANGE_TRACK}
           />
         </label>
         <label className="block">
           <div className="flex justify-between text-sm mb-2">
-            <span className="text-gray-400">Ping Interval (ms)</span>
-            <span className="text-white">{settings.pingInterval || 30000}</span>
+            <span className="text-gray-500 dark:text-gray-400">Ping Interval (ms)</span>
+            <span className="text-gray-900 dark:text-white">{settings.pingInterval || 30000}</span>
           </div>
           <input
             type="range"
@@ -186,7 +193,7 @@ function NetworkTab({ settings, onChange }: { settings: VoiceSettings; onChange:
             step="5000"
             value={settings.pingInterval || 30000}
             onChange={(e) => onChange('pingInterval', parseInt(e.target.value))}
-            className="w-full h-2 bg-slate-700 rounded-lg appearance-none accent-blue-500"
+            className={RANGE_TRACK}
           />
         </label>
       </div>
@@ -198,14 +205,14 @@ function AdvancedTab({ settings, onChange, availableInputDevices, availableOutpu
   return (
     <div className="space-y-6">
       <div className="space-y-4">
-        <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider">Audio Devices</h3>
+        <h3 className={SECTION_LABEL}>Audio Devices</h3>
         <label className="block">
-          <span className="block text-sm text-gray-400 mb-2">Microphone Input</span>
+          <span className={`block text-sm mb-2 ${FIELD_LABEL}`}>Microphone Input</span>
           <select
             value={settings.inputDeviceId}
             onChange={(e) => onChange('inputDeviceId', e.target.value)}
             disabled={isLoadingDevices}
-            className="w-full bg-slate-800/50 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-blue-500 disabled:opacity-50"
+            className={`${SELECT_FIELD} disabled:opacity-50`}
           >
             <option value="default">Default Device</option>
             {availableInputDevices.map((device) => (
@@ -217,12 +224,12 @@ function AdvancedTab({ settings, onChange, availableInputDevices, availableOutpu
           </select>
         </label>
         <label className="block">
-          <span className="block text-sm text-gray-400 mb-2">Audio Output</span>
+          <span className={`block text-sm mb-2 ${FIELD_LABEL}`}>Audio Output</span>
           <select
             value={settings.outputDeviceId}
             onChange={(e) => onChange('outputDeviceId', e.target.value)}
             disabled={isLoadingDevices}
-            className="w-full bg-slate-800/50 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-blue-500 disabled:opacity-50"
+            className={`${SELECT_FIELD} disabled:opacity-50`}
           >
             <option value="default">Default Device</option>
             {availableOutputDevices.map((device) => (
@@ -235,12 +242,12 @@ function AdvancedTab({ settings, onChange, availableInputDevices, availableOutpu
         </label>
       </div>
 
-      <div className="space-y-4 pt-4 border-t border-white/10">
-        <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider">Voice Activity Detection</h3>
+      <div className="space-y-4 pt-4 border-t border-gray-200 dark:border-white/10">
+        <h3 className={SECTION_LABEL}>Voice Activity Detection</h3>
         <label className="block">
           <div className="flex justify-between text-sm mb-2">
-            <span className="text-gray-400">VAD Sensitivity</span>
-            <span className="text-white">{Math.round((settings.vadSensitivity || 0.5) * 100)}%</span>
+            <span className="text-gray-500 dark:text-gray-400">VAD Sensitivity</span>
+            <span className="text-gray-900 dark:text-white">{Math.round((settings.vadSensitivity || 0.5) * 100)}%</span>
           </div>
           <input
             type="range"
@@ -249,14 +256,14 @@ function AdvancedTab({ settings, onChange, availableInputDevices, availableOutpu
             step="0.05"
             value={settings.vadSensitivity || 0.5}
             onChange={(e) => onChange('vadSensitivity', parseFloat(e.target.value))}
-            className="w-full h-2 bg-slate-700 rounded-lg appearance-none accent-blue-500"
+            className={RANGE_TRACK}
           />
-          <p className="text-xs text-gray-500 mt-1">Higher = more sensitive to quiet speech</p>
+          <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">Higher = more sensitive to quiet speech</p>
         </label>
         <label className="block">
           <div className="flex justify-between text-sm mb-2">
-            <span className="text-gray-400">Auto-stop Silence (ms)</span>
-            <span className="text-white">{settings.autoStopSilence || 1000}ms</span>
+            <span className="text-gray-500 dark:text-gray-400">Auto-stop Silence (ms)</span>
+            <span className="text-gray-900 dark:text-white">{settings.autoStopSilence || 1000}ms</span>
           </div>
           <input
             type="range"
@@ -265,36 +272,36 @@ function AdvancedTab({ settings, onChange, availableInputDevices, availableOutpu
             step="100"
             value={settings.autoStopSilence || 1000}
             onChange={(e) => onChange('autoStopSilence', parseInt(e.target.value))}
-            className="w-full h-2 bg-slate-700 rounded-lg appearance-none accent-blue-500"
+            className={RANGE_TRACK}
           />
-          <p className="text-xs text-gray-500 mt-1">Stop recording after this much silence</p>
+          <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">Stop recording after this much silence</p>
         </label>
       </div>
 
-      <div className="space-y-4 pt-4 border-t border-white/10">
-        <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider">Privacy & Data</h3>
-        <label className="flex items-center gap-3 cursor-pointer p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors">
+      <div className="space-y-4 pt-4 border-t border-gray-200 dark:border-white/10">
+        <h3 className={SECTION_LABEL}>Privacy & Data</h3>
+        <label className={TOGGLE_ROW}>
           <input
             type="checkbox"
             checked={settings.localProcessingOnly}
             onChange={(e) => onChange('localProcessingOnly', e.target.checked)}
-            className="w-5 h-5 rounded border-gray-600 text-blue-500 focus:ring-blue-500"
+            className={CHECKBOX}
           />
           <div>
-            <div className="font-medium text-white">Local Processing Only</div>
-            <div className="text-xs text-gray-500">Never send audio to cloud services</div>
+            <div className="font-medium text-gray-900 dark:text-white">Local Processing Only</div>
+            <div className="text-xs text-gray-500 dark:text-gray-500">Never send audio to cloud services</div>
           </div>
         </label>
-        <label className="flex items-center gap-3 cursor-pointer p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors">
+        <label className={TOGGLE_ROW}>
           <input
             type="checkbox"
             checked={settings.saveRecordings}
             onChange={(e) => onChange('saveRecordings', e.target.checked)}
-            className="w-5 h-5 rounded border-gray-600 text-blue-500 focus:ring-blue-500"
+            className={CHECKBOX}
           />
           <div>
-            <div className="font-medium text-white">Save Recordings Locally</div>
-            <div className="text-xs text-gray-500">Store audio files for playback and review</div>
+            <div className="font-medium text-gray-900 dark:text-white">Save Recordings Locally</div>
+            <div className="text-xs text-gray-500 dark:text-gray-500">Store audio files for playback and review</div>
           </div>
         </label>
       </div>
@@ -390,7 +397,7 @@ export function VoiceSettings({
   return (
     <AnimatePresence>
       <motion.div
-        className="fixed inset-0 z-50 flex items-end justify-center p-4 sm:p-6"
+        className="fixed inset-0 z-50 flex items-end justify-center p-4 sm:p-6 bg-black/40 dark:bg-black/60"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
@@ -402,20 +409,20 @@ export function VoiceSettings({
         onKeyDown={handleKeyDown}
       >
         <motion.div
-          className="w-full max-w-lg bg-slate-900/95 backdrop-blur-xl border border-white/10 rounded-3xl shadow-2xl overflow-hidden"
+          className="w-full max-w-lg bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-gray-200 dark:border-white/10 rounded-3xl shadow-2xl overflow-hidden"
           initial={{ opacity: 0, y: '100%' }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: '100%' }}
           transition={{ type: prefersReduced ? 'tween' : 'spring', stiffness: 300, damping: 30, duration: 0.4 }}
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
-            <h2 id="voice-settings-title" className="text-lg font-semibold text-white">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-white/10">
+            <h2 id="voice-settings-title" className="text-lg font-semibold text-gray-900 dark:text-white">
               Voice Settings
             </h2>
             <motion.button
               onClick={onClose}
-              className="p-2 rounded-xl text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+              className="p-2 rounded-xl text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
               aria-label="Close settings"
@@ -424,7 +431,7 @@ export function VoiceSettings({
             </motion.button>
           </div>
 
-          <div className="flex gap-1 px-4 pb-4 border-b border-white/10" role="tablist" aria-label="Settings categories">
+          <div className="flex gap-1 px-4 pb-4 border-b border-gray-200 dark:border-white/10" role="tablist" aria-label="Settings categories">
             {TABS.map(({ key, label, icon: Icon }) => (
               <motion.button
                 key={key}
@@ -433,8 +440,8 @@ export function VoiceSettings({
                 onClick={() => setActiveTab(key)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 flex-1 justify-center ${
                   activeTab === key
-                    ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm'
-                    : 'text-gray-500 hover:text-gray-300 dark:hover:text-gray-300'
+                    ? 'bg-gray-100 dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm'
+                    : 'text-gray-500 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
                 }`}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
@@ -449,10 +456,10 @@ export function VoiceSettings({
             {tabsContent[activeTab]}
           </div>
 
-          <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-white/10">
+          <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200 dark:border-white/10">
             <motion.button
               onClick={handleReset}
-              className="px-4 py-2 rounded-xl text-sm font-medium text-gray-300 bg-white/5 hover:bg-white/10 hover:text-white border border-white/10 transition-colors"
+              className="px-4 py-2 rounded-xl text-sm font-medium text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-white/5 hover:bg-gray-200 dark:hover:bg-white/10 hover:text-gray-900 dark:hover:text-white border border-gray-200 dark:border-white/10 transition-colors"
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
             >

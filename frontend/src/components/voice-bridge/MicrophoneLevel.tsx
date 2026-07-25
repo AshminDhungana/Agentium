@@ -24,7 +24,7 @@ export function MicrophoneLevel({
   const segmentVariants = {
     inactive: {
       scaleY: 0.1,
-      backgroundColor: 'rgba(148, 163, 184, 0.15)',
+      backgroundColor: 'rgba(100, 116, 139, 0.25)',
       transition: { duration: prefersReduced ? 0 : 0.15, ease: 'easeOut' as const },
     },
     active: (index: number) => ({
@@ -109,7 +109,7 @@ export function MicrophoneLevelRing({
           cy={size / 2}
           r={radius}
           fill="none"
-          stroke="rgba(148, 163, 184, 0.15)"
+          stroke="rgba(100, 116, 139, 0.25)"
           strokeWidth={strokeWidth}
         />
         <motion.circle
@@ -133,7 +133,7 @@ export function MicrophoneLevelRing({
           }}
         />
       </svg>
-      <span className="absolute text-xs font-mono text-white/70" aria-hidden="true">
+      <span className="absolute text-xs font-mono text-gray-700 dark:text-white/70" aria-hidden="true">
         {Math.round((level / maxLevel) * 100)}%
       </span>
     </div>
