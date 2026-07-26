@@ -3,7 +3,6 @@ import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
-import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
 import { FXAAPass } from 'three/addons/postprocessing/FXAAPass.js';
 
 interface ThreeSceneReturn {
@@ -89,11 +88,8 @@ export function useThreeScene(container: HTMLDivElement | null): ThreeSceneRetur
     );
     composer.addPass(bloomPass);
 
-    const smaaPass = new SMAAPass(
-      width * renderer.getPixelRatio(),
-      height * renderer.getPixelRatio()
-    );
-    composer.addPass(smaaPass);
+    const fxaaPass = new FXAAPass();
+    composer.addPass(fxaaPass);
 
     // ── Clock ─────────────────────────────────────────────────
     const clock = new THREE.Clock();
@@ -115,7 +111,6 @@ export function useThreeScene(container: HTMLDivElement | null): ThreeSceneRetur
       renderer.setSize(w, h);
       composer.setSize(w, h);
       bloomPass.resolution.set(w, h);
-      smaaPass.setSize(w * renderer.getPixelRatio(), h * renderer.getPixelRatio());
     };
 
     // ── Animation loop ────────────────────────────────────────
@@ -132,7 +127,7 @@ export function useThreeScene(container: HTMLDivElement | null): ThreeSceneRetur
       renderer.dispose();
       composer.dispose();
       bloomPass.dispose();
-      smaaPass.dispose();
+      fxaaPass.dispose();
       if (renderer.domElement.parentElement) renderer.domElement.parentElement.removeChild(renderer.domElement);
     };
 

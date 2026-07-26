@@ -5,6 +5,7 @@ interface ThreeColors {
   listening: THREE.Color;
   speaking: THREE.Color;
   thinking: THREE.Color;
+  processing: THREE.Color;
   error: THREE.Color;
   idle: THREE.Color;
   muted: THREE.Color;
@@ -17,6 +18,7 @@ const DEFAULTS: ThreeColors = {
   listening: new THREE.Color('#3b82f6'),
   speaking: new THREE.Color('#10b981'),
   thinking: new THREE.Color('#8b5cf6'),
+  processing: new THREE.Color('#8b5cf6'), // same as thinking
   error: new THREE.Color('#ef4444'),
   idle: new THREE.Color('#64748b'),
   muted: new THREE.Color('#9ca3af'),
@@ -38,6 +40,7 @@ export function useThreeColors(): ThreeColors & { updateColors: () => void } {
       listening: get('--c-voice-listening'),
       speaking: get('--c-voice-speaking'),
       thinking: get('--c-voice-thinking'),
+      processing: get('--c-voice-thinking'),
       error: get('--c-voice-error'),
       idle: new THREE.Color('#64748b'),
       muted: new THREE.Color('#9ca3af'),
