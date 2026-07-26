@@ -234,7 +234,7 @@ class Settings(BaseSettings):
         return [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",")]
     
     class Config:
-        # env_file = ".env"  # Disabled - use Docker environment variables only
+        env_file = ".env"
         env_file_encoding = "utf-8"
         case_sensitive = True
 

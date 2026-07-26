@@ -285,6 +285,8 @@ services:
       # Shared HuggingFace cache so the ~440MB bge model downloads once, not per service
       - hf_cache:/app/.cache/huggingface
     restart: unless-stopped
+    ports:
+      - "8000:8000"
     command: >
       sh -c "mkdir -p /data/config-repo && uvicorn backend.main:app --host 0.0.0.0 --port 8000"
     depends_on:
