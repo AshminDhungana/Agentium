@@ -4,6 +4,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
+import { FXAAPass } from 'three/addons/postprocessing/FXAAPass.js';
 
 interface ThreeSceneReturn {
   scene: THREE.Scene;
@@ -31,7 +32,7 @@ export function useThreeScene(container: HTMLDivElement | null): ThreeSceneRetur
 
     if (width === 0 || height === 0) return;
 
-    // Renderer
+    // ── Renderer ──────────────────────────────────────────────
     const renderer = new THREE.WebGLRenderer({
       antialias: true,
       alpha: true,
@@ -46,10 +47,10 @@ export function useThreeScene(container: HTMLDivElement | null): ThreeSceneRetur
     renderer.domElement.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;display:block;';
     containerEl.appendChild(renderer.domElement);
 
-    // Scene
+    // ── Scene ─────────────────────────────────────────────────
     const scene = new THREE.Scene();
 
-    // Camera: Orthographic for consistent sizing
+    // ── Camera: Orthographic for consistent sizing ────────────
     const aspect = width / height;
     const camera = new THREE.OrthographicCamera(
       (FRUSTUM_SIZE * aspect) / -2,
@@ -62,7 +63,7 @@ export function useThreeScene(container: HTMLDivElement | null): ThreeSceneRetur
     camera.position.set(0, 0, 30);
     camera.lookAt(0, 0, 0);
 
-    // Lighting
+    // ── Lighting ──────────────────────────────────────────────
     const ambient = new THREE.AmbientLight(0xffffff, 0.35);
     scene.add(ambient);
 
@@ -78,7 +79,7 @@ export function useThreeScene(container: HTMLDivElement | null): ThreeSceneRetur
     rimLight.position.set(-5, 5, -5);
     scene.add(rimLight);
 
-    // Post-Processing
+    // ── Post-Processing ───────────────────────────────────────
     const composer = new EffectComposer(renderer);
     composer.addPass(new RenderPass(scene, camera));
 
@@ -94,10 +95,10 @@ export function useThreeScene(container: HTMLDivElement | null): ThreeSceneRetur
     );
     composer.addPass(smaaPass);
 
-    // Clock
+    // ── Clock ─────────────────────────────────────────────────
     const clock = new THREE.Clock();
 
-    // Resize handler
+    // ── Resize handler ────────────────────────────────────────
     const resize = () => {
       if (!containerRef.current) return;
       const w = containerRef.current.clientWidth;
@@ -117,7 +118,7 @@ export function useThreeScene(container: HTMLDivElement | null): ThreeSceneRetur
       smaaPass.setSize(w * renderer.getPixelRatio(), h * renderer.getPixelRatio());
     };
 
-    // Animation loop
+    // ── Animation loop ────────────────────────────────────────
     const animate = () => {
       animationFrameRef.current = requestAnimationFrame(animate);
       const delta = clock.getDelta();
@@ -125,7 +126,7 @@ export function useThreeScene(container: HTMLDivElement | null): ThreeSceneRetur
     };
     animate();
 
-    // Cleanup
+    // ── Cleanup ───────────────────────────────────────────────
     const dispose = () => {
       if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
       renderer.dispose();
