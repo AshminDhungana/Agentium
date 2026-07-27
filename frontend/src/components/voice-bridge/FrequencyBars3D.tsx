@@ -1,23 +1,43 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useMemo } from 'react';
 import * as THREE from 'three';
 import { useThreeContext } from './ThreeContext';
+import { useThreeColors } from './hooks/useThreeColors';
 
 const BAR_COUNT = 48;
 
 interface FrequencyBars3DProps {
   frequencyData: Uint8Array | null;
-  color: THREE.Color;
   prefersReduced: boolean;
 }
 
-export function FrequencyBars3D({ frequencyData, color, prefersReduced }: FrequencyBars3DProps) {
+export function FrequencyBars3D({ frequencyData, prefersReduced }: FrequencyBars3DProps) {
   const { scene, registerObject, unregisterObject } = useThreeContext();
+  const colors = useThreeColors();
   const instancedMeshRef = useRef<THREE.InstancedMesh | null>(null);
   const geometryRef = useRef<THREE.CylinderGeometry | null>(null);
   const materialRef = useRef<THREE.MeshPhysicalMaterial | null>(null);
   const targetHeightsRef = useRef<Float32Array>(new Float32Array(BAR_COUNT));
   const currentHeightsRef = useRef<Float32Array>(new Float32Array(BAR_COUNT).fill(1));
   const dummyRef = useRef<THREE.Object3D>(new THREE.Object3D());
+  const animationRef = useRef<ReturnType<typeof setInterval>>();
+
+  // Theme-aware colors from CSS variables
+  const barColors = useMemo(() => {
+    const c = [];
+    for (let i = 0; i < BAR_COUNT; i++) {
+      const ratio = i / BAR_COUNT;
+      const color = new THREE.Color();
+      if (ratio < 0.33) {
+        color.setStyle(getComputedStyle(document.documentElement).getPropertyValue('--c-success').trim() || '#10b981');
+      } else if (ratio < 0.66) {
+        color.setStyle(getComputedStyle(document.documentElement).getPropertyValue('--c-warning').trim() || '#f59e0b');
+      } else {
+        color.setStyle(getComputedStyle(document.documentElement).getPropertyValue('--c-error').trim() || '#ef4444');
+      }
+      c.push(color);
+    }
+    return c;
+  }, []);
 
   // Initialize instanced mesh
   useEffect(() => {
@@ -33,6 +53,7 @@ export function FrequencyBars3D({ frequencyData, color, prefersReduced }: Freque
       clearcoat: 1.0,
       clearcoatRoughness: 0.1,
       side: THREE.DoubleSide,
+      vertexColors: true,
     });
     materialRef.current = material;
 
@@ -53,12 +74,8 @@ export function FrequencyBars3D({ frequencyData, color, prefersReduced }: Freque
       dummyRef.current.updateMatrix();
       mesh.setMatrixAt(i, dummyRef.current.matrix);
 
-      // Color gradient: green → amber → red
-      const ratio = i / BAR_COUNT;
-      const c = new THREE.Color();
-      if (ratio < 0.5) c.setHSL(0.35, 0.7, 0.5);       // green
-      else if (ratio < 0.75) c.setHSL(0.1, 0.8, 0.5);   // amber
-      else c.setHSL(0.0, 0.7, 0.5);                      // red
+      // Theme-aware color gradient
+      const c = barColors[i];
       mesh.setColorAt(i, c);
     }
 
@@ -71,7 +88,7 @@ export function FrequencyBars3D({ frequencyData, color, prefersReduced }: Freque
     });
 
     return () => unregisterObject(mesh);
-  }, [registerObject, unregisterObject]);
+  }, [registerObject, unregisterObject, barColors]);
 
   // Compute target heights from frequencyData
   useEffect(() => {
@@ -84,11 +101,13 @@ export function FrequencyBars3D({ frequencyData, color, prefersReduced }: Freque
     }
   }, [frequencyData]);
 
-  // Spring animation
+  // Spring animation with reduced motion support
   useEffect(() => {
     if (!instancedMeshRef.current) return;
 
     const animate = () => {
+      if (prefersReduced) return; // Freeze animation when reduced motion
+
       const mesh = instancedMeshRef.current!;
       const damping = 0.15;
 
@@ -106,9 +125,11 @@ export function FrequencyBars3D({ frequencyData, color, prefersReduced }: Freque
       mesh.instanceMatrix.needsUpdate = true;
     };
 
-    const id = setInterval(animate, 16);
-    return () => clearInterval(id);
-  }, []);
+    animationRef.current = setInterval(animate, 16);
+    return () => {
+      if (animationRef.current) clearInterval(animationRef.current);
+    };
+  }, [prefersReduced]);
 
   return null;
 }

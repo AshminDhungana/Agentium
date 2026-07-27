@@ -101,6 +101,8 @@ export interface VoiceControlsProps {
   onClose?: () => void;
   reducedMotion?: boolean;
   className?: string;
+  glassPill?: boolean;
+  condensed?: boolean;
 }
 
 export interface ConnectionStatusProps {

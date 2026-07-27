@@ -1,7 +1,8 @@
 import { motion, AnimatePresence, type Variants } from 'framer-motion';
-import { Copy, Trash2, X } from 'lucide-react';
+import { Copy, MessageSquare, X } from 'lucide-react';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import type { TranscriptDisplayProps, TranscriptEntry } from './types';
+import { EmptyState } from '@/components/ui/EmptyState';
 
 const transcriptVariants: Variants = {
   hidden: { opacity: 0, y: 20, scale: 0.98 },
@@ -38,7 +39,7 @@ export function TranscriptDisplay({
   className = '',
   maxHeight = 400,
 }: TranscriptDisplayProps) {
-  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [copiedTooltip, setCopiedTooltip] = useState<{ index: number; timeout: NodeJS.Timeout } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const prefersReduced = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -55,23 +56,26 @@ export function TranscriptDisplay({
   const handleCopy = (text: string, index: number) => {
     navigator.clipboard.writeText(text);
     setCopiedIndex(index);
-    setTimeout(() => setCopiedIndex(null), 2000);
+    if (copiedTooltip) clearTimeout(copiedTooltip.timeout);
+    const timeout = setTimeout(() => {
+      setCopiedIndex(null);
+      setCopiedTooltip(null);
+    }, 2000);
+    setCopiedTooltip({ index, timeout });
   };
+
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
   if (transcripts.length === 0) {
     return (
-      <div
-        className={`flex flex-col items-center justify-center h-full text-center p-8 ${className}`}
-        role="status"
-        aria-live="polite"
-      >
-        <div className="w-16 h-16 rounded-2xl bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 flex items-center justify-center mb-4">
-          <svg className="w-8 h-8 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-          </svg>
-        </div>
-        <p className="text-gray-600 dark:text-gray-300 text-sm font-medium">No conversation yet</p>
-        <p className="text-gray-400 dark:text-gray-500 text-xs mt-1">Start speaking to see transcripts here</p>
+      <div className={`flex flex-col items-center justify-center h-full text-center p-8 ${className}`} role="status" aria-live="polite">
+        <EmptyState
+          illustration="inbox"
+          icon={MessageSquare}
+          title="No conversation yet"
+          description="Start speaking to see transcripts here"
+          size="md"
+        />
       </div>
     );
   }
@@ -79,11 +83,12 @@ export function TranscriptDisplay({
   return (
     <div
       ref={containerRef}
-      className={`flex flex-col gap-3 overflow-y-auto pr-2 ${className}`}
+      className={`flex flex-col gap-3 overflow-y-auto pr-2 ${className} bg-[var(--c-panel)]/50 backdrop-blur-md border border-[var(--c-hairline)] rounded-2xl p-4`}
       style={{ maxHeight: maxHeight }}
       role="log"
       aria-live="polite"
       aria-label="Conversation transcript"
+      tabIndex={0}
     >
       <AnimatePresence>
         {transcripts.map((entry, index) => (
@@ -105,18 +110,18 @@ export function TranscriptDisplay({
                 <span
                   className={`font-medium px-2 py-0.5 rounded-full ${
                     entry.speaker === 'user'
-                      ? 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300'
-                      : 'bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300'
+                      ? 'bg-[var(--c-brand)]/15 text-[var(--c-brand)] dark:text-[var(--c-brand-light)] border border-[var(--c-brand)]/20'
+                      : 'bg-[var(--c-brand-2)]/15 text-[var(--c-brand-2)] dark:text-[var(--c-brand-2-light)] border border-[var(--c-brand-2)]/20'
                   }`}
                 >
                   {entry.speaker === 'user' ? 'You' : 'Agentium'}
                 </span>
-                <time className="text-gray-500 dark:text-gray-500" dateTime={entry.timestamp.toISOString()}>
+                <time className="text-[var(--color-text-muted)]" dateTime={entry.timestamp.toISOString()}>
                   {entry.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </time>
                 {entry.isStreaming && (
-                  <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400 text-xs">
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 dark:bg-amber-400 animate-pulse" />
+                  <span className="flex items-center gap-1 text-[var(--c-warning)] dark:text-[var(--c-warning-light)] text-xs">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[var(--c-warning)] dark:bg-[var(--c-warning-light)] animate-pulse" />
                     Streaming...
                   </span>
                 )}
@@ -125,8 +130,8 @@ export function TranscriptDisplay({
                 <div
                   className={`px-4 py-2.5 rounded-2xl ${
                     entry.speaker === 'user'
-                      ? 'bg-blue-50 dark:bg-blue-500/15 text-blue-900 dark:text-blue-100 border border-blue-200 dark:border-blue-500/20 rounded-br-md'
-                      : 'bg-gray-100 dark:bg-white/5 text-gray-900 dark:text-white border border-gray-200 dark:border-white/10 rounded-bl-md'
+                      ? 'bg-[var(--c-brand)]/10 dark:bg-[var(--c-brand)]/20 text-[var(--color-text-primary)] border border-[var(--c-brand)]/20 rounded-br-md'
+                      : 'bg-[var(--c-subtle)] dark:bg-[var(--c-subtle-dark)] text-[var(--color-text-primary)] border border-[var(--c-hairline)] rounded-bl-md'
                   } whitespace-pre-wrap break-words`}
                 >
                   {entry.isStreaming ? (
@@ -150,12 +155,18 @@ export function TranscriptDisplay({
                 <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
                   <button
                     onClick={() => handleCopy(entry.text, index)}
-                    className="p-1.5 rounded-lg bg-white/80 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors shadow-sm dark:shadow-none"
+                    className="relative p-1.5 rounded-lg bg-[var(--c-panel)]/80 dark:bg-[var(--c-panel)]/50 hover:bg-[var(--c-subtle)] dark:hover:bg-[var(--c-subtle-dark)] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors shadow-sm"
                     aria-label="Copy message"
-                    title="Copy"
                   >
                     {copiedIndex === index ? (
-                      <X className="w-3.5 h-3.5 text-green-600 dark:text-green-400" />
+                      <motion.span
+                        initial={{ opacity: 0, scale: 0.5, y: -10 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.5, y: -10 }}
+                        className="absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap px-2 py-1 text-xs bg-[var(--c-success)] text-white rounded"
+                      >
+                        Copied!
+                      </motion.span>
                     ) : (
                       <Copy className="w-3.5 h-3.5" />
                     )}
@@ -166,7 +177,13 @@ export function TranscriptDisplay({
           </motion.div>
         ))}
       </AnimatePresence>
-      <div ref={(el) => { if (el) el.scrollIntoView(); }} />
+      <div
+        ref={(el) => {
+          if (el && typeof el.scrollIntoView === 'function') {
+            el.scrollIntoView();
+          }
+        }}
+      />
     </div>
   );
 }
@@ -193,13 +210,13 @@ export function TranscriptEntryItem({
         <span
           className={`font-medium px-2 py-0.5 rounded-full ${
             entry.speaker === 'user'
-              ? 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300'
-              : 'bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300'
+              ? 'bg-[var(--c-brand)]/15 text-[var(--c-brand)] dark:text-[var(--c-brand-light)]'
+              : 'bg-[var(--c-brand-2)]/15 text-[var(--c-brand-2)] dark:text-[var(--c-brand-2-light)]'
           }`}
         >
           {entry.speaker === 'user' ? 'You' : 'Agentium'}
         </span>
-        <time className="text-gray-500 dark:text-gray-500" dateTime={entry.timestamp.toISOString()}>
+        <time className="text-[var(--color-text-muted)]" dateTime={entry.timestamp.toISOString()}>
           {entry.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </time>
       </div>
@@ -207,8 +224,8 @@ export function TranscriptEntryItem({
         <div
           className={`px-4 py-2.5 rounded-2xl ${
             entry.speaker === 'user'
-              ? 'bg-blue-50 dark:bg-blue-500/15 text-blue-900 dark:text-blue-100 border border-blue-200 dark:border-blue-500/20 rounded-br-md'
-              : 'bg-gray-100 dark:bg-white/5 text-gray-900 dark:text-white border border-gray-200 dark:border-white/10 rounded-bl-md'
+              ? 'bg-[var(--c-brand)]/10 dark:bg-[var(--c-brand)]/20 text-[var(--color-text-primary)] border border-[var(--c-brand)]/20 rounded-br-md'
+              : 'bg-[var(--c-subtle)] dark:bg-[var(--c-subtle-dark)] text-[var(--color-text-primary)] border border-[var(--c-hairline)] rounded-bl-md'
           } whitespace-pre-wrap break-words`}
         >
           {entry.text}
@@ -216,10 +233,10 @@ export function TranscriptEntryItem({
         <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
           <button
             onClick={() => onCopy(entry.text)}
-            className="p-1.5 rounded-lg bg-white/80 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors shadow-sm dark:shadow-none"
+            className="p-1.5 rounded-lg bg-[var(--c-panel)]/80 dark:bg-[var(--c-panel)]/50 hover:bg-[var(--c-subtle)] dark:hover:bg-[var(--c-subtle-dark)] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors shadow-sm"
             aria-label="Copy message"
           >
-            {copiedId === entry.id ? <X className="w-3.5 h-3.5 text-green-600 dark:text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+            {copiedId === entry.id ? <X className="w-3.5 h-3.5 text-[var(--c-success)] dark:text-[var(--c-success-light)]" /> : <Copy className="w-3.5 h-3.5" />}
           </button>
         </div>
       </div>

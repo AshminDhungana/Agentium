@@ -1,8 +1,9 @@
-import { useEffect, useRef, useMemo } from 'react';
+import { useEffect, useRef, useMemo, useLayoutEffect } from 'react';
 import * as THREE from 'three';
 import { useThreeContext } from './ThreeContext';
 import particleVertex from './shaders/particleVertex.glsl';
 import particleFragment from './shaders/particleFragment.glsl';
+import { useThreeColors } from './hooks/useThreeColors';
 
 const PARTICLE_COUNT = 2000;
 
@@ -10,14 +11,15 @@ interface ParticleFieldProps {
   micLevel: number;
   state: 'idle' | 'listening' | 'speaking' | 'processing' | 'error' | 'muted';
   prefersReduced: boolean;
-  color: THREE.Color;
 }
 
-export function ParticleField({ micLevel, state, prefersReduced, color }: ParticleFieldProps) {
+export function ParticleField({ micLevel, state, prefersReduced }: ParticleFieldProps) {
   const { scene, registerObject, unregisterObject } = useThreeContext();
+  const colors = useThreeColors();
   const pointsRef = useRef<THREE.Points | null>(null);
   const geometryRef = useRef<THREE.BufferGeometry | null>(null);
   const materialRef = useRef<THREE.ShaderMaterial | null>(null);
+  const animationRef = useRef<ReturnType<typeof setInterval>>();
 
   const stateIndex = useMemo(() => {
     switch (state) {
@@ -30,6 +32,41 @@ export function ParticleField({ micLevel, state, prefersReduced, color }: Partic
       default: return 0;
     }
   }, [state]);
+
+  // Derive particle hues from CSS variables for theme consistency
+  const getBaseHue = () => {
+    const style = getComputedStyle(document.documentElement);
+    const listeningColor = style.getPropertyValue('--c-voice-listening').trim();
+    const speakingColor = style.getPropertyValue('--c-voice-speaking').trim();
+    const thinkingColor = style.getPropertyValue('--c-voice-thinking').trim();
+    const errorColor = style.getPropertyValue('--c-voice-error').trim();
+    const idleColor = style.getPropertyValue('--color-text-muted').trim();
+
+    // Convert hex to approximate hue
+    const hexToHue = (hex: string) => {
+      const r = parseInt(hex.slice(1, 3), 16) / 255;
+      const g = parseInt(hex.slice(3, 5), 16) / 255;
+      const b = parseInt(hex.slice(5, 7), 16) / 255;
+      const max = Math.max(r, g, b), min = Math.min(r, g, b);
+      let h = 0;
+      if (max !== min) {
+        if (max === r) h = (g - b) / (max - min);
+        else if (max === g) h = 2 + (b - r) / (max - min);
+        else h = 4 + (r - g) / (max - min);
+        h *= 60;
+        if (h < 0) h += 360;
+      }
+      return h / 360;
+    };
+
+    return { listening: listeningColor ? hexToHue(listeningColor) : 0.58,
+             speaking: speakingColor ? hexToHue(speakingColor) : 0.33,
+             thinking: thinkingColor ? hexToHue(thinkingColor) : 0.72,
+             error: errorColor ? hexToHue(errorColor) : 0.0,
+             idle: idleColor ? hexToHue(idleColor) : 0.58 };
+  };
+
+  const baseHues = useMemo(getBaseHue, []);
 
   useEffect(() => {
     const geometry = new THREE.BufferGeometry();
@@ -58,8 +95,8 @@ export function ParticleField({ micLevel, state, prefersReduced, color }: Partic
       // Base size
       baseSizes[i] = 0.05 + Math.random() * 0.1;
 
-      // Color variation
-      const hue = 0.6 + Math.random() * 0.1;
+      // Theme-aware color variation based on CSS variables
+      const hue = baseHues.listening + Math.random() * 0.1 - 0.05;
       const sat = 0.5 + Math.random() * 0.3;
       const light = 0.4 + Math.random() * 0.3;
       const c = new THREE.Color().setHSL(hue, sat, light);
@@ -108,17 +145,22 @@ export function ParticleField({ micLevel, state, prefersReduced, color }: Partic
 
     const animate = () => {
       if (!materialRef.current) return;
+      // Respect reduced motion
+      if (prefersReduced) return;
+
       materialRef.current.uniforms.uTime.value += 1/60;
       materialRef.current.uniforms.uMicLevel.value = micLevel;
       materialRef.current.uniforms.uState.value = stateIndex;
     };
 
-    const id = setInterval(animate, 16);
-    return () => clearInterval(id);
-  }, [micLevel, stateIndex]);
+    animationRef.current = setInterval(animate, 16);
+    return () => {
+      if (animationRef.current) clearInterval(animationRef.current);
+    };
+  }, [micLevel, stateIndex, prefersReduced]);
 
   // Reduced motion: freeze particle physics
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (prefersReduced && materialRef.current) {
       materialRef.current.uniforms.uMicLevel.value = 0;
       materialRef.current.uniforms.uState.value = 0;

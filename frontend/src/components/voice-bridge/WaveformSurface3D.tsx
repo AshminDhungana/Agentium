@@ -4,6 +4,7 @@ import { DataTexture, RedFormat, FloatType } from 'three';
 import { useThreeContext } from './ThreeContext';
 import waveformVertex from './shaders/waveformVertex.glsl';
 import waveformFragment from './shaders/waveformFragment.glsl';
+import { useThreeColors } from './hooks/useThreeColors';
 
 interface WaveformSurface3DProps {
   timeDomainData: Uint8Array | null;
@@ -13,10 +14,17 @@ interface WaveformSurface3DProps {
 
 export function WaveformSurface3D({ timeDomainData, color, prefersReduced }: WaveformSurface3DProps) {
   const { scene, registerObject, unregisterObject, clock } = useThreeContext();
+  const colors = useThreeColors();
   const meshRef = useRef<THREE.Mesh | null>(null);
   const materialRef = useRef<THREE.ShaderMaterial | null>(null);
   const textureRef = useRef<DataTexture | null>(null);
   const geometryRef = useRef<THREE.PlaneGeometry | null>(null);
+  const animationRef = useRef<ReturnType<typeof setInterval>>();
+
+  // Sync theme-aware color
+  const themeColor = useMemo(() => {
+    return colors[color === colors.listening ? 'listening' : color === colors.speaking ? 'speaking' : 'thinking'] || colors.idle;
+  }, [color, colors]);
 
   useEffect(() => {
     // Geometry: 200x40 segments = 8000 vertices
@@ -36,7 +44,7 @@ export function WaveformSurface3D({ timeDomainData, color, prefersReduced }: Wav
       uniforms: {
         uWaveTexture: { value: texture },
         uWaveAmplitude: { value: 1.5 },
-        uColor: { value: color.clone() },
+        uColor: { value: themeColor.clone() },
         uTime: { value: 0 },
       },
       transparent: true,
@@ -57,7 +65,7 @@ export function WaveformSurface3D({ timeDomainData, color, prefersReduced }: Wav
     });
 
     return () => unregisterObject(mesh);
-  }, [registerObject, unregisterObject, color]);
+  }, [registerObject, unregisterObject, themeColor]);
 
   // Update texture and uniforms each frame
   useEffect(() => {
@@ -65,6 +73,9 @@ export function WaveformSurface3D({ timeDomainData, color, prefersReduced }: Wav
 
     const animate = () => {
       if (!timeDomainData || timeDomainData.length === 0) return;
+
+      // Respect reduced motion
+      if (prefersReduced) return;
 
       // Copy timeDomainData to texture
       const tex = textureRef.current!;
@@ -78,13 +89,15 @@ export function WaveformSurface3D({ timeDomainData, color, prefersReduced }: Wav
 
       if (materialRef.current) {
         materialRef.current.uniforms.uTime.value = clock.getElapsedTime();
-        materialRef.current.uniforms.uColor.value.set(color);
+        materialRef.current.uniforms.uColor.value.set(themeColor);
       }
     };
 
-    const id = setInterval(animate, 16);
-    return () => clearInterval(id);
-  }, [timeDomainData, color, clock]);
+    animationRef.current = setInterval(animate, 16);
+    return () => {
+      if (animationRef.current) clearInterval(animationRef.current);
+    };
+  }, [timeDomainData, themeColor, clock, prefersReduced]);
 
   return null;
 }

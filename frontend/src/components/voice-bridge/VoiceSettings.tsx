@@ -15,12 +15,12 @@ const TABS = [
 
 type TabKey = (typeof TABS)[number]['key'];
 
-const SECTION_LABEL = 'text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider';
-const FIELD_LABEL = 'text-gray-600 dark:text-gray-300';
-const RANGE_TRACK = 'w-full h-2 bg-gray-200 dark:bg-[#2a3347] rounded-lg appearance-none accent-blue-500';
-const SELECT_FIELD = 'w-full bg-gray-50 dark:bg-[#1c2333] border border-gray-200 dark:border-[#1e2535] rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-blue-500';
-const TOGGLE_ROW = 'flex items-center gap-3 cursor-pointer p-3 rounded-xl bg-gray-50 dark:bg-[#1c2333] hover:bg-gray-100 dark:hover:bg-[#2a3347] transition-colors';
-const CHECKBOX = 'w-5 h-5 rounded border-gray-300 dark:border-gray-600 text-blue-500 focus:ring-blue-500';
+const SECTION_LABEL = 'text-sm font-medium text-[var(--color-text-muted)] uppercase tracking-wider';
+const FIELD_LABEL = 'text-[var(--color-text-secondary)]';
+const RANGE_TRACK = 'w-full h-2 bg-[var(--c-subtle)] dark:bg-[var(--c-subtle-dark)] rounded-lg appearance-none accent-[var(--c-brand)]';
+const SELECT_FIELD = 'w-full bg-[var(--c-subtle)] dark:bg-[var(--c-subtle-dark)] border border-[var(--c-hairline)] rounded-xl px-4 py-2.5 text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--c-brand)]';
+const TOGGLE_ROW = 'flex items-center gap-3 cursor-pointer p-3 rounded-xl bg-[var(--c-subtle)] dark:bg-[var(--c-subtle-dark)] hover:bg-[var(--c-hairline)] dark:hover:bg-[var(--c-subtle-dark)] transition-colors';
+const CHECKBOX = 'w-5 h-5 rounded border-[var(--c-hairline)] dark:border-[var(--c-hairline-dark)] text-[var(--c-brand)] focus:ring-[var(--c-brand)]';
 
 function EngineTab({ settings, onChange }: { settings: VoiceSettings; onChange: (key: keyof VoiceSettings, value: any) => void }) {
   return (
@@ -35,8 +35,8 @@ function EngineTab({ settings, onChange }: { settings: VoiceSettings; onChange: 
             className={CHECKBOX}
           />
           <div>
-            <div className="font-medium text-gray-900 dark:text-white">Require Wake Word</div>
-            <div className="text-xs text-gray-500 dark:text-gray-500">Listen for "Hey Agentium" before recording</div>
+            <div className="font-medium text-[var(--color-text-primary)]">Require Wake Word</div>
+            <div className="text-xs text-[var(--color-text-muted)]">Listen for "Hey Agentium" before recording</div>
           </div>
         </label>
         <label className={TOGGLE_ROW}>
@@ -47,8 +47,8 @@ function EngineTab({ settings, onChange }: { settings: VoiceSettings; onChange: 
             className={CHECKBOX}
           />
           <div>
-            <div className="font-medium text-gray-900 dark:text-white">Proactive Mode</div>
-            <div className="text-xs text-gray-500 dark:text-gray-500">AI-initiated announcements and suggestions</div>
+            <div className="font-medium text-[var(--color-text-primary)]">Proactive Mode</div>
+            <div className="text-xs text-[var(--color-text-muted)]">AI-initiated announcements and suggestions</div>
           </div>
         </label>
         <label className={TOGGLE_ROW}>
@@ -59,8 +59,8 @@ function EngineTab({ settings, onChange }: { settings: VoiceSettings; onChange: 
             className={CHECKBOX}
           />
           <div>
-            <div className="font-medium text-gray-900 dark:text-white">Speaker Identification</div>
-            <div className="text-xs text-gray-500 dark:text-gray-500">Enroll voices so AI can identify speakers</div>
+            <div className="font-medium text-[var(--color-text-primary)]">Speaker Identification</div>
+            <div className="text-xs text-[var(--color-text-muted)]">Enroll voices so AI can identify speakers</div>
           </div>
         </label>
       </div>
@@ -74,8 +74,8 @@ function EngineTab({ settings, onChange }: { settings: VoiceSettings; onChange: 
               onClick={() => onChange('voiceMode', mode)}
               className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium border transition-all ${
                 settings.voiceMode === mode
-                  ? 'border-blue-500 bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400'
-                  : 'border-gray-200 dark:border-[#1e2535] text-gray-500 dark:text-gray-400 hover:border-gray-300 dark:hover:border-[#2a3347] hover:text-gray-700 dark:hover:text-gray-300 bg-white dark:bg-[#1c2333]'
+                  ? 'border-[var(--c-brand)] bg-[var(--c-brand)]/10 dark:bg-[var(--c-brand)]/20 text-[var(--c-brand)] dark:text-[var(--c-brand-light)]'
+                  : 'border-[var(--c-hairline)] dark:border-[var(--c-hairline-dark)] text-[var(--color-text-muted)] hover:border-[var(--c-hairline-hover)] dark:hover:border-[var(--c-hairline-hover)] hover:text-[var(--color-text-secondary)] dark:hover:text-[var(--color-text-muted)] bg-[var(--c-panel)] dark:bg-[var(--c-panel-dark)]'
               }`}
             >
               {mode === 'push-to-talk' ? <Mic className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
@@ -118,7 +118,7 @@ function VoiceTab({ settings, onChange }: { settings: VoiceSettings; onChange: (
           onChange={(e) => onChange('speechRate', parseFloat(e.target.value))}
           className={RANGE_TRACK}
         />
-        <div className="flex justify-between text-xs text-gray-500 dark:text-gray-500">
+        <div className="flex justify-between text-xs text-[var(--color-text-muted)]">
           <span>0.5x</span>
           <span>{settings.speechRate || 1}x</span>
           <span>2x</span>
@@ -136,7 +136,7 @@ function VoiceTab({ settings, onChange }: { settings: VoiceSettings; onChange: (
           onChange={(e) => onChange('pitch', parseInt(e.target.value))}
           className={RANGE_TRACK}
         />
-        <div className="flex justify-between text-xs text-gray-500 dark:text-gray-500">
+        <div className="flex justify-between text-xs text-[var(--color-text-muted)]">
           <span>-20</span>
           <span>{settings.pitch || 0}</span>
           <span>+20</span>
@@ -153,8 +153,8 @@ function NetworkTab({ settings, onChange }: { settings: VoiceSettings; onChange:
         <h3 className={SECTION_LABEL}>WebSocket Connection</h3>
         <label className="block">
           <div className="flex justify-between text-sm mb-2">
-            <span className="text-gray-500 dark:text-gray-400">Reconnect Delay (ms)</span>
-            <span className="text-gray-900 dark:text-white">{settings.reconnectDelay || 2000}</span>
+            <span className="text-[var(--color-text-muted)]">Reconnect Delay (ms)</span>
+            <span className="text-[var(--color-text-primary)]">{settings.reconnectDelay || 2000}</span>
           </div>
           <input
             type="range"
@@ -168,8 +168,8 @@ function NetworkTab({ settings, onChange }: { settings: VoiceSettings; onChange:
         </label>
         <label className="block">
           <div className="flex justify-between text-sm mb-2">
-            <span className="text-gray-500 dark:text-gray-400">Max Reconnect Attempts</span>
-            <span className="text-gray-900 dark:text-white">{settings.maxReconnectAttempts || 5}</span>
+            <span className="text-[var(--color-text-muted)]">Max Reconnect Attempts</span>
+            <span className="text-[var(--color-text-primary)]">{settings.maxReconnectAttempts || 5}</span>
           </div>
           <input
             type="range"
@@ -183,8 +183,8 @@ function NetworkTab({ settings, onChange }: { settings: VoiceSettings; onChange:
         </label>
         <label className="block">
           <div className="flex justify-between text-sm mb-2">
-            <span className="text-gray-500 dark:text-gray-400">Ping Interval (ms)</span>
-            <span className="text-gray-900 dark:text-white">{settings.pingInterval || 30000}</span>
+            <span className="text-[var(--color-text-muted)]">Ping Interval (ms)</span>
+            <span className="text-[var(--color-text-primary)]">{settings.pingInterval || 30000}</span>
           </div>
           <input
             type="range"
@@ -242,12 +242,12 @@ function AdvancedTab({ settings, onChange, availableInputDevices, availableOutpu
         </label>
       </div>
 
-      <div className="space-y-4 pt-4 border-t border-gray-200 dark:border-[#1e2535]">
+      <div className="space-y-4 pt-4 border-t border-[var(--c-hairline)]">
         <h3 className={SECTION_LABEL}>Voice Activity Detection</h3>
         <label className="block">
           <div className="flex justify-between text-sm mb-2">
-            <span className="text-gray-500 dark:text-gray-400">VAD Sensitivity</span>
-            <span className="text-gray-900 dark:text-white">{Math.round((settings.vadSensitivity || 0.5) * 100)}%</span>
+            <span className="text-[var(--color-text-muted)]">VAD Sensitivity</span>
+            <span className="text-[var(--color-text-primary)]">{Math.round((settings.vadSensitivity || 0.5) * 100)}%</span>
           </div>
           <input
             type="range"
@@ -258,12 +258,12 @@ function AdvancedTab({ settings, onChange, availableInputDevices, availableOutpu
             onChange={(e) => onChange('vadSensitivity', parseFloat(e.target.value))}
             className={RANGE_TRACK}
           />
-          <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">Higher = more sensitive to quiet speech</p>
+          <p className="text-xs text-[var(--color-text-muted)] mt-1">Higher = more sensitive to quiet speech</p>
         </label>
         <label className="block">
           <div className="flex justify-between text-sm mb-2">
-            <span className="text-gray-500 dark:text-gray-400">Auto-stop Silence (ms)</span>
-            <span className="text-gray-900 dark:text-white">{settings.autoStopSilence || 1000}ms</span>
+            <span className="text-[var(--color-text-muted)]">Auto-stop Silence (ms)</span>
+            <span className="text-[var(--color-text-primary)]">{settings.autoStopSilence || 1000}ms</span>
           </div>
           <input
             type="range"
@@ -274,11 +274,11 @@ function AdvancedTab({ settings, onChange, availableInputDevices, availableOutpu
             onChange={(e) => onChange('autoStopSilence', parseInt(e.target.value))}
             className={RANGE_TRACK}
           />
-          <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">Stop recording after this much silence</p>
+          <p className="text-xs text-[var(--color-text-muted)] mt-1">Stop recording after this much silence</p>
         </label>
       </div>
 
-      <div className="space-y-4 pt-4 border-t border-gray-200 dark:border-[#1e2535]">
+      <div className="space-y-4 pt-4 border-t border-[var(--c-hairline)]">
         <h3 className={SECTION_LABEL}>Privacy & Data</h3>
         <label className={TOGGLE_ROW}>
           <input
@@ -288,8 +288,8 @@ function AdvancedTab({ settings, onChange, availableInputDevices, availableOutpu
             className={CHECKBOX}
           />
           <div>
-            <div className="font-medium text-gray-900 dark:text-white">Local Processing Only</div>
-            <div className="text-xs text-gray-500 dark:text-gray-500">Never send audio to cloud services</div>
+            <div className="font-medium text-[var(--color-text-primary)]">Local Processing Only</div>
+            <div className="text-xs text-[var(--color-text-muted)]">Never send audio to cloud services</div>
           </div>
         </label>
         <label className={TOGGLE_ROW}>
@@ -300,8 +300,8 @@ function AdvancedTab({ settings, onChange, availableInputDevices, availableOutpu
             className={CHECKBOX}
           />
           <div>
-            <div className="font-medium text-gray-900 dark:text-white">Save Recordings Locally</div>
-            <div className="text-xs text-gray-500 dark:text-gray-500">Store audio files for playback and review</div>
+            <div className="font-medium text-[var(--color-text-primary)]">Save Recordings Locally</div>
+            <div className="text-xs text-[var(--color-text-muted)]">Store audio files for playback and review</div>
           </div>
         </label>
       </div>

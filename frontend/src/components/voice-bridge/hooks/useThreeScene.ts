@@ -13,9 +13,21 @@ interface ThreeSceneReturn {
   clock: THREE.Clock;
   resize: () => void;
   dispose: () => void;
+  webglAvailable: boolean;
 }
 
 const FRUSTUM_SIZE = 25;
+
+function isWebGLAvailable(): boolean {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return false;
+  try {
+    const canvas = document.createElement('canvas');
+    const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+    return !!gl;
+  } catch {
+    return false;
+  }
+}
 
 export function useThreeScene(container: HTMLDivElement | null): ThreeSceneReturn | null {
   const [sceneObjects, setSceneObjects] = useState<ThreeSceneReturn | null>(null);
@@ -24,6 +36,14 @@ export function useThreeScene(container: HTMLDivElement | null): ThreeSceneRetur
   containerRef.current = container;
 
   useEffect(() => {
+    const webglAvailable = isWebGLAvailable();
+
+    if (!webglAvailable) {
+      console.warn('[VoiceBridge] WebGL unavailable — 3D visualization disabled');
+      setSceneObjects(null);
+      return;
+    }
+
     if (!containerRef.current) return;
     const containerEl = containerRef.current;
     const width = containerEl.clientWidth;
@@ -131,7 +151,7 @@ export function useThreeScene(container: HTMLDivElement | null): ThreeSceneRetur
       if (renderer.domElement.parentElement) renderer.domElement.parentElement.removeChild(renderer.domElement);
     };
 
-    const returnObj: ThreeSceneReturn = { scene, camera, renderer, composer, clock, resize, dispose };
+    const returnObj: ThreeSceneReturn = { scene, camera, renderer, composer, clock, resize, dispose, webglAvailable: true };
     setSceneObjects(returnObj);
 
     window.addEventListener('resize', resize);

@@ -1,13 +1,13 @@
-import { useMemo, Suspense, lazy } from 'react';
+import { useMemo, useRef, useEffect, Suspense } from 'react';
 import { ThreeProvider } from './ThreeContext';
 import { useThreeScene } from './hooks/useThreeScene';
 import { useThreeColors } from './hooks/useThreeColors';
-import { useReducedMotion } from './hooks/useReducedMotion';
-import { VoiceOrb3D } from './VoiceOrb3D';
+import { LivingOrb3D } from './LivingOrb3D';
 import { WaveformSurface3D } from './WaveformSurface3D';
 import { FrequencyBars3D } from './FrequencyBars3D';
 import { ParticleField } from './ParticleField';
 import { ConnectionStatus3D } from './ConnectionStatus3D';
+import { Canvas2DFallback } from './Canvas2DFallback';
 
 type VoiceState = 'idle' | 'listening' | 'speaking' | 'processing' | 'error' | 'muted';
 type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error' | 'reconnecting';
@@ -19,6 +19,7 @@ interface ThreeSceneProps {
   frequencyData: Uint8Array | null;
   status: ConnectionStatus;
   prefersReduced: boolean;
+  orbSize?: number;
 }
 
 function ThreeSceneInner({
@@ -28,12 +29,60 @@ function ThreeSceneInner({
   frequencyData,
   status,
   prefersReduced,
+  orbSize,
 }: ThreeSceneProps) {
-  const containerRef = useMemo(() => ({ current: null as HTMLDivElement | null }), []);
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const colors = useThreeColors();
   const three = useThreeScene(containerRef.current);
 
-  if (!three) return <LoadingFallback />;
+  // WebGL not available - fall back to 2D canvas
+  if (!three) {
+    return (
+      <Canvas2DFallback
+        voiceState={voiceState}
+        micLevel={micLevel}
+        timeDomainData={timeDomainData}
+        frequencyData={frequencyData}
+        status={status}
+        orbSize={orbSize}
+      />
+    );
+  }
+
+  // Determine color for waveform and particles based on voice state
+  const stateColor = colors[voiceState === 'idle' ? 'idle' : voiceState === 'muted' ? 'muted' : voiceState === 'error' ? 'error' : voiceState === 'processing' ? 'thinking' : voiceState];
+
+  // Mouse parallax effect (disabled in reduced motion)
+  const mouseRef = useRef({ x: 0, y: 0 });
+
+  useEffect(() => {
+    if (prefersReduced) return;
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const rect = container.getBoundingClientRect();
+      mouseRef.current.x = (e.clientX - rect.left) / rect.width - 0.5;
+      mouseRef.current.y = (e.clientY - rect.top) / rect.height - 0.5;
+    };
+
+    container.addEventListener('mousemove', handleMouseMove);
+    return () => container.removeEventListener('mousemove', handleMouseMove);
+  }, [prefersReduced]);
+
+  useEffect(() => {
+    if (!three || prefersReduced) return;
+
+    const animate = () => {
+      requestAnimationFrame(animate);
+      // Apply subtle parallax to camera
+      const maxOffset = 0.5; // Max 0.5 units offset
+      three.camera.position.x = mouseRef.current.x * maxOffset;
+      three.camera.position.y = -mouseRef.current.y * maxOffset;
+      three.camera.lookAt(0, 0, 0);
+    };
+    animate();
+  }, [three, prefersReduced]);
 
   return (
     <div
@@ -48,8 +97,8 @@ function ThreeSceneInner({
         composer={three.composer}
         clock={three.clock}
       >
-        <VoiceOrb3D
-          size={220}
+        <LivingOrb3D
+          size={orbSize ?? 220}
           state={voiceState}
           micLevel={micLevel}
           frequencyData={frequencyData}
@@ -58,21 +107,19 @@ function ThreeSceneInner({
         />
         <WaveformSurface3D
           timeDomainData={timeDomainData}
-          color={colors[voiceState === 'idle' ? 'idle' : voiceState]}
+          color={stateColor}
           prefersReduced={prefersReduced}
         />
         <FrequencyBars3D
           frequencyData={frequencyData}
-          color={colors[voiceState === 'idle' ? 'idle' : voiceState]}
           prefersReduced={prefersReduced}
         />
         <ParticleField
           micLevel={micLevel}
           state={voiceState}
           prefersReduced={prefersReduced}
-          color={colors[voiceState === 'idle' ? 'idle' : voiceState]}
         />
-        <ConnectionStatus3D status={status} colors={colors} />
+        <ConnectionStatus3D status={status} prefersReduced={prefersReduced} />
       </ThreeProvider>
     </div>
   );

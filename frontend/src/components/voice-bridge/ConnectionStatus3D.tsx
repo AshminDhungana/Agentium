@@ -4,12 +4,12 @@ import { useThreeContext } from './ThreeContext';
 import { useThreeColors } from './hooks/useThreeColors';
 import type { ConnectionStatus } from './types';
 
-// Define color keys without the updateColors function
+// Define color keys
 type ThreeColorKey = 'listening' | 'speaking' | 'thinking' | 'processing' | 'error' | 'idle' | 'muted' | 'canvasBg' | 'panelBg' | 'glassBorder';
 
 interface ConnectionStatus3DProps {
   status: ConnectionStatus;
-  colors: Record<ThreeColorKey, THREE.Color> & { updateColors: () => void };
+  prefersReduced: boolean;
 }
 
 const STATUS_CONFIG: Record<ConnectionStatus, { color: ThreeColorKey; pulse: boolean }> = {
@@ -20,10 +20,12 @@ const STATUS_CONFIG: Record<ConnectionStatus, { color: ThreeColorKey; pulse: boo
   reconnecting: { color: 'thinking', pulse: true },
 };
 
-export function ConnectionStatus3D({ status, colors }: ConnectionStatus3DProps) {
+export function ConnectionStatus3D({ status, prefersReduced }: ConnectionStatus3DProps) {
   const { scene, registerObject, unregisterObject, clock } = useThreeContext();
+  const colors = useThreeColors();
   const sphereRef = useRef<THREE.Mesh | null>(null);
   const materialRef = useRef<THREE.MeshPhysicalMaterial | null>(null);
+  const animationRef = useRef<ReturnType<typeof setInterval>>();
 
   useEffect(() => {
     const geometry = new THREE.SphereGeometry(0.3, 16, 16);
@@ -52,10 +54,10 @@ export function ConnectionStatus3D({ status, colors }: ConnectionStatus3DProps) 
     return () => unregisterObject(sphere);
   }, [status, colors, registerObject, unregisterObject]);
 
-  // Pulse animation
+  // Pulse animation - respect reduced motion
   useEffect(() => {
     const config = STATUS_CONFIG[status];
-    if (!config.pulse || !materialRef.current) return;
+    if (!config.pulse || !materialRef.current || prefersReduced) return;
 
     const animate = () => {
       if (!materialRef.current) return;
@@ -66,9 +68,11 @@ export function ConnectionStatus3D({ status, colors }: ConnectionStatus3DProps) 
       if (sphereRef.current) sphereRef.current.scale.setScalar(1 + pulse * 0.2);
     };
 
-    const id = setInterval(animate, 16);
-    return () => clearInterval(id);
-  }, [status, clock]);
+    animationRef.current = setInterval(animate, 16);
+    return () => {
+      if (animationRef.current) clearInterval(animationRef.current);
+    };
+  }, [status, clock, prefersReduced]);
 
   return null;
 }

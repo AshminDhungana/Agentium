@@ -1,13 +1,15 @@
 import { useState, useEffect, useCallback, useRef, Suspense, lazy } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Mic, Loader2, AlertCircle, Trash2, Settings, MicOff, Volume2, MessageSquare, Copy } from 'lucide-react';
-import { ConnectionStatusCompact } from './ConnectionStatus';
+import { StatusBadge } from './StatusBadge';
+import { TranscriptDrawer } from './TranscriptDrawer';
 import { TranscriptDisplay } from './TranscriptDisplay';
 import { VoiceControls } from './VoiceControls';
 import { VoiceSettings } from './VoiceSettings';
 import { useVoiceBridge } from './hooks/useVoiceBridge';
 import { useAudioVisualization } from './hooks/useAudioVisualization';
 import { useReducedMotion } from './hooks/useReducedMotion';
+import { useBreakpoint } from './hooks/useBreakpoint';
 import type { VoiceState } from './types';
 import type { ConnectionStatus } from './types';
 import { WidgetCard } from '@/components/dashboard/WidgetCard';
@@ -22,18 +24,19 @@ const pageVariants = {
   visible: {
     opacity: 1,
     transition: {
-      staggerChildren: 0.1,
-      delayChildren: 0.1,
+      staggerChildren: 0.08,
+      delayChildren: 0.15,
     },
   },
 };
 
 const sectionVariants = {
-  hidden: { opacity: 0, y: 20 },
+  hidden: { opacity: 0, y: 20, scale: 0.98 },
   visible: {
     opacity: 1,
     y: 0,
-    transition: { type: 'spring' as const, stiffness: 300, damping: 30 }
+    scale: 1,
+    transition: { type: 'spring' as const, stiffness: 300, damping: 30 },
   },
 };
 
@@ -67,6 +70,16 @@ export function VoiceBridgeContainer({ className = '' }: { className?: string })
   const [stream, setStream] = useState<MediaStream | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const { prefersReduced } = useReducedMotion();
+  const breakpoint = useBreakpoint();
+
+  // Responsive breakpoints
+  const isMobile = breakpoint === 'mobile';
+  const isTablet = breakpoint === 'tablet';
+  const isDesktopSm = breakpoint === 'desktop-sm';
+  const isDesktopLg = breakpoint === 'desktop-lg';
+
+  // Orb size: 80vw on mobile, fixed on larger screens
+  const orbSize = isMobile ? Math.min(window.innerWidth * 0.8, window.innerHeight * 0.5) : 320;
 
   // Mic access on connect
   useEffect(() => {
@@ -148,97 +161,10 @@ export function VoiceBridgeContainer({ className = '' }: { className?: string })
       variants={pageVariants}
       initial="hidden"
       animate="visible"
-      className={`h-full flex flex-col bg-[var(--c-canvas)] transition-colors duration-200 ${className}`}
+      className={`h-screen w-full flex bg-[var(--c-canvas)] transition-colors duration-200 ${className}`}
     >
-      {/* ── Header ── */}
-      <motion.header
-        data-testid="voice-bridge-header"
-        variants={sectionVariants}
-        className="flex-shrink-0 bg-[var(--c-glass-bg)] border-b border-[var(--c-glass-border)] backdrop-blur-xl sticky top-0 z-10"
-      >
-        <div className="max-w-2xl mx-auto px-6 py-4 flex items-center justify-between gap-4">
-          {/* Brand with gradient orb */}
-          <motion.div
-            data-testid="voice-bridge-brand-orb"
-            initial={{ opacity: 0, scale: 0.8, rotate: -15 }}
-            animate={{ opacity: 1, scale: 1, rotate: 0 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-            className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-            style={{
-              background: 'linear-gradient(135deg, var(--c-voice-listening), var(--c-voice-speaking))',
-              boxShadow: '0 4px 20px var(--c-voice-glow)',
-            }}
-          >
-            <Mic className="w-5 h-5 text-white" aria-hidden="true" />
-          </motion.div>
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 30, delay: 0.05 }}
-            className="min-w-0"
-          >
-            <h1 className="text-base font-semibold text-[var(--color-text-primary)] leading-tight">Voice Bridge</h1>
-            <p className="text-xs text-[var(--color-text-muted)] truncate">Talk to Agentium in real time</p>
-          </motion.div>
-
-          {/* Connection status + connect button */}
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 30, delay: 0.1 }}
-            className="flex items-center gap-3 flex-shrink-0"
-          >
-            {/* 3D-style status dot (pure CSS) */}
-            <div className="flex items-center gap-2">
-              <motion.span
-                data-testid="connection-status-dot"
-                className="relative w-3 h-3 rounded-full"
-                style={{
-                  backgroundColor: statusColor,
-                  boxShadow: `0 0 8px ${statusColor}, 0 0 16px ${statusColor}40`,
-                }}
-                animate={isConnecting || isError ? {
-                  boxShadow: [
-                    `0 0 8px ${statusColor}`,
-                    `0 0 16px ${statusColor}80`,
-                    `0 0 8px ${statusColor}`
-                  ],
-                  transition: { duration: 1.5, repeat: Infinity }
-                } : {}}
-                aria-hidden="true"
-              />
-              <span className="text-xs font-medium text-[var(--color-text-secondary)] capitalize">
-                {status === 'reconnecting' ? 'Reconnecting' : status}
-              </span>
-            </div>
-
-            <motion.button
-              onClick={handleConnect}
-              disabled={isBusy}
-              className={`
-                inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors duration-150
-                ${isConnected
-                  ? 'bg-[var(--c-subtle)] hover:bg-[var(--c-hairline)] dark:bg-[var(--c-panel-2)] dark:hover:bg-[var(--c-hairline)] text-[var(--color-text-secondary)] dark:text-[var(--color-text-muted)]'
-                  : 'bg-[var(--c-brand)] hover:bg-[var(--color-primary-hover)] text-white shadow-sm dark:shadow-[0_4px_14px_var(--c-brand)/30]'
-                }
-              `}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              style={{ transition: prefersReduced ? 'none' : undefined }}
-            >
-              {isBusy && <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />}
-              {status === 'connected' ? 'Disconnect' : isBusy ? 'Connecting…' : 'Connect'}
-            </motion.button>
-          </motion.div>
-        </div>
-      </motion.header>
-
-      {/* ── Three.js Canvas ── */}
-      <motion.section
-        data-testid="visualization-section"
-        variants={sectionVariants}
-        className="relative flex-1 overflow-hidden"
-      >
+      {/* === CANVAS LAYER (fixed, inset-0, z-0) === */}
+      <div className="fixed inset-0 z-0" data-testid="canvas-layer">
         {/* Depth layer 1: Radial glow matching voice state */}
         <motion.div
           data-testid="viz-radial-glow"
@@ -273,84 +199,66 @@ export function VoiceBridgeContainer({ className = '' }: { className?: string })
           className="absolute inset-0 pointer-events-none bg-gradient-to-b from-[var(--c-canvas)]/60 via-transparent to-transparent"
         />
 
-        {/* The visualization */}
-        <Suspense fallback={
-          <div data-testid="viz-loading-fallback" className="absolute inset-0 flex items-center justify-center bg-[var(--c-canvas)]">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--c-brand)]" aria-label="Loading 3D visualization" />
-          </div>
-        }>
-          <ThreeScene
-            voiceState={voiceState}
-            micLevel={micLevel}
-            timeDomainData={timeDomainData ?? null}
-            frequencyData={frequencyData ?? null}
-            status={status}
-            prefersReduced={prefersReduced}
-          />
-        </Suspense>
-      </motion.section>
-
-      {/* ── Transcript Panel ── */}
-      <motion.section
-        data-testid="transcript-section"
-        variants={sectionVariants}
-        className="flex-shrink-0 w-full max-w-2xl mx-auto px-6 pb-8"
-      >
-        <WidgetCard
-          data-testid="transcript-widget-card"
-          title="Conversation"
-          icon={MessageSquare}
-          className="h-[320px] flex flex-col"
-          action={
-            transcripts.length > 0 && (
-              <motion.button
-                onClick={handleClearTranscripts}
-                className="p-1.5 rounded-lg bg-[var(--c-subtle)] hover:bg-[var(--c-hairline)] dark:bg-[var(--c-panel-2)] dark:hover:bg-[var(--c-hairline)] text-[var(--color-text-muted)] hover:text-[var(--c-error)] transition-colors"
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-                aria-label="Clear transcript"
-              >
-                <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
-              </motion.button>
-            )
-          }
+        {/* The visualization - responsive orb size */}
+        <div
+          className="absolute inset-0 flex items-center justify-center"
+          style={{
+            padding: isMobile ? '40px 20px' : 0,
+          }}
         >
-          <TranscriptDisplay transcripts={transcripts} maxHeight={280} className="flex-1" />
-
-          {/* Scroll shadow hint */}
-          <div className="relative">
-            <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-[var(--c-panel)] to-transparent pointer-events-none" />
-          </div>
-        </WidgetCard>
-      </motion.section>
-
-      {/* ── Controls ── */}
-      <motion.section
-        data-testid="controls-section"
-        variants={sectionVariants}
-        className="flex-shrink-0"
-      >
-        <div className="max-w-2xl mx-auto px-6 pb-6">
-          <div data-testid="controls-glass-pill" className="relative">
-            {/* Glass pill background */}
-            <div className="absolute inset-0 bg-[var(--c-glass-bg)] border border-[var(--c-glass-border)] rounded-3xl backdrop-blur-2xl shadow-2xl dark:shadow-[0_8px_40px_rgba(0,0,0,0.4)]" />
-
-            {/* Actual controls */}
-            <VoiceControls
+          <Suspense fallback={
+            <div data-testid="viz-loading-fallback" className="absolute inset-0 flex items-center justify-center bg-[var(--c-canvas)]">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--c-brand)]" aria-label="Loading 3D visualization" />
+            </div>
+          }>
+            <ThreeScene
               voiceState={voiceState}
-              isConnected={status === 'connected'}
-              isMuted={isMuted}
-              isRecording={isRecording}
-              onRecord={handleRecord}
-              onStop={handleStop}
-              onMuteToggle={handleMuteToggle}
-              onSettings={handleSettingsOpen}
-              reducedMotion={prefersReduced}
-              className="relative z-10 px-4 py-4"
+              micLevel={micLevel}
+              timeDomainData={timeDomainData ?? null}
+              frequencyData={frequencyData ?? null}
+              status={status}
+              prefersReduced={prefersReduced}
+              orbSize={orbSize}
             />
-          </div>
+          </Suspense>
         </div>
-      </motion.section>
+      </div>
+
+      {/* === FLOATING GLASS PANELS (z-20, absolute) === */}
+
+      {/* Status Badge (Top-Right) */}
+      <StatusBadge status={status} voiceState={voiceState} />
+
+      {/* Transcript Drawer (Bottom-Left) - responsive positioning handled internally */}
+      <TranscriptDrawer transcripts={transcripts} />
+
+      {/* Controls Pill (Bottom-Center) - responsive */}
+      <motion.div
+        className={`fixed z-20 transition-all duration-300 ${
+          isMobile
+            ? 'bottom-4 left-1/2 -translate-x-1/2'
+            : isTablet
+            ? 'bottom-20 left-1/2 -translate-x-1/2'
+            : 'bottom-6 left-1/2 -translate-x-1/2'
+        }`}
+        initial={{ opacity: 0, y: 30 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ type: 'spring', stiffness: 300, damping: 30, delay: 0.4 }}
+      >
+        <VoiceControls
+          voiceState={voiceState}
+          isConnected={status === 'connected'}
+          isMuted={isMuted}
+          isRecording={isRecording}
+          onRecord={handleRecord}
+          onStop={handleStop}
+          onMuteToggle={handleMuteToggle}
+          onSettings={handleSettingsOpen}
+          reducedMotion={prefersReduced}
+          glassPill={true}
+          condensed={isMobile}
+        />
+      </motion.div>
 
       <VoiceSettings
         isOpen={isSettingsOpen}

@@ -50,6 +50,12 @@
   --c-voice-glow: rgba(37, 99, 235, 0.2);
   --c-glass-bg: rgba(255, 255, 255, 0.85);
   --c-glass-border: rgba(37, 99, 235, 0.12);
+  --c-success: #059669;
+  --c-success-light: #34d399;
+  --c-warning: #d97706;
+  --c-warning-light: #fbbf24;
+  --c-error: #dc2626;
+  --c-error-light: #f87171;
 
   --color-primary: var(--c-brand);
   --color-primary-hover: #1d4ed8;
@@ -82,6 +88,12 @@
   --c-voice-glow: rgba(59, 130, 246, 0.3);
   --c-glass-bg: rgba(22, 27, 39, 0.85);
   --c-glass-border: rgba(59, 130, 246, 0.15);
+  --c-success: #10b981;
+  --c-success-light: #34d399;
+  --c-warning: #f59e0b;
+  --c-warning-light: #fbbf24;
+  --c-error: #ef4444;
+  --c-error-light: #fca5a5;
 
   --color-primary: var(--c-brand);
   --color-primary-hover: #2563eb;

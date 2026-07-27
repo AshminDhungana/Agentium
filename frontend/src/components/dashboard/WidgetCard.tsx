@@ -22,6 +22,7 @@ export function WidgetCard({
 }: WidgetCardProps) {
   return (
     <section
+      {...rest}
       aria-label={rest['aria-label'] ?? title}
       className={`flex flex-col rounded-xl border border-hairline bg-panel shadow-sm transition-colors duration-200 ${className}`}
     >

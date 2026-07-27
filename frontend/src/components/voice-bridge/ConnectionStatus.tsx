@@ -5,42 +5,42 @@ import type { ConnectionStatusProps, ConnectionStatus, ConnectionStatusConfig } 
 const STATUS_CONFIG: Record<ConnectionStatus, ConnectionStatusConfig> = {
   disconnected: {
     label: 'Disconnected',
-    color: 'text-gray-500 dark:text-gray-400',
+    color: 'text-[var(--color-text-muted)]',
     icon: <WifiOff className="w-4 h-4" />,
-    bgColor: 'bg-gray-100 dark:bg-gray-500/20',
-    ringColor: 'border-gray-300 dark:border-gray-500/30',
+    bgColor: 'bg-[var(--c-subtle)] dark:bg-[var(--c-subtle-dark)]',
+    ringColor: 'border-[var(--c-hairline)] dark:border-[var(--c-hairline-dark)]',
     dotHex: '#9ca3af',
   },
   connecting: {
     label: 'Connecting...',
-    color: 'text-amber-600 dark:text-amber-400',
+    color: 'text-[var(--c-warning)] dark:text-[var(--c-warning-light)]',
     icon: <Loader2 className="w-4 h-4 animate-spin" />,
-    bgColor: 'bg-amber-100 dark:bg-amber-500/20',
-    ringColor: 'border-amber-400 dark:border-amber-500/50',
+    bgColor: 'bg-[var(--c-warning)]/15 dark:bg-[var(--c-warning)]/20',
+    ringColor: 'border-[var(--c-warning)]/30 dark:border-[var(--c-warning)]/40',
     dotHex: '#f59e0b',
   },
   connected: {
     label: 'Connected',
-    color: 'text-emerald-600 dark:text-emerald-400',
+    color: 'text-[var(--c-success)] dark:text-[var(--c-success-light)]',
     icon: <CheckCircle className="w-4 h-4" />,
-    bgColor: 'bg-emerald-100 dark:bg-emerald-500/20',
-    ringColor: 'border-emerald-400 dark:border-emerald-500/50',
+    bgColor: 'bg-[var(--c-success)]/15 dark:bg-[var(--c-success)]/20',
+    ringColor: 'border-[var(--c-success)]/30 dark:border-[var(--c-success)]/40',
     dotHex: '#10b981',
   },
   reconnecting: {
     label: 'Reconnecting...',
-    color: 'text-amber-600 dark:text-amber-400',
+    color: 'text-[var(--c-warning)] dark:text-[var(--c-warning-light)]',
     icon: <Loader2 className="w-4 h-4 animate-spin" />,
-    bgColor: 'bg-amber-100 dark:bg-amber-500/20',
-    ringColor: 'border-amber-400 dark:border-amber-500/50',
+    bgColor: 'bg-[var(--c-warning)]/15 dark:bg-[var(--c-warning)]/20',
+    ringColor: 'border-[var(--c-warning)]/30 dark:border-[var(--c-warning)]/40',
     dotHex: '#f59e0b',
   },
   error: {
     label: 'Connection Error',
-    color: 'text-red-600 dark:text-red-400',
+    color: 'text-[var(--c-error)] dark:text-[var(--c-error-light)]',
     icon: <AlertCircle className="w-4 h-4" />,
-    bgColor: 'bg-red-100 dark:bg-red-500/20',
-    ringColor: 'border-red-400 dark:border-red-500/50',
+    bgColor: 'bg-[var(--c-error)]/15 dark:bg-[var(--c-error)]/20',
+    ringColor: 'border-[var(--c-error)]/30 dark:border-[var(--c-error)]/40',
     dotHex: '#ef4444',
   },
 };
@@ -100,7 +100,7 @@ export function ConnectionStatus({
 
   return (
     <motion.div
-      className={`flex items-center gap-3 px-4 py-3 rounded-2xl bg-white dark:bg-[#161b27] border shadow-sm dark:shadow-none ${config.ringColor} ${className}`}
+      className={`flex items-center gap-3 px-4 py-3 rounded-2xl bg-[var(--c-panel)] dark:bg-[var(--c-panel-dark)] border shadow-sm dark:shadow-none ${config.ringColor} ${className}`}
       variants={statusVariants}
       initial="hidden"
       animate="visible"
@@ -111,7 +111,7 @@ export function ConnectionStatus({
     >
       <div className="relative flex-shrink-0">
         <motion.span
-          className="flex items-center justify-center w-3 h-3 rounded-full border-2 border-gray-200 dark:border-white/10"
+          className="flex items-center justify-center w-3 h-3 rounded-full border-2 border-[var(--c-hairline)] dark:border-[var(--c-hairline-dark)]"
           animate={dotAnimation[status]}
           transition={{ duration: prefersReduced ? 0 : 1 }}
         >
@@ -130,7 +130,7 @@ export function ConnectionStatus({
 
       <div className="flex-1 min-w-0">
         <p className={`text-sm font-medium ${config.color}`}>{config.label}</p>
-        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+        <p className="text-xs text-[var(--color-text-muted)] truncate">
           {status === 'connected'
             ? 'Voice bridge is active and ready'
             : status === 'connecting' || status === 'reconnecting'
@@ -144,7 +144,7 @@ export function ConnectionStatus({
       {(status === 'disconnected' || status === 'error') && onConnect && (
         <button
           onClick={onConnect}
-          className="px-4 py-2 rounded-xl text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors whitespace-nowrap"
+          className="px-4 py-2 rounded-xl text-sm font-medium bg-[var(--c-brand)] text-white hover:bg-[var(--c-brand)]/90 transition-colors whitespace-nowrap"
           aria-label="Connect to voice bridge"
         >
           Connect
@@ -154,7 +154,7 @@ export function ConnectionStatus({
       {status === 'connected' && onDisconnect && (
         <button
           onClick={onDisconnect}
-          className="p-2 rounded-xl text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
+          className="p-2 rounded-xl text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] dark:hover:text-white hover:bg-[var(--c-hairline)] dark:hover:bg-[var(--c-hairline-dark)] transition-colors"
           aria-label="Disconnect from voice bridge"
         >
           <XCircle className="w-5 h-5" />
