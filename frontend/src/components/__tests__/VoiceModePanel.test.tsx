@@ -13,10 +13,6 @@ vi.mock('@/services/voiceBridge', () => ({
   },
 }));
 
-vi.mock('@/components/voice-bridge/VoiceOrb', () => ({
-  VoiceOrb: vi.fn(() => <div data-testid="voice-orb" />),
-}));
-
 describe('VoiceModePanel', () => {
   it('renders the voice mode panel', () => {
     render(<VoiceModePanel onClose={vi.fn()} />);

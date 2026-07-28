@@ -169,7 +169,6 @@ function AppWithRedirect() {
                         <Route path="settings" element={<SettingsPage />} />
                         <Route path="workflows" element={<WorkflowsPage />} />
                         <Route path="workflows/:id" element={<WorkflowDesignerPage />} />
-                        <Route path="voice-bridge" element={<VoiceBridgePage />} />
                     </Route>
 
                     <Route path="*" element={<Navigate to="/" replace />} />
@@ -197,7 +196,6 @@ const MessageLogPage   = lazy(() => import('@/pages/MessageLogPage').then(m => (
 const ABTestingPage    = lazy(() => import('@/pages/ABTestingPage').then(m => ({ default: m.ABTestingPage })));
 const WorkflowDesignerPage = lazy(() => import('@/pages/WorkflowDesignerPage').then(m => ({ default: m.WorkflowDesignerPage })));
 const WorkflowsPage = lazy(() => import('@/pages/WorkflowsPage').then(m => ({ default: m.WorkflowsPage })));
-const VoiceBridgePage = lazy(() => import('@/pages/VoiceBridgePage').then(m => ({ default: m.VoiceBridgePage })));
 
 // Lazy-loaded auth background (Three.js scene — kept out of initial bundle)
 const FlatMapAuthBackground = lazy(() => import('@/components/FlatMapAuthBackground').then(m => ({ default: m.FlatMapAuthBackground })));

@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, Crown, Users, ClipboardList, Activity,
   Gavel, BookOpen, Cpu, Radio, Inbox, FlaskConical,
-  Settings, Shield, Mic,
+  Settings, Shield,
 } from 'lucide-react';
 import type { ComponentType } from 'react';
 
@@ -35,7 +35,6 @@ export const PAGE_LABELS: Record<string, string> = {
   '/message-log': 'Message Log',
   '/ab-testing': 'A/B Testing',
   '/settings': 'Settings',
-  '/voice-bridge': 'Voice Bridge',
   '/sovereign': 'Sovereign Control',
 };
 
@@ -74,13 +73,6 @@ export const NAV_GROUPS: NavGroup[] = [
       { path: '/models', label: 'Models', icon: Cpu },
       { path: '/channels', label: 'Channels', icon: Radio },
       { path: '/message-log', label: 'Message Log', icon: Inbox },
-    ],
-  },
-  {
-    id: 'voice',
-    label: 'Voice',
-    items: [
-      { path: '/voice-bridge', label: 'Voice Bridge', icon: Mic },
     ],
   },
   {

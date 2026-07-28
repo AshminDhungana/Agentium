@@ -1,12 +1,47 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type {
-  VoiceState,
-  ConnectionStatus,
-  VoiceSettings,
-  TranscriptEntry,
-  AudioVisualizationData,
-} from '@/components/voice-bridge/types';
+
+type VoiceState = 'idle' | 'listening' | 'speaking' | 'processing' | 'error' | 'muted';
+
+type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'reconnecting' | 'error';
+
+interface VoiceSettings {
+  model: string;
+  voice: 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer';
+  language: string;
+  vadSensitivity: number;
+  autoStopSilence: number;
+  inputDeviceId: string;
+  outputDeviceId: string;
+  localProcessingOnly?: boolean;
+  saveRecordings?: boolean;
+  requireWakeWord?: boolean;
+  proactiveEnabled?: boolean;
+  speakerIdentification?: boolean;
+  voiceMode?: 'push-to-talk' | 'open-mic';
+  ttsVoice?: string;
+  speechRate?: number;
+  pitch?: number;
+  volume?: number;
+  reconnectAttempts?: number;
+  reconnectDelay?: number;
+  pingInterval?: number;
+  maxReconnectAttempts?: number;
+}
+
+interface TranscriptEntry {
+  id: string;
+  speaker: 'user' | 'assistant';
+  text: string;
+  timestamp: Date;
+  isStreaming?: boolean;
+}
+
+interface AudioVisualizationData {
+  timeDomainData: Uint8Array;
+  frequencyData: Uint8Array;
+  micLevel: number;
+}
 
 const DEFAULT_SETTINGS: VoiceSettings = {
   model: 'whisper-1',

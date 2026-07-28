@@ -39,7 +39,6 @@ export default defineConfig({
       output: {
         manualChunks: {
           'three': ['three', 'three/addons/postprocessing/EffectComposer.js', 'three/addons/postprocessing/RenderPass.js', 'three/addons/postprocessing/UnrealBloomPass.js', 'three/addons/postprocessing/FXAAPass.js'],
-          'voice-bridge-three': ['./src/components/voice-bridge/ThreeScene.tsx', './src/components/voice-bridge/VoiceOrb3D.tsx', './src/components/voice-bridge/WaveformSurface3D.tsx', './src/components/voice-bridge/FrequencyBars3D.tsx', './src/components/voice-bridge/ParticleField.tsx', './src/components/voice-bridge/ConnectionStatus3D.tsx'],
         },
       },
     },

@@ -124,11 +124,11 @@ export function MainLayout() {
       )}
 
       {/* Always mounted (not conditionally rendered) so the widget can play a
-          real enter/exit animation when navigating to/from /chat or
-          /voice-bridge, instead of instantly popping in or vanishing.
+          real enter/exit animation when navigating to/from /chat, instead of
+          instantly popping in or vanishing.
           `hidden` tells it which route it's on; FloatingChatWidget owns the
           transition itself. */}
-      <FloatingChatWidget hidden={location.pathname === '/chat' || location.pathname === '/voice-bridge'} />
+      <FloatingChatWidget hidden={location.pathname === '/chat'} />
     </div>
   );
 }

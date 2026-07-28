@@ -23,7 +23,6 @@ describe('navConfig', () => {
       '/', '/chat', '/agents', '/tasks',
       '/voting', '/constitution', '/monitoring',
       '/models', '/channels', '/message-log',
-      '/voice-bridge',
       '/settings',
     ]);
   });
@@ -40,9 +39,9 @@ describe('navConfig', () => {
     expect(admin.some((i) => i.path === '/ab-testing')).toBe(true);
   });
 
-  it('groups items into Workspace / Governance / Integrations / Voice / System', () => {
+  it('groups items into Workspace / Governance / Integrations / System', () => {
     expect(NAV_GROUPS.map((g) => g.id)).toEqual([
-      'workspace', 'governance', 'integrations', 'voice', 'system',
+      'workspace', 'governance', 'integrations', 'system',
     ]);
   });
 
