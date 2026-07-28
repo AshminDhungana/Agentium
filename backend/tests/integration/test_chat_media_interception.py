@@ -4,6 +4,7 @@ Tests the full pipeline: LLM response -> MediaInterceptor -> Storage -> Broadcas
 """
 
 import asyncio
+import uuid
 
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -15,9 +16,9 @@ from backend.services import chat_service as cs
 from backend.models.entities.agents import HeadOfCouncil
 from backend.models.entities.user import User
 from backend.models.entities.user_config import UserModelConfig, ProviderType, ConnectionStatus
-from backend.models.database import get_db_context
-from backend.services.model_provider import ModelService, OpenAICompatibleProvider
+from backend.models.entities.chat_message import ChatMessage
 from backend.models.database import SessionLocal
+from backend.services.model_provider import ModelService, OpenAICompatibleProvider
 
 
 def _commit_sovereign_user(user_id: str, username: str, email: str) -> None:
@@ -43,6 +44,29 @@ def _commit_sovereign_user(user_id: str, username: str, email: str) -> None:
             db.commit()
     finally:
         db.close()
+
+
+def _find_head_message_with_media(db, user_id: str, expected_media_url: str) -> bool:
+    """Query the database directly using a fresh session to find the persisted head message with media URL."""
+    msg = db.query(ChatMessage).filter(
+        ChatMessage.user_id == user_id,
+        ChatMessage.role == "head_of_council",
+        ChatMessage.content.like(f"%{expected_media_url}%")
+    ).first()
+    return msg is not None
+
+
+def _find_head_message_with_metadata_media(db, user_id: str, expected_media_url: str) -> bool:
+    """Query the database directly using a fresh session to find the persisted head message with media_urls in metadata."""
+    msgs = db.query(ChatMessage).filter(
+        ChatMessage.user_id == user_id,
+        ChatMessage.role == "head_of_council"
+    ).all()
+    for m in msgs:
+        if m.message_metadata and "media_urls" in (m.message_metadata or {}):
+            if any(expected_media_url in url for url in m.message_metadata["media_urls"]):
+                return True
+    return False
 
 
 class MockProvider(OpenAICompatibleProvider):
@@ -132,12 +156,12 @@ class TestChatServiceMediaInterception:
         }
         mock_llm_client.generate_with_tools = AsyncMock(return_value=mock_llm_result)
 
+        storage_url = "https://s3.bucket/files/user-admin-media-1/abc123.png"
         from backend.services.storage_service import storage_service
-        storage_service.upload_file = MagicMock(
-            return_value="https://s3.bucket/files/user-admin-media-1/abc123.png"
-        )
+        storage_service.upload_file = MagicMock(return_value=storage_url)
 
-        with patch("backend.services.media_interceptor.httpx.AsyncClient") as mock_client_class:
+        # Patch httpx.AsyncClient where it's actually used in the background task (chat_service)
+        with patch("backend.services.chat_service.httpx.AsyncClient") as mock_client_class:
             mock_client = AsyncMock()
             mock_response = AsyncMock()
             mock_response.status_code = 200
@@ -148,16 +172,28 @@ class TestChatServiceMediaInterception:
 
             result = await cs.ChatService.process_message(head, "Show me sales", seeded_db)
 
+        # Immediate response should still have original URL (background task rewrites later)
         assert "https://charts.example.com/sales.png" in result["content"]
-        assert "https://s3.bucket/files/user-admin-media-1/abc123.png" not in result["content"]
+        assert storage_url not in result["content"]
 
-        await asyncio.sleep(0.1)
+        # Wait for background task to complete
+        await asyncio.sleep(0.5)
 
-        from backend.models.entities.chat_message import ChatMessage
-        msgs = seeded_db.query(ChatMessage).filter_by(role="head_of_council").all()
-        assert any("https://s3.bucket/files/user-admin-media-1/abc123.png" in m.content for m in msgs)
-        assert any("https://charts.example.com/sales.png" not in m.content for m in msgs)
-        assert any("![Sales Chart]" in m.content for m in msgs)
+        # Query using a fresh database session (background task uses its own SessionLocal)
+        db = SessionLocal()
+        try:
+            found = _find_head_message_with_media(db, "user-admin-media-1", storage_url)
+            assert found, f"Expected media URL {storage_url} not found in head_of_council messages"
+
+            # Also verify the original URL was replaced
+            msgs = db.query(ChatMessage).filter_by(
+                user_id="user-admin-media-1", role="head_of_council"
+            ).all()
+            assert any(storage_url in m.content for m in msgs), "Storage URL not in message content"
+            assert any("https://charts.example.com/sales.png" not in m.content for m in msgs), "Original URL still in message"
+            assert any("![Sales Chart]" in m.content for m in msgs), "Alt text not preserved"
+        finally:
+            db.close()
 
     @pytest.mark.asyncio
     async def test_raw_image_url_intercepted_and_stored(self, seeded_db, mock_llm_client, monkeypatch):
@@ -193,7 +229,7 @@ class TestChatServiceMediaInterception:
             return_value="https://s3.bucket/files/user-admin-media-2/xyz789.jpg"
         )
 
-        with patch("backend.services.media_interceptor.httpx.AsyncClient") as mock_client_class:
+        with patch("backend.services.chat_service.httpx.AsyncClient") as mock_client_class:
             mock_client = AsyncMock()
             mock_response = AsyncMock()
             mock_response.status_code = 200
@@ -207,12 +243,23 @@ class TestChatServiceMediaInterception:
         assert "https://cdn.example.com/photo.jpg" in result["content"]
         assert "https://s3.bucket/files/user-admin-media-2/xyz789.jpg" not in result["content"]
 
-        await asyncio.sleep(0.1)
+        # Wait for background task to complete
+        await asyncio.sleep(0.5)
 
-        from backend.models.entities.chat_message import ChatMessage
-        msgs = seeded_db.query(ChatMessage).filter_by(role="head_of_council").all()
-        assert any("https://s3.bucket/files/user-admin-media-2/xyz789.jpg" in m.content for m in msgs)
-        assert any("https://cdn.example.com/photo.jpg" not in m.content for m in msgs)
+        # Query using a fresh database session (background task uses its own SessionLocal)
+        db = SessionLocal()
+        try:
+            storage_url = "https://s3.bucket/files/user-admin-media-2/xyz789.jpg"
+            found = _find_head_message_with_media(db, "user-admin-media-2", storage_url)
+            assert found, f"Expected media URL {storage_url} not found in head_of_council messages"
+
+            msgs = db.query(ChatMessage).filter_by(
+                user_id="user-admin-media-2", role="head_of_council"
+            ).all()
+            assert any(storage_url in m.content for m in msgs), "Storage URL not in message content"
+            assert any("https://cdn.example.com/photo.jpg" not in m.content for m in msgs), "Original URL still in message"
+        finally:
+            db.close()
 
     @pytest.mark.asyncio
     async def test_non_media_text_passthrough(self, seeded_db, mock_llm_client):
@@ -282,7 +329,7 @@ class TestChatServiceMediaInterception:
         }
         mock_llm_client.generate_with_tools = AsyncMock(return_value=mock_llm_result)
 
-        with patch("backend.services.media_interceptor.httpx.AsyncClient") as mock_client_class:
+        with patch("backend.services.chat_service.httpx.AsyncClient") as mock_client_class:
             mock_client = AsyncMock()
             mock_response = AsyncMock()
             mock_response.status_code = 404
@@ -329,7 +376,7 @@ class TestChatServiceMediaInterception:
             return_value="https://s3.bucket/files/user-admin-media-5/chart.png"
         )
 
-        with patch("backend.services.media_interceptor.httpx.AsyncClient") as mock_client_class:
+        with patch("backend.services.chat_service.httpx.AsyncClient") as mock_client_class:
             mock_client = AsyncMock()
             mock_response = AsyncMock()
             mock_response.status_code = 200
@@ -341,15 +388,12 @@ class TestChatServiceMediaInterception:
             result = await cs.ChatService.process_message(head, "Chart please", seeded_db)
 
         # Drive the background media interception + Head-turn persistence
-        await asyncio.sleep(0.1)
+        await asyncio.sleep(0.5)
 
-        # Verify ChatMessage was created with media_urls in metadata
-        from backend.models.entities.chat_message import ChatMessage
-        msgs = seeded_db.query(ChatMessage).filter_by(role="head_of_council").all()
-        assert msgs
-        matched = [m for m in msgs if m.message_metadata and "media_urls" in (m.message_metadata or {})]
-        assert matched
-        assert any(
-            "https://s3.bucket/files/user-admin-media-5/chart.png" in (m.message_metadata["media_urls"] or [])
-            for m in matched
-        )
+        # Verify ChatMessage was created with media_urls in metadata using a fresh session
+        db = SessionLocal()
+        try:
+            found = _find_head_message_with_metadata_media(db, "user-admin-media-5", "https://s3.bucket/files/user-admin-media-5/chart.png")
+            assert found, "Expected media URL not found in ChatMessage metadata.media_urls"
+        finally:
+            db.close()
