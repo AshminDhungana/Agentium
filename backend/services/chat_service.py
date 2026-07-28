@@ -24,11 +24,14 @@ from backend.core.llm_client import LLMClient
 from backend.models.entities.user_config import ConnectionStatus
 from backend.models.entities.chat_message import ChatMessage as ChatMsg
 from backend.models.database import SessionLocal
+from backend.services.storage_service import storage_service
 
 import uuid
 from backend.models.entities.chat_message import ChatMessage as ChatMessageEntity
 from backend.services.structured_input_service import render_external_text
 from backend.models.schemas.structured_input import StructuredInputCard as _SIC
+import io
+from io import BytesIO
 
 ws_manager = None
 
@@ -890,7 +893,6 @@ Progress: {task_progress or 'N/A'}%"""
         by network downloads or DB writes.
         """
         try:
-            import httpx
             from backend.services.media_interceptor import MediaInterceptor
 
             # Own DB session: the caller's session may already be closed by the
