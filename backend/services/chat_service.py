@@ -913,8 +913,14 @@ Progress: {task_progress or 'N/A'}%"""
         use_passed_db = db is not None
         if use_passed_db:
             try:
-                # Test if session is still usable
+                # Test if session is still usable - use a simple query that works in savepoint
                 db.execute(text("SELECT 1"))
+                # Also verify it's the same transaction by checking if it's still valid
+                in_trans = db.in_transaction() if hasattr(db, 'in_transaction') else False
+                in_nested = db.in_nested_transaction() if hasattr(db, 'in_nested_transaction') else False
+                if not in_trans and not in_nested:
+                    use_passed_db = False
+                    db = None
             except Exception:
                 # Session is closed or invalid — fall back to new session
                 use_passed_db = False
