@@ -22,31 +22,6 @@ from backend.services.model_provider import ModelService, OpenAICompatibleProvid
 import httpx
 
 
-def _commit_sovereign_user(user_id: str, username: str, email: str) -> None:
-    """Commit the admin (sovereign) user to the REAL database.
-
-    The media-interception background task opens its own ``SessionLocal()``
-    connection, so it cannot see rows committed only to a test's savepoint
-    transaction. Committing the sovereign user for real lets the background
-    task's ``ChatMessage.user_id`` FK resolve. Idempotent so the 3 media tests
-    can each call it without colliding on the (per-test unique) username.
-    """
-    db = SessionLocal()
-    try:
-        if db.query(User).filter_by(username=username).first() is None:
-            db.add(User(
-                id=user_id,
-                username=username,
-                email=email,
-                hashed_password="fake-hash-for-test",
-                is_admin=True,
-                is_active=True,
-            ))
-            db.commit()
-    finally:
-        db.close()
-
-
 def _find_head_message_with_media(db, user_id: str, expected_media_url: str) -> bool:
     """Query the database directly using a fresh session to find the persisted head message with media URL."""
     msg = db.query(ChatMessage).filter(
@@ -156,9 +131,16 @@ class TestChatServiceMediaInterception:
         )
         seeded_db.add(head)
 
-        _commit_sovereign_user(
-            "user-admin-media-1", "admin_media_1", "admin_media_1@agentium.test"
+        admin = User(
+            id="user-admin-media-1",
+            username="admin_media_1",
+            email="admin_media_1@agentium.test",
+            hashed_password="fake-hash-for-test",
+            is_admin=True,
+            is_active=True,
         )
+        seeded_db.add(admin)
+        seeded_db.commit()
 
         model = UserModelConfig(
             provider=ProviderType.OPENAI_COMPATIBLE,
@@ -217,7 +199,17 @@ class TestChatServiceMediaInterception:
         """Bare https://.../image.jpg URL gets replaced."""
         head = HeadOfCouncil(agentium_id="MEDIAH02", name="Test Head 2", is_active=True)
         seeded_db.add(head)
-        _commit_sovereign_user("user-admin-media-2", "admin_media_2", "admin_media_2@agentium.test")
+
+        admin = User(
+            id="user-admin-media-2",
+            username="admin_media_2",
+            email="admin_media_2@agentium.test",
+            hashed_password="fake-hash-for-test",
+            is_admin=True,
+            is_active=True,
+        )
+        seeded_db.add(admin)
+        seeded_db.commit()
 
         model = UserModelConfig(
             provider=ProviderType.OPENAI_COMPATIBLE,
@@ -348,7 +340,17 @@ class TestChatServiceMediaInterception:
         """New storage URLs stored in ChatMessage metadata.media_urls."""
         head = HeadOfCouncil(agentium_id="MEDIAH05", name="Test Head 5", is_active=True)
         seeded_db.add(head)
-        _commit_sovereign_user("user-admin-media-5", "admin_media_5", "admin_media_5@agentium.test")
+
+        admin = User(
+            id="user-admin-media-5",
+            username="admin_media_5",
+            email="admin_media_5@agentium.test",
+            hashed_password="fake-hash-for-test",
+            is_admin=True,
+            is_active=True,
+        )
+        seeded_db.add(admin)
+        seeded_db.commit()
 
         model = UserModelConfig(
             provider=ProviderType.OPENAI_COMPATIBLE,
