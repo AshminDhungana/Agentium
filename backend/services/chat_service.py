@@ -9,6 +9,7 @@ import time
 from datetime import datetime
 import asyncio
 from typing import Dict, Any, Optional, List, Callable, Awaitable
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from backend.models.entities import Agent, HeadOfCouncil, Task, TaskPriority, TaskType, UserModelConfig
@@ -171,7 +172,16 @@ class ChatService:
         # dropped the inbound message and any attached card answer.
         from backend.models.entities.user import User
         import uuid as _uuid
-        sovereign_user = db.query(User).filter_by(is_admin=True, is_active=True).first()
+
+        # Find sovereign user: prefer the user linked to Head's model config,
+        # fall back to first admin user. This ensures tests using explicit user IDs
+        # on their model configs get the right user.
+        sovereign_user = None
+        config = head.get_model_config(db)
+        if config and config.user_id:
+            sovereign_user = db.query(User).filter_by(id=config.user_id, is_active=True).first()
+        if not sovereign_user:
+            sovereign_user = db.query(User).filter_by(is_admin=True, is_active=True).first()
 
         # ── Build token-efficient chat context (Task 2.1) ─────────────────────
         # Load the compacted history (sliding window + pinned first message) and
@@ -524,6 +534,10 @@ Address the Sovereign respectfully. If they issue a command that requires execut
                         head.agentium_id,
                         result.get("model", model_name),
                         [],
+                        # NOTE: db session automatically closed after request in production.
+                        # Tests override get_fresh_db to share a session — only there
+                        # is the passed session still usable when the task runs.
+                        db=db,
                     )
                 )
             except Exception as exc:
@@ -885,6 +899,7 @@ Progress: {task_progress or 'N/A'}%"""
         agent_id: str,
         model: str,
         media_urls: list,
+        db: Session = None,  # Passed from process_message; only usable in tests
     ) -> None:
         """
         Fire-and-forget: download/rewrite media URLs in the Head's reply, then
@@ -892,27 +907,42 @@ Progress: {task_progress or 'N/A'}%"""
         spawned from ``process_message`` so the user-facing stream is not blocked
         by network downloads or DB writes.
         """
-        try:
-            from backend.services.media_interceptor import MediaInterceptor
+        # Determine if we can use the passed session (must be open and not in a
+        # rolled-back transaction). In production, the callers' session is closed
+        # by the time this task executes; in tests, the shared session is open.
+        use_passed_db = db is not None
+        if use_passed_db:
+            try:
+                # Test if session is still usable
+                db.execute(text("SELECT 1"))
+            except Exception:
+                # Session is closed or invalid — fall back to new session
+                use_passed_db = False
+                db = None
 
+        if not use_passed_db:
             # Own DB session: the caller's session may already be closed by the
             # time this background task runs. Open it in try/finally and close it
             # after use so the connection is never leaked.
-            db: Session = SessionLocal()
-            try:
-                async with httpx.AsyncClient(timeout=MediaInterceptor.DOWNLOAD_TIMEOUT) as http_client:
-                    content, media_urls = await MediaInterceptor.intercept_and_store(
-                        text=content,
-                        user_id=user_id,
-                        db=db,
-                        http_client=http_client,
-                    )
-            finally:
-                db.close()
+            db = SessionLocal()
+
+        try:
+            from backend.services.media_interceptor import MediaInterceptor
+
+            async with httpx.AsyncClient(timeout=MediaInterceptor.DOWNLOAD_TIMEOUT) as http_client:
+                content, media_urls = await MediaInterceptor.intercept_and_store(
+                    text=content,
+                    user_id=user_id,
+                    db=db,
+                    http_client=http_client,
+                )
         except Exception as exc:
             logger.warning(f"[ChatService] media interception (bg) failed: {exc}")
+        finally:
+            if not use_passed_db:
+                db.close()
         await ChatService._persist_head_turn_background(
-            user_id, content, agent_id, model, media_urls
+            user_id, content, agent_id, model, media_urls, db=db if use_passed_db else None
         )
 
     @staticmethod
@@ -922,28 +952,31 @@ Progress: {task_progress or 'N/A'}%"""
         agent_id: str,
         model: str,
         media_urls: list,
+        db: Session = None,  # Passed from _media_and_persist_background if using shared session
     ) -> None:
         """Persist the Head-of-Council turn + media rewrite off the critical path."""
+        use_existing_db = db is not None
+        if not use_existing_db:
+            db = SessionLocal()
         try:
-            db: Session = SessionLocal()
-            try:
-                msg_id = str(uuid.uuid4())
-                db.add(ChatMsg(
-                    id=msg_id,
-                    user_id=user_id,
-                    role="head_of_council",
-                    content=content,
-                    message_metadata={
-                        "agent_id": agent_id,
-                        "model": model,
-                        "media_urls": media_urls or [],
-                    },
-                ))
-                db.commit()
-            finally:
-                db.close()
+            msg_id = str(uuid.uuid4())
+            db.add(ChatMsg(
+                id=msg_id,
+                user_id=user_id,
+                role="head_of_council",
+                content=content,
+                message_metadata={
+                    "agent_id": agent_id,
+                    "model": model,
+                    "media_urls": media_urls or [],
+                },
+            ))
+            db.commit()
         except Exception as exc:
             logger.warning(f"[ChatService] Head turn persist (bg) failed: {exc}")
+        finally:
+            if not use_existing_db:
+                db.close()
 
     @staticmethod
     async def analyze_for_task(

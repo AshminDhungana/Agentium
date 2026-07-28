@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import List, Optional
-from models.schemas.structured_input import CardQuestion, StructuredInputCard, StructuredInputAnswer, CardAnswerQuestion
+from backend.models.schemas.structured_input import CardQuestion, StructuredInputCard, StructuredInputAnswer, CardAnswerQuestion
 
 LETTERS = "abcdefghijklmnopqrstuvwxyz"
 

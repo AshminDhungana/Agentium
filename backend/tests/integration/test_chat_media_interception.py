@@ -149,6 +149,7 @@ class TestChatServiceMediaInterception:
             status=ConnectionStatus.ACTIVE,
             is_default=True,
             api_base_url="http://test-url",
+            user_id="user-admin-media-1",
         )
         seeded_db.add(model)
         seeded_db.flush()
@@ -218,6 +219,7 @@ class TestChatServiceMediaInterception:
             status=ConnectionStatus.ACTIVE,
             is_default=True,
             api_base_url="http://test-url",
+            user_id="user-admin-media-2",
         )
         seeded_db.add(model)
         seeded_db.flush()
@@ -276,6 +278,7 @@ class TestChatServiceMediaInterception:
             status=ConnectionStatus.ACTIVE,
             is_default=True,
             api_base_url="http://test-url",
+            user_id="user-admin-media-3",
         )
         seeded_db.add(model)
         seeded_db.flush()
@@ -313,6 +316,7 @@ class TestChatServiceMediaInterception:
             status=ConnectionStatus.ACTIVE,
             is_default=True,
             api_base_url="http://test-url",
+            user_id="user-admin-media-4",
         )
         seeded_db.add(model)
         seeded_db.flush()
@@ -359,6 +363,7 @@ class TestChatServiceMediaInterception:
             status=ConnectionStatus.ACTIVE,
             is_default=True,
             api_base_url="http://test-url",
+            user_id="user-admin-media-5",
         )
         seeded_db.add(model)
         seeded_db.flush()
