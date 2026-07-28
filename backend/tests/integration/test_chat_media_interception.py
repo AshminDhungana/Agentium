@@ -139,7 +139,7 @@ class TestChatServiceMediaInterception:
             yield mock_client
 
     @pytest.fixture(autouse=True)
-    def patch_storage_service(self, monkeypatch):
+    def mock_storage_service(self, monkeypatch):
         """Mock storage_service.upload_file to return test URLs."""
         from backend.services import storage_service
         storage_service.upload_file = MagicMock(return_value="https://s3.bucket/files/user/test.png")
