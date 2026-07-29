@@ -77,27 +77,27 @@ const client = new AgentiumClient({
 
 // Health check
 const health = await client.health();
-console.log(\`Status: \${health.status}\`);
+// console.log(\`Status: \${health.status}\`);
 
 // List agents
 const agents = await client.listAgents();
 agents.forEach(a =>
-  console.log(\`  \${a.agentium_id} — \${a.role}\`),
-);
+  // console.log(\`  \${a.agentium_id} — \${a.role}\`)
+// );
 
 // Create a task
 const task = await client.createTask({
   title: 'Summarize report',
   description: 'Q4 financial summary',
 });
-console.log(\`Task: \${task.id}\`);
+// console.log(\`Task: \${task.id}\`);
 
 // Register a webhook
 const webhook = await client.createWebhookSubscription({
   url: 'https://your-server.com/webhook',
   events: ['task.completed', 'vote.resolved'],
 });
-console.log(\`Webhook: \${webhook.id}\`);`;
+// console.log(\`Webhook: \${webhook.id}\`);`;
 
 const CURL_SAMPLE = `# Health check
 curl -s http://localhost:8000/api/health | jq
