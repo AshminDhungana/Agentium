@@ -111,12 +111,32 @@
   --color-destructive-hover: #dc2626;
 }
 
-/* Thin custom scrollbar for sidebar nav */
-.scrollbar-thin { scrollbar-width: thin; }
-.scrollbar-thin::-webkit-scrollbar { width: 4px; }
+/* Thin custom scrollbar for sidebar nav — theme-aware via CSS variables */
+.scrollbar-thin { scrollbar-width: thin; scrollbar-color: var(--color-border) transparent; }
+.scrollbar-thin::-webkit-scrollbar { width: 4px; height: 4px; }
 .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
-.scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(156, 163, 175, 0.3); border-radius: 4px; }
-.scrollbar-thin::-webkit-scrollbar-thumb:hover { background: rgba(156, 163, 175, 0.5); }
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 4px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-muted);
+}
+
+/* Theme-aware scrollbar for virtualized lists (AgentsPage tree, etc.) */
+.scrollbar-theme {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+}
+.scrollbar-theme::-webkit-scrollbar { width: 6px; height: 6px; }
+.scrollbar-theme::-webkit-scrollbar-track { background: transparent; }
+.scrollbar-theme::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 3px;
+}
+.scrollbar-theme::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-muted);
+}
 
 /* Coordinated theme transition.
    Tailwind `dark:` utilities and the `--c-*` variables flip instantly when the

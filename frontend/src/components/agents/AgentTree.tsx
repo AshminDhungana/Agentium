@@ -322,7 +322,7 @@ export const AgentTree: React.FC<AgentTreeProps> = React.memo(({
             {/* flex-1 allows it to take remaining height below the toolbar */}
             <div
                 ref={parentRef}
-                className="w-full flex-1 overflow-auto"
+                className="w-full flex-1 overflow-auto scrollbar-theme"
                 style={{ minHeight: '400px' }}
             >
                 <div
