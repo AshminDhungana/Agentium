@@ -479,6 +479,39 @@ class ConnectionManager:
             "timestamp": datetime.utcnow().isoformat(),
         })
 
+    # ── Phase 15.2 / Phase 6: MCP revocation broadcast ────────────────────────
+
+    async def emit_mcp_tool_revoked(
+        self,
+        tool_id: str,
+        tool_name: str,
+        reason: str,
+        revoked_by: str,
+    ) -> None:
+        """
+        Broadcast MCP tool revocation to all connected clients.
+
+        Called synchronously from the revoke endpoint after successful Redis write.
+
+        WebSocket payload:
+            {
+                "type":       "mcp_tool_revoked",
+                "tool_id":    "<uuid>",
+                "tool_name":  "<name>",
+                "reason":     "<revocation reason>",
+                "revoked_by": "<agentium_id>",
+                "timestamp":  "<ISO8601>"
+            }
+        """
+        await self.broadcast({
+            "type":       "mcp_tool_revoked",
+            "tool_id":    tool_id,
+            "tool_name":  tool_name,
+            "reason":     reason,
+            "revoked_by": revoked_by,
+            "timestamp":  datetime.utcnow().isoformat(),
+        })
+
 
 # ── global singleton ──────────────────────────────────────────────────────────
 manager = ConnectionManager()
