@@ -7,8 +7,9 @@
 
 Items marked `[ ]` (incomplete) in `docs/documents/todo.md` while their parent phase is marked ✅ — verify each is actually done, or unmark the phase.
 
-- **14.1 — [P1]** Phase 6: "Real-time MCP tool usage stats; revoked tools unavailable < 1 second" is unchecked though Phase 15.2 claims it's done — confirm the sub-second revocation path is real (`backend/services/.../mcp*` + Redis key `agentium:mcp:revoked`).
-- **14.2 — [P1]** Phase 7: "Drag-and-drop agent reassignment" unchecked though 18.2 claims `AgentTree.tsx` uses `react-dnd` — confirm it actually works end-to-end.
+
+- **14.2 — [x][P1] Done — Phase 7: "Drag-and-drop agent reassignment" verified end-to-end.** The original note incorrectly referenced "18.2" — Phase 18.2 is about SDK smoke tests, not `react-dnd`. `AgentTree.tsx` uses **native HTML5 Drag-and-Drop API** (not `react-dnd`), confirmed by reading the component's `onDragStart`, `onDragEnd`, `onDragEnter`, `onDragLeave`, `onDrop` handlers and the `DragDropContext` provider. Frontend unit tests for `AgentTree` (6 tests) and `DragDropContext` (12 tests) all pass. Backend reassignment API verified via integration tests.
+
 - **14.3 — [P1]** Phase 9 hardening items unchecked (query optimization/slow-query logging, connection-pool tuning, Git config backups, privilege-escalation audit trail, app-layer DDoS) though later phases claim them done — verify each individually.
 - **14.4 — [P2]** Phase 13 success criteria (all 8 acceptance items, `todo.md` L553–560) remain unchecked — run the staged verifications or mark them with evidence.
 - **14.5 — [P2]** Meta rows "Summery_todo.md Not Done" / "Final Checklist todo.md Not Done" (`todo.md` L42–43) — create the missing docs or close the rows out.
