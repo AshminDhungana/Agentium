@@ -769,20 +769,33 @@ export function MCPToolRegistry() {
     useEffect(() => {
         if (!lastMessage) return;
         const msg = lastMessage as any;
-        if (msg.type !== 'mcp_stats_update') return;
+        if (msg.type === 'mcp_stats_update') {
+            const statsArr: MCPToolStats[] = msg.stats || [];
+            if (statsArr.length === 0) return;
 
-        const statsArr: MCPToolStats[] = msg.stats || [];
-        if (statsArr.length === 0) return;
+            setStatsMap(prev => {
+                const next = new Map(prev);
+                for (const s of statsArr) {
+                    next.set(s.tool_id, s);
+                }
+                return next;
+            });
+            setStatsLastUpdate(new Date());
+        }
 
-        setStatsMap(prev => {
-            const next = new Map(prev);
-            for (const s of statsArr) {
-                next.set(s.tool_id, s);
-            }
-            return next;
-        });
-        setStatsLastUpdate(new Date());
-    }, [lastMessage]);
+        // NEW: Phase 15.2/6 — mcp_tool_revoked
+        if (msg.type === 'mcp_tool_revoked') {
+            // 1. Immediately remove from live stats map
+            setStatsMap(prev => {
+                const next = new Map(prev);
+                next.delete(msg.tool_id);
+                return next;
+            });
+
+            // 2. Refresh tool list to get updated status from API
+            fetchTools();
+        }
+    }, [lastMessage, fetchTools]);
 
     // ── Filter ─────────────────────────────────────────────────────────────────
     const filtered = tools.filter(t =>
