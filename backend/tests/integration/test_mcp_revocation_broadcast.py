@@ -10,7 +10,7 @@ def test_revoke_endpoint_broadcasts_websocket_event(client, db_session, auth_hea
     # 1. Create and approve a tool
     r = client.post("/api/v1/mcp-tools", json={
         "name": "Test Tool for Revoke",
-        "description": "Test",
+        "description": "Test tool for revocation",
         "server_url": "http://localhost:9999/test",
         "tier": "pre_approved",
         "capabilities": [],
