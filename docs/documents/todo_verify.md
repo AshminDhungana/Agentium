@@ -1,41 +1,10 @@
 # Agentium — Verification & Improvement Backlog
 
 
----
-
-## 14. Roadmap Consistency Audit
-
-Items marked `[ ]` (incomplete) in `docs/documents/todo.md` while their parent phase is marked ✅ — verify each is actually done, or unmark the phase.
-
-
-- **14.2 — [x][P1] Done — Phase 7: "Drag-and-drop agent reassignment" verified end-to-end.** The original note incorrectly referenced "18.2" — Phase 18.2 is about SDK smoke tests, not `react-dnd`. `AgentTree.tsx` uses **native HTML5 Drag-and-Drop API** (not `react-dnd`), confirmed by reading the component's `onDragStart`, `onDragEnd`, `onDragEnter`, `onDragLeave`, `onDrop` handlers and the `DragDropContext` provider. Frontend unit tests for `AgentTree` (6 tests) and `DragDropContext` (12 tests) all pass. Backend reassignment API verified via integration tests.
-
-- **14.3 — [P1]** Phase 9 hardening items unchecked (query optimization/slow-query logging, connection-pool tuning, Git config backups, privilege-escalation audit trail, app-layer DDoS) though later phases claim them done — verify each individually.
-- **14.4 — [P2]** Phase 13 success criteria (all 8 acceptance items, `todo.md` L553–560) remain unchecked — run the staged verifications or mark them with evidence.
-- **14.5 — [P2]** Meta rows "Summery_todo.md Not Done" / "Final Checklist todo.md Not Done" (`todo.md` L42–43) — create the missing docs or close the rows out.
-- **14.6 — [P2]** Progress-overview table shows ✅ for phases (9, 13, …) that still contain unchecked `[ ]` sub-items — audit table-vs-checkbox consistency across the entire roadmap and reconcile.
-
----
-
-## 15. Voice Bridge
-
-> See `voice-bridge-setup.md` for the full host-side install/config reference.
-
-- **15.1 — [x][P1] Done — Cross-platform Windows compatibility.** `voice-bridge/main.py` + `audio_source.py` verified to use only PyAudio + `logging.StreamHandler` (no `signal`/`fcntl`/`fork`/`termios` — none of which exist on Windows). Installer bug fixed: premature `voice-installed.marker` write removed; consolidated to a single guarded Startup launcher + Desktop shortcut; marker is now only written once the bridge is confirmed listening on port 9999 (see "How it works" in `voice-bridge-setup.md`).
-- **15.2 — [x][P1] Done — Duplicate voice notifications.** `frontend/src/services/voiceBridge.ts` (~L82) was re-firing `showToast.error` on every reconnect attempt (`MAX_RETRIES=5`); a dedup/seen-guard was added so the user sees the error once per incident.
-- **15.3 — [P1] `VoiceIndicator.tsx` still re-shows the install/error card on every status flip.** `frontend/src/components/VoiceIndicator.tsx` (~L224–237) re-renders the install/error card on every `error ↔ offline` transition with no dedupe, distinct from the toast fixed in 15.2. Add the same seen-guard pattern here.
-- **15.4 — [x][P2] Done — Windows auto-install/startup consolidation.** `scripts/install-voice-bridge.ps1`, `setup.ps1`, `windows-bootstrap.cmd`, Task Scheduler / `.vbs` / Startup folder triggers consolidated into a single guarded Startup launcher (`agentium-voice-startup.cmd`) + one Desktop shortcut; legacy `.vbs`/HTA/`.reg`/duplicate `.cmd` triggers removed; `install-voice-bridge.ps1` cleans up legacy artifacts so there's no double-start.
-- **15.5 — [x][P2] Done — `docker-compose.yml` `voice-autoinstall` Windows path handling.** Verified reliable on Docker Desktop: the container drops `bootstrap-voice.cmd` (with the repo root baked in) + Startup launcher + Desktop shortcut into the `${USERPROFILE}`-mounted `/host_home` path; `make uninstall-voice` / `make voice-reinstall` are now Docker-Desktop/WSL2 aware.
-- **15.6 — [x][P3] Done — Diagnosable Windows failure logs.** Install steps write to `%USERPROFILE%\.agentium\install.log`; `setup.ps1` verifies port 9999 post-install and tails `voice-bridge.log` on failure; the bridge itself logs to stdout/file via launcher redirection.
-
----
-
 ## 16. Frontend Polish & Accessibility
 
-- **16.1 — [P2]** Remove leftover `console.log(...)` debug statements in `frontend/src/pages/DeveloperPortalPage.tsx` (~L80–100) per the project's cleanup convention.
-- **16.2 — [P3]** `VoiceIndicator.tsx` (L140, 166, 186) copy/close buttons use `text-gray-600 hover:text-gray-600` — the hover state is a no-op due to copy-paste styling. Give hover a distinct color.
-- **16.3 — [P2]** Audit Phase 13–15 pages (`WorkflowDesigner`, `ScalingDashboard`, `EventTriggerManager`, `LearningImpactDashboard`) for hardcoded `bg-white` / `text-black` / raw hex colors missing `dark:` variants, even though Phase 17.2 claims this was completed project-wide.
-- **16.4 — [P2]** Verify every toast goes through the shared `useToast()` hook and every network call goes through `services/api.ts` (Phase 17.2/18.3 claimed this was consolidated) — grep for stray inline `toast()` / `fetch()` calls and migrate any found.
+
+- ~~**16.4 — [P2]** Verify every toast goes through the shared `useToast()` hook and every network call goes through `services/api.ts` — grep for stray inline `toast()` / `fetch()` calls and migrate any found.~~ ✅ **COMPLETED** — Verified: all 47 files use `showToast`/`useToast()`; all API calls use `services/api.ts` axios instance; only 2 legitimate exceptions (rawFetch for SSE/WS, WS health check, Vite lazy imports).
 - **16.5 — [P2]** Color-contrast accessibility still needs a live-backend audit per the Phase 17.4 note — confirm the `axe-core` CI gate actually covers every page with a running backend (not just static/mocked pages).
 
 ---
