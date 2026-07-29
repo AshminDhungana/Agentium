@@ -136,3 +136,23 @@ class TestMCPSubSecondRevocation:
         assert tool_id in data["revoked_tool_ids"], (
             f"Expected {tool_id} in revoked list, got {data}"
         )
+
+    # ---- Task 4: WebSocket Broadcast on Revoke --------------------------------
+    def test_revoke_broadcasts_websocket_event(self, client, redis_client, db_session, auth_headers):
+        """
+        Revoking a tool should emit mcp_tool_revoked WebSocket event.
+        Note: This tests the broadcast call, not WebSocket delivery (requires separate WS test infrastructure).
+        """
+        from unittest.mock import AsyncMock, patch
+
+        tool_id = self._propose_tool(client, auth_headers, "test-revoke-ws", "http://localhost:9999/test-mcp-ws")
+        self._approve_tool(client, auth_headers, tool_id)
+
+        with patch("backend.api.routes.websocket.manager") as mock_manager:
+            mock_manager.emit_mcp_tool_revoked = AsyncMock()
+
+            self._revoke_tool(client, auth_headers, tool_id)
+
+            mock_manager.emit_mcp_tool_revoked.assert_called_once()
+            call_kwargs = mock_manager.emit_mcp_tool_revoked.call_args.kwargs
+            assert call_kwargs["tool_id"] == tool_id
