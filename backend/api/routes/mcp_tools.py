@@ -294,6 +294,19 @@ async def revoke_mcp_tool(
     if bridge:
         bridge.deregister(tool)
 
+    # ── Phase 15.2 / Phase 6: Broadcast revocation to WebSocket clients ──
+    try:
+        from backend.api.routes.websocket import manager
+        await manager.emit_mcp_tool_revoked(
+            tool_id=str(tool.id),
+            tool_name=tool.name,
+            reason=req.reason,
+            revoked_by=req.revoked_by,
+        )
+    except Exception as exc:
+        # Non-fatal: frontend has polling fallback
+        logger.warning("[MCPTools] WebSocket revocation broadcast failed: %s", exc)
+
     return MCPToolResponse(**tool.to_dict())
 
 
