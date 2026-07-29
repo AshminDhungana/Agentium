@@ -1,0 +1,29 @@
+# Enforce LF line endings for shell and Python scripts (critical for Linux containers)
+*.sh text eol=lf
+*.py text eol=lf
+*.shx text eol=lf
+
+# Other text files - let git handle normally
+*.md text
+*.txt text
+*.json text
+*.yaml text
+*.yml text
+*.toml text
+*.ini text
+*.cfg text
+
+# Binary files - don't touch
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+*.pdf binary
+*.zip binary
+*.gz binary
+*.tar binary
