@@ -1,20 +1,5 @@
 # Agentium — Verification & Improvement Backlog
 
----
-
-
-
-## 12. Agents Page — UI Bugs
-
-- **12.1 — [P3]** Scrollbar renders black in light mode; should adapt to the active theme.
-- **12.2 — [P3]** "Tier Groups: Expand All — Level 1, Level 2" text renders white-on-white in light mode; should use a theme-aware dark color.
-- **12.3 — [P1]** Agents list shows 3 agents but the graph view renders only 1 — data/render mismatch; fix so both views reflect the same source of truth.
-
----
-
-## 13. Miscellaneous
-
-- **13.1 — [P3]** Allow users to upload a profile picture.
 
 ---
 
@@ -115,21 +100,3 @@ Mapped from common agent production-readiness frameworks (functional correctness
 - **23.2 — [P2]** Scan `sdk/python/pyproject.toml` the same way; confirm build + `pytest` remain green after updates.
 - **23.3 — [P2]** Scan `frontend/package.json` + lockfile for deprecated/abandoned dependencies (e.g. unmaintained animation/utility libs); update and re-run `npm run build` + the a11y CI gate.
 - **23.4 — [P3]** Check `docker-compose.yml` base images for newer security patches; bump and re-test the full stack.
-
----
-
-## 24. Suggested Verification Order
-
-Work top-down. Each item becomes its own dive: **verify → reproduce → fix → re-verify** — don't mark anything done on inspection alone.
-
-1. **Log-reported P0/P1 defects (§1)** — these are confirmed from logs and block core functionality; fix first.
-2. **Roadmap P1 gaps (§14)** — fastest way to confirm claimed "done" features actually work.
-3. **Chat context optimization (§2)** — directly affects cost and latency on every request.
-4. **Voice Bridge remaining item (§15.3)** — user-facing, Windows-affecting.
-5. **Backend correctness (§17) + Safety (§21.2)** — correctness and security before anything cosmetic.
-6. **Core architecture — tools & skills (§3)** — unblocks agents building their own capabilities.
-7. **Logs & audit (§22) + Testing/CI (§18)** — you need to be able to see and verify behavior before trusting fixes elsewhere.
-8. **Agent behavior/delegation (§8), onboarding (§4), models/providers (§5), knowledge base (§6)** — core product experience.
-9. **Chat page bugs/UX (§9–§11), Agents page (§12), frontend polish/a11y (§16)** — user-facing polish.
-10. **SDKs (§19), DevOps/Windows (§20)** — developer-facing and deployment concerns.
-11. **Dependencies (§23) + remaining production-readiness items (§21.1, 21.3–21.5)** — maintenance and hardening last.

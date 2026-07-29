@@ -346,6 +346,10 @@ sequenceDiagram
     CB->>R: Publish "mcp_stats_update"
     R->>W: Broadcast
     W-->>C: { event: "mcp_stats_update", ... }
+
+    CB->>R: Publish "mcp_tool_revoked"
+    R->>W: Broadcast
+    W-->>C: { event: "mcp_tool_revoked", ... }
 ```
 
 ### 4.2 Event Types Reference
@@ -361,6 +365,7 @@ sequenceDiagram
 | `amendment_proposed` | AmendmentService | Constitution change | Alert of new proposal |
 | `knowledge_submitted` | KnowledgeService | New learning | Pending approval notice |
 | `mcp_stats_update` | Celery beat (30s) | Periodic | Real-time tool stats |
+| `mcp_tool_revoked` | MCP Tools API | On revoke | Real-time revocation broadcast |
 | `channel_health_update` | Celery beat (5min) | Periodic | Channel status change |
 | `system_mode_change` | SelfHealing | Degradation | Normal / Degraded / Critical |
 | `browser_frame` | BrowserService | Live screenshot | Screenshot frame (base64) |
