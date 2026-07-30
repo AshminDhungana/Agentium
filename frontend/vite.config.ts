@@ -32,6 +32,15 @@ export default defineConfig({
       }
     }
   },
+  optimizeDeps: {
+    include: [
+      'react-router-dom',
+      'framer-motion',
+      'motion/react',
+      'react-dom/client',
+      '@tanstack/react-query',
+    ],
+  },
   build: {
     target: 'esnext',
     sourcemap: true,

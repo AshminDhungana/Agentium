@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Routes, Route } from 'react-router-dom';
 
 vi.mock('@/hooks/useDashboardData', () => ({
   useDashboardData: () => ({
@@ -26,16 +26,34 @@ import { useBackendStore } from '@/store/backendStore';
 
 describe('Dashboard page color-contrast', () => {
   beforeEach(() => {
-    useBackendStore.setState({ status: { status: 'connected' }, fetchChannelMetrics: vi.fn() } as any);
+    useBackendStore.setState({
+      status: { status: 'connected', version: '1.0.0', lastChecked: new Date(), latency: 100 },
+      fetchChannelMetrics: vi.fn(),
+      startPolling: vi.fn(),
+    } as any);
   });
 
   it('passes in light theme', async () => {
-    const result = await auditRoute(<MemoryRouter><Dashboard /></MemoryRouter>, 'light');
+    const result = await auditRoute(
+      <MemoryRouter>
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+        </Routes>
+      </MemoryRouter>,
+      'light'
+    );
     expect(result).toHaveNoViolations();
   });
 
   it('passes in dark theme', async () => {
-    const result = await auditRoute(<MemoryRouter><Dashboard /></MemoryRouter>, 'dark');
+    const result = await auditRoute(
+      <MemoryRouter>
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+        </Routes>
+      </MemoryRouter>,
+      'dark'
+    );
     expect(result).toHaveNoViolations();
   });
 });

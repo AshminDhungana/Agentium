@@ -6,6 +6,26 @@ import { LearningImpactDashboard } from '@/pages/LearningImpactDashboard';
 import { useAuthStore } from '@/store/authStore';
 import { useWebSocketStore } from '@/store/websocketStore';
 
+vi.mock('@/services/improvements', () => ({
+  improvementsApi: {
+    getImpactStats: vi.fn().mockResolvedValue({
+      success_rate_delta: 5.2,
+      tools_generated: 10,
+      anti_patterns_warned: 3,
+      history: [{ date: '2024-01-01', success_rate: 0.85 }],
+    }),
+    getPatterns: vi.fn().mockResolvedValue({ patterns: [] }),
+    triggerConsolidation: vi.fn().mockResolvedValue(undefined),
+  },
+}));
+
+vi.mock('@/hooks/useToast', () => ({
+  showToast: {
+    error: vi.fn(),
+    success: vi.fn(),
+  },
+}));
+
 describe('LearningImpactDashboard color-contrast', () => {
   beforeEach(() => {
     useAuthStore.setState({
@@ -14,12 +34,20 @@ describe('LearningImpactDashboard color-contrast', () => {
     });
     useWebSocketStore.setState({
       connectionPhase: 'active',
-      isConnected: true,
       error: null,
-      connectionStats: null,
+      connectionStats: {
+        reconnectAttempts: 0,
+        lastPingTime: null,
+        latencyMs: null,
+      },
+      lastMessage: null,
       unreadCount: 0,
       messageHistory: [],
-      lastMessage: null,
+      lastWorkspace: null,
+      apiKeyAddedAt: null,
+      genesisAwaitingName: false,
+      genesisNamePrompt: '',
+      genesisNameTimeout: 0,
       genesisJustCompleted: false,
     } as any);
   });
