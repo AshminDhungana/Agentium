@@ -1730,10 +1730,7 @@ def upgrade() -> None:
     # [002-5] individual_votes.updated_at + uppercase enum variants
     # =========================================================================
     inspector = _get_inspector()
-    if inspector is not None:
-        iv_columns = {col['name'] for col in inspector.get_columns('individual_votes')}
-    else:
-        iv_columns = set()
+    iv_columns = _col_names(inspector, 'individual_votes')
     if 'updated_at' not in iv_columns:
         op.add_column('individual_votes', sa.Column('updated_at', sa.DateTime(), nullable=True))
         if not context.is_offline_mode():
@@ -2461,10 +2458,11 @@ def upgrade() -> None:
 # =============================================================================
 
 def downgrade() -> None:
-    conn = op.get_bind()
+    # Get inspector and tables (handles offline mode gracefully)
+    inspector = _get_inspector()
     existing_tables = _get_existing_tables()
 
-    print("🔄 Downgrading 000_combined_migration ...")
+    print("[DOWN] Downgrading 000_combined_migration ...")
 
     # ── [007] Citation Edges ──────────────────────────────────────────────────
     if 'citation_edges' in existing_tables:
@@ -2531,9 +2529,9 @@ def downgrade() -> None:
         op.drop_table('workflow_subtasks')
 
     if 'workflow_executions' in existing_tables:
-        fks = inspector.get_foreign_keys('workflow_executions')
+        fks = _fk_names(inspector, 'workflow_executions')
         for fk in fks:
-            if fk.get('name') == 'fk_workflow_executions_workflow_id':
+            if fk == 'fk_workflow_executions_workflow_id':
                 op.drop_constraint('fk_workflow_executions_workflow_id',
                                    'workflow_executions', type_='foreignkey')
         op.drop_index('ix_workflow_executions_status',      table_name='workflow_executions')
@@ -2629,7 +2627,7 @@ def downgrade() -> None:
     # ── [002] A/B testing, skill system ───────────────────────────────────────
     existing_tables = _get_existing_tables()
 
-    iv_columns = {col['name'] for col in inspector.get_columns('individual_votes')}
+    iv_columns = _col_names(inspector, 'individual_votes')
     if 'updated_at' in iv_columns:
         op.drop_column('individual_votes', 'updated_at')
 
@@ -2657,7 +2655,7 @@ def downgrade() -> None:
     # so break the cycle by dropping the tasks-side FK before any table drops.
     existing_tables = _get_existing_tables()
     if 'tasks' in existing_tables:
-        task_fks = {fk.get('name') for fk in inspector.get_foreign_keys('tasks')}
+        task_fks = _fk_names(inspector, 'tasks')
         if 'tasks_deliberation_id_fkey' in task_fks:
             op.drop_constraint('tasks_deliberation_id_fkey', 'tasks', type_='foreignkey')
 
