@@ -11,7 +11,7 @@
 
 ## 17. Backend Correctness
 
-- **17.1 — [P1]** `backend/services/agent_orchestrator.py` (~L500–501): `raise NotImplementedError("This tool was auto-generated...")` — verify this surfaces to the user as a clean, actionable task-failure message rather than a raw 500.
+- ~~**17.1 — [P1]** `backend/services/agent_orchestrator.py` (~L500–501): `raise NotImplementedError("This tool was auto-generated...")` — verify this surfaces to the user as a clean, actionable task-failure message rather than a raw 500.~~ ✅ **COMPLETED** — Fixed in commit 5311603: `NotImplementedError` replaced with LLM-based code generation that validates via ToolFactory and returns clean escalation messages instead of raw 500s. Unit tests in `backend/tests/unit/test_tool_self_creation.py` pass.
 - **17.2 — [P2]** `backend/core/constitutional_guard.py` (~L172): `TODO(pre-cutover): re-tune against the REAL constitution articles` — confirm thresholds were actually re-tuned after cutover; if not, do it now.
 - **17.3 — [P2]** `backend/models/entities/agents.py` (~L717–762) parses `TODO:` as a rule-action token — verify legitimate agent-authored text that happens to contain the literal string "TODO:" cannot be misinterpreted as a rule action. Add an escaping/quoting mechanism if it can.
 - **17.4 — [P2]** `backend/api/routes/chat.py` (~L432): a `_done_sent` flag was added to prevent a previously-fixed duplicate final-message emission — verify no other code path can still double-emit the final message.
