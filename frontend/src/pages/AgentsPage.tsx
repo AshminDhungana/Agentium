@@ -550,8 +550,8 @@ export const AgentsPage: React.FC = () => {
             <div className="flex justify-between items-start mb-6">
                 <div>
                     <div className="flex items-center gap-2 mb-1">
-                        <Users className="w-4 h-4 text-gray-600 dark:text-slate-500" />
-                        <span className="text-xs font-semibold tracking-widest uppercase text-gray-600 dark:text-slate-500">
+                        <Users className="w-4 h-4 text-gray-700 dark:text-gray-100" />
+                        <span className="text-xs font-semibold tracking-widest uppercase text-gray-700 dark:text-gray-100">
                             Workforce
                         </span>
                     </div>

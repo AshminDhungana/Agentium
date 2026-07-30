@@ -1057,7 +1057,7 @@ export function ChatPage() {
                                     <p className="text-xs text-gray-600 dark:text-gray-400 flex items-center gap-1.5">
                                         {activeTab === 'ai' ? (
                                             connectionPhase === 'active' ? (
-                                                <span className="text-green-600 dark:text-green-400 font-medium">Active now</span>
+                                                <span className="text-green-700 dark:text-green-300 font-medium">Active now</span>
                                             ) : connectionPhase === 'genesis_running' ? (
                                                 <span className="text-blue-600 dark:text-blue-400 font-medium flex items-center gap-1.5">
                                                     <LoadingSpinner size="sm" /> Initializing…
@@ -1083,7 +1083,7 @@ export function ChatPage() {
                                             </span>
                                         )}
                                         {activeTab === 'ai' && connectionStats.latencyMs && connectionPhase === 'active' && (
-                                            <span className="text-green-600 dark:text-green-500">· {connectionStats.latencyMs}ms</span>
+                                            <span className="text-green-700 dark:text-green-300">· {connectionStats.latencyMs}ms</span>
                                         )}
                                     </p>
                                 </div>
@@ -1152,6 +1152,7 @@ export function ChatPage() {
                                             icon={Crown}
                                             title="Head of Council"
                                             description={isConnected ? 'Send a message to your Head of Council.' : 'Connect to start chatting.'}
+                                            headingLevel={2}
                                         />
                                     </div>
                                 )}
@@ -1363,7 +1364,7 @@ export function ChatPage() {
                                                     </span>
                                                 )}
                                             </div>
-                                            <span className="text-xs text-gray-600 dark:text-gray-500">Enter to send · Shift+Enter for new line</span>
+                                            <span className="text-xs text-gray-600 dark:text-gray-400">Enter to send · Shift+Enter for new line</span>
                                         </div>
                                     </div>
                                     {activeStreamId ? (

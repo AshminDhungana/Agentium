@@ -280,7 +280,7 @@ export function SettingsPage() {
                                     <div className="w-full mt-6 pt-5 border-t border-gray-100 dark:border-[#1e2535]">
                                         <div className="flex items-center justify-between text-sm mb-3">
                                             <span className="text-gray-600 dark:text-gray-400">Account Status</span>
-                                            <span className="flex items-center gap-1.5 text-green-600 dark:text-green-400 font-medium text-xs">
+                                            <span className="flex items-center gap-1.5 text-green-700 dark:text-green-300 font-medium text-xs">
                                                 <CheckCircle2 className="w-3.5 h-3.5" />
                                                 Active
                                             </span>
@@ -318,7 +318,7 @@ export function SettingsPage() {
                                     </div>
                                     <div className="flex items-center justify-between py-2.5">
                                         <span className="text-xs text-gray-600 dark:text-gray-400">2FA Status</span>
-                                        <span className="text-xs text-gray-600 dark:text-gray-500">Not Enabled</span>
+                                        <span className="text-xs text-gray-600 dark:text-gray-300">Not Enabled</span>
                                     </div>
                                 </div>
                             </div>
@@ -387,7 +387,7 @@ export function SettingsPage() {
                                                 <div className="w-full border-t border-gray-200 dark:border-[#1e2535]" />
                                             </div>
                                             <div className="relative flex justify-center">
-                                                <span className="px-3 bg-white dark:bg-[#161b27] text-xs text-gray-600 dark:text-gray-500">
+                                                <span className="px-3 bg-white dark:bg-[#161b27] text-xs text-gray-700 dark:text-gray-300">
                                                     New Password
                                                 </span>
                                             </div>

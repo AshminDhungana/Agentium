@@ -884,3 +884,32 @@ agentium/
 
 *Architecture diagrams rendered with [Mermaid](https://mermaid.js.org/)*
 
+
+## Accessibility CI Gates
+
+Agentium runs two complementary accessibility gates:
+
+### 1. Fast PR Gate — `frontend-a11y.yml`
+- **Trigger:** Push/PR to main/develop affecting `frontend/**`
+- **Environment:** Frontend only (no backend services)
+- **Command:** `npm run test:a11y` (vitest + Playwright Chromium)
+- **Scope:** Component-level tests (`src/components/**/*.a11y.browser.test.tsx`) + smoke test
+- **Time:** ~2-3 minutes
+- **Purpose:** Catch regressions in shared UI components quickly
+
+### 2. Deep Merge Gate — `integration-a11y.yml` (Required Check)
+- **Trigger:** Push to main/develop (required status check)
+- **Environment:** Full stack via `docker-compose.test.yml` (PostgreSQL, Redis, ChromaDB) + FastAPI backend
+- **Command:** `npm run test:a11y` against `http://localhost:3000` with `VITE_API_URL=http://localhost:8000`
+- **Scope:** All 24 route-level tests (`src/pages/*.a11y.browser.test.tsx`) × 2 themes = 48 test cases
+- **Time:** ~8 minutes
+- **Purpose:** Catch color-contrast violations in real rendered pages with live data
+
+### Adding a New Page
+1. Create component in `src/pages/NewPage.tsx`
+2. Add route in `src/App.tsx` (protected or public)
+3. Create `src/pages/NewPage.a11y.browser.test.tsx` using existing template
+4. Run locally: `npm run test:a11y -- NewPage`
+5. Both CI gates auto-include the new test
+
+The deep gate is required because axe-core's `color-contrast` rule needs real layout/computed styles — mocked/static tests can't catch contrast issues in tables, badges, charts, or status pills rendered with live backend data.

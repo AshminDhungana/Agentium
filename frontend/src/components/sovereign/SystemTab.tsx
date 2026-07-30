@@ -242,7 +242,12 @@ export function SystemTab() {
                     </div>
                 </div>
 
-                <div className="overflow-x-auto">
+                <div
+                    tabIndex={0}
+                    role="region"
+                    aria-label="Container management table"
+                    className="overflow-x-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-[#0f1117]"
+                >
                     <table className="w-full">
                         <thead className="bg-gray-50 dark:bg-[#0f1117]">
                             <tr>
@@ -363,7 +368,12 @@ export function SystemTab() {
                     </div>
                 </div>
 
-                <div className="divide-y divide-gray-100 dark:divide-[#1e2535] max-h-[500px] overflow-y-auto">
+                <div
+                    tabIndex={0}
+                    role="region"
+                    aria-label="Command history list"
+                    className="divide-y divide-gray-100 dark:divide-[#1e2535] max-h-[500px] overflow-y-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-[#0f1117]"
+                >
                     {commandLogs.slice(0, 10).map((log) => (
                         <div
                             key={log.id}

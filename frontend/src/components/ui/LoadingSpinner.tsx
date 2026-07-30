@@ -40,7 +40,7 @@ export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
         className={`animate-spin text-current ${sizeClasses[size]} ${className || ''}`} 
         aria-label="Loading"
       />
-      {label && <span className="text-sm text-gray-600 dark:text-gray-400">{label}</span>}
+      {label && <span className="text-sm text-gray-700 dark:text-gray-300">{label}</span>}
     </div>
   );
 };

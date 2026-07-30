@@ -243,7 +243,10 @@ export function SovereignDashboard() {
             <div className="mb-6">
                 <div
                     ref={tabNavRef}
-                    className="w-fit max-w-full overflow-x-auto rounded-xl border border-gray-200 dark:border-[#1e2535] bg-white dark:bg-[#161b27] shadow-sm [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-[#2a3347] [&::-webkit-scrollbar-thumb]:rounded-full"
+                    tabIndex={0}
+                    role="navigation"
+                    aria-label="Sovereign dashboard tabs"
+                    className="w-fit max-w-full overflow-x-auto rounded-xl border border-gray-200 dark:border-[#1e2535] bg-white dark:bg-[#161b27] shadow-sm [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-[#2a3347] [&::-webkit-scrollbar-thumb]:rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-[#0f1117]"
                 >
                     <div className="flex gap-1 p-1 min-w-max">
                         {TABS.map((tab) => {
@@ -280,7 +283,7 @@ export function SovereignDashboard() {
                         })}
                     </div>
                 </div>
-                <p className="mt-2 ml-1 text-xs text-gray-600 dark:text-gray-500">
+                <p className="mt-2 ml-1 text-xs text-gray-600 dark:text-gray-400">
                     {TABS.find((t) => t.id === activeTab)?.description}
                 </p>
             </div>

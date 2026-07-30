@@ -46,6 +46,8 @@ export interface EmptyStateProps {
     size?: 'sm' | 'md';
     /** Optional illustration key for a contextual SVG graphic above the icon. */
     illustration?: 'agents' | 'tasks' | 'inbox' | 'knowledge' | 'workflows';
+    /** Heading level for the title (default: 3). Use 1-6 for proper document outline. */
+    headingLevel?: 1 | 2 | 3 | 4 | 5 | 6;
 }
 
 export function EmptyState({
@@ -55,6 +57,7 @@ export function EmptyState({
     action,
     size = 'md',
     illustration,
+    headingLevel = 3,
 }: EmptyStateProps) {
     const py = size === 'sm' ? 'py-8' : 'py-16';
     const iconSize = size === 'sm' ? 'w-8 h-8' : 'w-12 h-12';
@@ -63,6 +66,8 @@ export function EmptyState({
 
     const IllustrationComponent = illustration ? ILLUSTRATION_MAP[illustration] : null;
     const illustrationSize = size === 'sm' ? 'w-24 h-20' : 'w-32 h-28';
+
+    const HeadingTag = `h${headingLevel}` as keyof JSX.IntrinsicElements;
 
     return (
         <div
@@ -81,9 +86,9 @@ export function EmptyState({
                 </div>
             )}
 
-            <h3 className={`${titleSize} font-medium text-gray-700 dark:text-gray-300 mb-1`}>
+            <HeadingTag className={`${titleSize} font-medium text-gray-900 dark:text-white mb-1`}>
                 {title}
-            </h3>
+            </HeadingTag>
 
             {description && (
                 <p className="text-sm text-gray-600 dark:text-gray-400 max-w-xs">

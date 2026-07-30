@@ -334,7 +334,7 @@ Agentium serves an auto-generated OpenAPI 3.1 specification at:
 - **Swagger UI**: http://localhost:8000/docs
 - **ReDoc**: http://localhost:8000/redoc
 
-All 80+ endpoints are documented with example request/response bodies.
+All endpoints are documented with example request/response bodies.
 
 ### System Requirements
 
@@ -422,24 +422,6 @@ Agentium ships with two first-class SDKs, both auto-generated from the OpenAPI 3
 | --- | ------------ | ---------- |
 | **Python** | `pip install agentium-sdk` | [`sdk/python`](./sdk/python) |
 | **TypeScript** | `npm install @agentium/sdk` | [`sdk/typescript`](./sdk/typescript) |
-
-Quick example (Python):
-```python
-from agentium_sdk import AgentiumClient
-
-async with AgentiumClient("http://localhost:8000", api_key="sk-...") as client:
-    agents = await client.list_agents()
-    task = await client.create_task(title="Analyze Q3 reports")
-```
-
-Quick example (TypeScript):
-```typescript
-import { AgentiumClient } from '@agentium/sdk';
-
-const client = new AgentiumClient({ baseUrl: 'http://localhost:8000', apiKey: 'sk-...' });
-const agents = await client.listAgents();
-const task = await client.createTask({ title: 'Analyze Q3 reports' });
-```
 
 ---
 

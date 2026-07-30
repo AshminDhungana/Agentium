@@ -103,10 +103,10 @@ export default function UserManagement({
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center py-24">
+            <div className="flex items-center justify-center py-24 bg-white dark:bg-[#0f1117]">
                 <div className="flex flex-col items-center gap-3">
                     <LoadingSpinner size="lg" />
-                    <span className="text-sm text-gray-600 dark:text-gray-400">Loading users…</span>
+                    <span className="text-sm text-gray-600 dark:text-gray-300">Loading users…</span>
                 </div>
             </div>
         );
@@ -123,7 +123,7 @@ export default function UserManagement({
                     <p className="text-sm font-medium text-gray-900 dark:text-white mb-1">
                         Failed to load users
                     </p>
-                    <p className="text-xs text-gray-600 dark:text-gray-400 mb-4 max-w-xs">
+                    <p className="text-xs text-gray-600 dark:text-gray-300 mb-4 max-w-xs">
                         {error}
                     </p>
                     <button

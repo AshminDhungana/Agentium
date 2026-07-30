@@ -306,7 +306,7 @@ function MarketplaceTab() {
           <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-500/10 flex items-center justify-center">
             <Search className="w-4 h-4 text-blue-600 dark:text-blue-400" />
           </div>
-          <h3 className="text-lg font-bold text-gray-900 dark:text-white">Browse Marketplace</h3>
+          <h2 className="text-lg font-bold text-gray-900 dark:text-white">Browse Marketplace</h2>
         </div>
 
         <div className="flex gap-3 mb-4">
@@ -398,7 +398,7 @@ function MarketplaceTab() {
             <div className="w-8 h-8 rounded-lg bg-green-100 dark:bg-green-500/10 flex items-center justify-center">
               <Plus className="w-4 h-4 text-green-600 dark:text-green-400" />
             </div>
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white">Publish Tool</h3>
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white">Publish Tool</h2>
           </div>
 
           <div className="space-y-4">
@@ -462,7 +462,7 @@ function MarketplaceTab() {
             <div className="w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-500/10 flex items-center justify-center">
               <Download className="w-4 h-4 text-purple-600 dark:text-purple-400" />
             </div>
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white">Import from Marketplace</h3>
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white">Import from Marketplace</h2>
           </div>
 
           <div className="space-y-4">
@@ -527,7 +527,7 @@ function MarketplaceTab() {
                     "Import finalized",
                   )
                 }
-                className="w-full px-4 py-2 bg-green-600 hover:bg-green-700 dark:hover:bg-green-500 text-white rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 flex items-center justify-center gap-2"
+                className="w-full px-4 py-2 bg-green-700 hover:bg-green-800 dark:hover:bg-green-600 text-white rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {pendingAction === "FinalizeImport" && <LoadingSpinner size="sm" />}
                 Finalize Import ✓
@@ -542,7 +542,7 @@ function MarketplaceTab() {
             <div className="w-8 h-8 rounded-lg bg-yellow-100 dark:bg-yellow-500/10 flex items-center justify-center">
               <Star className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
             </div>
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white">Rate a Listing</h3>
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white">Rate a Listing</h2>
           </div>
 
           <div className="space-y-4">
@@ -585,7 +585,7 @@ function MarketplaceTab() {
             <div className="w-8 h-8 rounded-lg bg-red-100 dark:bg-red-500/10 flex items-center justify-center">
               <Trash2 className="w-4 h-4 text-red-600 dark:text-red-400" />
             </div>
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white">Yank Listing</h3>
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white">Yank Listing</h2>
           </div>
 
           <div className="space-y-4">
@@ -698,7 +698,7 @@ function ToolsTab() {
             <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-500/10 flex items-center justify-center">
               <Package className="w-4 h-4 text-blue-600 dark:text-blue-400" />
             </div>
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white">All Tools</h3>
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white">All Tools</h2>
           </div>
           <div className="flex gap-3">
             <select
@@ -789,7 +789,7 @@ function ToolsTab() {
             <div className="w-8 h-8 rounded-lg bg-green-100 dark:bg-green-500/10 flex items-center justify-center">
               <Plus className="w-4 h-4 text-green-600 dark:text-green-400" />
             </div>
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white">Propose New Tool</h3>
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white">Propose New Tool</h2>
           </div>
 
           <div className="space-y-4">
@@ -859,7 +859,7 @@ function ToolsTab() {
             <div className="w-8 h-8 rounded-lg bg-yellow-100 dark:bg-yellow-500/10 flex items-center justify-center">
               <Users className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
             </div>
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white">Vote on Proposal</h3>
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white">Vote on Proposal</h2>
           </div>
 
           <div className="space-y-4">
@@ -917,7 +917,7 @@ function ToolsTab() {
             <div className="w-8 h-8 rounded-lg bg-green-100 dark:bg-green-500/10 flex items-center justify-center">
               <Play className="w-4 h-4 text-green-600 dark:text-green-400" />
             </div>
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white">Execute Tool</h3>
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white">Execute Tool</h2>
           </div>
 
           <div className="space-y-4">
@@ -969,7 +969,7 @@ function ToolsTab() {
                   "Tool executed",
                 )
               }
-              className="w-full px-4 py-2 bg-green-600 hover:bg-green-700 dark:hover:bg-green-500 text-white rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 flex items-center justify-center gap-2"
+              className="w-full px-4 py-2 bg-green-700 hover:bg-green-800 dark:hover:bg-green-600 text-white rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {pendingAction === "Execute" && <LoadingSpinner size="sm" />}
               ▶ Execute
@@ -983,7 +983,7 @@ function ToolsTab() {
             <div className="w-8 h-8 rounded-lg bg-orange-100 dark:bg-orange-500/10 flex items-center justify-center">
               <AlertTriangle className="w-4 h-4 text-orange-600 dark:text-orange-400" />
             </div>
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white">Deprecate Tool</h3>
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white">Deprecate Tool</h2>
           </div>
 
           <div className="space-y-4">
@@ -1053,7 +1053,7 @@ function ToolsTab() {
               <div className="w-8 h-8 rounded-lg bg-green-100 dark:bg-green-500/10 flex items-center justify-center">
                 <RotateCcw className="w-4 h-4 text-green-600 dark:text-green-400" />
               </div>
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white">Restore Tool</h3>
+              <h2 className="text-lg font-bold text-gray-900 dark:text-white">Restore Tool</h2>
             </div>
 
             <div className="space-y-4">
@@ -1088,7 +1088,7 @@ function ToolsTab() {
                     "Tool restored",
                   )
                 }
-                className="w-full px-4 py-2 bg-green-600 hover:bg-green-700 dark:hover:bg-green-500 text-white rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 flex items-center justify-center gap-2"
+                className="w-full px-4 py-2 bg-green-700 hover:bg-green-800 dark:hover:bg-green-600 text-white rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {pendingAction === "Restore" && <LoadingSpinner size="sm" />}
                 ↺ Restore
@@ -1147,7 +1147,7 @@ function VersionsTab() {
           <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-500/10 flex items-center justify-center">
             <GitBranch className="w-4 h-4 text-blue-600 dark:text-blue-400" />
           </div>
-          <h3 className="text-lg font-bold text-gray-900 dark:text-white">Tool Version Explorer</h3>
+          <h2 className="text-lg font-bold text-gray-900 dark:text-white">Tool Version Explorer</h2>
         </div>
 
         <div className="flex gap-3">
@@ -1181,9 +1181,7 @@ function VersionsTab() {
             <div className="w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-500/10 flex items-center justify-center">
               <History className="w-4 h-4 text-purple-600 dark:text-purple-400" />
             </div>
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-              Changelog — {toolName}
-            </h3>
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white">Changelog — {toolName}</h2>
           </div>
 
           {versions.length === 0 ? (
@@ -1221,7 +1219,7 @@ function VersionsTab() {
             <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-500/10 flex items-center justify-center">
               <Code2 className="w-4 h-4 text-blue-600 dark:text-blue-400" />
             </div>
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white">Version Diff</h3>
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white">Version Diff</h2>
           </div>
 
           <div className="grid grid-cols-2 gap-3 mb-4">
@@ -1277,7 +1275,7 @@ function VersionsTab() {
             <div className="w-8 h-8 rounded-lg bg-yellow-100 dark:bg-yellow-500/10 flex items-center justify-center">
               <GitCommit className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
             </div>
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white">Propose Code Update</h3>
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white">Propose Code Update</h2>
           </div>
 
           <div className="space-y-4">
@@ -1329,7 +1327,7 @@ function VersionsTab() {
             <div className="w-8 h-8 rounded-lg bg-green-100 dark:bg-green-500/10 flex items-center justify-center">
               <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400" />
             </div>
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white">Approve Pending Update</h3>
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white">Approve Pending Update</h2>
           </div>
 
           <div className="space-y-4">
@@ -1368,7 +1366,7 @@ function VersionsTab() {
                   "Update approved",
                 )
               }
-              className="w-full px-4 py-2 bg-green-600 hover:bg-green-700 dark:hover:bg-green-500 text-white rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 flex items-center justify-center gap-2"
+              className="w-full px-4 py-2 bg-green-700 hover:bg-green-800 dark:hover:bg-green-600 text-white rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {pendingAction === "ApproveUpdate" && <LoadingSpinner size="sm" />}
               ✓ Approve Update
@@ -1382,7 +1380,7 @@ function VersionsTab() {
             <div className="w-8 h-8 rounded-lg bg-orange-100 dark:bg-orange-500/10 flex items-center justify-center">
               <RotateCcw className="w-4 h-4 text-orange-600 dark:text-orange-400" />
             </div>
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white">Rollback to Version</h3>
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white">Rollback to Version</h2>
           </div>
 
           <div className="space-y-4">
@@ -1486,9 +1484,9 @@ function SunsetTab() {
             <div className="w-8 h-8 rounded-lg bg-red-100 dark:bg-red-500/10 flex items-center justify-center">
               <Clock className="w-4 h-4 text-red-600 dark:text-red-400" />
             </div>
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white">
               Deprecated & Sunset Tools
-            </h3>
+            </h2>
           </div>
           <div className="flex gap-3">
             <button
@@ -1570,7 +1568,7 @@ function SunsetTab() {
             <div className="w-8 h-8 rounded-lg bg-orange-100 dark:bg-orange-500/10 flex items-center justify-center">
               <Clock className="w-4 h-4 text-orange-600 dark:text-orange-400" />
             </div>
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white">Schedule Sunset</h3>
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white">Schedule Sunset</h2>
           </div>
 
           <div className="space-y-4">
@@ -1621,9 +1619,9 @@ function SunsetTab() {
             <div className="w-8 h-8 rounded-lg bg-red-100 dark:bg-red-500/10 flex items-center justify-center">
               <Trash2 className="w-4 h-4 text-red-600 dark:text-red-400" />
             </div>
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white">
               Execute Sunset (Hard Remove)
-            </h3>
+            </h2>
           </div>
 
           <div className="space-y-4">
@@ -1746,7 +1744,7 @@ function AnalyticsTab() {
             <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-500/10 flex items-center justify-center">
               <BarChart3 className="w-4 h-4 text-blue-600 dark:text-blue-400" />
             </div>
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white">Analytics Report</h3>
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white">Analytics Report</h2>
           </div>
           <div className="flex gap-3 items-center">
             <div className="flex items-center gap-2">
@@ -1819,7 +1817,7 @@ function AnalyticsTab() {
             <div className="w-8 h-8 rounded-lg bg-red-100 dark:bg-red-500/10 flex items-center justify-center">
               <AlertTriangle className="w-4 h-4 text-red-600 dark:text-red-400" />
             </div>
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white">Recent Errors</h3>
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white">Recent Errors</h2>
           </div>
 
           <div className="flex gap-3 mb-4">
@@ -1890,7 +1888,7 @@ function AnalyticsTab() {
             <div className="w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-500/10 flex items-center justify-center">
               <Users className="w-4 h-4 text-purple-600 dark:text-purple-400" />
             </div>
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white">Per-Agent Tool Usage</h3>
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white">Per-Agent Tool Usage</h2>
           </div>
 
           <div className="flex gap-3 mb-4">
@@ -1940,7 +1938,7 @@ function AnalyticsTab() {
             <div className="w-8 h-8 rounded-lg bg-green-100 dark:bg-green-500/10 flex items-center justify-center">
               <Activity className="w-4 h-4 text-green-600 dark:text-green-400" />
             </div>
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white">Per-Tool Analytics</h3>
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white">Per-Tool Analytics</h2>
           </div>
 
           <div className="flex gap-3 mb-4">
@@ -2064,7 +2062,7 @@ export default function ToolMarketplacePage({ embedded = false }: ToolMarketplac
               className={`px-5 py-3 text-sm font-medium transition-all border-b-2 ${
                 active === i
                   ? "text-blue-600 dark:text-blue-400 border-blue-600 dark:border-blue-400"
-                  : "text-gray-600 dark:text-gray-400 border-transparent hover:text-gray-700 dark:hover:text-gray-300"
+                  : "text-gray-700 dark:text-white border-transparent hover:text-gray-900 dark:hover:text-white"
               }`}
             >
               {t}

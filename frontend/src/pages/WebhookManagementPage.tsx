@@ -136,9 +136,9 @@ const WebhookManagementPage: React.FC = () => {
 
   if (loading) {
       return (
-          <div className="flex flex-col items-center justify-center p-16">
+          <div className="flex flex-col items-center justify-center p-16 bg-white dark:bg-[#0f1117]">
               <LoadingSpinner size="lg" />
-              <p className="text-sm text-gray-600 dark:text-gray-400">Loading webhooks...</p>
+              <p className="text-sm text-gray-700 dark:text-gray-300">Loading webhooks...</p>
           </div>
       );
   }

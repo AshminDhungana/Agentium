@@ -557,7 +557,7 @@ export function ChannelsPage() {
 
     // ─── Render ───────────────────────────────────────────────────────────────
     return (
-        <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 transition-colors duration-200">
+        <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 transition-colors duration-200 bg-white dark:bg-[#0f1117]">
 
             {/* ── Page header ─────────────────────────────────────────────── */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
@@ -565,7 +565,7 @@ export function ChannelsPage() {
                     <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-1">
                         Communication Channels
                     </h1>
-                    <p className="text-gray-600 dark:text-gray-400 text-sm">
+                    <p className="text-gray-700 dark:text-gray-100 text-sm">
                         Connect external platforms to your AI agents
                     </p>
                 </div>
@@ -607,7 +607,7 @@ export function ChannelsPage() {
                         className="bg-white dark:bg-[#161b27] p-5 rounded-xl border border-gray-200 dark:border-[#1e2535] shadow-sm dark:shadow-none transition-colors duration-200"
                     >
                         <div className={`text-2xl font-bold ${stat.valueClass}`}>{stat.value}</div>
-                        <div className="text-xs font-medium text-gray-600 dark:text-gray-500 mt-0.5 uppercase tracking-wide">
+                        <div className="text-xs font-medium text-gray-600 dark:text-gray-300 mt-0.5 uppercase tracking-wide">
                             {stat.label}
                         </div>
                     </div>
@@ -900,15 +900,15 @@ export function ChannelsPage() {
                                     {/* Stats row */}
                                     <div className="flex items-center gap-5 pt-3 border-t border-gray-100 dark:border-[#1e2535]">
                                         <div className="text-sm">
-                                            <span className="text-gray-600 dark:text-gray-500 text-xs uppercase tracking-wide font-medium">Received </span>
+                                            <span className="text-gray-600 dark:text-gray-300 text-xs uppercase tracking-wide font-medium">Received </span>
                                             <span className="font-semibold text-gray-900 dark:text-gray-100">{channel.stats?.received ?? 0}</span>
                                         </div>
                                         <div className="text-sm">
-                                            <span className="text-gray-600 dark:text-gray-500 text-xs uppercase tracking-wide font-medium">Sent </span>
+                                            <span className="text-gray-600 dark:text-gray-300 text-xs uppercase tracking-wide font-medium">Sent </span>
                                             <span className="font-semibold text-gray-900 dark:text-gray-100">{channel.stats?.sent ?? 0}</span>
                                         </div>
                                         {channel.stats?.last_message && (
-                                            <div className="text-xs text-gray-600 dark:text-gray-500 ml-auto">
+                                            <div className="text-xs text-gray-600 dark:text-gray-300 ml-auto">
                                                 {format(new Date(channel.stats.last_message), 'MMM d, h:mm a')}
                                             </div>
                                         )}
