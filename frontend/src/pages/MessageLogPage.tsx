@@ -120,7 +120,7 @@ function FilterBar({ filters, channels, onChange, onReset }: FilterBarProps) {
         className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-medium transition-colors
           ${activeCount > 0
             ? 'bg-blue-100 dark:bg-blue-600/20 border-blue-300 dark:border-blue-500/40 text-blue-700 dark:text-blue-300'
-            : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600/50 text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:border-slate-300 dark:hover:border-slate-500'
+            : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600/50 text-slate-600 dark:text-slate-300 hover:text-slate-800 dark:hover:text-slate-200 hover:border-slate-300 dark:hover:border-slate-500'
           }`}
       >
         <Filter className="w-4 h-4" />
@@ -143,7 +143,7 @@ function FilterBar({ filters, channels, onChange, onReset }: FilterBarProps) {
         >
           {/* Channel */}
           <div>
-            <label className="text-xs text-slate-600 dark:text-slate-400 font-medium mb-1 block" htmlFor="log-filter-channel">Channel</label>
+            <label className="text-xs text-slate-600 dark:text-slate-300 font-medium mb-1 block" htmlFor="log-filter-channel">Channel</label>
             <select
               id="log-filter-channel"
               value={filters.channel_id ?? ''}
@@ -161,7 +161,7 @@ function FilterBar({ filters, channels, onChange, onReset }: FilterBarProps) {
 
           {/* Channel type */}
           <div>
-            <label className="text-xs text-slate-600 dark:text-slate-400 font-medium mb-1 block" htmlFor="log-filter-channel-type">Channel Type</label>
+            <label className="text-xs text-slate-600 dark:text-slate-300 font-medium mb-1 block" htmlFor="log-filter-channel-type">Channel Type</label>
             <select
               id="log-filter-channel-type"
               value={filters.channel_type ?? ''}
@@ -177,7 +177,7 @@ function FilterBar({ filters, channels, onChange, onReset }: FilterBarProps) {
 
           {/* Status */}
           <div>
-            <label className="text-xs text-slate-600 dark:text-slate-400 font-medium mb-1 block">Status</label>
+            <label className="text-xs text-slate-600 dark:text-slate-300 font-medium mb-1 block">Status</label>
             <div className="flex flex-wrap gap-1.5">
               {(['', 'received', 'processing', 'responded', 'failed'] as const).map(s => (
                 <button
@@ -186,7 +186,7 @@ function FilterBar({ filters, channels, onChange, onReset }: FilterBarProps) {
                   className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors border
                     ${(filters.status ?? '') === s
                       ? 'bg-blue-100 dark:bg-blue-600/30 border-blue-300 dark:border-blue-500/50 text-blue-700 dark:text-blue-300'
-                      : 'bg-slate-100 dark:bg-slate-700 border-slate-200 dark:border-slate-600/40 text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                      : 'bg-slate-100 dark:bg-slate-700 border-slate-200 dark:border-slate-600/40 text-slate-600 dark:text-slate-300 hover:text-slate-800 dark:hover:text-slate-200'
                     }`}
                 >
                   {s || 'All'}
@@ -197,7 +197,7 @@ function FilterBar({ filters, channels, onChange, onReset }: FilterBarProps) {
 
           {/* Outcome quick filters */}
           <div>
-            <label className="text-xs text-slate-600 dark:text-slate-400 font-medium mb-1 block">Outcome</label>
+            <label className="text-xs text-slate-600 dark:text-slate-300 font-medium mb-1 block">Outcome</label>
             <div className="flex gap-1.5">
               {[
                 { label: 'Any',         value: undefined },
@@ -210,7 +210,7 @@ function FilterBar({ filters, channels, onChange, onReset }: FilterBarProps) {
                   className={`flex-1 py-1 rounded-lg text-xs font-medium transition-colors border
                     ${filters.success === opt.value
                       ? 'bg-blue-100 dark:bg-blue-600/30 border-blue-300 dark:border-blue-500/50 text-blue-700 dark:text-blue-300'
-                      : 'bg-slate-100 dark:bg-slate-700 border-slate-200 dark:border-slate-600/40 text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                      : 'bg-slate-100 dark:bg-slate-700 border-slate-200 dark:border-slate-600/40 text-slate-600 dark:text-slate-300 hover:text-slate-800 dark:hover:text-slate-200'
                     }`}
                 >
                   {opt.label}
@@ -222,7 +222,7 @@ function FilterBar({ filters, channels, onChange, onReset }: FilterBarProps) {
           {/* Date range */}
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="text-xs text-slate-600 dark:text-slate-400 font-medium mb-1 block" htmlFor="log-filter-date-from">From</label>
+              <label className="text-xs text-slate-600 dark:text-slate-300 font-medium mb-1 block" htmlFor="log-filter-date-from">From</label>
               <input
                 id="log-filter-date-from"
                 type="datetime-local"
@@ -232,7 +232,7 @@ function FilterBar({ filters, channels, onChange, onReset }: FilterBarProps) {
               />
             </div>
             <div>
-              <label className="text-xs text-slate-600 dark:text-slate-400 font-medium mb-1 block" htmlFor="log-filter-date-to">To</label>
+              <label className="text-xs text-slate-600 dark:text-slate-300 font-medium mb-1 block" htmlFor="log-filter-date-to">To</label>
               <input
                 id="log-filter-date-to"
                 type="datetime-local"
@@ -245,7 +245,7 @@ function FilterBar({ filters, channels, onChange, onReset }: FilterBarProps) {
 
           {/* Agent ID */}
           <div>
-            <label className="text-xs text-slate-600 dark:text-slate-400 font-medium mb-1 block" htmlFor="log-filter-agent-id">Agent ID</label>
+            <label className="text-xs text-slate-600 dark:text-slate-300 font-medium mb-1 block" htmlFor="log-filter-agent-id">Agent ID</label>
             <input
               id="log-filter-agent-id"
               type="text"
@@ -259,7 +259,7 @@ function FilterBar({ filters, channels, onChange, onReset }: FilterBarProps) {
           <div className="flex justify-end pt-1">
             <button
               onClick={() => { onReset(); setOpen(false); }}
-              className="text-xs text-slate-600 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 flex items-center gap-1 transition-colors"
+              className="text-xs text-slate-600 dark:text-slate-300 hover:text-slate-700 dark:hover:text-slate-200 flex items-center gap-1 transition-colors"
             >
               <X className="w-3 h-3" /> Clear all filters
             </button>
@@ -320,13 +320,13 @@ const MessageRow = memo(function MessageRow({ msg, onReplay, replayingId }: Mess
             </span>
             <ChannelBadge type={msg.channel_type} name={msg.channel_name} />
             {msg.task_id && (
-              <span className="text-xs text-slate-600 dark:text-slate-500 font-mono">
+              <span className="text-xs text-slate-600 dark:text-slate-300 font-mono">
                 #{msg.task_id.slice(0, 8)}
               </span>
             )}
           </div>
-          <p className="text-sm text-slate-600 dark:text-slate-400 truncate mt-0.5">
-            {msg.content || <em className="text-gray-600 dark:text-slate-600">no content</em>}
+          <p className="text-sm text-slate-600 dark:text-slate-300 truncate mt-0.5">
+            {msg.content || <em className="text-gray-500 dark:text-slate-300">no content</em>}
           </p>
           {msg.last_error && (
             <p className="text-xs text-red-600 dark:text-red-400 truncate mt-0.5 flex items-center gap-1">
@@ -338,7 +338,7 @@ const MessageRow = memo(function MessageRow({ msg, onReplay, replayingId }: Mess
         {/* Right side */}
         <div className="flex items-center gap-3 flex-shrink-0">
           <StatusBadge status={msg.status} />
-          <span className="text-xs text-slate-600 dark:text-slate-500 w-16 text-right">
+          <span className="text-xs text-slate-600 dark:text-slate-300 w-16 text-right">
             {relativeTime}
           </span>
 
@@ -356,7 +356,7 @@ const MessageRow = memo(function MessageRow({ msg, onReplay, replayingId }: Mess
             </button>
           )}
 
-          <ChevronDown className={`w-4 h-4 text-gray-600 dark:text-slate-500 transition-transform ${expanded ? 'rotate-180' : ''}`} />
+          <ChevronDown className={`w-4 h-4 text-gray-600 dark:text-slate-400 transition-transform ${expanded ? 'rotate-180' : ''}`} />
         </div>
       </div>
 
@@ -373,7 +373,7 @@ const MessageRow = memo(function MessageRow({ msg, onReplay, replayingId }: Mess
               ...(msg.task_id           ? [{ icon: LayoutGrid, label: 'Task',  value: msg.task_id           }] : []),
             ].map(({ icon: Icon, label, value }) => (
               <div key={label}>
-                <span className="text-xs text-slate-600 dark:text-slate-500 flex items-center gap-1 mb-0.5">
+                <span className="text-xs text-slate-600 dark:text-slate-300 flex items-center gap-1 mb-0.5">
                   <Icon className="w-3 h-3" /> {label}
                 </span>
                 <span className="text-xs text-slate-700 dark:text-slate-300 font-mono break-all">{value}</span>
@@ -383,7 +383,7 @@ const MessageRow = memo(function MessageRow({ msg, onReplay, replayingId }: Mess
 
           {msg.content && (
             <div>
-              <span className="text-xs text-slate-600 dark:text-slate-500 block mb-1">Full Content</span>
+              <span className="text-xs text-slate-600 dark:text-slate-300 block mb-1">Full Content</span>
               <pre className="text-xs text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-900/60 rounded-lg p-3 whitespace-pre-wrap break-words max-h-48 overflow-y-auto">
                 {msg.content}
               </pre>
@@ -486,7 +486,7 @@ export function MessageLogPage() {
         <div className="flex items-center gap-2 mt-3 flex-wrap">
           {/* Search */}
           <div className="relative flex-1 min-w-52">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600 dark:text-slate-500" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600 dark:text-slate-400" />
             <input
               id="log-search"
               type="text"
@@ -508,7 +508,7 @@ export function MessageLogPage() {
           {hasActiveFilters && (
             <button
               onClick={handleReset}
-              className="flex items-center gap-1 px-2 py-2 rounded-lg text-xs text-slate-600 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+              className="flex items-center gap-1 px-2 py-2 rounded-lg text-xs text-slate-600 dark:text-slate-300 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
             >
               <X className="w-3.5 h-3.5" /> Clear
             </button>
@@ -573,7 +573,7 @@ export function MessageLogPage() {
       {/* Message list */}
       <div className="flex-1 overflow-y-auto px-6 py-4 space-y-2 bg-slate-50 dark:bg-[#0f1117] transition-colors duration-200">
         {loading && messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-gray-600 dark:text-slate-500">
+          <div className="flex flex-col items-center justify-center py-20 text-gray-600 dark:text-slate-400">
             <LoadingSpinner size="lg" />
             <p className="text-sm">Loading messages…</p>
           </div>

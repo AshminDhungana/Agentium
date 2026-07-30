@@ -159,7 +159,7 @@ const DeveloperPortalPage: React.FC = () => {
                   Developer Portal
               </h1>
           </div>
-          <p className="text-gray-600 dark:text-gray-400 text-sm">
+          <p className="text-gray-700 dark:text-white text-sm">
             API documentation, code samples, and webhook event reference for the Agentium platform.
           </p>
       </div>
@@ -171,8 +171,8 @@ const DeveloperPortalPage: React.FC = () => {
             key={key}
             className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 flex items-center gap-2 ${
                 activeTab === key
-                    ? 'bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400 border border-blue-200 dark:border-blue-500/20 shadow-sm'
-                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-[#1e2535] hover:text-gray-900 dark:hover:text-white border border-transparent'
+                    ? 'bg-blue-50 text-blue-700 dark:bg-blue-900 dark:text-white border border-blue-200 dark:border-blue-700 shadow-sm'
+                    : 'text-gray-700 dark:text-white hover:bg-gray-50 dark:hover:bg-[#1e2535] hover:text-gray-900 dark:hover:text-white border border-transparent'
             }`}
             onClick={() => setActiveTab(key)}
           >
@@ -187,15 +187,15 @@ const DeveloperPortalPage: React.FC = () => {
           {activeTab === 'overview' && (
             <>
               <div className="bg-white dark:bg-[#161b27] rounded-xl border border-gray-200 dark:border-[#1e2535] shadow-sm p-6">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                     <Zap className="w-5 h-5 text-blue-600" /> API Endpoints
-                </h3>
-                <div className="bg-gray-50 dark:bg-[#0f1117] p-4 rounded-lg border border-gray-200 dark:border-[#1e2535] mb-6 flex flex-wrap gap-4 text-sm text-gray-600 dark:text-gray-400">
+                </h2>
+                <div className="bg-gray-50 dark:bg-[#0f1117] p-4 rounded-lg border border-gray-200 dark:border-[#1e2535] mb-6 flex flex-wrap gap-4 text-sm text-gray-700 dark:text-gray-300">
                     <div>Base URL: <code className="text-blue-600 dark:text-blue-400 font-mono">http://localhost:8000</code></div>
                     <div className="hidden sm:block text-gray-300 dark:text-[#2a3347]">|</div>
-                    <div>Interactive docs: <a href="/docs" className="text-blue-600 dark:text-blue-400 hover:underline">/docs</a></div>
+                    <div>Interactive docs: <a href="/docs" className="text-blue-600 dark:text-blue-400 hover:underline underline underline-offset-2">/docs</a></div>
                     <div className="hidden sm:block text-gray-300 dark:text-[#2a3347]">|</div>
-                    <div>OpenAPI spec: <a href="/openapi.json" className="text-blue-600 dark:text-blue-400 hover:underline">/openapi.json</a></div>
+                    <div>OpenAPI spec: <a href="/openapi.json" className="text-blue-600 dark:text-blue-400 hover:underline underline underline-offset-2">/openapi.json</a></div>
                 </div>
 
                 <div className="divide-y divide-gray-100 dark:divide-[#1e2535]">
@@ -209,7 +209,7 @@ const DeveloperPortalPage: React.FC = () => {
                       <code className="text-sm text-gray-800 dark:text-gray-200 font-mono bg-gray-100 dark:bg-[#0f1117] px-2 py-0.5 rounded border border-gray-200 dark:border-[#2a3347]">
                           {ep.path}
                       </code>
-                      <span className="text-sm text-gray-600 dark:text-gray-400 sm:ml-auto">
+                      <span className="text-sm text-gray-700 dark:text-gray-300 sm:ml-auto">
                           {ep.desc}
                       </span>
                     </div>
@@ -218,10 +218,10 @@ const DeveloperPortalPage: React.FC = () => {
               </div>
 
               <div className="bg-white dark:bg-[#161b27] rounded-xl border border-gray-200 dark:border-[#1e2535] shadow-sm p-6">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                     <Lock className="w-5 h-5 text-blue-600" /> Authentication
-                </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                </h2>
+                <p className="text-sm text-gray-700 dark:text-gray-300 mb-3">
                   All API requests require authentication via one of:
                 </p>
                 <ul className="list-disc list-inside space-y-2 text-sm text-gray-700 dark:text-gray-300">
@@ -240,13 +240,13 @@ const DeveloperPortalPage: React.FC = () => {
           {activeTab === 'python' && (
             <div className="bg-white dark:bg-[#161b27] rounded-xl border border-gray-200 dark:border-[#1e2535] shadow-sm p-6">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                     <Code2 className="w-5 h-5 text-blue-600" /> Python SDK
-                </h3>
+                </h2>
                 <div className="flex items-center gap-3 bg-gray-50 dark:bg-[#0f1117] p-1.5 rounded-lg border border-gray-200 dark:border-[#1e2535]">
                     <code className="text-sm text-gray-700 dark:text-gray-300 font-mono px-3 whitespace-nowrap">pip install agentium-sdk</code>
-                    <button 
-                        className="p-1.5 text-gray-600 hover:text-blue-600 dark:text-gray-400 dark:hover:text-gray-600 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded transition-colors"
+                    <button
+                        className="p-1.5 text-gray-700 hover:text-blue-700 dark:text-gray-300 dark:hover:text-gray-200 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded transition-colors"
                         onClick={() => copyToClipboard('pip install agentium-sdk', 'py-install')}
                         title="Copy install command" aria-label="Copy install command"
                     >
@@ -256,12 +256,12 @@ const DeveloperPortalPage: React.FC = () => {
               </div>
               <div className="relative group rounded-xl overflow-hidden border border-gray-200 dark:border-[#1e2535] bg-[#0d1117]">
                   <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button 
-                          className="p-2 bg-[#161b27] border border-[#2a3347] text-gray-600 hover:text-white rounded-lg shadow-sm transition-colors"
+                      <button
+                          className="p-2 bg-[#161b27] border border-[#2a3347] text-gray-300 hover:text-white rounded-lg shadow-sm transition-colors"
                           onClick={() => copyToClipboard(PYTHON_SAMPLE, 'py-code')}
                           title="Copy Code" aria-label="Copy Code"
                       >
-                          {copiedStates['py-code'] ? <Check className="w-4 h-4 text-green-700" /> : <Copy className="w-4 h-4" />}
+                          {copiedStates['py-code'] ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
                       </button>
                   </div>
                   <pre className="p-4 text-sm text-[#c9d1d9] font-mono overflow-auto leading-relaxed max-h-[500px]">
@@ -275,13 +275,13 @@ const DeveloperPortalPage: React.FC = () => {
           {activeTab === 'typescript' && (
             <div className="bg-white dark:bg-[#161b27] rounded-xl border border-gray-200 dark:border-[#1e2535] shadow-sm p-6">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                     <Code2 className="w-5 h-5 text-blue-600" /> TypeScript SDK
-                </h3>
+                </h2>
                 <div className="flex items-center gap-3 bg-gray-50 dark:bg-[#0f1117] p-1.5 rounded-lg border border-gray-200 dark:border-[#1e2535]">
                     <code className="text-sm text-gray-700 dark:text-gray-300 font-mono px-3 whitespace-nowrap">npm install @agentium/sdk</code>
-                    <button 
-                        className="p-1.5 text-gray-600 hover:text-blue-600 dark:text-gray-400 dark:hover:text-gray-600 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded transition-colors"
+                    <button
+                        className="p-1.5 text-gray-700 hover:text-blue-700 dark:text-gray-300 dark:hover:text-gray-200 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded transition-colors"
                         onClick={() => copyToClipboard('npm install @agentium/sdk', 'ts-install')}
                         title="Copy install command" aria-label="Copy install command"
                     >
@@ -291,12 +291,12 @@ const DeveloperPortalPage: React.FC = () => {
               </div>
               <div className="relative group rounded-xl overflow-hidden border border-gray-200 dark:border-[#1e2535] bg-[#0d1117]">
                   <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button 
-                          className="p-2 bg-[#161b27] border border-[#2a3347] text-gray-600 hover:text-white rounded-lg shadow-sm transition-colors"
+                      <button
+                          className="p-2 bg-[#161b27] border border-[#2a3347] text-gray-300 hover:text-white rounded-lg shadow-sm transition-colors"
                           onClick={() => copyToClipboard(TS_SAMPLE, 'ts-code')}
                           title="Copy Code" aria-label="Copy Code"
                       >
-                          {copiedStates['ts-code'] ? <Check className="w-4 h-4 text-green-700" /> : <Copy className="w-4 h-4" />}
+                          {copiedStates['ts-code'] ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
                       </button>
                   </div>
                   <pre className="p-4 text-sm text-[#c9d1d9] font-mono overflow-auto leading-relaxed max-h-[500px]">
@@ -309,17 +309,17 @@ const DeveloperPortalPage: React.FC = () => {
           {/* cURL tab */}
           {activeTab === 'curl' && (
             <div className="bg-white dark:bg-[#161b27] rounded-xl border border-gray-200 dark:border-[#1e2535] shadow-sm p-6">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2 mb-4">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2 mb-4">
                   <TerminalSquare className="w-5 h-5 text-blue-600" /> cURL Examples
-              </h3>
+              </h2>
               <div className="relative group rounded-xl overflow-hidden border border-gray-200 dark:border-[#1e2535] bg-[#0d1117]">
                   <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button 
-                          className="p-2 bg-[#161b27] border border-[#2a3347] text-gray-600 hover:text-white rounded-lg shadow-sm transition-colors"
+                      <button
+                          className="p-2 bg-[#161b27] border border-[#2a3347] text-gray-300 hover:text-white rounded-lg shadow-sm transition-colors"
                           onClick={() => copyToClipboard(CURL_SAMPLE, 'curl-code')}
                           title="Copy Code" aria-label="Copy Code"
                       >
-                          {copiedStates['curl-code'] ? <Check className="w-4 h-4 text-green-700" /> : <Copy className="w-4 h-4" />}
+                          {copiedStates['curl-code'] ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
                       </button>
                   </div>
                   <pre className="p-4 text-sm text-[#c9d1d9] font-mono overflow-auto leading-relaxed max-h-[500px]">
@@ -333,21 +333,21 @@ const DeveloperPortalPage: React.FC = () => {
           {activeTab === 'webhooks' && (
             <div className="space-y-6">
               <div className="bg-white dark:bg-[#161b27] rounded-xl border border-gray-200 dark:border-[#1e2535] shadow-sm p-6">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2 mb-4">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                     <Webhook className="w-5 h-5 text-purple-600" /> Event Types
-                </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-6 leading-relaxed">
+                </h2>
+                <p className="text-sm text-gray-600 dark:text-gray-300 mb-6 leading-relaxed">
                   Register webhook subscriptions to receive real-time event
                   notifications. Each event is delivered as a POST request with an
                   HMAC-SHA256 signature in the <code className="text-purple-600 dark:text-purple-400 font-mono bg-purple-50 dark:bg-purple-500/10 px-1 py-0.5 rounded">X-Agentium-Signature</code> header.
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {WEBHOOK_EVENTS.map((ev) => (
-                    <div key={ev.event} className="bg-gray-50 dark:bg-[#0f1117] rounded-lg p-4 border border-gray-200 dark:border-[#1e2535] flex flex-col gap-1.5 hover:border-purple-200 dark:hover:border-purple-500/30 transition-colors">
+                    <div key={ev.event} className="bg-gray-50 dark:bg-[#161b27] rounded-lg p-4 border border-gray-200 dark:border-[#1e2535] flex flex-col gap-1.5 hover:border-purple-200 dark:hover:border-purple-500/30 transition-colors">
                       <code className="text-sm text-purple-700 dark:text-purple-400 font-semibold font-mono">
                           {ev.event}
                       </code>
-                      <span className="text-sm text-gray-600 dark:text-gray-400">
+                      <span className="text-sm text-gray-600 dark:text-gray-300">
                         {ev.desc}
                       </span>
                     </div>
@@ -357,14 +357,14 @@ const DeveloperPortalPage: React.FC = () => {
 
               <div className="bg-white dark:bg-[#161b27] rounded-xl border border-gray-200 dark:border-[#1e2535] shadow-sm p-6">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                         <Lock className="w-5 h-5 text-gray-600" /> Verifying Signatures
-                    </h3>
+                    </h2>
                 </div>
                 <div className="relative group rounded-xl overflow-hidden border border-gray-200 dark:border-[#1e2535] bg-[#0d1117]">
                   <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button 
-                          className="p-2 bg-[#161b27] border border-[#2a3347] text-gray-600 hover:text-white rounded-lg shadow-sm transition-colors"
+                      <button
+                          className="p-2 bg-[#161b27] border border-[#2a3347] text-gray-300 hover:text-white rounded-lg shadow-sm transition-colors"
                           onClick={() => copyToClipboard(`import hmac, hashlib
 
 def verify_signature(secret: str, body: bytes, signature: str) -> bool:
@@ -375,7 +375,7 @@ def verify_signature(secret: str, body: bytes, signature: str) -> bool:
     return hmac.compare_digest(f"sha256={expected}", signature)`, 'verify-code')}
                           title="Copy Code" aria-label="Copy Code"
                       >
-                          {copiedStates['verify-code'] ? <Check className="w-4 h-4 text-green-700" /> : <Copy className="w-4 h-4" />}
+                          {copiedStates['verify-code'] ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
                       </button>
                   </div>
                   <pre className="p-4 text-sm text-[#c9d1d9] font-mono overflow-auto leading-relaxed">

@@ -1,0 +1,163 @@
+name: Integration Accessibility
+
+on:
+  push:
+    branches: ["main", "master", "develop"]
+    paths:
+      - "frontend/**"
+      - "backend/**"
+      - ".github/workflows/integration-a11y.yml"
+  pull_request:
+    branches: ["main", "master", "develop"]
+    paths:
+      - "frontend/**"
+      - "backend/**"
+      - ".github/workflows/integration-a11y.yml"
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: "22"
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  a11y-with-backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── Reuse integration-tests.yml service startup (Postgres, Redis, ChromaDB) ──
+      - name: Start test services
+        run: docker compose -f docker-compose.test.yml up -d
+
+      - name: Wait for services to be healthy
+        run: |
+          echo "=== Service startup logs ==="
+          docker compose -f docker-compose.test.yml logs
+          echo "=== Waiting for healthy services ==="
+          for i in {1..60}; do
+            sleep 2
+            healthy_count=$(docker compose -f docker-compose.test.yml ps | grep -ci "healthy" || true)
+            if [ "$healthy_count" -eq 3 ]; then
+              echo "All 3 services healthy."
+              break
+            fi
+            echo "Waiting for services ($healthy_count/3 healthy) — attempt $i/60"
+          done
+          if [ "$healthy_count" -ne 3 ]; then
+            echo "ERROR: Services did not become healthy within timeout."
+            docker compose -f docker-compose.test.yml ps
+            docker compose -f docker-compose.test.yml logs
+            exit 1
+          fi
+          echo "=== Final service status ==="
+          docker compose -f docker-compose.test.yml ps
+
+      - name: Initialize test databases
+        run: |
+          PSQL_USER="$(docker compose -f docker-compose.test.yml exec -T postgres bash -lc 'echo "${POSTGRES_USER:-agentium}"' | tr -d '\r')"
+          echo "Using DB user: $PSQL_USER"
+
+          for i in {1..30}; do
+            if docker compose -f docker-compose.test.yml exec -T postgres bash -lc "pg_isready -U '$PSQL_USER'" >/dev/null 2>&1; then
+              echo "Postgres is ready."
+              break
+            fi
+            echo "Waiting for Postgres to be ready ($i/30)..."
+            sleep 1
+          done
+
+          for db in agentium agentium_test; do
+            echo "Ensuring database exists: $db"
+            docker compose -f docker-compose.test.yml exec -T postgres \
+              psql -U "$PSQL_USER" -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='$db'" | grep -q 1 || \
+              docker compose -f docker-compose.test.yml exec -T postgres \
+                psql -U "$PSQL_USER" -d postgres -c "CREATE DATABASE $db"
+          done
+
+          echo "=== Verifying databases ==="
+          docker compose -f docker-compose.test.yml exec -T postgres \
+            psql -U "$PSQL_USER" -d postgres -c "\l" | grep -E "agentium|agentium_test"
+
+      - name: Run database migrations
+        run: |
+          docker compose -f docker-compose.test.yml exec -T postgres \
+            psql -U "$PSQL_USER" -d agentium_test -c "CREATE EXTENSION IF NOT EXISTS vector;"
+          cd backend
+          pip install --upgrade pip setuptools wheel
+          pip install --no-cache-dir -r requirements.txt -r requirements-dev.txt
+          alembic upgrade head
+        env:
+          DATABASE_URL: postgresql://agentium:agentium@localhost:5432/agentium_test
+          REDIS_URL: redis://localhost:6379/1
+
+      - name: Start backend API server
+        run: |
+          cd backend
+          DATABASE_URL=postgresql://agentium:agentium@localhost:5432/agentium_test \
+          REDIS_URL=redis://localhost:6379/1 \
+          CHROMA_HOST=localhost \
+          CHROMA_PORT=8001 \
+          CELERY_TASK_ALWAYS_EAGER=true \
+          EMBEDDING_MODEL=BAAI/bge-base-en-v1.5 \
+          EMBEDDING_DIM=768 \
+          EMBEDDING_ACTIVE_VERSION=v2 \
+          TESTING=true \
+          PYTHONPATH=${{ github.workspace }} \
+          nohup python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 > /tmp/backend.log 2>&1 &
+          echo $! > /tmp/backend.pid
+          echo "Backend PID: $(cat /tmp/backend.pid)"
+          
+          # Wait for backend health
+          echo "Waiting for backend to be ready..."
+          for i in {1..30}; do
+            if curl -sf http://localhost:8000/api/health > /dev/null 2>&1; then
+              echo "Backend is ready!"
+              break
+            fi
+            echo "  attempt $i/30..."
+            sleep 2
+          done
+          # Show logs if it failed
+          if ! curl -sf http://localhost:8000/api/health > /dev/null 2>&1; then
+            echo "=== Backend logs (last 50 lines) ==="
+            tail -50 /tmp/backend.log
+            exit 1
+          fi
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        working-directory: ./frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Run accessibility tests against live backend
+        working-directory: ./frontend
+        env:
+          VITE_API_URL: http://localhost:8000
+          VITE_WS_URL: ws://localhost:8000
+        run: npm run test:a11y
+
+      - name: Stop backend
+        if: always()
+        run: |
+          if [ -f /tmp/backend.pid ]; then
+            kill $(cat /tmp/backend.pid) 2>/dev/null || true
+          fi
+
+      - name: Stop test services
+        if: always()
+        run: docker compose -f docker-compose.test.yml down

@@ -2281,7 +2281,7 @@ export const TasksPage: React.FC = () => {
                     <>
                         {/* Filter bar */}
                         <div className="px-6 py-4 border-b border-gray-100 dark:border-[#1e2535] flex flex-wrap items-center gap-3">
-                            <div className="flex items-center gap-2 text-gray-600 dark:text-gray-500">
+                            <div className="flex items-center gap-2 text-gray-600 dark:text-gray-300">
                                 <Filter className="w-4 h-4" />
                                 <span className="text-sm font-medium">Filter:</span>
                             </div>
