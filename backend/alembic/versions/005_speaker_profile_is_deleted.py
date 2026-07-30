@@ -3,9 +3,10 @@
 Revision ID: 005_speaker_profile_is_deleted
 Revises: 004_task_failure_reason
 """
-from alembic import op
+from alembic import op, context
 import sqlalchemy as sa
 from sqlalchemy import inspect
+
 
 revision = "005_speaker_profile_is_deleted"
 down_revision = "004_task_failure_reason"
@@ -14,6 +15,9 @@ depends_on = None
 
 
 def _has_column(table, column):
+    # Skip inspection in offline mode (bind is MockConnection)
+    if context.is_offline_mode():
+        return False
     bind = op.get_bind()
     inspector = inspect(bind)
     return column in [c["name"] for c in inspector.get_columns(table)]

@@ -10,9 +10,11 @@ from sqlalchemy import pool
 
 from alembic import context
 
-# Add project root to path so both 'backend' and 'models' packages can be imported
-# Project root is the parent of 'backend' directory
+# Add both project root and backend/ to path for all import patterns
+# Project root (parent of backend/) for 'backend.core.config' imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+# backend/ directory for 'models.*' imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from models.entities.base import Base
 from models.entities.agents import Agent, HeadOfCouncil, CouncilMember, LeadAgent, TaskAgent

@@ -20,7 +20,7 @@ and breaking task-to-deliberation binding.
 This migration adds the correctly-named FK constraint idempotently.
 """
 
-from alembic import op
+from alembic import op, context
 import sqlalchemy as sa
 from sqlalchemy import inspect
 
@@ -32,14 +32,16 @@ branch_labels = None
 depends_on = None
 
 
-def _fk_exists(conn, table, name):
+def _fk_exists(table, name):
+    if context.is_offline_mode():
+        return False
+    conn = op.get_bind()
     inspector = inspect(conn)
     return name in {fk.get("name") for fk in inspector.get_foreign_keys(table)}
 
 
 def upgrade() -> None:
-    conn = op.get_bind()
-    if not _fk_exists(conn, "tasks", "fk_tasks_deliberation_id"):
+    if not _fk_exists("tasks", "fk_tasks_deliberation_id"):
         op.create_foreign_key(
             "fk_tasks_deliberation_id",
             "tasks",
@@ -47,13 +49,12 @@ def upgrade() -> None:
             ["deliberation_id"],
             ["id"],
         )
-        print("✅ Created FK fk_tasks_deliberation_id on tasks.deliberation_id")
+        print("[OK] Created FK fk_tasks_deliberation_id on tasks.deliberation_id")
     else:
-        print("⏭️  FK fk_tasks_deliberation_id already exists — skipped")
+        print("[SKIP] FK fk_tasks_deliberation_id already exists")
 
 
 def downgrade() -> None:
-    conn = op.get_bind()
-    if _fk_exists(conn, "tasks", "fk_tasks_deliberation_id"):
+    if _fk_exists("tasks", "fk_tasks_deliberation_id"):
         op.drop_constraint("fk_tasks_deliberation_id", "tasks", type_="foreignkey")
-        print("↩️  Dropped FK fk_tasks_deliberation_id")
+        print("[OK] Dropped FK fk_tasks_deliberation_id")

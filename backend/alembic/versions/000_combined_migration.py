@@ -6,7 +6,7 @@ Create Date: 2026-05-31
 """
 
 import json
-from alembic import op
+from alembic import op, context
 import sqlalchemy as sa
 from sqlalchemy import inspect, text
 from sqlalchemy.engine.reflection import Inspector
@@ -41,19 +41,41 @@ wait_condition_status_enum = postgresql.ENUM(
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
+def _get_inspector():
+    """Get inspector for online mode; returns None in offline mode."""
+    if context.is_offline_mode():
+        return None
+    conn = op.get_bind()
+    return Inspector.from_engine(conn)
+
+def _get_existing_tables():
+    """Get existing tables in online mode; empty set in offline mode."""
+    inspector = _get_inspector()
+    if inspector is None:
+        return set()
+    return set(inspector.get_table_names())
+
 def _col_names(inspector: Inspector, table: str):
+    if inspector is None:
+        return set()
     return {col['name'] for col in inspector.get_columns(table)}
 
 def _index_exists(inspector: Inspector, table: str, index_name: str) -> bool:
+    if inspector is None:
+        return False
     return any(idx['name'] == index_name for idx in inspector.get_indexes(table))
 
 def _constraint_exists(inspector: Inspector, table: str, name: str) -> bool:
+    if inspector is None:
+        return False
     try:
         return any(uc.get('name') == name for uc in inspector.get_unique_constraints(table))
     except Exception:
         return False
 
 def _fk_names(inspector: Inspector, table: str):
+    if inspector is None:
+        return set()
     return {fk.get('name') for fk in inspector.get_foreign_keys(table)}
 
 
@@ -62,11 +84,10 @@ def _fk_names(inspector: Inspector, table: str):
 # =============================================================================
 
 def upgrade() -> None:
-    conn = op.get_bind()
-    inspector = Inspector.from_engine(conn)
-    existing_tables = set(inspector.get_table_names())
+    """Upgrade database schema."""
+    existing_tables = _get_existing_tables()
 
-    print("🚀 Starting 000_combined_migration ...")
+    print("Starting 000_combined_migration ...")
 
     # =========================================================================
     # [001] ENUM TYPES — created upfront so every table can reference them
@@ -1402,7 +1423,7 @@ def upgrade() -> None:
             sa.Column('change_category', sa.String(50), server_default='manual', nullable=False),
         )
 
-    print("✅ [001] Base schema applied")
+    print("[OK] [001] Base schema applied")
 
     # =========================================================================
     # [002] ENUM TYPES for A/B testing
@@ -1438,8 +1459,7 @@ def upgrade() -> None:
     # =========================================================================
     # [002-1] A/B TESTING TABLES
     # =========================================================================
-    inspector = Inspector.from_engine(conn)
-    existing_tables = set(inspector.get_table_names())
+    existing_tables = _get_existing_tables()
 
     if 'experiments' not in existing_tables:
         op.create_table(
@@ -1538,8 +1558,7 @@ def upgrade() -> None:
     # =========================================================================
     # [002-2] SKILL SYSTEM TABLES
     # =========================================================================
-    inspector = Inspector.from_engine(conn)
-    existing_tables = set(inspector.get_table_names())
+    existing_tables = _get_existing_tables()
 
     if 'skills' not in existing_tables:
         op.create_table(
@@ -1610,8 +1629,7 @@ def upgrade() -> None:
     # =========================================================================
     # [002-3] DB MAINTENANCE CONFIG + ANALYZE seed
     # =========================================================================
-    inspector = Inspector.from_engine(conn)
-    existing_tables = set(inspector.get_table_names())
+    existing_tables = _get_existing_tables()
 
     if 'db_maintenance_config' not in existing_tables:
         op.create_table(
@@ -1623,21 +1641,24 @@ def upgrade() -> None:
             sa.Column('updated_at', sa.DateTime(), server_default=sa.func.now()),
         )
 
-    analyze_value = json.dumps(ANALYZE_TABLES)
-    existing_row = conn.execute(text(
-        "SELECT id FROM db_maintenance_config WHERE config_key = 'analyze_tables'"
-    )).fetchone()
-    if existing_row:
-        conn.execute(text(
-            "UPDATE db_maintenance_config SET config_value = :val, updated_at = NOW() "
-            "WHERE config_key = 'analyze_tables'"
-        ), {"val": analyze_value})
-    else:
-        conn.execute(text(
-            "INSERT INTO db_maintenance_config (config_key, config_value, description) "
-            "VALUES ('analyze_tables', :val, "
-            "'JSON array of table names the db_maintenance service should ANALYZE')"
-        ), {"val": analyze_value})
+    # Only seed data in online mode - conn is MockConnection in offline mode
+    if not context.is_offline_mode():
+        conn = op.get_bind()
+        analyze_value = json.dumps(ANALYZE_TABLES)
+        existing_row = conn.execute(text(
+            "SELECT id FROM db_maintenance_config WHERE config_key = 'analyze_tables'"
+        )).fetchone()
+        if existing_row:
+            conn.execute(text(
+                "UPDATE db_maintenance_config SET config_value = :val, updated_at = NOW() "
+                "WHERE config_key = 'analyze_tables'"
+            ), {"val": analyze_value})
+        else:
+            conn.execute(text(
+                "INSERT INTO db_maintenance_config (config_key, config_value, description) "
+                "VALUES ('analyze_tables', :val, "
+                "'JSON array of table names the db_maintenance service should ANALYZE')"
+            ), {"val": analyze_value})
 
     # =========================================================================
     # [002-4] PostgreSQL backup helper functions
@@ -1708,40 +1729,46 @@ def upgrade() -> None:
     # =========================================================================
     # [002-5] individual_votes.updated_at + uppercase enum variants
     # =========================================================================
-    inspector = Inspector.from_engine(conn)
-    iv_columns = {col['name'] for col in inspector.get_columns('individual_votes')}
+    inspector = _get_inspector()
+    if inspector is not None:
+        iv_columns = {col['name'] for col in inspector.get_columns('individual_votes')}
+    else:
+        iv_columns = set()
     if 'updated_at' not in iv_columns:
         op.add_column('individual_votes', sa.Column('updated_at', sa.DateTime(), nullable=True))
-        conn.execute(text("UPDATE individual_votes SET updated_at = created_at WHERE updated_at IS NULL"))
-        conn.execute(text("""
-            ALTER TABLE individual_votes
-                ALTER COLUMN updated_at SET NOT NULL,
-                ALTER COLUMN updated_at SET DEFAULT NOW()
-        """))
+        if not context.is_offline_mode():
+            conn = op.get_bind()
+            conn.execute(text("UPDATE individual_votes SET updated_at = created_at WHERE updated_at IS NULL"))
+            conn.execute(text("""
+                ALTER TABLE individual_votes
+                    ALTER COLUMN updated_at SET NOT NULL,
+                    ALTER COLUMN updated_at SET DEFAULT NOW()
+            """))
 
     def add_missing_enum_values(type_name: str, values: list) -> None:
-        for val in values:
-            exists = conn.execute(text("""
-                SELECT 1
-                FROM pg_enum e
-                JOIN pg_type t ON t.oid = e.enumtypid
-                WHERE t.typname = :type_name AND e.enumlabel = :val
-            """), {"type_name": type_name, "val": val}).fetchone()
-            if not exists:
-                conn.execute(text(f"ALTER TYPE {type_name} ADD VALUE '{val}'"))
+        if not context.is_offline_mode():
+            conn = op.get_bind()
+            for val in values:
+                exists = conn.execute(text("""
+                    SELECT 1
+                    FROM pg_enum e
+                    JOIN pg_type t ON t.oid = e.enumtypid
+                    WHERE t.typname = :type_name AND e.enumlabel = :val
+                """), {"type_name": type_name, "val": val}).fetchone()
+                if not exists:
+                    conn.execute(text(f"ALTER TYPE {type_name} ADD VALUE '{val}'"))
 
     add_missing_enum_values('experiment_status',
         ['DRAFT', 'PENDING', 'RUNNING', 'COMPLETED', 'FAILED', 'CANCELLED'])
     add_missing_enum_values('run_status', ['PENDING', 'RUNNING', 'COMPLETED', 'FAILED'])
     add_missing_enum_values('task_complexity', ['SIMPLE', 'MEDIUM', 'COMPLEX'])
 
-    print("✅ [002] A/B testing, skill system, maintenance config applied")
+    print("[OK] [002] A/B testing, skill system, maintenance config applied")
 
     # =========================================================================
     # [003-A] Reasoning Traces
     # =========================================================================
-    inspector = Inspector.from_engine(conn)
-    existing_tables = set(inspector.get_table_names())
+    existing_tables = _get_existing_tables()
 
     if 'reasoning_traces' not in existing_tables:
         op.create_table(
@@ -1815,15 +1842,18 @@ def upgrade() -> None:
         op.create_index('ix_reasoning_steps_outcome',           'reasoning_steps', ['outcome'])
         op.create_index('ix_reasoning_steps_trace_id_sequence', 'reasoning_steps', ['trace_id', 'sequence'])
 
-    inspector = Inspector.from_engine(conn)
-    task_cols = _col_names(inspector, 'tasks')
+    inspector = _get_inspector()
+    if inspector is not None:
+        task_cols = _col_names(inspector, 'tasks')
+    else:
+        task_cols = set()
     if 'latest_trace_id' not in task_cols:
         op.add_column('tasks', sa.Column('latest_trace_id', sa.String(64), nullable=True))
 
     # =========================================================================
     # [003-B] Chat performance indexes
     # =========================================================================
-    inspector = Inspector.from_engine(conn)
+    inspector = _get_inspector()
     for idx_name, table, columns, kwargs in [
         ('idx_chat_messages_user_created',  'chat_messages',  ['user_id',         sa.text('created_at DESC')], {'postgresql_using': 'btree'}),
         ('idx_chat_messages_conversation',  'chat_messages',  ['conversation_id', sa.text('created_at DESC')], {'postgresql_using': 'btree'}),
@@ -1836,8 +1866,7 @@ def upgrade() -> None:
     # =========================================================================
     # [003-C] Phase 11 Ecosystem — RBAC, federation, plugins, device_tokens
     # =========================================================================
-    inspector = Inspector.from_engine(conn)
-    existing_tables = set(inspector.get_table_names())
+    existing_tables = _get_existing_tables()
     user_cols = _col_names(inspector, 'users')
 
     if 'role' not in user_cols:
@@ -1994,8 +2023,7 @@ def upgrade() -> None:
     # =========================================================================
     # [003-D] Notification preferences
     # =========================================================================
-    inspector = Inspector.from_engine(conn)
-    existing_tables = set(inspector.get_table_names())
+    existing_tables = _get_existing_tables()
 
     if 'notification_preferences' not in existing_tables:
         op.create_table(
@@ -2018,27 +2046,29 @@ def upgrade() -> None:
     # =========================================================================
     # [003-G] A/B Testing — unique constraint + index on model_performance_cache
     # =========================================================================
-    inspector = Inspector.from_engine(conn)
-    if not _constraint_exists(inspector, 'model_performance_cache', 'uq_perf_cache_task_category'):
-        conn.execute(sa.text("""
-            DELETE FROM model_performance_cache
-            WHERE id NOT IN (
-                SELECT DISTINCT ON (task_category) id
-                FROM model_performance_cache
-                ORDER BY task_category, last_updated DESC NULLS LAST
+    inspector = _get_inspector()
+    if inspector is not None:
+        if not _constraint_exists(inspector, 'model_performance_cache', 'uq_perf_cache_task_category'):
+            if not context.is_offline_mode():
+                conn = op.get_bind()
+                conn.execute(sa.text("""
+                    DELETE FROM model_performance_cache
+                    WHERE id NOT IN (
+                        SELECT DISTINCT ON (task_category) id
+                        FROM model_performance_cache
+                        ORDER BY task_category, last_updated DESC NULLS LAST
+                    )
+                """))
+            op.create_unique_constraint(
+                'uq_perf_cache_task_category', 'model_performance_cache', ['task_category'],
             )
-        """))
-        op.create_unique_constraint(
-            'uq_perf_cache_task_category', 'model_performance_cache', ['task_category'],
-        )
-    if not _index_exists(inspector, 'model_performance_cache', 'ix_perf_cache_last_updated'):
-        op.create_index('ix_perf_cache_last_updated', 'model_performance_cache', ['last_updated'])
+        if not _index_exists(inspector, 'model_performance_cache', 'ix_perf_cache_last_updated'):
+            op.create_index('ix_perf_cache_last_updated', 'model_performance_cache', ['last_updated'])
 
     # =========================================================================
     # [003-H] Outbound Webhooks
     # =========================================================================
-    inspector = Inspector.from_engine(conn)
-    existing_tables = set(inspector.get_table_names())
+    existing_tables = _get_existing_tables()
 
     if 'webhook_subscriptions' not in existing_tables:
         op.create_table(
@@ -2083,16 +2113,16 @@ def upgrade() -> None:
     # =========================================================================
     # [003-I] Composite index on user_model_configs
     # =========================================================================
-    inspector = Inspector.from_engine(conn)
-    if not _index_exists(inspector, 'user_model_configs', 'ix_user_model_configs_user_default'):
-        op.create_index('ix_user_model_configs_user_default', 'user_model_configs',
-                        ['user_id', 'is_default'], unique=False)
+    inspector = _get_inspector()
+    if inspector is not None:
+        if not _index_exists(inspector, 'user_model_configs', 'ix_user_model_configs_user_default'):
+            op.create_index('ix_user_model_configs_user_default', 'user_model_configs',
+                            ['user_id', 'is_default'], unique=False)
 
     # =========================================================================
     # [003-J] Workflows — workflow_executions + workflow_subtasks + tasks columns
     # =========================================================================
-    inspector = Inspector.from_engine(conn)
-    existing_tables = set(inspector.get_table_names())
+    existing_tables = _get_existing_tables()
 
     if 'workflows' not in existing_tables:
         op.create_table(
@@ -2174,10 +2204,31 @@ def upgrade() -> None:
     op.execute("CREATE INDEX IF NOT EXISTS ix_tasks_workflow_id ON tasks (workflow_id)")
 
     # =========================================================================
+    # [003-G] A/B Testing — unique constraint + index on model_performance_cache
+    # =========================================================================
+    inspector = _get_inspector()
+    if inspector is not None:
+        if not _constraint_exists(inspector, 'model_performance_cache', 'uq_perf_cache_task_category'):
+            if not context.is_offline_mode():
+                conn = op.get_bind()
+                conn.execute(sa.text("""
+                    DELETE FROM model_performance_cache
+                    WHERE id NOT IN (
+                        SELECT DISTINCT ON (task_category) id
+                        FROM model_performance_cache
+                        ORDER BY task_category, last_updated DESC NULLS LAST
+                    )
+                """))
+            op.create_unique_constraint(
+                'uq_perf_cache_task_category', 'model_performance_cache', ['task_category'],
+            )
+        if not _index_exists(inspector, 'model_performance_cache', 'ix_perf_cache_last_updated'):
+            op.create_index('ix_perf_cache_last_updated', 'model_performance_cache', ['last_updated'])
+
+    # =========================================================================
     # [003-M] Task Delegation Engine
     # =========================================================================
-    inspector = Inspector.from_engine(conn)
-    existing_tables = set(inspector.get_table_names())
+    existing_tables = _get_existing_tables()
 
     if 'task_dependencies' not in existing_tables:
         op.create_table(
@@ -2199,32 +2250,33 @@ def upgrade() -> None:
         op.create_index('ix_task_deps_child',  'task_dependencies', ['child_task_id'])
         op.create_index('ix_task_deps_order',  'task_dependencies', ['parent_task_id', 'dependency_order'])
 
-    inspector = Inspector.from_engine(conn)
-    task_cols = _col_names(inspector, 'tasks')
-    if 'complexity_score' not in task_cols:
-        op.add_column('tasks', sa.Column('complexity_score', sa.Integer(), nullable=True))
-    if 'escalation_timeout_seconds' not in task_cols:
-        op.add_column('tasks', sa.Column('escalation_timeout_seconds', sa.Integer(),
-                                         nullable=False, server_default='300'))
-    if 'delegation_metadata' not in task_cols:
-        op.add_column('tasks', sa.Column('delegation_metadata', sa.JSON(), nullable=True))
+    inspector = _get_inspector()
+    if inspector is not None:
+        task_cols = _col_names(inspector, 'tasks')
+        if 'complexity_score' not in task_cols:
+            op.add_column('tasks', sa.Column('complexity_score', sa.Integer(), nullable=True))
+        if 'escalation_timeout_seconds' not in task_cols:
+            op.add_column('tasks', sa.Column('escalation_timeout_seconds', sa.Integer(),
+                                             nullable=False, server_default='300'))
+        if 'delegation_metadata' not in task_cols:
+            op.add_column('tasks', sa.Column('delegation_metadata', sa.JSON(), nullable=True))
 
     # =========================================================================
     # [003-N] Self-Healing — agents.last_heartbeat_at
     # =========================================================================
-    inspector = Inspector.from_engine(conn)
-    agent_cols = _col_names(inspector, 'agents')
-    if 'last_heartbeat_at' not in agent_cols:
-        op.add_column('agents', sa.Column('last_heartbeat_at', sa.DateTime(), nullable=True))
+    inspector = _get_inspector()
+    if inspector is not None:
+        agent_cols = _col_names(inspector, 'agents')
+        if 'last_heartbeat_at' not in agent_cols:
+            op.add_column('agents', sa.Column('last_heartbeat_at', sa.DateTime(), nullable=True))
         op.create_index('ix_agents_last_heartbeat_at', 'agents', ['last_heartbeat_at'])
 
-    print("✅ [003] Reasoning traces, RBAC, federation, webhooks, workflows applied")
+    print("[OK] [003] Reasoning traces, RBAC, federation, webhooks, workflows applied")
 
     # =========================================================================
     # [004] EVENT TRIGGERS & EVENT LOGS
     # =========================================================================
-    inspector = Inspector.from_engine(conn)
-    existing_tables = set(inspector.get_table_names())
+    existing_tables = _get_existing_tables()
 
     if 'event_triggers' not in existing_tables:
         op.create_table(
@@ -2277,13 +2329,12 @@ def upgrade() -> None:
         )
         op.create_index('ix_event_logs_status', 'event_logs', ['status'])
 
-    print("✅ [004] event_triggers & event_logs applied")
+    print("[OK] [004] event_triggers & event_logs applied")
 
     # =========================================================================
     # [005] SPEAKER PROFILES
     # =========================================================================
-    inspector = Inspector.from_engine(conn)
-    existing_tables = set(inspector.get_table_names())
+    existing_tables = _get_existing_tables()
 
     if 'speaker_profiles' not in existing_tables:
         op.create_table(
@@ -2303,7 +2354,7 @@ def upgrade() -> None:
         op.create_index(op.f('ix_speaker_profiles_id'),      'speaker_profiles', ['id'],      unique=False)
         op.create_index(op.f('ix_speaker_profiles_user_id'), 'speaker_profiles', ['user_id'], unique=False)
 
-    print("✅ [005] speaker_profiles applied")
+    print("[OK] [005] speaker_profiles applied")
 
     # =========================================================================
     # [006] WAIT CONDITIONS (waitstrategy / waitconditionstatus enums)
@@ -2339,8 +2390,7 @@ def upgrade() -> None:
         END $$;
     """)
 
-    inspector = Inspector.from_engine(conn)
-    existing_tables = set(inspector.get_table_names())
+    existing_tables = _get_existing_tables()
 
     if 'wait_conditions' not in existing_tables:
         op.create_table(
@@ -2371,13 +2421,12 @@ def upgrade() -> None:
         op.create_index("ix_wait_conditions_task_id", "wait_conditions", ["task_id"])
         op.create_index("ix_wait_conditions_status",  "wait_conditions", ["status"])
 
-    print("✅ [006] wait_conditions applied")
+    print("[OK] [006] wait_conditions applied")
 
     # =========================================================================
     # [007] CITATION EDGES
     # =========================================================================
-    inspector = Inspector.from_engine(conn)
-    existing_tables = set(inspector.get_table_names())
+    existing_tables = _get_existing_tables()
 
     if 'citation_edges' not in existing_tables:
         op.create_table(
@@ -2403,8 +2452,8 @@ def upgrade() -> None:
             ["source_doc_id", "collection_key"],
         )
 
-    print("✅ [007] citation_edges applied")
-    print("✅ 000_combined_migration upgrade complete")
+    print("[OK] [007] citation_edges applied")
+    print("[OK] 000_combined_migration upgrade complete")
 
 
 # =============================================================================
@@ -2413,8 +2462,7 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     conn = op.get_bind()
-    inspector = Inspector.from_engine(conn)
-    existing_tables = set(inspector.get_table_names())
+    existing_tables = _get_existing_tables()
 
     print("🔄 Downgrading 000_combined_migration ...")
 
@@ -2450,8 +2498,7 @@ def downgrade() -> None:
     sa.Enum(name='triggertype').drop(op.get_bind(), checkfirst=True)
 
     # ── [003] Consolidated ────────────────────────────────────────────────────
-    inspector = Inspector.from_engine(conn)
-    existing_tables = set(inspector.get_table_names())
+    existing_tables = _get_existing_tables()
     agent_cols = _col_names(inspector, 'agents')
     if 'last_heartbeat_at' in agent_cols:
         op.drop_index('ix_agents_last_heartbeat_at', table_name='agents')
@@ -2505,29 +2552,34 @@ def downgrade() -> None:
 
     for tbl in ('device_tokens', 'plugin_reviews', 'plugin_installations', 'plugins',
                 'federated_votes', 'federated_tasks', 'federated_instances', 'delegations'):
-        inspector = Inspector.from_engine(conn)
-        existing_tables = set(inspector.get_table_names())
+        existing_tables = _get_existing_tables()
         if tbl in existing_tables:
             op.drop_table(tbl)
 
-    inspector = Inspector.from_engine(conn)
-    user_cols = _col_names(inspector, 'users')
-    if 'role_expires_at' in user_cols:
-        op.drop_column('users', 'role_expires_at')
-    if 'delegated_by_id' in user_cols:
-        try:
-            op.drop_constraint('fk_users_delegated_by_id', 'users', type_='foreignkey')
-        except Exception:
-            pass
-        op.drop_column('users', 'delegated_by_id')
-    if 'last_login_at' in user_cols:
-        op.drop_column('users', 'last_login_at')
-    if 'role' in user_cols:
-        op.drop_column('users', 'role')
+    if not context.is_offline_mode():
+        conn = op.get_bind()
+        inspector = Inspector.from_engine(conn)
+        user_cols = _col_names(inspector, 'users')
+        if 'role_expires_at' in user_cols:
+            op.drop_column('users', 'role_expires_at')
+        if 'delegated_by_id' in user_cols:
+            try:
+                op.drop_constraint('fk_users_delegated_by_id', 'users', type_='foreignkey')
+            except Exception:
+                pass
+            op.drop_column('users', 'delegated_by_id')
+        if 'last_login_at' in user_cols:
+            op.drop_column('users', 'last_login_at')
+        if 'role' in user_cols:
+            op.drop_column('users', 'role')
 
-    inspector = Inspector.from_engine(conn)
-    if _index_exists(inspector, 'user_model_configs', 'ix_user_model_configs_user_default'):
-        op.drop_index('ix_user_model_configs_user_default', table_name='user_model_configs')
+        inspector = Inspector.from_engine(conn)
+        if _index_exists(inspector, 'user_model_configs', 'ix_user_model_configs_user_default'):
+            op.drop_index('ix_user_model_configs_user_default', table_name='user_model_configs')
+    else:
+        # Run purely structural drops in offline mode
+        user_cols = set()  # Can't inspect in offline mode
+        # Note: In offline mode we skip column inspection and drops that need it
 
     if 'skill_submissions' in existing_tables:
         for idx in ('ix_skill_submissions_submitted_by', 'ix_skill_submissions_status',
@@ -2538,8 +2590,7 @@ def downgrade() -> None:
                 pass
         op.drop_table('skill_submissions')
 
-    inspector = Inspector.from_engine(conn)
-    existing_tables = set(inspector.get_table_names())
+    existing_tables = _get_existing_tables()
     if 'skills' in existing_tables:
         for idx in ('ix_skills_domain_usage', 'ix_skills_creator_id',
                     'ix_skills_verification_usage', 'ix_skills_skill_id'):
@@ -2549,8 +2600,7 @@ def downgrade() -> None:
                 pass
         op.drop_table('skills')
 
-    inspector = Inspector.from_engine(conn)
-    existing_tables = set(inspector.get_table_names())
+    existing_tables = _get_existing_tables()
     task_cols = _col_names(inspector, 'tasks')
     if 'latest_trace_id' in task_cols:
         op.drop_column('tasks', 'latest_trace_id')
@@ -2577,8 +2627,7 @@ def downgrade() -> None:
         op.drop_table('reasoning_traces')
 
     # ── [002] A/B testing, skill system ───────────────────────────────────────
-    inspector = Inspector.from_engine(conn)
-    existing_tables = set(inspector.get_table_names())
+    existing_tables = _get_existing_tables()
 
     iv_columns = {col['name'] for col in inspector.get_columns('individual_votes')}
     if 'updated_at' in iv_columns:
@@ -2606,8 +2655,7 @@ def downgrade() -> None:
     #   task_deliberations.task_id  -> tasks.id
     # Neither table can be dropped first while both constraints are in place,
     # so break the cycle by dropping the tasks-side FK before any table drops.
-    inspector = Inspector.from_engine(conn)
-    existing_tables = set(inspector.get_table_names())
+    existing_tables = _get_existing_tables()
     if 'tasks' in existing_tables:
         task_fks = {fk.get('name') for fk in inspector.get_foreign_keys('tasks')}
         if 'tasks_deliberation_id_fkey' in task_fks:
@@ -2638,8 +2686,7 @@ def downgrade() -> None:
         'critic_agents', 'task_agents', 'lead_agents', 'council_members', 'head_of_council',
         'agents', 'ethos', 'user_model_configs', 'users',
     ]
-    inspector = Inspector.from_engine(conn)
-    existing_tables = set(inspector.get_table_names())
+    existing_tables = _get_existing_tables()
     for table in tables_to_drop:
         if table in existing_tables:
             try:
@@ -2653,4 +2700,4 @@ def downgrade() -> None:
         except Exception as e:
             print(f"  Note: could not drop enum {enum_type}: {e}")
 
-    print("✅ 000_combined_migration downgrade complete")
+    print("[OK] 000_combined_migration downgrade complete")

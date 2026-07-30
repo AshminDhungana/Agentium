@@ -14,6 +14,10 @@ depends_on = None
 
 
 def _has_column(table, column):
+    from alembic import context
+    if context.is_offline_mode():
+        # In offline mode, assume column doesn't exist (will be added by upgrade)
+        return False
     bind = op.get_bind()
     inspector = inspect(bind)
     return column in [c["name"] for c in inspector.get_columns(table)]

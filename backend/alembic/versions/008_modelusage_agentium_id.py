@@ -19,6 +19,9 @@ depends_on = None
 
 
 def _has_constraint(table, name):
+    from alembic import context
+    if context.is_offline_mode():
+        return False
     bind = op.get_bind()
     inspector = inspect(bind)
     return name in [c["name"] for c in inspector.get_unique_constraints(table)]

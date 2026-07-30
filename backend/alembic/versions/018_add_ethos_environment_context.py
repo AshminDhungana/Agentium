@@ -8,7 +8,7 @@ Gives every agent a persistent, core-identity field describing its Docker
 runtime and host bind mounts, populated at agent creation.
 """
 
-from alembic import op
+from alembic import op, context
 import sqlalchemy as sa
 from sqlalchemy import inspect
 
@@ -21,6 +21,8 @@ depends_on = None
 
 
 def _column_exists(conn, table, name):
+    if context.is_offline_mode():
+        return False
     inspector = inspect(conn)
     return name in {c["name"] for c in inspector.get_columns(table)}
 

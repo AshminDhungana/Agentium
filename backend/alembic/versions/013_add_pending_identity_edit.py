@@ -14,7 +14,7 @@ migration; this migration makes it present in fresh databases
 (incl. the CI `agentium_test` db) so the tool works end-to-end.
 """
 
-from alembic import op
+from alembic import op, context
 import sqlalchemy as sa
 from sqlalchemy import inspect
 
@@ -26,14 +26,16 @@ branch_labels = None
 depends_on = None
 
 
-def _column_exists(conn, table, name):
+def _column_exists(table, name):
+    if context.is_offline_mode():
+        return False
+    conn = op.get_bind()
     inspector = inspect(conn)
     return name in {c["name"] for c in inspector.get_columns(table)}
 
 
 def upgrade() -> None:
-    bind = op.get_bind()
-    if not _column_exists(bind, "agents", "pending_identity_edit"):
+    if not _column_exists("agents", "pending_identity_edit"):
         op.add_column(
             "agents",
             sa.Column("pending_identity_edit", sa.Text(), nullable=True),
@@ -41,6 +43,5 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    bind = op.get_bind()
-    if _column_exists(bind, "agents", "pending_identity_edit"):
+    if _column_exists("agents", "pending_identity_edit"):
         op.drop_column("agents", "pending_identity_edit")

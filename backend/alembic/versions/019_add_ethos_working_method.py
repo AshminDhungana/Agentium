@@ -1,7 +1,7 @@
 """Add Ethos.working_method column for standard operating procedure (6.3)
 
 Revision ID: 019_add_ethos_working_method
-Revises: 018_add_ethos_environment_context
+Revises: 018_add_ethos_env_context
 Create Date: 2026-07-20
 
 Gives every agent a persistent, core-identity field describing its standard
@@ -9,7 +9,7 @@ working procedure / method, populated at agent creation alongside mission,
 rules, and capabilities.
 """
 
-from alembic import op
+from alembic import op, context
 import sqlalchemy as sa
 from sqlalchemy import inspect
 
@@ -22,6 +22,8 @@ depends_on = None
 
 
 def _column_exists(conn, table, name):
+    if context.is_offline_mode():
+        return False
     inspector = inspect(conn)
     return name in {c["name"] for c in inspector.get_columns(table)}
 

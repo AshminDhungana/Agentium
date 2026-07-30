@@ -8,7 +8,7 @@ column as nullable (matching the existing tool_marketplace_listings fix).
 Revision ID: 007_tool_agentium_id
 Revises: 006_add_user_avatar
 """
-from alembic import op
+from alembic import op, context
 import sqlalchemy as sa
 from sqlalchemy import inspect
 
@@ -19,6 +19,8 @@ depends_on = None
 
 
 def _has_column(table, column):
+    if context.is_offline_mode():
+        return False
     bind = op.get_bind()
     inspector = inspect(bind)
     return column in [c["name"] for c in inspector.get_columns(table)]

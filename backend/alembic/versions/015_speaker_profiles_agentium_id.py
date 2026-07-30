@@ -15,7 +15,7 @@ Revises: 014_add_task_decision_id
 
 import uuid
 
-from alembic import op
+from alembic import op, context
 import sqlalchemy as sa
 from sqlalchemy import inspect
 
@@ -27,12 +27,22 @@ depends_on = None
 
 
 def _has_column(table, column):
+    if context.is_offline_mode():
+        return False
     bind = op.get_bind()
     inspector = inspect(bind)
     return column in [c["name"] for c in inspector.get_columns(table)]
 
 
 def upgrade():
+    if context.is_offline_mode():
+        # In offline mode, just emit the structural changes
+        op.add_column(
+            "speaker_profiles",
+            sa.Column("agentium_id", sa.String(20), nullable=False, unique=True),
+        )
+        return
+
     bind = op.get_bind()
     if not _has_column("speaker_profiles", "agentium_id"):
         op.add_column(

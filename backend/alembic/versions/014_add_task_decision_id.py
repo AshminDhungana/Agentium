@@ -11,7 +11,7 @@ the same value in `AuditLog.correlation_id`. This enables end-to-end
 observability of the "decision -> work" chain.
 """
 
-from alembic import op
+from alembic import op, context
 import sqlalchemy as sa
 from sqlalchemy import inspect
 
@@ -23,14 +23,16 @@ branch_labels = None
 depends_on = None
 
 
-def _column_exists(conn, table, name):
+def _column_exists(table, name):
+    if context.is_offline_mode():
+        return False
+    conn = op.get_bind()
     inspector = inspect(conn)
     return name in {c["name"] for c in inspector.get_columns(table)}
 
 
 def upgrade() -> None:
-    bind = op.get_bind()
-    if not _column_exists(bind, "tasks", "decision_id"):
+    if not _column_exists("tasks", "decision_id"):
         op.add_column(
             "tasks",
             sa.Column("decision_id", sa.String(64), nullable=True),
@@ -41,7 +43,6 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    bind = op.get_bind()
-    if _column_exists(bind, "tasks", "decision_id"):
+    if _column_exists("tasks", "decision_id"):
         op.drop_index("ix_tasks_decision_id", table_name="tasks")
         op.drop_column("tasks", "decision_id")
