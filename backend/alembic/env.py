@@ -10,7 +10,7 @@ from sqlalchemy import pool
 
 from alembic import context
 
-# Add backend to path
+# Add backend to path so 'models' can be imported as 'models.entities.*'
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from models.entities.base import Base
@@ -23,10 +23,10 @@ from models.entities.voting import IndividualVote, VotingRecord
 from models.entities.audit import AuditLog, ConstitutionViolation, SessionLog, HealthCheck
 from models.entities.channels import ExternalChannel, ExternalMessage, ChannelType, ChannelStatus
 from models.entities.monitoring import (
-    AgentHealthReport, 
-    ViolationReport, 
-    TaskVerification, 
-    PerformanceMetric, 
+    AgentHealthReport,
+    ViolationReport,
+    TaskVerification,
+    PerformanceMetric,
     MonitoringAlert,
     MonitoringStatus,
     ViolationSeverity
@@ -36,11 +36,11 @@ from models.entities.user_config import UserModelConfig
 from models.entities.voice_config import VoiceConfig  # NEW
 
 # Phase 6.1 — Tool Management
-from backend.models.entities.tool_staging import ToolStaging
-from backend.models.entities.tool_version import ToolVersion
-from backend.models.entities.tool_usage_log import ToolUsageLog
-from backend.models.entities.tool_marketplace_listing import ToolMarketplaceListing
-from backend.models.entities.knowledge_document import KnowledgeDocument
+from models.entities.tool_staging import ToolStaging
+from models.entities.tool_version import ToolVersion
+from models.entities.tool_usage_log import ToolUsageLog
+from models.entities.tool_marketplace_listing import ToolMarketplaceListing
+from models.entities.knowledge_document import KnowledgeDocument
 
 # this is the Alembic Config object
 config = context.config
