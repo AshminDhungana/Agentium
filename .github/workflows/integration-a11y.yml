@@ -25,6 +25,8 @@ jobs:
     timeout-minutes: 45
     permissions:
       contents: read
+    env:
+      PSQL_USER: agentium
 
     steps:
       - name: Checkout repository
@@ -59,7 +61,6 @@ jobs:
 
       - name: Initialize test databases
         run: |
-          PSQL_USER="$(docker compose -f docker-compose.test.yml exec -T postgres bash -lc 'echo "${POSTGRES_USER:-agentium}"' | tr -d '\r')"
           echo "Using DB user: $PSQL_USER"
 
           for i in {1..30}; do
@@ -86,7 +87,7 @@ jobs:
       - name: Run database migrations
         run: |
           docker compose -f docker-compose.test.yml exec -T postgres \
-            psql -U "$PSQL_USER" -d agentium_test -c "CREATE EXTENSION IF NOT EXISTS vector;"
+            psql -U agentium -d agentium_test -c "CREATE EXTENSION IF NOT EXISTS vector;"
           cd backend
           pip install --upgrade pip setuptools wheel
           pip install --no-cache-dir -r requirements.txt -r requirements-dev.txt
