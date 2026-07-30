@@ -22,7 +22,7 @@ def test_revoke_endpoint_broadcasts_websocket_event(client, db_session, auth_hea
     assert r.status_code == 200
 
     # 2. Mock ConnectionManager.broadcast to capture call
-    with patch("backend.api.routes.mcp_tools.manager") as mock_manager:
+    with patch("backend.api.routes.websocket.manager") as mock_manager:
         mock_manager.emit_mcp_tool_revoked = AsyncMock()
 
         # 3. Revoke the tool
