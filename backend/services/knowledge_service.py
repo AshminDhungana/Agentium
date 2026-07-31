@@ -58,7 +58,7 @@ class KnowledgeService:
         self, db: Session, constitution: Constitution
     ) -> None:
         """
-        Vectorise constitution articles for semantic retrieval.
+        Vectorise constitution articles AND prohibited actions for semantic retrieval.
 
         Called when a new constitution is created or amended.
         """
@@ -87,6 +87,22 @@ class KnowledgeService:
                         if constitution.replaces_version
                         else None
                     ),
+                },
+                db=db,
+            )
+
+        # Also embed prohibited actions for better Tier 2 semantic discrimination
+        prohibited_actions = constitution.get_prohibited_actions_list()
+        for i, prohibition in enumerate(prohibited_actions):
+            self.vector_store.add_constitution_article(
+                article_id=f"{constitution.version}_prohibited_{i}",
+                content=f"PROHIBITED: {prohibition}",
+                metadata={
+                    "version": constitution.version,
+                    "version_number": constitution.version_number,
+                    "type": "prohibited_action",
+                    "title": "Constitutional Prohibition",
+                    "prohibition_index": i,
                 },
                 db=db,
             )

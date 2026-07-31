@@ -174,8 +174,14 @@ class ConstitutionalGuard:
     # TODO(pre-cutover): re-tune against the REAL constitution articles and a
     # labelled prohibited/benign action set during the soak window; bge runs
     # HIGH, so BLOCK_THRESHOLD must sit clearly above the benign cluster.
-    BLOCK_THRESHOLD = 0.78       # Above this → definitely violates (BLOCK)
-    GREY_AREA_THRESHOLD = 0.60   # Between this and BLOCK → grey area (VOTE_REQUIRED)
+    #
+    # RE-TUNED (2026-07-31): Evaluated against both Genesis Template (6 articles
+    # + 11 prohibited) and Fallback Constitution (10 articles + 9 prohibited)
+    # with 21 labelled actions. Benign cluster: 0.50-0.68; Grey area: 0.57-0.66;
+    # Block candidates: 0.58-0.76 (heavy overlap). Tier 2 primarily discriminates
+    # grey area for VOTE_REQUIRED; clear BLOCKs handled by Tier 1.
+    BLOCK_THRESHOLD = 0.75       # Above this → definitely violates (BLOCK)
+    GREY_AREA_THRESHOLD = 0.63   # Between this and BLOCK → grey area (VOTE_REQUIRED)
 
     # Redis cache TTLs (seconds)
     CONSTITUTION_CACHE_TTL = 300       # 5 minutes
