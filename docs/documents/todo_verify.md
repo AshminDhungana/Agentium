@@ -1,24 +1,6 @@
 # Agentium — Verification & Improvement Backlog
 
 
-## 16. Frontend Polish & Accessibility
-
-
-- ~~**16.4 — [P2]** Verify every toast goes through the shared `useToast()` hook and every network call goes through `services/api.ts` — grep for stray inline `toast()` / `fetch()` calls and migrate any found.~~ ✅ **COMPLETED** — Verified: all 47 files use `showToast`/`useToast()`; all API calls use `services/api.ts` axios instance; only 2 legitimate exceptions (rawFetch for SSE/WS, WS health check, Vite lazy imports).
-- **16.5 — [P2]** Color-contrast accessibility still needs a live-backend audit per the Phase 17.4 note — confirm the `axe-core` CI gate actually covers every page with a running backend (not just static/mocked pages).
-
----
-
-## 17. Backend Correctness
-
-- ~~**17.1 — [P1]** `backend/services/agent_orchestrator.py` (~L500–501): `raise NotImplementedError("This tool was auto-generated...")` — verify this surfaces to the user as a clean, actionable task-failure message rather than a raw 500.~~ ✅ **COMPLETED** — Fixed in commit 5311603: `NotImplementedError` replaced with LLM-based code generation that validates via ToolFactory and returns clean escalation messages instead of raw 500s. Unit tests in `backend/tests/unit/test_tool_self_creation.py` pass.
-- **17.2 — [P2]** `backend/core/constitutional_guard.py` (~L172): `TODO(pre-cutover): re-tune against the REAL constitution articles` — confirm thresholds were actually re-tuned after cutover; if not, do it now.
-- **17.3 — [P2]** `backend/models/entities/agents.py` (~L717–762) parses `TODO:` as a rule-action token — verify legitimate agent-authored text that happens to contain the literal string "TODO:" cannot be misinterpreted as a rule action. Add an escaping/quoting mechanism if it can.
-- **17.4 — [P2]** `backend/api/routes/chat.py` (~L432): a `_done_sent` flag was added to prevent a previously-fixed duplicate final-message emission — verify no other code path can still double-emit the final message.
-- **17.5 — [P2]** `backend/api/routes/websocket.py` (~L463 area) had an un-awaited `redis.asyncio.get()` coroutine bug, fixed in Phase 19.4 — grep the rest of `api/routes/` and `core/` for other unawaited coroutines (this class of bug already occurred twice — see 1.3 above).
-
----
-
 ## 18. Testing & CI
 
 - **18.1 — [P2]** Confirm the integration suite hits ≥80% coverage on `backend/services` with zero skipped tests; confirm `docker-compose.test.yml` is truly ephemeral (no state leaks between runs).
