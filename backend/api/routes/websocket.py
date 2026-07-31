@@ -850,7 +850,7 @@ async def genesis_status(current_user=Depends(get_current_user)):
     # Head 00001 (early commit) but then failed in a later step, so the
     # Head query alone is not a reliable indicator of success.
     try:
-        _redis = get_redis_client()
+        _redis = await get_redis_client()
         raw = await _redis.get("genesis:state")
         if raw:
             state = json.loads(raw)

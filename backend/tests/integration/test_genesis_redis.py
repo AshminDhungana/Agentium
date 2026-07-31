@@ -21,7 +21,7 @@ from backend.core.redis import get_redis_client
 async def test_genesis_state_persists_to_redis():
     # Only run against a reachable Redis — skip otherwise.
     try:
-        probe = get_redis_client()
+        probe = await get_redis_client()
         await probe.ping()
     except Exception:
         pytest.skip("real Redis (REDIS_URL) not reachable")

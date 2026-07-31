@@ -1317,7 +1317,7 @@ def trigger_genesis_if_needed(db) -> bool:
     async def _run_genesis() -> None:
         """Run genesis."""
         from backend.models.database import get_db_context
-        _redis = get_redis_client()
+        _redis = await get_redis_client()
         try:
             await _redis.set(
                 "genesis:state",
