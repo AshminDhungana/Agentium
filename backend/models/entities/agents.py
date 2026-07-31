@@ -881,20 +881,22 @@ class Agent(BaseEntity):
             self.ethos_action_pending = False
             results["ethos_refreshed"] = True
             
-            # Parse behavioral_rules for actionable items (marked with [ACTION:])
+            # Parse behavioral_rules for actionable items (marked with [ACTION: ...] only)
+            # Bare "TODO:" and "TASK:" are treated as literal text to avoid false positives
+            # on legitimate agent-authored guidance (e.g., "Always include TODO: comments")
             import json
             try:
                 rules = json.loads(ethos.behavioral_rules) if ethos.behavioral_rules else []
-                
+
                 for rule in rules:
-                    if "[ACTION:" in rule or "TODO:" in rule or "TASK:" in rule:
+                    if "[ACTION:" in rule:
                         results["tasks_found"] += 1
                         # Extract and execute the task
                         action_result = self._execute_ethos_task(db, rule, ethos.agentium_id)
                         results["actions_taken"].append(action_result)
                         if action_result["executed"]:
                             results["tasks_executed"] += 1
-                            
+
             except json.JSONDecodeError:
                 pass
             
@@ -918,7 +920,8 @@ class Agent(BaseEntity):
     def _execute_ethos_task(self, db: Session, rule: str, ethos_id: str) -> Dict[str, Any]:
         """
         Execute a specific task found in ethos behavioral rules.
-        Marked by [ACTION: description] or TODO: or TASK:
+        Only marked by [ACTION: description] format.
+        Bare "TODO:" and "TASK:" are treated as literal text (not action markers).
         """
         result = {
             "rule": rule[:100],
@@ -926,16 +929,12 @@ class Agent(BaseEntity):
             "action": None,
             "details": None
         }
-        
-        # Parse action markers
+
+        # Parse action markers - only [ACTION: ...] format is recognized
         action = None
         if "[ACTION:" in rule:
             action = rule.split("[ACTION:")[1].split("]")[0].strip()
-        elif "TODO:" in rule:
-            action = rule.split("TODO:")[1].strip()
-        elif "TASK:" in rule:
-            action = rule.split("TASK:")[1].strip()
-        
+
         if not action:
             return result
         
@@ -1033,13 +1032,13 @@ class Agent(BaseEntity):
                         ethos.add_lesson_learned(lesson)
                     results["lessons_recorded"] = len(lessons)
                 
-                # Legacy: execute [ACTION:] markers from behavioral rules
+                # Legacy: execute [ACTION:] markers from behavioral rules (only this format triggers)
                 self.ethos_last_read_at = datetime.utcnow()
                 self.ethos_action_pending = False
                 try:
                     rules = json.loads(ethos.behavioral_rules) if ethos.behavioral_rules else []
                     for rule in rules:
-                        if "[ACTION:" in rule or "TODO:" in rule or "TASK:" in rule:
+                        if "[ACTION:" in rule:
                             results["ethos_tasks_found"] += 1
                             action_result = self._execute_ethos_task(db, rule, ethos.agentium_id)
                             results["actions_taken"].append(action_result)
