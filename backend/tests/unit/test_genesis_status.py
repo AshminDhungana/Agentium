@@ -56,7 +56,7 @@ async def test_complete_when_head_exists(fake_redis):
 async def test_failed_returns_reason(fake_redis):
     fake_redis.get.return_value = json.dumps({"phase": "failed", "reason": "boom"})
     with patch.object(ws, "get_fresh_db") as gdb, \
-         patch.object(ws, "get_redis_client", lambda: fake_redis):
+         patch.object(ws, "get_redis_client", AsyncMock(return_value=fake_redis)):
         db = MagicMock()
         db.query.return_value.filter_by.return_value = _make_head_query(exists=False)
         gdb.return_value.__enter__.return_value = db
@@ -94,7 +94,7 @@ async def test_failed_takes_precedence_over_key(fake_redis):
     cfg_q = _make_cfg_query(exists=True)  # a config row exists
     head_q = _make_head_query(exists=False)
     with patch.object(ws, "get_fresh_db") as gdb, \
-         patch.object(ws, "get_redis_client", lambda: fake_redis):
+         patch.object(ws, "get_redis_client", AsyncMock(return_value=fake_redis)):
         db = MagicMock()
         db.query.side_effect = _db_side_effect(head_q, cfg_q)
         gdb.return_value.__enter__.return_value = db

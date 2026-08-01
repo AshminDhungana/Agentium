@@ -524,32 +524,32 @@ class ReincarnationService:
     def promote_to_lead(agent_id: str, promoted_by: Agent, reason: str, db: Session) -> LeadAgent:
         """
         Promote a Task Agent (3xxxx) to Lead Agent (2xxxx).
-        
+
         This is a rare operation reserved for exceptional Task Agents who have
         demonstrated leadership capability and need broader authority.
-        
+
         Args:
             agent_id: Agentium ID of Task Agent to promote
             promoted_by: Agent authorizing the promotion (must be Council/Head)
             reason: Justification for promotion
             db: Database session
-            
+
         Returns:
             New LeadAgent instance
-            
+
         Raises:
             ValueError: If agent is not a Task Agent or doesn't exist
             PermissionError: If promoter lacks authority
         """
-        # Get the Task Agent
-        task_agent = db.query(TaskAgent).filter_by(agentium_id=agent_id, is_active=True).first()
-        
-        if not task_agent:
-            raise ValueError(f"Task Agent {agent_id} not found or inactive")
-        
-        # Only Task Agents can be promoted to Lead
+        # Only Task Agents can be promoted to Lead (check prefix first)
         if not any(agent_id.startswith(p) for p in ['3', '4', '5', '6']):
             raise ValueError(f"Only Task Agents (3xxxx-6xxxx) can be promoted to Lead. Got: {agent_id}")
+
+        # Get the Task Agent
+        task_agent = db.query(TaskAgent).filter_by(agentium_id=agent_id, is_active=True).first()
+
+        if not task_agent:
+            raise ValueError(f"Task Agent {agent_id} not found or inactive")
         
         # Check promoter permission (must be Council or Head)
         promoter_tier = CapabilityRegistry.get_agent_tier(promoted_by.agentium_id)
@@ -586,20 +586,21 @@ class ReincarnationService:
             Task.assigned_task_agent_ids.contains([agent_id]),
             Task.is_active == True
         ).all()
-        
+
         for task in active_tasks:
-            # Replace old ID with new ID in assignments
+            # Replace old ID with new ID in assignments - reassign whole list for SQLAlchemy JSONB tracking
             if task.assigned_task_agent_ids and agent_id in task.assigned_task_agent_ids:
-                task.assigned_task_agent_ids.remove(agent_id)
-                task.assigned_task_agent_ids.append(new_lead_id)
-                
+                new_ids = [aid for aid in task.assigned_task_agent_ids if aid != agent_id]
+                new_ids.append(new_lead_id)
+                task.assigned_task_agent_ids = new_ids
+
                 # Log task transfer
                 task._log_status_change(
                     "agent_promoted",
                     promoted_by.agentium_id,
                     f"Task transferred to promoted Lead {new_lead_id} (was {agent_id})"
                 )
-        
+
         # Terminate the old Task Agent
         task_agent.status = AgentStatus.TERMINATED
         task_agent.terminated_at = datetime.utcnow()
@@ -731,13 +732,15 @@ class ReincarnationService:
             Task.status.in_([TaskStatus.PENDING, TaskStatus.IN_PROGRESS, TaskStatus.DELIBERATING]),
             Task.is_active == True
         ).all()
-        
+
         for task in active_tasks:
             # Try to reassign to parent
             if agent.parent:
                 if task.assigned_task_agent_ids and agent_id in task.assigned_task_agent_ids:
-                    task.assigned_task_agent_ids.remove(agent_id)
-                    task.assigned_task_agent_ids.append(agent.parent.agentium_id)
+                    # Reassign to parent - need to reassign the whole list for SQLAlchemy to track JSONB changes
+                    new_ids = [aid for aid in task.assigned_task_agent_ids if aid != agent_id]
+                    new_ids.append(agent.parent.agentium_id)
+                    task.assigned_task_agent_ids = new_ids
                     task._log_status_change(
                         "reassigned_liquidation",
                         liquidated_by.agentium_id,
@@ -1022,6 +1025,8 @@ class ReincarnationService:
                     task = db.query(Task).filter_by(id=current_task_id).first()
                     if task:
                         task.assigned_agent_id = successor.agentium_id
+                        # Also update the JSONB array for task agents
+                        task.assigned_task_agent_ids = [successor.agentium_id]
                         successor.current_task_id = current_task_id
                         db.add(task)
                         db.flush()
@@ -1197,7 +1202,7 @@ Provide a concise summary (max 300 words) that the successor agent will inherit.
         
         # Create new agent of same type
         new_agent_class = type(agent)
-        
+
         new_agent = new_agent_class(
             agentium_id=new_id,
             name=f"{agent.name} (Incarnation {previous_incarnation + 1})",
@@ -1210,14 +1215,24 @@ Provide a concise summary (max 300 words) that the successor agent will inherit.
             idle_mode_enabled=agent.idle_mode_enabled,
             created_by_agentium_id=agent.agentium_id
         )
-        
+
         # Copy key attributes
         new_agent.constitution_version = agent.constitution_version
         new_agent.preferred_config_id = agent.preferred_config_id
-        
+        # Set incarnation number
+        new_agent.incarnation_number = previous_incarnation + 1
+
         db.add(new_agent)
         db.flush()
-        
+
+        # Create default ethos for the new agent (similar to spawn methods)
+        # Use the Head of Council (00001) as the authority for ethos creation
+        head = db.query(HeadOfCouncil).filter_by(agentium_id="00001").first()
+        if head:
+            default_ethos = head._create_default_ethos(new_agent, db)
+            new_agent.ethos_id = default_ethos.id
+            db.flush()
+
         # Transfer ethos with wisdom
         if new_agent.ethos_id:
             successor_ethos = db.query(Ethos).filter_by(id=new_agent.ethos_id).first()
@@ -1225,13 +1240,27 @@ Provide a concise summary (max 300 words) that the successor agent will inherit.
                 # Prepend predecessor's accumulated wisdom
                 predecessor_ethos = db.query(Ethos).filter_by(id=agent.ethos_id).first()
                 if predecessor_ethos:
+                    # Copy behavioral rules (which contain LIFE_ wisdom entries)
+                    copied_rules = []
+                    if predecessor_ethos.behavioral_rules:
+                        try:
+                            copied_rules = json.loads(predecessor_ethos.behavioral_rules)
+                        except (json.JSONDecodeError, TypeError):
+                            copied_rules = []
+
+                    # Add the inherited wisdom marker to rules
+                    inherited_marker = f"[INHERITED_WISDOM_FROM_{agent.agentium_id}_INCARNATION_{previous_incarnation}]: {wisdom_summary[:300]}..."
+                    copied_rules.append(inherited_marker)
+
+                    # Update successor ethos
                     successor_ethos.mission_statement = (
                         f"[PREDECESSOR: {agent.agentium_id} - Incarnation {previous_incarnation}]\n"
                         f"Inherited wisdom: {wisdom_summary[:200]}...\n\n"
                         f"{successor_ethos.mission_statement}"
                     )
+                    successor_ethos.behavioral_rules = json.dumps(copied_rules[-20:])
                     db.flush()
-        
+
         return new_agent
 
     @staticmethod

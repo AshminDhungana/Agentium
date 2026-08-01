@@ -384,17 +384,17 @@ class CostAwareDelegator:
         Check if the task should be forced to use a local model.
 
         Returns True when:
-          - idle_budget remaining < 20%
+          - idle_budget cost percentage used > 80% (remaining < 20%)
           - AND complexity_score <= 3 (simple task)
         """
         try:
             from backend.services.token_optimizer import idle_budget
-            status = idle_budget.get_budget_status()
-            remaining = status.get("remaining_percentage", 100)
+            status = idle_budget.get_status()
+            cost_pct_used = status.get("cost_percentage_used", 0)
 
-            if remaining < 20 and complexity_score <= 3:
+            if cost_pct_used > 80 and complexity_score <= 3:
                 logger.info(
-                    f"CostAwareDelegator: budget at {remaining}%, "
+                    f"CostAwareDelegator: budget at {cost_pct_used}% used, "
                     f"complexity {complexity_score} — forcing local model"
                 )
                 return True
@@ -543,7 +543,7 @@ class DelegationEngine:
 
         # ── Audit log ────────────────────────────────────────────────────────
         try:
-            AuditLog.log(
+            audit_entry = AuditLog.log(
                 level=AuditLevel.INFO,
                 category=AuditCategory.GOVERNANCE,
                 actor_type="system",
@@ -558,6 +558,7 @@ class DelegationEngine:
                 ),
                 meta_data=decision,
             )
+            db.add(audit_entry)
         except Exception:
             pass  # Audit failure should not break delegation
 

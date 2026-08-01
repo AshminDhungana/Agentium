@@ -231,13 +231,20 @@ async def seeded_db(db_session: Session) -> Session:
 @pytest.fixture(scope="function")
 def redis_client():
     """Provide a flushed Redis database for the test."""
-    client = sync_redis.Redis.from_url(os.environ["REDIS_URL"])
+    # Use localhost in CI, 'redis' in Docker network
+    redis_url = os.environ.get("REDIS_URL", "redis://localhost:6379/1")
+    client = sync_redis.Redis.from_url(redis_url, decode_responses=False)
+
+    # Verify connection
+    try:
+        client.ping()
+    except Exception as e:
+        pytest.skip(f"Redis not reachable at {redis_url}: {e}")
+
     client.flushdb()
-    
-    # Patch the application's redis functions if necessary,
-    # though setting the REDIS_URL env var before imports usually suffices.
+
     yield client
-    
+
     client.flushdb()
     client.close()
 

@@ -425,33 +425,29 @@ def handle_task_escalation():
             
             for task in escalated_tasks:
                 logger.info(f"Processing escalated task {task.agentium_id}: {task.title}")
-                
+
                 try:
-                    deliberation = task.start_deliberation([m.agentium_id for m in council_members[:3]])
-                    db.add(deliberation)
-                    
                     decision = _simulate_council_decision(task)
-                    
+
                     if decision == "liquidate":
                         task.cancel(
                             reason="Council decision: Task liquidated after escalation",
                             cancelled_by="Council"
                         )
                         result = "liquidated"
-                        
+
                     elif decision == "modify_scope":
                         task.description += "\n[Modified by Council after escalation]"
                         task.retry_count = 0
                         task.error_count = 0
                         task.set_status(TaskStatus.IN_PROGRESS, "Council", "Scope modified, retrying")
                         result = "modified_and_retrying"
-                        
+
                     elif decision == "allocate_resources":
                         task.set_status(TaskStatus.IN_PROGRESS, "Council", "Additional resources allocated")
                         result = "resources_allocated"
                     
-                    AuditLog.log(
-                        db=db,
+                    entry = AuditLog.log(
                         level=AuditLevel.INFO,
                         category=AuditCategory.GOVERNANCE,
                         actor_type="agent",
@@ -466,6 +462,7 @@ def handle_task_escalation():
                             "previous_retries": task.retry_count
                         }
                     )
+                    db.add(entry)
                     
                     results.append({
                         "task_id": task.agentium_id,
@@ -531,8 +528,7 @@ def sovereign_data_retention():
             
             for task in old_tasks:
                 try:
-                    AuditLog.log(
-                        db=db,
+                    entry = AuditLog.log(
                         level=AuditLevel.INFO,
                         category=AuditCategory.GOVERNANCE,
                         actor_type="system",
@@ -543,6 +539,7 @@ def sovereign_data_retention():
                         before_state=task.to_dict(),
                         description=f"Task archived after 30 days: {task.agentium_id}"
                     )
+                    db.add(entry)
                     task.is_active = False
                     results["tasks_archived"] += 1
                 except Exception as e:

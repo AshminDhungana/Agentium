@@ -1,0 +1,200 @@
+============================= test session starts =============================
+platform win32 -- Python 3.13.12, pytest-9.1.1, pluggy-1.6.0
+rootdir: E:\Ongoing Projects\Agentium\backend
+configfile: pytest.ini
+plugins: anyio-4.12.1, Faker-40.23.0, locust-2.44.4, asyncio-1.4.0, cov-6.0.0, env-1.1.5, timeout-2.4.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=function, asyncio_default_test_loop_scope=function
+timeout: 180.0s
+timeout method: thread
+timeout func_only: False
+collected 44 items
+
+tests\integration\test_auto_delegation_service.py ...................... [ 50%]
+..........                                                               [ 72%]
+tests\integration\test_task_executor_integration.py ............
+ERROR: Coverage failure: total of 16 is less than fail-under=20
+                                                                         [100%]
+
+============================== warnings summary ===============================
+C:\Users\Lenovo\AppData\Local\Programs\Python\Python313\Lib\site-packages\pydantic\fields.py:1011
+C:\Users\Lenovo\AppData\Local\Programs\Python\Python313\Lib\site-packages\pydantic\fields.py:1011
+C:\Users\Lenovo\AppData\Local\Programs\Python\Python313\Lib\site-packages\pydantic\fields.py:1011
+C:\Users\Lenovo\AppData\Local\Programs\Python\Python313\Lib\site-packages\pydantic\fields.py:1011
+C:\Users\Lenovo\AppData\Local\Programs\Python\Python313\Lib\site-packages\pydantic\fields.py:1011
+  `min_items` is deprecated and will be removed, use `min_length` instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.10/migration/
+
+C:\Users\Lenovo\AppData\Local\Programs\Python\Python313\Lib\site-packages\pydantic\fields.py:1017
+  `max_items` is deprecated and will be removed, use `max_length` instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.10/migration/
+
+C:\Users\Lenovo\AppData\Local\Programs\Python\Python313\Lib\site-packages\pydantic\fields.py:1042: 65 warnings
+  Using extra keyword arguments on `Field` is deprecated and will be removed. Use `json_schema_extra` instead. (Extra keys: 'env'). Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.10/migration/
+
+C:\Users\Lenovo\AppData\Local\Programs\Python\Python313\Lib\site-packages\pydantic\_internal\_config.py:295
+C:\Users\Lenovo\AppData\Local\Programs\Python\Python313\Lib\site-packages\pydantic\_internal\_config.py:295
+C:\Users\Lenovo\AppData\Local\Programs\Python\Python313\Lib\site-packages\pydantic\_internal\_config.py:295
+C:\Users\Lenovo\AppData\Local\Programs\Python\Python313\Lib\site-packages\pydantic\_internal\_config.py:295
+C:\Users\Lenovo\AppData\Local\Programs\Python\Python313\Lib\site-packages\pydantic\_internal\_config.py:295
+C:\Users\Lenovo\AppData\Local\Programs\Python\Python313\Lib\site-packages\pydantic\_internal\_config.py:295
+  Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.10/migration/
+
+core\exceptions.py:59
+  'HTTP_413_REQUEST_ENTITY_TOO_LARGE' is deprecated. Use 'HTTP_413_CONTENT_TOO_LARGE' instead.
+
+services\token_optimizer.py:313: 1 warning
+services\token_optimizer.py:319: 1 warning
+tests/integration/test_auto_delegation_service.py: 2769 warnings
+tests/integration/test_task_executor_integration.py: 1089 warnings
+  datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+
+C:\Users\Lenovo\AppData\Local\Programs\Python\Python313\Lib\site-packages\stevedore\extension.py:185
+C:\Users\Lenovo\AppData\Local\Programs\Python\Python313\Lib\site-packages\stevedore\extension.py:185
+C:\Users\Lenovo\AppData\Local\Programs\Python\Python313\Lib\site-packages\stevedore\extension.py:185
+  The verify_requirements argument is now a no-op and is deprecated for removal. Remove the argument from calls.
+
+tests/integration/test_auto_delegation_service.py: 22 warnings
+  The EmbeddingFunction class does not implement name(). This will be required in a future version.
+
+tests/integration/test_task_executor_integration.py::TestExecuteTaskAsyncIntegration::test_execute_simple_task_creates_checkpoints
+tests/integration/test_task_executor_integration.py::TestExecuteTaskAsyncIntegration::test_execute_simple_task_creates_checkpoints
+  coroutine 'TestExecuteTaskAsyncIntegration.test_execute_simple_task_creates_checkpoints.<locals>._run_async' was never awaited
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+tests/integration/test_task_executor_integration.py::TestExecuteTaskAsyncIntegration::test_execute_task_with_failure_records_error
+  coroutine 'TestExecuteTaskAsyncIntegration.test_execute_task_with_failure_records_error.<locals>._run_async' was never awaited
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+tests/integration/test_task_executor_integration.py::TestExecuteTaskAsyncIntegration::test_execute_task_with_failure_records_error
+  coroutine 'AsyncMockMixin._execute_mock_call' was never awaited
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+tests/integration/test_task_executor_integration.py::TestExecuteTaskAsyncIntegration::test_execute_task_provider_exhaustion_rate_limited
+tests/integration/test_task_executor_integration.py::TestExecuteTaskAsyncIntegration::test_execute_task_provider_exhaustion_rate_limited
+  coroutine 'TestExecuteTaskAsyncIntegration.test_execute_task_provider_exhaustion_rate_limited.<locals>._run_async' was never awaited
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+tests/integration/test_task_executor_integration.py::TestExecuteTaskAsyncIntegration::test_execute_task_provider_exhaustion_all_keys_invalid
+tests/integration/test_task_executor_integration.py::TestExecuteTaskAsyncIntegration::test_execute_task_provider_exhaustion_all_keys_invalid
+  coroutine 'TestExecuteTaskAsyncIntegration.test_execute_task_provider_exhaustion_all_keys_invalid.<locals>._run_async' was never awaited
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+tests/integration/test_task_executor_integration.py::TestExecuteTaskAsyncIntegration::test_execute_task_provider_unreachable
+tests/integration/test_task_executor_integration.py::TestExecuteTaskAsyncIntegration::test_execute_task_provider_unreachable
+  coroutine 'TestExecuteTaskAsyncIntegration.test_execute_task_provider_unreachable.<locals>._run_async' was never awaited
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+
+---------- coverage: platform win32, python 3.13.12-final-0 ----------
+Name                                     Stmts   Miss Branch BrPart  Cover   Missing
+------------------------------------------------------------------------------------
+services\_find_missing_docs.py              51     51     38      0     0%   2-71
+services\ab_testing_service.py             237    207     60      0    10%   29-30, 41, 53-69, 83-102, 123-124, 139-169, 181-239, 250-319, 326-328, 335-348, 354-432, 439-492, 508-557, 566-577
+services\acceptance_criteria.py            118     74     30      0    30%   54-56, 62-63, 75-83, 104, 110, 134-150, 155, 160-162, 184-211, 228-284, 294-299
+services\agent_orchestrator.py             521    521    180      0     0%   5-1388
+services\agent_registry.py                  25     25      6      0     0%   1-48
+services\alert_manager.py                  116     87     40      0    19%   48-49, 55-85, 89-117, 128-142, 149-200, 208-217, 221-242, 253-282, 287-291, 300
+services\amendment_service.py              220    186     60      0    12%   79-81, 89-99, 128-201, 235-284, 304-325, 351-370, 406-433, 451-549, 562-588, 603-610, 630-637, 645-653, 657-666, 676-695, 699-710, 719-735, 745-760
+services\api_key_manager.py                419    317    132      4    20%   79->84, 81->84, 90, 106-109, 147-148, 169-176, 188-211, 222-225, 241-245, 267-321, 351-399, 408-414, 418-420, 429-439, 482-537, 553-566, 575-621, 646-652, 662-667, 693-742, 775-850, 859-874, 902-927, 939-973, 977-987, 992-1024, 1045-1087, 1100-1116, 1130-1138, 1162-1167
+services\api_manager.py                    154    110     40      0    23%   57, 78-80, 84-96, 100-131, 135-140, 145-150, 154-155, 159-160, 164, 175-176, 192-232, 241-260, 278-288, 303-367
+services\audio_service.py                  367    303    106      0    14%   99-116, 120-121, 125, 131-133, 137-155, 196-209, 224-252, 283-333, 363-397, 428-468, 484-503, 509-511, 529-530, 535, 562-563, 588-590, 593-613, 616-637, 656-659, 662-669, 672-678, 681-685, 688-697, 700-760, 763-813, 821-824, 835-837
+services\audit\__init__.py                   0      0      0      0   100%
+services\audit\audit_processor.py            7      7      0      0     0%   4-13
+services\audit_service.py                   14      7      2      0    44%   18-34
+services\auth.py                            31     21     16      0    21%   24-47, 60-78
+services\auto_delegation_service.py        203     36     50      6    82%   141->144, 205-207, 221-222, 246-294, 359, 360->362, 401-402, 468-470, 480, 499, 562-563
+services\autonomous_learning.py            165    108     38      3    30%   43, 110-139, 159-178, 195-216, 232-282, 297->300, 304, 333-370, 385-459, 472->474
+services\browser_service.py                354    258     98      0    21%   86-93, 99-136, 228-233, 239-260, 265-273, 285-340, 345-391, 395-415, 419, 423, 427-429, 444-456, 462-469, 480-511, 520-558, 567-614, 623-655, 664-699, 703, 716-718
+services\capability_registry.py            170     83     46      7    46%   183, 222-230, 234, 241, 260-263, 292, 305->309, 310, 362-407, 423-444, 464-496, 506-537, 568-582
+services\channel_manager.py               1519   1266    500      0    13%   100-102, 135-137, 152-209, 213-241, 261, 266-289, 294-313, 318-331, 336-354, 359-385, 390-406, 440-479, 484-505, 510-527, 532-575, 580-716, 738-743, 747-756, 763-903, 907-909, 935-952, 962-979, 995-1002, 1021-1288, 1300-1374, 1387-1391, 1403-1525, 1536-1574, 1579-1601, 1606-1609, 1622-1656, 1673-1716, 1721-1775, 1780-1802, 1814-1834, 1839-1858, 1864-1900, 1913-1917, 1929-1966, 1971-1991, 1996-2018, 2023-2061, 2074-2082, 2087-2099, 2113-2163, 2168-2189, 2203-2219, 2231-2264, 2269-2283, 2289-2313, 2318-2365, 2379-2392, 2398-2408, 2421-2423, 2428-2456, 2464-2477, 2482-2495, 2507-2531, 2543-2545, 2550-2574, 2580-2633, 2638-2651, 2656-2668, 2680-2688, 2700-2702, 2707-2716, 2721-2740, 2745-2768, 2773-2795, 2800-2811, 2833-2853, 2860-2897, 2902-2923, 2942-2971, 2976-2997, 3003, 3008-3034, 3046-3060, 3077-3082, 3087-3112, 3117-3138, 3144-3163, 3174-3181, 3186-3199
+services\channels\base.py                   14      5      0      0    64%   15-16, 24, 30, 36
+services\channels\whatsapp_unified.py      301    245     90      0    14%   21-22, 65-67, 75-78, 82-85, 89-92, 96-98, 102-105, 113-114, 118-148, 152-189, 199-225, 237-238, 242-255, 259-275, 279-326, 330-376, 380-398, 402-422, 439-462, 466-482, 498-547, 552-564
+services\chat_context.py                   179    179     56      0     0%   19-389
+services\chat_prune_service.py              79     60     18      0    20%   31-32, 49-76, 89-111, 116-129, 139-150, 155-167, 188-253
+services\chat_service.py                   384    325    106      0    12%   64-84, 94-125, 134-658, 680-690, 706-713, 719-737, 757-766, 786-838, 857-893, 913-950, 964-985, 1000-1003, 1014-1032
+services\checkpoint_service.py             192    134     72      2    23%   52, 109-166, 184-237, 249-271, 292, 335-349, 359-388, 401-418, 426-459, 473-528
+services\citation_graph_service.py          90     64     22      0    23%   39-49, 74-104, 120-193, 218-228, 236-253, 286-287, 302-314, 326-328
+services\clarification_service.py           71     49     22      0    24%   53-78, 95-134, 147-161, 166-173, 186-197, 205-221
+services\config_versioning.py              109    109      8      0     0%   7-222
+services\context_manager.py                 67     37     14      0    37%   63-65, 84-92, 96-104, 118-121, 128-133, 143-159, 163-174, 178-182
+services\critic_agents.py                  284    242     90      0    11%   105-123, 133-170, 180-202, 206, 228-426, 446-461, 479-490, 502-512, 527-541, 551-564, 568-582, 598-617, 625-638, 642-648, 652, 656-672, 676-693, 697-716, 730-755, 766-782, 790-796, 800-826
+services\db_maintenance.py                 194    156     44      0    16%   38-96, 105-132, 141-201, 216-269, 278-335, 343-350, 358-393, 398-405, 415-422, 449-453
+services\decision_engine.py                 81     53     26      0    26%   37-98, 102-125
+services\event_processor.py                247    213     74      0    11%   36-48, 55-58, 63-68, 73-75, 83-100, 122-176, 186-270, 280-353, 362-370, 375-402, 412-442, 454-498
+services\fact_checker.py                   235    235     80      0     0%   13-565
+services\federation_service.py             263    206     72      0    17%   37-38, 60-63, 78, 83, 89, 104-126, 134-137, 153, 178-198, 210-224, 246-278, 293-331, 349-378, 389-420, 433-448, 456-460, 466-473, 483-539, 549-572, 579-599, 607, 621-626
+services\file_processor.py                 102     87     36      0    11%   81-112, 134-180, 198-215, 249-294, 303-307
+services\governance_command_service.py      91     91     28      0     0%   14-250
+services\host_access.py                    133    111     34      0    13%   24-34, 40-50, 58-98, 106-125, 133-159, 167-188, 197-212, 216-230, 240-266, 277-317, 333-335, 342-353
+services\idle_governance.py                469    393    142      0    12%   45-46, 50-51, 55, 59-60, 64-74, 84-92, 100, 109, 163-183, 194-209, 218-261, 269-296, 305-344, 351-437, 456, 473-591, 599, 616, 631-790, 797-820, 829-975, 979-984, 988-992, 1004-1057, 1065-1097, 1132-1161
+services\initialization_service.py         477    235     94     22    48%   53, 65-69, 107-138, 153-155, 166-221, 230-266, 281, 316-317, 321->332, 328-330, 360-361, 380-381, 388-393, 403-432, 436-443, 458, 469-470, 481->486, 526, 534-543, 583-586, 594->598, 598->602, 603-607, 610-611, 616, 620-623, 632, 668-672, 705, 814-825, 860-861, 879->886, 1091-1092, 1097-1099, 1121-1291, 1310-1394, 1411-1418, 1429-1466
+services\knowledge_assist.py               190    149     40      0    18%   58-72, 76, 80-81, 85-93, 98-104, 108-118, 122-123, 134-157, 169-210, 237-238, 247-251, 262-366
+services\knowledge_governance.py           276    219     50      0    17%   56-73, 92-94, 99-101, 106-109, 113-138, 142-199, 213-261, 271-298, 312-321, 331-372, 376-379, 395-420, 424-432, 447-463, 467-487, 491-522, 526-536, 540-552, 566-572, 579, 586-594, 598, 609-610
+services\knowledge_service.py              194    154     82      0    17%   36-38, 117, 136-346, 367-475, 490-505, 537-557, 566-569, 588-614, 630-672, 689-713
+services\mcp_client.py                      85     59      8      0    28%   20-22, 49-51, 58-59, 64, 70-85, 89-94, 103-122, 131-156, 168-188, 195-196, 203, 214
+services\mcp_governance.py                 309    262     68      0    12%   59, 80-110, 114-118, 138-244, 260-313, 333-357, 372-392, 411-421, 442-577, 585-598, 605-615, 627-654, 663-668, 672-674, 687-695, 704-707, 719-730, 735-738, 744
+services\mcp_stats_service.py              127    127     20      0     0%   20-257
+services\mcp_tool_bridge.py                 66     46     10      0    26%   64, 76-101, 120-121, 131-147, 154-168, 176-181, 185, 194-233, 262-263
+services\media_interceptor.py              104     70     34      0    25%   71-108, 114-115, 129-143, 165-222, 228-242
+services\message_bus.py                    311    311    106      0     0%   7-705
+services\model_allocation.py               123    104     42      0    12%   27-28, 49-69, 73-103, 110-121, 128-134, 141-160, 172-237, 244-269, 276-288, 294-329, 339
+services\model_provider.py                 889    797    348      3     8%   25-26, 43-46, 75-80, 90-97, 115-133, 302-340, 351-362, 371-377, 381, 387, 393, 413-462, 479-484, 537, 542-556, 565-571, 581-613, 618, 631-700, 705-736, 753-817, 861-1109, 1140-1150, 1155-1214, 1219-1248, 1291-1488, 1510-1547, 1551-1566, 1613-1629, 1641, 1655-1659, 1680-1704, 1757-1860, 1865-1891, 1906-2169, 2174-2179, 2195-2221, 2246-2332, 2339-2361, 2366-2431
+services\monitoring\__init__.py              0      0      0      0   100%
+services\monitoring\health_checks.py         7      7      0      0     0%   4-13
+services\monitoring_service.py             647    583    176      0     8%   36-105, 120-179, 193-213, 226-292, 300-351, 356-363, 368-374, 386-411, 423-460, 468-498, 507-519, 529-573, 582-637, 647-699, 708-740, 752-761, 775-788, 797-809, 822-1013, 1022-1153, 1168-1246, 1254-1323, 1333-1339, 1359-1439, 1444-1455
+services\overflow_recovery.py              125     77     16      0    34%   73-82, 91-92, 96-97, 103-106, 112-114, 120-123, 137-154, 163-213, 218-219, 229, 241-297
+services\persistent_council.py             162    124     38      0    19%   56-68, 74-128, 133-175, 180-218, 223-251, 256-437, 442-609, 614-615, 620-625, 630-636, 641-649
+services\plugin_marketplace_service.py     160    128     56      0    15%   39-57, 62-77, 84-113, 118-132, 139-188, 195-205, 212-232, 246-265, 272-303, 310-315
+services\predictive_scaling.py             158    128     42      0    15%   38-89, 98-138, 152-276, 286-322
+services\pricing_sync_service.py            89     74     24      0    13%   24-33, 42-65, 73-160
+services\prompt_template_manager.py        119    119     34      0     0%   9-866
+services\provider_rate_limiter.py          213    172     34      0    17%   133-139, 142-155, 168-208, 219-231, 240, 251-264, 268-274, 282-298, 318-331, 338-343, 347, 358-373, 377-388, 402-414, 426-439, 445-459
+services\push_notification_service.py      181    143     56      0    16%   37-59, 64-73, 78-82, 89-97, 111-126, 134-149, 158-187, 196-247, 257-280, 285-290, 295-301, 306-312, 319-331
+services\rbac_service.py                    87     60     22      0    25%   51-59, 64, 76-116, 121-147, 157-200, 205-220
+services\reasoning_trace_service.py        305    206     38      0    29%   89-93, 97-100, 138-149, 153, 157-161, 165-168, 172, 217-251, 305-318, 338-352, 364-380, 390-417, 427-448, 462-473, 487-521, 527, 548-638, 645-656, 665-694, 701-721, 749-845, 854-857, 862-870, 875-885
+services\reincarnation_service.py          424    310    120     13    24%   76, 98-104, 123->120, 125-126, 159-259, 287-308, 337, 349, 357-364, 390-402, 449, 463, 471-476, 545-642, 682-835, 853-876, 894-904, 928-1059, 1069-1102, 1108-1112, 1122-1155, 1166-1235, 1244-1279
+services\remote_executor\__init__.py         3      0      0      0   100%
+services\remote_executor\executor.py        69     54     12      1    20%   53-61, 75, 100-125, 152-232, 244-252
+services\remote_executor\sandbox.py        151    117     36      0    18%   16-19, 39, 53, 93-94, 98-118, 123-125, 129-144, 152-226, 253-296, 313-342, 359-389
+services\remote_executor\service.py        130    111     32      0    12%   53-55, 91-267, 301-368, 378
+services\self_healing_service.py           295    295     52      0     0%   14-895
+services\self_improvement_service.py        72     72     18      0     0%   3-142
+services\skill_manager.py                  213    181     60      0    12%   41-46, 62-63, 88-180, 184-187, 191-201, 233-309, 319-345, 360-418, 422-432, 436-453, 469-522, 530-542, 556-584
+services\skill_rag.py                       88     70     22      0    16%   67-123, 159-224, 255-323
+services\slow_query_service.py              82     82     10      0     0%   7-213
+services\storage_service.py                163    109     26      1    29%   73-90, 94-123, 134-145, 149-158, 162-167, 171-179, 183-186, 226-235, 242-246, 250-257, 264-281, 286-290, 330-347, 358, 364, 368, 375, 380
+services\structured_input_service.py        42     35     20      0    11%   10-21, 26-28, 39-63
+services\task_state_machine.py              29      9      4      2    67%   115, 120, 130, 135, 140-143, 149
+services\tasks\__init__.py                   0      0      0      0   100%
+services\tasks\reindex_knowledge.py         32     32      6      0     0%   12-72
+services\tasks\task_executor.py            888    647    212     16    25%   82-91, 122, 125->128, 129, 132, 137-138, 152-156, 173-174, 178-184, 188-189, 201-202, 212-220, 244-245, 258-259, 281-282, 302-337, 350->358, 355-356, 369-370, 383-384, 440-444, 446->450, 472-474, 488-490, 501, 545-546, 555-561, 564-565, 574-577, 583-587, 597-599, 616-625, 631-755, 765-813, 823-884, 894-908, 914-952, 962-999, 1009-1028, 1038-1077, 1093-1136, 1147-1206, 1217-1225, 1232-1245, 1252-1262, 1269-1281, 1292-1298, 1305-1311, 1322-1329, 1336-1345, 1356-1368, 1375-1387, 1398-1417, 1424-1437, 1448-1457, 1463-1500, 1511-1540, 1551-1577, 1588-1634, 1641-1658, 1695-1799, 1827-1838, 1848
+services\tasks\workflow_tasks.py            59     59      6      0     0%   10-163
+services\token_optimizer.py                268    149     58      2    39%   52-53, 61, 74->70, 78-79, 87-116, 161, 172, 181, 186, 191, 196, 207-210, 240-241, 249-250, 261-265, 333, 337-347, 351-361, 365, 370-385, 390-400, 405-438, 443-474, 478-487, 491-500, 504-508, 513-517, 521, 534-543, 548-557, 562-563, 586-589
+services\tool_analytics.py                 110     79     18      0    24%   41-43, 48-49, 54, 66, 89-100, 125, 149-165, 186-217, 236-250, 277-282, 296-312, 317-321, 326-330, 342-345, 353-357, 363-373
+services\tool_creation_service.py          177    153     56      0    10%   45-48, 60-135, 151-181, 205-268, 301-361, 386-446, 456-484, 493-509
+services\tool_deprecation.py               103     86     38      0    12%   35, 55-112, 136-158, 181-233, 254-280, 296-307, 319-323, 335-349
+services\tool_factory.py                   106     88     46      0    12%   21-43, 52-73, 83-99, 104-147, 151-162, 166-167, 171-189, 193-229, 233
+services\tool_marketplace.py               122     99     44      0    14%   43-44, 62-126, 151-182, 206-247, 276-289, 308-325, 348-367, 385-415, 429-443
+services\tool_versioning.py                120    100     36      0    13%   35-36, 54-70, 89-132, 155-224, 247-326, 345-367, 381-391, 416, 426-440
+services\user_preference_service.py        183    155     82      0    11%   56, 71-94, 105-108, 125-175, 186-202, 216-237, 246-255, 259-274, 288-323, 332-342, 358-389, 400-484, 488-530, 538-549, 554-556, 560-585, 599-609
+services\voice\__init__.py                   2      0      0      0   100%
+services\voice\voice_config_service.py      57     39     18      0    24%   36, 50-55, 93-118, 151-179, 192
+services\wait_poll_service.py              213    177     68      0    13%   61-82, 91-115, 129-138, 152-177, 184-202, 220-256, 261-268, 280-308, 320-350, 359-377, 382-393, 398-411, 416-436
+services\webhook_dispatch_service.py        95     71     14      0    22%   48, 65-112, 125-188, 198-231, 241
+services\whisper_cpp_service.py             62     38     14      0    32%   34, 43-49, 54-56, 62, 67-101, 110-112
+services\workflow_engine.py                247    204     52      0    14%   33-52, 57-83, 88-99, 104-123, 128-146, 151-207, 213-214, 219-244, 249-258, 263-289, 314-379, 392-409, 418-441, 446-458, 463-476, 482-483
+services\workflow_executor.py              103    103     34      0     0%   15-251
+services\workflow_planner.py                75     75     20      0     0%   10-231
+services\workflow_tools.py                 118    118     18      0     0%   17-290
+------------------------------------------------------------------------------------
+TOTAL                                    18581  14932   5166     82    16%
+Coverage HTML written to dir htmlcov
+
+FAIL Required test coverage of 20% not reached. Total coverage: 16.07%
+================ 44 passed, 3973 warnings in 299.81s (0:04:59) ================
+sed, 3973 warnings in 280.48s (0:04:40) ================
