@@ -6,6 +6,8 @@ Connects to the running docker-compose stack on localhost.
 import os
 import json
 import logging
+import subprocess
+import sys
 import pytest
 import pytest_asyncio
 from typing import Generator
@@ -76,17 +78,24 @@ def db_engine():
         conn.execute(text("CREATE DATABASE agentium_test ENCODING 'UTF8' TEMPLATE template0"))
     engine_default.dispose()
 
-    # Create all tables in the test database
+    # Create all tables in the test database via alembic
     engine_test = create_engine(TEST_DB_URL)
 
-    # Import all models to ensure they are registered with Base
-    import backend.models.entities
+    # Run alembic upgrade head to apply all migrations
+    alembic_cfg = "alembic.ini"
+    result = subprocess.run(
+        [sys.executable, "-m", "alembic", "-c", alembic_cfg, "upgrade", "head"],
+        cwd=".",  # backend directory
+        capture_output=True,
+        text=True,
+        env={**os.environ, "DATABASE_URL": TEST_DB_URL},
+    )
+    if result.returncode != 0:
+        print(f"Alembic upgrade failed: {result.stderr}")
+        raise RuntimeError(f"Alembic upgrade failed: {result.stderr}")
+    print(f"Alembic upgrade output: {result.stdout}")
 
-    Base.metadata.create_all(bind=engine_test)
-
-    # Phase 19: enable pg_stat_statements extension so slow-query tests have
-    # real data. Requires shared_preload_libraries=pg_stat_statements in
-    # docker-compose.test.yml postgres (added in this task).
+    # Phase 19: enable pg_stat_statements extension
     with engine_test.connect() as conn:
         conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_stat_statements"))
         conn.commit()
