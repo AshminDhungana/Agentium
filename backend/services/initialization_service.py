@@ -877,7 +877,7 @@ class InitializationService:
 
         for member in attached_council:
             if member.ethos:
-                member.ethos.metadata = json.dumps({
+                member.ethos.meta_data = json.dumps({
                     "knowledge_admin": True,
                     "can_approve_submissions": True,
                     "granted_at": datetime.utcnow().isoformat()

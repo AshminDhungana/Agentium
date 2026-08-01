@@ -270,6 +270,9 @@ class Ethos(BaseEntity):
 
     # Standard working procedure (6.3) — how this agent operates, set at creation
     working_method = Column(Text, nullable=True)
+
+    # Generic metadata storage for additional agent-specific data (e.g., knowledge_admin)
+    meta_data = Column(Text, nullable=True)
     def get_core_values(self) -> List[str]:
         import json
         val = self.core_values
