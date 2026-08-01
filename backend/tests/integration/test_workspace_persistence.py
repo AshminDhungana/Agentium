@@ -15,7 +15,7 @@ import os
 
 import pytest
 
-pytestmark = pytest.mark.integration
+pytestmark = [pytest.mark.integration, pytest.mark.requires_docker]
 
 
 def _sandbox_runnable() -> bool:
@@ -36,6 +36,7 @@ def _sandbox_runnable() -> bool:
 
 
 def test_code_output_persists_to_host(tmp_path, monkeypatch):
+    # pytest.mark.requires_docker handles CI exclusion
     if not _sandbox_runnable():
         pytest.skip("Docker daemon not available / unusable by SandboxManager")
 

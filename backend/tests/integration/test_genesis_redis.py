@@ -18,13 +18,11 @@ from backend.core.redis import get_redis_client
 
 
 @pytest.mark.integration
+@pytest.mark.requires_redis
 async def test_genesis_state_persists_to_redis():
     # Only run against a reachable Redis — skip otherwise.
-    try:
-        probe = await get_redis_client()
-        await probe.ping()
-    except Exception:
-        pytest.skip("real Redis (REDIS_URL) not reachable")
+    probe = await get_redis_client()
+    await probe.ping()  # Will raise if unreachable; marker handles CI exclusion
 
     await probe.delete("genesis:state")
 

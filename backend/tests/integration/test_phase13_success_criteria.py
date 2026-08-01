@@ -457,6 +457,7 @@ class TestCriterion05Workflow:
       4. Rollback to prior version restores the template
       5. ETA estimation is within 20% of actual
     """
+    pytestmark = pytest.mark.requires_alembic_head
 
     def _make_5_step_template(self) -> dict:
         """Canonical 5-step template: task -> condition -> parallel -> human_approval -> task"""
@@ -502,34 +503,29 @@ class TestCriterion05Workflow:
 
     def test_create_and_execute_5_step_workflow(self, seeded_db: Session):
         """Create the workflow, start execution, and run all steps."""
-        try:
-            template = self._make_5_step_template()
-            workflow = WorkflowEngine.create_workflow(
-                db=seeded_db,
-                name="Test 5-Step Workflow",
-                template_json=template,
-                agent_id=None,
-                cron="0 9 * * *",
-            )
+        template = self._make_5_step_template()
+        workflow = WorkflowEngine.create_workflow(
+            db=seeded_db,
+            name="Test 5-Step Workflow",
+            template_json=template,
+            agent_id=None,
+            cron="0 9 * * *",
+        )
 
-            assert workflow is not None
-            assert workflow.name == "Test 5-Step Workflow"
-            assert workflow.schedule_cron == "0 9 * * *"
+        assert workflow is not None
+        assert workflow.name == "Test 5-Step Workflow"
+        assert workflow.schedule_cron == "0 9 * * *"
 
-            # Trigger execution
-            execution = WorkflowEngine.trigger_execution(
-                db=seeded_db,
-                workflow_id=workflow.id,
-                trigger="api",
-                context={"status": "ok"},
-            )
+        # Trigger execution
+        execution = WorkflowEngine.trigger_execution(
+            db=seeded_db,
+            workflow_id=workflow.id,
+            trigger="api",
+            context={"status": "ok"},
+        )
 
-            assert execution is not None
-            assert execution.status is not None
-        except Exception as exc:
-            if 'agentium_id' in str(exc):
-                pytest.skip("workflow tables missing agentium_id column—run `alembic upgrade head` in test DB")
-            raise
+        assert execution is not None
+        assert execution.status is not None
 
     def test_workflow_version_increments_on_update(self, seeded_db: Session):
         """Updating a workflow should bump the version number."""
