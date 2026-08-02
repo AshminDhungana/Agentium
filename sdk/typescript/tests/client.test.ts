@@ -87,7 +87,7 @@ test('listAgents returns agents', async () => {
   const client = new AgentiumClient({ baseUrl: BASE, apiKey: 'key' });
   const agents = await client.listAgents();
   expect(agents).toHaveLength(2);
-  expect(agents[0].agentium_id).toBe('00001');
+  expect(agents[0]?.agentium_id).toBe('00001');
 });
 
 test('getAgent returns single agent', async () => {
@@ -148,7 +148,7 @@ test('listVotes returns proposals', async () => {
   const client = new AgentiumClient({ baseUrl: BASE, apiKey: 'key' });
   const votes = await client.listVotes();
   expect(votes).toHaveLength(1);
-  expect(votes[0].votes_for).toBe(2);
+  expect(votes[0]?.votes_for).toBe(2);
 });
 
 // ═══════════════════════════════════════════════════════════
