@@ -7892,7 +7892,9 @@ export interface components {
              * Resources
              * @description CPU, memory limits
              */
-            resources?: Record<string, never> | null;
+            resources?: {
+                [key: string]: unknown;
+            } | null;
             /**
              * Environment Vars
              * @description Additional env vars
@@ -7984,7 +7986,9 @@ export interface components {
              * Discussion Thread
              * @default []
              */
-            discussion_thread: Record<string, never>[];
+            discussion_thread: {
+                [key: string]: unknown;
+            }[];
         };
         /** ApproveMCPToolRequest */
         ApproveMCPToolRequest: {
@@ -8051,7 +8055,10 @@ export interface components {
         };
         /** Body_import_checkpoint_api_v1_checkpoints_import_post */
         Body_import_checkpoint_api_v1_checkpoints_import_post: {
-            /** File */
+            /**
+             * File
+             * Format: binary
+             */
             file: string;
             /** Target Branch */
             target_branch?: string | null;
@@ -8068,7 +8075,10 @@ export interface components {
         };
         /** Body_register_speaker_api_v1_audio_speakers_register_post */
         Body_register_speaker_api_v1_audio_speakers_register_post: {
-            /** Audio */
+            /**
+             * Audio
+             * Format: binary
+             */
             audio: string;
             /**
              * Name
@@ -8105,21 +8115,30 @@ export interface components {
         };
         /** Body_transcribe_audio_api_v1_audio_transcribe_post */
         Body_transcribe_audio_api_v1_audio_transcribe_post: {
-            /** Audio */
+            /**
+             * Audio
+             * Format: binary
+             */
             audio: string;
             /** Language */
             language?: string | null;
         };
         /** Body_transcribe_audio_api_v1_voice_transcribe_post */
         Body_transcribe_audio_api_v1_voice_transcribe_post: {
-            /** Audio */
+            /**
+             * Audio
+             * Format: binary
+             */
             audio: string;
             /** Language */
             language?: string | null;
         };
         /** Body_upload_avatar_api_v1_users_me_avatar_post */
         Body_upload_avatar_api_v1_users_me_avatar_post: {
-            /** File */
+            /**
+             * File
+             * Format: binary
+             */
             file: string;
         };
         /** Body_upload_files_api_v1_files_upload_post */
@@ -8129,7 +8148,10 @@ export interface components {
         };
         /** Body_validate_checkpoint_file_api_v1_checkpoints_validate_post */
         Body_validate_checkpoint_file_api_v1_checkpoints_validate_post: {
-            /** File */
+            /**
+             * File
+             * Format: binary
+             */
             file: string;
         };
         /** BranchCompareResponse */
@@ -8202,13 +8224,17 @@ export interface components {
             /** Total Agents */
             total_agents: number;
             /** Tier Distribution */
-            tier_distribution: Record<string, never>;
+            tier_distribution: {
+                [key: string]: unknown;
+            };
             /** Dynamic Grants Total */
             dynamic_grants_total: number;
             /** Dynamic Revocations Total */
             dynamic_revocations_total: number;
             /** Recent Capability Changes */
-            recent_capability_changes: Record<string, never>[];
+            recent_capability_changes: {
+                [key: string]: unknown;
+            }[];
         };
         /** CapabilityCheckRequest */
         CapabilityCheckRequest: {
@@ -8256,13 +8282,21 @@ export interface components {
         /** CapacityResponse */
         CapacityResponse: {
             /** Head */
-            head: Record<string, never>;
+            head: {
+                [key: string]: unknown;
+            };
             /** Council */
-            council: Record<string, never>;
+            council: {
+                [key: string]: unknown;
+            };
             /** Lead */
-            lead: Record<string, never>;
+            lead: {
+                [key: string]: unknown;
+            };
             /** Task */
-            task: Record<string, never>;
+            task: {
+                [key: string]: unknown;
+            };
             /** Warnings */
             warnings: string[];
         };
@@ -8311,7 +8345,9 @@ export interface components {
              */
             type: string;
             /** Config */
-            config?: Record<string, never>;
+            config?: {
+                [key: string]: unknown;
+            };
             /** Default Agent Id */
             default_agent_id?: string | null;
             /**
@@ -8357,7 +8393,9 @@ export interface components {
             /** Name */
             name?: string | null;
             /** Config */
-            config?: Record<string, never> | null;
+            config?: {
+                [key: string]: unknown;
+            } | null;
             /** Default Agent Id */
             default_agent_id?: string | null;
             /** Auto Create Tasks */
@@ -8377,9 +8415,13 @@ export interface components {
              */
             stream: boolean;
             /** Attachments */
-            attachments?: Record<string, never>[] | null;
+            attachments?: {
+                [key: string]: unknown;
+            }[] | null;
             /** Card Response */
-            card_response?: Record<string, never> | null;
+            card_response?: {
+                [key: string]: unknown;
+            } | null;
             /** Voice Persona */
             voice_persona?: string | null;
             /** Speaker Id */
@@ -8433,11 +8475,17 @@ export interface components {
             task_id: string;
             phase: components["schemas"]["CheckpointPhase"];
             /** Agent States */
-            agent_states?: Record<string, never>;
+            agent_states?: {
+                [key: string]: unknown;
+            };
             /** Artifacts */
-            artifacts?: Record<string, never>[];
+            artifacts?: {
+                [key: string]: unknown;
+            }[];
             /** Task State Snapshot */
-            task_state_snapshot?: Record<string, never>;
+            task_state_snapshot?: {
+                [key: string]: unknown;
+            };
             /** Parent Checkpoint Id */
             parent_checkpoint_id?: string | null;
             /** Branch Name */
@@ -8460,11 +8508,17 @@ export interface components {
             task_id: string;
             phase: components["schemas"]["CheckpointPhase"];
             /** Agent States */
-            agent_states?: Record<string, never>;
+            agent_states?: {
+                [key: string]: unknown;
+            };
             /** Artifacts */
-            artifacts?: Record<string, never>[];
+            artifacts?: {
+                [key: string]: unknown;
+            }[];
             /** Task State Snapshot */
-            task_state_snapshot?: Record<string, never>;
+            task_state_snapshot?: {
+                [key: string]: unknown;
+            };
             /** Parent Checkpoint Id */
             parent_checkpoint_id?: string | null;
             /** Branch Name */
@@ -8619,7 +8673,9 @@ export interface components {
         ComparisonOut: {
             winner: components["schemas"]["WinnerOut"];
             /** Model Comparisons */
-            model_comparisons: Record<string, never>;
+            model_comparisons: {
+                [key: string]: unknown;
+            };
             /** Created At */
             created_at: string | null;
         };
@@ -8638,11 +8694,15 @@ export interface components {
             /** Preamble */
             preamble?: string | null;
             /** Articles */
-            articles?: Record<string, never> | null;
+            articles?: {
+                [key: string]: unknown;
+            } | null;
             /** Prohibited Actions */
             prohibited_actions?: string[] | null;
             /** Sovereign Preferences */
-            sovereign_preferences?: Record<string, never> | null;
+            sovereign_preferences?: {
+                [key: string]: unknown;
+            } | null;
         };
         /** ContainerActionRequest */
         ContainerActionRequest: {
@@ -8778,7 +8838,9 @@ export interface components {
             task_id: string;
             strategy: components["schemas"]["WaitStrategy"];
             /** Config */
-            config?: Record<string, never>;
+            config?: {
+                [key: string]: unknown;
+            };
             /**
              * Max Attempts
              * @default 60
@@ -8876,7 +8938,9 @@ export interface components {
              * Discussion Thread
              * @default []
              */
-            discussion_thread: Record<string, never>[];
+            discussion_thread: {
+                [key: string]: unknown;
+            }[];
         };
         /** DeviceRegistrationRequest */
         DeviceRegistrationRequest: {
@@ -8917,7 +8981,9 @@ export interface components {
             /** Path */
             path: string;
             /** Entries */
-            entries: Record<string, never>[];
+            entries: {
+                [key: string]: unknown;
+            }[];
             /** Total Count */
             total_count: number;
             /** Error */
@@ -8956,7 +9022,9 @@ export interface components {
              * Detail
              * @description Optional extra context.
              */
-            detail?: Record<string, never> | null;
+            detail?: {
+                [key: string]: unknown;
+            } | null;
         };
         /** ExecuteMCPToolRequest */
         ExecuteMCPToolRequest: {
@@ -8975,7 +9043,9 @@ export interface components {
              * @description Tool parameters
              * @default {}
              */
-            params: Record<string, never>;
+            params: {
+                [key: string]: unknown;
+            };
             /**
              * Tool Name
              * @description Specific tool name on the MCP server
@@ -8993,7 +9063,9 @@ export interface components {
             /** Installation Id */
             installation_id: string;
             /** Input Data */
-            input_data: Record<string, never>;
+            input_data: {
+                [key: string]: unknown;
+            };
         };
         /**
          * ExecutionSummaryResponse
@@ -9009,7 +9081,9 @@ export interface components {
             /** Status */
             status: string;
             /** Summary */
-            summary?: Record<string, never> | null;
+            summary?: {
+                [key: string]: unknown;
+            } | null;
             /** Error Message */
             error_message?: string | null;
             /**
@@ -9046,12 +9120,16 @@ export interface components {
              * Sample
              * @description Sample data (max 3 items)
              */
-            sample?: Record<string, never>[];
+            sample?: {
+                [key: string]: unknown;
+            }[];
             /**
              * Stats
              * @description Statistical summary
              */
-            stats?: Record<string, never>;
+            stats?: {
+                [key: string]: unknown;
+            };
             /**
              * Stdout
              * @description Standard output (truncated)
@@ -9222,7 +9300,9 @@ export interface components {
             /** Documents */
             documents: string[];
             /** Metadatas */
-            metadatas: Record<string, never>[];
+            metadatas: {
+                [key: string]: unknown;
+            }[];
         };
         /** FetchModelsRequest */
         FetchModelsRequest: {
@@ -9398,9 +9478,13 @@ export interface components {
             /** Overall Status */
             overall_status: string;
             /** Providers */
-            providers: Record<string, never>;
+            providers: {
+                [key: string]: unknown;
+            };
             /** Summary */
-            summary: Record<string, never>;
+            summary: {
+                [key: string]: unknown;
+            };
             /** Generated At */
             generated_at: string;
         };
@@ -9538,7 +9622,9 @@ export interface components {
              */
             token_type: string;
             /** User */
-            user: Record<string, never>;
+            user: {
+                [key: string]: unknown;
+            };
         };
         /** MCPAuditResponse */
         MCPAuditResponse: {
@@ -9547,7 +9633,9 @@ export interface components {
             /** Tool Name */
             tool_name: string;
             /** Entries */
-            entries: Record<string, never>[];
+            entries: {
+                [key: string]: unknown;
+            }[];
             /** Total Entries */
             total_entries: number;
         };
@@ -9741,7 +9829,9 @@ export interface components {
             /** Max Concurrent Requests */
             max_concurrent_requests?: number | null;
             /** Settings */
-            settings?: Record<string, never>;
+            settings?: {
+                [key: string]: unknown;
+            };
             /**
              * Effort
              * @default none
@@ -9750,7 +9840,9 @@ export interface components {
             /** Last Tested */
             last_tested?: string | null;
             /** Total Usage */
-            total_usage?: Record<string, never>;
+            total_usage?: {
+                [key: string]: unknown;
+            };
         };
         /** ModelConfigUpdate */
         ModelConfigUpdate: {
@@ -9883,7 +9975,9 @@ export interface components {
         /** PluginInstallRequest */
         PluginInstallRequest: {
             /** Config */
-            config: Record<string, never>;
+            config: {
+                [key: string]: unknown;
+            };
         };
         /** PluginReviewRequest */
         PluginReviewRequest: {
@@ -9909,7 +10003,9 @@ export interface components {
             /** Source Url */
             source_url?: string | null;
             /** Config Schema */
-            config_schema?: Record<string, never> | null;
+            config_schema?: {
+                [key: string]: unknown;
+            } | null;
             /** Dependencies */
             dependencies?: string[] | null;
         };
@@ -9919,7 +10015,9 @@ export interface components {
              * Preferences
              * @description Map of keys to values
              */
-            preferences: Record<string, never>;
+            preferences: {
+                [key: string]: unknown;
+            };
             /**
              * Reason
              * @description Reason for bulk update
@@ -10210,7 +10308,9 @@ export interface components {
         /** ResolveWaitConditionRequest */
         ResolveWaitConditionRequest: {
             /** Data */
-            data?: Record<string, never> | null;
+            data?: {
+                [key: string]: unknown;
+            } | null;
         };
         /** RestoreRequest */
         RestoreRequest: {
@@ -10345,7 +10445,9 @@ export interface components {
             /** Status */
             status: string;
             /** Config */
-            config?: Record<string, never>;
+            config?: {
+                [key: string]: unknown;
+            };
         };
         /** ScheduleSunsetRequest */
         ScheduleSunsetRequest: {
@@ -10475,7 +10577,9 @@ export interface components {
              * Params
              * @default {}
              */
-            params: Record<string, never>;
+            params: {
+                [key: string]: unknown;
+            };
             /**
              * Target
              * @default head_of_council
@@ -10562,7 +10666,9 @@ export interface components {
              * Data
              * @description Payload data.
              */
-            data?: Record<string, never> | null;
+            data?: {
+                [key: string]: unknown;
+            } | null;
         };
         /** SystemInfoResponse */
         SystemInfoResponse: {
@@ -10575,9 +10681,13 @@ export interface components {
             /** Uptime */
             uptime: string;
             /** Metrics */
-            metrics?: Record<string, never> | null;
+            metrics?: {
+                [key: string]: unknown;
+            } | null;
             /** Filesystems */
-            filesystems: Record<string, never>[];
+            filesystems: {
+                [key: string]: unknown;
+            }[];
             /** Timestamp */
             timestamp: string;
         };
@@ -10631,7 +10741,9 @@ export interface components {
             /** Original Task Id */
             original_task_id: string;
             /** Payload */
-            payload: Record<string, never>;
+            payload: {
+                [key: string]: unknown;
+            };
         };
         /** TaskResponse */
         TaskResponse: {
@@ -10731,7 +10843,9 @@ export interface components {
              */
             code_template: string;
             /** Test Cases */
-            test_cases?: Record<string, never>[];
+            test_cases?: {
+                [key: string]: unknown;
+            }[];
             /** Authorized Tiers */
             authorized_tiers?: string[];
             /** Created By Agentium Id */
@@ -10891,7 +11005,9 @@ export interface components {
             /** Valid */
             valid: boolean;
             /** User */
-            user?: Record<string, never> | null;
+            user?: {
+                [key: string]: unknown;
+            } | null;
         };
         /** VoiceCommandRequest */
         VoiceCommandRequest: {
@@ -11118,7 +11234,9 @@ export interface components {
         /** ExecuteToolRequest */
         backend__api__routes__tool_creation__ExecuteToolRequest: {
             /** Kwargs */
-            kwargs?: Record<string, never>;
+            kwargs?: {
+                [key: string]: unknown;
+            };
             /** Task Id */
             task_id?: string | null;
         };
@@ -11130,7 +11248,9 @@ export interface components {
              * Params
              * @default {}
              */
-            params: Record<string, never>;
+            params: {
+                [key: string]: unknown;
+            };
             /**
              * Has Head Approval Token
              * @default false
@@ -11286,7 +11406,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": Record<string, never>;
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Validation Error */
@@ -29700,7 +29822,9 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": Record<string, never>;
+                "application/json": {
+                    [key: string]: unknown;
+                };
             };
         };
         responses: {
@@ -38391,7 +38515,9 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": Record<string, never>;
+                "application/json": {
+                    [key: string]: unknown;
+                };
             };
         };
         responses: {
@@ -38775,7 +38901,9 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": Record<string, never>;
+                "application/json": {
+                    [key: string]: unknown;
+                };
             };
         };
         responses: {
@@ -45137,7 +45265,9 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": Record<string, never>;
+                "application/json": {
+                    [key: string]: unknown;
+                };
             };
         };
         responses: {
@@ -45311,7 +45441,9 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": Record<string, never>;
+                "application/json": {
+                    [key: string]: unknown;
+                };
             };
         };
         responses: {
@@ -45400,7 +45532,9 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": Record<string, never>;
+                "application/json": {
+                    [key: string]: unknown;
+                };
             };
         };
         responses: {
@@ -45890,7 +46024,9 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": Record<string, never>;
+                "application/json": {
+                    [key: string]: unknown;
+                };
             };
         };
         responses: {
@@ -46273,7 +46409,9 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": Record<string, never>;
+                "application/json": {
+                    [key: string]: unknown;
+                };
             };
         };
         responses: {
@@ -46362,7 +46500,9 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": Record<string, never>;
+                "application/json": {
+                    [key: string]: unknown;
+                };
             };
         };
         responses: {
