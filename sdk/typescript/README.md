@@ -68,8 +68,39 @@ try {
 Generate TypeScript interfaces from a running Agentium backend:
 
 ```bash
-npx ts-node scripts/generate-types.ts http://localhost:8000
+npm run generate-types
 ```
+
+This uses [openapi-typescript](https://github.com/openapi-ts/openapi-typescript) to fetch the OpenAPI spec from `http://localhost:8000/openapi.json` and generate types to `src/generated-types.ts`.
+
+### Regenerate Types Locally
+
+```bash
+# 1. Start the backend
+cd ../../backend
+docker compose up -d
+
+# 2. Generate types
+cd ../sdk/typescript
+npm run generate-types
+
+# 3. Review changes
+git diff src/generated-types.ts
+
+# 4. Commit if satisfied
+git add src/generated-types.ts
+git commit -m "chore: regenerate API types from OpenAPI spec"
+```
+
+### CI Drift Check
+
+The CI pipeline (`sdk-smoke-tests.yml`) automatically:
+1. Starts the backend via Docker Compose
+2. Generates types from the live `/openapi.json` endpoint
+3. Compares against committed `src/generated-types.ts`
+4. Fails the build if any drift is detected
+
+To fix a CI drift failure, follow the local regeneration steps above and push the updated `generated-types.ts`.
 
 ## License
 
