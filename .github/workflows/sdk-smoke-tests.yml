@@ -54,6 +54,60 @@ jobs:
           cache: 'npm'
           cache-dependency-path: sdk/typescript/package-lock.json
 
+      # ── Start backend for live OpenAPI spec ──────────────────────────────────
+      - name: Start test services
+        run: |
+          docker compose -f docker-compose.test.yml up -d
+
+      - name: Wait for backend to be healthy
+        run: |
+          echo "=== Service startup logs ==="
+          docker compose -f docker-compose.test.yml logs
+          echo "=== Waiting for healthy services ==="
+          for i in {1..60}; do
+            sleep 2
+            healthy_count=$(docker compose -f docker-compose.test.yml ps | grep -ci "healthy" || true)
+            if [ "$healthy_count" -eq 3 ]; then
+              echo "All 3 services healthy."
+              break
+            fi
+            echo "Waiting for services ($healthy_count/3 healthy) — attempt $i/60"
+          done
+          if [ "$healthy_count" -ne 3 ]; then
+            echo "ERROR: Services did not become healthy within the timeout."
+            docker compose -f docker-compose.test.yml ps
+            docker compose -f docker-compose.test.yml logs
+            exit 1
+          fi
+
+      - name: Start backend server
+        run: |
+          DATABASE_URL=postgresql://agentium:agentium@localhost:5432/agentium_test \
+          REDIS_URL=redis://localhost:6379/1 \
+          CELERY_BROKER_URL=redis://localhost:6379/1 \
+          CELERY_RESULT_BACKEND=redis://localhost:6379/1 \
+          CHROMA_HOST=localhost \
+          CHROMA_PORT=8001 \
+          CELERY_TASK_ALWAYS_EAGER=true \
+          TESTING=true \
+          PYTHONPATH=${{ github.workspace }} \
+          nohup python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 &> /tmp/backend.log &
+          echo $! > /tmp/backend.pid
+          echo "Backend PID: $(cat /tmp/backend.pid)"
+
+          # Wait for the server to respond
+          echo "Waiting for backend to be ready..."
+          for i in {1..30}; do
+            if curl -sf http://localhost:8000/api/health > /dev/null 2>&1; then
+              echo "Backend is ready!"
+              break
+            fi
+            echo "  attempt $i/30..."
+            sleep 2
+          done
+          # Show last few lines of server log for debugging
+          tail -20 /tmp/backend.log || true
+
       - name: Install TypeScript SDK dependencies
         working-directory: ./sdk/typescript
         run: npm install
@@ -62,6 +116,31 @@ jobs:
         working-directory: ./sdk/typescript
         run: npm run build
 
+      # ── Type Drift Check ─────────────────────────────────────────────────────
+      - name: Generate Types from Live Spec
+        working-directory: ./sdk/typescript
+        run: npm run generate-types:ci
+
+      - name: Check for Type Drift
+        run: |
+          if ! git diff --exit-code -- sdk/typescript/src/generated-types.ts; then
+            echo "::error file=sdk/typescript/src/generated-types.ts::Type drift detected — generated types don't match committed files"
+            echo "Run 'npm run generate-types' in sdk/typescript and commit the changes."
+            git diff sdk/typescript/src/generated-types.ts
+            exit 1
+          fi
+
       - name: Run TypeScript SDK smoke tests
         working-directory: ./sdk/typescript
         run: npm test
+
+      - name: Stop backend server
+        if: always()
+        run: |
+          if [ -f /tmp/backend.pid ]; then
+            kill "$(cat /tmp/backend.pid)" 2>/dev/null || true
+          fi
+
+      - name: Stop test services
+        if: always()
+        run: docker compose -f docker-compose.test.yml down
