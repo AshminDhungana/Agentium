@@ -117,6 +117,24 @@ jobs:
         run: npm run build
 
       # ── Type Drift Check ─────────────────────────────────────────────────────
+      - name: Wait for OpenAPI spec to be ready
+        run: |
+          echo "Waiting for OpenAPI spec at http://127.0.0.1:8000/openapi.json..."
+          for i in {1..30}; do
+            if curl -sf http://127.0.0.1:8000/openapi.json > /dev/null 2>&1; then
+              echo "OpenAPI spec is ready!"
+              break
+            fi
+            echo "  attempt $i/30..."
+            sleep 2
+          done
+          # Show backend log for debugging if it failed
+          if [ $i -eq 30 ]; then
+            echo "ERROR: OpenAPI spec did not become available"
+            tail -30 /tmp/backend.log || true
+            exit 1
+          fi
+
       - name: Generate Types from Live Spec
         working-directory: ./sdk/typescript
         run: npm run generate-types http://127.0.0.1:8000
