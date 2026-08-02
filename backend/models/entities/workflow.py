@@ -88,15 +88,18 @@ class WorkflowExecution(BaseEntity):
     Tracks a specific run (execution) of a workflow.
     """
     __tablename__ = 'workflow_executions'
-    
+
     workflow_id = Column(String(36), ForeignKey('workflows.id'), nullable=False, index=True)
+    original_message = Column(Text, nullable=True)  # Required by migration
     status = Column(Enum(WorkflowExecutionStatus), default=WorkflowExecutionStatus.PENDING, nullable=False, index=True)
-    current_step_index = Column(Integer, default=0, nullable=False)
     context_data = Column(JSON, default=dict)
+    error = Column(Text, nullable=True)  # Required by migration
+    created_by = Column(String(128), nullable=True)  # Required by migration
+    current_step_index = Column(Integer, default=0, nullable=True)  # Required by tests/migration
     started_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
     triggered_by = Column(String(100), nullable=True)
-    
+
     # Relationships
     workflow = relationship("Workflow", back_populates="executions")
     
@@ -106,24 +109,9 @@ class WorkflowExecution(BaseEntity):
             self.agentium_id = self._generate_execution_id()
 
     def _generate_execution_id(self) -> str:
-        """Generate execution ID: WX + 5-digit sequence."""
-        from backend.models.database import get_db_context
-        from sqlalchemy import text
-        with get_db_context() as db:
-            result = db.execute(text("""
-                SELECT agentium_id FROM workflow_executions 
-                WHERE agentium_id ~ '^WX[0-9]+$'
-                ORDER BY CAST(SUBSTRING(agentium_id FROM 3) AS INTEGER) DESC 
-                LIMIT 1
-            """)).scalar()
-            
-            if result:
-                last_num = int(result[2:])
-                next_num = last_num + 1
-            else:
-                next_num = 1
-                
-            return f"WX{next_num:05d}"
+        """Generate execution ID: WX + 5-char UUID (no DB query needed)."""
+        import uuid
+        return f"WX{uuid.uuid4().hex[:5].upper()}"
             
     def to_dict(self) -> Dict[str, Any]:
         base = super().to_dict()

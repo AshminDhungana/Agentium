@@ -128,19 +128,20 @@ class WorkflowEngine:
         workflow = db.query(Workflow).filter(Workflow.id == workflow_id).first()
         if not workflow:
             raise ValueError("Workflow not found")
-            
+
         execution = WorkflowExecution(
             workflow_id=workflow_id,
             status=WorkflowExecutionStatus.RUNNING,
             current_step_index=0,
             context_data=context or {},
+            original_message=f"Triggered by {trigger}",  # Required by migration
             triggered_by=trigger,
             started_at=datetime.utcnow()
         )
         db.add(execution)
         db.commit()
         db.refresh(execution)
-        
+
         # Enqueue first step asynchronously
         workflow_step_runner.delay(execution.id)
         return execution

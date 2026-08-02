@@ -13,7 +13,7 @@ import pytest
 import json
 import uuid
 from datetime import datetime, timedelta
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 from backend.services.workflow_engine import WorkflowEngine
 from backend.models.entities.workflow import (
@@ -31,6 +31,18 @@ pytestmark = pytest.mark.integration
 
 class TestWorkflowEngine:
     """Holistic suite for the Workflow Automation Pipeline."""
+
+    # =======================================================================
+    # Fixtures
+    # =======================================================================
+
+    @pytest.fixture(autouse=True)
+    def _mock_workflow_step_runner(self):
+        """Mock Celery task to run synchronously and avoid Redis connection."""
+        with patch('backend.services.workflow_engine.workflow_step_runner') as mock_runner:
+            mock_runner.delay = MagicMock()
+            mock_runner.apply_async = MagicMock()
+            yield mock_runner
 
     # =======================================================================
     # Helpers
@@ -286,6 +298,7 @@ class TestWorkflowEngine:
                 status=WorkflowExecutionStatus.COMPLETED,
                 current_step_index=4,
                 context_data={},
+                original_message="Test execution for ETA calculation",
                 triggered_by="api",
                 started_at=datetime.utcnow() - timedelta(seconds=actual_duration),
                 completed_at=datetime.utcnow(),

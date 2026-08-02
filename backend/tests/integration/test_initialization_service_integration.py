@@ -1,6 +1,7 @@
 """Integration tests for InitializationService - Genesis Protocol end-to-end."""
 import json
 import pytest
+import asyncio
 from datetime import datetime
 from unittest.mock import AsyncMock, patch, MagicMock
 
@@ -125,12 +126,11 @@ class TestInitializationServiceGenesisProtocol:
             assert metadata.get("can_approve_submissions") is True
 
             # Verify capabilities granted
-            from backend.models.entities.agents import AgentCapability
-            from backend.services.capability_registry import Capability
-            capabilities = seeded_db.query(AgentCapability).filter_by(agent_id=member.id).all()
-            capability_names = [c.name for c in capabilities]
-            assert Capability.SPAWN_TASK_AGENT.value in capability_names
-            assert Capability.SPAWN_LEAD.value in capability_names
+            from backend.services.capability_registry import Capability, CapabilityRegistry
+            caps = CapabilityRegistry.get_agent_capabilities(member)
+            effective = caps["effective_capabilities"]
+            assert Capability.SPAWN_TASK_AGENT.value in effective
+            assert Capability.SPAWN_LEAD.value in effective
 
     @pytest.mark.asyncio
     async def test_genesis_creates_welcome_chat_message(self, seeded_db):
@@ -274,26 +274,20 @@ class TestInitializationServiceCountryNameHandling:
         """_broadcast_to_user should attempt both WebSocket and channel broadcasts."""
         svc = InitializationService(db=seeded_db)
 
-        # Mock sovereign user
-        admin_user = User(
-            username="admin",
-            email="admin@test.com",
-            hashed_password=User.hash_password("admin"),
-            is_active=True,
-            is_admin=True
-        )
-        seeded_db.add(admin_user)
-        seeded_db.flush()
+        # Get the existing admin user from seeded_db instead of creating a new one
+        admin_user = seeded_db.query(User).filter(User.is_admin == True, User.is_active == True).first()
+        assert admin_user is not None
 
-        # Patch the query chain to return our admin user
-        with patch.object(svc.db, "query") as mock_query:
-            mock_filter_by = MagicMock()
-            mock_filter_by.return_value.first.return_value = admin_user
-            mock_query.return_value.filter_by.return_value = mock_filter_by
-
-            with patch("backend.api.routes.websocket.manager.broadcast", new=AsyncMock()) as mock_ws, \
-                 patch("backend.services.channel_manager.ChannelManager.broadcast_to_channels", new=AsyncMock()) as mock_channels:
-                await svc._broadcast_to_user("Test message", is_urgent=True)
+        # Mock both WebSocket and ChannelManager.broadcast_to_channels
+        # ChannelManager.broadcast_to_channels is called from a fresh DB session
+        # in a fire-and-forget task. For testing, we need to ensure the task runs
+        # before we check the mock. We'll await a small sleep to let the event
+        # loop process the task.
+        with patch("backend.api.routes.websocket.manager.broadcast", new=AsyncMock()) as mock_ws, \
+             patch("backend.services.channel_manager.ChannelManager.broadcast_to_channels", new=AsyncMock()) as mock_channels:
+            await svc._broadcast_to_user("Test message", is_urgent=True)
+            # Allow the fire-and-forget task to execute
+            await asyncio.sleep(0.1)
 
         assert mock_ws.called
         assert mock_channels.called
@@ -378,25 +372,31 @@ class TestInitializationServiceEarlyCommit:
 
         captured = {"early_commit_called": False}
 
-        async def _fake_prompt(timeout=60):
-            # Check if commit/flush was called before this point
-            # In TESTING mode (which seeded_db uses), genesis uses flush() not commit()
-            captured["early_commit_called"] = svc.db.commit.called or svc.db.flush.called
-            return None  # Use default name
+        # We need to mock commit/flush BEFORE the genesis runs, because
+        # the _fake_prompt checks them. Patch them as AsyncMock since
+        # the service runs in async context.
+        with patch.object(svc.db, 'commit', new_callable=AsyncMock) as mock_commit, \
+             patch.object(svc.db, 'flush', new_callable=AsyncMock) as mock_flush:
 
-        with patch.object(svc, "_has_any_active_api_key", return_value=True), \
-             patch.object(svc, "_clear_existing_data", AsyncMock()), \
-             patch.object(svc, "_create_head_of_council", AsyncMock(return_value=MagicMock())), \
-             patch.object(svc, "_create_council_members", AsyncMock(return_value=[MagicMock(), MagicMock()])), \
-             patch.object(svc, "_create_default_lead", AsyncMock(return_value=MagicMock())), \
-             patch.object(svc, "_load_constitution", AsyncMock(return_value=MagicMock())), \
-             patch.object(svc, "_vote_on_country_name", AsyncMock()), \
-             patch.object(svc, "_notify_country_name_decision", AsyncMock()), \
-             patch.object(svc, "_index_to_vector_db", AsyncMock()), \
-             patch.object(svc, "_grant_council_privileges", AsyncMock()), \
-             patch.object(svc, "_ensure_default_model_config", AsyncMock()), \
-             patch.object(svc, "_prompt_for_country_name", _fake_prompt):
-            await svc.run_genesis_protocol(force=True)
+            async def _fake_prompt(timeout=60):
+                # Check if commit/flush was called before this point
+                # In TESTING mode (which seeded_db uses), genesis uses flush() not commit()
+                captured["early_commit_called"] = mock_commit.called or mock_flush.called
+                return None  # Use default name
+
+            with patch.object(svc, "_has_any_active_api_key", return_value=True), \
+                 patch.object(svc, "_clear_existing_data", AsyncMock()), \
+                 patch.object(svc, "_create_head_of_council", AsyncMock(return_value=MagicMock())), \
+                 patch.object(svc, "_create_council_members", AsyncMock(return_value=[MagicMock(), MagicMock()])), \
+                 patch.object(svc, "_create_default_lead", AsyncMock(return_value=MagicMock())), \
+                 patch.object(svc, "_load_constitution", AsyncMock(return_value=MagicMock())), \
+                 patch.object(svc, "_vote_on_country_name", AsyncMock()), \
+                 patch.object(svc, "_notify_country_name_decision", AsyncMock()), \
+                 patch.object(svc, "_index_to_vector_db", AsyncMock()), \
+                 patch.object(svc, "_grant_council_privileges", AsyncMock()), \
+                 patch.object(svc, "_ensure_default_model_config", AsyncMock()), \
+                 patch.object(svc, "_prompt_for_country_name", _fake_prompt):
+                await svc.run_genesis_protocol(force=True)
 
         assert captured["early_commit_called"] is True
 
@@ -413,18 +413,22 @@ class TestInitializationServiceEarlyCommit:
         async def _boom():
             raise RuntimeError("head creation failed")
 
-        with patch.object(svc, "_has_any_active_api_key", return_value=True), \
-             patch.object(svc, "_clear_existing_data", AsyncMock()), \
-             patch.object(svc, "_create_head_of_council", _boom):
-            try:
-                await svc.run_genesis_protocol(force=True)
-            except Exception:
-                pass
+        # Patch commit/flush BEFORE the genesis runs
+        with patch.object(svc.db, 'commit', new_callable=AsyncMock) as mock_commit, \
+             patch.object(svc.db, 'flush', new_callable=AsyncMock) as mock_flush:
 
-        # In TESTING mode, early commit uses flush(), not commit()
-        # The test expects no flush to happen before the failure
-        assert svc.db.commit.called is False
-    # Note: flush may be called by _clear_existing_data, so we don't assert on it
+            with patch.object(svc, "_has_any_active_api_key", return_value=True), \
+                 patch.object(svc, "_clear_existing_data", AsyncMock()), \
+                 patch.object(svc, "_create_head_of_council", _boom):
+                try:
+                    await svc.run_genesis_protocol(force=True)
+                except Exception:
+                    pass
+
+            # In TESTING mode, early commit uses flush(), not commit()
+            # The test expects no flush to happen before the failure
+            assert mock_commit.called is False
+            # Note: flush may be called by _clear_existing_data, so we don't assert on it
 
 
 @pytest.mark.integration
