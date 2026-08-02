@@ -119,7 +119,7 @@ jobs:
       # ── Type Drift Check ─────────────────────────────────────────────────────
       - name: Generate Types from Live Spec
         working-directory: ./sdk/typescript
-        run: npm run generate-types:ci
+        run: npm run generate-types http://127.0.0.1:8000
 
       - name: Check for Type Drift
         run: |
