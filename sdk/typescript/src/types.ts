@@ -1,10 +1,50 @@
 /**
  * TypeScript interfaces mirroring the Agentium backend models.
+ *
+ * This file combines:
+ * 1. Manual SDK-specific types (config, event types, etc.)
+ * 2. Re-exports of generated OpenAPI types where they match SDK needs
+ * 3. Convenience aliases for commonly used generated types
  */
 
-// ═══════════════════════════════════════════════════════════
-// Agent
-// ═══════════════════════════════════════════════════════════
+// ─────────────────────────────────────────────────────────────────
+// Re-export generated OpenAPI types
+// ─────────────────────────────────────────────────────────────────
+
+// Export all types from generated-types for consumers who want full access
+export * from './generated-types';
+
+// ─────────────────────────────────────────────────────────────────
+// Import generated schema types for convenience aliases
+// ─────────────────────────────────────────────────────────────────
+
+import type { components } from './generated-types';
+
+// ─────────────────────────────────────────────────────────────────
+// SDK-specific types (not in OpenAPI spec)
+// ─────────────────────────────────────────────────────────────────
+
+export interface AgentiumClientConfig {
+  baseUrl: string;
+  apiKey?: string;
+  token?: string;
+  timeout?: number;
+}
+
+export type WebhookEventType =
+  | 'task.created'
+  | 'task.completed'
+  | 'task.failed'
+  | 'vote.started'
+  | 'vote.resolved'
+  | 'constitution.amended'
+  | 'agent.spawned'
+  | 'agent.terminated';
+
+// ─────────────────────────────────────────────────────────────────
+// Manual type definitions (matching SDK client usage)
+// These mirror the OpenAPI schemas but provide stable, documented interfaces
+// ─────────────────────────────────────────────────────────────────
 
 export interface Agent {
   id?: string;
@@ -24,10 +64,6 @@ export interface Agent {
   last_active?: string | null;
   [key: string]: unknown;
 }
-
-// ═══════════════════════════════════════════════════════════
-// Task
-// ═══════════════════════════════════════════════════════════
 
 export interface Task {
   id?: string;
@@ -52,10 +88,6 @@ export interface CreateTaskParams {
   [key: string]: unknown;
 }
 
-// ═══════════════════════════════════════════════════════════
-// Constitution
-// ═══════════════════════════════════════════════════════════
-
 export interface Constitution {
   id?: string;
   agentium_id?: string;
@@ -78,10 +110,6 @@ export interface UpdateConstitutionParams {
   sovereign_preferences?: Record<string, unknown>;
 }
 
-// ═══════════════════════════════════════════════════════════
-// Voting
-// ═══════════════════════════════════════════════════════════
-
 export interface Vote {
   id?: string;
   proposal_type?: string;
@@ -98,10 +126,6 @@ export interface Vote {
   resolved_at?: string | null;
   [key: string]: unknown;
 }
-
-// ═══════════════════════════════════════════════════════════
-// Webhook
-// ═══════════════════════════════════════════════════════════
 
 export interface WebhookSubscription {
   id?: string;
@@ -133,10 +157,6 @@ export interface WebhookDelivery {
   [key: string]: unknown;
 }
 
-// ═══════════════════════════════════════════════════════════
-// Chat
-// ═══════════════════════════════════════════════════════════
-
 export interface ChatMessage {
   content: string;
   agent_id?: string;
@@ -150,10 +170,6 @@ export interface ChatResponse {
   [key: string]: unknown;
 }
 
-// ═══════════════════════════════════════════════════════════
-// System
-// ═══════════════════════════════════════════════════════════
-
 export interface HealthStatus {
   status: string;
   database?: Record<string, unknown>;
@@ -166,36 +182,63 @@ export interface TokenStatus {
   mode: string;
 }
 
-// ═══════════════════════════════════════════════════════════
-// Auth
-// ═══════════════════════════════════════════════════════════
-
 export interface LoginResponse {
   access_token: string;
   [key: string]: unknown;
 }
 
-// ═══════════════════════════════════════════════════════════
-// Client Config
-// ═══════════════════════════════════════════════════════════
+// ─────────────────────────────────────────────────────────────────
+// Convenience type aliases for generated OpenAPI schema types
+// These provide direct access to the generated schemas when needed
+// ─────────────────────────────────────────────────────────────────
 
-export interface AgentiumClientConfig {
-  baseUrl: string;
-  apiKey?: string;
-  token?: string;
-  timeout?: number;
-}
+/**
+ * Alias for generated TaskResponse schema from OpenAPI
+ * Use when you need the exact API response shape
+ */
+export type GeneratedTaskResponse = components['schemas']['TaskResponse'];
 
-// ═══════════════════════════════════════════════════════════
-// Webhook Event Types
-// ═══════════════════════════════════════════════════════════
+/**
+ * Alias for generated TaskCreate schema from OpenAPI
+ */
+export type GeneratedTaskCreate = components['schemas']['TaskCreate'];
 
-export type WebhookEventType =
-  | 'task.created'
-  | 'task.completed'
-  | 'task.failed'
-  | 'vote.started'
-  | 'vote.resolved'
-  | 'constitution.amended'
-  | 'agent.spawned'
-  | 'agent.terminated';
+/**
+ * Alias for generated AgentSpawnRequest schema from OpenAPI
+ */
+export type GeneratedAgentSpawnRequest = components['schemas']['AgentSpawnRequest'];
+
+/**
+ * Alias for generated ConstitutionUpdateRequest schema from OpenAPI
+ */
+export type GeneratedConstitutionUpdateRequest = components['schemas']['ConstitutionUpdateRequest'];
+
+/**
+ * Alias for generated VoteCast schema from OpenAPI
+ */
+export type GeneratedVoteCast = components['schemas']['VoteCast'];
+
+/**
+ * Alias for generated VoteRequest schema from OpenAPI
+ */
+export type GeneratedVoteRequest = components['schemas']['VoteRequest'];
+
+/**
+ * Alias for generated WebhookWithSecretResponse schema from OpenAPI
+ */
+export type GeneratedWebhookWithSecretResponse = components['schemas']['WebhookWithSecretResponse'];
+
+/**
+ * Alias for generated CreateWebhookRequest schema from OpenAPI
+ */
+export type GeneratedCreateWebhookRequest = components['schemas']['CreateWebhookRequest'];
+
+/**
+ * Alias for generated HealthReportResponse schema from OpenAPI
+ */
+export type GeneratedHealthReportResponse = components['schemas']['HealthReportResponse'];
+
+/**
+ * Alias for generated LoginResponse schema from OpenAPI
+ */
+export type GeneratedLoginResponse = components['schemas']['LoginResponse'];
