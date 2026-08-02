@@ -80,6 +80,17 @@ jobs:
             exit 1
           fi
 
+      - name: Set up Python for backend
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install backend dependencies
+        working-directory: ./backend
+        run: |
+          pip install --upgrade pip setuptools wheel
+          pip install -r requirements.txt
+
       - name: Start backend server
         run: |
           DATABASE_URL=postgresql://agentium:agentium@localhost:5432/agentium_test \
