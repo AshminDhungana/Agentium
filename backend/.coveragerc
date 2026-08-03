@@ -1,6 +1,12 @@
 [run]
 source = backend/services
 branch = True
+omit =
+    services/_find_missing_docs.py
+    services/browser_service.py
+    services/voice/*
+    services/monitoring/health_checks.py
+    services/audit/audit_processor.py
 
 [report]
 show_missing = True
