@@ -139,7 +139,7 @@ function ModelPriceLine({ pricingMap, modelId }: {
 
 // ─── Searchable model picker (search box + filtered list after fetch) ─────────
 
-function SearchableModelSelect({ models, value, onChange, inputCls }: {
+export function SearchableModelSelect({ models, value, onChange, inputCls }: {
     models: string[];
     value: string;
     onChange: (m: string) => void;
@@ -149,6 +149,7 @@ function SearchableModelSelect({ models, value, onChange, inputCls }: {
     const [open, setOpen] = useState(false);
     const [highlight, setHighlight] = useState(0);
     const containerRef = useRef<HTMLDivElement>(null);
+    const listRef = useRef<HTMLUListElement>(null);
     const listId = useId();
 
     // Keep the box in sync when the external value changes (e.g. after a
@@ -183,14 +184,30 @@ function SearchableModelSelect({ models, value, onChange, inputCls }: {
         setOpen(false);
     };
 
+    // Scroll the highlighted item into view
+    const scrollHighlightIntoView = (index: number) => {
+        requestAnimationFrame(() => {
+            const item = listRef.current?.querySelector(`[id="${listId}-${index}"]`) as HTMLElement | null;
+            item?.scrollIntoView?.({ block: 'nearest' });
+        });
+    };
+
     const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.key === 'ArrowDown') {
             e.preventDefault();
             if (!open) { setOpen(true); return; }
-            setHighlight(i => Math.min(i + 1, filtered.length - 1));
+            setHighlight(i => {
+                const next = Math.min(i + 1, filtered.length - 1);
+                scrollHighlightIntoView(next);
+                return next;
+            });
         } else if (e.key === 'ArrowUp') {
             e.preventDefault();
-            setHighlight(i => Math.max(i - 1, 0));
+            setHighlight(i => {
+                const next = Math.max(i - 1, 0);
+                scrollHighlightIntoView(next);
+                return next;
+            });
         } else if (e.key === 'Enter') {
             if (open && filtered[highlight]) {
                 e.preventDefault();
@@ -199,6 +216,11 @@ function SearchableModelSelect({ models, value, onChange, inputCls }: {
         } else if (e.key === 'Escape') {
             setOpen(false);
         }
+    };
+
+    const handleMouseEnter = (index: number) => {
+        setHighlight(index);
+        scrollHighlightIntoView(index);
     };
 
     return (
@@ -229,6 +251,7 @@ function SearchableModelSelect({ models, value, onChange, inputCls }: {
             />
             {open && (
                 <ul
+                    ref={listRef}
                     id={listId}
                     role="listbox"
                     aria-label="Available models"
@@ -244,7 +267,7 @@ function SearchableModelSelect({ models, value, onChange, inputCls }: {
                                 role="option"
                                 aria-selected={m === value}
                                 onMouseDown={(e) => { e.preventDefault(); selectModel(m); }}
-                                onMouseEnter={() => setHighlight(i)}
+                                onMouseEnter={() => handleMouseEnter(i)}
                                 className={`px-3 py-2 text-sm font-mono cursor-pointer ${i === highlight ? 'bg-blue-50 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'} ${m === value ? 'font-semibold' : ''}`}
                             >
                                 {m}
