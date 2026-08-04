@@ -100,6 +100,7 @@ class ProviderRateLimiter:
 
     def __init__(self) -> None:
         self._redis: Any = None
+        self._redis_loop: Optional["asyncio.AbstractEventLoop"] = None
         self._sha: Optional[str] = None
         # Locks are created lazily (see _get_sha / _sem) so they bind to the
         # running event loop. Creating asyncio.Lock() eagerly at import time
@@ -130,12 +131,20 @@ class ProviderRateLimiter:
     # ── Redis plumbing ────────────────────────────────────────────────────────
 
     async def _get_redis(self):
-        if self._redis is None:
+        loop = asyncio.get_running_loop()
+        if self._redis is None or self._redis_loop is not loop:
+            # Close stale client bound to a now-defunct (or different) loop.
+            if self._redis is not None:
+                try:
+                    await self._redis.aclose()
+                except Exception:
+                    pass
             import redis.asyncio as aioredis
 
             url = os.getenv("REDIS_URL", "redis://redis:6379/0")
             # decode_responses=False so binary-safe; we only deal with numbers.
             self._redis = aioredis.from_url(url, decode_responses=True)
+            self._redis_loop = loop
         return self._redis
 
     async def _get_sha(self, r) -> Optional[str]:

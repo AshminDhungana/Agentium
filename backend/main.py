@@ -683,7 +683,8 @@ app.include_router(knowledge_routes.router,          prefix="/api/v1")
 )
 async def health_check_api():
     """Health check endpoint."""
-    db_status = check_health()
+    import asyncio
+    db_status = await asyncio.to_thread(check_health)
     return {
         "status": "healthy" if db_status["status"] == "healthy" else "unhealthy",
         "database": db_status,
@@ -752,7 +753,7 @@ async def create_agent(
     responses=build_responses(None),
     tags=["Agents"],
 )
-async def list_agents(
+def list_agents(
     tier: int = None,
     status: str = None,
     db: Session = Depends(get_db)
@@ -781,7 +782,7 @@ async def list_agents(
     responses=build_responses(None),
     tags=["Agents"],
 )
-async def get_agent(
+def get_agent(
     agentium_id: str,
     db: Session = Depends(get_db)
 ):

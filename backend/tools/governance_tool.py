@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 
 from backend.models.entities.agents import (
     Agent,
+    AgentStatus,
     AgentType,
     CouncilMember,
     HeadOfCouncil,
@@ -193,10 +194,21 @@ def create_task(
     )
     db.add(task)
     db.commit()
-    council = db.query(CouncilMember).all()
+    council = db.query(CouncilMember).filter(
+        CouncilMember.is_active == True,
+        CouncilMember.status != AgentStatus.TERMINATED
+    ).all()
     if council:
         task.start_deliberation([c.agentium_id for c in council])
         db.commit()
+    else:
+        task.set_status(TaskStatus.APPROVED, "System", "Auto-approved: No active Council members available.")
+        db.commit()
+        try:
+            from backend.services.tasks.task_executor import execute_task_async
+            execute_task_async.delay(task.agentium_id, "00001")
+        except Exception as err:
+            logger.warning(f"create_task: auto-dispatch failed: {err}")
     return _result(True, data={"task_id": task.agentium_id, "status": task.status.value})
 
 

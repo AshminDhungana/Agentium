@@ -131,12 +131,17 @@ export const LifecycleDashboard: React.FC<LifecycleDashboardProps> = ({
         else setIsRefreshing(true);
         setError(null);
         try {
-            const [cap, st] = await Promise.all([
+            const [capResult, stResult] = await Promise.allSettled([
                 lifecycleService.getCapacity(),
                 lifecycleService.getLifecycleStats(),
             ]);
-            setCapacity(cap);
-            setStats(st);
+            if (capResult.status === 'fulfilled') setCapacity(capResult.value);
+            if (stResult.status === 'fulfilled') setStats(stResult.value);
+            // Only show error if BOTH calls failed
+            if (capResult.status === 'rejected' && stResult.status === 'rejected') {
+                const detail = (capResult.reason as any)?.response?.data?.detail;
+                setError(detail || 'Failed to load lifecycle data.');
+            }
         } catch (err: any) {
             setError(err.response?.data?.detail || 'Failed to load lifecycle data.');
         } finally {

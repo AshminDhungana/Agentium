@@ -66,7 +66,7 @@ logger = logging.getLogger(__name__)
 _CACHE_TTL_SECONDS = 300          # 5 minutes
 _DEFAULT_MAX_RESULTS = 5
 _MAX_RESULTS_LIMIT   = 10
-_REQUEST_TIMEOUT     = 12.0       # seconds — keeps agents responsive
+_REQUEST_TIMEOUT     = 8.0        # seconds — keeps agents and healthchecks responsive
 
 _PROVIDER_PRIORITY = ["tavily", "brave", "serpapi", "duckduckgo"]
 

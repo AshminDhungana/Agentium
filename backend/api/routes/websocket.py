@@ -765,14 +765,17 @@ async def websocket_chat_endpoint(
                         raise
                     except Exception as exc:
                         logger.error(f"[WebSocket] process_message failed: {exc}")
-                        await websocket.send_json({
-                            "type":         "message_end",
-                            "stream_id":    sid,
-                            "content":      "",
-                            "metadata":     {},
-                            "finish_reason": "error",
-                            "timestamp":    datetime.utcnow().isoformat(),
-                        })
+                        try:
+                            await websocket.send_json({
+                                "type":         "message_end",
+                                "stream_id":    sid,
+                                "content":      f"⚠️ An error occurred while processing your message: {str(exc)[:300]}",
+                                "metadata":     {},
+                                "finish_reason": "error",
+                                "timestamp":    datetime.utcnow().isoformat(),
+                            })
+                        except Exception:
+                            pass  # socket already closing — error is logged above
                     finally:
                         active_streams.pop(sid, None)
                         pending_tasks.pop(sid, None)

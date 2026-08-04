@@ -1494,8 +1494,8 @@ class Agent(BaseEntity):
             'name': self.name,
             'status': self.status.value,
             'model_config': config_info,
-            'parent': self.parent.agentium_id if self.parent else None,
-            'subordinates': [sub.agentium_id for sub in self.subordinates],
+            'parent': self.parent.agentium_id if (self.parent and getattr(self.parent, 'is_active', True) and self.parent.status != AgentStatus.TERMINATED) else None,
+            'subordinates': [sub.agentium_id for sub in self.subordinates if getattr(sub, 'is_active', True) and sub.status != AgentStatus.TERMINATED],
             'stats': {
                 'tasks_completed': self.tasks_completed,
                 'tasks_failed': self.tasks_failed,

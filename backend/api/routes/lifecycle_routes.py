@@ -4,6 +4,10 @@ Provides endpoints for spawning, promoting, and liquidating agents.
 
 """
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 from datetime import datetime
 from typing import List, Optional
 from fastapi import APIRouter, Depends, status, BackgroundTasks
@@ -425,22 +429,30 @@ async def get_capacity(
     db: Session = Depends(get_db)
 ):
     """Get available ID pool capacity for each agent tier."""
-    capacity = reincarnation_service.get_available_capacity(db)
+    try:
+        capacity = reincarnation_service.get_available_capacity(db)
 
-    warnings = []
-    for tier_name, tier_data in capacity.items():
-        if tier_data["critical"]:
-            warnings.append(f"CRITICAL: {tier_name.upper()} tier at {tier_data['percentage']}% capacity")
-        elif tier_data["warning"]:
-            warnings.append(f"WARNING: {tier_name.upper()} tier at {tier_data['percentage']}% capacity")
+        warnings = []
+        for tier_name, tier_data in capacity.items():
+            if tier_data["critical"]:
+                warnings.append(f"CRITICAL: {tier_name.upper()} tier at {tier_data['percentage']}% capacity")
+            elif tier_data["warning"]:
+                warnings.append(f"WARNING: {tier_name.upper()} tier at {tier_data['percentage']}% capacity")
 
-    return CapacityResponse(
-        head=capacity["head"],
-        council=capacity["council"],
-        lead=capacity["lead"],
-        task=capacity["task"],
-        warnings=warnings
-    )
+        return CapacityResponse(
+            head=capacity["head"],
+            council=capacity["council"],
+            lead=capacity["lead"],
+            task=capacity["task"],
+            warnings=warnings
+        )
+    except Exception as exc:
+        logger.error(f"Capacity endpoint failed: {exc}")
+        _empty_tier = {"total": 0, "used": 0, "available": 0, "percentage": 0, "warning": False, "critical": False}
+        return CapacityResponse(
+            head=_empty_tier, council=_empty_tier, lead=_empty_tier, task=_empty_tier,
+            warnings=[f"Error loading capacity data: {str(exc)[:100]}"]
+        )
 
 
 # ═══════════════════════════════════════════════════════════
@@ -516,51 +528,60 @@ async def get_lifecycle_stats(
     db: Session = Depends(get_db)
 ):
     """Get comprehensive lifecycle statistics (last 30 days)."""
-    from backend.models.entities.audit import AuditLog
-    from datetime import timedelta
-    from sqlalchemy import func
+    try:
+        from backend.models.entities.audit import AuditLog
+        from datetime import timedelta
+        from sqlalchemy import func
 
-    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+        thirty_days_ago = datetime.utcnow() - timedelta(days=30)
 
-    spawned = db.query(AuditLog).filter(
-        AuditLog.action.in_(["agent_spawned", "lead_spawned"]),
-        AuditLog.created_at >= thirty_days_ago
-    ).count()
+        spawned = db.query(AuditLog).filter(
+            AuditLog.action.in_(["agent_spawned", "lead_spawned"]),
+            AuditLog.created_at >= thirty_days_ago
+        ).count()
 
-    promoted = db.query(AuditLog).filter(
-        AuditLog.action == "agent_promoted",
-        AuditLog.created_at >= thirty_days_ago
-    ).count()
+        promoted = db.query(AuditLog).filter(
+            AuditLog.action == "agent_promoted",
+            AuditLog.created_at >= thirty_days_ago
+        ).count()
 
-    liquidated = db.query(AuditLog).filter(
-        AuditLog.action == "agent_liquidated",
-        AuditLog.created_at >= thirty_days_ago
-    ).count()
+        liquidated = db.query(AuditLog).filter(
+            AuditLog.action == "agent_liquidated",
+            AuditLog.created_at >= thirty_days_ago
+        ).count()
 
-    reincarnated = db.query(AuditLog).filter(
-        AuditLog.action == "agent_birth",
-        AuditLog.created_at >= thirty_days_ago
-    ).count()
+        reincarnated = db.query(AuditLog).filter(
+            AuditLog.action == "agent_birth",
+            AuditLog.created_at >= thirty_days_ago
+        ).count()
 
-    active_by_tier = {}
-    for prefix in ['0', '1', '2', '3']:
-        count = db.query(func.count(Agent.id)).filter(
-            Agent.agentium_id.like(f"{prefix}%"),
-            Agent.is_active == True
-        ).scalar()
-        active_by_tier[f"tier_{prefix}"] = count
+        active_by_tier = {}
+        for prefix in ['0', '1', '2', '3']:
+            count = db.query(func.count(Agent.id)).filter(
+                Agent.agentium_id.like(f"{prefix}%"),
+                Agent.is_active == True
+            ).scalar()
+            active_by_tier[f"tier_{prefix}"] = count
 
-    return {
-        "period_days": 30,
-        "lifecycle_events": {
-            "spawned":      spawned,
-            "promoted":     promoted,
-            "liquidated":   liquidated,
-            "reincarnated": reincarnated,
-        },
-        "active_agents_by_tier": active_by_tier,
-        "capacity": reincarnation_service.get_available_capacity(db)
-    }
+        return {
+            "period_days": 30,
+            "lifecycle_events": {
+                "spawned":      spawned,
+                "promoted":     promoted,
+                "liquidated":   liquidated,
+                "reincarnated": reincarnated,
+            },
+            "active_agents_by_tier": active_by_tier,
+            "capacity": reincarnation_service.get_available_capacity(db)
+        }
+    except Exception as exc:
+        logger.error(f"Lifecycle stats query failed: {exc}")
+        return {
+            "period_days": 30,
+            "lifecycle_events": {"spawned": 0, "promoted": 0, "liquidated": 0, "reincarnated": 0},
+            "active_agents_by_tier": {"tier_0": 0, "tier_1": 0, "tier_2": 0, "tier_3": 0},
+            "capacity": {"head": {}, "council": {}, "lead": {}, "task": {}, "warnings": []}
+        }
 
 
 # ═══════════════════════════════════════════════════════════

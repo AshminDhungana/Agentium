@@ -117,6 +117,8 @@ class VectorStore:
         "tool_skills": "tool_skills",
         # Web-search write-backs live here; also serves the 6.4 web-index seed.
         "web_knowledge": "web_knowledge_v2",
+        # Subject matter expertise / domain knowledge store
+        "domain_knowledge": "domain_knowledge",
     }
 
     def __init__(

@@ -119,7 +119,8 @@ export function MarkdownMessage({
     }
   };
 
-  const maxHeight = (isCollapsed && shouldCollapse && !isStreaming) ? '120px' : 'none';
+  const isCurrentlyCollapsed = isCollapsed && shouldCollapse && !isStreaming;
+  const maxHeight = isCurrentlyCollapsed ? '160px' : 'none';
   const transition = prefersReducedMotionRef.current ? 'none' : 'max-height 200ms ease';
 
   const renderCaret = () =>
@@ -203,7 +204,6 @@ export function MarkdownMessage({
 
   return (
     <div
-      ref={contentRef}
       role={shouldCollapse ? 'region' : undefined}
       aria-label={shouldCollapse ? 'Message content' : undefined}
       aria-expanded={shouldCollapse ? !isCollapsed : undefined}
@@ -214,29 +214,35 @@ export function MarkdownMessage({
       onKeyDown={shouldCollapse ? handleKeyDown : undefined}
       tabIndex={shouldCollapse ? 0 : undefined}
       className={`markdown-body text-[15px] leading-relaxed ${className}`}
-      style={{
-        maxHeight: maxHeight,
-        overflow: shouldCollapse ? 'hidden' : 'visible',
-        transition: transition,
-        position: 'relative',
-      }}
     >
-      <div ref={ref} dangerouslySetInnerHTML={{ __html: html }} />
+      <div
+        ref={contentRef}
+        className="relative"
+        style={{
+          maxHeight: maxHeight,
+          overflow: isCurrentlyCollapsed ? 'hidden' : 'visible',
+          transition: transition,
+        }}
+      >
+        <div ref={ref} dangerouslySetInnerHTML={{ __html: html }} />
+        
+        {isCurrentlyCollapsed && (
+          <div className={styles['collapse-fade']} aria-hidden="true" />
+        )}
+      </div>
       
       {shouldCollapse && (
-        <div className={styles['collapse-fade']} aria-hidden="true" />
-      )}
-      
-      {shouldCollapse && (
-        <button
-          type="button"
-          className={styles['collapse-toggle']}
-          onClick={(e) => { e.stopPropagation(); toggleCollapse(); }}
-          aria-expanded={!isCollapsed}
-          aria-controls={contentRef.current?.id}
-        >
-          {isCollapsed ? 'Show more' : 'Show less'}
-        </button>
+        <div className={styles['collapse-toggle-wrapper']}>
+          <button
+            type="button"
+            className={styles['collapse-toggle']}
+            onClick={(e) => { e.stopPropagation(); toggleCollapse(); }}
+            aria-expanded={!isCollapsed}
+            aria-controls={contentRef.current?.id}
+          >
+            {isCollapsed ? 'Show more' : 'Show less'}
+          </button>
+        </div>
       )}
     </div>
   );

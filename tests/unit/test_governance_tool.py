@@ -43,6 +43,26 @@ def test_create_task_unauthorized():
         assert "not authorized" in res["error"].lower()
 
 
+def test_create_task_no_council_auto_approves():
+    caller = MagicMock()
+    caller.agentium_id = "00001"
+    task_instance = MagicMock()
+    task_instance.agentium_id = "TASK-001"
+    task_instance.status.value = "approved"
+    db = MagicMock()
+    db.query.return_value.filter.return_value.all.return_value = []
+    db.query.return_value.filter_by.return_value.first.return_value = None
+
+    with patch("backend.tools.governance_tool._caller", return_value=caller), \
+         patch("backend.tools.governance_tool.CapabilityRegistry.can_agent", return_value=True), \
+         patch("backend.tools.governance_tool.Task", return_value=task_instance), \
+         patch("backend.services.tasks.task_executor.execute_task_async.delay") as mock_delay:
+        res = create_task(title="T", description="D", db=db, agent_id="00001")
+        assert res["success"] is True
+        assert res["data"]["status"] == "approved"
+        assert res["data"]["task_id"] == "TASK-001"
+
+
 def test_complete_task_happy_path():
     task = MagicMock(); task.agentium_id = "t1"; task.status.value = "completed"
     db = MagicMock()
@@ -114,12 +134,13 @@ async def test_cast_vote_happy_path():
 
 
 def test_governance_tools_registered_with_tiers():
+    all_tiers = ["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"]
     expected = {
         "spawn_agent": ["0xxxx", "1xxxx", "2xxxx"],
         "liquidate_agent": ["0xxxx", "2xxxx"],
         "create_task": ["0xxxx", "1xxxx", "2xxxx"],
         "dispatch_task": ["0xxxx", "1xxxx", "2xxxx"],
-        "complete_task": ["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx"],
+        "complete_task": all_tiers,
         "propose_amendment": ["0xxxx", "1xxxx"],
         "open_vote": ["0xxxx", "1xxxx"],
         "cast_vote": ["0xxxx", "1xxxx"],
@@ -133,10 +154,11 @@ def test_governance_tools_registered_with_tiers():
 
 
 def test_existing_tool_tier_changes():
-    assert tool_registry.get_tool("read_file")["authorized_tiers"] == ["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx"]
-    assert tool_registry.get_tool("write_file")["authorized_tiers"] == ["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx"]
-    assert tool_registry.get_tool("text_editor")["authorized_tiers"] == ["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx"]
-    assert tool_registry.get_tool("execute_command")["authorized_tiers"] == ["0xxxx", "1xxxx", "2xxxx"]
+    all_tiers = ["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"]
+    assert tool_registry.get_tool("read_file")["authorized_tiers"] == all_tiers
+    assert tool_registry.get_tool("write_file")["authorized_tiers"] == all_tiers
+    assert tool_registry.get_tool("text_editor")["authorized_tiers"] == all_tiers
+    assert tool_registry.get_tool("execute_command")["authorized_tiers"] == all_tiers
 
 
 @pytest.mark.asyncio
