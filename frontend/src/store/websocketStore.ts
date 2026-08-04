@@ -165,6 +165,12 @@ interface WebSocketState {
      * so polling never outlives the component.
      */
     _genesisPollTimeout: ReturnType<typeof setTimeout> | null;
+    /**
+     * True while a genesis-status poll chain is running. Prevents duplicate
+     * chains from being started (race between system_not_ready handler and
+     * the 1013 onclose handler, which both call _pollGenesisStatus).
+     */
+    _genesisPollActive: boolean;
     /** Consecutive not_started poll responses while genesis_running (P5 grace). */
     /**
      * BUG 2 FIX: true after the first successful ping→pong round-trip,
@@ -298,6 +304,7 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
     _activeToastId: null,
     _lastConnectTime: 0,       // BUG 3 FIX
     _genesisPollTimeout: null,
+    _genesisPollActive: false,
     _genesisGraceCount: 0,
     _connectionStable: false,   // BUG 2 FIX
     _lastMessageTimestamp: null,
@@ -438,6 +445,7 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
     _stopGenesisPoll: () => {
         const s = get();
         if (s._genesisPollTimeout) { clearTimeout(s._genesisPollTimeout); set({ _genesisPollTimeout: null }); }
+        set({ _genesisPollActive: false });
     },
 
     _stopHeartbeat: () => {
@@ -595,6 +603,16 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
     // reports "complete" — typically saves up to ~8s of dead waiting per
     // cycle, and removes the false impression that chat is "stuck".
     _pollGenesisStatus: (attempt: number = 0) => {
+        // Guard: prevent duplicate poll chains.  Both the system_not_ready
+        // message handler and the 1013 onclose handler call this function,
+        // and their parallel chains race — one may clear genesisAwaitingName
+        // right after the other sets it, preventing the modal from showing.
+        if (attempt === 0 && get()._genesisPollActive) {
+            logger.debug('[WebSocket] Genesis poll already active — skipping duplicate start');
+            return;
+        }
+        set({ _genesisPollActive: true });
+
         if (attempt >= WS_CONFIG.GENESIS_POLL_MAX_ATTEMPTS) {
             logger.error('[WebSocket] Genesis poll exceeded max attempts — giving up');
             // No escape via the poll loop anymore — surface a real error and
@@ -603,7 +621,7 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
                 'System initialization is taking longer than expected. ' +
                 'Please refresh or contact support if this persists.'
             );
-            set({ _genesisPollTimeout: null, connectionPhase: 'genesis_failed', _genesisGraceCount: 0 });
+            set({ _genesisPollTimeout: null, connectionPhase: 'genesis_failed', _genesisGraceCount: 0, _genesisPollActive: false });
             return;
         }
 
@@ -635,7 +653,7 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
                 set({ _genesisPollTimeout: null });
 
                 if (nextPhase === 'connecting') {
-                    set({ _genesisGraceCount: 0, genesisJustCompleted: true });
+                    set({ _genesisGraceCount: 0, genesisJustCompleted: true, _genesisPollActive: false });
                     logger.debug('[WebSocket] Genesis complete — reconnecting now (debounce-exempt)');
                     get()._setError(null);
                     // Force a clean handshake so we reliably reach 'active' even if
@@ -648,7 +666,7 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
                     return;
                 }
                 if (nextPhase === 'genesis_failed') {
-                    set({ _genesisGraceCount: 0 });
+                    set({ _genesisGraceCount: 0, _genesisPollActive: false });
                     // P9: backend reported failure — surface it instead of polling forever.
                     const reason = (data as any).reason as string | undefined;
                     logger.error('[WebSocket] Genesis failed:', reason);
