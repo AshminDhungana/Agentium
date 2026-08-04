@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback, useId } from 'react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import { marked } from 'marked';
 import { sanitizeMarkdown } from '../../utils/markdown/sanitizeMarkdown';
 import styles from './MarkdownMessage.module.css';
@@ -34,6 +35,7 @@ export function MarkdownMessage({
 }: MarkdownMessageProps) {
   const contentRef = useRef<HTMLDivElement>(null);
   const ref = useRef<HTMLDivElement>(null); // for backward compat with caret logic
+  const contentId = useId();
 
   // Compute sanitized HTML (empty string = plain-text fallback).
   const html = useMemo(() => {
@@ -216,6 +218,7 @@ export function MarkdownMessage({
       className={`markdown-body text-[15px] leading-relaxed ${className}`}
     >
       <div
+        id={contentId}
         ref={contentRef}
         className="relative"
         style={{
@@ -238,9 +241,14 @@ export function MarkdownMessage({
             className={styles['collapse-toggle']}
             onClick={(e) => { e.stopPropagation(); toggleCollapse(); }}
             aria-expanded={!isCollapsed}
-            aria-controls={contentRef.current?.id}
+            aria-controls={contentId}
           >
-            {isCollapsed ? 'Show more' : 'Show less'}
+            <span>{isCollapsed ? 'Show more' : 'Show less'}</span>
+            {isCollapsed ? (
+              <ChevronDown className={styles['toggle-icon']} aria-hidden="true" />
+            ) : (
+              <ChevronUp className={styles['toggle-icon']} aria-hidden="true" />
+            )}
           </button>
         </div>
       )}
