@@ -54,7 +54,7 @@ Verify that agents in the Agentium system meet functional correctness criteria:
 | `test_tool_schema_enforcement_all_tools` | Parametrized: every registered tool accepts valid params |
 | `test_tool_schema_rejection_invalid_params` | ToolRegistry rejects invalid params for every tool |
 | `test_critic_output_schema_enforcement` | Code/Output/Plan Critics reject non-compliant outputs |
-| `test_deep_think_fallback_on_uncertainty` | Low-confidence LLM response triggers deep_think → escalation |
+| `test_deep_think_fallback_on_uncertainty` | LLM returns tool_call with confidence < 0.5 OR malformed tool_call → orchestrator catches, invokes deep_think, escalates via create_task |
 
 ### 3.3 New Tests in `test_agentic_loop_hardening.py`
 
@@ -68,7 +68,7 @@ Verify that agents in the Agentium system meet functional correctness criteria:
 | Test | Verifies |
 |------|----------|
 | `test_graceful_degradation_provider_exhaustion` | Provider failover preserves task integrity |
-| `test_fallback_chain_preserves_context` | Context retained across provider fallback chain (includes local/Ollama) |
+| `test_fallback_chain_preserves_context` | After each provider failover: Ethos working_memory + Task.checkpoint_data + LLM conversation history all preserved |
 
 ---
 
@@ -115,7 +115,7 @@ success_criteria:
   - output_schema_compliant: true
   - context_retained_across_steps: true
   - terminal_state_reached: true
-  - max_duration_seconds: 120
+  - max_duration_seconds: 120  # Total scenario timeout (not per-step)
 ```
 
 ### 4.3 Four Benchmark Scenarios
@@ -175,7 +175,7 @@ Two jobs:
 | Context retention score | ContextValidator | 1.0 | < 1.0 |
 | Schema validation pass rate | SchemaValidator | 100% | < 100% |
 | Terminal state reached | TerminalStateValidator | 100% | < 100% |
-| Provider fallbacks | LLMClient | 0 median | > 1 |
+| Provider fallbacks per scenario | LLMClient failover counter | 0 median | > 1 |
 
 ### 6.3 Report Outputs
 - **summary.json** — Machine-readable for historical tracking, CI gating
