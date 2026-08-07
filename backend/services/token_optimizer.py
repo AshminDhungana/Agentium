@@ -20,7 +20,8 @@ from backend.models.entities.agents import Agent, AgentStatus, AgentType
 from backend.models.entities.task import Task, TaskStatus, TaskPriority
 from backend.services.api_manager import init_api_manager, ModelCapability
 import backend.services.api_manager as api_manager_module
-from backend.services.model_allocation import init_model_allocator, model_allocator
+import backend.services.model_allocation as model_allocation_module
+from backend.services.model_allocation import init_model_allocator
 
 logger = logging.getLogger(__name__)
 
@@ -340,7 +341,7 @@ class TokenOptimizer:
         if agents:
             self.persistent_agents = [a.agentium_id for a in agents if a.is_persistent]
 
-        if model_allocator is None:
+        if model_allocation_module.model_allocator is None:
             init_model_allocator(db)
 
         self.idle_model_key = "local:kimi-2.5-7b"
@@ -415,7 +416,7 @@ class TokenOptimizer:
         for agent in agents:
             if agent.preferred_config_id:
                 self.active_model_configs[agent.id] = agent.preferred_config_id
-            new_config_id = model_allocator._ensure_agent_has_config(agent, local_model).id
+            new_config_id = model_allocation_module.model_allocator._ensure_agent_has_config(agent, local_model).id
             agent.preferred_config_id = new_config_id
             agent.idle_mode_enabled = True
             agent.status = AgentStatus.IDLE_WORKING
@@ -453,7 +454,7 @@ class TokenOptimizer:
             ).first()
 
             try:
-                new_config_id = model_allocator.allocate_model(agent, current_task)
+                new_config_id = model_allocation_module.model_allocator.allocate_model(agent, current_task)
                 agent.preferred_config_id = new_config_id
             except Exception:
                 if agent.agentium_id in self.active_model_configs:
@@ -478,7 +479,7 @@ class TokenOptimizer:
         if not self.initialized:
             self.initialize(db)
 
-        config_id = model_allocator.allocate_model(agent, task)
+        config_id = model_allocation_module.model_allocator.allocate_model(agent, task)
         self.active_model_configs[agent.agentium_id] = config_id
 
         self.tokens_used_by_agent.setdefault(agent.agentium_id, 0)
@@ -496,7 +497,7 @@ class TokenOptimizer:
         }
         if not task:
             return 500
-        task_type = model_allocator._classify_task_type(task) if model_allocator else "simple"
+        task_type = model_allocation_module.model_allocator._classify_task_type(task) if model_allocation_module.model_allocator else "simple"
         return base_tokens.get(task_type, 1000)
 
     def update_token_count(self, agent_id: str, tokens_used: int, cost: float = 0.0):
@@ -524,7 +525,7 @@ class TokenOptimizer:
             "tokens_by_agent": self.tokens_used_by_agent.copy(),
             "total_saved_today": self.total_tokens_saved_today,
             "budget_status": idle_budget.get_status(),
-            "allocation_report": model_allocator.get_allocation_report() if model_allocator else {},
+            "allocation_report": model_allocation_module.model_allocator.get_allocation_report() if model_allocation_module.model_allocator else {},
             "hourly_cost_estimate": self._calculate_hourly_cost(db),
         }
 
@@ -583,7 +584,8 @@ idle_budget = IdleBudgetManager()   # Loads persisted limits from DB on first us
 
 def init_token_optimizer(db: Session, agents: List[Agent] = None):
     """Initialize token optimizer with database and agents."""
-    token_optimizer.initialize(db, agents)
-
+    # Initialize API manager first - model_allocator depends on it
     if api_manager_module.api_manager is None:
         init_api_manager(db)
+
+    token_optimizer.initialize(db, agents)

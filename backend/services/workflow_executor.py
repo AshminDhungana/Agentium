@@ -29,29 +29,75 @@ class WorkflowExecutor:
     """Execute a WorkflowPlan as a DAG with concurrent sub-tasks and deferred scheduling."""
 
     async def execute(
-        self, plan: WorkflowPlan, created_by: str = None
+        self, plan: WorkflowPlan, created_by: str = None, db_session=None
     ) -> WorkflowExecution:
         """
         Persist *plan* to the database and execute all sub-tasks.
         Returns the final WorkflowExecution record (status may be
         'completed', 'completed_with_errors', or 'failed').
+
+        Args:
+            plan: The WorkflowPlan to execute
+            created_by: User/agent ID that created this execution
+            db_session: Optional SQLAlchemy session to use. If provided, all
+                       database operations will use this session for transaction
+                       isolation compatibility (e.g., in tests).
         """
-        execution = self._persist_plan(plan, created_by)
-        await self._run_dag(plan)
+        print(f"DEBUG execute: plan.workflow_id = {plan.workflow_id}")
+        print(f"DEBUG execute: db_session = {db_session}")
+        execution = self._persist_plan(plan, created_by, db_session)
+        print(f"DEBUG execute: _persist_plan returned execution = {execution}")
+        print(f"DEBUG execute: execution in session before _run_dag: {execution in db_session}")
+        await self._run_dag(plan, db_session)
+        print(f"DEBUG execute: execution in session after _run_dag: {execution in db_session}")
         # Reload from DB to pick up all status updates
-        with get_db_context() as db:
-            fresh = db.query(WorkflowExecution).filter_by(
+        if db_session is not None:
+            all_exec = db_session.query(WorkflowExecution).all()
+            print(f"DEBUG execute: all executions in session after _run_dag: {[(e.id, e.workflow_id, e.status) for e in all_exec]}")
+            fresh = db_session.query(WorkflowExecution).filter_by(
                 workflow_id=plan.workflow_id
             ).first()
+        else:
+            with get_db_context() as db:
+                fresh = db.query(WorkflowExecution).filter_by(
+                    workflow_id=plan.workflow_id
+                ).first()
+        print(f"DEBUG execute: returning fresh = {fresh}")
         return fresh
 
     # ------------------------------------------------------------------
     # Private helpers
     # ------------------------------------------------------------------
 
-    def _persist_plan(self, plan: WorkflowPlan, created_by: str) -> WorkflowExecution:
-        """Write the WorkflowExecution and all WorkflowSubTask rows."""
-        with get_db_context() as db:
+    def _persist_plan(self, plan: WorkflowPlan, created_by: str, db_session=None) -> WorkflowExecution:
+        """Write the WorkflowExecution and all WorkflowSubTask rows.
+
+        Args:
+            plan: The WorkflowPlan to persist
+            created_by: User/agent ID that created this execution
+            db_session: Optional SQLAlchemy session to use. If not provided, creates a new one via get_db_context().
+                       This allows tests to pass a seeded_db session for transaction isolation compatibility.
+        """
+        from backend.models.entities.workflow import Workflow
+
+        # Use provided session or create a new one
+        if db_session is not None:
+            db = db_session
+            owns_session = False
+        else:
+            db = get_db_context().__enter__()
+            owns_session = True
+
+        try:
+            print(f"DEBUG _persist_plan: plan.workflow_id = {plan.workflow_id}, db = {db}")
+            # Verify workflow exists in this session
+            result = db.query(Workflow).filter_by(id=plan.workflow_id).first()
+            if not result:
+                # Debug: list all workflows in this session
+                all_wfs = db.query(Workflow).all()
+                print(f"DEBUG: Workflow {plan.workflow_id} not found. Available workflows: {[(w.id, w.name) for w in all_wfs]}")
+                raise ValueError(f"Workflow {plan.workflow_id} not found in database session")
+
             execution = WorkflowExecution(
                 workflow_id=plan.workflow_id,
                 original_message=plan.original_message,
@@ -73,10 +119,18 @@ class WorkflowExecutor:
                 )
                 db.add(sub)
 
-            db.commit()
+            if owns_session:
+                db.commit()
+            else:
+                # Flush to ensure the data is visible within the same transaction
+                db.flush()
+            print(f"DEBUG _persist_plan: execution created with id = {execution.id}")
+        finally:
+            if owns_session:
+                db.close()
         return execution
 
-    async def _run_dag(self, plan: WorkflowPlan):
+    async def _run_dag(self, plan: WorkflowPlan, db_session=None):
         """Topological execution loop."""
         # status_map tracks local (in-memory) status for dependency resolution
         status_map: Dict[str, str] = {
@@ -118,16 +172,18 @@ class WorkflowExecutor:
                         status_map[st.intent] = "failed"
                         self._update_subtask(
                             plan.workflow_id, st.intent, "failed",
-                            error="Skipped: a dependency failed."
+                            error="Skipped: a dependency failed.", db_session=db_session
                         )
                 break
 
             # Execute ready tasks concurrently
+            print(f"DEBUG _run_dag: Before gather - db_session = {db_session}, session in_transaction = {db_session.in_transaction() if db_session else 'None'}")
             results = await asyncio.gather(
-                *[self._execute_one(plan.workflow_id, st, context)
+                *[self._execute_one(plan.workflow_id, st, context, db_session)
                   for st in ready],
                 return_exceptions=True,
             )
+            print(f"DEBUG _run_dag: After gather - db_session = {db_session}, session in_transaction = {db_session.in_transaction() if db_session else 'None'}")
 
             for st, result in zip(ready, results):
                 if isinstance(result, Exception):
@@ -141,7 +197,7 @@ class WorkflowExecutor:
 
         # Enqueue deferred tasks with Celery countdown
         for st in deferred:
-            self._enqueue_deferred(plan.workflow_id, st, context)
+            self._enqueue_deferred(plan.workflow_id, st, context, db_session)
             status_map[st.intent] = "scheduled"
 
         # Determine and persist final workflow status
@@ -153,22 +209,23 @@ class WorkflowExecutor:
         else:
             final_status = "completed"
 
-        self._finalize_workflow(plan.workflow_id, final_status, context)
+        self._finalize_workflow(plan.workflow_id, final_status, context, db_session)
 
     async def _execute_one(
         self,
         workflow_id: str,
         spec: SubTaskSpec,
         context: dict,
+        db_session=None,
     ) -> dict:
         """Execute a single sub-task, update DB, return result."""
-        self._update_subtask(workflow_id, spec.intent, "running")
+        self._update_subtask(workflow_id, spec.intent, "running", db_session=db_session)
         try:
             result = await workflow_tools.execute(spec.intent, spec.params, context)
-            self._update_subtask(workflow_id, spec.intent, "completed", result=result)
+            self._update_subtask(workflow_id, spec.intent, "completed", result=result, db_session=db_session)
             return result
         except Exception as exc:
-            self._update_subtask(workflow_id, spec.intent, "failed", error=str(exc))
+            self._update_subtask(workflow_id, spec.intent, "failed", error=str(exc), db_session=db_session)
             raise
 
     def _update_subtask(
@@ -178,9 +235,17 @@ class WorkflowExecutor:
         status: str,
         result: dict = None,
         error: str = None,
+        db_session=None,
     ):
         """Update a single WorkflowSubTask row in the database."""
-        with get_db_context() as db:
+        if db_session is not None:
+            db = db_session
+            owns_session = False
+        else:
+            db = get_db_context().__enter__()
+            owns_session = True
+
+        try:
             sub = db.query(WorkflowSubTask).filter_by(
                 workflow_id=workflow_id, intent=intent
             ).first()
@@ -193,13 +258,20 @@ class WorkflowExecutor:
                 sub.error = error
             if status in ("completed", "failed", "scheduled"):
                 sub.completed_at = datetime.utcnow()
-            db.commit()
+            if owns_session:
+                db.commit()
+            else:
+                db.flush()
+        finally:
+            if owns_session:
+                db.close()
 
     def _enqueue_deferred(
         self,
         workflow_id: str,
         spec: SubTaskSpec,
         context: dict,
+        db_session=None,
     ):
         """Hand a deferred sub-task to Celery and record the task ID."""
         from backend.services.tasks.workflow_tasks import execute_deferred_subtask
@@ -217,7 +289,14 @@ class WorkflowExecutor:
             countdown=delay,
         )
 
-        with get_db_context() as db:
+        if db_session is not None:
+            db = db_session
+            owns_session = False
+        else:
+            db = get_db_context().__enter__()
+            owns_session = True
+
+        try:
             sub = db.query(WorkflowSubTask).filter_by(
                 workflow_id=workflow_id, intent=spec.intent
             ).first()
@@ -225,7 +304,13 @@ class WorkflowExecutor:
                 sub.celery_task_id = async_result.id
                 sub.status = "scheduled"
                 sub.scheduled_for = datetime.utcnow() + timedelta(seconds=delay)
+            if owns_session:
                 db.commit()
+            else:
+                db.flush()
+        finally:
+            if owns_session:
+                db.close()
 
         logger.info(
             f"[WorkflowExecutor] Deferred '{spec.intent}' enqueued "
@@ -237,9 +322,17 @@ class WorkflowExecutor:
         workflow_id: str,
         status: str,
         context: dict,
+        db_session=None,
     ):
         """Write the final workflow status and merged context to the database."""
-        with get_db_context() as db:
+        if db_session is not None:
+            db = db_session
+            owns_session = False
+        else:
+            db = get_db_context().__enter__()
+            owns_session = True
+
+        try:
             wf = db.query(WorkflowExecution).filter_by(
                 workflow_id=workflow_id
             ).first()
@@ -247,5 +340,11 @@ class WorkflowExecutor:
                 wf.status = status
                 wf.context_data = context
                 wf.completed_at = datetime.utcnow()
+            if owns_session:
                 db.commit()
+            else:
+                db.flush()
+        finally:
+            if owns_session:
+                db.close()
         logger.info(f"[WorkflowExecutor] Workflow {workflow_id} → {status}")

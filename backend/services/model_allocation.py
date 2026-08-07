@@ -7,8 +7,9 @@ from typing import Dict, Any, Optional
 from sqlalchemy.orm import Session
 from backend.models.entities.agents import Agent
 from backend.models.entities.task import Task, TaskType, TaskPriority
-from backend.models.entities.user_config import UserModelConfig
-from backend.services.api_manager import api_manager, ModelCapability, ModelConfig
+from backend.models.entities.user_config import UserModelConfig, ProviderType, ConnectionStatus
+from backend.services import api_manager as api_manager_module
+from backend.services.api_manager import ModelCapability, ModelConfig
 
 
 class ModelAllocationService:
@@ -62,7 +63,7 @@ class ModelAllocationService:
             return self._allocate_code_model(agent, task_priority)
 
         # Single API mode: Use the one available API for all
-        if api_manager.single_api_mode():
+        if api_manager_module.api_manager.single_api_mode():
             return self._handle_single_api_mode(agent, task_type)
 
         # Multi-API mode: Optimize based on tier and task
@@ -107,7 +108,7 @@ class ModelAllocationService:
         Get model for idle operations.
         Always uses cheapest local model available.
         """
-        local_model = api_manager._get_best_local_model()
+        local_model = api_manager_module.api_manager._get_best_local_model()
         config = self._ensure_agent_has_config(agent, local_model)
 
         # Record token savings
@@ -125,7 +126,7 @@ class ModelAllocationService:
         When only one API is available, use it for all tasks.
         Creates a shared config if needed.
         """
-        available_models = [m for m in api_manager.models.values() if m.is_available]
+        available_models = [m for m in api_manager_module.api_manager.models.values() if m.is_available]
         if not available_models:
             raise ValueError("No API models available")
 
@@ -138,7 +139,7 @@ class ModelAllocationService:
         Allocate best model for code tasks regardless of tier.
         Code tasks require highest quality to avoid debugging costs.
         """
-        code_model = api_manager._get_best_available_model_by_capability(
+        code_model = api_manager_module.api_manager._get_best_available_model_by_capability(
             ModelCapability.CODE
         )
 
@@ -223,13 +224,13 @@ class ModelAllocationService:
             target_capability = capability_boost.get(target_capability, target_capability)
 
         # Get model for capability
-        model = api_manager._get_best_available_model_by_capability(target_capability)
+        model = api_manager_module.api_manager._get_best_available_model_by_capability(target_capability)
 
         # Budget check for Task agents (tiers 3, 4, 5, 6)
         try:
             from backend.services.token_optimizer import idle_budget
             if agent_tier in [3, 4, 5, 6] and not idle_budget.check_budget(model.cost_per_1k_tokens * 5):
-                model = api_manager._get_best_local_model()
+                model = api_manager_module.api_manager._get_best_local_model()
         except Exception:
             pass  # Budget check is advisory only
 
@@ -241,10 +242,17 @@ class ModelAllocationService:
         Ensure agent has a UserModelConfig record for this model.
         Creates one if it doesn't exist.
         """
+        # Convert provider string to ProviderType enum if needed
+        from backend.models.entities.user_config import ProviderType
+        if isinstance(model.provider, str):
+            provider_enum = ProviderType(model.provider)
+        else:
+            provider_enum = model.provider
+
         existing = self.db.query(UserModelConfig).filter_by(
             user_id=agent.id,
             default_model=model.model_name,
-            provider=model.provider
+            provider=provider_enum
         ).first()
 
         if existing:
@@ -253,17 +261,18 @@ class ModelAllocationService:
         config = UserModelConfig(
             user_id=agent.id,
             config_name=f"auto_{model.model_name}_{agent.agentium_id}",
-            provider=model.provider,
+            provider=provider_enum,
             api_key_encrypted=None,  # Use shared API key
             default_model=model.model_name,
-            base_url=None,
+            api_base_url=None,
             temperature=0.2 if model.capability == ModelCapability.CODE else 0.7,
             max_tokens=4000,
             is_default=False,
-            status='active'
+            status=ConnectionStatus.ACTIVE
         )
         self.db.add(config)
         self.db.flush()
+        self.db.refresh(config)  # Refresh to ensure it's in the session's identity map
 
         self.agent_model_cache[agent.agentium_id] = config.id
         return config
@@ -309,7 +318,7 @@ class ModelAllocationService:
 
             tier = int(agent.agentium_id[0])
             model_key = f"{agent.preferred_config.provider}:{agent.preferred_config.default_model}"
-            model = api_manager.models.get(model_key)
+            model = api_manager_module.api_manager.models.get(model_key)
 
             if not model:
                 continue

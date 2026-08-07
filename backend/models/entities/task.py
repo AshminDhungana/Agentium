@@ -76,7 +76,20 @@ class TaskType(str, enum.Enum):
     ANALYSIS = "analysis"
     COMMUNICATION = "communication"
     CONSTITUTION_READ = "constitution_read"
-    
+
+    # Additional execution types (used by model_allocation)
+    CODE_GENERATION = "code_generation"
+    CODE_REVIEW = "code_review"
+    DEBUGGING = "debugging"
+    SYSTEM_ANALYSIS = "system_analysis"
+    DECISION = "decision"
+    PLANNING = "planning"
+    CREATIVE_WRITING = "creative_writing"
+    BRAINSTORMING = "brainstorming"
+    DOCUMENTATION = "documentation"
+    SIMPLE_QUERY = "simple_query"
+    CONFIRMATION = "confirmation"
+
     # IDLE optimization tasks
     VECTOR_MAINTENANCE = "vector_maintenance"
     STORAGE_DEDUPE = "storage_dedupe"

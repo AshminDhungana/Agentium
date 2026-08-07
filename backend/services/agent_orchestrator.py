@@ -1,8 +1,9 @@
 """
-Agent Orchestrator - Central routing and governance coordinator 
+Agent Orchestrator - Central routing and governance coordinator
 """
 
 import asyncio
+import json
 import logging
 import time
 from textwrap import dedent
@@ -26,7 +27,7 @@ from backend.core.constitutional_guard import ConstitutionalGuard, Verdict, Viol
 from backend.services.tool_creation_service import ToolCreationService
 from backend.services.tool_factory import ToolFactory
 from backend.services.critic_agents import critic_service, CriticType
-from backend.services.api_manager import api_manager
+from backend.services import api_manager as api_manager_module
 from backend.core.llm_client import LLMClient
 from backend.models.schemas.tool_creation import ToolCreationRequest
 from backend.services.decision_engine import DecisionEngine, DecisionAction
@@ -112,51 +113,69 @@ class AgentOrchestrator:
         task.execution_context["stalled_resume_count"]).
         """
         # ── Resolve resume-attempt counter from task context ──────────────────
-        exec_ctx = getattr(task, "execution_context", None) or {}
+        exec_ctx_raw = getattr(task, "execution_context", None)
+        if isinstance(exec_ctx_raw, str):
+            try:
+                exec_ctx = json.loads(exec_ctx_raw)
+            except json.JSONDecodeError:
+                exec_ctx = {}
+        elif isinstance(exec_ctx_raw, dict):
+            exec_ctx = exec_ctx_raw
+        else:
+            exec_ctx = {}
         resume_count = exec_ctx.get("stalled_resume_count", 0)
 
-        try:
-            return await self._execute_task_inner(task, agent, db)
-        except StalledReasoningError as stall_exc:
-            logger.warning(
-                "execute_task: StalledReasoningError for task=%s agent=%s (attempt %d/3): %s",
-                getattr(task, "agentium_id", "?"), agent.agentium_id, resume_count + 1, stall_exc,
-            )
-
-            if resume_count >= 3:
-                logger.error(
-                    "execute_task: max stall retries (3) reached for task=%s — giving up.",
-                    getattr(task, "agentium_id", "?"),
+        max_retries = 3
+        for attempt in range(resume_count, max_retries):
+            try:
+                return await self._execute_task_inner(
+                    task, agent, db,
+                    resume_hint=(
+                        f"RESUME FROM CHECKPOINT (attempt {attempt + 1}/{max_retries}): "
+                        "Your previous reasoning trace stalled. Summarise what was completed so far, "
+                        "identify the next required step, and continue execution from there."
+                    ) if attempt > 0 else None,
                 )
-                raise
+            except StalledReasoningError as stall_exc:
+                logger.warning(
+                    "execute_task: StalledReasoningError for task=%s agent=%s (attempt %d/%d): %s",
+                    getattr(task, "agentium_id", "?"), agent.agentium_id, attempt + 1, max_retries, stall_exc,
+                )
 
-            # Persist updated resume count before re-attempting
-            exec_ctx["stalled_resume_count"] = resume_count + 1
-            try:
-                task.execution_context = exec_ctx
-                db.commit()
-            except Exception:
-                pass
+                # Persist updated resume count before re-attempting or giving up
+                exec_ctx["stalled_resume_count"] = attempt + 1
+                try:
+                    task.execution_context = json.dumps(exec_ctx)
+                    db.commit()
+                except Exception:
+                    pass
 
-            # Compress ethos to shed bloat accumulated before the stall
-            try:
-                agent.compress_ethos(db)
-            except Exception as compress_exc:
-                logger.warning("execute_task: ethos compression failed: %s", compress_exc)
+                if attempt >= max_retries - 1:
+                    logger.error(
+                        "execute_task: max stall retries (%d) reached for task=%s — giving up.",
+                        max_retries, getattr(task, "agentium_id", "?"),
+                    )
+                    # Compress ethos one last time before giving up
+                    try:
+                        agent.compress_ethos(db)
+                    except Exception as compress_exc:
+                        logger.warning("execute_task: ethos compression failed: %s", compress_exc)
+                    raise
 
-            # Re-invoke with a resume prompt injected into the system prompt
-            logger.info(
-                "execute_task: resuming task=%s (attempt %d/3) from checkpoint.",
-                getattr(task, "agentium_id", "?"), resume_count + 1,
-            )
-            return await self._execute_task_inner(
-                task, agent, db,
-                resume_hint=(
-                    f"RESUME FROM CHECKPOINT (attempt {resume_count + 1}/3): "
-                    "Your previous reasoning trace stalled. Summarise what was completed so far, "
-                    "identify the next required step, and continue execution from there."
-                ),
-            )
+                # Compress ethos to shed bloat accumulated before the stall
+                try:
+                    agent.compress_ethos(db)
+                except Exception as compress_exc:
+                    logger.warning("execute_task: ethos compression failed: %s", compress_exc)
+
+                logger.info(
+                    "execute_task: resuming task=%s (attempt %d/%d) from checkpoint.",
+                    getattr(task, "agentium_id", "?"), attempt + 1, max_retries,
+                )
+                # Loop continues to next attempt
+
+        # Should never reach here
+        raise StalledReasoningError("Max retries exceeded")
 
     async def _execute_task_inner(
         self,
@@ -171,17 +190,23 @@ class AgentOrchestrator:
 
         # Update agent with allocated model
         agent.preferred_config_id = config_id
+        db.flush()
 
-        # Reload relationship to avoid DetachedInstanceError
-        db.refresh(agent)
-        db.refresh(agent, attribute_names=["preferred_config"])
-        if agent.preferred_config is None:
+        # Explicitly load the config from DB since the relationship may not auto-load
+        # due to session identity map when the config was created after agent was loaded
+        from backend.models.entities.user_config import UserModelConfig
+        preferred_config = db.query(UserModelConfig).filter_by(id=config_id).first()
+        if preferred_config is None:
             raise ValueError(
                 f"Agent {agent.agentium_id} has preferred_config_id={config_id!r} "
                 "but the related ModelConfig row was not found."
             )
-        model_key = f"{agent.preferred_config.provider}:{agent.preferred_config.default_model}"
-        model = api_manager.models.get(model_key)
+
+        # Manually set the relationship to avoid DetachedInstanceError
+        agent.preferred_config = preferred_config
+
+        model_key = f"{preferred_config.provider}:{preferred_config.default_model}"
+        model = api_manager_module.api_manager.models.get(model_key)
 
         # Build provider- and task-aware system prompt
         agent_tier_int = int(agent.agentium_id[0]) if agent.agentium_id[0].isdigit() else 3
@@ -1373,6 +1398,7 @@ class AgentOrchestrator:
     async def _log(self, actor: str, action: str, desc: str, level=AuditLevel.INFO, target=None):
         """Log."""
 
+        import uuid as _uuid
         audit = AuditLog(
             level=level,
             category=AuditCategory.GOVERNANCE,
@@ -1380,7 +1406,7 @@ class AgentOrchestrator:
             actor_id=actor,
             action=action,
             description=desc,
-            agentium_id=f"L{datetime.utcnow().strftime('%H%M%S')}",
+            agentium_id=f"L{_uuid.uuid4().hex[:9]}",
             target_type="agent",
             target_id=target or "",
         )

@@ -494,19 +494,83 @@ def upgrade() -> None:
         op.create_table(
             'subtasks',
             sa.Column('id', sa.String(36), primary_key=True),
-            sa.Column('task_id', sa.String(36), sa.ForeignKey('tasks.id')),
+            sa.Column('parent_task_id', sa.String(36), sa.ForeignKey('tasks.id'), nullable=False),
             sa.Column('agentium_id', sa.String(20), unique=True, nullable=False),
-            sa.Column('title', sa.String(200), nullable=True),
+            sa.Column('title', sa.String(200), nullable=False),
             sa.Column('description', sa.Text(), nullable=False),
-            sa.Column('status', sa.String(20), server_default='pending'),
-            sa.Column('assigned_to_agent_id', sa.String(36), sa.ForeignKey('agents.id'), nullable=True),
-            sa.Column('execution_order', sa.Integer(), server_default='0'),
+            sa.Column('status', postgresql.ENUM(
+                'pending', 'deliberating', 'approved', 'rejected', 'delegating',
+                'assigned', 'in_progress', 'review', 'completed', 'failed',
+                'cancelled', 'escalated',
+                'idle_pending', 'idle_running', 'idle_paused', 'idle_completed',
+                'PENDING', 'DELIBERATING', 'APPROVED', 'REJECTED', 'DELEGATING',
+                'ASSIGNED', 'IN_PROGRESS', 'REVIEW', 'COMPLETED', 'FAILED',
+                'CANCELLED', 'ESCALATED',
+                'IDLE_PENDING', 'IDLE_RUNNING', 'IDLE_PAUSED', 'IDLE_COMPLETED',
+                name='taskstatus', create_type=False),
+                server_default='pending', nullable=False),
+            sa.Column('assigned_agent_id', sa.String(36), sa.ForeignKey('agents.id'), nullable=True),
+            sa.Column('sequence', sa.Integer(), server_default='0', nullable=False),
+            sa.Column('dependencies', sa.JSON(), server_default='[]'),
+            sa.Column('expected_output', sa.Text(), nullable=True),
+            sa.Column('tools_allowed', sa.JSON(), server_default='[]'),
             sa.Column('result', sa.Text(), nullable=True),
+            sa.Column('output_data', sa.JSON(), nullable=True),
+            sa.Column('completed_at', sa.DateTime(), nullable=True),
+            sa.Column('max_duration', sa.Integer(), server_default='300'),
+            sa.Column('started_at', sa.DateTime(), nullable=True),
             sa.Column('is_active', sa.Boolean(), server_default='true'),
             sa.Column('created_at', sa.DateTime(), server_default=sa.func.now()),
             sa.Column('updated_at', sa.DateTime(), server_default=sa.func.now()),
             sa.Column('deleted_at', sa.DateTime(), nullable=True),
         )
+    else:
+        # Table exists - ensure all columns are present (for migrations that ran partially)
+        # Also handle schema differences from legacy versions (task_id vs parent_task_id, etc.)
+        inspector = _get_inspector()
+        if inspector is not None:
+            col_names = _col_names(inspector, 'subtasks')
+            if 'completed_at' not in col_names:
+                op.add_column('subtasks', sa.Column('completed_at', sa.DateTime(), nullable=True))
+            if 'max_duration' not in col_names:
+                op.add_column('subtasks', sa.Column('max_duration', sa.Integer(), server_default='300'))
+            if 'started_at' not in col_names:
+                op.add_column('subtasks', sa.Column('started_at', sa.DateTime(), nullable=True))
+            if 'agentium_id' not in col_names:
+                op.add_column('subtasks', sa.Column('agentium_id', sa.String(20), unique=True, nullable=False))
+            if 'parent_task_id' not in col_names and 'task_id' in col_names:
+                # Legacy schema uses task_id, rename to parent_task_id
+                op.alter_column('subtasks', 'task_id', new_column_name='parent_task_id')
+            if 'assigned_agent_id' not in col_names and 'assigned_to_agent_id' in col_names:
+                # Legacy schema uses assigned_to_agent_id, rename to assigned_agent_id
+                op.alter_column('subtasks', 'assigned_to_agent_id', new_column_name='assigned_agent_id')
+            if 'sequence' not in col_names and 'execution_order' in col_names:
+                # Legacy schema uses execution_order, rename to sequence
+                op.alter_column('subtasks', 'execution_order', new_column_name='sequence')
+            if 'dependencies' not in col_names:
+                op.add_column('subtasks', sa.Column('dependencies', sa.JSON(), server_default='[]'))
+            if 'expected_output' not in col_names:
+                op.add_column('subtasks', sa.Column('expected_output', sa.Text(), nullable=True))
+            if 'tools_allowed' not in col_names:
+                op.add_column('subtasks', sa.Column('tools_allowed', sa.JSON(), server_default='[]'))
+            if 'output_data' not in col_names:
+                op.add_column('subtasks', sa.Column('output_data', sa.JSON(), nullable=True))
+            if 'title' not in col_names:
+                op.add_column('subtasks', sa.Column('title', sa.String(200), nullable=False, server_default=''))
+            if 'description' not in col_names:
+                op.add_column('subtasks', sa.Column('description', sa.Text(), nullable=False, server_default=''))
+            if 'sequence' not in col_names:
+                op.add_column('subtasks', sa.Column('sequence', sa.Integer(), server_default='0', nullable=False))
+            if 'dependencies' not in col_names:
+                op.add_column('subtasks', sa.Column('dependencies', sa.JSON(), server_default='[]'))
+            if 'expected_output' not in col_names:
+                op.add_column('subtasks', sa.Column('expected_output', sa.Text(), nullable=True))
+            if 'tools_allowed' not in col_names:
+                op.add_column('subtasks', sa.Column('tools_allowed', sa.JSON(), server_default='[]'))
+            if 'result' not in col_names:
+                op.add_column('subtasks', sa.Column('result', sa.Text(), nullable=True))
+            if 'output_data' not in col_names:
+                op.add_column('subtasks', sa.Column('output_data', sa.JSON(), nullable=True))
 
     # =========================================================================
     # [001-9] TASK DELIBERATIONS
@@ -2144,6 +2208,7 @@ def upgrade() -> None:
         op.create_table(
             'workflow_executions',
             sa.Column('id',         sa.String(36), primary_key=True),
+            sa.Column('agentium_id', sa.String(20), unique=True, nullable=False),
             sa.Column('is_active',  sa.Boolean(),  nullable=False, server_default='true'),
             sa.Column('created_at', sa.DateTime(), nullable=False, server_default=sa.text('NOW()')),
             sa.Column('updated_at', sa.DateTime(), nullable=False, server_default=sa.text('NOW()')),
@@ -2171,6 +2236,7 @@ def upgrade() -> None:
         op.create_table(
             'workflow_subtasks',
             sa.Column('id',         sa.String(36), primary_key=True),
+            sa.Column('agentium_id', sa.String(20), unique=True, nullable=False),
             sa.Column('is_active',  sa.Boolean(),  nullable=False, server_default='true'),
             sa.Column('created_at', sa.DateTime(), nullable=False, server_default=sa.text('NOW()')),
             sa.Column('updated_at', sa.DateTime(), nullable=False, server_default=sa.text('NOW()')),
@@ -2193,6 +2259,43 @@ def upgrade() -> None:
         )
         op.create_index('ix_workflow_subtasks_workflow_id', 'workflow_subtasks', ['workflow_id'])
         op.create_index('ix_workflow_subtasks_status',      'workflow_subtasks', ['status'])
+    else:
+        # Table exists - ensure all columns are present (for migrations that ran partially)
+        inspector = _get_inspector()
+        if inspector is not None:
+            col_names = _col_names(inspector, 'workflow_subtasks')
+            if 'agentium_id' not in col_names:
+                op.add_column('workflow_subtasks', sa.Column('agentium_id', sa.String(20), unique=True, nullable=False))
+            if 'completed_at' not in col_names:
+                op.add_column('workflow_subtasks', sa.Column('completed_at', sa.DateTime(), nullable=True))
+            if 'celery_task_id' not in col_names:
+                op.add_column('workflow_subtasks', sa.Column('celery_task_id', sa.String(256), nullable=True))
+            if 'is_active' not in col_names:
+                op.add_column('workflow_subtasks', sa.Column('is_active', sa.Boolean(), server_default='true'))
+            if 'created_at' not in col_names:
+                op.add_column('workflow_subtasks', sa.Column('created_at', sa.DateTime(), server_default=sa.text('NOW()')))
+            if 'updated_at' not in col_names:
+                op.add_column('workflow_subtasks', sa.Column('updated_at', sa.DateTime(), server_default=sa.text('NOW()')))
+            if 'deleted_at' not in col_names:
+                op.add_column('workflow_subtasks', sa.Column('deleted_at', sa.DateTime(), nullable=True))
+            if 'schedule_offset_days' not in col_names:
+                op.add_column('workflow_subtasks', sa.Column('schedule_offset_days', sa.Integer(), server_default='0'))
+            if 'scheduled_for' not in col_names:
+                op.add_column('workflow_subtasks', sa.Column('scheduled_for', sa.DateTime(), nullable=True))
+            if 'result' not in col_names:
+                op.add_column('workflow_subtasks', sa.Column('result', sa.JSON(), nullable=True))
+            if 'error' not in col_names:
+                op.add_column('workflow_subtasks', sa.Column('error', sa.Text(), nullable=True))
+            if 'step_index' not in col_names:
+                op.add_column('workflow_subtasks', sa.Column('step_index', sa.Integer(), server_default='0'))
+            if 'intent' not in col_names:
+                op.add_column('workflow_subtasks', sa.Column('intent', sa.String(128), nullable=False, server_default=''))
+            if 'params' not in col_names:
+                op.add_column('workflow_subtasks', sa.Column('params', sa.JSON(), server_default='{}'))
+            if 'depends_on' not in col_names:
+                op.add_column('workflow_subtasks', sa.Column('depends_on', sa.JSON(), server_default='[]'))
+            if 'status' not in col_names:
+                op.add_column('workflow_subtasks', sa.Column('status', sa.String(32), server_default='pending'))
 
     # New columns on tasks (from 006_workflow)
     op.execute("ALTER TABLE tasks ADD COLUMN IF NOT EXISTS workflow_id    VARCHAR(64)  NULL")

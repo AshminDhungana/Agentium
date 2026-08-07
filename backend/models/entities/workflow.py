@@ -13,6 +13,7 @@ class WorkflowExecutionStatus(str, enum.Enum):
     PAUSED = "paused"
     COMPLETED = "completed"
     FAILED = "failed"
+    COMPLETED_WITH_ERRORS = "completed_with_errors"
 
 
 class WorkflowStepType(str, enum.Enum):
@@ -254,6 +255,16 @@ class WorkflowSubTask(BaseEntity):
     schedule_offset_days = Column(Integer,     nullable=False, server_default='0')
     scheduled_for        = Column(DateTime,    nullable=True)
     completed_at         = Column(DateTime,    nullable=True)
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        if not kwargs.get('agentium_id'):
+            self.agentium_id = self._generate_subtask_id()
+
+    def _generate_subtask_id(self) -> str:
+        """Generate subtask ID: SUB + 5-char UUID."""
+        import uuid
+        return f"SUB{uuid.uuid4().hex[:5].upper()}"
 
     def to_dict(self) -> Dict[str, Any]:
         base = super().to_dict()
