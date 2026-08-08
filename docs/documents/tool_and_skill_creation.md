@@ -124,6 +124,26 @@ Edit `backend/core/tool_registry.py`:
   list. Params without `optional` are **required** — so `action` (no `optional`)
   is always required, which is what you want.
 - Add `"enum": [...]` to constrain a value.
+- **Schema validation**: All registered tools automatically get a Pydantic model
+  built from their parameter schema at registration time. When tools are executed
+  via `execute_tool_async()` (the API route, internal calls, or MCP bridge),
+  parameters are validated against this model **before** tool logic runs. This
+  catches invalid parameters early and returns structured field-level errors:
+  ```json
+  {
+    "status": "error",
+    "error": {
+      "type": "schema_validation_error",
+      "message": "Invalid parameters for tool 'my_thing'",
+      "details": [{"loc": ["max_results"], "type": "int_parsing", "input": "five"}]
+    }
+  }
+  ```
+  - **Type coercion** is enabled by default (e.g., string `"5"` → int `5`,
+    string `"true"` → bool `true`) to handle common LLM mistakes.
+  - **Strict mode** can be enabled per-tool by adding `"strict_validation": true`
+    to the registry metadata — this rejects coercions and requires exact types.
+  - **Extra fields** in the call are ignored (forward-compatibility).
 
 ### 2.4 Tier authorization
 

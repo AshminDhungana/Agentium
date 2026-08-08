@@ -23,6 +23,10 @@ How it works
    The tools.py route is updated to pass `agent_id` and `agent_tier` through
    for all MCP tools (identified by the "is_mcp" flag in their registry entry).
 
+4. Schema Validation: Each MCP tool's inputSchema (JSON Schema) is converted
+   to a Pydantic model at registration time, enabling pre-execution parameter
+   validation with structured error responses.
+
 Tier → authorized_tiers mapping
 ---------------------------------
 pre_approved  → ["0xxxx", "1xxxx", "2xxxx", "3xxxx"]  (all agents)
@@ -59,6 +63,76 @@ _TIER_TO_AUTHORIZED: Dict[str, List[str]] = {
 }
 
 
+def _build_pydantic_model_from_jsonschema(schema: Dict[str, Any]):
+    """
+    Convert JSON Schema (MCP inputSchema) to Pydantic model.
+    Handles: type, properties, required, enum, default, description.
+    Falls back to permissive Dict model for unsupported constructs.
+    """
+    from pydantic import create_model, Field
+    from typing import Any, Dict, List, Optional, Literal, Union
+
+    if not schema or schema.get("type") != "object":
+        # Fallback permissive model
+        return create_model("PermissiveParams", data=(Dict[str, Any], Field(default_factory=dict)))
+
+    properties = schema.get("properties", {})
+    required = set(schema.get("required", []))
+
+    TYPE_MAP = {
+        "string": str,
+        "integer": int,
+        "number": float,
+        "boolean": bool,
+        "array": List[Any],
+        "object": Dict[str, Any],
+    }
+
+    fields = {}
+    for prop_name, prop_schema in properties.items():
+        prop_type = prop_schema.get("type", "string")
+        python_type = TYPE_MAP.get(prop_type, Any)
+
+        is_required = prop_name in required
+        has_default = "default" in prop_schema
+
+        field_kwargs = {"description": prop_schema.get("description", "")}
+
+        # Handle enum
+        if "enum" in prop_schema:
+            enum_values = prop_schema["enum"]
+            python_type = Literal[tuple(enum_values)]
+            if not is_required and not has_default:
+                python_type = Optional[python_type]
+
+        # Handle optional
+        if not is_required:
+            if has_default:
+                field_kwargs["default"] = prop_schema["default"]
+            else:
+                python_type = Optional[python_type]
+                field_kwargs["default"] = None
+        elif has_default:
+            field_kwargs["default"] = prop_schema["default"]
+
+        fields[prop_name] = (python_type, Field(**field_kwargs))
+
+    # Handle additionalProperties
+    additional_props = schema.get("additionalProperties", True)
+    if additional_props is False:
+        config = {"extra": "forbid"}
+    else:
+        config = {"extra": "ignore"}
+
+    model = create_model(
+        f"MCPParams_{hash(tuple(sorted(fields.keys())))}",
+        __config__=config,
+        **fields
+    )
+
+    return model
+
+
 def _registry_name(tool: MCPTool) -> str:
     """Canonical registry key for an MCPTool: 'mcp__<tool.name>'."""
     return f"{MCP_PREFIX}{tool.name}"
@@ -82,6 +156,27 @@ def _build_invoke_fn(tool_id: str, tool_name: str, db_factory):
         **_extra,
     ) -> Dict[str, Any]:
         """Invoke the governed MCP tool using the provided agent context and parameters."""
+        # Validate params against the specific sub-tool's inputSchema if available
+        from backend.core.tool_registry import tool_registry
+        tool_entry = tool_registry.tools.get(f"mcp__{tool_name}")
+        if tool_entry and "mcp_input_models" in tool_entry:
+            sub_tool = tool_name_override or (tool_entry.get("mcp_capabilities", [{}])[0].get("name") if tool_entry.get("mcp_capabilities") else None)
+            if sub_tool and sub_tool in tool_entry["mcp_input_models"]:
+                model = tool_entry["mcp_input_models"][sub_tool]
+                from pydantic import ValidationError
+                try:
+                    validated = model.model_validate(params or {})
+                    params = validated.model_dump()
+                except ValidationError as e:
+                    return {
+                        "status": "error",
+                        "error": {
+                            "type": "schema_validation_error",
+                            "message": f"Invalid parameters for MCP tool '{sub_tool}'",
+                            "details": e.errors(),
+                        }
+                    }
+
         db: Session = db_factory()
         try:
             svc = MCPGovernanceService(db)
@@ -211,7 +306,7 @@ class MCPToolBridge:
             params_schema["tool_name_override"] = {
                 "type": "string",
                 "description": "Specific sub-tool to invoke",
-                "enum": tool.capabilities,
+                "enum": [c["name"] for c in tool.capabilities if isinstance(c, dict) and c.get("name")],
             }
 
         invoke_fn = _build_invoke_fn(str(tool.id), tool.name, self._db_factory)
@@ -231,6 +326,19 @@ class MCPToolBridge:
         self._registry.tools[key]["mcp_tier"] = tool.tier
         self._registry.tools[key]["mcp_server_url"] = tool.server_url
         self._registry.tools[key]["mcp_original_name"] = tool.name
+
+        # Store the full capability descriptors (with inputSchema) for validation
+        self._registry.tools[key]["mcp_capabilities"] = tool.capabilities
+
+        # Build Pydantic models for each sub-tool's inputSchema
+        mcp_models = {}
+        for cap in tool.capabilities:
+            if isinstance(cap, dict) and cap.get("input_schema"):
+                sub_tool_name = cap.get("name")
+                if sub_tool_name:
+                    mcp_models[sub_tool_name] = _build_pydantic_model_from_jsonschema(cap["input_schema"])
+        if mcp_models:
+            self._registry.tools[key]["mcp_input_models"] = mcp_models
 
 
 # ── Module-level singleton ─────────────────────────────────────────────────────

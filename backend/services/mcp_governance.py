@@ -160,7 +160,11 @@ class MCPGovernanceService:
             }
 
         capabilities = [
-            t.get("name")
+            {
+                "name": t.get("name"),
+                "description": getattr(t, "description", ""),
+                "input_schema": getattr(t, "inputSchema", {}),
+            }
             for t in discovered
             if isinstance(t, dict) and t.get("name")
         ]

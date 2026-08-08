@@ -5,6 +5,9 @@ import asyncio
 import inspect
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from pydantic import create_model, Field
+from typing import Literal
+
 from backend.tools.nodriver_tool import nodriver_tool
 from backend.tools.browser_tool  import BrowserTool
 from backend.tools.file_tool     import FileSystemTool
@@ -329,6 +332,8 @@ class ToolRegistry:
             },
             authorized_tiers=["0xxxx", "1xxxx", "2xxxx"],
         )
+        # Enable strict validation for sensitive code execution
+        self.tools["code_execution"]["strict_validation"] = True
 
         # ══════════════════════════════════════════════════════════════════════
         # TOOL SEARCH TOOL
@@ -664,6 +669,8 @@ class ToolRegistry:
             },
             authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
+        # Enable strict validation for sensitive shell execution
+        self.tools["execute_command"]["strict_validation"] = True
 
         # ── Remote Exec Tool ──────────────────────────────────────────────────
         self.register_tool(
@@ -722,6 +729,8 @@ class ToolRegistry:
             },
             authorized_tiers=["3xxxx", "4xxxx", "5xxxx", "6xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
+        # Enable strict validation for sensitive remote execution
+        self.tools["remote_exec"]["strict_validation"] = True
 
         # ══════════════════════════════════════════════════════════════════════
         # HOST OS TOOL — cross-platform detection + execution
@@ -791,6 +800,8 @@ class ToolRegistry:
             },
             authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "7xxxx", "8xxxx", "9xxxx"],
         )
+        # Enable strict validation for sensitive smart execution
+        self.tools["host_smart_execute"]["strict_validation"] = True
 
         # ══════════════════════════════════════════════════════════════════════
         # DESKTOP TOOL — mouse, keyboard, files, documents, browser
@@ -1007,6 +1018,9 @@ class ToolRegistry:
             },
             authorized_tiers=["0xxxx", "1xxxx"],
         )
+        # Enable strict validation for sensitive file deletion
+        self.tools["desktop_delete_file"]["strict_validation"] = True
+
         self.register_tool(
             name="desktop_copy_file",
             description="Copy a file or directory from src to dst.",
@@ -1970,6 +1984,65 @@ class ToolRegistry:
             authorized_tiers=["0xxxx", "1xxxx", "2xxxx", "3xxxx", "4xxxx", "5xxxx", "6xxxx"],
         )
 
+    # ── Schema Validation ─────────────────────────────────────────────────────────
+
+    def _build_pydantic_model(self, parameters: Dict[str, Any]):
+        """
+        Convert internal parameter schema dict to a Pydantic model class.
+        Caches model in tool dict for reuse.
+        """
+        TYPE_MAP = {
+            "string": str,
+            "integer": int,
+            "number": float,
+            "boolean": bool,
+            "array": List[Any],
+            "object": Dict[str, Any],
+            "any": Any,
+        }
+
+        fields = {}
+        for param_name, meta in parameters.items():
+            raw_type = meta.get("type", "string")
+            python_type = TYPE_MAP.get(raw_type, Any)
+
+            is_optional = meta.get("optional", False)
+            has_default = "default" in meta
+
+            # Build field kwargs
+            field_kwargs = {"description": meta.get("description", "")}
+
+            # Handle enum
+            if "enum" in meta:
+                # Use Literal for enum types
+                enum_values = meta["enum"]
+                python_type = Literal[tuple(enum_values)]
+                # Don't wrap Optional again if already handled
+                if is_optional and not has_default:
+                    from typing import Optional as Opt
+                    python_type = Opt[python_type]
+
+            # Handle optional with default
+            if is_optional:
+                if has_default:
+                    default_val = meta["default"]
+                    field_kwargs["default"] = default_val
+                else:
+                    from typing import Optional as Opt
+                    python_type = Opt[python_type]
+                    field_kwargs["default"] = None
+
+            fields[param_name] = (python_type, Field(**field_kwargs))
+
+        # Create model with extra="ignore" for forward compatibility
+        model = create_model(
+            f"ToolParams_{hash(tuple(sorted(fields.keys())))}",
+            __config__={"extra": "ignore"},
+            **fields
+        )
+
+        return model
+
     # ── Registration ───────────────────────────────────────────────────────────
 
     def register_tool(
@@ -1988,6 +2061,7 @@ class ToolRegistry:
             "parameters":       parameters,
             "authorized_tiers": authorized_tiers or [],
             "timeout":          timeout,
+            "pydantic_model":   self._build_pydantic_model(parameters),
         }
 
     # ── Queries ────────────────────────────────────────────────────────────────
@@ -2059,7 +2133,34 @@ class ToolRegistry:
         {"status": "error", "error": ...}.
         """
         from backend.core.tool_runner import run_tool_async
+        from pydantic import ValidationError
 
+        tool = self.get_tool(name)
+        if not tool:
+            return {"status": "error", "error": f"Tool '{name}' not found"}
+
+        # NEW: Validate parameters against Pydantic model
+        model = tool.get("pydantic_model")
+        if model is None:
+            # Lazy build for tools registered before this feature
+            model = self._build_pydantic_model(tool.get("parameters", {}))
+            tool["pydantic_model"] = model
+
+        strict = tool.get("strict_validation", False)
+        try:
+            validated = model.model_validate(kwargs, strict=strict)
+            kwargs = validated.model_dump()
+        except ValidationError as e:
+            return {
+                "status": "error",
+                "error": {
+                    "type": "schema_validation_error",
+                    "message": f"Invalid parameters for tool '{name}'",
+                    "details": e.errors(),
+                }
+            }
+
+        # Existing execution logic
         structured = await run_tool_async(name, kwargs, use_service=False)
         if structured["status"] == "success":
             return structured.get("result", structured)
