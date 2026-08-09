@@ -18,7 +18,7 @@ import hashlib
 
 from sqlalchemy.orm import Session
 from backend.models.entities.checkpoint import ExecutionCheckpoint, CheckpointPhase
-from backend.models.entities.task import Task, TaskStatus
+from backend.models.entities.task import Task, TaskStatus, TaskType, TaskPriority
 from backend.models.entities.agents import Agent, AgentStatus
 from backend.models.entities.audit import AuditLog, AuditLevel, AuditCategory
 
@@ -53,6 +53,14 @@ class CheckpointService:
 
         # Serialize current task state
         task_snapshot = task.to_dict()
+
+        # Ensure result_data is always at top level for checkpoint purposes
+        # (Task.to_dict() only includes it in 'result' when COMPLETED)
+        task_snapshot["result_data"] = task.result_data
+        task_snapshot["result_summary"] = task.result_summary
+        task_snapshot["completion_percentage"] = task.completion_percentage
+        task_snapshot["supervisor_id"] = task.supervisor_id
+        task_snapshot["assigned_task_agent_ids"] = task.assigned_task_agent_ids
 
         # ── Serialize assigned agent states ──────────────────────
         agent_states = CheckpointService._capture_agent_states(db, task)
@@ -122,21 +130,34 @@ class CheckpointService:
         if 'status' in snapshot:
             restored_status = TaskStatus(snapshot['status'])
             if task.status != restored_status:
-                task.set_status(
-                    restored_status,
-                    actor_id=actor_id,
-                    note=f"Resumed from checkpoint {checkpoint_id}",
-                    trigger_checkpoint=False,
+                # Bypass state machine validation for time-travel resume
+                # Checkpoint resume should be able to restore ANY captured state,
+                # including terminal → non-terminal transitions
+                old_status = task.status
+                task.status = restored_status
+
+                # Log the change without triggering checkpoint
+                task._log_status_change(
+                    restored_status.value,
+                    actor_id,
+                    f"Resumed from checkpoint {checkpoint_id}"
                 )
+
+                # Emit event for event sourcing
+                task._emit_status_event(old_status, restored_status, actor_id,
+                                        f"Resumed from checkpoint {checkpoint_id}")
             
         if 'result_data' in snapshot:
             task.result_data = snapshot['result_data']
+            task.result_summary = snapshot.get('result_summary')
+            task.completion_percentage = snapshot.get('completion_percentage')
 
         if 'assigned_task_agent_ids' in snapshot:
             task.assigned_task_agent_ids = snapshot['assigned_task_agent_ids']
 
-        if 'completion_summary' in snapshot:
-            task.completion_summary = snapshot.get('completion_summary')
+        # completion_summary doesn't exist on Task model, skip
+        # if 'completion_summary' in snapshot:
+        #     task.completion_summary = snapshot.get('completion_summary')
 
         # ── 2. Restore agent states ──────────────────────────────
         CheckpointService._restore_agent_states(db, checkpoint.agent_states)
@@ -188,20 +209,54 @@ class CheckpointService:
             raise ValueError(f"Checkpoint {checkpoint_id} not found.")
 
         snapshot = checkpoint.task_state_snapshot
-        
+
         # Create a new branch task avoiding unique constraints
         new_task_id = str(uuid.uuid4())
-        
+
+        # Convert snapshot values back to enums
+        task_type_val = snapshot.get('type', 'execution')
+        if isinstance(task_type_val, str):
+            try:
+                task_type = TaskType(task_type_val)
+            except ValueError:
+                task_type = TaskType.EXECUTION
+        else:
+            task_type = task_type_val
+
+        priority_val = snapshot.get('priority', 'normal')
+        if isinstance(priority_val, str):
+            try:
+                priority = TaskPriority(priority_val)
+            except ValueError:
+                priority = TaskPriority.NORMAL
+        else:
+            priority = priority_val
+
         new_task = Task(
             id=new_task_id,
+            title=snapshot.get('description', 'Branched task'),
             description=snapshot.get('description'),
             supervisor_id=new_supervisor_id or snapshot.get('supervisor_id'),
-            priority=snapshot.get('priority'),
-            type=snapshot.get('type'),
-            session_id=snapshot.get('session_id'),
+            priority=priority,
+            task_type=task_type,
             acceptance_criteria=snapshot.get('acceptance_criteria'),
             veto_authority=snapshot.get('veto_authority'),
-            input_data=snapshot.get('input_data')
+            status=TaskStatus.PENDING,
+            workflow_id=snapshot.get('workflow_id'),
+            error_count=0,
+            retry_count=0,
+            max_retries=5,
+            estimated_tokens=0,
+            tokens_used=0,
+            time_estimated=0,
+            time_actual=0,
+            completion_percentage=0,
+            is_idle_task=False,
+            requires_deliberation=True,
+            approved_by_council=False,
+            approved_by_head=False,
+            sandbox_mode=True,
+            agentium_id=f"B{uuid.uuid4().hex[:10].upper()}",  # Branch prefix + random hex
         )
 
         db.add(new_task)
@@ -209,7 +264,7 @@ class CheckpointService:
         # Create a branch checkpoint
         branch_checkpoint = ExecutionCheckpoint(
             id=str(uuid.uuid4()),
-            session_id=new_task.session_id,
+            session_id=checkpoint.session_id,
             task_id=new_task.id,
             phase=checkpoint.phase,
             agent_states=checkpoint.agent_states,
@@ -324,7 +379,8 @@ class CheckpointService:
                 "description": st.description,
                 "assigned_task_agent_ids": st.assigned_task_agent_ids,
                 "result_data": st.result_data,
-                "completion_summary": st.completion_summary,
+                "result_summary": st.result_summary,
+                "completion_percentage": st.completion_percentage,
             }
             for st in subtasks
         ]
@@ -366,12 +422,22 @@ class CheckpointService:
                 try:
                     restored_status = TaskStatus(saved_status)
                     if subtask.status != restored_status:
-                        subtask.set_status(
-                            restored_status,
-                            actor_id=actor_id,
-                            note=f"Restored from checkpoint {checkpoint_id}",
-                            trigger_checkpoint=False,
+                        # Bypass state machine validation for time-travel resume
+                        # Checkpoint resume should be able to restore ANY captured state,
+                        # including terminal → non-terminal transitions
+                        old_status = subtask.status
+                        subtask.status = restored_status
+
+                        # Log the change without triggering checkpoint
+                        subtask._log_status_change(
+                            restored_status.value,
+                            actor_id,
+                            f"Restored from checkpoint {checkpoint_id}"
                         )
+
+                        # Emit event for event sourcing
+                        subtask._emit_status_event(old_status, restored_status, actor_id,
+                                                   f"Restored from checkpoint {checkpoint_id}")
                 except (ValueError, Exception) as e:
                     logger.warning(
                         f"⚠️ Failed to restore status '{saved_status}' for subtask "
@@ -380,12 +446,13 @@ class CheckpointService:
 
             if "result_data" in snap:
                 subtask.result_data = snap["result_data"]
+                subtask.result_summary = snap.get("result_summary")
 
             if "assigned_task_agent_ids" in snap:
                 subtask.assigned_task_agent_ids = snap["assigned_task_agent_ids"]
 
-            if "completion_summary" in snap:
-                subtask.completion_summary = snap.get("completion_summary")
+            if "completion_percentage" in snap:
+                subtask.completion_percentage = snap.get("completion_percentage")
 
 
 

@@ -481,3 +481,107 @@ def auth_headers(client, seeded_db):
     assert response.status_code == 200, f"Login failed: status={response.status_code}, body={response.text}"
     token = response.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# SHARED FIXTURES FOR CROSS-COMPONENT INTEGRATION TESTS
+# ═══════════════════════════════════════════════════════════════════════
+
+@pytest.fixture(scope="function")
+def chat_context_builder():
+    """Create a ChatContextBuilder instance for testing."""
+    from backend.services.chat_context import ChatContextBuilder
+    return ChatContextBuilder(
+        window_size=10,
+        model_limit=128000
+    )
+
+
+@pytest.fixture(scope="function")
+def context_manager_clean():
+    """Create a fresh ContextWindowManager instance for testing."""
+    from backend.services.context_manager import ContextWindowManager
+    # Reset singleton
+    ContextWindowManager._instance = None
+    return ContextWindowManager()
+
+
+@pytest.fixture(scope="function")
+def seeded_task_with_agents(seeded_db):
+    """Create a task with supervisor and assigned agents."""
+    from backend.models.entities.task import Task, TaskType, TaskPriority, TaskStatus
+    from backend.models.entities.agents import Agent, AgentType, AgentStatus, CouncilMember
+
+    # Create task
+    task = Task(
+        title="Test task with agents",
+        description="Test task with agents",
+        task_type=TaskType.EXECUTION,
+        priority=TaskPriority.NORMAL,
+        status=TaskStatus.IN_PROGRESS,
+        supervisor_id="10003",
+        assigned_task_agent_ids=["10003", "10004"]
+    )
+    seeded_db.add(task)
+    seeded_db.flush()
+
+    # Ensure agents exist
+    for agent_id in ["10003", "10004"]:
+        agent = seeded_db.query(Agent).filter_by(agentium_id=agent_id).first()
+        if not agent:
+            agent = CouncilMember(
+                agentium_id=agent_id,
+                name=f"Agent {agent_id}",
+                agent_type=AgentType.COUNCIL_MEMBER,
+                status=AgentStatus.ACTIVE,
+                is_persistent=True,
+            )
+            seeded_db.add(agent)
+    seeded_db.commit()
+
+    return task
+
+
+@pytest.fixture(scope="function")
+def fake_model_provider(monkeypatch):
+    """Patch ModelService to return deterministic mock responses."""
+    from backend.services.model_provider import ModelService
+
+    class MockProvider:
+        def __init__(self):
+            self.calls = []
+            self.default_response = {
+                "content": "Mock deterministic response",
+                "tokens_used": 100,
+                "prompt_tokens": 60,
+                "completion_tokens": 40,
+                "latency_ms": 15,
+                "model": "mock-deterministic-v1",
+                "cost_usd": 0.001,
+                "finish_reason": "stop",
+            }
+            self.custom_responses = []
+
+        async def mock_generate(self, *args, **kwargs):
+            call = {"args": args, "kwargs": kwargs}
+            self.calls.append(call)
+
+            if self.custom_responses:
+                resp = self.custom_responses.pop(0)
+                full_resp = self.default_response.copy()
+                full_resp.update(resp)
+                return full_resp
+
+            resp = self.default_response.copy()
+            user_msg = kwargs.get("user_message", "") if "user_message" in kwargs else str(args[0]) if args else ""
+            resp["content"] = f"Mock response to: {user_msg[:50]}..."
+            return resp
+
+        @property
+        def call_count(self):
+            return len(self.calls)
+
+    mock = MockProvider()
+    monkeypatch.setattr(ModelService, "generate_with_agent", mock.mock_generate)
+    monkeypatch.setattr(ModelService, "generate_with_agent_tools", mock.mock_generate)
+    yield mock
