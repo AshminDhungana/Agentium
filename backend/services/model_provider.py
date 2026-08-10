@@ -10,10 +10,12 @@ import time
 import json
 import uuid
 import httpx
-from typing import Optional, Dict, Any, AsyncGenerator, List, Callable, Tuple, Awaitable
+from typing import Optional, Dict, Any, AsyncGenerator, List, Callable, Tuple, Awaitable, Type
 from abc import ABC, abstractmethod
 from datetime import datetime
 import logging
+
+from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +34,123 @@ from backend.core.tool_runner import (
     register_tool_run,
     deregister_tool_run,
 )
+from backend.core.response_validator import ResponseValidator
+
+
+async def _build_reprompt_message(
+    original_content: str,
+    validation_error: Dict[str, Any],
+    response_model: Type[BaseModel],
+) -> str:
+    """Build a re-prompt message for validation failure."""
+    details = validation_error.get("details", [])
+    error_lines = []
+    for d in details:
+        loc = " -> ".join(str(x) for x in d.get("loc", ()))
+        msg = d.get("msg", "Unknown error")
+        if loc:
+            error_lines.append(f"- Field '{loc}': {msg}")
+        else:
+            error_lines.append(f"- {msg}")
+
+    error_text = "\n".join(error_lines)
+    schema = response_model.model_json_schema()
+
+    return (
+        f"Your previous response failed schema validation.\n\n"
+        f"Errors:\n{error_text}\n\n"
+        f"Please output ONLY valid JSON matching the schema. No markdown, no explanations.\n\n"
+        f"Schema:\n{json.dumps(schema, indent=2)}"
+    )
+
+
+async def retry_with_validation(
+    response_model: Type[BaseModel],
+    content: str,
+    messages: List[Dict[str, str]],
+    provider: "BaseModelProvider",
+    system_prompt: str,
+    *,
+    max_retries: int = 2,
+    agentium_id: str = "system",
+    **kwargs,
+) -> Tuple[Optional[BaseModel], Optional[Dict[str, Any]]]:
+    """
+    Re-prompt LLM to produce valid structured output.
+
+    Strategy:
+    1. Try native response_format if provider supports it (OpenAI-compatible)
+    2. Otherwise, add validation error as user message and call provider.generate()
+    3. Repeat up to max_retries times
+
+    Returns:
+        (parsed_model, None) on success
+        (None, error_dict) on max retries exceeded
+
+    Note: error_dict includes "attempts" key indicating number of retries attempted
+    """
+    from pydantic import BaseModel
+
+    # First, validate the initial content
+    parsed, error = ResponseValidator.validate(response_model, content)
+    if error is None:
+        return parsed, None
+
+    # Build conversation for re-prompting
+    conversation = list(messages)
+
+    # Check if provider supports native response_format (OpenAI-compatible)
+    supports_response_format = hasattr(provider, 'config') and str(provider.config.provider).lower() in (
+        'openai', 'azure', 'azure_openai', 'groq', 'mistral', 'together',
+        'fireworks', 'perplexity', 'deepseek', 'moonshot', 'qianwen', 'zhipu',
+        'custom', 'openai_compatible', 'local'
+    )
+
+    attempts = 0
+    for attempt in range(max_retries):
+        attempts = attempt + 1
+        if supports_response_format and hasattr(response_model, 'model_json_schema'):
+            # Use native response_format with JSON schema
+            schema = response_model.model_json_schema()
+            # OpenAI requires "strict": true and name field
+            response_format = {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": response_model.__name__,
+                    "schema": schema,
+                    "strict": True,
+                }
+            }
+            # Pass response_format via kwargs to provider.generate
+            result = await provider.generate(
+                system_prompt=system_prompt,
+                user_message=f"Previous attempt failed. Please output valid JSON only.\n\nSchema:\n{json.dumps(schema, indent=2)}",
+                response_format=response_format,
+                **kwargs,
+            )
+        else:
+            # Fallback: Add re-prompt message to conversation
+            reprompt_msg = await _build_reprompt_message(content, error, response_model)
+            conversation.append({"role": "user", "content": reprompt_msg})
+            result = await provider.generate(
+                system_prompt=system_prompt,
+                user_message=conversation[-1]["content"],
+                **kwargs,
+            )
+
+        # Validate the new response
+        content = result.get("content", "")
+        parsed, error = ResponseValidator.validate(response_model, content)
+        if error is None:
+            # Success - include attempts in a special success error dict
+            return parsed, {"attempts": attempts, "success": True}
+
+        # Continue to next retry
+        content = result.get("content", "")
+
+    # All retries exhausted
+    error["attempts"] = attempts
+    return None, error
 
 
 async def _record_provider_headers(config) -> None:
@@ -642,17 +761,24 @@ class OpenAICompatibleProvider(BaseModelProvider):
         try:
             rpm = getattr(self.config, "requests_per_minute", 60) or 60
             await provider_rate_limiter.acquire(self.config.id, rpm)
-            response = await client.chat.completions.create(
-                model=kwargs.get('model', self.config.default_model),
-                messages=[
+
+            # Build create kwargs, including response_format if provided
+            create_kwargs = {
+                "model": kwargs.get('model', self.config.default_model),
+                "messages": [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_message}
                 ],
-                max_tokens=kwargs.get('max_tokens', self.config.max_tokens),
-                temperature=kwargs.get('temperature', self.config.temperature),
-                top_p=kwargs.get('top_p', self.config.top_p),
+                "max_tokens": kwargs.get('max_tokens', self.config.max_tokens),
+                "temperature": kwargs.get('temperature', self.config.temperature),
+                "top_p": kwargs.get('top_p', self.config.top_p),
                 **self._thinking_kwargs(),
-            )
+            }
+            # Add response_format for structured outputs (if provided)
+            if "response_format" in kwargs:
+                create_kwargs["response_format"] = kwargs["response_format"]
+
+            response = await client.chat.completions.create(**create_kwargs)
 
             await _record_provider_headers(self.config)
 
@@ -1717,6 +1843,9 @@ class ModelService:
         on_delta: Optional[Callable[[str], Awaitable[None]]] = None,
         cancel_event: Optional[asyncio.Event] = None,
         on_tool_start: Optional[Callable[[List[Dict], int], Awaitable[None]]] = None,
+        # NEW: Output schema validation parameters
+        response_model: Optional[Type[BaseModel]] = None,
+        max_validation_retries: int = 2,
         **kwargs,
     ) -> Dict[str, Any]:
         """
@@ -1737,9 +1866,11 @@ class ModelService:
             config_id:              Optional ModelConfig ID override.
             system_prompt_override: Use instead of ethos.mission_statement.
             agent_tier:             Tier string like "3xxxx". Inferred from
-                                    agent.agentium_id[0] + "xxxx" if not supplied.
+                                        agent.agentium_id[0] + "xxxx" if not supplied.
             task_id:                Passed to ToolUsageLog for analytics correlation.
             max_tool_iterations:    Safety cap on agentic loop turns (default 10).
+            response_model:         Optional Pydantic model for structured output validation.
+            max_validation_retries: Max retries for validation failures (default 2).
             **kwargs:               Forwarded to the provider (model, max_tokens, etc.).
 
         Returns:
@@ -1752,9 +1883,13 @@ class ModelService:
                 "latency_ms":        int,
                 "model":             str,
                 "messages":          list,   # full conversation history
+                "parsed_response":   dict,   # validated response model (if response_model provided)
+                "validation_error":  dict,   # error details if validation failed
+                "validation_retries": int,   # number of retries attempted
             }
         """
         from backend.core.tool_registry import tool_registry
+        from pydantic import BaseModel
 
         provider = await ModelService.get_provider("sovereign", config_id)
         if not provider:
@@ -1851,7 +1986,48 @@ class ModelService:
             cost = result.get("cost_usd", 0.0)
             tokens = result.get("tokens_used", 0)
             api_key_manager.record_spend(provider.config.id, cost, tokens, db=db)
-            return result
+
+            # ── NEW: Response schema validation ──
+            validation_retries = 0
+            parsed_response = None
+            validation_error = None
+
+            if response_model is not None:
+                # Validate the final response content
+                from backend.core.response_validator import ResponseValidator
+                from backend.services.model_provider import retry_with_validation
+
+                # Check if the content is already valid
+                parsed, error = ResponseValidator.validate(response_model, result.get("content", ""))
+                if error is None:
+                    parsed_response = parsed.model_dump() if parsed else None
+                    validation_retries = 0
+                else:
+                    # Retry with validation
+                    parsed, retry_result = await retry_with_validation(
+                        response_model=response_model,
+                        content=result.get("content", ""),
+                        messages=messages,
+                        provider=provider,
+                        system_prompt=system_prompt,
+                        max_retries=max_validation_retries,
+                        agentium_id=agent_id,
+                        **kwargs,
+                    )
+                    validation_retries = retry_result.get("attempts", 0) if retry_result else 0
+                    if parsed is not None:
+                        parsed_response = parsed.model_dump()
+                    else:
+                        validation_error = retry_result
+
+            # Build final result with validation fields
+            final_result = {
+                **result,
+                "parsed_response": parsed_response,
+                "validation_error": validation_error,
+                "validation_retries": validation_retries,
+            }
+            return final_result
         except Exception as e:
             is_rate_limit = "rate limit" in str(e).lower() or "429" in str(e)
             api_key_manager.mark_key_failed(provider.config.id, error=str(e), is_rate_limit=is_rate_limit, db=db)
