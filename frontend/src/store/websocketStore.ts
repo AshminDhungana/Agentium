@@ -834,6 +834,25 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
                         return;
                     }
 
+                    // ── Genesis nation-name prompt (live broadcast) ──────────────
+                    // After Head 00001 is early-committed, the WS reconnects
+                    // successfully (active phase) and never enters the genesis-
+                    // status polling path. The backend broadcasts a genesis_prompt
+                    // message when it's time to name the country — handle it here
+                    // so the naming modal shows up immediately.
+                    if (data.type === 'genesis_prompt') {
+                        const meta = data.metadata as Record<string, unknown> | undefined;
+                        if (meta?.prompt_type === 'country_name') {
+                            logger.debug('[WebSocket] genesis_prompt received — showing country name modal');
+                            set({
+                                genesisAwaitingName: true,
+                                genesisNamePrompt: String(data.content ?? ''),
+                                genesisNameTimeout: Number(meta.timeout_seconds ?? 60),
+                            });
+                        }
+                        return;
+                    }
+
                     // genesis_triggered=false  → no API key saved yet, stay silent.
                     // genesis_triggered=true   → API key exists, genesis is running,
                     //                            poll genesis-status every 2s (P8: no

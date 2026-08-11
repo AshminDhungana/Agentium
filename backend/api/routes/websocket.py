@@ -517,6 +517,40 @@ class ConnectionManager:
 manager = ConnectionManager()
 
 
+# ── genesis prompt re-delivery on fresh connections ───────────────────────────
+
+async def _send_genesis_prompt_if_awaiting(websocket: WebSocket) -> None:
+    """Push the nation-name prompt to a newly-authenticated client.
+
+    After Head 00001 is early-committed, the WebSocket handshake succeeds and
+    the client enters the ``active`` phase — but genesis may still be paused on
+    the country-name prompt. The original broadcast was sent before this socket
+    existed (nobody to receive it), so we re-deliver it here.
+    """
+    from backend.services import initialization_service as _init_svc
+
+    active = _init_svc.get_active_genesis()
+    if active is None or not getattr(active, "awaiting_country_name", False):
+        return
+
+    try:
+        await websocket.send_json({
+            "type":      "genesis_prompt",
+            "role":      "head_of_council",
+            "content":   active.country_name_prompt,
+            "is_urgent": True,
+            "timestamp": datetime.utcnow().isoformat(),
+            "metadata": {
+                "requires_response":  True,
+                "timeout_seconds":    active.COUNTRY_NAME_TIMEOUT_SECONDS,
+                "prompt_type":        "country_name",
+            },
+        })
+        logger.info("[WebSocket] Re-delivered genesis_prompt to newly authenticated client")
+    except Exception as exc:
+        logger.warning(f"[WebSocket] Failed to re-deliver genesis_prompt: {exc}")
+
+
 # ═══════════════════════════════════════════════════════════
 # WebSocket endpoint (unchanged)
 # ═══════════════════════════════════════════════════════════
@@ -561,6 +595,11 @@ async def websocket_chat_endpoint(
             ),
             "timestamp": datetime.utcnow().isoformat(),
         })
+        # If genesis is currently awaiting the country name, push the prompt
+        # directly to this newly-connected client.  The original broadcast
+        # was sent before this socket existed (Head 00001 was early-committed
+        # but the WS hadn't reconnected yet), so the client never saw it.
+        await _send_genesis_prompt_if_awaiting(websocket)
 
     try:
         while True:
@@ -598,6 +637,8 @@ async def websocket_chat_endpoint(
                     ),
                     "timestamp": datetime.utcnow().isoformat(),
                 })
+                # See comment above — push genesis prompt if awaiting.
+                await _send_genesis_prompt_if_awaiting(websocket)
                 continue
 
             # ── Require authentication ────────────────────────────────────────
