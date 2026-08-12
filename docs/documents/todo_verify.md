@@ -38,55 +38,55 @@
 
 > **Files**: `docker-compose.yml`, `docker-compose.test.yml`, `docker-compose.remote-executor.yml`, `Makefile`, `.env.example`
 
-- [ ] **1.1 — PostgreSQL Container**
-  - [ ] 1.1.1 — Container starts cleanly with `docker compose up postgres`
-  - [ ] 1.1.2 — `pg_isready -U agentium` healthcheck passes
-  - [ ] 1.1.3 — `pg_stat_statements` extension loads (`shared_preload_libraries` flag works)
-  - [ ] 1.1.4 — Slow-query logging at ≥500ms threshold produces output in `docker compose logs postgres`
-  - [ ] 1.1.5 — Data persists across container restarts via `postgres_data` volume
+- [x] **1.1 — PostgreSQL Container**
+  - [x] 1.1.1 — Container starts cleanly with `docker compose up postgres`
+  - [x] 1.1.2 — `pg_isready -U agentium` healthcheck passes
+  - [x] 1.1.3 — `pg_stat_statements` extension loads (`shared_preload_libraries` flag works)
+  - [x] 1.1.4 — Slow-query logging at ≥500ms threshold produces output in `docker compose logs postgres`
+  - [x] 1.1.5 — Data persists across container restarts via `postgres_data` volume
 
-- [ ] **1.2 — ChromaDB Container**
-  - [ ] 1.2.1 — Container starts and healthcheck passes (TCP probe on port 8000)
-  - [ ] 1.2.2 — Port mapping correct: host `8001` → container `8000`
-  - [ ] 1.2.3 — Memory limits enforced (2G limit / 1G reservation)
-  - [ ] 1.2.4 — Vector data persists via `chroma_data` volume
-  - [ ] 1.2.5 — Backend can connect and create/query collections
+- [x] **1.2 — ChromaDB Container**
+  - [x] 1.2.1 — Container starts and healthcheck passes (TCP probe on port 8000)
+  - [x] 1.2.2 — Port mapping correct: host `8001` → container `8000`
+  - [x] 1.2.3 — Memory limits enforced (2G limit / 1G reservation)
+  - [x] 1.2.4 — Vector data persists via `chroma_data` volume
+  - [x] 1.2.5 — Backend can connect and create/query collections
 
-- [ ] **1.3 — Redis Container**
-  - [ ] 1.3.1 — Container starts, `redis-cli ping` returns `PONG`
-  - [ ] 1.3.2 — Custom `redis.conf` mounts correctly from `./redis/redis.conf`
-  - [ ] 1.3.3 — Redis is accessible as Celery broker (`redis://redis:6379/0`)
-  - [ ] 1.3.4 — Data persists via `redis_data` volume
+- [x] **1.3 — Redis Container**
+  - [x] 1.3.1 — Container starts, `redis-cli ping` returns `PONG`
+  - [x] 1.3.2 — Custom `redis.conf` mounts correctly from `./redis/redis.conf`
+  - [x] 1.3.3 — Redis is accessible as Celery broker (`redis://redis:6379/0`)
+  - [x] 1.3.4 — Data persists via `redis_data` volume
 
-- [ ] **1.4 — MinIO Object Storage**
-  - [ ] 1.4.1 — Container starts, console accessible at `http://localhost:9001`
-  - [ ] 1.4.2 — S3-compatible API responds on port `9000`
-  - [ ] 1.4.3 — Backend `storage_service.py` can upload/download files
-  - [ ] 1.4.4 — Fallback to local disk when MinIO is unreachable
-  - [ ] 1.4.5 — Default credential detection warns/blocks (`security_checks.py`)
+- [x] **1.4 — MinIO Object Storage**
+  - [x] 1.4.1 — Container starts, console accessible at `http://localhost:9001`
+  - [x] 1.4.2 — S3-compatible API responds on port `9000`
+  - [x] 1.4.3 — Backend `storage_service.py` can upload/download files
+  - [x] 1.4.4 — Fallback to local disk when MinIO is unreachable
+  - [x] 1.4.5 — Default credential detection warns/blocks (`security_checks.py`)
 
-- [ ] **1.5 — Backend (FastAPI) Container**
-  - [ ] 1.5.1 — `Dockerfile` / `Dockerfile.privileged` builds without errors
-  - [ ] 1.5.2 — Container starts, API responds on port `8000`
-  - [ ] 1.5.3 — All environment variables from `.env.example` are documented and applied
-  - [ ] 1.5.4 — Host workspace bind mounts (`/host`, `/host_home`) work on Windows
+- [x] **1.5 — Backend (FastAPI) Container**
+  - [x] 1.5.1 — `Dockerfile` / `Dockerfile.privileged` builds without errors
+  - [x] 1.5.2 — Container starts, API responds on port `8000`
+  - [x] 1.5.3 — All environment variables from `.env.example` are documented and applied
+  - [x] 1.5.4 — Host workspace bind mounts (`/host`, `/host_home`) work on Windows
 
-- [ ] **1.6 — Celery Worker & Beat Containers**
-  - [ ] 1.6.1 — Worker container starts and connects to Redis broker
-  - [ ] 1.6.2 — Beat container starts and schedules fire on time
-  - [ ] 1.6.3 — Worker discovers all task modules in `include` list
-  - [ ] 1.6.4 — `celery inspect active` shows running workers
+- [x] **1.6 — Celery Worker & Beat Containers**
+  - [x] 1.6.1 — Worker container starts and connects to Redis broker
+  - [x] 1.6.2 — Beat container starts and schedules fire on time
+  - [x] 1.6.3 — Worker discovers all task modules in `include` list
+  - [x] 1.6.4 — `celery inspect active` shows running workers
 
-- [ ] **1.7 — WhatsApp Bridge Container**
-  - [ ] 1.7.1 — Bridge container starts on port `3001`
-  - [ ] 1.7.2 — QR code generation works for pairing
-  - [ ] 1.7.3 — Webhook callbacks to backend are delivered
+- [x] **1.7 — WhatsApp Bridge Container**
+  - [x] 1.7.1 — Bridge container starts on port `3001`
+  - [x] 1.7.2 — QR code generation works for pairing
+  - [x] 1.7.3 — Webhook callbacks to backend are delivered
 
-- [ ] **1.8 — Docker Network & Compose Orchestration**
-  - [ ] 1.8.1 — `agentium-network` is created and all services are attached
-  - [ ] 1.8.2 — `docker compose up` starts all services without errors
-  - [ ] 1.8.3 — `docker compose down -v` cleanly tears everything down
-  - [ ] 1.8.4 — Service dependency ordering (depends_on with healthchecks) works correctly
+- [x] **1.8 — Docker Network & Compose Orchestration**
+  - [x] 1.8.1 — `agentium-network` is created and all services are attached
+  - [x] 1.8.2 — `docker compose up` starts all services without errors
+  - [x] 1.8.3 — `docker compose down -v` cleanly tears everything down
+  - [x] 1.8.4 — Service dependency ordering (depends_on with healthchecks) works correctly
 
 ---
 
