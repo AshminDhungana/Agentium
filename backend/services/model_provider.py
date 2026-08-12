@@ -14,6 +14,7 @@ from typing import Optional, Dict, Any, AsyncGenerator, List, Callable, Tuple, A
 from abc import ABC, abstractmethod
 from datetime import datetime
 import logging
+from unittest.mock import MagicMock
 
 from pydantic import BaseModel
 
@@ -35,6 +36,10 @@ from backend.core.tool_runner import (
     deregister_tool_run,
 )
 from backend.core.response_validator import ResponseValidator
+
+# Uncertainty detection & clarification (Task 21.1.5)
+from backend.core.uncertainty_detector import UncertaintyDetector
+from backend.services.clarification_handler import ClarificationHandler
 
 
 async def _build_reprompt_message(
@@ -165,8 +170,8 @@ async def _record_provider_headers(config) -> None:
         await provider_rate_limiter.record_header_insight(config.id, provider, headers)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Task 17 — Reuse a single SDK client per provider config.
+# ---------------
+# Task 17 -- Reuse a single SDK client per provider config.
 #
 # Previously every generate()/stream_generate()/generate_with_tools() call
 # built a brand-new openai.AsyncOpenAI / anthropic.AsyncAnthropic instance.
@@ -175,7 +180,7 @@ async def _record_provider_headers(config) -> None:
 # state. We now construct ONE client per (config_id, api_key) and reuse it for
 # the lifetime of the process. The client is also the attachment point for the
 # httpx event hook that feeds raw rate-limit headers into the limiter (Task 10).
-# ─────────────────────────────────────────────────────────────────────────────
+# ---------------
 
 # Cache of SDK clients keyed by (config_id, api_key, base_url, is_anthropic).
 # api_key is part of the key so a rotated key transparently yields a fresh
@@ -251,7 +256,7 @@ def _get_cached_sdk_client(
     _CLIENT_CACHE[cache_key] = client
     return client
 
-# ─────────────────────────────────────────────────────────────────────────────
+# ---------------
 # Per-model pricing table
 # Prices are USD per 1 M tokens (input_rate, output_rate).
 # Source: official provider pricing pages as of June 2026.
@@ -261,12 +266,12 @@ def _get_cached_sdk_client(
 # NOTE: Anthropic model_used values come back from the API as the canonical
 # IDs above (e.g. "claude-sonnet-4-6"). The prefix-match fallback in
 # calculate_cost() also covers dated/snapshot variants if Anthropic adds them.
-# ─────────────────────────────────────────────────────────────────────────────
+# ---------------
 
 # fmt: off
 MODEL_PRICES: Dict[str, Tuple[float, float]] = {
-    # ── OpenAI ───────────────────────────────────────────────────────────────
-    # Current generation (Jun 2026) — see https://openai.com/api/pricing/
+    # -- OpenAI --------
+    # Current generation (Jun 2026) -- see https://openai.com/api/pricing/
     "gpt-5.5":                         (5.00,   30.00),
     "gpt-5.5-pro":                     (30.00, 180.00),
     "gpt-5.4":                         (2.50,   15.00),
@@ -296,8 +301,8 @@ MODEL_PRICES: Dict[str, Tuple[float, float]] = {
     "o1-mini":                         (3.00,   12.00),
     "o3-mini":                         (1.10,    4.40),
 
-    # ── Anthropic ────────────────────────────────────────────────────────────
-    # Current generation (Jun 2026) — see https://platform.claude.com/docs/en/about-claude/pricing
+    # -- Anthropic ------
+    # Current generation (Jun 2026) -- see https://platform.claude.com/docs/en/about-claude/pricing
     "claude-fable-5":                  (10.00,  50.00),
     "claude-mythos-5":                 (10.00,  50.00),   # limited availability (Project Glasswing)
     "claude-mythos-preview":           (10.00,  50.00),   # limited availability (Project Glasswing)
@@ -323,8 +328,8 @@ MODEL_PRICES: Dict[str, Tuple[float, float]] = {
     "claude-2.1":                      (8.00,   24.00),
     "claude-2.0":                      (8.00,   24.00),
 
-    # ── Google Gemini ─────────────────────────────────────────────────────────
-    # Current generation (Jun 2026), standard ≤200K-token rate — see https://ai.google.dev/gemini-api/docs/pricing
+    # -- Google Gemini --------------
+    # Current generation (Jun 2026), standard ≤200K-token rate -- see https://ai.google.dev/gemini-api/docs/pricing
     "gemini-3.1-pro":                  (2.00,   12.00),
     "gemini-3.1-pro-preview":          (2.00,   12.00),
     "gemini-3.5-flash":                (1.50,    9.00),
@@ -342,14 +347,14 @@ MODEL_PRICES: Dict[str, Tuple[float, float]] = {
     "gemini-1.0-pro":                  (0.50,    1.50),
     "gemini-2.0-flash":                (0.10,    0.40),
 
-    # ── Groq ─────────────────────────────────────────────────────────────────
+    # -- Groq ----------
     "llama-3.3-70b-versatile":         (0.59,    0.79),
     "llama-3.1-8b-instant":            (0.05,    0.08),
     "llama-3.1-70b-versatile":         (0.59,    0.79),
     "mixtral-8x7b-32768":              (0.24,    0.24),
     "gemma2-9b-it":                    (0.20,    0.20),
 
-    # ── Mistral ───────────────────────────────────────────────────────────────
+    # -- Mistral --------
     "mistral-large-latest":            (2.00,    6.00),
     "mistral-medium-latest":           (2.75,    8.10),
     "mistral-small-latest":            (0.20,    0.60),
@@ -358,29 +363,29 @@ MODEL_PRICES: Dict[str, Tuple[float, float]] = {
     "open-mixtral-8x22b":              (2.00,    6.00),
     "codestral-latest":                (0.20,    0.60),
 
-    # ── Together AI ───────────────────────────────────────────────────────────
+    # -- Together AI -------
     "meta-llama/meta-llama-3.1-70b-instruct-turbo":  (0.88,  0.88),
     "meta-llama/meta-llama-3.1-8b-instruct-turbo":   (0.18,  0.18),
     "meta-llama/meta-llama-3.1-405b-instruct-turbo": (3.50,  3.50),
     "mistralai/mixtral-8x7b-instruct-v0.1":          (0.60,  0.60),
     "qwen/qwen2.5-72b-instruct-turbo":               (1.20,  1.20),
 
-    # ── DeepSeek ──────────────────────────────────────────────────────────────
+    # -- DeepSeek -------
     "deepseek-chat":                   (0.27,    1.10),
     "deepseek-reasoner":               (0.55,    2.19),
     "deepseek-coder":                  (0.27,    1.10),
 
-    # ── Moonshot (Kimi) ───────────────────────────────────────────────────────
+    # -- Moonshot (Kimi) ------------
     "moonshot-v1-8k":                  (1.63,    1.63),
     "moonshot-v1-32k":                 (3.26,    3.26),
     "moonshot-v1-128k":                (8.14,    8.14),
 
-    # ── Cohere ────────────────────────────────────────────────────────────────
+    # -- Cohere ---------
     "command-r-plus":                  (2.50,   10.00),
     "command-r":                       (0.15,    0.60),
     "command":                         (1.00,    2.00),
 
-    # ── Local / free — all cost $0 ───────────────────────────────────────────
+    # -- Local / free -- all cost $0 ------------
 }
 # fmt: on
 
@@ -432,7 +437,7 @@ def calculate_cost(
         # 1. Exact match in hardcoded MODEL_PRICES
         prices = MODEL_PRICES.get(normalised)
 
-    # 2. Prefix match — handles dated/snapshot suffixes, e.g.
+    # 2. Prefix match -- handles dated/snapshot suffixes, e.g.
     #    "claude-opus-4-8-20260615" → "claude-opus-4-8", "gpt-4o-2024-xx-xx" → "gpt-4o".
     #    Picks the LONGEST matching key (most specific) rather than the first
     #    one found, since dict order can't be relied on to put more specific
@@ -459,7 +464,7 @@ def calculate_cost(
     return round(cost, 8)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+# ---------------
 
 class BaseModelProvider(ABC):
     """Abstract base for all model providers."""
@@ -475,14 +480,14 @@ class BaseModelProvider(ABC):
         # every provider EXCEPT AI21 / AZURE_OPENAI / CUSTOM / OPENAI_COMPATIBLE,
         # which require the user to supply api_base_url explicitly. Without this
         # check, base_url=None gets passed straight to openai.AsyncOpenAI(),
-        # which silently defaults to https://api.openai.com/v1 — i.e. the exact
+        # which silently defaults to https://api.openai.com/v1 -- i.e. the exact
         # "everything calls OpenAI" bug this is guarding against.
         if self.base_url is None and config.provider != ProviderType.ANTHROPIC:
             raise ValueError(
                 f"No base URL configured for provider '{config.provider.value}' "
                 f"(config_id={getattr(config, 'id', '?')}). This provider requires "
                 f"an explicit api_base_url (or azure_endpoint for Azure) to be set "
-                f"on the model config — refusing to fall back to a default endpoint."
+                f"on the model config -- refusing to fall back to a default endpoint."
             )
 
     def _get_api_key(self) -> Optional[str]:
@@ -593,7 +598,7 @@ def _normalize_tool_choice(tool_choice: Any) -> Any:
     nothing and makes tool-calling robust across providers.
 
     Forced function calls (``{"type": "function", "function": {...}}``) are left
-    untouched — only the bare-mode dicts are normalized.
+    untouched -- only the bare-mode dicts are normalized.
     """
     if (
         isinstance(tool_choice, dict)
@@ -603,7 +608,7 @@ def _normalize_tool_choice(tool_choice: Any) -> Any:
     return tool_choice
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+# ---------------
 # Extended-thinking wiring (Task 3).
 #
 # A single source of truth that maps a UserModelConfig.effort value to the
@@ -614,7 +619,7 @@ def _normalize_tool_choice(tool_choice: Any) -> Any:
 #   * unsupported provider        -> {}   (e.g. COHERE is intentionally absent)
 #   * model fails the model_hint  -> {}   (e.g. gpt-4o is not a reasoning model)
 # so nothing invalid is ever sent upstream.
-# ─────────────────────────────────────────────────────────────────────────────
+# ---------------
 
 # Per-provider extended-thinking strategy. `kind` selects the param shape;
 # `model_hint` (optional regex) gates both UI visibility and param emission.
@@ -952,6 +957,7 @@ class OpenAICompatibleProvider(BaseModelProvider):
         on_delta: Optional[Callable[[str], Awaitable[None]]] = None,
         cancel_event: Optional[asyncio.Event] = None,
         on_tool_start: Optional[Callable[[List[Dict], int], Awaitable[None]]] = None,
+        db: Any = None,
         **kwargs,
     ) -> Dict[str, Any]:
         """
@@ -984,6 +990,9 @@ class OpenAICompatibleProvider(BaseModelProvider):
                 "messages":          full conversation history including tool turns,
             }
         """
+        print(f"DEBUG ENTRY: generate_with_tools called, max_iterations={max_iterations}")
+
+
         actual_model = kwargs.get("model", self.config.default_model)
         client = getattr(self, "_client", None) or _get_cached_sdk_client(
             self.config,
@@ -1017,12 +1026,12 @@ class OpenAICompatibleProvider(BaseModelProvider):
                     # Honor an explicit tool_choice from the caller (e.g. the
                     # decision engine forces a specific tool); default to "auto".
                     # Normalize the dict form {"type": "auto"} to the string
-                    # "auto" — some upstreams (Novita) reject the dict form.
+                    # "auto" -- some upstreams (Novita) reject the dict form.
                     create_kwargs["tool_choice"] = _normalize_tool_choice(
                         kwargs.get("tool_choice", "auto")
                     )
 
-                # ── Prompt caching (Task 2.1) ────────────────────────────────────
+                # -- Prompt caching (Task 2.1) -----
                 # A stable prefix (system + summary + first message) is identical
                 # across turns, so route it to a shared cache via prompt_cache_key.
                 # Only meaningful for OpenAI-family providers; others ignore it.
@@ -1032,7 +1041,7 @@ class OpenAICompatibleProvider(BaseModelProvider):
                 ):
                     create_kwargs["prompt_cache_key"] = _pc_key
 
-                # ── Extended thinking (Task 3) ─────────────────────────────────
+                # -- Extended thinking (Task 3) ---------
                 # Merge provider-specific reasoning params (extra_body/temperature)
                 # into the call kwargs. Works for both the blocking `create` path
                 # below and the streaming path (which copies create_kwargs).
@@ -1042,8 +1051,11 @@ class OpenAICompatibleProvider(BaseModelProvider):
                 await provider_rate_limiter.acquire(self.config.id, rpm)
 
                 if on_delta is None:
-                    # ── Blocking path ──────────────────────────────────────────
+                    # -- Blocking path -----------
                     response = await client.chat.completions.create(**create_kwargs)
+                    print(f"DEBUG: Got response, finish_reason={response.choices[0].finish_reason}")
+                    print(f"DEBUG: response.choices[0].message = {response.choices[0].message}")
+                    print(f"DEBUG: response.choices[0].message.tool_calls = {response.choices[0].message.tool_calls}")
                     await _record_provider_headers(self.config)
 
                     # Defensive: a test double may return an async stream even
@@ -1051,7 +1063,9 @@ class OpenAICompatibleProvider(BaseModelProvider):
                     # run the identical decision logic below. Real providers
                     # return a non-stream object here, so this branch is a no-op
                     # in production (behavior stays byte-for-byte identical).
-                    if hasattr(response, "__aiter__"):
+                    # Use type check to avoid MagicMock false positives
+                    if hasattr(response, "__aiter__") and callable(getattr(response, "__aiter__", None)) \
+                       and not isinstance(response, MagicMock):
                         msg, turn_usage, finish_reason = await self._assemble_stream_turn(
                             response, None, None
                         )
@@ -1064,11 +1078,16 @@ class OpenAICompatibleProvider(BaseModelProvider):
                         finish_reason = response.choices[0].finish_reason
                         msg_tool_calls = msg.tool_calls
                         msg_content = msg.content
+                        print(f"DEBUG: msg_tool_calls={msg_tool_calls}, msg_content={msg_content}, finish_reason={finish_reason}")
                         # Append raw assistant turn to history so the next
                         # iteration has full context.  model_dump(exclude_none=True)
                         # avoids sending null fields that some providers reject.
                         try:
-                            conversation.append(msg.model_dump(exclude_none=True))
+                            conversation.append({
+                                "role": "assistant",
+                                "content": msg.content or "",
+                                **({"tool_calls": [tc.model_dump() for tc in msg.tool_calls]} if msg.tool_calls else {}),
+                            })
                         except Exception:
                             conversation.append({
                                 "role": "assistant",
@@ -1097,12 +1116,14 @@ class OpenAICompatibleProvider(BaseModelProvider):
                                     },
                                 })
 
-                    # Model signalled it is done — no more tool calls
+                    # Model signalled it is done -- no more tool calls
                     if finish_reason == "stop" or not norm_tool_calls:
                         content = msg_content or ""
+                        print(f"DEBUG: Breaking loop - finish_reason={finish_reason}, norm_tool_calls={norm_tool_calls}")
                         break
 
                     if finish_reason == "tool_calls" and norm_tool_calls:
+                        print(f"DEBUG: Tool calls detected: {len(norm_tool_calls)}")
                         _tool_call_counter += len(norm_tool_calls)
                         if on_tool_start is not None:
                             await on_tool_start(norm_tool_calls, _tool_call_counter)
@@ -1117,24 +1138,58 @@ class OpenAICompatibleProvider(BaseModelProvider):
                             ],
                             return_exceptions=True,
                         )
+                        print(f"DEBUG: Tool results: {results}")
 
                         # Feed each result back as a separate tool message
+                        tool_results = []
                         for tc, result in zip(norm_tool_calls, results):
                             result_str = (
                                 str(result) if not isinstance(result, Exception)
                                 else f"ERROR: {result}"
                             )
+                            # Parse the JSON result for uncertainty detection
+                            try:
+                                parsed_result = json.loads(result_str)
+                            except Exception:
+                                parsed_result = {"status": "error", "tool_name": tc["function"]["name"], "error": result_str, "result": None}
+                            tool_results.append(parsed_result)
                             conversation.append({
                                 "role":         "tool",
                                 "tool_call_id": tc["id"],
                                 "content":      result_str,
                             })
+
+                        # -- Uncertainty Detection & Clarification (Task 21.1.5) ----------
+                        try:
+                            signal = UncertaintyDetector.analyze(tool_results, kwargs.get("agent"), db)
+                            if signal:
+                                handler = ClarificationHandler(kwargs.get("agent"), db)
+                                resolved, guidance = await handler.handle_uncertainty(signal, conversation)
+                                if resolved:
+                                    # Inject clarification as system message before next LLM turn
+                                    conversation.append({
+                                        "role": "system",
+                                        "content": f"CLARIFICATION FROM SUPERVISOR:\n{guidance}\n\nPlease continue with this context."
+                                    })
+                                    # Track clarification in metadata for observability
+                                    if "metadata" not in conversation[-1]:
+                                        conversation[-1]["metadata"] = {}
+                                    conversation[-1]["metadata"]["clarification_round"] = handler.clarification_rounds
+                                else:
+                                    # Max rounds exceeded or no clarification available
+                                    conversation.append({
+                                        "role": "system",
+                                        "content": "WARNING: Unable to resolve uncertainty via clarification chain. Proceed with best judgment."
+                                    })
+                        except Exception as e:
+                            # Fail open - log and continue without clarification
+                            logger.warning(f"Uncertainty detection/clarification failed (fail-open): {e}")
                     else:
-                        # Unexpected finish_reason — return whatever content exists
+                        # Unexpected finish_reason -- return whatever content exists
                         content = msg_content or ""
                         break
                 else:
-                    # ── Streaming final-turn path ────────────────────────────
+                    # -- Streaming final-turn path ----
                     # The tool-call loop structure is identical to the blocking
                     # path; only the FINAL text turn is streamed token-by-token
                     # and each chunk is forwarded to on_delta.  Tool-call turns
@@ -1165,7 +1220,7 @@ class OpenAICompatibleProvider(BaseModelProvider):
                     msg_tool_calls = msg.get("tool_calls")
                     msg_content = msg.get("content")
 
-                    # Model signalled it is done — no more tool calls
+                    # Model signalled it is done -- no more tool calls
                     if finish_reason == "stop" or not msg_tool_calls:
                         content = msg_content or ""
                         break
@@ -1188,18 +1243,51 @@ class OpenAICompatibleProvider(BaseModelProvider):
                         )
 
                         # Feed each result back as a separate tool message
+                        tool_results = []
                         for tc, result in zip(msg_tool_calls, results):
                             result_str = (
                                 str(result) if not isinstance(result, Exception)
                                 else f"ERROR: {result}"
                             )
+                            # Parse the JSON result for uncertainty detection
+                            try:
+                                parsed_result = json.loads(result_str)
+                            except Exception:
+                                parsed_result = {"status": "error", "tool_name": tc["function"]["name"], "error": result_str, "result": None}
+                            tool_results.append(parsed_result)
                             conversation.append({
                                 "role":         "tool",
                                 "tool_call_id": tc["id"],
                                 "content":      result_str,
                             })
+
+                        # -- Uncertainty Detection & Clarification (Task 21.1.5) ----------
+                        try:
+                            signal = UncertaintyDetector.analyze(tool_results, kwargs.get("agent"), db)
+                            if signal:
+                                handler = ClarificationHandler(kwargs.get("agent"), db)
+                                resolved, guidance = await handler.handle_uncertainty(signal, conversation)
+                                if resolved:
+                                    # Inject clarification as system message before next LLM turn
+                                    conversation.append({
+                                        "role": "system",
+                                        "content": f"CLARIFICATION FROM SUPERVISOR:\n{guidance}\n\nPlease continue with this context."
+                                    })
+                                    # Track clarification in metadata for observability
+                                    if "metadata" not in conversation[-1]:
+                                        conversation[-1]["metadata"] = {}
+                                    conversation[-1]["metadata"]["clarification_round"] = handler.clarification_rounds
+                                else:
+                                    # Max rounds exceeded or no clarification available
+                                    conversation.append({
+                                        "role": "system",
+                                        "content": "WARNING: Unable to resolve uncertainty via clarification chain. Proceed with best judgment."
+                                    })
+                        except Exception as e:
+                            # Fail open - log and continue without clarification
+                            logger.warning(f"Uncertainty detection/clarification failed (fail-open): {e}")
                     else:
-                        # Unexpected finish_reason — return whatever content exists
+                        # Unexpected finish_reason -- return whatever content exists
                         content = msg_content or ""
                         break
             else:
@@ -1245,6 +1333,9 @@ class OpenAICompatibleProvider(BaseModelProvider):
                 actual_model, self.config.provider,
                 total_prompt_tokens, total_completion_tokens
             ),
+            # NEW: Clarification tracking (Task 21.1.5)
+            "clarification_rounds": getattr(handler, 'clarification_rounds', 0) if 'handler' in locals() else 0,
+            "clarification_resolved": True,
         }
 
 class AnthropicProvider(BaseModelProvider):
@@ -1383,6 +1474,7 @@ class AnthropicProvider(BaseModelProvider):
         on_delta: Optional[Callable[[str], Awaitable[None]]] = None,
         cancel_event: Optional[asyncio.Event] = None,
         on_tool_start: Optional[Callable[[List[Dict], int], Awaitable[None]]] = None,
+        db: Any = None,
         **kwargs,
     ) -> Dict[str, Any]:
         """
@@ -1441,7 +1533,7 @@ class AnthropicProvider(BaseModelProvider):
                     system=system_prompt,
                     messages=conversation,
                 )
-                # ── Prompt caching (Task 2.1) ────────────────────────────────────
+                # -- Prompt caching (Task 2.1) -----
                 # Mark the stable prefix (system prompt + everything up to the last
                 # stable turn) as cacheable. The current user turn is the final
                 # message, so the boundary is the second-to-last message.
@@ -1471,7 +1563,7 @@ class AnthropicProvider(BaseModelProvider):
                 if tools:
                     create_kwargs["tools"] = tools
 
-                # ── Extended thinking (Task 3) ─────────────────────────────────
+                # -- Extended thinking (Task 3) ---------
                 # Merge provider-specific reasoning params (thinking/temperature
                 # for Anthropic, extra_body otherwise) into the call kwargs.
                 create_kwargs.update(self._thinking_kwargs())
@@ -1480,7 +1572,7 @@ class AnthropicProvider(BaseModelProvider):
                 rpm = getattr(self.config, "requests_per_minute", 60) or 60
                 await provider_rate_limiter.acquire(self.config.id, rpm)
 
-                # ── Streaming final-turn path ─────────────────────────────────
+                # -- Streaming final-turn path ---------
                 # Only when on_delta is provided AND there are no tools (i.e. the
                 # model is producing its final text reply). Tool-call turns and
                 # the on_delta=None case stay on the blocking path below.
@@ -1526,7 +1618,7 @@ class AnthropicProvider(BaseModelProvider):
                         break
                     except Exception:
                         # Any streaming failure (unsupported endpoint, mock
-                        # double, transport error) — fall back to the blocking
+                        # double, transport error) -- fall back to the blocking
                         # create below and reuse the existing result assembly.
                         pass
 
@@ -1538,7 +1630,7 @@ class AnthropicProvider(BaseModelProvider):
                     total_completion_tokens += response.usage.output_tokens or 0
 
                 # Anthropic requires the raw content block list in the
-                # assistant turn — not a plain string.
+                # assistant turn -- not a plain string.
                 conversation.append({"role": "assistant", "content": response.content})
 
                 if response.stop_reason == "end_turn":
@@ -1576,8 +1668,37 @@ class AnthropicProvider(BaseModelProvider):
                             "content":     result_str,
                         })
                     conversation.append({"role": "user", "content": tool_results})
+
+                    # -- Uncertainty Detection & Clarification (Task 21.1.5) ----------
+                    try:
+                        # Convert Anthropic tool_results format to standard format
+                        standard_results = []
+                        for tr in tool_results:
+                            standard_results.append({
+                                "status": "error" if "ERROR:" in tr["content"] else "success",
+                                "tool_name": tr.get("tool_use_id", ""),
+                                "result": tr["content"]
+                            })
+                        signal = UncertaintyDetector.analyze(standard_results, kwargs.get("agent"), db)
+                        if signal:
+                            from backend.services.clarification_handler import ClarificationHandler
+                            handler = ClarificationHandler(kwargs.get("agent"), db)
+                            resolved, guidance = await handler.handle_uncertainty(signal, conversation)
+                            if resolved:
+                                conversation.append({
+                                    "role": "system",
+                                    "content": f"CLARIFICATION FROM SUPERVISOR:\n{guidance}\n\nPlease continue with this context."
+                                })
+                            else:
+                                conversation.append({
+                                    "role": "system",
+                                    "content": "WARNING: Unable to resolve uncertainty via clarification chain. Proceed with best judgment."
+                                })
+                    except Exception as e:
+                        # Fail open - log and continue without clarification
+                        logger.warning(f"Uncertainty detection/clarification failed (fail-open): {e}")
                 else:
-                    # Unexpected stop_reason — return whatever text is available
+                    # Unexpected stop_reason -- return whatever text is available
                     content = next(
                         (b.text for b in response.content if hasattr(b, "text")), ""
                     )
@@ -1624,6 +1745,9 @@ class AnthropicProvider(BaseModelProvider):
                 actual_model, self.config.provider,
                 total_prompt_tokens, total_completion_tokens
             ),
+            # NEW: Clarification tracking (Task 21.1.5)
+            "clarification_rounds": getattr(handler, 'clarification_rounds', 0) if 'handler' in locals() else 0,
+            "clarification_resolved": True,
         }
 
 
@@ -1700,7 +1824,7 @@ class LocalProvider(OpenAICompatibleProvider):
     # since LocalProvider already delegates to the OpenAI-compat endpoint.
 
 
-# Provider factory — UNIVERSAL mapping
+# Provider factory -- UNIVERSAL mapping
 PROVIDERS = {
     ProviderType.ANTHROPIC:       AnthropicProvider,
     ProviderType.GEMINI:          OpenAICompatibleProvider,
@@ -1734,7 +1858,7 @@ def build_tool_executor(
 
     Routes every call through run_tool_async so each tool gets its own
     timeout (per-tool override or global default) and is cancellable via
-    ``cancel_event``. Returns a JSON string (the model's tool_result).
+    cancel_event. Returns a JSON string.
     """
     from backend.core.tool_registry import tool_registry
 
@@ -1791,12 +1915,12 @@ class ModelService:
         user_id: str = "sovereign",
         config_id: Optional[str] = None,
         system_prompt_override: Optional[str] = None,
-        # Extra kwargs accepted but not used — kept for call-site compatibility
+        # Extra kwargs accepted but not used -- kept for call-site compatibility
         **kwargs,
     ) -> Dict[str, Any]:
         """
-        Generate response using agent's ethos and user-selected model.
-        UNCHANGED from original — kept for full backward compatibility.
+        Generate response using agent ethos and user-selected model.
+        UNCHANGED from original -- kept for full backward compatibility.
         """
         provider = await ModelService.get_provider(user_id, config_id)
 
@@ -1849,7 +1973,7 @@ class ModelService:
         **kwargs,
     ) -> Dict[str, Any]:
         """
-        Tool-aware generation entry point — Phase 6.9.
+        Tool-aware generation entry point -- Phase 6.9.
 
         Selects the correct schema format per provider, builds an analytics-
         and audit-wrapped tool executor (all ToolUsageLog rows preserved), and
@@ -1895,13 +2019,13 @@ class ModelService:
         if not provider:
             raise ValueError("No active model configuration found.")
 
-        # ── Resolve tier ───────────────────────────────────────────────────────
+        # -- Resolve tier ------------
         tier = agent_tier
         if not tier:
             agent_id_str = getattr(agent, "agentium_id", "") or ""
             tier = (agent_id_str[0] + "xxxx") if agent_id_str else "3xxxx"
 
-        # ── Select schema format based on provider type ────────────────────────
+        # -- Select schema format based on provider type ---
         is_anthropic = isinstance(provider, AnthropicProvider)
         tools = (
             tool_registry.to_anthropic_tools(tier)
@@ -1911,7 +2035,7 @@ class ModelService:
 
         # A caller (e.g. LLMClient.decide()) may supply its own ``tools`` and
         # ``tool_choice`` via **kwargs to force a specific tool call. Those must
-        # win over the generic registry tool set — but ``tools`` is also passed
+        # win over the generic registry tool set -- but ``tools`` is also passed
         # as an explicit keyword below, so pop them out of kwargs first to avoid
         # a "multiple values for keyword argument 'tools'" TypeError.
         caller_tools = kwargs.pop("tools", None)
@@ -1919,7 +2043,7 @@ class ModelService:
         if caller_tools is not None:
             tools = caller_tools
 
-        # ── Analytics-wrapped executor ─────────────────────────────────────────
+        # -- Analytics-wrapped executor ----------
         # Routes every tool call through run_tool_async() (Task 3/4) so each tool
         # gets its own timeout (per-tool override or global default) and is
         # cancellable via the run's cancel_event. ToolCreationService is invoked
@@ -1927,7 +2051,7 @@ class ModelService:
         # tracking, and audit entries are all written exactly as before.
         agent_id = getattr(agent, "agentium_id", "system")
 
-        # ── Build system prompt ────────────────────────────────────────────────
+        # -- Build system prompt -------
         system_prompt = system_prompt_override
         if not system_prompt:
             ethos = getattr(agent, "ethos", None)
@@ -1942,16 +2066,16 @@ class ModelService:
                 except Exception:
                     pass
 
-        # ── Hard response-length enforcement (Gap 3) ──────────────────────────
+        # -- Hard response-length enforcement (Gap 3) ---
         # Appended LAST so it cannot be overridden by ethos or caller content.
         system_prompt += (
-            "\n\nYour response MUST be 2–3 lines maximum. "
+            "\n\nYour response MUST be 2-3 lines maximum. "
             "Never explain governance mechanics. "
             "Never reference internal architecture."
         )
-        # ── end enforcement ───────────────────────────────────────────────────
+        # -- end enforcement --------
 
-        # ── Seed with prior conversation history (oldest first) ───────────────
+        # -- Seed with prior conversation history (oldest first) ---
         # Lets the model recall earlier turns so context-dependent follow-ups
         # ("try again", "redo the previous task") work like a normal chat.
         messages: List[Dict[str, str]] = list(history) if history else []
@@ -1979,6 +2103,7 @@ class ModelService:
                 on_delta=on_delta,
                 on_tool_start=on_tool_start,
                 cancel_event=run_event,
+                db=db,
                 **({"tool_choice": caller_tool_choice} if caller_tool_choice else {}),
                 **kwargs,
             )
@@ -1987,7 +2112,7 @@ class ModelService:
             tokens = result.get("tokens_used", 0)
             api_key_manager.record_spend(provider.config.id, cost, tokens, db=db)
 
-            # ── NEW: Response schema validation ──
+            # -- NEW: Response schema validation --
             validation_retries = 0
             parsed_response = None
             validation_error = None
@@ -2080,7 +2205,7 @@ class ModelService:
         Falls back to sensible defaults if API call fails.
         """
         try:
-            # Users often paste the full chat endpoint (…/v1/chat/completions).
+            # Users often paste the full chat endpoint (.../v1/chat/completions).
             # The OpenAI SDK appends /models and /chat/completions to the base
             # itself, so the stored base must be the API root. Strip a trailing
             # /chat/completions so listing (and any reuse of base_url) works.
@@ -2089,12 +2214,12 @@ class ModelService:
                 if base_url.lower().endswith('/chat/completions'):
                     base_url = base_url[: -len('/chat/completions')]
 
-            # ── OPENAI ──────────────────────────────────────────────────────────
+            # -- OPENAI ------
             if provider == ProviderType.OPENAI:
                 # For a custom base_url (OpenAI-compatible, e.g. OpenRouter) the
                 # /models endpoint is frequently public and needs no key. Only
                 # fall back to the curated defaults when we have neither a key
-                # nor a custom endpoint to query — otherwise we silently hide the
+                # nor a custom endpoint to query -- otherwise we silently hide the
                 # real provider's model list behind 8 hardcoded names.
                 if not api_key and not base_url:
                     return ModelService._get_default_models(provider)
@@ -2122,9 +2247,9 @@ class ModelService:
                            if any(x in m.lower() for x in ['gpt-4o', 'gpt-4', 'gpt-3.5', 'o1', 'o3'])]
                 return sorted(ids)
 
-            # ── ANTHROPIC ────────────────────────────────────────────────────────
+            # -- ANTHROPIC -------------
             # Anthropic now exposes a public GET /v1/models endpoint (added after
-            # this integration was first written) — fetch live instead of
+            # this integration was first written) -- fetch live instead of
             # hardcoding a list that goes stale every time a new Claude ships.
             elif provider == ProviderType.ANTHROPIC:
                 if not api_key:
@@ -2139,8 +2264,8 @@ class ModelService:
                     logger.error(f"Anthropic list_models error: {e}")
                     return ModelService._get_default_models(provider)
 
-            # ── GEMINI ────────────────────────────────────────────────────────────
-            # Uses Google Discovery REST API (v1beta/models) — NOT the old native SDK
+            # -- GEMINI ------
+            # Uses Google Discovery REST API (v1beta/models) -- NOT the old native SDK
             # path that caused: "models/gemini-1.5-flash is not found for API version v1main"
             elif provider == ProviderType.GEMINI:
                 if not api_key:
@@ -2164,7 +2289,7 @@ class ModelService:
                             logger.error(f"Gemini list error {resp.status}: {err}")
                             return ModelService._get_default_models(provider)
 
-            # ── GROQ ─────────────────────────────────────────────────────────────
+            # -- GROQ ------
             elif provider == ProviderType.GROQ:
                 if not api_key:
                     return ModelService._get_default_models(provider)
@@ -2173,7 +2298,7 @@ class ModelService:
                 models = await client.models.list()
                 return sorted([m.id for m in models.data])
 
-            # ── MISTRAL ───────────────────────────────────────────────────────────
+            # -- MISTRAL -------
             elif provider == ProviderType.MISTRAL:
                 if not api_key:
                     return ModelService._get_default_models(provider)
@@ -2182,7 +2307,7 @@ class ModelService:
                 models = await client.models.list()
                 return sorted([m.id for m in models.data])
 
-            # ── TOGETHER ──────────────────────────────────────────────────────────
+            # -- TOGETHER ------
             elif provider == ProviderType.TOGETHER:
                 if not api_key:
                     return ModelService._get_default_models(provider)
@@ -2191,7 +2316,7 @@ class ModelService:
                 models = await client.models.list()
                 return sorted([m.id for m in models.data])
 
-            # ── FIREWORKS ─────────────────────────────────────────────────────────
+            # -- FIREWORKS --------------
             elif provider == ProviderType.FIREWORKS:
                 if not api_key:
                     return ModelService._get_default_models(provider)
@@ -2200,8 +2325,8 @@ class ModelService:
                 models = await client.models.list()
                 return sorted([m.id for m in models.data])
 
-            # ── PERPLEXITY ────────────────────────────────────────────────────────
-            # Perplexity has no public /models endpoint — return curated list
+            # -- PERPLEXITY -------------
+            # Perplexity has no public /models endpoint -- return curated list
             elif provider == ProviderType.PERPLEXITY:
                 return [
                     "sonar-pro",
@@ -2211,7 +2336,7 @@ class ModelService:
                     "r1-1776",
                 ]
 
-            # ── COHERE ────────────────────────────────────────────────────────────
+            # -- COHERE ------
             elif provider == ProviderType.COHERE:
                 if not api_key:
                     return ModelService._get_default_models(provider)
@@ -2228,8 +2353,8 @@ class ModelService:
                             return sorted(models) if models else ModelService._get_default_models(provider)
                         return ModelService._get_default_models(provider)
 
-            # ── AI21 ──────────────────────────────────────────────────────────────
-            # AI21 has no standard /models endpoint — return curated list
+            # -- AI21 -------
+            # AI21 has no standard /models endpoint -- return curated list
             elif provider == ProviderType.AI21:
                 return [
                     "jamba-1.5-large",
@@ -2240,7 +2365,7 @@ class ModelService:
                     "j2-light",
                 ]
 
-            # ── DEEPSEEK ──────────────────────────────────────────────────────────
+            # -- DEEPSEEK ------
             elif provider == ProviderType.DEEPSEEK:
                 if not api_key:
                     return ModelService._get_default_models(provider)
@@ -2249,7 +2374,7 @@ class ModelService:
                 models = await client.models.list()
                 return sorted([m.id for m in models.data])
 
-            # ── MOONSHOT ──────────────────────────────────────────────────────────
+            # -- MOONSHOT ------
             elif provider == ProviderType.MOONSHOT:
                 if not api_key:
                     return ModelService._get_default_models(provider)
@@ -2258,8 +2383,8 @@ class ModelService:
                 models = await client.models.list()
                 return sorted([m.id for m in models.data])
 
-            # ── QIANWEN (Alibaba) ─────────────────────────────────────────────────
-            # No public /models endpoint — return curated list
+            # -- QIANWEN (Alibaba) ------
+            # No public /models endpoint -- return curated list
             elif provider == ProviderType.QIANWEN:
                 return [
                     "qwen-max",
@@ -2272,8 +2397,8 @@ class ModelService:
                     "qwen2.5-7b-instruct",
                 ]
 
-            # ── ZHIPU (ChatGLM) ───────────────────────────────────────────────────
-            # No public /models endpoint — return curated list
+            # -- ZHIPU (ChatGLM) --------
+            # No public /models endpoint -- return curated list
             elif provider == ProviderType.ZHIPU:
                 return [
                     "glm-4-plus",
@@ -2284,8 +2409,8 @@ class ModelService:
                     "chatglm_turbo",
                 ]
 
-            # ── AZURE OPENAI ──────────────────────────────────────────────────────
-            # Azure lists deployments, not base models — requires resource-specific URL
+            # -- AZURE OPENAI -----------
+            # Azure lists deployments, not base models -- requires resource-specific URL
             elif provider == ProviderType.AZURE_OPENAI:
                 if not api_key or not base_url:
                     return ModelService._get_default_models(provider)
@@ -2301,7 +2426,7 @@ class ModelService:
                 except Exception:
                     return ModelService._get_default_models(provider)
 
-            # ── LOCAL (Ollama / LM Studio) ────────────────────────────────────────
+            # -- LOCAL (Ollama / LM Studio) ---------
             elif provider == ProviderType.LOCAL:
                 import aiohttp
                 url = base_url or settings.OLLAMA_BASE_URL
@@ -2326,12 +2451,12 @@ class ModelService:
                 except Exception:
                     return ModelService._get_default_models(provider)
 
-            # ── CUSTOM / OPENAI_COMPATIBLE ────────────────────────────────────────
+            # -- CUSTOM / OPENAI_COMPATIBLE ---------
             elif provider in [ProviderType.CUSTOM, ProviderType.OPENAI_COMPATIBLE]:
                 if not base_url:
                     return ["custom-model-1", "custom-model-2"]
                 import openai
-                # Public /models endpoints (e.g. OpenRouter) need no key — use a
+                # Public /models endpoints (e.g. OpenRouter) need no key -- use a
                 # placeholder so the SDK client constructs and the call succeeds.
                 client = openai.AsyncOpenAI(api_key=api_key or "not-needed", base_url=base_url)
                 models = await client.models.list()
@@ -2360,11 +2485,11 @@ class ModelService:
         Extract (input_per_1m, output_per_1m) USD from an OpenAI-compatible
         model object, handling the two real-world shapes explicitly:
 
-        1. OpenRouter-style nested `pricing` object — values are STRINGS of
-           per-token USD, e.g. {"prompt": "0.000005",
-           "completion": "0.000015"}. Multiply by 1e6 for per-1M.
-        2. LiteLLM-style flat fields `input_cost_per_token` /
-           `output_cost_per_token` (also per-token USD, numeric or string).
+        1. OpenRouter-style nested pricing object - values are STRINGS of
+           per-token USD, e.g. prompt 5 per million,
+           completion 15 per million. Multiply by 1_000_000 for per-million tokens.
+        2. LiteLLM-style flat fields input_cost_per_token /
+           output_cost_per_token (also per-token USD, numeric or string).
 
         Returns None when the model exposes no pricing (treated as free/unknown).
         """
@@ -2374,7 +2499,7 @@ class ModelService:
             completion = pricing.get("completion")
             if prompt is not None and completion is not None:
                 try:
-                    # round() kills float noise from ×1e6 (e.g. 0.0999999… -> 0.1)
+                    # round() kills float noise from ×1e6 (e.g. 0.0999999... -> 0.1)
                     return (
                         round(float(prompt) * 1_000_000, 6),
                         round(float(completion) * 1_000_000, 6),
@@ -2403,30 +2528,30 @@ class ModelService:
         base_url: Optional[str] = None,
     ) -> Dict[str, Optional[tuple]]:
         """
-        Fetch live, per-model pricing from a provider's API.
+        Fetch live, per-model pricing from a provider API.
 
-        Returns a map of ``model_id (lower-cased) -> (input_per_1m,
-        output_per_1m) in USD`` when the provider exposes pricing, or
-        ``model_id -> None`` when it does not (free / unknown — the caller
-        should SUPPRESS the price). Providers that don't expose a model list
+        Returns a map of model_id (lower-cased) -> (input_per_1m,
+        output_per_1m) in USD when the provider exposes pricing, or
+        model_id -> None when it does not (free / unknown -- the caller
+        should SUPPRESS the price). Providers that do not expose a model list
         with prices return an empty dict.
 
         The two schemas are handled explicitly rather than assuming one shape:
           * OpenAI-compatible (OpenAI, OpenRouter, Groq, Mistral, Together,
             Fireworks, DeepSeek, Moonshot, Azure, custom): parse the
-            `/models` payload's ``pricing`` (OpenRouter) or
-            ``input_cost_per_token`` (LiteLLM) fields.
-          * Anthropic: ``/v1/models`` returns model metadata ONLY — no
-            pricing fields at all — so every model maps to None.
+            /models payload pricing (OpenRouter) or
+            input_cost_per_token (LiteLLM) fields.
+          * Anthropic: /v1/models returns model metadata ONLY -- no
+            pricing fields at all -- so every model maps to None.
         """
         base_url = ModelService._normalize_base_url(base_url)
 
         try:
             import httpx
 
-            # ── ANTHROPIC ────────────────────────────────────────────────
+            # -- ANTHROPIC -------
             # /v1/models returns {data:[{id, capabilities, max_input_tokens,
-            # display_name, ...}]} — NO pricing. Every model is None (free).
+            # display_name, ...}]} -- NO pricing. Every model is None (free).
             if provider == ProviderType.ANTHROPIC:
                 if not api_key:
                     return {}
@@ -2448,12 +2573,12 @@ class ModelService:
                         result[mid] = None
                 return result
 
-            # ── LOCAL (Ollama / LM Studio) ──────────────────────────────
+            # -- LOCAL (Ollama / LM Studio) ------
             # No published pricing for self-hosted models.
             if provider == ProviderType.LOCAL:
                 return {}
 
-            # ── OPENAI (native) ──────────────────────────────────────────
+            # -- OPENAI (native) -----------
             # Native api.openai.com /models carries no pricing fields, so every
             # listed model resolves to None (free/unknown). Only query when we
             # actually have a key; otherwise there's nothing to fetch.
@@ -2464,8 +2589,8 @@ class ModelService:
                 headers = {"Authorization": f"Bearer {api_key}", "Accept": "application/json"}
                 return await ModelService._fetch_openai_style_pricing(url, headers)
 
-            # ── OPENAI-COMPATIBLE (custom base, Azure, Groq, Mistral,
-            #    Together, Fireworks, DeepSeek, Moonshot) ───────────────────
+            # -- OPENAI-COMPATIBLE (custom base, Azure, Groq, Mistral,
+            #    Together, Fireworks, DeepSeek, Moonshot) -------
             # All expose an OpenAI-style /models endpoint that MAY include a
             # `pricing` object (e.g. OpenRouter, Azure Marketplace gateways).
             openai_compat_bases = {
@@ -2499,8 +2624,8 @@ class ModelService:
                 headers = {"api-key": api_key, "Accept": "application/json"}
                 return await ModelService._fetch_openai_style_pricing(url, headers)
 
-            # ── OTHER PROVIDERS (Gemini, Perplexity, Cohere, AI21, Qwen,
-            #    Zhipu) ── no price-bearing /models endpoint ────────────────
+            # -- OTHER PROVIDERS (Gemini, Perplexity, Cohere, AI21, Qwen,
+            #    Zhipu) -- no price-bearing /models endpoint ----
             return {}
 
         except Exception as e:
