@@ -103,6 +103,7 @@ class ChangePasswordRequest(BaseModel):
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 
+
 @router.post(
     "/signup",
     response_model=SignupResponse,
@@ -156,7 +157,22 @@ async def signup(
     )
 
 
-
+@router.post(
+    "/register",
+    response_model=SignupResponse,
+    summary="Register a new user account",
+    description=(
+        "Creates a pending user account. Requires admin approval before login.\n\n"
+        "**Rate limit:** 5 attempts per IP per 5 minutes."
+    ),
+)
+async def register(
+    request: Request,
+    payload: SignupRequest,
+    db: Session = Depends(get_db),
+):
+    """Alias for /signup - creates a pending user account."""
+    return await signup(request, payload, db)
 
 
 @router.post(

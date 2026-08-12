@@ -94,12 +94,12 @@
 
 > **Files**: `backend/core/auth.py`, `backend/api/routes/auth.py`, `backend/models/entities/user.py`, `backend/services/auth.py`, `backend/api/middleware/auth.py`, `backend/services/rbac_service.py`, `backend/api/routes/rbac.py`, `frontend/src/store/authStore.ts`, `frontend/src/services/auth.ts`
 
-- [ ] **2.1 — User Registration**
-  - [ ] 2.1.1 — `POST /api/v1/auth/register` creates new user
-  - [ ] 2.1.2 — Duplicate username/email returns proper error
-  - [ ] 2.1.3 — Password is hashed before storage (verify `User.hash_password`)
-  - [ ] 2.1.4 — Frontend `SignupPage.tsx` form submits correctly
-  - [ ] 2.1.5 — Pending user flow works (admin approval if configured)
+- [x] **2.1 — User Registration**
+  - [x] 2.1.1 — `POST /api/v1/auth/register` creates new user
+  - [x] 2.1.2 — Duplicate username/email returns proper error
+  - [x] 2.1.3 — Password is hashed before storage (verify `User.hash_password`)
+  - [x] 2.1.4 — Frontend `SignupPage.tsx` form submits correctly
+  - [x] 2.1.5 — Pending user flow works (admin approval if configured)
 
 - [ ] **2.2 — Login & JWT Tokens**
   - [ ] 2.2.1 — `POST /api/v1/auth/login` returns valid JWT token
