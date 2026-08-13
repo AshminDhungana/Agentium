@@ -101,12 +101,12 @@
   - [x] 2.1.4 — Frontend `SignupPage.tsx` form submits correctly
   - [x] 2.1.5 — Pending user flow works (admin approval if configured)
 
-- [ ] **2.2 — Login & JWT Tokens**
-  - [ ] 2.2.1 — `POST /api/v1/auth/login` returns valid JWT token
-  - [ ] 2.2.2 — Token contains correct claims (user_id, username, is_admin, exp)
-  - [ ] 2.2.3 — Token refresh mechanism works
-  - [ ] 2.2.4 — Expired token returns 401 Unauthorized
-  - [ ] 2.2.5 — Frontend `LoginPage.tsx` stores token in `authStore`
+- [x] **2.2 — Login & JWT Tokens**
+  - [x] 2.2.1 — `POST /api/v1/auth/login` returns valid JWT token
+  - [x] 2.2.2 — Token contains correct claims (user_id, username, is_admin, exp)
+  - [x] 2.2.3 — Token refresh mechanism works
+  - [x] 2.2.4 — Expired token returns 401 Unauthorized
+  - [x] 2.2.5 — Frontend `LoginPage.tsx` stores token in `authStore`
 
 - [ ] **2.3 — Default Admin Bootstrap**
   - [ ] 2.3.1 — `create_default_admin()` in `main.py` creates admin on first boot

@@ -243,8 +243,9 @@ async def login(
 
     token_data = {
         "sub": user.username,
+        "username": user.username,
         "user_id": user.id,
-        "role": "user",
+        "role": getattr(user, "role", "user"),
         "is_admin": user.is_admin,
         "is_active": user.is_active,
     }
@@ -288,16 +289,31 @@ async def refresh_token_endpoint(
     if not token_payload or token_payload.get("type") != "refresh":
         raise UnauthorizedError(error="Invalid or expired refresh token", code="INVALID_OR_EXPIRED_REFRESH_TOKEN", headers={"WWW-Authenticate": "Bearer"})
 
-    username = token_payload.get("sub")
+    username = token_payload.get("sub") or token_payload.get("username")
     if not username:
         raise UnauthorizedError(error="Invalid token payload", code="INVALID_TOKEN_PAYLOAD")
 
+    user_id = token_payload.get("user_id")
+    if user_id:
+        db_user = db.query(User).filter(User.id == user_id).first()
+    else:
+        db_user = db.query(User).filter(User.username == username).first()
+
+    if db_user and (not db_user.is_active or db_user.is_pending):
+        raise ForbiddenError(error="Account pending approval or deactivated", code="ACCOUNT_PENDING_APPROVAL_OR_DEACTIVATED")
+
+    role = db_user.role if db_user else token_payload.get("role", "user")
+    is_admin = db_user.is_admin if db_user else token_payload.get("is_admin", False)
+    is_active = db_user.is_active if db_user else token_payload.get("is_active", True)
+    actual_user_id = db_user.id if db_user else user_id
+
     token_data = {
         "sub": username,
-        "user_id": token_payload.get("user_id"),
-        "role": token_payload.get("role", "user"),
-        "is_admin": token_payload.get("is_admin", False),
-        "is_active": token_payload.get("is_active", True),
+        "username": username,
+        "user_id": actual_user_id,
+        "role": role,
+        "is_admin": is_admin,
+        "is_active": is_active,
     }
 
     new_access_token  = create_access_token(token_data)
