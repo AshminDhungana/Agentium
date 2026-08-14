@@ -41,3 +41,24 @@ def test_create_default_admin_creates_user(fresh_db):
     assert admin.hashed_password.startswith("$2b$")
     # Verify password works
     assert User.verify_password("admin", admin.hashed_password) is True
+
+
+def test_create_default_admin_idempotent(fresh_db):
+    """2.3.1 — create_default_admin() is idempotent (safe to call multiple times)."""
+    # First call - creates admin
+    created_first = create_default_admin(fresh_db)
+    assert created_first is True
+
+    # Second call - should return False (already exists)
+    created_second = create_default_admin(fresh_db)
+    assert created_second is False
+
+    # Verify only ONE admin exists
+    admins = fresh_db.query(User).filter(User.username == "admin").all()
+    assert len(admins) == 1
+
+    # Verify admin still has correct flags (was updated, not recreated)
+    admin = admins[0]
+    assert admin.is_active is True
+    assert admin.is_pending is False
+    assert admin.is_admin is True
