@@ -198,6 +198,7 @@ class User(Base):
             "is_admin":     self.is_admin,
             "is_pending":   self.is_pending,
             "role":         self.effective_role,
+            "effective_role": self.effective_role,
             "can_veto":     self.can_veto,
             "is_sovereign": self.is_sovereign,
             "role_expires_at": self.role_expires_at.isoformat() if self.role_expires_at else None,

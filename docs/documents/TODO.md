@@ -113,11 +113,11 @@
   - [x] 2.3.2 — Default admin credentials work (username: `admin`, password: `admin`)
   - [x] 2.3.3 — Admin user has `is_admin=True`, `is_active=True`, `is_pending=False`
 
-- [ ] **2.4 — RBAC (Role-Based Access Control)**
-  - [ ] 2.4.1 — `GET/POST /api/v1/rbac/roles` CRUD works
-  - [ ] 2.4.2 — Role permissions are enforced on protected endpoints
-  - [ ] 2.4.3 — `RBACManagement.tsx` page loads and displays roles
-  - [ ] 2.4.4 — Admin-only routes reject non-admin users
+- [x] **2.4 — RBAC (Role-Based Access Control)**
+  - [x] 2.4.1 — `GET/POST /api/v1/rbac/roles` CRUD works
+  - [x] 2.4.2 — Role permissions are enforced on protected endpoints
+  - [x] 2.4.3 — `RBACManagement.tsx` page loads and displays roles
+  - [x] 2.4.4 — Admin-only routes reject non-admin users
 
 - [ ] **2.5 — Session Management**
   - [ ] 2.5.1 — `SessionLimitMiddleware` enforces max concurrent sessions

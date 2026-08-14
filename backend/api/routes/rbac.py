@@ -32,6 +32,11 @@ class EmergencyTransferRequest(BaseModel):
     new_sovereign_id: str
     reason: str
 
+class AssignRoleRequest(BaseModel):
+    user_id: str
+    role: str
+    expires_at: Optional[datetime] = None
+
 
 # --- Dependencies --- #
 
@@ -97,6 +102,33 @@ def list_users_with_roles(
             u_dict["active_delegations"] = active_dels
         result.append(u_dict)
     return result
+
+
+@router.post(
+    "/roles",
+    summary="Assign Role",
+    description="Assign a role to a user (requires Sovereign or Admin).",
+    responses=build_responses(None),
+)
+def assign_role(
+    request: AssignRoleRequest,
+    current_user: User = Depends(get_current_user_from_token),
+    db: Session = Depends(get_db),
+):
+    """Assign a role to a user (requires Sovereign or Admin)."""
+    try:
+        updated_user = RBACService.assign_role(
+            db=db,
+            actor=current_user,
+            target_user_id=request.user_id,
+            new_role=request.role,
+            role_expires_at=request.expires_at,
+        )
+        return updated_user.to_dict()
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise BadRequestError(error=str(e), code="ROLE_ASSIGNMENT_FAILED")
 
 
 @router.get(

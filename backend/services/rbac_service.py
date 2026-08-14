@@ -200,6 +200,69 @@ class RBACService:
         return delegation
 
     @staticmethod
+    def assign_role(
+        db: Session,
+        actor: User,
+        target_user_id: str,
+        new_role: str,
+        role_expires_at: Optional[datetime] = None,
+    ) -> User:
+        """
+        Assign a new RBAC role to a user.
+
+        Only Sovereign or admin users may call this.  Updates the target's
+        ``role`` column and keeps ``is_admin`` in sync for backward compat.
+        """
+        from backend.models.entities.user import VALID_ROLES, ROLE_PRIMARY_SOVEREIGN
+
+        if not (actor.is_sovereign or actor.is_admin):
+            raise ForbiddenError(
+                error="Only Sovereign or admin users can assign roles.",
+                code="INSUFFICIENT_PERMISSIONS",
+            )
+
+        if new_role not in VALID_ROLES:
+            raise BadRequestError(
+                error=f"Invalid role '{new_role}'. Must be one of: {sorted(VALID_ROLES)}",
+                code="INVALID_ROLE",
+            )
+
+        target = db.query(User).filter(User.id == target_user_id).first()
+        if not target:
+            raise NotFoundError(
+                error="Target user not found.",
+                code="TARGET_USER_NOT_FOUND",
+            )
+
+        old_role = target.effective_role
+        target.role = new_role
+        target.role_expires_at = role_expires_at
+        # Keep is_admin in sync for backward compatibility
+        target.is_admin = (new_role == ROLE_PRIMARY_SOVEREIGN)
+
+        # Audit log
+        audit_entry = AuditLog.log(
+            level=AuditLevel.WARNING,
+            category=AuditCategory.AUTHORIZATION,
+            actor_type="user",
+            actor_id=actor.id,
+            action="role_assignment",
+            target_type="user",
+            target_id=target.id,
+            description=f"Changed role from '{old_role}' to '{new_role}'",
+            success=True,
+            meta_data={
+                "old_role": old_role,
+                "new_role": new_role,
+                "expires_at": role_expires_at.isoformat() if role_expires_at else None,
+            },
+        )
+        db.add(audit_entry)
+        db.commit()
+        db.refresh(target)
+        return target
+
+    @staticmethod
     def expire_stale_delegations(db: Session) -> int:
         """Scan and auto-revoke any delegations that have passed their expiry time."""
         now = datetime.utcnow()
