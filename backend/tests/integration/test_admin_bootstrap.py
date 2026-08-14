@@ -82,3 +82,16 @@ def test_default_admin_credentials_work(client, fresh_db):
     assert data["token_type"] == "bearer"
     assert data["user"]["username"] == "admin"
     assert data["user"]["is_admin"] is True
+
+
+def test_default_admin_has_correct_flags(fresh_db):
+    """2.3.3 — Admin user has is_admin=True, is_active=True, is_pending=False."""
+    create_default_admin(fresh_db)
+
+    admin = fresh_db.query(User).filter(User.username == "admin").first()
+    assert admin is not None
+
+    # Core flags from TODO.md 2.3.3
+    assert admin.is_admin is True
+    assert admin.is_active is True
+    assert admin.is_pending is False
