@@ -95,3 +95,18 @@ def test_default_admin_has_correct_flags(fresh_db):
     assert admin.is_admin is True
     assert admin.is_active is True
     assert admin.is_pending is False
+
+
+def test_admin_role_is_primary_sovereign(fresh_db):
+    """2.3.3 — Admin user has effective_role = primary_sovereign."""
+    from backend.models.entities.user import ROLE_PRIMARY_SOVEREIGN
+
+    create_default_admin(fresh_db)
+
+    admin = fresh_db.query(User).filter(User.username == "admin").first()
+    assert admin is not None
+
+    # The effective_role property should return primary_sovereign for is_admin users
+    assert admin.effective_role == ROLE_PRIMARY_SOVEREIGN
+    assert admin.is_sovereign is True
+    assert admin.can_veto is True
