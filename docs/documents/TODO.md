@@ -108,10 +108,10 @@
   - [x] 2.2.4 — Expired token returns 401 Unauthorized
   - [x] 2.2.5 — Frontend `LoginPage.tsx` stores token in `authStore`
 
-- [ ] **2.3 — Default Admin Bootstrap**
-  - [ ] 2.3.1 — `create_default_admin()` in `main.py` creates admin on first boot
-  - [ ] 2.3.2 — Default admin credentials work (username: `admin`, password: `admin`)
-  - [ ] 2.3.3 — Admin user has `is_admin=True`, `is_active=True`, `is_pending=False`
+- [x] **2.3 — Default Admin Bootstrap**
+  - [x] 2.3.1 — `create_default_admin()` in `main.py` creates admin on first boot
+  - [x] 2.3.2 — Default admin credentials work (username: `admin`, password: `admin`)
+  - [x] 2.3.3 — Admin user has `is_admin=True`, `is_active=True`, `is_pending=False`
 
 - [ ] **2.4 — RBAC (Role-Based Access Control)**
   - [ ] 2.4.1 — `GET/POST /api/v1/rbac/roles` CRUD works
