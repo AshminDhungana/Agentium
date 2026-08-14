@@ -119,10 +119,10 @@
   - [x] 2.4.3 — `RBACManagement.tsx` page loads and displays roles
   - [x] 2.4.4 — Admin-only routes reject non-admin users
 
-- [ ] **2.5 — Session Management**
-  - [ ] 2.5.1 — `SessionLimitMiddleware` enforces max concurrent sessions
-  - [ ] 2.5.2 — Frontend `authStore.ts` handles logout / token invalidation
-  - [ ] 2.5.3 — `checkAuth()` on page load correctly restores session
+- [x] **2.5 — Session Management**
+  - [x] 2.5.1 — `SessionLimitMiddleware` enforces max concurrent sessions
+  - [x] 2.5.2 — Frontend `authStore.ts` handles logout / token invalidation
+  - [x] 2.5.3 — `checkAuth()` on page load correctly restores session
 
 - [ ] **2.6 — User Management Page**
   - [ ] 2.6.1 — `Usermanagement.tsx` lists all users

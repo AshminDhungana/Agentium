@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import { api } from '@/services/api';
 import { jwtDecode } from 'jwt-decode';
 import { logger } from '@/utils/logger';
@@ -51,7 +51,7 @@ interface AuthState {
     // B5: signup is now part of the store so all auth API calls go through
     //     one layer — no more direct api.post() calls from page components.
     signup: (username: string, email: string, password: string) => Promise<SignupResult>;
-    logout: () => void;
+    logout: () => Promise<void>;
     changePassword: (oldPassword: string, newPassword: string) => Promise<boolean>;
     checkAuth: () => Promise<boolean>;
     updateAvatar: (avatarUrl: string | null) => void;
@@ -86,6 +86,23 @@ function deriveIsSovereign(user: {
     return false;
 }
 
+const getStorageProvider = () => {
+    try {
+        if (typeof window !== 'undefined' && window.localStorage) {
+            return window.localStorage;
+        }
+    } catch {}
+    const dummyMap = new Map<string, string>();
+    return {
+        getItem: (key: string) => dummyMap.get(key) ?? null,
+        setItem: (key: string, value: string) => { dummyMap.set(key, String(value)); },
+        removeItem: (key: string) => { dummyMap.delete(key); },
+        clear: () => { dummyMap.clear(); },
+        key: (i: number) => Array.from(dummyMap.keys())[i] ?? null,
+        length: 0,
+    };
+};
+
 export const useAuthStore = create<AuthState>()(
     persist(
         (set, get) => ({
@@ -104,7 +121,7 @@ export const useAuthStore = create<AuthState>()(
                     });
 
                     const { access_token, user } = response.data;
-                    localStorage.setItem('access_token', access_token);
+                    getStorageProvider().setItem('access_token', access_token);
 
                     set({
                         user: {
@@ -188,9 +205,16 @@ export const useAuthStore = create<AuthState>()(
                 }
             },
 
-            logout: () => {
-                localStorage.removeItem('access_token');
-                set({ user: null, error: null, isInitialized: true });
+            logout: async () => {
+                try {
+                    await api.post('/api/v1/auth/logout');
+                } catch (error) {
+                    logger.warn('Logout API request failed (clearing local state anyway):', error);
+                } finally {
+                    getStorageProvider().removeItem('access_token');
+                    delete api.defaults.headers.common['Authorization'];
+                    set({ user: null, error: null, isInitialized: true });
+                }
             },
 
             changePassword: async (oldPassword: string, newPassword: string) => {
@@ -236,7 +260,7 @@ export const useAuthStore = create<AuthState>()(
             },
 
             checkAuth: async () => {
-                const token = localStorage.getItem('access_token');
+                const token = getStorageProvider().getItem('access_token');
 
                 if (!token) {
                     set({ user: null, isInitialized: true });
@@ -277,7 +301,7 @@ export const useAuthStore = create<AuthState>()(
                         });
                         return true;
                     } else {
-                        localStorage.removeItem('access_token');
+                        getStorageProvider().removeItem('access_token');
                         set({ user: null, isLoading: false, isInitialized: true });
                         return false;
                     }
@@ -307,7 +331,7 @@ export const useAuthStore = create<AuthState>()(
                     }
 
                     if (!hasPersistedUser) {
-                        localStorage.removeItem('access_token');
+                        getStorageProvider().removeItem('access_token');
                         set({ user: null, isLoading: false, isInitialized: true });
                     } else {
                         set({ isLoading: false, isInitialized: true });
@@ -318,6 +342,7 @@ export const useAuthStore = create<AuthState>()(
         }),
         {
             name: 'auth-storage',
+            storage: createJSONStorage(getStorageProvider),
             // IMPORTANT: only persist `user`. Never persist isInitialized or isLoading —
             // isInitialized must always be false on a fresh page load.
             partialize: (state) => ({ user: state.user }),

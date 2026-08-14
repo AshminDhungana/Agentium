@@ -225,18 +225,27 @@ class ErrorCounterMiddleware(BaseHTTPMiddleware):
 class SessionLimitMiddleware(BaseHTTPMiddleware):
     """
     Limits concurrent active sessions per user.
-    Tracks sessions by (user_id, token) pairs in memory.
-    Phase 9.4: Security Hardening.
+    Tracks sessions by (user_id, token) pairs in memory with exp timestamp auto-purging.
+    Phase 9.4 & Phase 2.5: Security Hardening & Session Management.
     """
 
-    def __init__(self, app, max_sessions: Optional[int] = None):
+    _instance: Optional["SessionLimitMiddleware"] = None
+
+    def __init__(
+        self,
+        app,
+        max_sessions: Optional[int] = None,
+        enforce_in_testing: bool = False,
+    ):
         super().__init__(app)
         self.max_sessions = max_sessions or settings.MAX_CONCURRENT_SESSIONS
-        self._sessions: dict = {}  # user_id -> set[token_hash]
+        self.enforce_in_testing = enforce_in_testing
+        self._sessions: dict[str, dict[int, float]] = {}  # user_id -> {token_hash: exp_timestamp}
+        SessionLimitMiddleware._instance = self
 
     async def dispatch(self, request: Request, call_next):
         import os
-        if os.environ.get("TESTING") == "true":
+        if os.environ.get("TESTING") == "true" and not self.enforce_in_testing:
             return await call_next(request)
 
         # Only enforce on authenticated endpoints
@@ -247,7 +256,7 @@ class SessionLimitMiddleware(BaseHTTPMiddleware):
         token = auth_header[7:]
         token_hash = hash(token)
 
-        # Try to extract user_id from token (lightweight, no full decode)
+        # Try to extract user_id and exp from token (lightweight, no signature verify)
         try:
             from jose import jwt as jose_jwt
             payload = jose_jwt.decode(
@@ -255,19 +264,30 @@ class SessionLimitMiddleware(BaseHTTPMiddleware):
                 options={"verify_exp": False}
             )
             user_id = payload.get("user_id") or payload.get("sub", "unknown")
+            exp = float(payload.get("exp", time.time() + 86400))
         except Exception:
             # If decode fails, let the actual auth handler deal with it
             return await call_next(request)
 
-        # Track sessions
-        active = self._sessions.get(user_id, set())
-        active.add(token_hash)
-        self._sessions[user_id] = active
+        now = time.time()
 
-        if len(active) > self.max_sessions:
+        # Prune expired sessions for this user
+        user_sessions = self._sessions.get(user_id, {})
+        active_sessions = {
+            th: exp_time for th, exp_time in user_sessions.items()
+            if exp_time > now
+        }
+
+        # Add current session if not expired
+        if exp > now:
+            active_sessions[token_hash] = exp
+
+        self._sessions[user_id] = active_sessions
+
+        if len(active_sessions) > self.max_sessions:
             logger.warning(
                 f"Session limit exceeded for user {user_id}: "
-                f"{len(active)} sessions (limit: {self.max_sessions})"
+                f"{len(active_sessions)} active sessions (limit: {self.max_sessions})"
             )
             return make_error_response(
                 status_code=429,
@@ -284,9 +304,16 @@ class SessionLimitMiddleware(BaseHTTPMiddleware):
     def clear_session(self, user_id: str, token_hash: int):
         """Remove a session on logout."""
         if user_id in self._sessions:
-            self._sessions[user_id].discard(token_hash)
+            self._sessions[user_id].pop(token_hash, None)
             if not self._sessions[user_id]:
                 del self._sessions[user_id]
+
+
+def clear_user_session(user_id: str, token: str):
+    """Module helper to clear a user session from the active SessionLimitMiddleware instance."""
+    if SessionLimitMiddleware._instance:
+        SessionLimitMiddleware._instance.clear_session(user_id, hash(token))
+
 
 
 class InputSanitizationMiddleware(BaseHTTPMiddleware):

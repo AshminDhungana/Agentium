@@ -26,6 +26,7 @@ from backend.core.auth import (
 from backend.models.entities.user import User
 from backend.models.entities.audit import AuditLog, AuditLevel, AuditCategory
 from backend.core.voice_auth import create_voice_token
+from backend.core.security_middleware import clear_user_session
 from backend.api.schemas.examples import ErrorResponseExample
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -558,3 +559,45 @@ async def verify_session(
             "role": current_user.get("role", "user"),
         },
     )
+
+
+class LogoutResponse(BaseModel):
+    status: str
+    message: str
+
+
+@router.post(
+    "/logout",
+    response_model=LogoutResponse,
+    summary="Log out active user session",
+    description="Invalidates the current session token in SessionLimitMiddleware and logs an audit entry."
+)
+async def logout(
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_security),
+    current_user: dict = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Log out active user session.
+    Clears the session from SessionLimitMiddleware and logs an audit record.
+    """
+    token = credentials.credentials if credentials else ""
+    user_id = current_user.get("user_id") or current_user.get("sub", "")
+
+    if user_id and token:
+        clear_user_session(user_id, token)
+
+    audit_entry = AuditLog.log(
+        level=AuditLevel.INFO,
+        category=AuditCategory.AUTHENTICATION,
+        actor_type="user",
+        actor_id=current_user.get("username", "unknown"),
+        action="logout",
+        description="User logged out successfully",
+        meta_data={"user_id": user_id},
+    )
+    db.add(audit_entry)
+    db.commit()
+
+    return LogoutResponse(status="success", message="Logged out successfully")
