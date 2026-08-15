@@ -75,6 +75,10 @@ class RoleChangeRequest(BaseModel):
     )
 
 
+class UserStatusChangeRequest(BaseModel):
+    is_active: bool
+
+
 class BlockedIPResponse(BaseModel):
     """Response schema for a single blocked IP entry."""
     ip: str
