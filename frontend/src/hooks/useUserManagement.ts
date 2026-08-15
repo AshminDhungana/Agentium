@@ -41,9 +41,10 @@ export interface UseUserManagementReturn {
     // Status flags
     loading:                boolean;
     error:                  string | null;
-    changingRole:           string | null;     // userId currently having role updated
+    changingRole:           string | null;      // userId currently having role updated
+    changingStatus:         string | null;      // userId currently having status updated
     isChangingPassword:     boolean;
-    roleChangeSuccess:      string | null;     // userId that just succeeded (2 s)
+    roleChangeSuccess:      string | null;      // userId that just succeeded (2 s)
     // Confirmation sets (Set is safe for rapid multi-click)
     confirmingReject:       Set<string>;
     confirmingDelete:       Set<string>;
@@ -58,6 +59,7 @@ export interface UseUserManagementReturn {
     handleReject:           (userId: string, username: string) => Promise<void>;
     handleDelete:           (userId: string, username: string) => Promise<void>;
     handleRoleChange:       (userId: string, username: string, newRole: string) => Promise<void>;
+    handleStatusChange:     (userId: string, username: string, newStatus: boolean) => Promise<void>;
     handleChangePassword:   (userId: string, username: string, newPassword: string) => Promise<boolean>;
     toggleConfirmReject:    (userId: string) => void;
     toggleConfirmDelete:    (userId: string) => void;
