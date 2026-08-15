@@ -188,6 +188,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Log out active user session
+         * @description Invalidates the current session token in SessionLimitMiddleware and logs an audit entry.
+         */
+        post: operations["logout_api_v1_auth_logout_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/models/providers": {
         parameters: {
             query?: never;
@@ -2370,6 +2390,26 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/users/{user_id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Change user active status
+         * @description Activate or deactivate a user account. Admin cannot deactivate their own account.
+         */
+        patch: operations["change_user_status_api_v1_admin_users__user_id__status_patch"];
         trace?: never;
     };
     "/api/v1/admin/slow-queries": {
@@ -6153,7 +6193,11 @@ export interface paths {
          */
         get: operations["list_users_with_roles_api_v1_rbac_roles_get"];
         put?: never;
-        post?: never;
+        /**
+         * Assign Role
+         * @description Assign a role to a user (requires Sovereign or Admin).
+         */
+        post: operations["assign_role_api_v1_rbac_roles_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -8043,6 +8087,15 @@ export interface components {
             /** Right */
             right: unknown;
         };
+        /** AssignRoleRequest */
+        AssignRoleRequest: {
+            /** User Id */
+            user_id: string;
+            /** Role */
+            role: string;
+            /** Expires At */
+            expires_at?: string | null;
+        };
         /** AssignedAgents */
         AssignedAgents: {
             /** Head */
@@ -9648,6 +9701,13 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        /** LogoutResponse */
+        LogoutResponse: {
+            /** Status */
+            status: string;
+            /** Message */
+            message: string;
+        };
         /** MCPAuditResponse */
         MCPAuditResponse: {
             /** Tool Id */
@@ -10976,6 +11036,11 @@ export interface components {
             /** Is Active */
             is_active?: boolean | null;
         };
+        /** UserStatusChangeRequest */
+        UserStatusChangeRequest: {
+            /** Is Active */
+            is_active: boolean;
+        };
         /** ValidateReassignmentRequest */
         ValidateReassignmentRequest: {
             /**
@@ -11533,6 +11598,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["VerifyResponse"];
+                };
+            };
+        };
+    };
+    logout_api_v1_auth_logout_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LogoutResponse"];
                 };
             };
         };
@@ -22510,6 +22595,104 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["RoleChangeRequest"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponseExample"];
+                };
+            };
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponseExample"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+        };
+    };
+    change_user_status_api_v1_admin_users__user_id__status_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserStatusChangeRequest"];
             };
         };
         responses: {
@@ -40682,6 +40865,102 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+        };
+    };
+    assign_role_api_v1_rbac_roles_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssignRoleRequest"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponseExample"];
+                };
+            };
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponseExample"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
             /** @description Too Many Requests */
