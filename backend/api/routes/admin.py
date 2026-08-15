@@ -601,6 +601,56 @@ async def change_user_role(
     }
 
 
+@router.patch(
+    "/admin/users/{user_id}/status",
+    summary="Change user active status",
+    description="Activate or deactivate a user account. Admin cannot deactivate their own account.",
+    responses=build_responses(None),
+)
+async def change_user_status(
+    user_id: str,
+    request: UserStatusChangeRequest,
+    admin: dict = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    # Guard: cannot deactivate own account
+    if user_id == admin.get("user_id") and not request.is_active:
+        raise BadRequestError(
+            error="Cannot deactivate your own account",
+            code="CANNOT_DEACTIVATE_YOUR_OWN_ACCOUNT"
+        )
+
+    user = _get_user_or_404(db, user_id)
+    old_status = user.is_active
+    user.is_active = request.is_active
+    user.updated_at = datetime.now(timezone.utc)
+
+    # Audit log
+    audit_entry = AuditLog.log(
+        level=AuditLevel.WARNING,
+        category=AuditCategory.AUTHORIZATION,
+        actor_type="admin",
+        actor_id=admin.get("username", "unknown"),
+        action="user_status_changed",
+        target_type="user",
+        target_id=str(user.id),
+        description=f"Admin changed status for {user.username}: {'Active' if old_status else 'Inactive'} → {'Active' if request.is_active else 'Inactive'}",
+        meta_data={
+            "target_username": user.username,
+            "old_status": old_status,
+            "new_status": request.is_active,
+        },
+    )
+    db.add(audit_entry)
+    db.commit()
+
+    return {
+        "success": True,
+        "message": f"User {user.username} {'activated' if request.is_active else 'deactivated'} successfully",
+        "is_active": request.is_active,
+    }
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # GET /api/v1/admin/slow-queries
 # ──────────────────────────────────────────────────────────────────────────────
