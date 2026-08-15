@@ -207,4 +207,19 @@ export const adminService = {
         );
         return response.data;
     },
+
+    /**
+     * Change a user's active status (activate/deactivate).
+     * Maps to PATCH /api/v1/admin/users/{user_id}/status
+     */
+    async changeUserStatus(
+        userId: string,
+        isActive: boolean,
+    ): Promise<{ success: boolean; message: string; is_active: boolean }> {
+        const response = await api.patch(
+            `/api/v1/admin/users/${userId}/status`,
+            { is_active: isActive },
+        );
+        return response.data;
+    },
 };
