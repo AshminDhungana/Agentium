@@ -71,6 +71,8 @@ export default function UserManagement({
         handleChangePassword,
         toggleConfirmReject,
         toggleConfirmDelete,
+    changingStatus,
+        handleStatusChange,
     } = useUserManagement(onPendingCountChange);
 
     // Focus first input when modal opens
@@ -381,6 +383,14 @@ export default function UserManagement({
                                                     )}
                                                 </div>
 
+                                                {/* Status Toggle */}
+                                                <StatusToggle
+                                                    user={user}
+                                                    isActive={user.is_active}
+                                                    isChanging={changingStatus === user.id}
+                                                    onToggle={() => handleStatusChange(user.id, user.username, !user.is_active)}
+                                                />
+
                                                 <button
                                                     onClick={() => openPasswordModal(user)}
                                                     className="px-3 py-2 bg-blue-600 hover:bg-blue-700 dark:hover:bg-blue-500 text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors duration-150 shadow-sm"
@@ -614,6 +624,48 @@ function EmptyState({
             <p className="text-sm text-gray-600 dark:text-gray-400">{description}</p>
             {action}
         </div>
+    );
+}
+
+// ── Status Toggle ──────────────────────────────────────────────────────────────
+
+function StatusToggle({
+    user,
+    isActive,
+    isChanging,
+    onToggle,
+}: {
+    user: Pick<User, 'id' | 'username'>;
+    isActive: boolean;
+    isChanging: boolean;
+    onToggle: () => void;
+}) {
+    return (
+        <button
+            role="switch"
+            aria-checked={isActive}
+            aria-label={isActive ? `Deactivate ${user.username}` : `Activate ${user.username}`}
+            onClick={onToggle}
+            disabled={isChanging}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-[#0f1117] ${
+                isActive
+                    ? 'bg-green-600'
+                    : 'bg-gray-300 dark:bg-gray-600'
+            } ${isChanging ? 'opacity-50 cursor-wait' : 'cursor-pointer'}`}
+            title={isActive ? `Deactivate ${user.username}` : `Activate ${user.username}`}
+        >
+            <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition-transform duration-200 ${
+                    isActive ? 'translate-x-6' : 'translate-x-1'
+                }`}
+                aria-hidden="true"
+            />
+            {isChanging && (
+                <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2" aria-hidden="true">
+                    <LoadingSpinner size="xs" />
+                </span>
+            )}
+        </button>
     );
 }
 
