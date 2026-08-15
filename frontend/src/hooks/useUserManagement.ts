@@ -85,6 +85,7 @@ export function useUserManagement(
     const [changingRole,       setChangingRole]       = useState<string | null>(null);
     const [isChangingPassword, setIsChangingPassword] = useState(false);
     const [roleChangeSuccess,  setRoleChangeSuccess]  = useState<string | null>(null);
+    const [changingStatus,     setChangingStatus]     = useState<string | null>(null);
 
     // Confirmation sets — Set<string> prevents a second click from overwriting
     // a pending confirmation for a different user (single-string had this bug).
@@ -240,6 +241,43 @@ export function useUserManagement(
     }, []);
 
     /**
+     * Change user active status with optimistic update.
+     * Prevents admin from deactivating their own account.
+     */
+    const handleStatusChange = useCallback(async (
+        userId: string,
+        username: string,
+        newStatus: boolean,
+    ) => {
+        // Prevent self-deactivation
+        if (currentUser?.id && userId === currentUser.id && !newStatus) {
+            showToast.error('You cannot deactivate your own account');
+            return;
+        }
+
+        setChangingStatus(userId);
+        const previousUsers = approvedUsers;
+
+        // Optimistic update
+        setApprovedUsers(prev =>
+            prev.map(u =>
+                u.id === userId ? { ...u, is_active: newStatus } : u
+            )
+        );
+
+        try {
+            await adminService.changeUserStatus(userId, newStatus);
+            showToast.success(`User ${username} ${newStatus ? 'activated' : 'deactivated'} successfully`);
+        } catch (err: any) {
+            // Rollback on error
+            setApprovedUsers(previousUsers);
+            showToast.error(err?.response?.data?.detail ?? `Failed to ${newStatus ? 'activate' : 'deactivate'} user`);
+        } finally {
+            setChangingStatus(null);
+        }
+    }, [currentUser?.id]);
+
+    /**
      * Returns true on success so the modal can close itself.
      * isChangingPassword prevents duplicate submissions while in-flight.
      */
@@ -270,6 +308,7 @@ export function useUserManagement(
         changingRole,
         isChangingPassword,
         roleChangeSuccess,
+        changingStatus,
         confirmingReject,
         confirmingDelete,
         rawSearch,
@@ -282,6 +321,7 @@ export function useUserManagement(
         handleDelete,
         handleRoleChange,
         handleChangePassword,
+        handleStatusChange,
         toggleConfirmReject,
         toggleConfirmDelete,
         setIsChangingPassword,
