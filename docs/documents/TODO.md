@@ -124,11 +124,11 @@
   - [x] 2.5.2 — Frontend `authStore.ts` handles logout / token invalidation
   - [x] 2.5.3 — `checkAuth()` on page load correctly restores session
 
-- [ ] **2.6 — User Management Page**
-  - [ ] 2.6.1 — `Usermanagement.tsx` lists all users
-  - [ ] 2.6.2 — Admin can activate/deactivate users
-  - [ ] 2.6.3 — Admin can change user roles
-  - [ ] 2.6.4 — User deletion works correctly
+- [x] **2.6 — User Management Page**
+  - [x] 2.6.1 — `Usermanagement.tsx` lists all users
+  - [x] 2.6.2 — Admin can activate/deactivate users
+  - [x] 2.6.3 — Admin can change user roles
+  - [x] 2.6.4 — User deletion works correctly
 
 ---
 
