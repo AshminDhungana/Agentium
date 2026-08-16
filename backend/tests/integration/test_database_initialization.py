@@ -27,14 +27,14 @@ def test_init_db_creates_all_tables(db_session):
         is_constant = name == 'AGENT_TYPE_MAP'
         is_pydantic = isinstance(model, type) and issubclass(model, BaseModel)
 
-        # SQLAlchemy models: inherit from Base (not BaseEntity) but are not Base itself
+        # SQLAlchemy models: inherit from BaseEntity OR inherit from Base but are not Base itself
         # Note: Some models inherit from BaseEntity (which is abstract), others from Base directly (e.g., User)
         is_sqlalchemy = (
             isinstance(model, type) and
             (issubclass(model, BaseEntity) or (issubclass(model, Base) and model is not Base))
         )
 
-        # Skip abstract base classes
+        # Skip abstract base classes (BaseEntity has __abstract__ = True)
         is_abstract = getattr(model, '__abstract__', False)
 
         if is_sqlalchemy and hasattr(model, '__tablename__') and not is_abstract:

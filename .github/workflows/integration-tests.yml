@@ -135,7 +135,7 @@ jobs:
       - name: Run database initialization unit tests
         working-directory: ./backend
         run: |
-          pytest tests/unit/test_entity_imports.py tests/unit/test_check_health.py -v
+          pytest tests/unit/test_entity_imports.py tests/unit/test_check_health.py -v -o addopts="" --no-cov
         env:
           PYTHONPATH: ${{ github.workspace }}
 
