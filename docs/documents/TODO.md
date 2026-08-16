@@ -136,11 +136,11 @@
 
 > **Files**: `backend/models/database.py`, `backend/alembic/`, `backend/models/entities/`
 
-- [ ] **3.1 — Database Initialization**
-  - [ ] 3.1.1 — `init_db()` creates all tables via SQLAlchemy `create_all()`
-  - [ ] 3.1.2 — All 40+ entity models import correctly in `entities/__init__.py`
-  - [ ] 3.1.3 — `check_health()` returns healthy status
-  - [ ] 3.1.4 — Connection pooling works under concurrent requests
+- [x] **3.1 — Database Initialization**
+  - [x] 3.1.1 — `init_db()` creates all tables via SQLAlchemy `create_all()`
+  - [x] 3.1.2 — All 40+ entity models import correctly in `entities/__init__.py`
+  - [x] 3.1.3 — `check_health()` returns healthy status
+  - [x] 3.1.4 — Connection pooling works under concurrent requests
 
 - [ ] **3.2 — Alembic Migrations**
   - [ ] 3.2.1 — `alembic upgrade head` applies all migrations without error
