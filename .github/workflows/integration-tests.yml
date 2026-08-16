@@ -132,6 +132,51 @@ jobs:
         run: |
           python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('BAAI/bge-base-en-v1.5')"
 
+      - name: Run database initialization unit tests
+        working-directory: ./backend
+        run: |
+          pytest tests/unit/test_entity_imports.py tests/unit/test_check_health.py -v
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+
+      - name: Run database initialization integration tests
+        working-directory: ./backend
+        run: |
+          pytest tests/integration/test_database_initialization.py -v
+        env:
+          HF_HUB_OFFLINE: "1"
+          DATABASE_URL: postgresql://agentium:agentium@localhost:5432/agentium_test
+          REDIS_URL: redis://localhost:6379/1
+          CELERY_BROKER_URL: redis://localhost:6379/1
+          CELERY_RESULT_BACKEND: redis://localhost:6379/1
+          CHROMA_HOST: localhost
+          CHROMA_PORT: 8001
+          CELERY_TASK_ALWAYS_EAGER: true
+          EMBEDDING_MODEL: BAAI/bge-base-en-v1.5
+          EMBEDDING_DIM: "768"
+          EMBEDDING_ACTIVE_VERSION: v2
+          TESTING: true
+          PYTHONPATH: ${{ github.workspace }}
+
+      - name: Run connection pool load test
+        working-directory: ./backend
+        run: |
+          pytest tests/load/test_connection_pool_load.py -v -s --timeout=120
+        env:
+          HF_HUB_OFFLINE: "1"
+          DATABASE_URL: postgresql://agentium:agentium@localhost:5432/agentium_test
+          REDIS_URL: redis://localhost:6379/1
+          CELERY_BROKER_URL: redis://localhost:6379/1
+          CELERY_RESULT_BACKEND: redis://localhost:6379/1
+          CHROMA_HOST: localhost
+          CHROMA_PORT: 8001
+          CELERY_TASK_ALWAYS_EAGER: true
+          EMBEDDING_MODEL: BAAI/bge-base-en-v1.5
+          EMBEDDING_DIM: "768"
+          EMBEDDING_ACTIVE_VERSION: v2
+          TESTING: true
+          PYTHONPATH: ${{ github.workspace }}
+
       - name: Run integration tests with coverage
         working-directory: ./backend
         run: pytest -m "integration and not requires_docker and not requires_redis and not requires_alembic_head" --cov=services --cov-fail-under=20
