@@ -142,7 +142,7 @@ jobs:
       - name: Run database initialization integration tests
         working-directory: ./backend
         run: |
-          pytest tests/integration/test_database_initialization.py -v
+          pytest tests/integration/test_database_initialization.py -v -o addopts="" --no-cov
         env:
           HF_HUB_OFFLINE: "1"
           DATABASE_URL: postgresql://agentium:agentium@localhost:5432/agentium_test
@@ -161,7 +161,7 @@ jobs:
       - name: Run connection pool load test
         working-directory: ./backend
         run: |
-          pytest tests/load/test_connection_pool_load.py -v -s --timeout=120
+          pytest tests/load/test_connection_pool_load.py -v -s --timeout=120 -o addopts="" --no-cov
         env:
           HF_HUB_OFFLINE: "1"
           DATABASE_URL: postgresql://agentium:agentium@localhost:5432/agentium_test
