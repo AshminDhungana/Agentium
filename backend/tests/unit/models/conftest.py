@@ -160,14 +160,18 @@ def sample_ethos(db_session, sample_task_agent):
 @pytest.fixture
 def sample_amendment_voting(db_session, sample_constitution, sample_council_member):
     """AmendmentVoting with council members as eligible voters."""
-    from backend.models.entities.voting import AmendmentVoting
+    from backend.models.entities.voting import AmendmentVoting, AmendmentStatus
+    import json
     voting = AmendmentVoting(
         amendment_id=sample_constitution.id,
-        status="active",
-        eligible_voter_ids=[sample_council_member.id],
-        quorum_threshold=0.6,
-        supermajority_threshold=0.66,
-        discussion_thread_json=[],
+        status=AmendmentStatus.PROPOSED,
+        eligible_voters=json.dumps([sample_council_member.agentium_id]),
+        required_votes=3,
+        supermajority_threshold=66,
+        proposed_by_agentium_id="00001",
+        proposed_changes="Test amendment",
+        rationale="Test rationale",
+        discussion_thread=[],
     )
     db_session.add(voting)
     db_session.commit()
@@ -178,13 +182,16 @@ def sample_amendment_voting(db_session, sample_constitution, sample_council_memb
 @pytest.fixture
 def sample_task_deliberation(db_session, sample_council_member, sample_lead_agent, sample_task_agent):
     """TaskDeliberation with council members as participants."""
-    from backend.models.entities.voting import TaskDeliberation
+    from backend.models.entities.voting import TaskDeliberation, DeliberationStatus
+    import json
     deliberation = TaskDeliberation(
         task_id="test-task-id",
-        status="active",
+        status=DeliberationStatus.PENDING,
         min_quorum=2,
         required_approvals=2,
-        participant_ids=[sample_council_member.id, sample_lead_agent.id, sample_task_agent.id],
+        participating_members=json.dumps([sample_council_member.agentium_id, sample_lead_agent.agentium_id, sample_task_agent.agentium_id]),
+        time_limit_minutes=30,
+        discussion_thread=[],
     )
     db_session.add(deliberation)
     db_session.commit()
