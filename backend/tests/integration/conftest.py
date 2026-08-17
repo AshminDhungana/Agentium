@@ -3,6 +3,14 @@ Fixture factory for integration tests.
 Connects to the running docker-compose stack on localhost.
 """
 
+# CRITICAL: Patch JSONB BEFORE any model imports (some models use JSONB)
+# This must be at the very top, before importing backend modules
+import sqlalchemy.dialects.postgresql as pg_dialect
+from sqlalchemy import JSON
+class _JSONBCompat(JSON):
+    pass
+pg_dialect.JSONB = _JSONBCompat
+
 import os
 import json
 import logging
