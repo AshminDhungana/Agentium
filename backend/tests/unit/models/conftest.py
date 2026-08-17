@@ -1,11 +1,37 @@
 import pytest
 from datetime import datetime, timezone
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, JSON
 from sqlalchemy.orm import sessionmaker
+
+# CRITICAL: Patch JSONB in postgresql dialect BEFORE any model imports
+# This ensures any model importing JSONB gets the SQLite-compatible version
+import sqlalchemy.dialects.postgresql as pg_dialect
+pg_dialect.JSONB = lambda **kwargs: JSON(**kwargs)
+# Also patch the class to be instantiable
+class _JSONBCompat(JSON):
+    pass
+pg_dialect.JSONB = _JSONBCompat
+
+# Also patch the imported name in task module when it loads
+import sys
+original_import = sys.modules.copy()
+
 from backend.models.database import Base
-from backend.models.entities.agents import Agent, AgentType, AgentStatus
+from backend.models.entities.agents import (
+    Agent, AgentType, AgentStatus,
+    HeadOfCouncil, CouncilMember, LeadAgent, TaskAgent
+)
 from backend.models.entities.constitution import Constitution, Ethos
 from backend.models.entities.voting import AmendmentVoting, TaskDeliberation, IndividualVote, VotingRecord, VoteType
+from sqlalchemy import event as sa_event
+
+
+AGENT_CLASS_MAP = {
+    AgentType.HEAD_OF_COUNCIL: HeadOfCouncil,
+    AgentType.COUNCIL_MEMBER: CouncilMember,
+    AgentType.LEAD_AGENT: LeadAgent,
+    AgentType.TASK_AGENT: TaskAgent,
+}
 
 
 @pytest.fixture(scope="function")
@@ -22,8 +48,9 @@ def db_session():
 
 
 def _create_agent(db_session, agentium_id: str, agent_type: AgentType, status: AgentStatus = AgentStatus.ACTIVE, parent=None):
-    """Helper to create agent with proper ID generation."""
-    agent = Agent(
+    """Helper to create agent with proper ID generation using correct subclass."""
+    agent_class = AGENT_CLASS_MAP.get(agent_type, Agent)
+    agent = agent_class(
         agentium_id=agentium_id,
         agent_type=agent_type,
         status=status,
@@ -32,9 +59,18 @@ def _create_agent(db_session, agentium_id: str, agent_type: AgentType, status: A
     if parent:
         agent.parent_id = parent.id
     db_session.add(agent)
-    db_session.commit()
+    db_session.flush()
+    # Force id generation for polymorphic subclasses
     db_session.refresh(agent)
     return agent
+
+
+# Ensure agent IDs are generated before commit for polymorphic classes
+@sa_event.listens_for(Agent, 'before_insert')
+def ensure_agent_id(mapper, connection, target):
+    if target.id is None:
+        import uuid
+        target.id = str(uuid.uuid4())
 
 
 @pytest.fixture
@@ -64,17 +100,20 @@ def sample_task_agent(db_session, sample_lead_agent):
 @pytest.fixture
 def sample_constitution(db_session):
     """Active Constitution with articles, prohibited_actions, sovereign_preferences."""
+    import json
     constitution = Constitution(
+        agentium_id="C00001",
         version_number=1,
-        version_string="v1.0.0",
-        articles_json={
+        version="v1.0.0",
+        articles=json.dumps({
             "article_1": {"title": "Sovereign Authority", "content": "The sovereign holds ultimate authority."},
             "article_2": {"title": "Council Governance", "content": "Council members govern by consensus."},
-        },
-        prohibited_actions_json=["unauthorized_tool_use", "constitution_modification"],
-        sovereign_preferences_json={"theme": "dark", "notifications": True},
+        }),
+        prohibited_actions=json.dumps(["unauthorized_tool_use", "constitution_modification"]),
+        sovereign_preferences=json.dumps({"theme": "dark", "notifications": True}),
         effective_date=datetime.now(timezone.utc),
         is_active=True,
+        created_by_agentium_id="00001",
     )
     db_session.add(constitution)
     db_session.commit()
@@ -86,21 +125,35 @@ def sample_constitution(db_session):
 def sample_ethos(db_session, sample_task_agent):
     """Ethos linked to agent with working memory populated."""
     from backend.models.entities.constitution import Ethos
+    import json
     ethos = Ethos(
+        agentium_id=f"E{sample_task_agent.agentium_id[1:]}",  # E + rest of agent id
         agent_id=sample_task_agent.id,
+        agent_type=sample_task_agent.agent_type.value,
+        mission_statement="Test mission",
+        core_values=json.dumps([]),
+        behavioral_rules=json.dumps([]),
+        restrictions=json.dumps([]),
+        capabilities=json.dumps([]),
         current_objective="Test objective",
-        active_plan_json={"steps": ["step1", "step2"]},
-        constitutional_references_json=["article_1", "article_2"],
-        task_progress_markers_json={"step1": "completed"},
-        reasoning_artifacts_json=[{"thought": "Initial reasoning"}],
+        active_plan=json.dumps({"steps": ["step1", "step2"]}),
+        constitutional_references=json.dumps([]),
+        task_progress_markers=json.dumps({"step1": "completed"}),
+        reasoning_artifacts=json.dumps([{"thought": "Initial reasoning"}]),
         outcome_summary="Initial summary",
-        lessons_learned_json=["Lesson 1: Test lesson"],
+        lessons_learned=json.dumps(["Lesson 1: Test lesson"]),
         version=1,
-        verified=True,
+        is_verified=True,
+        created_by_agentium_id=sample_task_agent.agentium_id,
+        working_method="Test working method",
+        environment_context="Test environment",
     )
     db_session.add(ethos)
     db_session.commit()
     db_session.refresh(ethos)
+    # Link ethos to agent
+    sample_task_agent.ethos_id = ethos.id
+    db_session.commit()
     return ethos
 
 
