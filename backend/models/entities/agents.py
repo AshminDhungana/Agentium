@@ -1283,13 +1283,17 @@ class Agent(BaseEntity):
             incarnation_number=kwargs.get('incarnation_number', 1),
             **kwargs
         )
-        
+
         if not new_agent.preferred_config_id and self.preferred_config_id:
             new_agent.preferred_config_id = self.preferred_config_id
-        
+
+        # Add and flush new_agent to generate its ID before creating ethos
+        session.add(new_agent)
+        session.flush()
+
         default_ethos = self._create_default_ethos(new_agent, session)
         new_agent.ethos_id = default_ethos.id
-        
+
         return new_agent
     
     def _generate_agentium_id(self, agent_type: AgentType, session: Session) -> str:
