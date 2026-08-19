@@ -10,7 +10,10 @@ from sqlalchemy import Column, String, Integer, Float, Boolean, DateTime, Enum, 
 from sqlalchemy.orm import validates
 from sqlalchemy.orm import relationship
 from .base import BaseEntity
-from backend.core.config import settings
+try:
+    from backend.core.config import settings
+except ImportError:
+    from core.config import settings
 
 
 class ProviderType(str, enum.Enum):

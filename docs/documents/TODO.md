@@ -142,23 +142,23 @@
   - [x] 3.1.3 — `check_health()` returns healthy status
   - [x] 3.1.4 — Connection pooling works under concurrent requests
 
-- [ ] **3.2 — Alembic Migrations**
-  - [ ] 3.2.1 — `alembic upgrade head` applies all migrations without error
-  - [ ] 3.2.2 — `alembic downgrade -1` rolls back cleanly
-  - [ ] 3.2.3 — Migration scripts match current model definitions
-  - [ ] 3.2.4 — No orphaned or conflicting migration heads
+- [x] **3.2 — Alembic Migrations**
+  - [x] 3.2.1 — `alembic upgrade head` applies all migrations without error
+  - [x] 3.2.2 — `alembic downgrade -1` rolls back cleanly
+  - [x] 3.2.3 — Migration scripts match current model definitions
+  - [x] 3.2.4 — No orphaned or conflicting migration heads
 
-- [ ] **3.3 — Key Entity Models**
-  - [ ] 3.3.1 — `Agent` model: all statuses (INITIALIZING, ACTIVE, SUSPENDED, TERMINATED, etc.) work
-  - [ ] 3.3.2 — `Task` model: all task types and statuses function correctly
-  - [ ] 3.3.3 — `Constitution` model: articles, amendments, ethos records persist
-  - [ ] 3.3.4 — `User` / `UserModelConfig` / `UserPreference` relationships work
-  - [ ] 3.3.5 — `AuditLog` / `ViolationReport` records are immutable after creation
-  - [ ] 3.3.6 — `Checkpoint` model: save/restore works
-  - [ ] 3.3.7 — `Workflow` / `ScheduledTask` models work with Celery
-  - [ ] 3.3.8 — `Voting` / `VoteRecord` / `Proposal` models tally correctly
-  - [ ] 3.3.9 — `Channel` / `ChannelMessage` models store bridge messages
-  - [ ] 3.3.10 — `MCPTool` / `ToolVersion` / `ToolStagingArea` models support tool lifecycle
+- [x] **3.3 — Key Entity Models**
+  - [x] 3.3.1 — `Agent` model: all statuses (INITIALIZING, ACTIVE, SUSPENDED, TERMINATED, etc.) work
+  - [x] 3.3.2 — `Task` model: all task types and statuses function correctly
+  - [x] 3.3.3 — `Constitution` model: articles, amendments, ethos records persist
+  - [x] 3.3.4 — `User` / `UserModelConfig` / `UserPreference` relationships work
+  - [x] 3.3.5 — `AuditLog` / `ViolationReport` records are immutable after creation
+  - [x] 3.3.6 — `Checkpoint` model: save/restore works
+  - [x] 3.3.7 — `Workflow` / `ScheduledTask` models work with Celery
+  - [x] 3.3.8 — `Voting` / `VoteRecord` / `Proposal` models tally correctly
+  - [x] 3.3.9 — `Channel` / `ChannelMessage` models store bridge messages
+  - [x] 3.3.10 — `MCPTool` / `ToolVersion` / `ToolStagingArea` models support tool lifecycle
 
 - [ ] **3.4 — Database Maintenance**
   - [ ] 3.4.1 — `DatabaseMaintenanceService` vacuum and cleanup tasks run

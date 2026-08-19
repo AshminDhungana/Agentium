@@ -16,13 +16,18 @@ pg_dialect.JSONB = _JSONBCompat
 import sys
 original_import = sys.modules.copy()
 
-from backend.models.database import Base
-from backend.models.entities.agents import (
+# Use relative imports since we're running from backend directory
+from models.database import Base
+from models.entities.agents import (
     Agent, AgentType, AgentStatus,
     HeadOfCouncil, CouncilMember, LeadAgent, TaskAgent
 )
-from backend.models.entities.constitution import Constitution, Ethos
-from backend.models.entities.voting import AmendmentVoting, TaskDeliberation, IndividualVote, VotingRecord, VoteType
+from models.entities.constitution import Constitution, Ethos
+from models.entities.voting import AmendmentVoting, TaskDeliberation, IndividualVote, VotingRecord, VoteType
+from models.entities.channels import (
+    ExternalChannel, ExternalMessage, ChannelMetrics,
+    ChannelType, ChannelStatus, CircuitBreakerState
+)
 from sqlalchemy import event as sa_event
 
 

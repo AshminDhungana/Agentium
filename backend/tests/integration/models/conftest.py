@@ -10,13 +10,30 @@ class _JSONBCompat(JSON):
     pass
 pg_dialect.JSONB = _JSONBCompat
 
+import os
+os.environ["TESTING"] = "true"
+
 import pytest
+import uuid
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from backend.models.database import Base
 from backend.models.entities.agents import Agent, AgentType, AgentStatus
 from backend.models.entities.constitution import Constitution, Ethos
 from backend.models.entities.voting import AmendmentVoting, TaskDeliberation, IndividualVote, VoteType, AmendmentStatus, DeliberationStatus
+from backend.models.entities.task import Task, TaskType, TaskStatus
+from backend.models.entities.user import User
+from backend.models.entities.user_config import UserModelConfig, ProviderType, ConnectionStatus
+from backend.models.entities.user_preference import UserPreference, PreferenceCategory
+from backend.models.entities.audit import AuditLog, AuditLevel, AuditCategory
+from backend.models.entities.monitoring import ViolationReport, ViolationSeverity
+from backend.models.entities.checkpoint import ExecutionCheckpoint, CheckpointPhase
+from backend.models.entities.workflow import Workflow, WorkflowExecution, WorkflowStep, WorkflowStepType, WorkflowExecutionStatus
+from backend.models.entities.scheduled_task import ScheduledTask, ScheduledTaskExecution, ScheduledTaskStatus, ScheduledTaskExecutionStatus
+from backend.models.entities.channels import ExternalChannel, ExternalMessage, ChannelType, ChannelStatus, ChannelMetrics
+from backend.models.entities.mcp_tool import MCPTool
+from backend.models.entities.tool_version import ToolVersion
+from backend.models.entities.tool_staging import ToolStaging
 from sqlalchemy import event as sa_event
 import json
 from datetime import datetime, timezone
@@ -187,8 +204,6 @@ def sample_amendment_voting(db_session, sample_constitution, sample_council_memb
 @pytest.fixture
 def sample_task(db_session, sample_council_member, sample_lead_agent, sample_task_agent):
     """Task for deliberation tests."""
-    from backend.models.entities.task import Task, TaskType, TaskStatus
-
     # Provide manual task ID to avoid PostgreSQL-specific _generate_task_id
     task = Task(
         title="Test Task",
@@ -222,8 +237,233 @@ def sample_task_deliberation(db_session, sample_council_member, sample_lead_agen
     )
     db_session.add(deliberation)
     db_session.commit()
+    sample_task.deliberation_id = deliberation.id
+    db_session.commit()
     db_session.refresh(deliberation)
     return deliberation
+
+
+# =========================================================================
+# NEW Fixtures for 3.3 — Key Entity Models
+# =========================================================================
+
+@pytest.fixture
+def sample_user(db_session):
+    """User created via ORM (bypasses create_user commit to use test session)."""
+    user = User(
+        id=str(uuid.uuid4()),
+        username="test_sovereign",
+        email="sovereign@agentium.test",
+        hashed_password=User.hash_password("TestPass123!"),
+        is_active=True,
+        is_admin=True,
+        is_pending=False,
+        role="primary_sovereign",
+    )
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
+    return user
+
+
+@pytest.fixture
+def sample_user_model_config(db_session, sample_user):
+    """UserModelConfig linked to sample_user."""
+    config = UserModelConfig(
+        agentium_id=f"MC{uuid.uuid4().hex[:8]}",
+        user_id=sample_user.id,
+        provider=ProviderType.OPENAI,
+        config_name="Test OpenAI Config",
+        default_model="gpt-4",
+        api_key_encrypted="enc_test_key",
+        api_key_masked="sk-...abc",
+        status=ConnectionStatus.ACTIVE,
+    )
+    db_session.add(config)
+    db_session.commit()
+    db_session.refresh(config)
+    return config
+
+
+@pytest.fixture
+def sample_user_preference(db_session, sample_user):
+    """UserPreference linked to sample_user."""
+    pref = UserPreference(
+        agentium_id=f"UP{uuid.uuid4().hex[:8]}",
+        user_id=sample_user.id,
+        category=PreferenceCategory.UI,
+        key="ui.theme",
+        value_json=json.dumps("dark"),
+        data_type="string",
+        scope="global",
+    )
+    db_session.add(pref)
+    db_session.commit()
+    db_session.refresh(pref)
+    return pref
+
+
+@pytest.fixture
+def sample_audit_log(db_session):
+    """AuditLog created via factory method."""
+    entry = AuditLog.log(
+        level=AuditLevel.INFO,
+        category=AuditCategory.SYSTEM,
+        actor_type="system",
+        actor_id="SYSTEM",
+        action="test_action",
+        description="Test audit log entry",
+        success=True,
+    )
+    db_session.add(entry)
+    db_session.commit()
+    db_session.refresh(entry)
+    return entry
+
+
+@pytest.fixture
+def sample_violation_report(db_session, sample_lead_agent, sample_task_agent):
+    """ViolationReport filed by lead against task agent."""
+    report = ViolationReport(
+        agentium_id=f"VR{uuid.uuid4().hex[:8]}",
+        reporter_agent_id=sample_lead_agent.id,
+        reporter_agentium_id=sample_lead_agent.agentium_id,
+        violator_agent_id=sample_task_agent.id,
+        violator_agentium_id=sample_task_agent.agentium_id,
+        severity=ViolationSeverity.MODERATE,
+        violation_type="unauthorized_access",
+        description="Task agent attempted unauthorized tool use",
+        evidence=[{"type": "log", "content": "Attempted fs_write without permission"}],
+    )
+    db_session.add(report)
+    db_session.commit()
+    db_session.refresh(report)
+    return report
+
+
+@pytest.fixture
+def sample_checkpoint(db_session, sample_task):
+    """ExecutionCheckpoint linked to a task."""
+    checkpoint = ExecutionCheckpoint(
+        agentium_id=f"CK{uuid.uuid4().hex[:8]}",
+        session_id="test-session-001",
+        task_id=sample_task.id,
+        phase=CheckpointPhase.PLAN_APPROVED,
+        agent_states={"agent_00001": {"status": "active", "task_count": 3}},
+        artifacts=["artifact_1.txt", "artifact_2.json"],
+        task_state_snapshot={"status": "in_progress", "completion": 50},
+    )
+    db_session.add(checkpoint)
+    db_session.commit()
+    db_session.refresh(checkpoint)
+    return checkpoint
+
+
+@pytest.fixture
+def sample_workflow(db_session):
+    """Workflow with manual agentium_id (avoids PostgreSQL ID generation)."""
+    workflow = Workflow(
+        agentium_id="WF00001",
+        name="Test Workflow",
+        description="A test workflow template",
+        template_json={"steps": [{"type": "task", "config": {"title": "Step 1"}}]},
+        version=1,
+        schedule_cron="0 9 * * *",
+    )
+    db_session.add(workflow)
+    db_session.commit()
+    db_session.refresh(workflow)
+    return workflow
+
+
+@pytest.fixture
+def sample_scheduled_task(db_session):
+    """ScheduledTask with valid cron expression."""
+    st = ScheduledTask(
+        agentium_id="R0001",
+        name="Daily Cleanup",
+        description="Runs daily cleanup tasks",
+        cron_expression="0 0 * * *",
+        task_payload=json.dumps({"action_type": "cleanup", "params": {"older_than_days": 30}}),
+        owner_agentium_id="00001",
+        status=ScheduledTaskStatus.ACTIVE,
+    )
+    db_session.add(st)
+    db_session.commit()
+    db_session.refresh(st)
+    return st
+
+
+@pytest.fixture
+def sample_channel(db_session):
+    """ExternalChannel with PENDING status."""
+    channel = ExternalChannel(
+        agentium_id=f"CH{uuid.uuid4().hex[:8]}",
+        name="Test WhatsApp Channel",
+        channel_type=ChannelType.WHATSAPP,
+        status=ChannelStatus.PENDING,
+        config={"phone_number": "+1234567890", "api_key": "test_key"},
+    )
+    db_session.add(channel)
+    db_session.commit()
+    db_session.refresh(channel)
+    return channel
+
+
+@pytest.fixture
+def sample_mcp_tool(db_session):
+    """MCPTool in pending status."""
+    tool = MCPTool(
+        agentium_id=f"MT{uuid.uuid4().hex[:8]}",
+        name="test_calculator",
+        description="A simple calculator MCP tool",
+        server_url="http://localhost:8080/mcp",
+        tier="restricted",
+        status="pending",
+        capabilities=["calculate", "convert"],
+        health_status="unknown",
+    )
+    db_session.add(tool)
+    db_session.commit()
+    db_session.refresh(tool)
+    return tool
+
+
+@pytest.fixture
+def sample_tool_version(db_session):
+    """ToolVersion for a test tool."""
+    tv = ToolVersion(
+        agentium_id=f"TV{uuid.uuid4().hex[:8]}",
+        tool_name="test_calculator",
+        version_number=1,
+        version_tag="v1.0.0",
+        code_snapshot="def calculate(a, b): return a + b",
+        tool_path="/tools/test_calculator.py",
+        authored_by_agentium_id="00001",
+        change_summary="Initial version",
+        is_active=True,
+    )
+    db_session.add(tv)
+    db_session.commit()
+    db_session.refresh(tv)
+    return tv
+
+
+@pytest.fixture
+def sample_tool_staging(db_session):
+    """ToolStaging record in pending_approval status."""
+    ts = ToolStaging(
+        agentium_id=f"TS{uuid.uuid4().hex[:8]}",
+        tool_name="staged_tool",
+        proposed_by_agentium_id="30001",
+        tool_path="/tools/staged_tool.py",
+        request_json=json.dumps({"name": "staged_tool", "description": "A staged tool"}),
+        status="pending_approval",
+    )
+    db_session.add(ts)
+    db_session.commit()
+    db_session.refresh(ts)
+    return ts
 
 
 @pytest.fixture(scope="session")

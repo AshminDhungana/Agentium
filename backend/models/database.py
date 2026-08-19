@@ -15,12 +15,18 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker, Session, scoped_session
 from sqlalchemy.pool import QueuePool
 
-from backend.models.entities.base import Base
+try:
+    from backend.models.entities.base import Base
+except ImportError:
+    from models.entities.base import Base
 
 logger = logging.getLogger(__name__)
 
 # Configuration — all pool knobs are env-tunable via Settings.
-from backend.core.config import settings  # noqa: E402  (kept local to limit import cost)
+try:
+    from backend.core.config import settings  # noqa: E402
+except ImportError:
+    from core.config import settings  # noqa: E402
 
 # Engine configuration with pooling (production-tuned, overridable per deploy)
 engine = create_engine(
@@ -341,7 +347,10 @@ def init_db():
     before create_all() runs.
     """
     # ── Core / Base ──────────────────────────────────────────────────────────
-    from backend.models.entities.base import Base  # noqa: F401
+    try:
+        from backend.models.entities.base import Base
+    except ImportError:
+        from models.entities.base import Base  # noqa: F401
 
     # ── User & Auth ──────────────────────────────────────────────────────────
     from backend.models.entities.user import User  # noqa: F401

@@ -94,7 +94,10 @@ class EventTrigger(BaseEntity):
         """Generate trigger ID: ET + 5-digit sequence."""
         from sqlalchemy import text, create_engine
         from sqlalchemy.pool import NullPool
-        from backend.core.config import settings
+        try:
+            from backend.core.config import settings
+        except ImportError:
+            from core.config import settings
         engine = create_engine(
             settings.DATABASE_URL,
             poolclass=NullPool,
@@ -170,7 +173,10 @@ class EventLog(BaseEntity):
         """Generate log ID: EL + 5-digit sequence."""
         from sqlalchemy import text, create_engine
         from sqlalchemy.pool import NullPool
-        from backend.core.config import settings
+        try:
+            from backend.core.config import settings
+        except ImportError:
+            from core.config import settings
         engine = create_engine(
             settings.DATABASE_URL,
             poolclass=NullPool,

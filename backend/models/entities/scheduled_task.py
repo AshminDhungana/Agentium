@@ -237,6 +237,7 @@ class ScheduledTaskExecution(BaseEntity):
             'duration_seconds': (self.completed_at - self.started_at).total_seconds() if self.completed_at else None,
             'status': self.status.value,
             'result': json.loads(self.result_payload) if self.result_payload else None,
-            'error': self.error_message
+            'error': self.error_message,
+            'retry_number': self.retry_number
         })
         return base

@@ -7,14 +7,24 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 
 import uuid
-from backend.models.entities.agents import (
-    Agent, AgentType, AgentStatus, HeadOfCouncil, CouncilMember, LeadAgent, TaskAgent,
-    AGENT_TYPE_MAP
-)
-from backend.models.entities.critics import (
-    CriticAgent, OutputCriticAgent, PlanCriticAgent, CriticType, CriticVerdict
-)
-from backend.models.entities.constitution import Constitution, Ethos
+try:
+    from backend.models.entities.agents import (
+        Agent, AgentType, AgentStatus, HeadOfCouncil, CouncilMember, LeadAgent, TaskAgent,
+        AGENT_TYPE_MAP
+    )
+    from backend.models.entities.critics import (
+        CriticAgent, OutputCriticAgent, PlanCriticAgent, CriticType, CriticVerdict
+    )
+    from backend.models.entities.constitution import Constitution, Ethos
+except ImportError:
+    from models.entities.agents import (
+        Agent, AgentType, AgentStatus, HeadOfCouncil, CouncilMember, LeadAgent, TaskAgent,
+        AGENT_TYPE_MAP
+    )
+    from models.entities.critics import (
+        CriticAgent, OutputCriticAgent, PlanCriticAgent, CriticType, CriticVerdict
+    )
+    from models.entities.constitution import Constitution, Ethos
 
 
 class TestAgent:

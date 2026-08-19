@@ -229,9 +229,10 @@ class TaskDeliberation(BaseEntity):
     
     # Relationships
     task = relationship(
-    "Task",
-    primaryjoin="Task.deliberation_id == TaskDeliberation.id",
-    back_populates="deliberation"
+        "Task",
+        primaryjoin="Task.deliberation_id == TaskDeliberation.id",
+        back_populates="deliberation",
+        uselist=False
     )
     individual_votes = relationship("IndividualVote", back_populates="task_deliberation", lazy="dynamic")
     
@@ -510,11 +511,11 @@ class VotingRecord(BaseEntity):
             return None
         
         stats = {
-            'total': len(votes),
-            'for': sum(1 for v in votes if v.vote == VoteType.FOR),
-            'against': sum(1 for v in votes if v.vote == VoteType.AGAINST),
-            'abstain': sum(1 for v in votes if v.vote == VoteType.ABSTAIN),
-            'changed': sum(1 for v in votes if v.vote_changed)
+            'total_votes_cast': len(votes),
+            'votes_for': sum(1 for v in votes if v.vote == VoteType.FOR),
+            'votes_against': sum(1 for v in votes if v.vote == VoteType.AGAINST),
+            'votes_abstain': sum(1 for v in votes if v.vote == VoteType.ABSTAIN),
+            'votes_changed': sum(1 for v in votes if v.vote_changed)
         }
         
         record = cls(
