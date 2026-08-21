@@ -74,70 +74,122 @@ class DatabaseMaintenanceService:
         return total
 
     @staticmethod
+    async def cleanup_stale_data_once() -> dict:
+        """Run a single pass of audit log / task / constitution cleanup.
+
+        Async because it `await`s the `_chunked_delete` helper. Tests
+        drive one tick at a time without spinning the 24-hour sleep loop.
+
+        All bulk deletes route through `_chunked_delete` so each single
+        DELETE statement holds its lock for at most `batch_size` rows
+        and yields to the event loop between batches.
+        """
+        with get_db_context() as db:
+            report = {
+                "audit_logs_deleted": 0,
+                "tasks_deleted": 0,
+                "constitution_versions_pruned": 0,
+            }
+
+            # Bound any single lock-acquisition wait. SQLite ignores
+            # this clause (no-op); Postgres honors it.
+            try:
+                db.execute(text("SET LOCAL lock_timeout = '5s'"))
+            except Exception:
+                pass
+
+            # 1. Old audit logs (chunked).
+            audit_cutoff = datetime.utcnow() - timedelta(
+                days=settings.AUDIT_LOG_RETENTION_DAYS
+            )
+            report["audit_logs_deleted"] = (
+                await DatabaseMaintenanceService._chunked_delete(
+                    db=db,
+                    model=AuditLog,
+                    filter_factory=lambda: AuditLog.created_at < audit_cutoff,
+                    batch_size=1000,
+                    sleep_ms=50,
+                )
+            )
+
+            # 2. Completed / cancelled / failed tasks older than archive.
+            task_cutoff = datetime.utcnow() - timedelta(
+                days=settings.TASK_ARCHIVE_DAYS
+            )
+            report["tasks_deleted"] = (
+                await DatabaseMaintenanceService._chunked_delete(
+                    db=db,
+                    model=Task,
+                    filter_factory=lambda: (
+                        Task.status.in_(["completed", "cancelled", "failed"])
+                        & (Task.updated_at < task_cutoff)
+                    ),
+                    batch_size=1000,
+                    sleep_ms=50,
+                )
+            )
+
+            # 3. Constitution versions: keep latest N + version 1.
+            report["constitution_versions_pruned"] = (
+                await DatabaseMaintenanceService._prune_constitution_versions_chunked(
+                    db
+                )
+            )
+
+            total = sum(report.values())
+            if total > 0:
+                logger.info(
+                    f"DB Maintenance: {report['audit_logs_deleted']} "
+                    f"audit logs, {report['tasks_deleted']} tasks, "
+                    f"{report['constitution_versions_pruned']} "
+                    f"constitution versions cleaned up."
+                )
+            return report
+
+    @staticmethod
+    async def _prune_constitution_versions_chunked(db: Session) -> int:
+        """Keep the latest N constitution versions plus version 1
+        (original). Routes the actual DELETEs through `_chunked_delete`
+        so single-statement lock hold is bounded.
+
+        The legacy `_prune_constitution_versions` is kept (no external
+        callers, but the symbol remains importable).
+        """
+        all_versions = (
+            db.query(Constitution)
+            .order_by(Constitution.version.desc())
+            .all()
+        )
+        if len(all_versions) <= settings.CONSTITUTION_MAX_VERSIONS:
+            return 0
+
+        keep_ids = set()
+        for v in all_versions[: settings.CONSTITUTION_MAX_VERSIONS]:
+            keep_ids.add(v.id)
+        for v in all_versions:
+            if v.version == 1:
+                keep_ids.add(v.id)
+                break
+
+        return await DatabaseMaintenanceService._chunked_delete(
+            db=db,
+            model=Constitution,
+            filter_factory=lambda: ~Constitution.id.in_(keep_ids),
+            batch_size=100,
+            sleep_ms=50,
+        )
+
+    @staticmethod
     async def cleanup_stale_data():
-        """
-        Background task: Daily cleanup of old audit logs, archived tasks,
-        constitution versions, and stale messages.
-        Phase 9.2: Memory Management Requirement
-        """
+        """Background task: Daily cleanup of audit logs, tasks, and
+        constitutions. Phase 9.2: Memory Management Requirement.
+        Delegates a single tick to `cleanup_stale_data_once` so the same
+        body is exercised by tests and the production loop."""
         while True:
             try:
-                with get_db_context() as db:
-                    alert_manager = AlertManager(db)
-                    report = {
-                        "audit_logs_deleted": 0,
-                        "tasks_deleted": 0,
-                        "constitution_versions_pruned": 0,
-                    }
-
-                    # 1. Clean up Audit Logs older than configured retention
-                    audit_cutoff = datetime.utcnow() - timedelta(
-                        days=settings.AUDIT_LOG_RETENTION_DAYS
-                    )
-                    report["audit_logs_deleted"] = (
-                        db.query(AuditLog)
-                        .filter(AuditLog.created_at < audit_cutoff)
-                        .delete()
-                    )
-
-                    # 2. Archive completed/cancelled/failed tasks older than
-                    #    configured archive period
-                    task_cutoff = datetime.utcnow() - timedelta(
-                        days=settings.TASK_ARCHIVE_DAYS
-                    )
-                    report["tasks_deleted"] = (
-                        db.query(Task)
-                        .filter(
-                            Task.status.in_(
-                                ["completed", "cancelled", "failed"]
-                            ),
-                            Task.updated_at < task_cutoff,
-                        )
-                        .delete()
-                    )
-
-                    # 3. Constitution version cleanup
-                    #    Keep last N versions, NEVER delete version 1
-                    report["constitution_versions_pruned"] = (
-                        DatabaseMaintenanceService._prune_constitution_versions(
-                            db
-                        )
-                    )
-
-                    db.commit()
-
-                    total = sum(report.values())
-                    if total > 0:
-                        logger.info(
-                            f"DB Maintenance: {report['audit_logs_deleted']} "
-                            f"audit logs, {report['tasks_deleted']} tasks, "
-                            f"{report['constitution_versions_pruned']} "
-                            f"constitution versions cleaned up."
-                        )
-
+                await DatabaseMaintenanceService.cleanup_stale_data_once()
             except Exception as e:
                 logger.error(f"Error in DB cleanup routine: {e}")
-
             await asyncio.sleep(86400)  # Sleep 24 hours
 
     @staticmethod
