@@ -29,6 +29,51 @@ class DatabaseMaintenanceService:
     """Handles routine database cleanup, archival, and trigger for backups."""
 
     @staticmethod
+    async def _chunked_delete(
+        db: Session,
+        model: type,
+        filter_factory,
+        batch_size: int = 1000,
+        sleep_ms: int = 50,
+    ) -> int:
+        """Delete matching rows in chunks; sleep between chunks.
+
+        `filter_factory` is a callable returning the filter clause; it is
+        re-evaluated each chunk so newly-eligible rows are also caught.
+        Each chunk runs inside a SAVEPOINT so a chunk-level error does
+        not poison the outer transaction. Each chunk commits before
+        sleeping, so partial progress persists across restarts.
+
+        SQLAlchemy 2.x refuses `.limit().delete()` because LIMIT semantics
+        on UPDATE/DELETE differ across dialects. We do a bounded SELECT
+        of IDs (the LIMIT applies here) then a DELETE WHERE id IN (...) —
+        the bound on rows-deleted-per-statement is preserved.
+
+        Returns the total number of rows deleted across all chunks.
+        """
+        total = 0
+        while True:
+            with db.begin_nested():
+                ids_subq = (
+                    db.query(model.id)
+                    .filter(filter_factory())
+                    .limit(batch_size)
+                    .subquery()
+                )
+                count = (
+                    db.query(model)
+                    .filter(model.id.in_(ids_subq))
+                    .delete(synchronize_session="fetch")
+                )
+            if count == 0:
+                break
+            total += count
+            db.commit()
+            if sleep_ms > 0:
+                await asyncio.sleep(sleep_ms / 1000)
+        return total
+
+    @staticmethod
     async def cleanup_stale_data():
         """
         Background task: Daily cleanup of old audit logs, archived tasks,
