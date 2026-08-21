@@ -167,14 +167,14 @@ class DatabaseMaintenanceService:
         for v in all_versions[: settings.CONSTITUTION_MAX_VERSIONS]:
             keep_ids.add(v.id)
         for v in all_versions:
-            if v.version == 1:
+            if v.version_number == 1:
                 keep_ids.add(v.id)
                 break
 
         return await DatabaseMaintenanceService._chunked_delete(
             db=db,
             model=Constitution,
-            filter_factory=lambda: ~Constitution.id.in_(keep_ids),
+            filter_factory=lambda: Constitution.id.notin_(keep_ids),
             batch_size=100,
             sleep_ms=50,
         )
@@ -213,9 +213,10 @@ class DatabaseMaintenanceService:
         for v in all_versions[: settings.CONSTITUTION_MAX_VERSIONS]:
             keep_ids.add(v.id)
 
-        # Always keep version 1 (original)
+        # Always keep version 1 (original). v.version_number is the
+        # Integer; v.version is the String display label ("v1.0.0").
         for v in all_versions:
-            if v.version == 1:
+            if v.version_number == 1:
                 keep_ids.add(v.id)
                 break
 
