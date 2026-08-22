@@ -119,6 +119,10 @@ class Settings(BaseSettings):
     TASK_ARCHIVE_DAYS: int = Field(default=30, env="TASK_ARCHIVE_DAYS")
     CONSTITUTION_MAX_VERSIONS: int = Field(default=10, env="CONSTITUTION_MAX_VERSIONS")
     
+    # Phase 9: Database Maintenance — batch cleanup settings
+    DB_MAINTENANCE_BATCH_SIZE: int = Field(default=1000, env="DB_MAINTENANCE_BATCH_SIZE")
+    DB_MAINTENANCE_BATCH_SLEEP: float = Field(default=0.1, env="DB_MAINTENANCE_BATCH_SLEEP")
+    
     # Phase 9: Security Hardening
     TOKEN_EXPIRY_DAYS: int = Field(default=7, env="TOKEN_EXPIRY_DAYS")
     MAX_CONCURRENT_SESSIONS: int = Field(default=5, env="MAX_CONCURRENT_SESSIONS")
