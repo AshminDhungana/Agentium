@@ -21,7 +21,7 @@ A read of the existing code shows (1) is structurally present but **untested**, 
 
 This spec is a verify-plus-tiny-fix pass: write the missing tests, and make surgical edits to the bulk-delete path and the constitution-pruning invariant so (1), (2), (3) become testable rather than aspirational.
 
-**Implementation status (as of 2026-08-22):** The worktree `.claude/worktrees/db-maintenance-verification/` already contains the implementation work — four commits implementing the production-side changes (`_chunked_delete` helper, `cleanup_stale_data_once` single-tick extract, constitution v1 fix, lock_timeout wiring) plus the unit test file. The pool-under-load unit test and the real-Postgres integration test remain to be done. This spec restores + refreshes the deleted 2026-08-21 design with today's audit decisions and current entity schema references; the implementation plan reuses the worktree's already-passing code where possible.
+**Implementation status (as of 2026-08-22):** The worktree `.claude/worktrees/db-maintenance-verification/` already contains the implementation work — the production-side changes (across 2 production commits + 1 unit-test commit) (`_chunked_delete` helper and `cleanup_stale_data_once` single-tick extract) plus 1 unit-test commit with the SQLite suite. Three gaps remain: (a) File A "test_chunked_delete_respects_batch_size" outcome-only assertion must be strengthened to verify chunk count (a non-chunked rewrite would still pass the row-count assertion alone); (b) backend/tests/integration/test_db_maintenance_pg.py is to be authored; (c) backend/tests/unit/test_connection_pool_under_load.py is to be authored. This spec restores + refreshes the deleted 2026-08-21 design with today's audit decisions and current entity schema references; the implementation plan reuses the worktree's already-passing code where possible.
 
 ---
 
@@ -117,6 +117,7 @@ async def _chunked_delete(
     filter_factory,
     batch_size: int = 1000,
     sleep_ms: int = 50,
+    on_chunk: callable = None,
 ) -> int:
     """Delete matching rows in chunks; sleep between chunks.
 
@@ -130,6 +131,11 @@ async def _chunked_delete(
     on UPDATE/DELETE differ across dialects. We do a bounded SELECT
     of IDs (the LIMIT applies here) then a DELETE WHERE id IN (...) —
     the bound on rows-deleted-per-statement is preserved.
+
+    `on_chunk`, if provided, is invoked once per non-empty chunk with
+    the deleted count; the test suite uses this hook to assert that
+    the helper iterates more than once instead of swallowing the whole
+    backlog in a single statement.
     """
     total = 0
     while True:
@@ -148,6 +154,8 @@ async def _chunked_delete(
         if count == 0:
             break
         total += count
+        if on_chunk is not None:
+            on_chunk(count)
         db.commit()
         if sleep_ms > 0:
             await asyncio.sleep(sleep_ms / 1000)
@@ -309,7 +317,7 @@ Pure logic and coroutine tests. SQLite-compatible — no testcontainers needed.
 | `test_cleanup_drops_completed_tasks_older_than_archive` | G1 | Seed an old COMPLETED task and an old IN_PROGRESS task under a marker `title` prefix; assert only COMPLETED is deleted. |
 | `test_cleanup_keeps_constitution_v1_always` | G1 + Edit 3 | Seed N+3 constitutions with `version_number` 1..(N+3); assert v1 survives and total kept == N+1. |
 | `test_constitution_prune_keeps_latest_n` | G1 | Seed exactly N constitutions; cleanup deletes zero. |
-| `test_chunked_delete_respects_batch_size` | G2 | Seed 250 AuditLog rows matching a marker; run `_chunked_delete(batch_size=50, sleep_ms=0)`; assert all 250 deleted and `count == 0` after. Outcome-based: any non-chunked future rewrite trips the assertion. |
+| `test_chunked_delete_respects_batch_size` | G2 | Seed 250 AuditLog rows matching a marker. Run `_chunked_delete(batch_size=50, sleep_ms=0, on_chunk=lambda c: chunk_counts.append(c))` where `on_chunk` is a new optional hook the helper exposes; assert (a) `len(chunk_counts) >= 5` and (b) all 250 rows deleted and `count == 0` after. **Strengthens the prior outcome-only assertion**: a non-chunked rewrite deleting 250 rows in one statement would still match (b) but fails (a) because chunk_counts would have length 1. |
 | `test_get_maintenance_report_returns_zero_on_empty_db` | G1 | Empty SQLite DB → report shows zero counters and intact `retention_config`. |
 
 This file already exists in the worktree (`backend/tests/unit/test_db_maintenance.py`) and is the canonical reference — the implementation plan reads its actual code blocks rather than reproducing them.
@@ -343,7 +351,7 @@ Pool-leak claims are engine-level; no schema needed.
 
 ## Failure Modes & Error Handling
 
-The new code can misbehave in five distinct ways; each is caught by the test matrix.
+The new code can misbehave in six distinct ways; each is caught by the test matrix.
 
 | Mode | What it looks like in production | Caught by |
 |---|---|---|
