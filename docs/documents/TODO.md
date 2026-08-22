@@ -160,10 +160,10 @@
   - [x] 3.3.9 — `Channel` / `ChannelMessage` models store bridge messages
   - [x] 3.3.10 — `MCPTool` / `ToolVersion` / `ToolStagingArea` models support tool lifecycle
 
-- [ ] **3.4 — Database Maintenance**
-  - [ ] 3.4.1 — `DatabaseMaintenanceService` vacuum and cleanup tasks run
-  - [ ] 3.4.2 — `db_maintenance.py` periodic tasks don't lock tables excessively
-  - [ ] 3.4.3 — Connection pool doesn't leak under load
+- [x] **3.4 — Database Maintenance**
+  - [x] 3.4.1 — `DatabaseMaintenanceService` vacuum and cleanup tasks run
+  - [x] 3.4.2 — `db_maintenance.py` periodic tasks don't lock tables excessively
+  - [x] 3.4.3 — Connection pool doesn't leak under load
 
 ---
 
