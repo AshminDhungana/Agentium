@@ -6,12 +6,13 @@ vector DB optimization, backup rotation, and triggers basic snapshot logical bac
 
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
-from sqlalchemy import text
+from sqlalchemy import text, and_
 import logging
 import asyncio
 import os
 import glob
 import subprocess
+import time
 
 from backend.models.database import get_db_context
 from backend.models.entities.audit import AuditLog
@@ -49,10 +50,8 @@ class DatabaseMaintenanceService:
                     audit_cutoff = datetime.utcnow() - timedelta(
                         days=settings.AUDIT_LOG_RETENTION_DAYS
                     )
-                    report["audit_logs_deleted"] = (
-                        db.query(AuditLog)
-                        .filter(AuditLog.created_at < audit_cutoff)
-                        .delete()
+                    report["audit_logs_deleted"] = DatabaseMaintenanceService._batch_delete(
+                        db, AuditLog, AuditLog.created_at < audit_cutoff
                     )
 
                     # 2. Archive completed/cancelled/failed tasks older than
@@ -60,15 +59,12 @@ class DatabaseMaintenanceService:
                     task_cutoff = datetime.utcnow() - timedelta(
                         days=settings.TASK_ARCHIVE_DAYS
                     )
-                    report["tasks_deleted"] = (
-                        db.query(Task)
-                        .filter(
-                            Task.status.in_(
-                                ["completed", "cancelled", "failed"]
-                            ),
-                            Task.updated_at < task_cutoff,
-                        )
-                        .delete()
+                    task_filter = and_(
+                        Task.status.in_(["completed", "cancelled", "failed"]),
+                        Task.updated_at < task_cutoff,
+                    )
+                    report["tasks_deleted"] = DatabaseMaintenanceService._batch_delete(
+                        db, Task, task_filter
                     )
 
                     # 3. Constitution version cleanup
@@ -79,7 +75,7 @@ class DatabaseMaintenanceService:
                         )
                     )
 
-                    db.commit()
+                    db.commit()  # Commit constitution version pruning
 
                     total = sum(report.values())
                     if total > 0:
@@ -130,6 +126,45 @@ class DatabaseMaintenanceService:
                 pruned += 1
 
         return pruned
+
+    @staticmethod
+    def _batch_delete(db: Session, model, filter_criterion, batch_size: int = None, sleep: float = None) -> int:
+        """
+        Delete rows matching filter_criterion in batches to avoid long locks.
+
+        Args:
+            db: Database session
+            model: SQLAlchemy model class (e.g., AuditLog, Task)
+            filter_criterion: SQLAlchemy filter expression (e.g., AuditLog.created_at < cutoff)
+            batch_size: Rows per batch (default from settings)
+            sleep: Seconds to sleep between batches (default from settings)
+
+        Returns:
+            Total rows deleted
+        """
+        if batch_size is None:
+            batch_size = settings.DB_MAINTENANCE_BATCH_SIZE
+        if sleep is None:
+            sleep = settings.DB_MAINTENANCE_BATCH_SLEEP
+
+        total = 0
+        while True:
+            # Fetch IDs to delete in this batch
+            ids_to_delete = db.query(model.id).filter(filter_criterion).limit(batch_size).all()
+            if not ids_to_delete:
+                break
+
+            id_list = [row[0] for row in ids_to_delete]
+            deleted = db.query(model).filter(model.id.in_(id_list)).delete(synchronize_session=False)
+            db.commit()
+            total += deleted
+
+            if deleted < batch_size:
+                break
+
+            time.sleep(sleep)  # Yield to other transactions
+
+        return total
 
     @staticmethod
     async def vector_db_optimization():
