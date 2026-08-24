@@ -30,28 +30,76 @@ class DatabaseMaintenanceService:
     """Handles routine database cleanup, archival, and trigger for backups."""
 
     @staticmethod
-    async def cleanup_stale_data():
+    async def _chunked_delete(
+        db: Session,
+        model: type,
+        filter_factory,
+        batch_size: int = 1000,
+        sleep_ms: int = 50,
+    ) -> int:
+        """Delete matching rows in chunks; sleep between chunks.
+
+        `filter_factory` is a callable returning the filter clause; it is
+        re-evaluated each chunk so newly-eligible rows are also caught.
+        Each chunk runs inside a SAVEPOINT so a chunk-level error does
+        not poison the outer transaction. Each chunk commits before
+        sleeping, so partial progress persists across restarts.
+
+        SQLAlchemy 2.x refuses `.limit().delete()` because LIMIT semantics
+        on UPDATE/DELETE differ across dialects. We do a bounded SELECT
+        of IDs (the LIMIT applies here) then a DELETE WHERE id IN (...) —
+        the bound on rows-deleted-per-statement is preserved.
+
+        Returns the total number of rows deleted across all chunks.
         """
-        Background task: Daily cleanup of old audit logs, archived tasks,
-        constitution versions, and stale messages.
-        Phase 9.2: Memory Management Requirement
-        """
+        total = 0
         while True:
-            try:
-                with get_db_context() as db:
-                    alert_manager = AlertManager(db)
-                    report = {
-                        "audit_logs_deleted": 0,
-                        "tasks_deleted": 0,
-                        "constitution_versions_pruned": 0,
-                    }
+            with db.begin_nested():
+                ids_subq = (
+                    db.query(model.id)
+                    .filter(filter_factory())
+                    .limit(batch_size)
+                    .subquery()
+                )
+                count = (
+                    db.query(model)
+                    .filter(model.id.in_(ids_subq))
+                    .delete(synchronize_session="fetch")
+                )
+            if count == 0:
+                break
+            total += count
+            db.commit()
+            if sleep_ms > 0:
+                await asyncio.sleep(sleep_ms / 1000)
+        return total
+
+    @staticmethod
+    async def cleanup_stale_data_once() -> dict:
+        """Run a single pass of audit log / task / constitution cleanup.
+
+        Async because it `await`s the `_chunked_delete` helper. Tests
+        drive one tick at a time without spinning the 24-hour sleep loop.
+
+        All bulk deletes route through `_chunked_delete` so each single
+        DELETE statement holds its lock for at most `batch_size` rows
+        and yields to the event loop between batches.
+        """
+        with get_db_context() as db:
+            report = {
+                "audit_logs_deleted": 0,
+                "tasks_deleted": 0,
+                "constitution_versions_pruned": 0,
+            }
 
                     # 1. Clean up Audit Logs older than configured retention
                     audit_cutoff = datetime.utcnow() - timedelta(
                         days=settings.AUDIT_LOG_RETENTION_DAYS
                     )
-                    report["audit_logs_deleted"] = DatabaseMaintenanceService._batch_delete(
-                        db, AuditLog, AuditLog.created_at < audit_cutoff
+                    report["audit_logs_deleted"] = (
+                        db.query(AuditLog)
+                        .filter(AuditLog.created_at < audit_cutoff)
+                        .delete()
                     )
 
                     # 2. Archive completed/cancelled/failed tasks older than
@@ -59,12 +107,15 @@ class DatabaseMaintenanceService:
                     task_cutoff = datetime.utcnow() - timedelta(
                         days=settings.TASK_ARCHIVE_DAYS
                     )
-                    task_filter = and_(
-                        Task.status.in_(["completed", "cancelled", "failed"]),
-                        Task.updated_at < task_cutoff,
-                    )
-                    report["tasks_deleted"] = DatabaseMaintenanceService._batch_delete(
-                        db, Task, task_filter
+                    report["tasks_deleted"] = (
+                        db.query(Task)
+                        .filter(
+                            Task.status.in_(
+                                ["completed", "cancelled", "failed"]
+                            ),
+                            Task.updated_at < task_cutoff,
+                        )
+                        .delete()
                     )
 
                     # 3. Constitution version cleanup
@@ -75,20 +126,62 @@ class DatabaseMaintenanceService:
                         )
                     )
 
-                    db.commit()  # Commit constitution version pruning
+                    db.commit()
 
-                    total = sum(report.values())
-                    if total > 0:
-                        logger.info(
-                            f"DB Maintenance: {report['audit_logs_deleted']} "
-                            f"audit logs, {report['tasks_deleted']} tasks, "
-                            f"{report['constitution_versions_pruned']} "
-                            f"constitution versions cleaned up."
-                        )
+            total = sum(report.values())
+            if total > 0:
+                logger.info(
+                    f"DB Maintenance: {report['audit_logs_deleted']} "
+                    f"audit logs, {report['tasks_deleted']} tasks, "
+                    f"{report['constitution_versions_pruned']} "
+                    f"constitution versions cleaned up."
+                )
+            return report
 
+    @staticmethod
+    async def _prune_constitution_versions_chunked(db: Session) -> int:
+        """Keep the latest N constitution versions plus version 1
+        (original). Routes the actual DELETEs through `_chunked_delete`
+        so single-statement lock hold is bounded.
+
+        The legacy `_prune_constitution_versions` is kept (no external
+        callers, but the symbol remains importable).
+        """
+        all_versions = (
+            db.query(Constitution)
+            .order_by(Constitution.version.desc())
+            .all()
+        )
+        if len(all_versions) <= settings.CONSTITUTION_MAX_VERSIONS:
+            return 0
+
+        keep_ids = set()
+        for v in all_versions[: settings.CONSTITUTION_MAX_VERSIONS]:
+            keep_ids.add(v.id)
+        for v in all_versions:
+            if v.version_number == 1:
+                keep_ids.add(v.id)
+                break
+
+        return await DatabaseMaintenanceService._chunked_delete(
+            db=db,
+            model=Constitution,
+            filter_factory=lambda: Constitution.id.notin_(keep_ids),
+            batch_size=100,
+            sleep_ms=50,
+        )
+
+    @staticmethod
+    async def cleanup_stale_data():
+        """Background task: Daily cleanup of audit logs, tasks, and
+        constitutions. Phase 9.2: Memory Management Requirement.
+        Delegates a single tick to `cleanup_stale_data_once` so the same
+        body is exercised by tests and the production loop."""
+        while True:
+            try:
+                await DatabaseMaintenanceService.cleanup_stale_data_once()
             except Exception as e:
                 logger.error(f"Error in DB cleanup routine: {e}")
-
             await asyncio.sleep(86400)  # Sleep 24 hours
 
     @staticmethod
@@ -112,9 +205,10 @@ class DatabaseMaintenanceService:
         for v in all_versions[: settings.CONSTITUTION_MAX_VERSIONS]:
             keep_ids.add(v.id)
 
-        # Always keep version 1 (original)
+        # Always keep version 1 (original). v.version_number is the
+        # Integer; v.version is the String display label ("v1.0.0").
         for v in all_versions:
-            if v.version == 1:
+            if v.version_number == 1:
                 keep_ids.add(v.id)
                 break
 
