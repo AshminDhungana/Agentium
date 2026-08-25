@@ -1,7 +1,7 @@
 # Design: Application Startup (Lifespan) Verification — Section 4.1
 
 ## Overview
-Verify the existing `lifespan()` implementation in `backend/main.py` against the 9 checklist items in `docs/documents/TODO.md` section 4.1 using Docker-compose based E2E tests with shared infrastructure and transaction rollback isolation.
+Verify the existing `lifespan()` implementation in `backend/main.py` against the 9 checklist items in `docs/documents/TODO.md` section 4.1 using Docker-compose based E2E tests with shared infrastructure and post-test database cleanup.
 
 ## Current State Analysis
 The `lifespan()` function in `backend/main.py:156-514` already implements all 9 checklist items:
@@ -185,7 +185,7 @@ def test_4_1_9_idle_governance_engine_starts(app, caplog):
 ## Success Criteria
 - All 9 tests pass in CI
 - Tests complete in < 60 seconds total
-- No flaky tests (deterministic transaction rollback)
+- No flaky tests (deterministic post-test cleanup via TRUNCATE)
 - Clear failure messages indicating which startup step failed
 
 ## Out of Scope
