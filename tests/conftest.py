@@ -1,10 +1,16 @@
 # tests/conftest.py
 import subprocess
 import time
+import sys
+import os
 import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session
 from fastapi.testclient import TestClient
+
+# Add project root to Python path for backend imports
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, PROJECT_ROOT)
 
 # Import Base and all models for table metadata
 from backend.models.entities import Base
@@ -29,7 +35,9 @@ def docker_services():
 
 
 def _wait_for_healthchecks(timeout: int = 60):
-    """Wait for all docker-compose services to report healthy."""
+    """Wait for all docker-compose.test.yml services to report healthy."""
+    # Only check the 4 test services defined in docker-compose.test.yml
+    required_services = {"postgres", "redis", "chromadb", "minio"}
     start = time.time()
     while time.time() - start < timeout:
         result = subprocess.run(
@@ -40,15 +48,18 @@ def _wait_for_healthchecks(timeout: int = 60):
         if result.returncode == 0:
             import json
             services = [json.loads(line) for line in result.stdout.strip().split("\n") if line]
-            if all(s.get("Health") == "healthy" for s in services):
+            # Filter to only required test services
+            test_services = [s for s in services if s.get("Service") in required_services]
+            if len(test_services) == len(required_services) and all(s.get("Health") == "healthy" for s in test_services):
                 return
         time.sleep(2)
-    raise TimeoutError("Services did not become healthy in time")
+    raise TimeoutError("Test services did not become healthy in time")
 
 
 @pytest.fixture(scope="session")
 def db_engine(docker_services):
     """SQLAlchemy engine connected to test postgres."""
+    # Use localhost since tests run on host machine, not inside Docker
     return create_engine("postgresql://agentium:agentium@localhost:5432/agentium_test")
 
 
@@ -68,19 +79,99 @@ def cleanup_db(db_engine):
 
 @pytest.fixture(scope="function")
 def app(cleanup_db, monkeypatch):
-    """FastAPI app with test database URL."""
+    """FastAPI app with test database URL (TESTING mode NOT set by default)."""
     # Override DATABASE_URL for this test
-    monkeypatch.setenv("DATABASE_URL", "postgresql://agentium:agentium@localhost:5432/agentium_test")
+    test_db_url = "postgresql://agentium:agentium@localhost:5432/agentium_test"
+    monkeypatch.setenv("DATABASE_URL", test_db_url)
     # Also override other test-specific settings
-    monkeypatch.setenv("TESTING", "true")
     monkeypatch.setenv("MINIO_ROOT_USER", "testuser")
     monkeypatch.setenv("MINIO_ROOT_PASSWORD", "testpassword")
+    # Note: TESTING is NOT set by default - tests that need it should set it themselves
     
-    # Re-import to pick up new env vars
+    # Clear the settings cache so new env vars are picked up
+    import backend.core.config as config_module
+    config_module.get_settings.cache_clear()
+    
+    # Re-import to pick up new env vars - must reload database module first since engine is created at import time
     import importlib
+    import backend.models.database
+    importlib.reload(backend.models.database)
+    
+    # Replace the engine in the database module BEFORE reloading main
+    from backend.models.database import engine
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    
+    # Create new engine directly with test URL (bypassing settings cache)
+    new_engine = create_engine(
+        test_db_url,
+        poolclass=engine.pool.__class__,
+        pool_size=engine.pool.size(),
+        max_overflow=engine.pool._max_overflow,
+        pool_timeout=engine.pool._timeout,
+        pool_recycle=engine.pool._recycle,
+        pool_pre_ping=True,
+    )
+    
+    # Replace the engine in the database module
+    import backend.models.database as db_module
+    db_module.engine = new_engine
+    db_module.SessionLocal = sessionmaker(
+        autocommit=False,
+        autoflush=False,
+        expire_on_commit=False,
+        bind=new_engine
+    )
+    
     import backend.main
     importlib.reload(backend.main)
     from backend.main import app as reloaded_app
     
     # Return app without TestClient context - tests will create their own
+    yield reloaded_app
+
+
+@pytest.fixture(scope="function")
+def app_testing_mode(cleanup_db, monkeypatch):
+    """FastAPI app with test database URL AND TESTING mode enabled."""
+    test_db_url = "postgresql://agentium:agentium@localhost:5432/agentium_test"
+    monkeypatch.setenv("DATABASE_URL", test_db_url)
+    monkeypatch.setenv("MINIO_ROOT_USER", "testuser")
+    monkeypatch.setenv("MINIO_ROOT_PASSWORD", "testpassword")
+    monkeypatch.setenv("TESTING", "true")
+    
+    import backend.core.config as config_module
+    config_module.get_settings.cache_clear()
+    
+    import importlib
+    import backend.models.database
+    importlib.reload(backend.models.database)
+    
+    from backend.models.database import engine
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    
+    new_engine = create_engine(
+        test_db_url,
+        poolclass=engine.pool.__class__,
+        pool_size=engine.pool.size(),
+        max_overflow=engine.pool._max_overflow,
+        pool_timeout=engine.pool._timeout,
+        pool_recycle=engine.pool._recycle,
+        pool_pre_ping=True,
+    )
+    
+    import backend.models.database as db_module
+    db_module.engine = new_engine
+    db_module.SessionLocal = sessionmaker(
+        autocommit=False,
+        autoflush=False,
+        expire_on_commit=False,
+        bind=new_engine
+    )
+    
+    import backend.main
+    importlib.reload(backend.main)
+    from backend.main import app as reloaded_app
+    
     yield reloaded_app
