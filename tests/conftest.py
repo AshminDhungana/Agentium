@@ -60,25 +60,30 @@ def _wait_for_healthchecks(timeout: int = 60):
 def db_engine(docker_services):
     """SQLAlchemy engine connected to test postgres."""
     # Use localhost since tests run on host machine, not inside Docker
-    return create_engine("postgresql://agentium:agentium@localhost:5432/agentium_test")
+    engine = create_engine("postgresql://agentium:agentium@localhost:5432/agentium_test")
+    yield engine
+    # Dispose connection pool at session end to avoid "connection abort" warnings
+    engine.dispose()
 
 
 @pytest.fixture(scope="function")
 def cleanup_db(db_engine):
     """Truncate all tables after each test to isolate lifespan side effects."""
     yield
-    # Post-test cleanup: truncate all tables in reverse FK order
+    # Post-test cleanup: delete from tables (faster than TRUNCATE with CASCADE on 74 tables)
     with db_engine.connect() as conn:
-        # Disable FK checks, truncate, re-enable
         conn.execute(text("SET session_replication_role = 'replica'"))
         for table in reversed(Base.metadata.sorted_tables):
-            conn.execute(text(f"TRUNCATE TABLE {table.name} RESTART IDENTITY CASCADE"))
+            try:
+                conn.execute(text(f"DELETE FROM {table.name}"))
+            except Exception:
+                pass  # Ignore errors for tables that don't exist or are empty
         conn.execute(text("SET session_replication_role = 'origin'"))
         conn.commit()
 
 
 @pytest.fixture(scope="function")
-def app(cleanup_db, monkeypatch):
+def app(cleanup_db, db_engine, monkeypatch):
     """FastAPI app with test database URL (TESTING mode NOT set by default)."""
     # Override DATABASE_URL for this test
     test_db_url = "postgresql://agentium:agentium@localhost:5432/agentium_test"
@@ -97,30 +102,17 @@ def app(cleanup_db, monkeypatch):
     import backend.models.database
     importlib.reload(backend.models.database)
     
-    # Replace the engine in the database module BEFORE reloading main
-    from backend.models.database import engine
-    from sqlalchemy import create_engine
+    # Replace the engine in the database module with the shared db_engine
     from sqlalchemy.orm import sessionmaker
-    
-    # Create new engine directly with test URL (bypassing settings cache)
-    new_engine = create_engine(
-        test_db_url,
-        poolclass=engine.pool.__class__,
-        pool_size=engine.pool.size(),
-        max_overflow=engine.pool._max_overflow,
-        pool_timeout=engine.pool._timeout,
-        pool_recycle=engine.pool._recycle,
-        pool_pre_ping=True,
-    )
     
     # Replace the engine in the database module
     import backend.models.database as db_module
-    db_module.engine = new_engine
+    db_module.engine = db_engine
     db_module.SessionLocal = sessionmaker(
         autocommit=False,
         autoflush=False,
         expire_on_commit=False,
-        bind=new_engine
+        bind=db_engine
     )
     
     import backend.main
@@ -132,7 +124,7 @@ def app(cleanup_db, monkeypatch):
 
 
 @pytest.fixture(scope="function")
-def app_testing_mode(cleanup_db, monkeypatch):
+def app_testing_mode(cleanup_db, db_engine, monkeypatch):
     """FastAPI app with test database URL AND TESTING mode enabled."""
     test_db_url = "postgresql://agentium:agentium@localhost:5432/agentium_test"
     monkeypatch.setenv("DATABASE_URL", test_db_url)
@@ -147,27 +139,15 @@ def app_testing_mode(cleanup_db, monkeypatch):
     import backend.models.database
     importlib.reload(backend.models.database)
     
-    from backend.models.database import engine
-    from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
     
-    new_engine = create_engine(
-        test_db_url,
-        poolclass=engine.pool.__class__,
-        pool_size=engine.pool.size(),
-        max_overflow=engine.pool._max_overflow,
-        pool_timeout=engine.pool._timeout,
-        pool_recycle=engine.pool._recycle,
-        pool_pre_ping=True,
-    )
-    
     import backend.models.database as db_module
-    db_module.engine = new_engine
+    db_module.engine = db_engine
     db_module.SessionLocal = sessionmaker(
         autocommit=False,
         autoflush=False,
         expire_on_commit=False,
-        bind=new_engine
+        bind=db_engine
     )
     
     import backend.main

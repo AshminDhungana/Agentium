@@ -92,41 +92,41 @@ class DatabaseMaintenanceService:
                 "constitution_versions_pruned": 0,
             }
 
-                    # 1. Clean up Audit Logs older than configured retention
-                    audit_cutoff = datetime.utcnow() - timedelta(
-                        days=settings.AUDIT_LOG_RETENTION_DAYS
-                    )
-                    report["audit_logs_deleted"] = (
-                        db.query(AuditLog)
-                        .filter(AuditLog.created_at < audit_cutoff)
-                        .delete()
-                    )
+            # 1. Clean up Audit Logs older than configured retention
+            audit_cutoff = datetime.utcnow() - timedelta(
+                days=settings.AUDIT_LOG_RETENTION_DAYS
+            )
+            report["audit_logs_deleted"] = (
+                db.query(AuditLog)
+                .filter(AuditLog.created_at < audit_cutoff)
+                .delete()
+            )
 
-                    # 2. Archive completed/cancelled/failed tasks older than
-                    #    configured archive period
-                    task_cutoff = datetime.utcnow() - timedelta(
-                        days=settings.TASK_ARCHIVE_DAYS
-                    )
-                    report["tasks_deleted"] = (
-                        db.query(Task)
-                        .filter(
-                            Task.status.in_(
-                                ["completed", "cancelled", "failed"]
-                            ),
-                            Task.updated_at < task_cutoff,
-                        )
-                        .delete()
-                    )
+            # 2. Archive completed/cancelled/failed tasks older than
+            #    configured archive period
+            task_cutoff = datetime.utcnow() - timedelta(
+                days=settings.TASK_ARCHIVE_DAYS
+            )
+            report["tasks_deleted"] = (
+                db.query(Task)
+                .filter(
+                    Task.status.in_(
+                        ["completed", "cancelled", "failed"]
+                    ),
+                    Task.updated_at < task_cutoff,
+                )
+                .delete()
+            )
 
-                    # 3. Constitution version cleanup
-                    #    Keep last N versions, NEVER delete version 1
-                    report["constitution_versions_pruned"] = (
-                        DatabaseMaintenanceService._prune_constitution_versions(
-                            db
-                        )
-                    )
+            # 3. Constitution version cleanup
+            #    Keep last N versions, NEVER delete version 1
+            report["constitution_versions_pruned"] = (
+                DatabaseMaintenanceService._prune_constitution_versions(
+                    db
+                )
+            )
 
-                    db.commit()
+            db.commit()
 
             total = sum(report.values())
             if total > 0:

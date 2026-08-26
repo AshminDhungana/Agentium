@@ -12,7 +12,6 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from backend.core.vector_store import get_vector_store
 from backend.models.database import get_db
 from backend.models.entities.agents import (
     AgentStatus,
@@ -93,6 +92,7 @@ class InitializationService:
         """Init."""
 
         self.db = db
+        from backend.core.vector_store import get_vector_store
         self.vector_store = get_vector_store()
         self.knowledge_service = get_knowledge_service()
         self.genesis_log: List[str] = []

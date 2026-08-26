@@ -6,16 +6,27 @@ ChromaDB-backed RAG infrastructure for collective agent memory.
 import json
 import logging
 import os
-from contextlib import contextmanager
-from typing import Any, Dict, Generator, List, Optional, Union
-
 import time
+from contextlib import contextmanager
+from typing import Any, Dict, Generator, List, Optional, Union, TYPE_CHECKING
 
-import chromadb
-import httpx as _httpx
 import numpy as np
-from chromadb.api.types import EmbeddingFunction, QueryResult
-from sentence_transformers import SentenceTransformer
+
+if TYPE_CHECKING:
+    import chromadb
+    import httpx
+    from chromadb.api.types import EmbeddingFunction, QueryResult
+    from sentence_transformers import SentenceTransformer
+else:
+    from typing import Protocol
+    
+    class EmbeddingFunction(Protocol):
+        def __call__(self, input: List[str]) -> List[List[float]]: ...
+        def embed_documents(self, input: List[str]) -> List[Any]: ...
+        def embed_query(self, input: Union[str, List[str]]) -> List[Any]: ...
+    
+    class QueryResult(Protocol):
+        pass
 
 from backend.core.config import settings as _settings
 from backend.core.chunking import chunk_text
@@ -49,9 +60,15 @@ class BgeEmbeddingFunction(EmbeddingFunction):
         self.model_name = model_name or _settings.EMBEDDING_MODEL
         self._model = None
 
+    def _get_sentence_transformer(self):
+        """Lazily import and return SentenceTransformer."""
+        from sentence_transformers import SentenceTransformer
+        return SentenceTransformer
+
     @property
-    def model(self) -> SentenceTransformer:
+    def model(self) -> "SentenceTransformer":
         if self._model is None:
+            SentenceTransformer = self._get_sentence_transformer()
             self._model = SentenceTransformer(self.model_name)
         return self._model
 
@@ -76,6 +93,10 @@ class BgeEmbeddingFunction(EmbeddingFunction):
     def __call__(self, input: List[str]) -> List[List[float]]:
         # Default path (collection init / stored documents) = no prefix, normalized.
         return self.embed_documents(input)
+
+    def name(self) -> str:
+        """Return the name of the embedding function for ChromaDB compatibility."""
+        return "bge-base-en-v1.5"
 
 
 AgentiumEmbeddingFunction = BgeEmbeddingFunction
@@ -131,10 +152,20 @@ class VectorStore:
         # can be constructed without mutating global state.
         self._host: Optional[str] = host if host is not None else CHROMA_HOST
         self._port: int = port if port is not None else CHROMA_PORT
-        self._client: Optional[chromadb.ClientAPI] = None
+        self._client: Optional["chromadb.ClientAPI"] = None
         self._v2_embedding_fn = BgeEmbeddingFunction()
-        self._collections: Dict[str, chromadb.Collection] = {}
-        self._collections_by_name: Dict[str, chromadb.Collection] = {}
+        self._collections: Dict[str, "chromadb.Collection"] = {}
+        self._collections_by_name: Dict[str, "chromadb.Collection"] = {}
+
+    def _get_chromadb(self):
+        """Lazily import and return chromadb module."""
+        import chromadb
+        return chromadb
+
+    def _get_httpx(self):
+        """Lazily import and return httpx module."""
+        import httpx
+        return httpx
 
     def _patch_http_timeouts(self) -> None:
         """Replace chromadb's internal httpx session with one that has timeouts.
@@ -144,18 +175,19 @@ class VectorStore:
         This method swaps in a session with sensible timeouts so failures
         surface promptly instead of blocking the caller forever.
         """
-        session: _httpx.Client = getattr(self._client, '_session', None)  # type: ignore[attr-defined]
+        httpx = self._get_httpx()
+        session: httpx.Client = getattr(self._client, '_session', None)  # type: ignore[attr-defined]
         if session is None:
             return
         base_url = session.base_url
-        self._client._session = _httpx.Client(  # type: ignore[attr-defined]
+        self._client._session = httpx.Client(  # type: ignore[attr-defined]
             base_url=str(base_url) if base_url else f"http://{self._host}:{self._port}",
-            timeout=_httpx.Timeout(30.0, connect=10.0, read=30.0, write=30.0, pool=10.0),
+            timeout=httpx.Timeout(30.0, connect=10.0, read=30.0, write=30.0, pool=10.0),
             limits=session._limits,
             headers=dict(session.headers),
         )
 
-    def initialize(self) -> chromadb.ClientAPI:
+    def initialize(self) -> "chromadb.ClientAPI":
         """
         Initialize ChromaDB client.
 
@@ -165,6 +197,8 @@ class VectorStore:
         """
         if self._client is not None:
             return self._client
+
+        chromadb = self._get_chromadb()
 
         if self._host:
             # Production: connect to the dedicated ChromaDB container
@@ -190,7 +224,7 @@ class VectorStore:
                     self._patch_http_timeouts()
                     last_error = None
                     break
-                except _httpx.TransportError as exc:
+                except self._get_httpx().TransportError as exc:
                     logger.warning(
                         "ChromaDB connect attempt %d/3 failed: %s",
                         attempt + 1, exc,
@@ -228,7 +262,7 @@ class VectorStore:
         return self._client
 
     @property
-    def client(self) -> chromadb.ClientAPI:
+    def client(self) -> "chromadb.ClientAPI":
         """Return (or lazily initialise) the ChromaDB client."""
         if self._client is None:
             self.initialize()

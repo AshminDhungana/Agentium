@@ -171,16 +171,16 @@
 
 > **Files**: `backend/main.py`, `backend/core/middleware.py`, `backend/core/security_middleware.py`, `backend/core/timing_middleware.py`, `backend/core/observer_middleware.py`
 
-- [ ] **4.1 — Application Startup (Lifespan)**
-  - [ ] 4.1.1 — `lifespan()` in `main.py` completes all init steps without error
-  - [ ] 4.1.2 — Security startup checks run (`run_security_startup_checks`)
-  - [ ] 4.1.3 — Workspace config validation runs
-  - [ ] 4.1.4 — Constitution seed executes on first boot
-  - [ ] 4.1.5 — Persistent Council status check runs
-  - [ ] 4.1.6 — API Manager, Model Allocator, Token Optimizer initialize
-  - [ ] 4.1.7 — MCP Tool Bridge initializes (`init_bridge`)
-  - [ ] 4.1.8 — Pricing sync runs in background
-  - [ ] 4.1.9 — Idle Governance engine starts
+- [x] **4.1 — Application Startup (Lifespan)**
+  - [x] 4.1.1 — `lifespan()` in `main.py` completes all init steps without error
+  - [x] 4.1.2 — Security startup checks run (`run_security_startup_checks`)
+  - [x] 4.1.3 — Workspace config validation runs
+  - [x] 4.1.4 — Constitution seed executes on first boot
+  - [x] 4.1.5 — Persistent Council status check runs
+  - [x] 4.1.6 — API Manager, Model Allocator, Token Optimizer initialize
+  - [x] 4.1.7 — MCP Tool Bridge initializes (`init_bridge`)
+  - [x] 4.1.8 — Pricing sync runs in background
+  - [x] 4.1.9 — Idle Governance engine starts
 
 - [ ] **4.2 — Route Registration**
   - [ ] 4.2.1 — All 44 route modules register without import errors
