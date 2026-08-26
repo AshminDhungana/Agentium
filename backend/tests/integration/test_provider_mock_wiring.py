@@ -160,10 +160,14 @@ from backend.core.tool_registry import tool_registry
 from backend.models.entities import Agent
 
 
-def make_mock_config(provider: ProviderType, base_url: str) -> UserModelConfig:
+def make_mock_config(provider: ProviderType, base_url: str, engine=None) -> UserModelConfig:
     """Committed UserModelConfig pointing at the mock; sets provider + local URL."""
-    eng = create_engine(os.getenv("DATABASE_URL"), poolclass=NullPool, pool_pre_ping=True)
-    s = sessionmaker(bind=eng)()
+    if engine is None:
+        engine = create_engine(os.getenv("DATABASE_URL"), poolclass=NullPool, pool_pre_ping=True)
+        own_engine = True
+    else:
+        own_engine = False
+    s = sessionmaker(bind=engine)()
     cfg = UserModelConfig(
         user_id="sovereign",
         provider=provider,
@@ -185,7 +189,8 @@ def make_mock_config(provider: ProviderType, base_url: str) -> UserModelConfig:
     s.commit()
     s.refresh(cfg)
     s.close()
-    eng.dispose()
+    if own_engine:
+        engine.dispose()
     return cfg
 
 
@@ -208,7 +213,7 @@ def _ensure_test_db(db_engine):
 
 
 @pytest.fixture(scope="module")
-def seeded_once():
+def seeded_once(db_engine):
     """Run genesis at most ONCE for this module and reuse it across every
     parametrized provider case.
 
@@ -223,8 +228,7 @@ def seeded_once():
     from backend.models.entities.agents import Agent as _Agent, AgentType, AgentStatus
     from backend.models.entities.user import User
 
-    eng = create_engine(os.getenv("DATABASE_URL"), poolclass=NullPool, pool_pre_ping=True)
-    session = sessionmaker(bind=eng)()
+    session = sessionmaker(bind=db_engine)()
 
     admin = session.query(User).filter(User.username == "admin").first()
     if not admin:
@@ -262,7 +266,6 @@ def seeded_once():
         yield session
     finally:
         session.close()
-        eng.dispose()
 
 
 provider_cases = [
@@ -286,9 +289,10 @@ provider_cases = [
 ]
 
 
-def test_make_mock_config_committed():
+@pytest.mark.integration
+def test_make_mock_config_committed(db_engine):
     srv = ExtendedFakeProviderServer()
-    cfg = make_mock_config(ProviderType.OPENAI, srv.base_url)
+    cfg = make_mock_config(ProviderType.OPENAI, srv.base_url, engine=db_engine)
     try:
         assert cfg.id is not None
         assert cfg.provider == ProviderType.OPENAI
@@ -340,13 +344,13 @@ ANTHROPIC_TOOL_CALL = {
 @pytest.mark.integration
 class TestProviderHappyPath:
     @pytest.mark.parametrize("provider,path", provider_cases)
-    async def test_happy_path_wiring(self, provider, path, seeded_once):
+    async def test_happy_path_wiring(self, provider, path, seeded_once, db_engine):
         seeded_db = seeded_once
         if path == "anthropic":
             srv = ExtendedFakeProviderServer(anthropic_body=ANTHROPIC_OK)
         else:
             srv = ExtendedFakeProviderServer()
-        cfg = make_mock_config(provider, srv.base_url)
+        cfg = make_mock_config(provider, srv.base_url, engine=db_engine)
         created_ids = [str(cfg.id)]
         try:
             agent = seeded_db.query(Agent).filter_by(agentium_id="10003").first()
@@ -416,12 +420,12 @@ rotation_cases = [(p, path) for (p, path) in provider_cases if p != ProviderType
 @pytest.mark.integration
 class TestProviderResilience:
     @pytest.mark.parametrize("provider,path", provider_cases)
-    async def test_429_retries_then_succeeds(self, provider, path, seeded_once):
+    async def test_429_retries_then_succeeds(self, provider, path, seeded_once, db_engine):
         seeded_db = seeded_once
         srv = ExtendedFakeProviderServer()
         # First call 429, then 200 on retry.
         srv.set_next(429, None, {"error": "rate limited"})
-        cfg = make_mock_config(provider, srv.base_url)
+        cfg = make_mock_config(provider, srv.base_url, engine=db_engine)
         created_ids = [str(cfg.id)]
         try:
             agent = seeded_db.query(Agent).filter_by(agentium_id="10003").first()
@@ -437,11 +441,11 @@ class TestProviderResilience:
             reset_resilience()
 
     @pytest.mark.parametrize("provider,path", provider_cases)
-    async def test_500_retries_then_succeeds(self, provider, path, seeded_once):
+    async def test_500_retries_then_succeeds(self, provider, path, seeded_once, db_engine):
         seeded_db = seeded_once
         srv = ExtendedFakeProviderServer()
         srv.set_next(500, None, {"error": "boom"})
-        cfg = make_mock_config(provider, srv.base_url)
+        cfg = make_mock_config(provider, srv.base_url, engine=db_engine)
         created_ids = [str(cfg.id)]
         try:
             agent = seeded_db.query(Agent).filter_by(agentium_id="10003").first()
@@ -454,13 +458,13 @@ class TestProviderResilience:
             reset_resilience()
 
     @pytest.mark.parametrize("provider,path", rotation_cases)
-    async def test_401_rotates_without_retry(self, provider, path, seeded_once):
+    async def test_401_rotates_without_retry(self, provider, path, seeded_once, db_engine):
         seeded_db = seeded_once
         dead = ExtendedFakeProviderServer(default_status=401,
                                           default_body={"error": "unauthorized"})
         good = ExtendedFakeProviderServer(default_status=200)
-        dead_cfg = make_mock_config(provider, dead.base_url)
-        good_cfg = make_mock_config(provider, good.base_url)
+        dead_cfg = make_mock_config(provider, dead.base_url, engine=db_engine)
+        good_cfg = make_mock_config(provider, good.base_url, engine=db_engine)
         created_ids = [str(dead_cfg.id), str(good_cfg.id)]
         try:
             agent = seeded_db.query(Agent).filter_by(agentium_id="10003").first()

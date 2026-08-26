@@ -208,9 +208,9 @@ class TestRateLimitsRespected:
         srv = FakeProviderServer(default_status=200)
         created = []
         try:
-            cfg60 = make_fake_config(srv.base_url, rpm=60)
+            cfg60 = make_fake_config(srv.base_url, rpm=60, engine=db_engine)
             created.append(str(cfg60.id))
-            cfg30 = make_fake_config(srv.base_url, rpm=30)
+            cfg30 = make_fake_config(srv.base_url, rpm=30, engine=db_engine)
             created.append(str(cfg30.id))
 
             async def drive(cfg):
@@ -241,7 +241,7 @@ class TestRateLimitsRespected:
             assert cfg30 and cfg60
         finally:
             srv.shutdown()
-            _delete_fake_configs(created)
+            _delete_fake_configs(created, engine=db_engine)
 
 
 @pytest.mark.integration
@@ -430,6 +430,7 @@ def make_fake_config(
     rpm: int = 100000,
     max_concurrent: int = 10,
     status: ConnectionStatus = ConnectionStatus.ACTIVE,
+    engine=None,
 ):
     """Create + TOP-LEVEL commit a UserModelConfig pointing at a FakeProviderServer.
 
@@ -445,16 +446,20 @@ def make_fake_config(
     via encrypt_api_key("sk-test") so the real decrypt_api_key path yields a
     valid non-empty key (the OpenAI SDK refuses an empty key).
     """
-    import os
-    from sqlalchemy import create_engine
+    if engine is None:
+        import os
+        from sqlalchemy import create_engine
+        from sqlalchemy.pool import NullPool
+        database_url = os.getenv(
+            "DATABASE_URL",
+            "postgresql://agentium:agentium@postgres:5432/agentium_test",
+        )
+        eng = create_engine(database_url, poolclass=NullPool, pool_pre_ping=True)
+        own_engine = True
+    else:
+        eng = engine
+        own_engine = False
     from sqlalchemy.orm import sessionmaker
-    from sqlalchemy.pool import NullPool
-
-    database_url = os.getenv(
-        "DATABASE_URL",
-        "postgresql://agentium:agentium@postgres:5432/agentium_test",
-    )
-    eng = create_engine(database_url, poolclass=NullPool, pool_pre_ping=True)
     s = sessionmaker(bind=eng)()
     cfg = UserModelConfig(
         user_id="sovereign",
@@ -474,11 +479,12 @@ def make_fake_config(
     s.commit()
     s.refresh(cfg)
     s.close()
-    eng.dispose()
+    if own_engine:
+        eng.dispose()
     return cfg
 
 
-def _delete_fake_configs(ids):
+def _delete_fake_configs(ids, engine=None):
     """Soft-deactivate configs committed by make_fake_config.
 
     make_fake_config commits via its own engine (bypassing the test's
@@ -491,12 +497,16 @@ def _delete_fake_configs(ids):
     """
     if not ids:
         return
-    import os
-    from sqlalchemy import create_engine
+    if engine is None:
+        import os
+        from sqlalchemy import create_engine
+        from sqlalchemy.pool import NullPool
+        eng = create_engine(os.getenv("DATABASE_URL"), poolclass=NullPool, pool_pre_ping=True)
+        own_engine = True
+    else:
+        eng = engine
+        own_engine = False
     from sqlalchemy.orm import sessionmaker
-    from sqlalchemy.pool import NullPool
-
-    eng = create_engine(os.getenv("DATABASE_URL"), poolclass=NullPool, pool_pre_ping=True)
     s = sessionmaker(bind=eng)()
     s.query(UserModelConfig).filter(UserModelConfig.id.in_(ids)).update(
         {
@@ -507,6 +517,8 @@ def _delete_fake_configs(ids):
     )
     s.commit()
     s.close()
+    if own_engine:
+        eng.dispose()
     eng.dispose()
 
 
@@ -514,9 +526,9 @@ def _delete_fake_configs(ids):
 class TestMockProviderHarness:
     """Task 20 sanity: a 200 fake server returns 'ok' through the real SDK path."""
 
-    def test_fake_provider_returns_ok(self, seeded_db: Session):
+    def test_fake_provider_returns_ok(self, seeded_db: Session, db_engine):
         srv = FakeProviderServer(default_status=200)
-        cfg = make_fake_config(srv.base_url, rpm=100000)
+        cfg = make_fake_config(srv.base_url, rpm=100000, engine=db_engine)
         try:
             agent = seeded_db.query(Agent).filter_by(agentium_id="10003").first()
             assert agent is not None
@@ -531,7 +543,7 @@ class TestMockProviderHarness:
             assert result["content"] == "ok"
         finally:
             srv.shutdown()
-            _delete_fake_configs([str(cfg.id)])
+            _delete_fake_configs([str(cfg.id)], engine=db_engine)
 
 
 @pytest.mark.integration
@@ -568,10 +580,10 @@ class Test429Burst:
         # attempt and stop the remaining tasks from re-hitting the server.
         created_ids = []
         try:
-            fb = make_fake_config(always_200.base_url)
+            fb = make_fake_config(always_200.base_url, engine=db_engine)
             created_ids.append(str(fb.id))
             N = 5
-            primaries = [make_fake_config(always_429.base_url) for _ in range(N)]
+            primaries = [make_fake_config(always_429.base_url, engine=db_engine) for _ in range(N)]
             created_ids.extend(str(p.id) for p in primaries)
             agents = [
                 types.SimpleNamespace(ethos=None, agentium_id=f"task-{i}")
@@ -603,7 +615,7 @@ class Test429Burst:
             # make_fake_config commits via its own engine, bypassing the test's
             # transaction rollback — delete explicitly so these rows don't
             # pollute the fallback-chain test that runs later in this session.
-            _delete_fake_configs(created_ids)
+            _delete_fake_configs(created_ids, engine=db_engine)
 
 
 @pytest.mark.integration
@@ -615,7 +627,7 @@ class TestInvalidKey:
     marks the key unhealthy, and the task still completes via the fallback.
     """
 
-    async def test_invalid_key_rotates_immediately(self, seeded_db: Session, monkeypatch):
+    async def test_invalid_key_rotates_immediately(self, seeded_db: Session, monkeypatch, db_engine):
         import openai as _openai
 
         _orig = _openai.AsyncOpenAI
@@ -630,9 +642,9 @@ class TestInvalidKey:
         always_200 = FakeProviderServer(default_status=200)
         created_ids = []
         try:
-            primary = make_fake_config(always_401.base_url)
+            primary = make_fake_config(always_401.base_url, engine=db_engine)
             created_ids.append(str(primary.id))
-            fb = make_fake_config(always_200.base_url)
+            fb = make_fake_config(always_200.base_url, engine=db_engine)
             created_ids.append(str(fb.id))
             agent = types.SimpleNamespace(ethos=None, agentium_id="task-22")
 
@@ -656,7 +668,7 @@ class TestInvalidKey:
         finally:
             always_401.shutdown()
             always_200.shutdown()
-            _delete_fake_configs(created_ids)
+            _delete_fake_configs(created_ids, engine=db_engine)
 
 
 @pytest.mark.integration
@@ -777,24 +789,17 @@ class TestPreExhaustionWarning:
     is debounced per-config so it fires once per 60s window, not per request.
     """
 
-    def test_warning_at_80_percent(self, seeded_db: Session):
+    def test_warning_at_80_percent(self, seeded_db: Session, db_engine):
         import os
         import time
 
         import redis
-        from sqlalchemy import create_engine
         from sqlalchemy.orm import sessionmaker
-        from sqlalchemy.pool import NullPool
 
         # The warn check reads via its own top-level session (get_db_context),
         # so the config must be committed at the top level — not merely flushed
         # inside the savepoint-wrapped seeded_db session.
-        database_url = os.getenv(
-            "DATABASE_URL",
-            "postgresql://agentium:agentium@postgres:5432/agentium_test",
-        )
-        eng = create_engine(database_url, poolclass=NullPool, pool_pre_ping=True)
-        s = sessionmaker(bind=eng)()
+        s = sessionmaker(bind=db_engine)()
         cfg = _make_config(s, ProviderType.OPENAI, "gpt-4o", priority=1)
         # requests_per_minute = 10 → 8 requests == 80% boundary (8 >= 0.8*10).
         cfg.requests_per_minute = 10
@@ -819,26 +824,18 @@ class TestPreExhaustionWarning:
             api_key_manager.check_rate_budget_warning(str(cfg.id))
 
         s.close()
-        eng.dispose()
 
         assert alerts, "expected a pre-exhaustion warning alert at 80% of rate"
         assert any("80%" in a or "warning" in a.lower() for a in alerts)
 
-    def test_no_warning_well_below_threshold(self, seeded_db: Session):
+    def test_no_warning_well_below_threshold(self, seeded_db: Session, db_engine):
         import os
         import time
 
         import redis
-        from sqlalchemy import create_engine
         from sqlalchemy.orm import sessionmaker
-        from sqlalchemy.pool import NullPool
 
-        database_url = os.getenv(
-            "DATABASE_URL",
-            "postgresql://agentium:agentium@postgres:5432/agentium_test",
-        )
-        eng = create_engine(database_url, poolclass=NullPool, pool_pre_ping=True)
-        s = sessionmaker(bind=eng)()
+        s = sessionmaker(bind=db_engine)()
         cfg = _make_config(s, ProviderType.OPENAI, "gpt-4o", priority=1)
         cfg.requests_per_minute = 10
         s.commit()
@@ -862,6 +859,4 @@ class TestPreExhaustionWarning:
             api_key_manager.check_rate_budget_warning(str(cfg.id))
 
         s.close()
-        eng.dispose()
-
         assert not alerts, "no warning should fire well below the 80% threshold"

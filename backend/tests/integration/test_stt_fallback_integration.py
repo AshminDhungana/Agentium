@@ -150,6 +150,7 @@ def make_fake_config(
     *,
     rpm: int = 100000,
     status: ConnectionStatus = ConnectionStatus.ACTIVE,
+    engine=None,
 ):
     """Create + TOP-LEVEL commit a UserModelConfig pointing at a FakeProviderServer.
 
@@ -159,11 +160,16 @@ def make_fake_config(
     rpm is stored in the `requests_per_minute` column (renamed away from the
     old `rate_limit` column — see user_config.py and migration 003).
     """
-    database_url = os.getenv(
-        "DATABASE_URL",
-        "postgresql://agentium:agentium@localhost:5432/agentium_test",
-    )
-    eng = create_engine(database_url, poolclass=NullPool, pool_pre_ping=True)
+    if engine is None:
+        database_url = os.getenv(
+            "DATABASE_URL",
+            "postgresql://agentium:agentium@localhost:5432/agentium_test",
+        )
+        eng = create_engine(database_url, poolclass=NullPool, pool_pre_ping=True)
+        own_engine = True
+    else:
+        eng = engine
+        own_engine = False
     s = sessionmaker(bind=eng)()
     cfg = UserModelConfig(
         user_id="sovereign",
@@ -182,16 +188,22 @@ def make_fake_config(
     s.commit()
     s.refresh(cfg)
     s.close()
-    eng.dispose()
+    if own_engine:
+        eng.dispose()
     return cfg
 
 
-def _delete_fake_configs(ids):
+def _delete_fake_configs(ids, engine=None):
     """Soft-deactivate configs committed by make_fake_config."""
     if not ids:
         return
-    database_url = os.getenv("DATABASE_URL")
-    eng = create_engine(database_url, poolclass=NullPool, pool_pre_ping=True)
+    if engine is None:
+        database_url = os.getenv("DATABASE_URL")
+        eng = create_engine(database_url, poolclass=NullPool, pool_pre_ping=True)
+        own_engine = True
+    else:
+        eng = engine
+        own_engine = False
     s = sessionmaker(bind=eng)()
     s.query(UserModelConfig).filter(UserModelConfig.id.in_(ids)).update(
         {
@@ -202,7 +214,8 @@ def _delete_fake_configs(ids):
     )
     s.commit()
     s.close()
-    eng.dispose()
+    if own_engine:
+        eng.dispose()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -211,11 +224,11 @@ def _delete_fake_configs(ids):
 
 @pytest.mark.integration
 class TestWhisperDownFallsBackToOpenAI:
-    async def test_openai_leg_used_when_whisper_unavailable(self, seeded_db: Session, monkeypatch):
+    async def test_openai_leg_used_when_whisper_unavailable(self, seeded_db: Session, monkeypatch, db_engine):
         srv = FakeProviderServer(default_status=200)
         created = []
         try:
-            cfg = make_fake_config(srv.base_url, rpm=100000)
+            cfg = make_fake_config(srv.base_url, rpm=100000, engine=db_engine)
             created.append(str(cfg.id))
 
             # Disable the local whisper.cpp leg so the chain must use OpenAI.
@@ -244,4 +257,4 @@ class TestWhisperDownFallsBackToOpenAI:
             assert srv.hits() >= 1
         finally:
             srv.shutdown()
-            _delete_fake_configs(created)
+            _delete_fake_configs(created, engine=db_engine)
