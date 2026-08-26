@@ -263,6 +263,9 @@ class APIKeyManager:
              the base URL.
         Excludes keys in ConnectionStatus.ERROR. Returns [] if unknown.
         Consumed by Task 12 (routing) and Task 14 (call-site audit).
+
+        LOCAL is guaranteed to be included (as the last entry) if it exists,
+        by reserving one slot in the MAX_FALLBACK_CONFIGS cap.
         """
         primary = db.query(UserModelConfig).filter_by(id=config_id).first()
         if not primary:
@@ -270,7 +273,9 @@ class APIKeyManager:
 
         out: List[str] = []
 
-        # 1. same provider, other healthy keys
+        # 1. same provider, other healthy keys — limit to leave room for
+        #    cross-provider (1) + LOCAL (1) so LOCAL is never dropped.
+        max_same_provider = max(0, self.MAX_FALLBACK_CONFIGS - 2)
         same_provider = (
             db.query(UserModelConfig)
             .filter(
@@ -280,6 +285,7 @@ class APIKeyManager:
                 UserModelConfig.status != ConnectionStatus.ERROR,
             )
             .order_by(UserModelConfig.priority.asc())
+            .limit(max_same_provider)
             .all()
         )
         out += [k.id for k in same_provider]
@@ -317,8 +323,9 @@ class APIKeyManager:
                 "base_url": local.local_server_url or "http://localhost:11434/v1",
             }
 
-        # Bound to primary + MAX_FALLBACK_CONFIGS (LLMClient enforces the same).
-        return out[: self.MAX_FALLBACK_CONFIGS + 1]
+        # Cap at MAX_FALLBACK_CONFIGS (not +1). LLMClient.generate tries
+        # primary + up to MAX_FALLBACK_CONFIGS fallbacks.
+        return out[: self.MAX_FALLBACK_CONFIGS]
 
     # =====================================================================
     # Failure Handling & Recovery

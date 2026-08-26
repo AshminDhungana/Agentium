@@ -299,7 +299,7 @@ def test_make_mock_config_committed(db_engine):
         assert cfg.api_base_url == srv.base_url
     finally:
         srv.shutdown()
-        _delete_fake_configs([str(cfg.id)])
+        _delete_fake_configs([str(cfg.id)], engine=db_engine)
         reset_resilience()
 
 
@@ -403,7 +403,7 @@ class TestProviderHappyPath:
             assert "content" in result
         finally:
             srv.shutdown()
-            _delete_fake_configs(created_ids)
+            _delete_fake_configs(created_ids, engine=db_engine)
             reset_resilience()
 
 
@@ -437,7 +437,7 @@ class TestProviderResilience:
             assert counts.get(200, 0) >= 1
         finally:
             srv.shutdown()
-            _delete_fake_configs(created_ids)
+            _delete_fake_configs(created_ids, engine=db_engine)
             reset_resilience()
 
     @pytest.mark.parametrize("provider,path", provider_cases)
@@ -454,7 +454,7 @@ class TestProviderResilience:
             assert res["content"] == "ok"
         finally:
             srv.shutdown()
-            _delete_fake_configs(created_ids)
+            _delete_fake_configs(created_ids, engine=db_engine)
             reset_resilience()
 
     @pytest.mark.parametrize("provider,path", rotation_cases)
