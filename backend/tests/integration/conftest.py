@@ -32,9 +32,9 @@ from httpx import ASGITransport
 # Only set defaults when not already provided — CI (GitHub Actions)
 # sets these to localhost because tests run on the runner host, not
 # inside the Docker network where "postgres"/"redis"/"chromadb" resolve.
-os.environ.setdefault("DATABASE_URL", "postgresql://agentium:agentium@postgres:5432/agentium_test")
-os.environ.setdefault("REDIS_URL", "redis://redis:6379/1")
-os.environ.setdefault("CHROMA_HOST", "chromadb")
+os.environ.setdefault("DATABASE_URL", "postgresql://agentium:agentium@localhost:5432/agentium_test")
+os.environ.setdefault("REDIS_URL", "redis://localhost:6379/1")
+os.environ.setdefault("CHROMA_HOST", "localhost")
 os.environ.setdefault("CHROMA_PORT", "8001")
 os.environ.setdefault("CELERY_TASK_ALWAYS_EAGER", "true")
 # Default the integration suite to the bge embedding model (768-dim, cosine).

@@ -482,7 +482,7 @@ class TestProviderResilience:
         finally:
             dead.shutdown()
             good.shutdown()
-            _delete_fake_configs(created_ids)
+            _delete_fake_configs(created_ids, engine=db_engine)
             reset_resilience()
 
 
