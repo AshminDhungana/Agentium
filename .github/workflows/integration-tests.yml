@@ -139,6 +139,13 @@ jobs:
         env:
           PYTHONPATH: ${{ github.workspace }}
 
+      - name: Run database migrations
+        working-directory: ./backend
+        run: |
+          alembic upgrade head
+        env:
+          DATABASE_URL: postgresql://agentium:agentium@localhost:5432/agentium_test
+
       - name: Run database initialization integration tests
         working-directory: ./backend
         run: |

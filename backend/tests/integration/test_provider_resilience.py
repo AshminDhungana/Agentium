@@ -197,7 +197,7 @@ class TestRateLimitsRespected:
     limiter is what enforces the spacing, not the provider rejecting us.
     """
 
-    async def test_rate_limits_respected(self, seeded_db: Session, monkeypatch):
+    async def test_rate_limits_respected(self, seeded_db: Session, monkeypatch, db_engine):
         # The pre-exhaustion warning (Task 19) runs a synchronous DB query on
         # the rate-limiter hot path via asyncio.to_thread. That is Task 19's
         # concern (covered by its own test) and its DB session contends with the

@@ -6,7 +6,10 @@ import os
 import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session
+from sqlalchemy.pool import NullPool
 from fastapi.testclient import TestClient
+from alembic.config import Config
+from alembic import command
 
 # Add project root to Python path for backend imports
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -58,9 +61,16 @@ def _wait_for_healthchecks(timeout: int = 60):
 
 @pytest.fixture(scope="session")
 def db_engine(docker_services):
-    """SQLAlchemy engine connected to test postgres."""
+    """SQLAlchemy engine connected to test postgres with migrations applied."""
     # Use localhost since tests run on host machine, not inside Docker
-    engine = create_engine("postgresql://agentium:agentium@localhost:5432/agentium_test")
+    database_url = "postgresql://agentium:agentium@localhost:5432/agentium_test"
+    engine = create_engine(database_url, poolclass=NullPool)
+    
+    # Run Alembic migrations to create schema
+    alembic_cfg = Config(os.path.join(PROJECT_ROOT, "backend", "alembic.ini"))
+    alembic_cfg.set_main_option("sqlalchemy.url", database_url)
+    command.upgrade(alembic_cfg, "head")
+    
     yield engine
     # Dispose connection pool at session end to avoid "connection abort" warnings
     engine.dispose()
