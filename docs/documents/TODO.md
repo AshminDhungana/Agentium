@@ -182,11 +182,11 @@
   - [x] 4.1.8 — Pricing sync runs in background
   - [x] 4.1.9 — Idle Governance engine starts
 
-- [ ] **4.2 — Route Registration**
-  - [ ] 4.2.1 — All 44 route modules register without import errors
-  - [ ] 4.2.2 — `GET /openapi.json` returns valid OpenAPI spec
-  - [ ] 4.2.3 — `GET /docs` Swagger UI loads with all endpoints
-  - [ ] 4.2.4 — Route prefixes (`/api/v1/`) are consistent
+- [x] **4.2 — Route Registration**
+  - [x] 4.2.1 — All 44 route modules register without import errors
+  - [x] 4.2.2 — `GET /openapi.json` returns valid OpenAPI spec
+  - [x] 4.2.3 — `GET /docs` Swagger UI loads with all endpoints
+  - [x] 4.2.4 — Route prefixes (`/api/v1/`) are consistent
 
 - [ ] **4.3 — Middleware Stack**
   - [ ] 4.3.1 — `IPBlocklistMiddleware` blocks IPs in Redis blocklist
