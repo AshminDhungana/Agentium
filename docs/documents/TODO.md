@@ -209,12 +209,12 @@
 
 > **Files**: `backend/services/model_provider.py`, `backend/core/llm_client.py`, `backend/services/pricing_sync_service.py`, `backend/services/model_allocation.py`, `backend/services/token_optimizer.py`, `backend/api/routes/models.py`, `frontend/src/pages/ModelsPage.tsx`, `frontend/src/services/models.ts`
 
-- [ ] **5.1 — Model Configuration**
-  - [ ] 5.1.1 — `POST /api/v1/models/configs` creates a new model config (API key + provider)
-  - [ ] 5.1.2 — `GET /api/v1/models/configs` returns user's model configs
-  - [ ] 5.1.3 — API keys are stored encrypted (verify `api_key_manager.py`)
-  - [ ] 5.1.4 — Supported providers: OpenAI, Anthropic, Google, Groq, DeepSeek, Mistral, OpenRouter, xAI, local
-  - [ ] 5.1.5 — `ModelsPage.tsx` add/edit/delete model configs UI works
+- [x] **5.1 — Model Configuration**
+  - [x] 5.1.1 — `POST /api/v1/models/configs` creates a new model config (API key + provider)
+  - [x] 5.1.2 — `GET /api/v1/models/configs` returns user's model configs
+  - [x] 5.1.3 — API keys are stored encrypted (verify `api_key_manager.py`)
+  - [x] 5.1.4 — Supported providers: OpenAI, Anthropic, Google, Groq, DeepSeek, Mistral, OpenRouter, xAI, local
+  - [x] 5.1.5 — `ModelsPage.tsx` add/edit/delete model configs UI works
 
 - [ ] **5.2 — LLM Request Flow**
   - [ ] 5.2.1 — `ModelService.generate()` sends prompt to correct provider
