@@ -40,6 +40,7 @@ class ProviderType(str, enum.Enum):
     DEEPSEEK = "DEEPSEEK"
     QIANWEN = "QIANWEN"    # Alibaba
     ZHIPU = "ZHIPU"        # ChatGLM
+    XAI = "XAI"            # xAI Grok
 
     # Microsoft
     AZURE_OPENAI = "AZURE_OPENAI"
@@ -47,6 +48,7 @@ class ProviderType(str, enum.Enum):
     # Local/Custom (universal handler)
     LOCAL = "LOCAL"        # Ollama, llama.cpp, LM Studio
     CUSTOM = "CUSTOM"      # ANY OpenAI-compatible API not listed above
+    OPENROUTER = "OPENROUTER"  # OpenRouter aggregation
 
     # Special
     OPENAI_COMPATIBLE = "OPENAI_COMPATIBLE"  # Generic fallback
