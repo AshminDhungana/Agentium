@@ -1,32 +1,23 @@
 # tests/conftest.py
+import os
+os.environ["ENCRYPTION_KEY"] = "ZmDfcTF7_60GrrY167zsiPd67pEvs0aGOv2oasOM1Pg="
+
 import pytest
 import pytest_asyncio
-from httpx import AsyncClient
+from httpx import AsyncClient, ASGITransport
 from sqlalchemy.orm import Session
 from backend.main import app
-from backend.models.database import get_db, SessionLocal, engine
+from backend.models.database import get_db, engine
 from backend.models.entities.user import User
 from backend.models.entities.user_config import UserModelConfig, ProviderType, ConnectionStatus
 from backend.core.auth import create_access_token
-from backend.core.config import settings
 import uuid
-from datetime import datetime
-
-# Override DB dependency for tests
-@pytest.fixture(scope="session")
-def test_engine():
-    """Create test database engine."""
-    from sqlalchemy import create_engine
-    test_db_url = settings.DATABASE_URL.replace("agentium", "agentium_test")
-    eng = create_engine(test_db_url)
-    yield eng
-    eng.dispose()
 
 @pytest.fixture(scope="function")
-def db_session(test_engine):
+def db_session():
     """Function-scoped DB session with rollback."""
     from sqlalchemy.orm import sessionmaker
-    TestingSessionLocal = sessionmaker(bind=test_engine, autocommit=False, autoflush=False)
+    TestingSessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
     session = TestingSessionLocal()
     try:
         yield session
@@ -59,7 +50,8 @@ async def auth_client(db_session):
     
     app.dependency_overrides[get_db] = get_test_db
     
-    async with AsyncClient(app=app, base_url="http://test") as client:
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
         client.headers.update({"Authorization": f"Bearer {token}"})
         yield client
     
