@@ -3,6 +3,7 @@
 import pytest
 from fastapi import FastAPI, HTTPException, status
 from fastapi.testclient import TestClient
+from backend.core.config import settings as settings_module
 from backend.core.exceptions import (
     AgentiumError,
     BadRequestError,
@@ -59,7 +60,7 @@ def client():
     def _service_unavailable():
         raise ServiceUnavailableError("Down", code="DOWN")
 
-    return TestClient(app)
+    return TestClient(app, raise_server_exceptions=False)
 
 
 def assert_envelope(data: dict, *, error: str, code: str):
@@ -127,3 +128,44 @@ def test_inherits_fastapi_http_exception():
     err = BadRequestError("msg", code="C")
     assert isinstance(err, HTTPException)
     assert err.status_code == 400
+
+
+def test_unhandled_exception_debug_mode(monkeypatch):
+    """Unhandled exception returns traceback in DEBUG mode."""
+    monkeypatch.setattr(settings_module, "DEBUG", True)
+    
+    app = FastAPI()
+    register_error_handlers(app)
+
+    @app.get("/crash")
+    def _crash():
+        raise ValueError("something broke")
+
+    client = TestClient(app, raise_server_exceptions=False)
+    resp = client.get("/crash")
+    assert resp.status_code == 500
+    data = resp.json()
+    assert data["error"] == "something broke"
+    assert data["code"] == "INTERNAL_ERROR"
+    assert "traceback" in data["detail"]
+    assert "ValueError" in data["detail"]["traceback"]
+
+
+def test_unhandled_exception_production_mode(monkeypatch):
+    """Unhandled exception returns masked error in production mode."""
+    monkeypatch.setattr(settings_module, "DEBUG", False)
+    
+    app = FastAPI()
+    register_error_handlers(app)
+
+    @app.get("/crash")
+    def _crash():
+        raise ValueError("something broke")
+
+    client = TestClient(app, raise_server_exceptions=False)
+    resp = client.get("/crash")
+    assert resp.status_code == 500
+    data = resp.json()
+    assert data["error"] == "Internal server error"
+    assert data["code"] == "INTERNAL_ERROR"
+    assert data.get("detail") is None or "traceback" not in data["detail"]

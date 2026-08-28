@@ -199,9 +199,9 @@
   - [x] 4.3.8 — `TimingMiddleware` logs request duration and regression gates
   - [x] 4.3.9 — CORS middleware allows configured origins
 
-- [ ] **4.4 — Error Handling**
-  - [ ] 4.4.1 — Custom exceptions (BadRequest, Unauthorized, Forbidden, NotFound, Conflict, TooLarge, RateLimit, InternalServerError, ServiceUnavailable) return correct HTTP codes
-  - [ ] 4.4.2 — Unhandled exceptions return 500 with masked details (no stack trace in production)
+- [x] **4.4 — Error Handling**
+  - [x] 4.4.1 — Custom exceptions (BadRequest, Unauthorized, Forbidden, NotFound, Conflict, TooLarge, RateLimit, InternalServerError, ServiceUnavailable) return correct HTTP codes
+  - [x] 4.4.2 — Unhandled exceptions return 500 with masked details (no stack trace in production)
 
 ---
 

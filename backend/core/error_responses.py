@@ -50,5 +50,25 @@ def make_error_response(status_code: int, error: str, code: str, detail: dict | 
     return JSONResponse(status_code=status_code, content=body.model_dump(), headers=dict(headers or {}))
 
 
+async def _generic_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    from backend.core.config import settings
+
+    if settings.DEBUG:
+        import traceback
+        tb = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+        body = HTTPErrorResponse(
+            error=str(exc),
+            code="INTERNAL_ERROR",
+            detail={"traceback": tb}
+        )
+    else:
+        body = HTTPErrorResponse(
+            error="Internal server error",
+            code="INTERNAL_ERROR"
+        )
+    return JSONResponse(status_code=500, content=body.model_dump())
+
+
 def register_error_handlers(app: FastAPI) -> None:
     app.add_exception_handler(AgentiumError, _agentium_error_handler)
+    app.add_exception_handler(Exception, _generic_exception_handler)
