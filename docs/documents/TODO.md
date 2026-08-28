@@ -188,16 +188,16 @@
   - [x] 4.2.3 — `GET /docs` Swagger UI loads with all endpoints
   - [x] 4.2.4 — Route prefixes (`/api/v1/`) are consistent
 
-- [ ] **4.3 — Middleware Stack**
-  - [ ] 4.3.1 — `IPBlocklistMiddleware` blocks IPs in Redis blocklist
-  - [ ] 4.3.2 — `PayloadSizeLimitMiddleware` rejects oversized requests (413)
-  - [ ] 4.3.3 — `ErrorCounterMiddleware` tracks 4xx/5xx error rates
-  - [ ] 4.3.4 — `RateLimitMiddleware` enforces per-user/per-IP limits via Redis
-  - [ ] 4.3.5 — `SessionLimitMiddleware` caps concurrent sessions
-  - [ ] 4.3.6 — `InputSanitizationMiddleware` strips XSS payloads
-  - [ ] 4.3.7 — `ObserverReadOnlyMiddleware` blocks writes for observer-role users
-  - [ ] 4.3.8 — `TimingMiddleware` logs request duration and regression gates
-  - [ ] 4.3.9 — CORS middleware allows configured origins
+- [x] **4.3 — Middleware Stack**
+  - [x] 4.3.1 — `IPBlocklistMiddleware` blocks IPs in Redis blocklist
+  - [x] 4.3.2 — `PayloadSizeLimitMiddleware` rejects oversized requests (413)
+  - [x] 4.3.3 — `ErrorCounterMiddleware` tracks 4xx/5xx error rates
+  - [x] 4.3.4 — `RateLimitMiddleware` enforces per-user/per-IP limits via Redis
+  - [x] 4.3.5 — `SessionLimitMiddleware` caps concurrent sessions
+  - [x] 4.3.6 — `InputSanitizationMiddleware` strips XSS payloads
+  - [x] 4.3.7 — `ObserverReadOnlyMiddleware` blocks writes for observer-role users
+  - [x] 4.3.8 — `TimingMiddleware` logs request duration and regression gates
+  - [x] 4.3.9 — CORS middleware allows configured origins
 
 - [ ] **4.4 — Error Handling**
   - [ ] 4.4.1 — Custom exceptions (BadRequest, Unauthorized, Forbidden, NotFound, Conflict, TooLarge, RateLimit, InternalServerError, ServiceUnavailable) return correct HTTP codes

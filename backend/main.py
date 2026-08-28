@@ -565,12 +565,10 @@ app = FastAPI(
 from backend.core.error_responses import register_error_handlers
 register_error_handlers(app)
 
-origins = os.getenv("ALLOWED_ORIGINS")
-
-# CORS middleware
+# CORS middleware - uses settings.cors_origins which parses comma-separated ALLOWED_ORIGINS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[origins] if origins else ["*"],
+    allow_origins=settings.cors_origins or ["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
