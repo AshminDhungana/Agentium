@@ -139,3 +139,80 @@ class TestListConfigs:
         assert set(data.keys()) >= required
         assert "api_key" not in data  # Never exposed
         assert data["api_key_masked"].startswith("...")
+
+
+class TestEncryption:
+    """5.1.3 — API keys stored encrypted"""
+    
+    @pytest.mark.asyncio
+    async def test_api_key_encrypted_in_db(self, auth_client: AsyncClient, db_session: Session):
+        payload = {"provider": "OPENAI", "config_name": "Enc Test", "default_model": "gpt-4o",
+                   "api_key": "sk-secret1234567890"}
+        resp = await auth_client.post("/api/v1/models/configs", json=payload)
+        assert resp.status_code == 200
+        
+        config = db_session.query(UserModelConfig).filter_by(config_name="Enc Test").first()
+        assert config.api_key_encrypted is not None
+        assert config.api_key_encrypted != "sk-secret1234567890"  # Not plaintext
+        assert "sk-secret" not in config.api_key_encrypted  # Definitely not plaintext
+    
+    @pytest.mark.asyncio
+    async def test_encryption_round_trip(self, auth_client: AsyncClient, db_session: Session):
+        from backend.core.security import encrypt_api_key, decrypt_api_key
+        
+        original = "sk-roundtrip1234567890"
+        encrypted = encrypt_api_key(original)
+        decrypted = decrypt_api_key(encrypted)
+        assert decrypted == original
+    
+    @pytest.mark.asyncio
+    async def test_api_key_masked_format(self, auth_client: AsyncClient, db_session: Session):
+        payload = {"provider": "OPENAI", "config_name": "Mask Test", "default_model": "gpt-4o",
+                   "api_key": "sk-masked1234567890"}
+        resp = await auth_client.post("/api/v1/models/configs", json=payload)
+        data = resp.json()
+        
+        assert data["api_key_masked"] == "...7890"
+        config = db_session.query(UserModelConfig).filter_by(config_name="Mask Test").first()
+        assert config.api_key_masked == "...7890"
+
+
+class TestProvidersList:
+    """5.1.4 — Supported providers list"""
+    
+    @pytest.mark.asyncio
+    async def test_providers_endpoint_returns_all(self, auth_client: AsyncClient):
+        resp = await auth_client.get("/api/v1/models/providers")
+        assert resp.status_code == 200
+        data = resp.json()
+        
+        assert isinstance(data, list)
+        provider_ids = {p["id"] for p in data}
+        # Matches the hardcoded list in models.py list_providers()
+        expected = {"OPENAI", "ANTHROPIC", "GEMINI", "GROQ", "MISTRAL", 
+                    "TOGETHER", "COHERE", "MOONSHOT", "DEEPSEEK", 
+                    "AZURE_OPENAI", "LOCAL"}
+        assert provider_ids >= expected, f"Missing: {expected - provider_ids}"
+    
+    @pytest.mark.asyncio
+    async def test_provider_metadata_complete(self, auth_client: AsyncClient):
+        resp = await auth_client.get("/api/v1/models/providers")
+        data = resp.json()
+        
+        for p in data:
+            assert "id" in p
+            assert "name" in p
+            assert "display_name" in p
+            assert "requires_api_key" in p
+            assert isinstance(p["requires_api_key"], bool)
+            assert "default_base_url" in p
+            assert "popular_models" in p
+            assert isinstance(p["popular_models"], list)
+            assert len(p["popular_models"]) > 0
+    
+    @pytest.mark.asyncio
+    async def test_local_provider_requires_no_key(self, auth_client: AsyncClient):
+        resp = await auth_client.get("/api/v1/models/providers")
+        data = resp.json()
+        local = next(p for p in data if p["id"] == "LOCAL")
+        assert local["requires_api_key"] is False
