@@ -10287,7 +10287,7 @@ export interface components {
          *     Use CUSTOM for any OpenAI-compatible endpoint not listed.
          * @enum {string}
          */
-        ProviderType: "OPENAI" | "ANTHROPIC" | "GEMINI" | "GROQ" | "MISTRAL" | "COHERE" | "TOGETHER" | "FIREWORKS" | "PERPLEXITY" | "AI21" | "MOONSHOT" | "DEEPSEEK" | "QIANWEN" | "ZHIPU" | "AZURE_OPENAI" | "LOCAL" | "CUSTOM" | "OPENAI_COMPATIBLE";
+        ProviderType: "OPENAI" | "ANTHROPIC" | "GEMINI" | "GROQ" | "MISTRAL" | "COHERE" | "TOGETHER" | "FIREWORKS" | "PERPLEXITY" | "AI21" | "MOONSHOT" | "DEEPSEEK" | "QIANWEN" | "ZHIPU" | "XAI" | "AZURE_OPENAI" | "LOCAL" | "CUSTOM" | "OPENROUTER" | "OPENAI_COMPATIBLE";
         /** PublishListingRequest */
         PublishListingRequest: {
             /** Tool Name */
