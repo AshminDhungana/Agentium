@@ -90,18 +90,26 @@ def db_engine():
     engine_test = create_engine(TEST_DB_URL)
 
     # Run alembic upgrade head to apply all migrations
-    alembic_cfg = "alembic.ini"
+    # alembic.ini is in the backend directory (project root for tests)
+    # __file__ = .../backend/tests/integration/conftest.py
+    # Go up 3 levels: integration -> tests -> backend
+    backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    alembic_cfg = os.path.join(backend_dir, "alembic.ini")
+    print(f"DEBUG: backend_dir={backend_dir}, alembic_cfg={alembic_cfg}, TEST_DB_URL={TEST_DB_URL}")
     result = subprocess.run(
         [sys.executable, "-m", "alembic", "-c", alembic_cfg, "upgrade", "head"],
-        cwd=".",  # backend directory
+        cwd=backend_dir,
         capture_output=True,
         text=True,
         env={**os.environ, "DATABASE_URL": TEST_DB_URL},
     )
+    print(f"DEBUG: returncode={result.returncode}, stdout_len={len(result.stdout)}, stderr_len={len(result.stderr)}")
     if result.returncode != 0:
-        print(f"Alembic upgrade failed: {result.stderr}")
-        raise RuntimeError(f"Alembic upgrade failed: {result.stderr}")
-    print(f"Alembic upgrade output: {result.stdout}")
+        print(f"Alembic upgrade failed: returncode={result.returncode}")
+        print(f"Alembic stdout: {result.stdout}")
+        print(f"Alembic stderr: {result.stderr}")
+        raise RuntimeError(f"Alembic upgrade failed: returncode={result.returncode}, stderr={result.stderr}")
+    print(f"Alembic upgrade output: {result.stdout[:200]}")
 
     # Phase 19: enable pg_stat_statements extension
     with engine_test.connect() as conn:

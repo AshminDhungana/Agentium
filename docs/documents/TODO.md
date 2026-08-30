@@ -216,12 +216,12 @@
   - [x] 5.1.4 — Supported providers: OpenAI, Anthropic, Google, Groq, DeepSeek, Mistral, OpenRouter, xAI, local
   - [x] 5.1.5 — `ModelsPage.tsx` add/edit/delete model configs UI works
 
-- [ ] **5.2 — LLM Request Flow**
-  - [ ] 5.2.1 — `ModelService.generate()` sends prompt to correct provider
-  - [ ] 5.2.2 — Streaming responses work (SSE / chunked response)
-  - [ ] 5.2.3 — Token counting is accurate
-  - [ ] 5.2.4 — System prompt injection (constitution + ethos + context) works
-  - [ ] 5.2.5 — JSON/structured output mode works when requested
+- [x] **5.2 — LLM Request Flow**
+  - [x] 5.2.1 — `ModelService.generate()` sends prompt to correct provider
+  - [x] 5.2.2 — Streaming responses work (SSE / chunked response)
+  - [x] 5.2.3 — Token counting is accurate
+  - [x] 5.2.4 — System prompt injection (constitution + ethos + context) works
+  - [x] 5.2.5 — JSON/structured output mode works when requested
 
 - [ ] **5.3 — Model Redirect on First Login**
   - [ ] 5.3.1 — `useModelRedirect` hook redirects to `/models` when no configs exist

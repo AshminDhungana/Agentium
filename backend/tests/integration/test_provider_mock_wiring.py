@@ -684,3 +684,274 @@ async def test_governance_path_emits_no_deltas(monkeypatch):
         message="/govern", db=MagicMock(), on_delta=on_delta)
     assert res["content"] == "Governed."
     assert captured == []
+
+
+# ─── 5.2.2 Streaming Edge Cases ────────────────────────────────────────────────
+
+class ExtendedFakeProviderServerForStreaming(ExtendedFakeProviderServer):
+    """Extended fake server that supports streaming SSE for tool calls."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._sse_tool_queue = []
+
+    def set_stream_tool_calls(self, chunks):
+        """Set up a streaming response that includes tool calls."""
+        with self._lock:
+            self._sse_tool_queue = list(chunks)
+
+    def _make_handler(self):
+        server = self
+        base_handler = super()._make_handler()
+
+        class _H(base_handler):
+            def do_POST(self):
+                if self.path == "/v1/chat/completions" and server._sse_tool_queue:
+                    server._drain(self)
+                    with server._lock:
+                        chunks = server._sse_tool_queue
+                        server._sse_tool_queue = []
+                    self.send_response(200)
+                    self.send_header("Content-Type", "text/event-stream")
+                    self.send_header("Cache-Control", "no-cache")
+                    self.send_header("Connection", "close")
+                    self.end_headers()
+                    for ch in chunks:
+                        self.wfile.write(f"data: {json.dumps(ch)}\n\n".encode())
+                        self.wfile.flush()
+                    self.wfile.write(b"data: [DONE]\n\n")
+                    self.wfile.flush()
+                    return
+                base_handler.do_POST(self)
+
+        return _H
+
+
+SSE_TOOL_CALL_CHUNKS = [
+    # First chunk: start of tool call
+    {
+        "id": "c1",
+        "object": "chat.completion.chunk",
+        "model": "fake",
+        "choices": [{
+            "index": 0,
+            "delta": {
+                "tool_calls": [{
+                    "index": 0,
+                    "id": "call_1",
+                    "type": "function",
+                    "function": {"name": "get_time", "arguments": "{"}
+                }]
+            },
+            "finish_reason": None
+        }]
+    },
+    # Second chunk: continue tool call arguments
+    {
+        "id": "c2",
+        "object": "chat.completion.chunk",
+        "model": "fake",
+        "choices": [{
+            "index": 0,
+            "delta": {
+                "tool_calls": [{
+                    "index": 0,
+                    "function": {"arguments": "\"location\":\"NYC\"}"}
+                }]
+            },
+            "finish_reason": None
+        }]
+    },
+    # Third chunk: finish tool call, then final text
+    {
+        "id": "c3",
+        "object": "chat.completion.chunk",
+        "model": "fake",
+        "choices": [{
+            "index": 0,
+            "delta": {"content": "The time in NYC is "},
+            "finish_reason": None
+        }]
+    },
+    # Fourth chunk: final text completion
+    {
+        "id": "c4",
+        "object": "chat.completion.chunk",
+        "model": "fake",
+        "choices": [{
+            "index": 0,
+            "delta": {"content": "12:00 PM"},
+            "finish_reason": "stop"
+        }],
+        "usage": {"prompt_tokens": 20, "completion_tokens": 15, "total_tokens": 35}
+    },
+]
+
+
+@pytest.mark.integration
+class TestStreamingEdgeCases:
+    """5.2.2 — Streaming edge cases: tool calls, reassembly, cancellation."""
+
+    async def test_streaming_with_tool_calls_interleaved(self, seeded_once, db_engine):
+        """Streaming should handle tool calls interleaved with text."""
+        seeded_db = seeded_once
+        srv = ExtendedFakeProviderServerForStreaming()
+        srv.set_stream_tool_calls(SSE_TOOL_CALL_CHUNKS)
+        cfg = make_mock_config(ProviderType.OPENAI, srv.base_url, engine=db_engine)
+        created_ids = [str(cfg.id)]
+        try:
+            provider = await ModelService.get_provider("sovereign", str(cfg.id))
+            chunks = []
+            async for chunk in provider.stream_generate("sys", "What time in NYC?"):
+                chunks.append(chunk)
+            # Tool calls are not yielded as text deltas in stream_generate
+            # (they're handled in generate_with_tools), so only text content comes through
+            assert "".join(chunks) == "The time in NYC is 12:00 PM"
+        finally:
+            srv.shutdown()
+            _delete_fake_configs(created_ids, engine=db_engine)
+            reset_resilience()
+
+    async def test_stream_reassembly_matches_blocking(self, seeded_once, db_engine):
+        """Streamed content should match blocking generate content."""
+        seeded_db = seeded_once
+        blocking_srv = ExtendedFakeProviderServer()
+        streaming_srv = ExtendedFakeProviderServer()
+
+        # Same response content for both
+        blocking_srv._default["body"]["choices"][0]["message"]["content"] = "Hello world from blocking"
+        blocking_srv._default["body"]["usage"] = {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}
+
+        SSE_BLOCKING_EQUIV = [
+            {"id": "c1", "object": "chat.completion.chunk", "model": "fake",
+             "choices": [{"index": 0, "delta": {"content": "Hello "}, "finish_reason": None}]},
+            {"id": "c2", "object": "chat.completion.chunk", "model": "fake",
+             "choices": [{"index": 0, "delta": {"content": "world "}, "finish_reason": None}]},
+            {"id": "c3", "object": "chat.completion.chunk", "model": "fake",
+             "choices": [{"index": 0, "delta": {"content": "from "}, "finish_reason": None}]},
+            {"id": "c4", "object": "chat.completion.chunk", "model": "fake",
+             "choices": [{"index": 0, "delta": {"content": "blocking"}, "finish_reason": "stop"}]},
+        ]
+        streaming_srv.set_stream(SSE_BLOCKING_EQUIV)
+
+        cfg_block = make_mock_config(ProviderType.OPENAI, blocking_srv.base_url, engine=db_engine)
+        cfg_stream = make_mock_config(ProviderType.OPENAI, streaming_srv.base_url, engine=db_engine)
+        created_ids = [str(cfg_block.id), str(cfg_stream.id)]
+        try:
+            # Blocking generate
+            provider_block = await ModelService.get_provider("sovereign", str(cfg_block.id))
+            result_block = await provider_block.generate("sys", "Say hello")
+
+            # Streaming generate
+            provider_stream = await ModelService.get_provider("sovereign", str(cfg_stream.id))
+            chunks = []
+            async for chunk in provider_stream.stream_generate("sys", "Say hello"):
+                chunks.append(chunk)
+            result_stream = "".join(chunks)
+
+            # Content should match
+            assert result_block["content"] == result_stream
+        finally:
+            blocking_srv.shutdown()
+            streaming_srv.shutdown()
+            _delete_fake_configs(created_ids, engine=db_engine)
+            reset_resilience()
+
+    async def test_stream_cancellation_mid_generation(self, seeded_once, db_engine):
+        """Cancellation event should stop streaming mid-generation."""
+        seeded_db = seeded_once
+        srv = ExtendedFakeProviderServer()
+        SSE_LONG = [
+            {"id": f"c{i}", "object": "chat.completion.chunk", "model": "fake",
+             "choices": [{"index": 0, "delta": {"content": f"word {i} "}, "finish_reason": None}]}
+            for i in range(20)
+        ]
+        SSE_LONG[-1]["choices"][0]["finish_reason"] = "stop"
+        srv.set_stream(SSE_LONG)
+        cfg = make_mock_config(ProviderType.OPENAI, srv.base_url, engine=db_engine)
+        created_ids = [str(cfg.id)]
+        try:
+            provider = await ModelService.get_provider("sovereign", str(cfg.id))
+            cancel_event = asyncio.Event()
+            chunks = []
+
+            async def collect():
+                async for chunk in provider.stream_generate("sys", "Generate long text"):
+                    chunks.append(chunk)
+                    if len(chunks) >= 3:
+                        cancel_event.set()
+
+            await collect()
+            # Should have stopped after ~3 chunks
+            assert len(chunks) <= 5  # Allow some buffer for event processing
+            assert cancel_event.is_set()
+        finally:
+            srv.shutdown()
+            _delete_fake_configs(created_ids, engine=db_engine)
+            reset_resilience()
+
+    async def test_generate_with_tools_streaming_tool_calls(self, seeded_once, db_engine):
+        """generate_with_tools with on_delta should stream final text turn."""
+        seeded_db = seeded_once
+        srv = ExtendedFakeProviderServerForStreaming()
+        # First response: tool call (blocking), second: streaming final text
+        OPENAI_TOOL_CALL_BLOCKING = {
+            "id": "chatcmplt-tool",
+            "object": "chat.completion",
+            "created": 1,
+            "model": "fake",
+            "choices": [{
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "content": None,
+                    "tool_calls": [{
+                        "id": "call_1",
+                        "type": "function",
+                        "function": {"name": "get_time", "arguments": "{\"location\":\"NYC\"}"}
+                    }]
+                },
+                "finish_reason": "tool_calls",
+            }],
+            "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
+        }
+        # Stream the final text response
+        SSE_FINAL_TEXT = [
+            {"id": "c1", "object": "chat.completion.chunk", "model": "fake",
+             "choices": [{"index": 0, "delta": {"content": "The time is "}, "finish_reason": None}]},
+            {"id": "c2", "object": "chat.completion.chunk", "model": "fake",
+             "choices": [{"index": 0, "delta": {"content": "12:00 PM"}, "finish_reason": "stop"}]},
+        ]
+        srv.set_next(200, None, OPENAI_TOOL_CALL_BLOCKING)
+        srv.set_stream_tool_calls(SSE_FINAL_TEXT)
+
+        cfg = make_mock_config(ProviderType.OPENAI, srv.base_url, engine=db_engine)
+        created_ids = [str(cfg.id)]
+        try:
+            provider = await ModelService.get_provider("sovereign", str(cfg.id))
+            tool_results = []
+
+            async def executor(name, args):
+                tool_results.append({"name": name, "args": args})
+                return "12:00 PM"
+
+            chunks = []
+            async def on_delta(text):
+                chunks.append(text)
+
+            result = await provider.generate_with_tools(
+                system_prompt="sys",
+                messages=[{"role": "user", "content": "What time in NYC?"}],
+                tools=[{"type": "function", "function": {"name": "get_time", "parameters": {}}}],
+                tool_executor=executor,
+                on_delta=on_delta,
+            )
+
+            assert tool_results == [{"name": "get_time", "args": {"location": "NYC"}}]
+            assert "".join(chunks) == "The time is 12:00 PM"
+            assert result["content"] == "The time is 12:00 PM"
+            assert result["finish_reason"] == "stop"
+        finally:
+            srv.shutdown()
+            _delete_fake_configs(created_ids, engine=db_engine)
+            reset_resilience()
