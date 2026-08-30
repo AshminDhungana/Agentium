@@ -18,6 +18,7 @@ import json
 import time
 import asyncio
 import types
+import copy
 from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from unittest.mock import patch, AsyncMock
@@ -349,7 +350,7 @@ class FakeProviderServer:
         self._default = {
             "status": default_status,
             "headers": default_headers or {},
-            "body": default_body or OPENAI_COMPLETION,
+            "body": copy.deepcopy(default_body or OPENAI_COMPLETION),
         }
         self._queue = []  # list of {"status","headers","body"}
         self._lock = threading.Lock()
@@ -389,7 +390,7 @@ class FakeProviderServer:
                     )
                 status = spec.get("status", 200)
                 headers = spec.get("headers", {})
-                body = spec.get("body", OPENAI_COMPLETION)
+                body = copy.deepcopy(spec.get("body", OPENAI_COMPLETION))
                 payload = json.dumps(body).encode()
                 self.send_response(status)
                 for k, v in headers.items():
@@ -407,7 +408,7 @@ class FakeProviderServer:
                 {
                     "status": status,
                     "headers": headers or {},
-                    "body": body or OPENAI_COMPLETION,
+                    "body": copy.deepcopy(body or OPENAI_COMPLETION),
                 }
             )
 

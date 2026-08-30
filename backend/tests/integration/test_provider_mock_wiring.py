@@ -707,7 +707,7 @@ class ExtendedFakeProviderServerForStreaming(ExtendedFakeProviderServer):
         class _H(base_handler):
             def do_POST(self):
                 if self.path == "/v1/chat/completions" and server._sse_tool_queue:
-                    server._drain(self)
+                    self._drain()
                     with server._lock:
                         chunks = server._sse_tool_queue
                         server._sse_tool_queue = []

@@ -841,6 +841,7 @@ class OpenAICompatibleProvider(BaseModelProvider):
             is_anthropic=False,
         )
 
+        cancel_event = kwargs.get('cancel_event')
         maxc = getattr(self.config, "max_concurrent_requests", 10) or 10
         await provider_rate_limiter.acquire_concurrency(self.config.id, maxc)
         try:
@@ -861,6 +862,8 @@ class OpenAICompatibleProvider(BaseModelProvider):
             await _record_provider_headers(self.config)
 
             async for chunk in stream:
+                if cancel_event is not None and cancel_event.is_set():
+                    break
                 if chunk.choices[0].delta.content:
                     yield chunk.choices[0].delta.content
         finally:
