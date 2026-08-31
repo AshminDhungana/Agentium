@@ -223,10 +223,10 @@
   - [x] 5.2.4 — System prompt injection (constitution + ethos + context) works
   - [x] 5.2.5 — JSON/structured output mode works when requested
 
-- [ ] **5.3 — Model Redirect on First Login**
-  - [ ] 5.3.1 — `useModelRedirect` hook redirects to `/models` when no configs exist
-  - [ ] 5.3.2 — Redirect fires only once per login session
-  - [ ] 5.3.3 — After adding a model, redirect stops for the session
+- [x] **5.3 — Model Redirect on First Login**
+  - [x] 5.3.1 — `useModelRedirect` hook redirects to `/models` when no configs exist
+  - [x] 5.3.2 — Redirect fires only once per login session
+  - [x] 5.3.3 — After adding a model, redirect stops for the session
 
 - [ ] **5.4 — Pricing & Cost Tracking**
   - [ ] 5.4.1 — `PricingSyncService.sync_prices()` fetches current model prices
