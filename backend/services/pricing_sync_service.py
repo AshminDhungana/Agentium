@@ -108,6 +108,9 @@ class PricingSyncService:
                 input_cost_per_token = info.get("input_cost_per_token")
                 output_cost_per_token = info.get("output_cost_per_token")
                 
+                # Fetch max_tokens (context window) from litellm data
+                context_window = info.get("max_tokens", 128_000)
+                
                 # Skip models that have no pricing defined
                 if input_cost_per_token is None or output_cost_per_token is None:
                     continue
@@ -129,6 +132,7 @@ class PricingSyncService:
                         pricing_record.output_rate_per_1m = output_rate
                         pricing_record.provider = provider_str
                         pricing_record.is_active = True
+                        pricing_record.context_window = context_window
                         updated_count += 1
                 else:
                     new_pricing = ModelPricing(
@@ -136,7 +140,8 @@ class PricingSyncService:
                         provider=provider_str,
                         input_rate_per_1m=input_rate,
                         output_rate_per_1m=output_rate,
-                        is_active=True
+                        is_active=True,
+                        context_window=context_window
                     )
                     db.add(new_pricing)
                     added_count += 1
