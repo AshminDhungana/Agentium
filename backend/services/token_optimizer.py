@@ -22,6 +22,7 @@ from backend.services.api_manager import init_api_manager, ModelCapability
 import backend.services.api_manager as api_manager_module
 import backend.services.model_allocation as model_allocation_module
 from backend.services.model_allocation import init_model_allocator
+from backend.services.chat_context import estimate_tokens
 
 logger = logging.getLogger(__name__)
 
@@ -572,6 +573,63 @@ class TokenOptimizer:
             if api_manager_module.api_manager
             else False,
         }
+
+    def _model_key_from_config_id(self, config_id: str) -> str:
+        """The config_id IS the key used in api_manager.models dict."""
+        return config_id
+
+    def trim_context_for_agent(
+        self,
+        messages: List[Dict[str, str]],
+        system_prompt: str,
+        model_config_id: str,
+        reserve_pct: float = 0.15
+    ) -> List[Dict[str, str]]:
+        """
+        Trim message history to fit model's context_window.
+        
+        Args:
+            messages: List of {"role": "...", "content": "..."} (user/assistant turns)
+            system_prompt: The system prompt (tokens counted but not trimmed)
+            model_config_id: UserModelConfig.id to look up model's context_window
+            reserve_pct: Fraction of context_window to reserve for response + overhead (default 15%)
+        
+        Returns:
+            Trimmed message list (most recent turns that fit)
+        """
+        # 1. Look up model config → get context_window
+        model_key = self._model_key_from_config_id(model_config_id)
+        model = api_manager_module.api_manager.models.get(model_key)
+        context_window = model.context_window if model else 128_000
+        
+        # 2. Calculate available tokens for messages
+        system_tokens = estimate_tokens([], system_prompt)
+        available = int(context_window * (1 - reserve_pct)) - system_tokens
+        available = max(available, 100)  # Floor - small minimum for small context windows
+        
+        # 3. Trim from oldest, keeping most recent turns
+        return self._trim_messages_to_budget(messages, available)
+
+    def _trim_messages_to_budget(self, messages: List[Dict], budget: int) -> List[Dict]:
+        """Keep most recent messages that fit within token budget."""
+        if not messages:
+            return []
+        
+        # Estimate total
+        total = estimate_tokens(messages, "")
+        if total <= budget:
+            return messages
+        
+        # Drop oldest until under budget
+        trimmed = messages[:]
+        while trimmed and estimate_tokens(trimmed, "") > budget:
+            trimmed = trimmed[1:]  # Drop oldest
+        
+        # Always keep at least the last message
+        if not trimmed and messages:
+            trimmed = [messages[-1]]
+        
+        return trimmed
 
 
 # ---------------------------------------------------------------------------
