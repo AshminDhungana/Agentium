@@ -60,10 +60,26 @@ class ExtendedFakeProviderServer(FakeProviderServer):
             def log_message(self, *a):
                 pass
 
+            def _safe_write(self, data: bytes) -> bool:
+                """Write data to client, handling disconnect gracefully.
+                Returns True if write succeeded, False if client disconnected.
+                """
+                try:
+                    self.wfile.write(data)
+                    self.wfile.flush()
+                    return True
+                except (BrokenPipeError, ConnectionResetError, OSError):
+                    # Client disconnected before we could write the response
+                    return False
+
             def _drain(self):
                 length = int(self.headers.get("Content-Length", 0) or 0)
                 if length:
-                    self.rfile.read(length)
+                    try:
+                        self.rfile.read(length)
+                    except (BrokenPipeError, ConnectionResetError, OSError):
+                        # Client disconnected during request read
+                        pass
 
             def do_POST(self):
                 # Only the branches we serve ourselves drain the body. The
@@ -96,13 +112,13 @@ class ExtendedFakeProviderServer(FakeProviderServer):
                     self.send_header("Content-Type", "application/json")
                     self.send_header("Content-Length", str(len(body)))
                     self.end_headers()
-                    self.wfile.write(body)
+                    self._safe_write(body)
                     return
                 if self.path == "/v1/chat/completions":
-                    self._drain()
                     with server._lock:
                         # Handle streaming response if available
                         if server._sse_queue:
+                            self._drain()
                             chunks = server._sse_queue
                             server._sse_queue = []
                             self.send_response(200)
@@ -114,18 +130,18 @@ class ExtendedFakeProviderServer(FakeProviderServer):
                             self.close_connection = True
                             self.end_headers()
                             for i, ch in enumerate(chunks):
-                                self.wfile.write(f"data: {json.dumps(ch)}\n\n".encode())
-                                self.wfile.flush()
+                                if not self._safe_write(f"data: {json.dumps(ch)}\n\n".encode()):
+                                    return
                                 # Small delay between chunks to allow client cancellation
                                 # to be processed (simulates network latency).
                                 if i < len(chunks) - 1:
                                     import time
                                     time.sleep(0.01)
-                            self.wfile.write(b"data: [DONE]\n\n")
-                            self.wfile.flush()
+                            self._safe_write(b"data: [DONE]\n\n")
                             return
                         # Handle non-streaming response from queue
                         elif server._queue:
+                            self._drain()
                             spec = server._queue.pop(0)
                             status = spec.get("status", 200)
                             server._status_counts[status] = (
@@ -140,7 +156,7 @@ class ExtendedFakeProviderServer(FakeProviderServer):
                             self.send_header("Content-Type", "application/json")
                             self.send_header("Content-Length", str(len(body)))
                             self.end_headers()
-                            self.wfile.write(body)
+                            self._safe_write(body)
                             return
                 base_handler.do_POST(self)
 
@@ -725,7 +741,7 @@ class ExtendedFakeProviderServerForStreaming(ExtendedFakeProviderServer):
         with self._lock:
             self._sse_tool_queue = list(chunks)
 
-    def _make_handler(self):
+def _make_handler(self):
         server = self
         base_handler = super()._make_handler()
 
@@ -733,17 +749,20 @@ class ExtendedFakeProviderServerForStreaming(ExtendedFakeProviderServer):
             def do_POST(self):
                 # Only use _sse_tool_queue for streaming requests (stream=true in body)
                 if self.path == "/v1/chat/completions":
-                    self._drain()
                     # Check if this is a streaming request
                     length = int(self.headers.get("Content-Length", 0) or 0)
-                    body = self.rfile.read(length) if length else b"{}"
+                    try:
+                        body = self.rfile.read(length) if length else b"{}"
+                    except (BrokenPipeError, ConnectionResetError, OSError):
+                        # Client disconnected during request read
+                        return
                     import json as _json
                     try:
                         req_body = _json.loads(body)
                         is_streaming = req_body.get("stream", False)
                     except Exception:
                         is_streaming = False
-                    
+
                     if is_streaming and server._sse_tool_queue:
                         with server._lock:
                             chunks = server._sse_tool_queue
@@ -754,10 +773,9 @@ class ExtendedFakeProviderServerForStreaming(ExtendedFakeProviderServer):
                         self.send_header("Connection", "close")
                         self.end_headers()
                         for ch in chunks:
-                            self.wfile.write(f"data: {_json.dumps(ch)}\n\n".encode())
-                            self.wfile.flush()
-                        self.wfile.write(b"data: [DONE]\n\n")
-                        self.wfile.flush()
+                            if not self._safe_write(f"data: {_json.dumps(ch)}\n\n".encode()):
+                                return
+                        self._safe_write(b"data: [DONE]\n\n")
                         return
                 base_handler.do_POST(self)
 

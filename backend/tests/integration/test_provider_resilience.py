@@ -376,12 +376,28 @@ class FakeProviderServer:
             def log_message(self, *a):
                 pass
 
+            def _safe_write(self, data: bytes) -> bool:
+                """Write data to client, handling disconnect gracefully.
+                Returns True if write succeeded, False if client disconnected.
+                """
+                try:
+                    self.wfile.write(data)
+                    self.wfile.flush()
+                    return True
+                except (BrokenPipeError, ConnectionResetError, OSError):
+                    # Client disconnected before we could write the response
+                    return False
+
             def do_POST(self):
                 # Drain the request body so keep-alive connections stay aligned
                 # when the client (httpx) reuses the socket across calls.
                 length = int(self.headers.get("Content-Length", 0) or 0)
                 if length:
-                    self.rfile.read(length)
+                    try:
+                        self.rfile.read(length)
+                    except (BrokenPipeError, ConnectionResetError, OSError):
+                        # Client disconnected during request read
+                        return
                 with server._lock:
                     server._hits += 1
                     spec = server._queue.pop(0) if server._queue else server._default
@@ -398,7 +414,7 @@ class FakeProviderServer:
                 self.send_header("Content-Type", "application/json")
                 self.send_header("Content-Length", str(len(payload)))
                 self.end_headers()
-                self.wfile.write(payload)
+                self._safe_write(payload)
 
         return _H
 
