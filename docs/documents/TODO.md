@@ -233,10 +233,10 @@
   - [x] 5.4.2 — Token cost per query is calculated and logged
   - [x] 5.4.3 — Pricing cache loads from DB on startup
 
-- [ ] **5.5 — Model Allocation & Token Optimization**
-  - [ ] 5.5.1 — `model_allocator` selects optimal model per task complexity
-  - [ ] 5.5.2 — `token_optimizer` trims context to fit model's context window
-  - [ ] 5.5.3 — Budget tracking per user / per day works
+- [x] **5.5 — Model Allocation & Token Optimization**
+  - [x] 5.5.1 — `model_allocator` selects optimal model per task complexity
+  - [x] 5.5.2 — `token_optimizer` trims context to fit model's context window
+  - [x] 5.5.3 — Budget tracking per user / per day works
 
 - [ ] **5.6 — Provider Error Handling**
   - [ ] 5.6.1 — 429 rate-limit errors trigger exponential backoff with jitter
