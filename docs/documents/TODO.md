@@ -228,10 +228,10 @@
   - [x] 5.3.2 — Redirect fires only once per login session
   - [x] 5.3.3 — After adding a model, redirect stops for the session
 
-- [ ] **5.4 — Pricing & Cost Tracking**
-  - [ ] 5.4.1 — `PricingSyncService.sync_prices()` fetches current model prices
-  - [ ] 5.4.2 — Token cost per query is calculated and logged
-  - [ ] 5.4.3 — Pricing cache loads from DB on startup
+- [x] **5.4 — Pricing & Cost Tracking**
+  - [x] 5.4.1 — `PricingSyncService.sync_prices()` fetches current model prices
+  - [x] 5.4.2 — Token cost per query is calculated and logged
+  - [x] 5.4.3 — Pricing cache loads from DB on startup
 
 - [ ] **5.5 — Model Allocation & Token Optimization**
   - [ ] 5.5.1 — `model_allocator` selects optimal model per task complexity
