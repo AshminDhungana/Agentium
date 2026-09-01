@@ -98,25 +98,50 @@ class ExtendedFakeProviderServer(FakeProviderServer):
                     self.end_headers()
                     self.wfile.write(body)
                     return
-                if self.path == "/v1/chat/completions" and server._sse_queue:
+                if self.path == "/v1/chat/completions":
                     self._drain()
                     with server._lock:
-                        chunks = server._sse_queue
-                        server._sse_queue = []
-                    self.send_response(200)
-                    self.send_header("Content-Type", "text/event-stream")
-                    self.send_header("Cache-Control", "no-cache")
-                    # HTTPServer speaks HTTP/1.0; without a Content-Length the
-                    # client relies on connection close to detect end-of-stream.
-                    self.send_header("Connection", "close")
-                    self.close_connection = True
-                    self.end_headers()
-                    for ch in chunks:
-                        self.wfile.write(f"data: {json.dumps(ch)}\n\n".encode())
-                        self.wfile.flush()
-                    self.wfile.write(b"data: [DONE]\n\n")
-                    self.wfile.flush()
-                    return
+                        # Handle streaming response if available
+                        if server._sse_queue:
+                            chunks = server._sse_queue
+                            server._sse_queue = []
+                            self.send_response(200)
+                            self.send_header("Content-Type", "text/event-stream")
+                            self.send_header("Cache-Control", "no-cache")
+                            # HTTPServer speaks HTTP/1.0; without a Content-Length the
+                            # client relies on connection close to detect end-of-stream.
+                            self.send_header("Connection", "close")
+                            self.close_connection = True
+                            self.end_headers()
+                            for i, ch in enumerate(chunks):
+                                self.wfile.write(f"data: {json.dumps(ch)}\n\n".encode())
+                                self.wfile.flush()
+                                # Small delay between chunks to allow client cancellation
+                                # to be processed (simulates network latency).
+                                if i < len(chunks) - 1:
+                                    import time
+                                    time.sleep(0.01)
+                            self.wfile.write(b"data: [DONE]\n\n")
+                            self.wfile.flush()
+                            return
+                        # Handle non-streaming response from queue
+                        elif server._queue:
+                            spec = server._queue.pop(0)
+                            status = spec.get("status", 200)
+                            server._status_counts[status] = (
+                                server._status_counts.get(status, 0) + 1
+                            )
+                            if status == 200:
+                                body = json.dumps(spec.get("body", {})).encode()
+                            else:
+                                err = spec.get("body") or {"error": "mock error"}
+                                body = json.dumps(err).encode()
+                            self.send_response(status)
+                            self.send_header("Content-Type", "application/json")
+                            self.send_header("Content-Length", str(len(body)))
+                            self.end_headers()
+                            self.wfile.write(body)
+                            return
                 base_handler.do_POST(self)
 
         return _H
@@ -706,22 +731,34 @@ class ExtendedFakeProviderServerForStreaming(ExtendedFakeProviderServer):
 
         class _H(base_handler):
             def do_POST(self):
-                if self.path == "/v1/chat/completions" and server._sse_tool_queue:
+                # Only use _sse_tool_queue for streaming requests (stream=true in body)
+                if self.path == "/v1/chat/completions":
                     self._drain()
-                    with server._lock:
-                        chunks = server._sse_tool_queue
-                        server._sse_tool_queue = []
-                    self.send_response(200)
-                    self.send_header("Content-Type", "text/event-stream")
-                    self.send_header("Cache-Control", "no-cache")
-                    self.send_header("Connection", "close")
-                    self.end_headers()
-                    for ch in chunks:
-                        self.wfile.write(f"data: {json.dumps(ch)}\n\n".encode())
+                    # Check if this is a streaming request
+                    length = int(self.headers.get("Content-Length", 0) or 0)
+                    body = self.rfile.read(length) if length else b"{}"
+                    import json as _json
+                    try:
+                        req_body = _json.loads(body)
+                        is_streaming = req_body.get("stream", False)
+                    except Exception:
+                        is_streaming = False
+                    
+                    if is_streaming and server._sse_tool_queue:
+                        with server._lock:
+                            chunks = server._sse_tool_queue
+                            server._sse_tool_queue = []
+                        self.send_response(200)
+                        self.send_header("Content-Type", "text/event-stream")
+                        self.send_header("Cache-Control", "no-cache")
+                        self.send_header("Connection", "close")
+                        self.end_headers()
+                        for ch in chunks:
+                            self.wfile.write(f"data: {_json.dumps(ch)}\n\n".encode())
+                            self.wfile.flush()
+                        self.wfile.write(b"data: [DONE]\n\n")
                         self.wfile.flush()
-                    self.wfile.write(b"data: [DONE]\n\n")
-                    self.wfile.flush()
-                    return
+                        return
                 base_handler.do_POST(self)
 
         return _H
@@ -876,7 +913,7 @@ class TestStreamingEdgeCases:
             chunks = []
 
             async def collect():
-                async for chunk in provider.stream_generate("sys", "Generate long text"):
+                async for chunk in provider.stream_generate("sys", "Generate long text", cancel_event=cancel_event):
                     chunks.append(chunk)
                     if len(chunks) >= 3:
                         cancel_event.set()
