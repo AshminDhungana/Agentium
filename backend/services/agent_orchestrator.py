@@ -224,6 +224,17 @@ class AgentOrchestrator:
         if resume_hint:
             system_prompt = f"{resume_hint}\n\n{system_prompt}"
 
+        # NEW: Trim context to fit model's context window
+        messages = [{"role": "user", "content": task.description}]
+        trimmed_messages = token_optimizer.trim_context_for_agent(
+            messages=messages,
+            system_prompt=system_prompt,
+            model_config_id=config_id,
+        )
+
+        # Use trimmed message for generation
+        user_message = trimmed_messages[0]["content"] if trimmed_messages else task.description
+
         # ── Phase 6.9: tool-aware generation ──────────────────────────────────
         # generate_with_agent_tools() drives the full agentic loop:
         #   1. Exports tier-filtered tools in the correct schema format.
@@ -243,7 +254,7 @@ class AgentOrchestrator:
         llm_client = LLMClient(db=db)
         result = await llm_client.generate_with_tools(
             agent=agent,
-            user_message=task.description,
+            user_message=user_message,
             db=db,
             config_id=config_id,
             fallback_configs=fallback_configs,
