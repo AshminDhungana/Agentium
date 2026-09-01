@@ -1,13 +1,13 @@
 """Add agentium_id column to workflow_executions table
 
-Revision ID: 022_agentium_id_workflow_exec
-Revises: 021_add_workflow_versions_table
+Revision ID: b2c3d4e5f6a7
+Revises: 001_fix_alembic_version_length
 """
 from alembic import op
 import sqlalchemy as sa
 
-revision = "022_agentium_id_workflow_exec"
-down_revision = "021_add_workflow_versions_table"
+revision = "b2c3d4e5f6a7"
+down_revision = "001_fix_alembic_version_length"
 branch_labels = None
 depends_on = None
 

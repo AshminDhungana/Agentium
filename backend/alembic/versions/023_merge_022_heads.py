@@ -1,7 +1,7 @@
 """Merge 022 heads
 
 Revision ID: 023_merge_022_heads
-Revises: 022_agentium_id_workflow_exec, 022_add_context_window_to_model_pricings
+Revises: b2c3d4e5f6a7, a1b2c3d4e5f6
 Create Date: 2026-09-01 10:19:57.000000
 
 """
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = '023_merge_022_heads'
-down_revision = ('022_agentium_id_workflow_exec', '022_add_context_window_to_model_pricings')
+down_revision = ('b2c3d4e5f6a7', 'a1b2c3d4e5f6')
 branch_labels = None
 depends_on = None
 

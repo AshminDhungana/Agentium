@@ -1,7 +1,7 @@
 """Add context_window column to model_pricings table
 
-Revision ID: 022_add_context_window_to_model_pricings
-Revises: 021_add_workflow_versions_table
+Revision ID: a1b2c3d4e5f6
+Revises: 001_fix_alembic_version_length
 Create Date: 2026-09-01 10:19:57.000000
 
 """
@@ -10,8 +10,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '022_add_context_window_to_model_pricings'
-down_revision = '021_add_workflow_versions_table'
+revision = 'a1b2c3d4e5f6'
+down_revision = '001_fix_alembic_version_length'
 branch_labels = None
 depends_on = None
 
