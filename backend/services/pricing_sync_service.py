@@ -14,8 +14,8 @@ logger = logging.getLogger(__name__)
 
 class PricingSyncService:
     """PricingSyncService."""
-    # Class-level cache (model_id_lower -> (input_rate_per_1m, output_rate_per_1m))
-    _cache: Dict[str, Tuple[float, float]] = {}
+    # Class-level cache (model_id_lower -> (input_rate_per_1m, output_rate_per_1m, context_window))
+    _cache: Dict[str, Tuple[float, float, int]] = {}
     _initialized = False
 
     @classmethod
@@ -24,7 +24,7 @@ class PricingSyncService:
         try:
             pricings = db.query(ModelPricing).filter_by(is_active=True).all()
             cls._cache = {
-                p.model_id.lower().strip(): (p.input_rate_per_1m, p.output_rate_per_1m)
+                p.model_id.lower().strip(): (p.input_rate_per_1m, p.output_rate_per_1m, p.context_window or 128000)
                 for p in pricings
             }
             cls._initialized = True
@@ -33,11 +33,12 @@ class PricingSyncService:
             logger.error(f"Failed to load pricing cache from DB: {e}")
 
     @classmethod
-    def get_price(cls, model_id: str, db: Optional[Session] = None) -> Optional[Tuple[float, float]]:
+    def get_price(cls, model_id: str, db: Optional[Session] = None) -> Optional[Tuple[float, float, int]]:
         """
         Retrieve pricing for a given model ID (case-insensitive).
         Checks the in-memory cache first. If not found and a db session is provided,
         checks the database and caches it.
+        Returns: (input_rate_per_1m, output_rate_per_1m, context_window) or None
         """
         if not model_id:
             return None
@@ -56,7 +57,7 @@ class PricingSyncService:
                     ModelPricing.is_active == True
                 ).first()
                 if pricing:
-                    rates = (pricing.input_rate_per_1m, pricing.output_rate_per_1m)
+                    rates = (pricing.input_rate_per_1m, pricing.output_rate_per_1m, pricing.context_window or 128000)
                     cls._cache[normalized] = rates
                     return rates
             except Exception as e:

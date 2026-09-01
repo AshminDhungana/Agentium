@@ -452,7 +452,11 @@ def calculate_cost(
                 prices = val
 
     if prices is not None:
-        input_rate, output_rate = prices
+        # Handle both old (2-tuple) and new (3-tuple with context_window) formats
+        if len(prices) >= 2:
+            input_rate, output_rate = prices[0], prices[1]
+        else:
+            input_rate, output_rate = prices
         cost = (
             (prompt_tokens     / 1_000_000) * input_rate
             + (completion_tokens / 1_000_000) * output_rate
@@ -861,11 +865,16 @@ class OpenAICompatibleProvider(BaseModelProvider):
 
             await _record_provider_headers(self.config)
 
-            async for chunk in stream:
-                if cancel_event is not None and cancel_event.is_set():
-                    break
-                if chunk.choices[0].delta.content:
-                    yield chunk.choices[0].delta.content
+            try:
+                async for chunk in stream:
+                    if cancel_event is not None and cancel_event.is_set():
+                        break
+                    if chunk.choices[0].delta.content:
+                        yield chunk.choices[0].delta.content
+            finally:
+                # Ensure the stream is properly closed
+                if hasattr(stream, 'aclose'):
+                    await stream.aclose()
         finally:
             await provider_rate_limiter.release_concurrency(self.config.id)
 
@@ -1053,246 +1062,171 @@ class OpenAICompatibleProvider(BaseModelProvider):
                 rpm = getattr(self.config, "requests_per_minute", 60) or 60
                 await provider_rate_limiter.acquire(self.config.id, rpm)
 
-                if on_delta is None:
-                    # -- Blocking path -----------
-                    response = await client.chat.completions.create(**create_kwargs)
-                    print(f"DEBUG: Got response, finish_reason={response.choices[0].finish_reason}")
-                    print(f"DEBUG: response.choices[0].message = {response.choices[0].message}")
-                    print(f"DEBUG: response.choices[0].message.tool_calls = {response.choices[0].message.tool_calls}")
-                    await _record_provider_headers(self.config)
+                # -- Unified blocking path for tool-calling loop --
+                # Always use blocking calls for tool-calling turns.
+                # The final text turn will be streamed separately if on_delta is provided.
+                response = await client.chat.completions.create(**create_kwargs)
+                print(f"DEBUG: Got response, finish_reason={response.choices[0].finish_reason}")
+                print(f"DEBUG: response.choices[0].message = {response.choices[0].message}")
+                print(f"DEBUG: response.choices[0].message.tool_calls = {response.choices[0].message.tool_calls}")
+                await _record_provider_headers(self.config)
 
-                    # Defensive: a test double may return an async stream even
-                    # for a non-stream request. Consume it WITHOUT on_delta and
-                    # run the identical decision logic below. Real providers
-                    # return a non-stream object here, so this branch is a no-op
-                    # in production (behavior stays byte-for-byte identical).
-                    # Use type check to avoid MagicMock false positives
-                    if hasattr(response, "__aiter__") and callable(getattr(response, "__aiter__", None)) \
-                       and not isinstance(response, MagicMock):
-                        msg, turn_usage, finish_reason = await self._assemble_stream_turn(
-                            response, None, None
-                        )
-                        msg_tool_calls = msg.get("tool_calls")
-                        msg_content = msg.get("content")
-                        conversation.append(msg)
-                    else:
-                        msg = response.choices[0].message
-                        turn_usage = response.usage
-                        finish_reason = response.choices[0].finish_reason
-                        msg_tool_calls = msg.tool_calls
-                        msg_content = msg.content
-                        print(f"DEBUG: msg_tool_calls={msg_tool_calls}, msg_content={msg_content}, finish_reason={finish_reason}")
-                        # Append raw assistant turn to history so the next
-                        # iteration has full context.  model_dump(exclude_none=True)
-                        # avoids sending null fields that some providers reject.
-                        try:
-                            conversation.append({
-                                "role": "assistant",
-                                "content": msg.content or "",
-                                **({"tool_calls": [tc.model_dump() for tc in msg.tool_calls]} if msg.tool_calls else {}),
-                            })
-                        except Exception:
-                            conversation.append({
-                                "role": "assistant",
-                                "content": msg.content or "",
-                                **({"tool_calls": [tc.model_dump() for tc in msg.tool_calls]} if msg.tool_calls else {}),
-                            })
-
-                    if turn_usage:
-                        total_prompt_tokens     += getattr(turn_usage, "prompt_tokens", 0)     or 0
-                        total_completion_tokens += getattr(turn_usage, "completion_tokens", 0) or 0
-
-                    # Normalize tool_calls to dicts so the executor call is
-                    # uniform for both Pydantic and assembled-stream messages.
-                    norm_tool_calls: List[Dict[str, Any]] = []
-                    if msg_tool_calls:
-                        for tc in msg_tool_calls:
-                            if isinstance(tc, dict):
-                                norm_tool_calls.append(tc)
-                            else:
-                                norm_tool_calls.append({
-                                    "id": tc.id,
-                                    "type": "function",
-                                    "function": {
-                                        "name": tc.function.name,
-                                        "arguments": tc.function.arguments,
-                                    },
-                                })
-
-                    # Model signalled it is done -- no more tool calls
-                    if finish_reason == "stop" or not norm_tool_calls:
-                        content = msg_content or ""
-                        print(f"DEBUG: Breaking loop - finish_reason={finish_reason}, norm_tool_calls={norm_tool_calls}")
-                        break
-
-                    if finish_reason == "tool_calls" and norm_tool_calls:
-                        print(f"DEBUG: Tool calls detected: {len(norm_tool_calls)}")
-                        _tool_call_counter += len(norm_tool_calls)
-                        if on_tool_start is not None:
-                            await on_tool_start(norm_tool_calls, _tool_call_counter)
-                        # Execute ALL tool calls in this response in parallel
-                        results = await asyncio.gather(
-                            *[
-                                tool_executor(
-                                    tc["function"]["name"],
-                                    json.loads(tc["function"]["arguments"] or "{}"),
-                                )
-                                for tc in norm_tool_calls
-                            ],
-                            return_exceptions=True,
-                        )
-                        print(f"DEBUG: Tool results: {results}")
-
-                        # Feed each result back as a separate tool message
-                        tool_results = []
-                        for tc, result in zip(norm_tool_calls, results):
-                            result_str = (
-                                str(result) if not isinstance(result, Exception)
-                                else f"ERROR: {result}"
-                            )
-                            # Parse the JSON result for uncertainty detection
-                            try:
-                                parsed_result = json.loads(result_str)
-                            except Exception:
-                                parsed_result = {"status": "error", "tool_name": tc["function"]["name"], "error": result_str, "result": None}
-                            tool_results.append(parsed_result)
-                            conversation.append({
-                                "role":         "tool",
-                                "tool_call_id": tc["id"],
-                                "content":      result_str,
-                            })
-
-                        # -- Uncertainty Detection & Clarification (Task 21.1.5) ----------
-                        try:
-                            signal = UncertaintyDetector.analyze(tool_results, kwargs.get("agent"), db)
-                            if signal:
-                                handler = ClarificationHandler(kwargs.get("agent"), db)
-                                resolved, guidance = await handler.handle_uncertainty(signal, conversation)
-                                if resolved:
-                                    # Inject clarification as system message before next LLM turn
-                                    conversation.append({
-                                        "role": "system",
-                                        "content": f"CLARIFICATION FROM SUPERVISOR:\n{guidance}\n\nPlease continue with this context."
-                                    })
-                                    # Track clarification in metadata for observability
-                                    if "metadata" not in conversation[-1]:
-                                        conversation[-1]["metadata"] = {}
-                                    conversation[-1]["metadata"]["clarification_round"] = handler.clarification_rounds
-                                else:
-                                    # Max rounds exceeded or no clarification available
-                                    conversation.append({
-                                        "role": "system",
-                                        "content": "WARNING: Unable to resolve uncertainty via clarification chain. Proceed with best judgment."
-                                    })
-                        except Exception as e:
-                            # Fail open - log and continue without clarification
-                            logger.warning(f"Uncertainty detection/clarification failed (fail-open): {e}")
-                    else:
-                        # Unexpected finish_reason -- return whatever content exists
-                        content = msg_content or ""
-                        break
-                else:
-                    # -- Streaming final-turn path ----
-                    # The tool-call loop structure is identical to the blocking
-                    # path; only the FINAL text turn is streamed token-by-token
-                    # and each chunk is forwarded to on_delta.  Tool-call turns
-                    # are still read fully (deltas assembled) and executed the
-                    # same way as the blocking branch.
-                    stream_kwargs: Dict[str, Any] = dict(create_kwargs)
-                    stream_kwargs["stream"] = True
-                    stream_kwargs["stream_options"] = {"include_usage": True}
-
-                    stream = await client.chat.completions.create(**stream_kwargs)
-                    await _record_provider_headers(self.config)
-
+                # Defensive: a test double may return an async stream even
+                # for a non-stream request. Consume it WITHOUT on_delta and
+                # run the identical decision logic below. Real providers
+                # return a non-stream object here, so this branch is a no-op
+                # in production (behavior stays byte-for-byte identical).
+                # Use type check to avoid MagicMock false positives
+                if hasattr(response, "__aiter__") and callable(getattr(response, "__aiter__", None)) \
+                   and not isinstance(response, MagicMock):
                     msg, turn_usage, finish_reason = await self._assemble_stream_turn(
-                        stream, on_delta, cancel_event
+                        response, None, None
                     )
-
-                    if turn_usage:
-                        total_prompt_tokens     += getattr(turn_usage, "prompt_tokens", 0)     or 0
-                        total_completion_tokens += getattr(turn_usage, "completion_tokens", 0) or 0
-
-                    conversation.append(msg)
-
-                    if cancel_event is not None and cancel_event.is_set():
-                        content = msg.get("content") or ""
-                        loop_finish_reason = "stopped_by_user"
-                        break
-
                     msg_tool_calls = msg.get("tool_calls")
                     msg_content = msg.get("content")
+                    conversation.append(msg)
+                else:
+                    msg = response.choices[0].message
+                    turn_usage = response.usage
+                    finish_reason = response.choices[0].finish_reason
+                    msg_tool_calls = msg.tool_calls
+                    msg_content = msg.content
+                    print(f"DEBUG: msg_tool_calls={msg_tool_calls}, msg_content={msg_content}, finish_reason={finish_reason}")
+                    # Append raw assistant turn to history so the next
+                    # iteration has full context.  model_dump(exclude_none=True)
+                    # avoids sending null fields that some providers reject.
+                    try:
+                        conversation.append({
+                            "role": "assistant",
+                            "content": msg.content or "",
+                            **({"tool_calls": [tc.model_dump() for tc in msg.tool_calls]} if msg.tool_calls else {}),
+                        })
+                    except Exception:
+                        conversation.append({
+                            "role": "assistant",
+                            "content": msg.content or "",
+                            **({"tool_calls": [tc.model_dump() for tc in msg.tool_calls]} if msg.tool_calls else {}),
+                        })
 
-                    # Model signalled it is done -- no more tool calls
-                    if finish_reason == "stop" or not msg_tool_calls:
-                        content = msg_content or ""
-                        break
+                if turn_usage:
+                    total_prompt_tokens     += getattr(turn_usage, "prompt_tokens", 0)     or 0
+                    total_completion_tokens += getattr(turn_usage, "completion_tokens", 0) or 0
 
-                    if finish_reason == "tool_calls" and msg_tool_calls:
-                        _tool_call_counter += len(msg_tool_calls)
-                        if on_tool_start is not None:
-                            await on_tool_start(msg_tool_calls, _tool_call_counter)
-                        # Execute ALL tool calls in this response in parallel,
-                        # mirroring the blocking branch exactly.
-                        results = await asyncio.gather(
-                            *[
-                                tool_executor(
-                                    tc["function"]["name"],
-                                    json.loads(tc["function"]["arguments"] or "{}"),
-                                )
-                                for tc in msg_tool_calls
-                            ],
-                            return_exceptions=True,
-                        )
-
-                        # Feed each result back as a separate tool message
-                        tool_results = []
-                        for tc, result in zip(msg_tool_calls, results):
-                            result_str = (
-                                str(result) if not isinstance(result, Exception)
-                                else f"ERROR: {result}"
-                            )
-                            # Parse the JSON result for uncertainty detection
-                            try:
-                                parsed_result = json.loads(result_str)
-                            except Exception:
-                                parsed_result = {"status": "error", "tool_name": tc["function"]["name"], "error": result_str, "result": None}
-                            tool_results.append(parsed_result)
-                            conversation.append({
-                                "role":         "tool",
-                                "tool_call_id": tc["id"],
-                                "content":      result_str,
+                # Normalize tool_calls to dicts so the executor call is
+                # uniform for both Pydantic and assembled-stream messages.
+                norm_tool_calls: List[Dict[str, Any]] = []
+                if msg_tool_calls:
+                    for tc in msg_tool_calls:
+                        if isinstance(tc, dict):
+                            norm_tool_calls.append(tc)
+                        else:
+                            norm_tool_calls.append({
+                                "id": tc.id,
+                                "type": "function",
+                                "function": {
+                                    "name": tc.function.name,
+                                    "arguments": tc.function.arguments,
+                                },
                             })
 
-                        # -- Uncertainty Detection & Clarification (Task 21.1.5) ----------
+                # Model signalled it is done -- no more tool calls
+                if finish_reason == "stop" or not norm_tool_calls:
+                    content = msg_content or ""
+                    print(f"DEBUG: Breaking loop - finish_reason={finish_reason}, norm_tool_calls={norm_tool_calls}")
+                    # If on_delta is provided, stream the final text turn
+                    if on_delta is not None and content:
+                        # Make a streaming call for the final text turn
+                        stream_kwargs: Dict[str, Any] = dict(create_kwargs)
+                        stream_kwargs["stream"] = True
+                        stream_kwargs["stream_options"] = {"include_usage": True}
+                        # Remove tools for the final streaming call to ensure clean text output
+                        stream_kwargs.pop("tools", None)
+                        stream_kwargs.pop("tool_choice", None)
+
+                        stream = await client.chat.completions.create(**stream_kwargs)
+                        await _record_provider_headers(self.config)
+
+                        # Stream the final content via on_delta
+                        final_content = ""
+                        async for chunk in stream:
+                            if cancel_event is not None and cancel_event.is_set():
+                                loop_finish_reason = "stopped_by_user"
+                                break
+                            if chunk.choices[0].delta.content:
+                                final_content += chunk.choices[0].delta.content
+                                await on_delta(chunk.choices[0].delta.content)
+                            if getattr(chunk, "usage", None):
+                                total_prompt_tokens     += getattr(chunk.usage, "prompt_tokens", 0)     or 0
+                                total_completion_tokens += getattr(chunk.usage, "completion_tokens", 0) or 0
+                        content = final_content or content
+                    break
+
+                if finish_reason == "tool_calls" and norm_tool_calls:
+                    print(f"DEBUG: Tool calls detected: {len(norm_tool_calls)}")
+                    _tool_call_counter += len(norm_tool_calls)
+                    if on_tool_start is not None:
+                        await on_tool_start(norm_tool_calls, _tool_call_counter)
+                    # Execute ALL tool calls in this response in parallel
+                    results = await asyncio.gather(
+                        *[
+                            tool_executor(
+                                tc["function"]["name"],
+                                json.loads(tc["function"]["arguments"] or "{}"),
+                            )
+                            for tc in norm_tool_calls
+                        ],
+                        return_exceptions=True,
+                    )
+                    print(f"DEBUG: Tool results: {results}")
+
+                    # Feed each result back as a separate tool message
+                    tool_results = []
+                    for tc, result in zip(norm_tool_calls, results):
+                        result_str = (
+                            str(result) if not isinstance(result, Exception)
+                            else f"ERROR: {result}"
+                        )
+                        # Parse the JSON result for uncertainty detection
                         try:
-                            signal = UncertaintyDetector.analyze(tool_results, kwargs.get("agent"), db)
-                            if signal:
-                                handler = ClarificationHandler(kwargs.get("agent"), db)
-                                resolved, guidance = await handler.handle_uncertainty(signal, conversation)
-                                if resolved:
-                                    # Inject clarification as system message before next LLM turn
-                                    conversation.append({
-                                        "role": "system",
-                                        "content": f"CLARIFICATION FROM SUPERVISOR:\n{guidance}\n\nPlease continue with this context."
-                                    })
-                                    # Track clarification in metadata for observability
-                                    if "metadata" not in conversation[-1]:
-                                        conversation[-1]["metadata"] = {}
-                                    conversation[-1]["metadata"]["clarification_round"] = handler.clarification_rounds
-                                else:
-                                    # Max rounds exceeded or no clarification available
-                                    conversation.append({
-                                        "role": "system",
-                                        "content": "WARNING: Unable to resolve uncertainty via clarification chain. Proceed with best judgment."
-                                    })
-                        except Exception as e:
-                            # Fail open - log and continue without clarification
-                            logger.warning(f"Uncertainty detection/clarification failed (fail-open): {e}")
-                    else:
-                        # Unexpected finish_reason -- return whatever content exists
-                        content = msg_content or ""
-                        break
+                            parsed_result = json.loads(result_str)
+                        except Exception:
+                            parsed_result = {"status": "error", "tool_name": tc["function"]["name"], "error": result_str, "result": None}
+                        tool_results.append(parsed_result)
+                        conversation.append({
+                            "role":         "tool",
+                            "tool_call_id": tc["id"],
+                            "content":      result_str,
+                        })
+
+                    # -- Uncertainty Detection & Clarification (Task 21.1.5) ----------
+                    try:
+                        signal = UncertaintyDetector.analyze(tool_results, kwargs.get("agent"), db)
+                        if signal:
+                            handler = ClarificationHandler(kwargs.get("agent"), db)
+                            resolved, guidance = await handler.handle_uncertainty(signal, conversation)
+                            if resolved:
+                                # Inject clarification as system message before next LLM turn
+                                conversation.append({
+                                    "role": "system",
+                                    "content": f"CLARIFICATION FROM SUPERVISOR:\n{guidance}\n\nPlease continue with this context."
+                                })
+                                # Track clarification in metadata for observability
+                                if "metadata" not in conversation[-1]:
+                                    conversation[-1]["metadata"] = {}
+                                conversation[-1]["metadata"]["clarification_round"] = handler.clarification_rounds
+                            else:
+                                # Max rounds exceeded or no clarification available
+                                conversation.append({
+                                    "role": "system",
+                                    "content": "WARNING: Unable to resolve uncertainty via clarification chain. Proceed with best judgment."
+                                })
+                    except Exception as e:
+                        # Fail open - log and continue without clarification
+                        logger.warning(f"Uncertainty detection/clarification failed (fail-open): {e}")
+                else:
+                    # Unexpected finish_reason -- return whatever content exists
+                    content = msg_content or ""
+                    break
             else:
                 # max_iterations reached without a clean stop
                 content = ""
@@ -1641,6 +1575,9 @@ class AnthropicProvider(BaseModelProvider):
                     content = next(
                         (b.text for b in response.content if hasattr(b, "text")), ""
                     )
+                    # If on_delta is provided, stream the final text turn
+                    if on_delta is not None and content:
+                        await on_delta(content)
                     break
 
                 if response.stop_reason == "tool_use":

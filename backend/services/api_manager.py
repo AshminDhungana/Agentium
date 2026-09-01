@@ -50,6 +50,7 @@ class ModelConfig:
     capability: ModelCapability
     is_available: bool = True
     current_load: int = 0
+    context_window: int = 128_000  # NEW: Actual model context window from pricing sync
 
     def to_dict(self) -> Dict[str, Any]:
         """To dict."""
@@ -60,6 +61,7 @@ class ModelConfig:
             "config_id": self.config_id,
             "cost_per_1k_tokens": self.cost_per_1k_tokens,
             "max_context_length": self.max_context_length,
+            "context_window": self.context_window,
             "capability": self.capability.value,
             "is_available": self.is_available,
             "current_load": self.current_load
@@ -116,6 +118,11 @@ class APIManager:
             from backend.services.model_provider import calculate_cost
             cost_per_1k = calculate_cost(config.default_model, config.provider, 1000, 0)
 
+            # NEW: Get context_window from pricing sync
+            from backend.services.pricing_sync_service import PricingSyncService
+            pricing = PricingSyncService.get_price(config.default_model, self.db)
+            context_window = pricing[2] if pricing and len(pricing) > 2 else 128_000
+
             return ModelConfig(
                 provider=config.provider.value if hasattr(config.provider, 'value') else str(config.provider),
                 model_name=config.default_model,
@@ -125,6 +132,7 @@ class APIManager:
                 rate_limit_per_minute=config.requests_per_minute or 60,
                 capability=capability,
                 is_available=config.is_key_healthy(),
+                context_window=context_window,
             )
         except Exception as e:
             logger.warning(f"Could not convert config {config.id}: {e}")
