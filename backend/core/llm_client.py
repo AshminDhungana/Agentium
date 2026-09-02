@@ -241,11 +241,13 @@ class LLMClient:
 
         return ErrorTier.UNKNOWN
 
-    async def _delay(self, attempt: int) -> None:
-        """Full-jitter backoff: random in [0, min(max_delay, base*2**attempt)]."""
-        upper = min(self.max_retry_delay, self.base_retry_delay * (2 ** attempt))
+    async def _delay(self, attempt: int, retry_after: Optional[float] = None) -> None:
+        """Full-jitter backoff with optional Retry-After floor (hybrid strategy)."""
+        base_delay = min(self.max_retry_delay, self.base_retry_delay * (2 ** attempt))
+        upper = max(base_delay, retry_after or 0)  # Hybrid: max of both
         delay = random.uniform(0, upper)
-        logger.debug("LLMClient backoff: attempt=%d sleep=%.2fs (jitter)", attempt, delay)
+        logger.debug("LLMClient backoff: attempt=%d retry_after=%.2f sleep=%.2fs", 
+                     attempt, retry_after or 0, delay)
         await asyncio.sleep(delay)
 
     async def _track_tokens_and_cost(

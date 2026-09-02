@@ -294,6 +294,44 @@ class TestLLMClientDelayJitter:
         # All delays should be within [0, 0.2] for attempt=1 (base=0.1 * 2**1 = 0.2)
         assert all(0 <= d <= 0.2 for d in delays), "All delays within full-jitter bounds"
 
+    @pytest.mark.asyncio
+    @patch("backend.core.llm_client.random.uniform")
+    @patch("backend.core.llm_client.asyncio.sleep", new_callable=AsyncMock)
+    async def test_delay_uses_retry_after_as_floor(self, mock_sleep, mock_uniform, llm_client):
+        """_delay uses max(base_delay, retry_after) as upper bound."""
+        mock_uniform.return_value = 0.0
+        
+        # retry_after=5, base_delay for attempt=0 is 0.1 -> upper should be 5
+        await llm_client._delay(0, retry_after=5.0)
+        
+        # random.uniform called with (0, 5.0)
+        mock_uniform.assert_called_once_with(0, 5.0)
+
+    @pytest.mark.asyncio
+    @patch("backend.core.llm_client.random.uniform")
+    @patch("backend.core.llm_client.asyncio.sleep", new_callable=AsyncMock)
+    async def test_delay_uses_exponential_when_larger(self, mock_sleep, mock_uniform, llm_client):
+        """_delay uses exponential backoff when it exceeds retry_after."""
+        mock_uniform.return_value = 0.0
+        
+        # retry_after=1, base_delay for attempt=3 is 0.8, capped at max_retry_delay=1.0
+        # So upper should be max(1.0, 1.0) = 1.0
+        await llm_client._delay(3, retry_after=1.0)
+        
+        mock_uniform.assert_called_once_with(0, 1.0)
+
+    @pytest.mark.asyncio
+    @patch("backend.core.llm_client.random.uniform")
+    @patch("backend.core.llm_client.asyncio.sleep", new_callable=AsyncMock)
+    async def test_delay_none_retry_after_uses_exponential(self, mock_sleep, mock_uniform, llm_client):
+        """_delay falls back to exponential when retry_after is None."""
+        mock_uniform.return_value = 0.0
+        
+        await llm_client._delay(2, retry_after=None)
+        
+        # base_delay = 0.1 * 2^2 = 0.4
+        mock_uniform.assert_called_once_with(0, 0.4)
+
 
 class TestLLMClientGenerateWithTools:
     @pytest.fixture
