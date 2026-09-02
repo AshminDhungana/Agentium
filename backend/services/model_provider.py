@@ -589,6 +589,20 @@ class BaseModelProvider(ABC):
             # Logging must never crash the main request path
             logger.error(f"⚠️  _log_usage failed: {exc}")
 
+    def get_retry_hints(self, exc: Exception) -> "ProviderRetryHints":
+        """
+        Extract provider-specific retry hints from an exception.
+        Default implementation delegates to LLMClient.classify_error().
+        Subclasses override to parse SDK response headers.
+        """
+        from backend.core.llm_client import LLMClient, ProviderRetryHints, ErrorTier
+        tier = LLMClient().classify_error(exc)
+        return ProviderRetryHints(
+            should_retry=tier in (ErrorTier.TRANSIENT, ErrorTier.RATE_LIMITED),
+            error_tier=tier,
+            is_permanent=tier == ErrorTier.PERMANENT_KEY_FAILURE,
+        )
+
 
 def _normalize_tool_choice(tool_choice: Any) -> Any:
     """
@@ -833,6 +847,45 @@ class OpenAICompatibleProvider(BaseModelProvider):
             raise
         finally:
             await provider_rate_limiter.release_concurrency(self.config.id)
+
+    def get_retry_hints(self, exc: Exception) -> "ProviderRetryHints":
+        from backend.core.llm_client import ProviderRetryHints
+        import openai
+        
+        hints = super().get_retry_hints(exc)
+        
+        # Parse Retry-After from openai.RateLimitError.response.headers
+        if isinstance(exc, openai.RateLimitError) and getattr(exc, 'response', None):
+            retry_after = self._parse_retry_after(exc.response.headers.get("Retry-After"))
+            if retry_after:
+                hints.retry_after = retry_after
+        
+        # Parse from APIStatusError (covers 5xx with headers)
+        if isinstance(exc, openai.APIStatusError) and getattr(exc, 'response', None):
+            retry_after = self._parse_retry_after(exc.response.headers.get("Retry-After"))
+            if retry_after:
+                hints.retry_after = retry_after
+                
+        return hints
+
+    @staticmethod
+    def _parse_retry_after(header_value: Optional[str]) -> Optional[float]:
+        """Parse Retry-After header (seconds or HTTP-date) to float seconds."""
+        if not header_value:
+            return None
+        try:
+            # Try seconds first
+            return float(header_value)
+        except ValueError:
+            # Try HTTP-date (RFC 7231)
+            try:
+                from email.utils import parsedate_to_datetime
+                from datetime import timezone
+                retry_date = parsedate_to_datetime(header_value)
+                now = datetime.now(timezone.utc)
+                return max(0, (retry_date - now).total_seconds())
+            except Exception:
+                return None
 
     async def stream_generate(self, system_prompt: str, user_message: str, **kwargs):
         """Stream generate."""
@@ -1400,6 +1453,39 @@ class AnthropicProvider(BaseModelProvider):
                     yield text
         finally:
             await provider_rate_limiter.release_concurrency(self.config.id)
+
+    def get_retry_hints(self, exc: Exception) -> "ProviderRetryHints":
+        from backend.core.llm_client import ProviderRetryHints
+        import anthropic
+        
+        hints = super().get_retry_hints(exc)
+        
+        # Anthropic SDK exposes retry_after on RateLimitError (seconds) - this takes priority
+        if isinstance(exc, anthropic.RateLimitError):
+            if hasattr(exc, 'retry_after') and exc.retry_after:
+                hints.retry_after = float(exc.retry_after)
+                return hints  # SDK-native retry_after takes priority, skip header parsing
+        
+        # Parse headers from other error types (only if no SDK-native retry_after)
+        for attr in ('response', 'headers'):
+            if hasattr(exc, attr):
+                obj = getattr(exc, attr)
+                # Try to get headers dict directly from response object
+                headers = None
+                if attr == 'response' and hasattr(obj, 'headers'):
+                    headers = obj.headers
+                elif attr == 'headers' and isinstance(obj, dict):
+                    headers = obj
+                
+                if isinstance(headers, dict):
+                    val = headers.get("Retry-After") or headers.get("retry-after")
+                    if isinstance(val, (str, int, float)):
+                        retry_after = OpenAICompatibleProvider._parse_retry_after(val)
+                        if retry_after:
+                            hints.retry_after = retry_after
+                            break
+                        
+        return hints
 
     async def generate_with_tools(
         self,

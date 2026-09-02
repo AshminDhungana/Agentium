@@ -463,3 +463,129 @@ class TestProviderExhaustedError:
         assert str(exc) == "message"
         assert exc.result == result
         assert exc.result.error == "test"
+
+
+import time
+from unittest.mock import MagicMock
+from backend.services.model_provider import OpenAICompatibleProvider, AnthropicProvider
+from backend.models.entities.user_config import ProviderType
+from backend.core.llm_client import ErrorTier, ProviderRetryHints
+import openai
+import anthropic
+
+
+class MockConfig:
+    def __init__(self, provider=ProviderType.OPENAI, id="test-config", **kwargs):
+        self.provider = provider
+        self.id = id
+        self.api_key_encrypted = None
+        self.default_model = "gpt-4o"
+        self.max_tokens = 4096
+        self.temperature = 0.7
+        self.top_p = 1.0
+        self.timeout_seconds = 60
+        self.max_concurrent_requests = 10
+        self.requests_per_minute = 60
+        self.api_base_url = None
+        self.base_url = None
+        for k, v in kwargs.items():
+            setattr(self, k, v)
+
+    def requires_api_key(self):
+        return self.provider != ProviderType.LOCAL
+
+    def get_effective_base_url(self):
+        if self.api_base_url:
+            return self.api_base_url
+        if self.base_url:
+            return self.base_url
+        if self.provider == ProviderType.OPENAI:
+            return "https://api.openai.com/v1"
+        if self.provider == ProviderType.ANTHROPIC:
+            return "https://api.anthropic.com"
+        return None
+
+
+class TestOpenAIProviderRetryHints:
+    def test_parses_retry_after_seconds(self):
+        config = MockConfig()
+        provider = OpenAICompatibleProvider(config)
+        
+        response = MagicMock()
+        response.headers = {"Retry-After": "5"}
+        response.status_code = 429
+        exc = openai.RateLimitError("rate limit", response=response, body=None)
+        
+        hints = provider.get_retry_hints(exc)
+        assert hints.retry_after == 5.0
+        assert hints.should_retry is True
+
+    def test_parses_retry_after_http_date(self):
+        config = MockConfig()
+        provider = OpenAICompatibleProvider(config)
+        
+        from email.utils import formatdate
+        future = formatdate(timeval=time.time() + 10, usegmt=True)
+        
+        response = MagicMock()
+        response.headers = {"Retry-After": future}
+        response.status_code = 429
+        exc = openai.RateLimitError("rate limit", response=response, body=None)
+        
+        hints = provider.get_retry_hints(exc)
+        assert hints.retry_after is not None
+        assert 9 <= hints.retry_after <= 11
+
+    def test_no_retry_after_returns_none(self):
+        config = MockConfig()
+        provider = OpenAICompatibleProvider(config)
+        
+        response = MagicMock()
+        response.headers = {}
+        response.status_code = 429
+        exc = openai.RateLimitError("rate limit", response=response, body=None)
+        
+        hints = provider.get_retry_hints(exc)
+        assert hints.retry_after is None
+        assert hints.should_retry is True
+
+
+class TestAnthropicProviderRetryHints:
+    def test_uses_sdk_retry_after(self):
+        config = MockConfig(provider=ProviderType.ANTHROPIC)
+        provider = AnthropicProvider(config)
+        
+        resp = MagicMock()
+        resp.request = MagicMock()
+        resp.headers = {}  # Proper dict, not MagicMock
+        exc = anthropic.RateLimitError("rate limited", response=resp, body=None)
+        exc.retry_after = 3.0
+        
+        hints = provider.get_retry_hints(exc)
+        assert hints.retry_after == 3.0
+        assert hints.should_retry is True
+
+    def test_fallback_to_headers(self):
+        config = MockConfig(provider=ProviderType.ANTHROPIC)
+        provider = AnthropicProvider(config)
+        
+        resp = MagicMock()
+        resp.request = MagicMock()
+        resp.headers = {"Retry-After": "7"}
+        resp.status_code = 429
+        exc = anthropic.RateLimitError("rate limited", response=resp, body=None)
+        
+        hints = provider.get_retry_hints(exc)
+        assert hints.retry_after == 7.0
+
+
+class TestBaseProviderDefaultBehavior:
+    def test_default_uses_classify_error(self):
+        config = MockConfig()
+        provider = OpenAICompatibleProvider(config)
+        
+        exc = RuntimeError("random error")
+        
+        hints = provider.get_retry_hints(exc)
+        assert hints.error_tier == ErrorTier.UNKNOWN
+        assert hints.should_retry is False
