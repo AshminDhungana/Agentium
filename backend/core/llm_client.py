@@ -14,6 +14,7 @@ ModelService directly.
 import asyncio
 import logging
 import random
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
 from typing import Dict, Any, Optional, List, Callable, Awaitable
@@ -32,6 +33,34 @@ class ErrorTier(str, Enum):
     RATE_LIMITED = "rate_limited"
     PERMANENT_KEY_FAILURE = "permanent_key_failure"
     UNKNOWN = "unknown"
+
+
+@dataclass
+class ProviderRetryHints:
+    """Provider-specific retry guidance extracted from an exception."""
+    should_retry: bool
+    retry_after: Optional[float] = None
+    error_tier: ErrorTier = ErrorTier.UNKNOWN
+    is_permanent: bool = False
+
+
+@dataclass
+class ProviderErrorResult:
+    """Structured result when all retries + fallbacks exhausted."""
+    success: bool = False
+    error: str = ""
+    error_tier: ErrorTier = ErrorTier.UNKNOWN
+    attempted_configs: List[str] = field(default_factory=list)
+    errors_per_config: Dict[str, List[str]] = field(default_factory=dict)
+    total_attempts: int = 0
+    timestamp: datetime = field(default_factory=datetime.utcnow)
+
+
+class ProviderExhaustedError(RuntimeError):
+    """Raised when all provider configs and retries are exhausted."""
+    def __init__(self, message: str, result: ProviderErrorResult):
+        super().__init__(message)
+        self.result = result
 
 
 # Typed SDK exceptions (hard deps, but guarded for test environments)

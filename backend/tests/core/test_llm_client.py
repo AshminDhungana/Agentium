@@ -401,3 +401,65 @@ class TestCallSitesPassFallback:
         captured.update(mock_gen.call_args.kwargs)
         assert captured.get("fallback_configs") == fb_list, "no fallback_configs forwarded to generate_with_tools"
         assert captured.get("config_id") == config_id
+
+
+class TestProviderRetryHints:
+    def test_default_values(self):
+        from backend.core.llm_client import ProviderRetryHints, ErrorTier
+        hints = ProviderRetryHints(should_retry=True)
+        assert hints.should_retry is True
+        assert hints.retry_after is None
+        assert hints.error_tier == ErrorTier.UNKNOWN
+        assert hints.is_permanent is False
+
+    def test_custom_values(self):
+        from backend.core.llm_client import ProviderRetryHints, ErrorTier
+        hints = ProviderRetryHints(
+            should_retry=False,
+            retry_after=5.0,
+            error_tier=ErrorTier.RATE_LIMITED,
+            is_permanent=True
+        )
+        assert hints.should_retry is False
+        assert hints.retry_after == 5.0
+        assert hints.error_tier == ErrorTier.RATE_LIMITED
+        assert hints.is_permanent is True
+
+
+class TestProviderErrorResult:
+    def test_default_values(self):
+        from backend.core.llm_client import ProviderErrorResult, ErrorTier
+        from datetime import datetime
+        result = ProviderErrorResult()
+        assert result.success is False
+        assert result.error == ""
+        assert result.error_tier == ErrorTier.UNKNOWN
+        assert result.attempted_configs == []
+        assert result.errors_per_config == {}
+        assert result.total_attempts == 0
+        assert isinstance(result.timestamp, datetime)
+
+    def test_custom_values(self):
+        from backend.core.llm_client import ProviderErrorResult, ErrorTier
+        result = ProviderErrorResult(
+            error="test error",
+            error_tier=ErrorTier.TRANSIENT,
+            attempted_configs=["cfg-1", "cfg-2"],
+            errors_per_config={"cfg-1": ["err1"], "cfg-2": ["err2"]},
+            total_attempts=4
+        )
+        assert result.error == "test error"
+        assert result.error_tier == ErrorTier.TRANSIENT
+        assert result.attempted_configs == ["cfg-1", "cfg-2"]
+        assert result.total_attempts == 4
+
+
+class TestProviderExhaustedError:
+    def test_inherits_from_runtime_error(self):
+        from backend.core.llm_client import ProviderErrorResult, ProviderExhaustedError
+        result = ProviderErrorResult(error="test")
+        exc = ProviderExhaustedError("message", result)
+        assert isinstance(exc, RuntimeError)
+        assert str(exc) == "message"
+        assert exc.result == result
+        assert exc.result.error == "test"
