@@ -166,9 +166,17 @@ for attempt in range(_max_retries + 1):
 
 ### 5.3 Exhaustion Handling
 
-When all configs and retries exhausted, return structured `ProviderErrorResult` instead of raising (or raise if caller expects exception):
+When all configs and retries exhausted, raise a `ProviderExhaustedError` exception that carries the structured `ProviderErrorResult` as an attribute — preserving backward compatibility (callers catching `RuntimeError` still work) while exposing rich error details.
 
 ```python
+class ProviderExhaustedError(RuntimeError):
+    """Raised when all provider configs and retries are exhausted."""
+    def __init__(self, message: str, result: ProviderErrorResult):
+        super().__init__(message)
+        self.result = result  # ProviderErrorResult with full details
+
+
+# In the retry loop:
 if last_error:
     error_result = ProviderErrorResult(
         error=str(last_error),
@@ -177,7 +185,10 @@ if last_error:
         errors_per_config=collected_errors,
         total_attempts=sum(len(errs) for errs in collected_errors.values()),
     )
-    return error_result.__dict__  # caller checks .get("success") or .get("error")
+    raise ProviderExhaustedError(
+        f"All {len(configs_to_try)} provider configs exhausted after {error_result.total_attempts} attempts. Last error: {last_error}",
+        error_result
+    )
 ```
 
 ---
@@ -223,7 +234,7 @@ Existing `ProviderCircuitBreaker` in `LLMClient` continues to work:
 | TE-03 | No Retry-After header | Full-jitter exponential backoff |
 | TE-04 | 401 Invalid key | Immediate failover, no retry, clear message |
 | TE-05 | 503 Service Unavailable | Retried with backoff, max 3 attempts |
-| TE-06 | All configs exhausted | Returns `ProviderErrorResult` with full details |
+| TE-06 | All configs exhausted | Raises `ProviderExhaustedError` with `ProviderErrorResult` attached |
 | TE-07 | Timeout after 60s | Classified TRANSIENT, retried |
 | TE-08 | Clear error messages | Verify message templates match Section 6 |
 
@@ -242,8 +253,9 @@ Existing `ProviderCircuitBreaker` in `LLMClient` continues to work:
 ## 11. Backward Compatibility
 
 - **No breaking changes** to public APIs
-- `LLMClient.generate()` / `generate_with_tools()` return `Dict` on success; on exhaustion, return `ProviderErrorResult` dict (has `"success": False` key) — existing callers checking `result["content"]` will get `KeyError`, which is acceptable as they should handle errors
-- **Migration:** Callers should check `result.get("success", True)` or `"error" in result` before accessing content
+- `LLMClient.generate()` / `generate_with_tools()` raise `ProviderExhaustedError` (subclass of `RuntimeError`) on exhaustion — existing `except RuntimeError` handlers continue to work
+- **New capability:** Callers can catch `ProviderExhaustedError` and access `.result` (`ProviderErrorResult`) for structured error details (attempted configs, per-config errors, total attempts, timestamps)
+- **Migration:** New code should catch `ProviderExhaustedError` for rich error handling; old code catching `RuntimeError` works unchanged
 
 ---
 
@@ -264,6 +276,7 @@ Existing `ProviderCircuitBreaker` in `LLMClient` continues to work:
 - [ ] 5xx errors retried gracefully with backoff
 - [ ] Invalid API key returns clear, actionable error message
 - [ ] Provider timeout doesn't crash; retried/failed over gracefully
-- [ ] All exhaustion cases return structured `ProviderErrorResult`
+- [ ] All exhaustion cases raise `ProviderExhaustedError` with `ProviderErrorResult` attached
 - [ ] Tests pass (unit + integration)
 - [ ] No regression in existing failover/circuit breaker behavior
+- [ ] Backward compatibility: existing `except RuntimeError` handlers still catch exhaustion
