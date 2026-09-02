@@ -548,8 +548,38 @@ async def _make_streaming_openai_provider(on_delta=None, cancel_event=None):
         yield _Chunk("Hello "); yield _Chunk("world")
     class _StreamResp:
         def __aiter__(self): return _gen().__aiter__()
+    
+    # Mock for blocking call (first call) - returns tool_calls=None, finish_reason="stop"
+    class _Message:
+        def __init__(self):
+            self.content = "Hello world"
+            self.tool_calls = None
+            self.role = "assistant"
+    class _BlockingChoice:
+        def __init__(self):
+            self.message = _Message()
+            self.finish_reason = "stop"
+    class _BlockingResp:
+        def __init__(self):
+            self.choices = [_BlockingChoice()]
+            self.usage = MagicMock()
+            self.usage.prompt_tokens = 10
+            self.usage.completion_tokens = 5
+            self.usage.total_tokens = 15
+            self.model = "gpt-test"
+    
     client = MagicMock()
-    client.chat.completions.create = AsyncMock(return_value=_StreamResp())
+    # First call (blocking) returns blocking response, subsequent calls return stream
+    blocking_resp = _BlockingResp()
+    stream_resp = _StreamResp()
+    call_count = 0
+    async def mock_create(**kwargs):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            return blocking_resp
+        return stream_resp
+    client.chat.completions.create = mock_create
     provider._client = client
     return provider
 
@@ -741,42 +771,35 @@ class ExtendedFakeProviderServerForStreaming(ExtendedFakeProviderServer):
         with self._lock:
             self._sse_tool_queue = list(chunks)
 
-def _make_handler(self):
+    def _make_handler(self):
         server = self
         base_handler = super()._make_handler()
 
         class _H(base_handler):
             def do_POST(self):
-                # Only use _sse_tool_queue for streaming requests (stream=true in body)
+                # Serve from _sse_tool_queue for streaming requests.
+                # If _queue has pending responses (blocking), delegate to base handler.
                 if self.path == "/v1/chat/completions":
-                    # Check if this is a streaming request
-                    length = int(self.headers.get("Content-Length", 0) or 0)
-                    try:
-                        body = self.rfile.read(length) if length else b"{}"
-                    except (BrokenPipeError, ConnectionResetError, OSError):
-                        # Client disconnected during request read
-                        return
-                    import json as _json
-                    try:
-                        req_body = _json.loads(body)
-                        is_streaming = req_body.get("stream", False)
-                    except Exception:
-                        is_streaming = False
-
-                    if is_streaming and server._sse_tool_queue:
-                        with server._lock:
+                    with server._lock:
+                        # If there's a queued blocking response, let base handler serve it
+                        if server._queue:
+                            pass  # Fall through to base handler
+                        elif server._sse_tool_queue:
+                            # No blocking response queued, serve streaming from _sse_tool_queue
+                            self._drain()
                             chunks = server._sse_tool_queue
                             server._sse_tool_queue = []
-                        self.send_response(200)
-                        self.send_header("Content-Type", "text/event-stream")
-                        self.send_header("Cache-Control", "no-cache")
-                        self.send_header("Connection", "close")
-                        self.end_headers()
-                        for ch in chunks:
-                            if not self._safe_write(f"data: {_json.dumps(ch)}\n\n".encode()):
-                                return
-                        self._safe_write(b"data: [DONE]\n\n")
-                        return
+                            self.send_response(200)
+                            self.send_header("Content-Type", "text/event-stream")
+                            self.send_header("Cache-Control", "no-cache")
+                            self.send_header("Connection", "close")
+                            self.end_headers()
+                            import json as _json
+                            for ch in chunks:
+                                if not self._safe_write(f"data: {_json.dumps(ch)}\n\n".encode()):
+                                    return
+                            self._safe_write(b"data: [DONE]\n\n")
+                            return
                 base_handler.do_POST(self)
 
         return _H
@@ -803,7 +826,7 @@ SSE_TOOL_CALL_CHUNKS = [
     },
     # Second chunk: continue tool call arguments
     {
-        "id": "c2",
+        "id": "c1",
         "object": "chat.completion.chunk",
         "model": "fake",
         "choices": [{
@@ -819,7 +842,7 @@ SSE_TOOL_CALL_CHUNKS = [
     },
     # Third chunk: finish tool call, then final text
     {
-        "id": "c3",
+        "id": "c1",
         "object": "chat.completion.chunk",
         "model": "fake",
         "choices": [{
@@ -830,7 +853,7 @@ SSE_TOOL_CALL_CHUNKS = [
     },
     # Fourth chunk: final text completion
     {
-        "id": "c4",
+        "id": "c1",
         "object": "chat.completion.chunk",
         "model": "fake",
         "choices": [{
@@ -974,10 +997,30 @@ class TestStreamingEdgeCases:
         SSE_FINAL_TEXT = [
             {"id": "c1", "object": "chat.completion.chunk", "model": "fake",
              "choices": [{"index": 0, "delta": {"content": "The time is "}, "finish_reason": None}]},
-            {"id": "c2", "object": "chat.completion.chunk", "model": "fake",
+            {"id": "c1", "object": "chat.completion.chunk", "model": "fake",
              "choices": [{"index": 0, "delta": {"content": "12:00 PM"}, "finish_reason": "stop"}]},
+            {"id": "c1", "object": "chat.completion.chunk", "model": "fake",
+             "choices": [{"index": 0, "delta": {}, "finish_reason": None}],
+             "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}},
         ]
+        # Blocking response for the final text turn (second request)
+        OPENAI_FINAL_TEXT_BLOCKING = {
+            "id": "chatcmplt-final",
+            "object": "chat.completion",
+            "created": 1,
+            "model": "fake",
+            "choices": [{
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "content": "The time is 12:00 PM",
+                },
+                "finish_reason": "stop",
+            }],
+            "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
+        }
         srv.set_next(200, None, OPENAI_TOOL_CALL_BLOCKING)
+        srv.set_next(200, None, OPENAI_FINAL_TEXT_BLOCKING)
         srv.set_stream_tool_calls(SSE_FINAL_TEXT)
 
         cfg = make_mock_config(ProviderType.OPENAI, srv.base_url, engine=db_engine)

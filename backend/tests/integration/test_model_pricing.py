@@ -58,9 +58,9 @@ async def test_pricing_synchronization(db_session):
     assert mini.input_rate_per_1m == pytest.approx(0.15)
     assert mini.output_rate_per_1m == pytest.approx(0.60)
     
-    # Verify in-memory cache
-    assert PricingSyncService.get_price("gpt-4o-mini") == (pytest.approx(0.15), pytest.approx(0.60))
-    assert PricingSyncService.get_price("GPT-4O-MINI ") == (pytest.approx(0.15), pytest.approx(0.60))  # Case / whitespace insensitivity
+    # Verify in-memory cache (returns 3-tuple: input_rate, output_rate, context_window)
+    assert PricingSyncService.get_price("gpt-4o-mini") == (pytest.approx(0.15), pytest.approx(0.60), 128000)
+    assert PricingSyncService.get_price("GPT-4O-MINI ") == (pytest.approx(0.15), pytest.approx(0.60), 128000)  # Case / whitespace insensitivity
     
     # Verify updates
     mock_response.json = lambda: {
@@ -84,7 +84,7 @@ async def test_pricing_synchronization(db_session):
     
     updated_mini = db_session.query(ModelPricing).filter_by(model_id="gpt-4o-mini").first()
     assert updated_mini.input_rate_per_1m == pytest.approx(0.20)
-    assert PricingSyncService.get_price("gpt-4o-mini") == (pytest.approx(0.20), pytest.approx(0.60))
+    assert PricingSyncService.get_price("gpt-4o-mini") == (pytest.approx(0.20), pytest.approx(0.60), 128000)
 
 
 @pytest.mark.asyncio
