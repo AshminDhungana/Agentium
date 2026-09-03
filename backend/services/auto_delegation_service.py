@@ -474,11 +474,11 @@ class DelegationEngine:
         result["force_local_model"] = force_local
 
         # ── Step 4: Determine tier ───────────────────────────────────────────
-        # Spec 6.2.3: 1-3→Task(tier3), 4-6→Lead(tier2), 7-10→Council(tier1)
-        if complexity >= 7:
-            target_tier = "1"  # Council (1xxxx) for complex tasks requiring deliberation
-        elif complexity >= 4:
-            target_tier = "2"  # Lead (2xxxx) for medium complexity
+        # Tier mapping per escalation design (Task→Lead→Council→Head):
+        #   1-3  → Task (tier 3)
+        #   4-10 → Lead (tier 2) — Council (tier 1) only via escalation
+        if complexity >= 4:
+            target_tier = "2"  # Lead (2xxxx) for medium/high complexity
         else:
             target_tier = "3"  # Task (3xxxx-6xxxx) for simple tasks
 
