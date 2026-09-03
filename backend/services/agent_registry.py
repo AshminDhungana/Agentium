@@ -45,4 +45,29 @@ class AgentRegistry:
                 logger.warning("AgentRegistry auto-spawn failed: %s", e)
             return None
         # For Lead-tier targets (2xxxx) reuse existing Lead selection logic of caller.
+        if decision.target_tier and decision.target_tier[:1] == "2":
+            return None
+
+        # Council tier (1xxxx) - no auto-spawn, use existing Council members
+        if decision.target_tier and decision.target_tier[:1] == "1":
+            agent = (
+                db.query(Agent)
+                .filter(
+                    Agent.agent_type == AgentType.COUNCIL_MEMBER,
+                    Agent.status == AgentStatus.ACTIVE,
+                    Agent.is_active == True,
+                )
+                .order_by(Agent.tasks_completed.asc())  # Least loaded
+                .first()
+            )
+            if agent:
+                return agent.agentium_id
+
+            # Fallback: Head of Council
+            head = db.query(Agent).filter_by(agentium_id="00001").first()
+            if head and head.is_active:
+                return "00001"
+
+            return None
+
         return None

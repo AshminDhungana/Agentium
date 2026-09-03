@@ -474,12 +474,13 @@ class DelegationEngine:
         result["force_local_model"] = force_local
 
         # ── Step 4: Determine tier ───────────────────────────────────────────
-        if complexity >= 8:
-            target_tier = "2"  # Lead agent for very complex tasks
-        elif complexity >= 5:
-            target_tier = "3"  # Task agent for medium complexity
+        # Spec 6.2.3: 1-3→Task(tier3), 4-6→Lead(tier2), 7-10→Council(tier1)
+        if complexity >= 7:
+            target_tier = "1"  # Council (1xxxx) for complex tasks requiring deliberation
+        elif complexity >= 4:
+            target_tier = "2"  # Lead (2xxxx) for medium complexity
         else:
-            target_tier = "3"  # Task agent for simple tasks
+            target_tier = "3"  # Task (3xxxx-6xxxx) for simple tasks
 
         # ── Step 5: Rank and assign ──────────────────────────────────────────
         ranked = AgentRanker.rank(
@@ -516,6 +517,26 @@ class DelegationEngine:
             )
 
         # ── Step 6: Record decision trail ────────────────────────────────────
+        # Track escalation hops for audit trail (max 3 hops: Task→Lead→Council→Head)
+        existing = task.delegation_metadata or {}
+        history = existing.get("history", [])
+        escalation_hop = existing.get("escalation_hop", 0)
+
+        if existing.get("delegated_at"):  # Re-delegation = escalation
+            escalation_hop += 1
+            escalation_entry = {
+                "escalation_hop": escalation_hop,
+                "from_tier": existing.get("target_tier"),
+                "to_tier": target_tier,
+                "complexity_score": complexity,
+                "assigned_to": result.get("assigned_to"),
+                "timestamp": datetime.utcnow().isoformat(),
+                "reason": "force_redelegation"
+            }
+            if "escalation_history" not in existing:
+                existing["escalation_history"] = []
+            existing["escalation_history"].append(escalation_entry)
+
         decision = {
             "delegated_at": datetime.utcnow().isoformat(),
             "complexity_score": complexity,
@@ -527,11 +548,18 @@ class DelegationEngine:
             "candidate_count": result.get("candidate_count", 0),
             "candidates": result.get("candidates", []),
             "forced": force,
+            "escalation_hop": escalation_hop,
+            "escalation_history": existing.get("escalation_history", []),
         }
 
+        # Enforce max 3 escalation hops (Task→Lead→Council→Head)
+        if escalation_hop >= 3:
+            logger.error(
+                f"DelegationEngine: max escalation hops (3) reached for task {task.agentium_id}, "
+                f"escalation_history={existing.get('escalation_history', [])}"
+            )
+
         # Merge with existing metadata if re-delegating
-        existing = task.delegation_metadata or {}
-        history = existing.get("history", [])
         if existing.get("delegated_at"):
             history.append({k: v for k, v in existing.items() if k != "history"})
         decision["history"] = history
@@ -541,7 +569,36 @@ class DelegationEngine:
         result["delegated"] = assigned_agent is not None
         result["delegation_metadata"] = decision
 
-        # ── Audit log ────────────────────────────────────────────────────────
+        # ── Escalation audit log ───────────────────────────────────────
+        if escalation_hop > 0:
+            try:
+                last_escalation = existing.get("escalation_history", [])[-1]
+                escalation_audit = AuditLog.log(
+                    level=AuditLevel.WARNING,
+                    category=AuditCategory.GOVERNANCE,
+                    actor_type="system",
+                    actor_id="DELEGATION_ENGINE",
+                    action="tier_escalation",
+                    target_type="task",
+                    target_id=task.id,
+                    description=(
+                        f"Escalated task {task.agentium_id} from tier {last_escalation.get('from_tier')} "
+                        f"to tier {last_escalation.get('to_tier')} (complexity={complexity}, hop={escalation_hop})"
+                    ),
+                    meta_data={
+                        "from_tier": last_escalation.get("from_tier"),
+                        "to_tier": last_escalation.get("to_tier"),
+                        "complexity_score": complexity,
+                        "escalation_hop": escalation_hop,
+                        "reason": last_escalation.get("reason", "force_redelegation"),
+                        "assigned_to": result.get("assigned_to"),
+                    }
+                )
+                db.add(escalation_audit)
+            except Exception as e:
+                logger.warning(f"Failed to log escalation audit: {e}")
+
+        # ── Audit log ──────────────────────────────────────────────────
         try:
             audit_entry = AuditLog.log(
                 level=AuditLevel.INFO,
