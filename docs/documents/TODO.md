@@ -238,11 +238,11 @@
   - [x] 5.5.2 — `token_optimizer` trims context to fit model's context window
   - [x] 5.5.3 — Budget tracking per user / per day works
 
-- [ ] **5.6 — Provider Error Handling**
-  - [ ] 5.6.1 — 429 rate-limit errors trigger exponential backoff with jitter
-  - [ ] 5.6.2 — 5xx provider errors are retried gracefully
-  - [ ] 5.6.3 — Invalid API key returns clear error message
-  - [ ] 5.6.4 — Provider timeout doesn't crash the system
+- [x] **5.6 — Provider Error Handling**
+  - [x] 5.6.1 — 429 rate-limit errors trigger exponential backoff with jitter
+  - [x] 5.6.2 — 5xx provider errors are retried gracefully
+  - [x] 5.6.3 — Invalid API key returns clear error message
+  - [x] 5.6.4 — Provider timeout doesn't crash the system
 
 ---
 
