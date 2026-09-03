@@ -242,6 +242,153 @@ class TestLLMClientGenerate:
             assert mock_akm.record_spend.called or mock_akm.record_spend.call_count > 0
 
 
+from unittest.mock import AsyncMock
+from backend.core.llm_client import LLMClient, ProviderExhaustedError, ErrorTier, ProviderRetryHints
+from backend.services.model_provider import OpenAICompatibleProvider
+
+
+class TestGenerateRetryHintsIntegration:
+    @pytest.mark.asyncio
+    async def test_uses_provider_retry_hints_for_backoff(self):
+        """generate() calls provider.get_retry_hints and uses retry_after for delay."""
+        client = LLMClient(db=None, max_retries=2, base_retry_delay=0.01)
+        
+        call_count = 0
+        async def mock_generate(agent, user_message, config_id=None, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            if call_count < 3:
+                # Create OpenAI rate limit error with Retry-After: 2
+                import openai
+                response = MagicMock()
+                response.headers = {"Retry-After": "2"}
+                response.status_code = 429
+                exc = openai.RateLimitError("rate limit", response=response, body=None)
+                raise exc
+            return {"content": "success", "tokens_used": 10, "cost_usd": 0.001}
+        
+        with patch("backend.core.llm_client.ModelService.generate_with_agent", side_effect=mock_generate), \
+             patch("backend.core.llm_client.ModelService.get_provider") as mock_get_provider, \
+             patch.object(client, "_delay", new_callable=AsyncMock) as mock_delay:
+            
+            # Mock provider with get_retry_hints
+            mock_config = MagicMock()
+            mock_config.id = "test-config-id"
+            mock_provider = MagicMock()
+            mock_provider.config = mock_config
+            
+            def mock_get_retry_hints(exc):
+                return ProviderRetryHints(
+                    should_retry=True,
+                    retry_after=2.0,
+                    error_tier=ErrorTier.RATE_LIMITED
+                )
+            mock_provider.get_retry_hints = mock_get_retry_hints
+            
+            mock_get_provider.return_value = mock_provider
+            
+            agent = MockAgent()
+            result = await client.generate(agent, "test", max_retries=2)
+            
+            assert result["content"] == "success"
+            # Should have called _delay twice with retry_after=2.0
+            assert mock_delay.call_count == 2
+            for call in mock_delay.call_args_list:
+                assert call[0][1] == 2.0  # retry_after=2.0
+
+    @pytest.mark.asyncio
+    async def test_permanent_failure_no_retry_immediate_failover(self):
+        """Permanent key failure triggers immediate failover without delay."""
+        client = LLMClient(db=None, max_retries=2, base_retry_delay=0.01)
+        
+        call_order = []
+        
+        async def mock_generate(agent, user_message, config_id=None, **kwargs):
+            call_order.append(("generate", config_id))
+            if config_id == "cfg-primary":
+                import openai
+                response = MagicMock()
+                response.status_code = 401
+                raise openai.AuthenticationError("invalid key", response=response, body=None)
+            return {"content": "fallback success", "tokens_used": 5, "cost_usd": 0.0001}
+        
+        with patch("backend.core.llm_client.ModelService.generate_with_agent", side_effect=mock_generate), \
+             patch("backend.core.llm_client.ModelService.get_provider") as mock_get_provider, \
+             patch.object(client, "_delay", new_callable=AsyncMock) as mock_delay:
+            
+            mock_config_primary = MagicMock()
+            mock_config_primary.id = "cfg-primary"
+            mock_provider_primary = MagicMock()
+            mock_provider_primary.config = mock_config_primary
+            mock_provider_primary.get_retry_hints.return_value = ProviderRetryHints(
+                should_retry=False, error_tier=ErrorTier.PERMANENT_KEY_FAILURE, is_permanent=True
+            )
+            
+            mock_config_fallback = MagicMock()
+            mock_config_fallback.id = "cfg-fallback"
+            mock_provider_fallback = MagicMock()
+            mock_provider_fallback.config = mock_config_fallback
+            
+            def get_provider_side_effect(user_id, config_id):
+                if config_id == "cfg-primary":
+                    return mock_provider_primary
+                return mock_provider_fallback
+            
+            mock_get_provider.side_effect = get_provider_side_effect
+            
+            agent = MockAgent()
+            agent.preferred_config_id = "cfg-primary"
+            
+            result = await client.generate(agent, "test", fallback_configs=["cfg-fallback"])
+            
+            assert result["content"] == "fallback success"
+            assert result["provider_config_id"] == "cfg-fallback"
+            # _delay should NOT be called for permanent failure
+            mock_delay.assert_not_called()
+            # Only 2 calls: primary (fail) + fallback (success)
+            assert len(call_order) == 2
+
+    @pytest.mark.asyncio
+    async def test_exhaustion_raises_provider_exhausted_error_with_details(self):
+        """All configs exhausted raises ProviderExhaustedError with full details."""
+        client = LLMClient(db=None, max_retries=1, base_retry_delay=0.01)
+        
+        async def mock_generate(agent, user_message, config_id=None, **kwargs):
+            import openai
+            response = MagicMock()
+            response.status_code = 503
+            raise openai.InternalServerError("service unavailable", response=response, body=None)
+        
+        with patch("backend.core.llm_client.ModelService.generate_with_agent", side_effect=mock_generate), \
+             patch("backend.core.llm_client.ModelService.get_provider") as mock_get_provider:
+            
+            def make_provider(config_id):
+                mock_config = MagicMock()
+                mock_config.id = config_id
+                mock_provider = MagicMock()
+                mock_provider.config = mock_config
+                mock_provider.get_retry_hints.return_value = ProviderRetryHints(
+                    should_retry=True, error_tier=ErrorTier.TRANSIENT
+                )
+                return mock_provider
+            
+            mock_get_provider.side_effect = lambda uid, cid: make_provider(cid or "default")
+            
+            agent = MockAgent()
+            
+            with pytest.raises(ProviderExhaustedError) as exc_info:
+                await client.generate(agent, "test", config_id="cfg-1", fallback_configs=["cfg-2"])
+            
+            exc = exc_info.value
+            assert isinstance(exc, RuntimeError)  # backward compat
+            assert exc.result is not None
+            assert exc.result.error_tier == ErrorTier.TRANSIENT
+            assert "cfg-1" in exc.result.attempted_configs
+            assert "cfg-2" in exc.result.attempted_configs
+            assert exc.result.total_attempts == 4  # 2 configs * (1 retry + 1 initial)
+            assert "exhausted" in str(exc).lower()
+
+
 class TestLLMClientDelayJitter:
     """Tests for LLMClient._delay full-jitter exponential backoff."""
 

@@ -250,13 +250,17 @@
 
 > **Files**: `backend/services/agent_orchestrator.py`, `backend/models/entities/agents.py`, `backend/services/auto_delegation_service.py`, `backend/services/agent_registry.py`, `backend/services/critic_agents.py`, `backend/services/decision_engine.py`, `backend/services/persistent_council.py`, `backend/services/idle_governance.py`, `frontend/src/pages/AgentsPage.tsx`
 
-- [ ] **6.1 — Agent CRUD**
-  - [ ] 6.1.1 — Genesis creates the initial Head of Council agent (agent ID 00001)
-  - [ ] 6.1.2 — Council members (10001–19999) are seeded or spawned
-  - [ ] 6.1.3 — Lead agents (20001–29999) can be spawned by council
-  - [ ] 6.1.4 — Task agents (30001–69999) can be spawned by leads
-  - [ ] 6.1.5 — Agent status transitions follow the lifecycle state machine
-  - [ ] 6.1.6 — `AgentsPage.tsx` displays agents with correct statuses
+- [x] **6.1 — Agent CRUD**
+  - [x] 6.1.1 — Genesis creates the initial Head of Council agent (agent ID 00001)
+  - [x] 6.1.2 — Council members (10001–19999) are seeded or spawned
+  - [x] 6.1.3 — Lead agents (20001–29999) can be spawned by council
+  - [x] 6.1.4 — Task agents (30001–69999) can be spawned by leads
+  - [x] 6.1.5 — Agent status transitions follow the lifecycle state machine (promotion works; liquidation FK bug fixed - now checks ethos reference count)
+  - [x] 6.1.6 — `AgentsPage.tsx` displays agents with correct statuses
+
+> **Issues Found During Verification:**
+> - **Liquidation FK Bug (FIXED)**: When liquidating a promoted agent (e.g., 20002 promoted from 30001), the code tried to delete its ethos but the ethos was still referenced by the terminated original agent (30001). **Fixed in `reincarnation_service.liquidate_agent()`** - now checks reference count before deleting ethos. Verified: solo ethos agents delete ethos; shared ethos agents preserve ethos and report `ethos_shared_with`.
+> - **Missing `specialization` column (FALSE ALARM)**: The `specialization` column exists on the `council_members` joined table, not the base `agents` table. My verification query didn't join the table. The data is correctly stored and seeded.
 
 - [ ] **6.2 — Agent Orchestration**
   - [ ] 6.2.1 — `AgentOrchestrator` routes requests to the correct agent tier
@@ -279,9 +283,9 @@
   - [ ] 6.4.5 — Idle governance doesn't interfere with active tasks
   - [ ] 6.4.6 — Token budget for idle tasks respects `DAILY_TOKEN_BUDGET_USD`
 
-- [ ] **6.5 — Agent Initialization Service**
-  - [ ] 6.5.1 — `InitializationService` sets up all required agents on first boot
-  - [ ] 6.5.2 — Agent capabilities are registered in capability registry
+- [/] **6.5 — Agent Initialization Service**
+  - [x] 6.5.1 — `InitializationService` sets up all required agents on first boot
+  - [x] 6.5.2 — Agent capabilities are registered in capability registry (tier-based base capabilities verified)
   - [ ] 6.5.3 — Missing agents are detected and re-created
 
 ---

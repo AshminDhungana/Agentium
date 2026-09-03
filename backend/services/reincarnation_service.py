@@ -801,12 +801,24 @@ class ReincarnationService:
         # remains in PostgreSQL after liquidation (audit spec §D4 — Ethos
         # Hygiene). We delete the row and detach the FK; the agent is being
         # terminated, so its Ethos can no longer be referenced.
+        # BUT: only delete if no other agents reference this ethos (e.g., 
+        # promoted agents share ethos with their predecessor).
         if agent.ethos_id:
             ethos = db.query(Ethos).filter_by(id=agent.ethos_id).first()
             if ethos:
-                db.delete(ethos)
+                # Check if any other agents (including terminated) reference this ethos
+                other_agents = db.query(Agent).filter(
+                    Agent.ethos_id == agent.ethos_id,
+                    Agent.id != agent.id
+                ).first()
+                
+                if not other_agents:
+                    db.delete(ethos)
+                    liquidation_summary["ethos_deleted"] = True
+                else:
+                    liquidation_summary["ethos_deleted"] = False
+                    liquidation_summary["ethos_shared_with"] = other_agents.agentium_id
             agent.ethos_id = None
-            liquidation_summary["ethos_deleted"] = True
 
         # Store archive in custom field if available
         if hasattr(agent, 'liquidation_archive'):
