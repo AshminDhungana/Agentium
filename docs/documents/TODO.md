@@ -262,12 +262,12 @@
 > - **Liquidation FK Bug (FIXED)**: When liquidating a promoted agent (e.g., 20002 promoted from 30001), the code tried to delete its ethos but the ethos was still referenced by the terminated original agent (30001). **Fixed in `reincarnation_service.liquidate_agent()`** - now checks reference count before deleting ethos. Verified: solo ethos agents delete ethos; shared ethos agents preserve ethos and report `ethos_shared_with`.
 > - **Missing `specialization` column (FALSE ALARM)**: The `specialization` column exists on the `council_members` joined table, not the base `agents` table. My verification query didn't join the table. The data is correctly stored and seeded.
 
-- [ ] **6.2 — Agent Orchestration**
-  - [ ] 6.2.1 — `AgentOrchestrator` routes requests to the correct agent tier
-  - [ ] 6.2.2 — Complexity analysis assigns delegation scores (1–10)
-  - [ ] 6.2.3 — Auto-delegation routes: score 1–3 → Task, 4–6 → Lead, 7–10 → Council
-  - [ ] 6.2.4 — Multi-step reasoning chains execute correctly
-  - [ ] 6.2.5 — Agent can use multiple tools in sequence
+- [x] **6.2 — Agent Orchestration**
+  - [x] 6.2.1 — `AgentOrchestrator` routes requests to the correct agent tier
+  - [x] 6.2.2 — Complexity analysis assigns delegation scores (1–10)
+  - [x] 6.2.3 — Auto-delegation routes: score 1–3 → Task, 4–6 → Lead, 7–10 → Council
+  - [x] 6.2.4 — Multi-step reasoning chains execute correctly
+  - [x] 6.2.5 — Agent can use multiple tools in sequence
 
 - [ ] **6.3 — Critic Agents (Judiciary)**
   - [ ] 6.3.1 — Code Critic (7xxxx) reviews generated code for syntax/security
