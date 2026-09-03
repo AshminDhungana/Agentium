@@ -197,21 +197,14 @@ class TestComplexityScoringTierMapping:
         assert result["delegation_metadata"]["target_tier"] == "3"
 
     @pytest.mark.asyncio
-    async def test_very_high_complexity_task_assigned_to_lead_tier(self, seeded_db: Session):
-        """Score >= 8 routes to tier '2' (Lead Agent) per DelegationEngine's mapping."""
+    async def test_very_high_complexity_task_assigned_to_council_tier(self, seeded_db: Session):
+        """Score >= 7 routes to tier '1' (Council) per DelegationEngine's mapping."""
         head = seeded_db.query(HeadOfCouncil).filter_by(agentium_id="00001").first()
         assert head is not None
 
-        # Need a Lead agent candidate available on tier '2' for the ranker to find.
+        # Ensure a Council member candidate exists on tier '1'
         council = seeded_db.query(CouncilMember).first()
         assert council is not None
-        lead = reincarnation_service.spawn_lead_agent(
-            parent=head if head.agentium_id.startswith("0") else council,
-            name="Lead-Candidate-A",
-            description="Lead candidate for high-complexity routing",
-            db=seeded_db,
-        )
-        seeded_db.commit()
 
         task = _make_task(
             description=(
@@ -226,14 +219,12 @@ class TestComplexityScoringTierMapping:
 
         result = await DelegationEngine.delegate(task, seeded_db)
 
-        assert result["complexity_score"] >= 8
-        assert result["delegation_metadata"]["target_tier"] == "2"
-        # Routed to a Lead-tier agent (2xxxx). The seeded DB already contains a
-        # Lead (20001); AgentRanker picks the best-scored lead, so we assert on
-        # tier membership rather than a specific agentium_id.
+        assert result["complexity_score"] >= 7
+        assert result["delegation_metadata"]["target_tier"] == "1"
+        # Routed to a Council-tier agent (1xxxx).
         assert result["assigned_to"] is not None
-        assert result["assigned_to"].startswith("2")
-        assert any(c["agentium_id"] == lead.agentium_id for c in result.get("candidates", []))
+        assert result["assigned_to"].startswith("1")
+        assert any(c["agentium_id"] == council.agentium_id for c in result.get("candidates", []))
 
     @pytest.mark.asyncio
     async def test_decision_trail_records_complexity_and_tier(self, seeded_db: Session):
