@@ -129,19 +129,11 @@ class TestCriterion01AutoDelegation:
         assert result["delegation_metadata"]["target_tier"] == "3"
 
     @pytest.mark.asyncio
-    async def test_high_complexity_task_routes_to_lead_tier(self, seeded_db: Session):
-        """Complex task -> score >=8 -> tier 2 (LeadAgent)."""
+    async def test_high_complexity_task_routes_to_council_tier(self, seeded_db: Session):
+        """Complex task -> score >=7 -> tier 1 (Council)."""
         head = _get_head_of_council(seeded_db)
         council = seeded_db.query(CouncilMember).first()
-
-        # Need a Lead agent candidate on tier 2
-        ReincarnationService.spawn_lead_agent(
-            parent=head if head.agentium_id.startswith("0") else council,
-            name="Lead-Candidate",
-            description="Lead candidate for high-complexity routing",
-            db=seeded_db,
-        )
-        seeded_db.commit()
+        assert council is not None, "Council member must exist from seeding"
 
         task = _make_task(
             seeded_db,
@@ -153,8 +145,11 @@ class TestCriterion01AutoDelegation:
 
         result = await DelegationEngine.delegate(task, seeded_db)
 
-        assert result["complexity_score"] >= 8
-        assert result["delegation_metadata"]["target_tier"] == "2"
+        assert result["complexity_score"] >= 7
+        assert result["delegation_metadata"]["target_tier"] == "1"
+        # Routed to a Council-tier agent (1xxxx)
+        assert result["assigned_to"] is not None
+        assert result["assigned_to"].startswith("1")
 
     @pytest.mark.asyncio
     async def test_delegation_decision_trail_persisted(self, seeded_db: Session):

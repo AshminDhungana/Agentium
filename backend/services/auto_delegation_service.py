@@ -476,9 +476,12 @@ class DelegationEngine:
         # ── Step 4: Determine tier ───────────────────────────────────────────
         # Tier mapping per escalation design (Task→Lead→Council→Head):
         #   1-3  → Task (tier 3)
-        #   4-10 → Lead (tier 2) — Council (tier 1) only via escalation
-        if complexity >= 4:
-            target_tier = "2"  # Lead (2xxxx) for medium/high complexity
+        #   4-6  → Lead (tier 2)
+        #   7-10 → Council (tier 1)
+        if complexity >= 7:
+            target_tier = "1"  # Council (1xxxx) for high complexity
+        elif complexity >= 4:
+            target_tier = "2"  # Lead (2xxxx) for medium complexity
         else:
             target_tier = "3"  # Task (3xxxx-6xxxx) for simple tasks
 
