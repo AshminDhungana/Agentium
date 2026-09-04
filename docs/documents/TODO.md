@@ -269,11 +269,11 @@
   - [x] 6.2.4 — Multi-step reasoning chains execute correctly
   - [x] 6.2.5 — Agent can use multiple tools in sequence
 
-- [ ] **6.3 — Critic Agents (Judiciary)**
-  - [ ] 6.3.1 — Code Critic (7xxxx) reviews generated code for syntax/security
-  - [ ] 6.3.2 — Output Critic (8xxxx) verifies output alignment with intent
-  - [ ] 6.3.3 — Plan Critic (9xxxx) validates DAG soundness
-  - [ ] 6.3.4 — Critic feedback is incorporated before final response
+- [x] **6.3 — Critic Agents (Judiciary)**
+  - [x] 6.3.1 — Code Critic (7xxxx) reviews generated code for syntax/security
+  - [x] 6.3.2 — Output Critic (8xxxx) verifies output alignment with intent
+  - [x] 6.3.3 — Plan Critic (9xxxx) validates DAG soundness
+  - [x] 6.3.4 — Critic feedback is incorporated before final response
 
 - [ ] **6.4 — Persistent Council & Idle Governance**
   - [ ] 6.4.1 — Council agents activate during idle periods

@@ -17,16 +17,15 @@ rejections — no cold-start penalty on a retry.
 """
 
 import hashlib
+import json
 import logging
+import re
 import time
 from datetime import datetime
 from typing import Dict, Any, Optional, List
 from sqlalchemy.orm import Session
 
-logger = logging.getLogger(__name__)
-
-from backend.models.database import get_db_context
-from backend.models.entities.agents import Agent, AgentType, AgentStatus
+from backend.models.entities.agents import AgentStatus
 from backend.models.entities.critics import (
     CriticAgent, CritiqueReview, CriticType, CriticVerdict, CRITIC_TYPE_TO_AGENT_TYPE
 )
@@ -35,6 +34,8 @@ from backend.models.entities.audit import AuditLog, AuditLevel, AuditCategory
 from backend.services.acceptance_criteria import (
     AcceptanceCriteriaService, AcceptanceCriterion, CriterionResult
 )
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -181,7 +182,7 @@ class CriticService:
             db.query(CriticAgent)
             .filter(
                 CriticAgent.current_task_id == task_id,
-                CriticAgent.is_active == True,
+                CriticAgent.is_active,
             )
             .all()
         )
@@ -480,7 +481,7 @@ class CriticService:
 
         q = db.query(CriticAgent).filter(
             CriticAgent.agent_type == agent_type,
-            CriticAgent.is_active == True,
+            CriticAgent.is_active,
             CriticAgent.current_task_id == task_id,
             CriticAgent.status.in_([AgentStatus.ACTIVE, AgentStatus.IDLE_WORKING]),
         )
@@ -503,7 +504,7 @@ class CriticService:
 
         q = db.query(CriticAgent).filter(
             CriticAgent.agent_type == agent_type,
-            CriticAgent.is_active == True,
+            CriticAgent.is_active,
             CriticAgent.status.in_([AgentStatus.ACTIVE, AgentStatus.IDLE_WORKING]),
         )
         if exclude_id:
@@ -622,12 +623,19 @@ Respond ONLY with a JSON object — no markdown, no preamble:
 
     def _parse_ai_verdict(self, raw_response: str) -> tuple:
         """Parse the AI response and return a tuple of (verdict, reason, suggestions)."""
-        import json, re
-
         cleaned = re.sub(r"```(?:json)?|```", "", raw_response).strip()
         try:
             data = json.loads(cleaned)
         except json.JSONDecodeError:
+            # Regex fallback for common patterns
+            verdict_match = re.search(r'"verdict"\s*:\s*"(pass|reject)"', raw_response, re.IGNORECASE)
+            if verdict_match:
+                verdict = CriticVerdict.REJECT if verdict_match.group(1).lower() == "reject" else CriticVerdict.PASS
+                reason_match = re.search(r'"reason"\s*:\s*"([^"]*)"', raw_response)
+                suggestions_match = re.search(r'"suggestions"\s*:\s*"([^"]*)"', raw_response)
+                return (verdict,
+                        reason_match.group(1) if reason_match else "Parsed via regex fallback",
+                        suggestions_match.group(1) if suggestions_match else "AI response was not valid JSON")
             logger.warning("Critic AI returned non-JSON: %s", raw_response[:200])
             return (CriticVerdict.PASS, None, "AI response was not valid JSON — manual review recommended")
 
@@ -652,7 +660,7 @@ Respond ONLY with a JSON object — no markdown, no preamble:
         return self._preflight_check(content, critic_type, task)
 
     def _review_code(self, content: str, task: Optional[Task]) -> tuple:
-        """Check code output for dangerous patterns and obvious issues."""
+        """Check code output for dangerous patterns, syntax errors, and obvious issues."""
         issues, suggestions = [], []
         dangerous_patterns = [
             "eval(", "exec(", "__import__", "os.system(", "subprocess.Popen(",
@@ -667,6 +675,15 @@ Respond ONLY with a JSON object — no markdown, no preamble:
         if len(content) > 100000:
             issues.append("Output exceeds 100K chars — may indicate unbounded generation")
             suggestions.append("Add output length constraints")
+        
+        # Python syntax validation
+        try:
+            import ast
+            ast.parse(content)
+        except SyntaxError as e:
+            issues.append(f"Syntax error: {e.msg} at line {e.lineno}")
+            suggestions.append("Fix syntax error before submission")
+        
         if issues:
             return (CriticVerdict.REJECT, "; ".join(issues), "; ".join(suggestions) or None)
         return (CriticVerdict.PASS, None, None)
@@ -693,7 +710,7 @@ Respond ONLY with a JSON object — no markdown, no preamble:
         return (CriticVerdict.PASS, None, None)
 
     def _review_plan(self, content: str, task: Optional[Task]) -> tuple:
-        """Check execution plan for completeness, duplicates, and length."""
+        """Check execution plan for completeness, duplicates, cycles, and length."""
         issues, suggestions = [], []
         if not content.strip():
             issues.append("Execution plan is empty")
@@ -708,6 +725,43 @@ Respond ONLY with a JSON object — no markdown, no preamble:
                     suggestions.append("Remove duplicate steps from the plan")
                     break
                 seen.add(stripped)
+            
+            # Basic dependency cycle detection
+            # Look for "step X depends on step Y" patterns where Y > X
+            step_deps = {}
+            for line in lines:
+                stripped = line.strip()
+                if "depends on" in stripped:
+                    # Try to parse step numbers
+                    import re
+                    match = re.search(r'step\s*(\d+).*depends on.*step\s*(\d+)', stripped)
+                    if match:
+                        from_step = int(match.group(1))
+                        to_step = int(match.group(2))
+                        if to_step > from_step:
+                            step_deps.setdefault(from_step, []).append(to_step)
+            
+            # Check for cycles in dependencies
+            def has_cycle(node, visited, rec_stack):
+                visited.add(node)
+                rec_stack.add(node)
+                for neighbor in step_deps.get(node, []):
+                    if neighbor not in visited:
+                        if has_cycle(neighbor, visited, rec_stack):
+                            return True
+                    elif neighbor in rec_stack:
+                        return True
+                rec_stack.remove(node)
+                return False
+            
+            visited = set()
+            for node in step_deps:
+                if node not in visited:
+                    if has_cycle(node, visited, set()):
+                        issues.append("Circular dependency detected in plan steps")
+                        suggestions.append("Remove circular dependencies between steps")
+                        break
+        
         if len(lines) > 100:
             issues.append(f"Plan has {len(lines)} steps — may be over-engineered")
             suggestions.append("Simplify the plan to fewer, higher-level steps")
@@ -789,7 +843,7 @@ Respond ONLY with a JSON object — no markdown, no preamble:
         """Return all active reviews associated with a task."""
         reviews = (
             db.query(CritiqueReview)
-            .filter(CritiqueReview.task_id == task_id, CritiqueReview.is_active == True)
+            .filter(CritiqueReview.task_id == task_id, CritiqueReview.is_active)
             .order_by(CritiqueReview.reviewed_at.desc())
             .all()
         )

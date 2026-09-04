@@ -11,20 +11,16 @@ Usage:
 """
 import argparse
 import asyncio
-import json
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 # Add backend to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from backend.models.database import get_db_context
-from backend.services.critic_agents import CriticService, CriticType, CriticVerdict
+from backend.services.critic_agents import CriticService, CriticType
 from backend.models.entities.task import Task
-from backend.models.entities.critics import CriticAgent
-from backend.models.entities.agents import AgentStatus
 
 
 SAMPLE_TASKS = {
@@ -80,7 +76,7 @@ async def run_verification(critic_type: CriticType, model: str, interactive: boo
             return
 
         # Test good output
-        print(f"\n--- Testing GOOD output ---")
+        print("\n--- Testing GOOD output ---")
         print(f"Task: {task_data['description']}")
         print(f"Output:\n{task_data['good_output'][:200]}...")
 
@@ -99,7 +95,7 @@ async def run_verification(critic_type: CriticType, model: str, interactive: boo
         print(f"Duration: {result.get('review_duration_ms', 0):.1f}ms")
 
         # Test bad output
-        print(f"\n--- Testing BAD output ---")
+        print("\n--- Testing BAD output ---")
         print(f"Output:\n{task_data['bad_output'][:200]}...")
 
         result = await critic_service.review_task_output(
