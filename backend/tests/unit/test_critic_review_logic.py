@@ -206,3 +206,84 @@ class TestAIReviewParsing:
         prompt = critic_service._build_critic_user_prompt(CriticType.CODE, task, "def api(): pass")
         assert "Build a REST API" in prompt
         assert "def api()" in prompt
+
+
+class TestAIReviewFlow:
+    """Tests for _ai_review and _execute_review with mocked _ai_review."""
+
+    @pytest.fixture
+    def critic_service(self):
+        return CriticService()
+
+    @pytest.fixture
+    def mock_task(self):
+        task = MagicMock(spec=Task)
+        task.description = "Write a secure login function"
+        task.id = "test-task-123"
+        return task
+
+    @pytest.fixture
+    def mock_critic(self):
+        critic = MagicMock(spec=CriticAgent)
+        critic.agentium_id = "70001"
+        critic.critic_specialty = CriticType.CODE
+        critic.preferred_review_model = "openai:gpt-4o-mini"
+        return critic
+
+    @pytest.fixture
+    def mock_db(self, mock_task):
+        """Mock database session that returns the mock task."""
+        db = MagicMock()
+        db.query.return_value.filter_by.return_value.first.return_value = mock_task
+        return db
+
+    async def test_ai_review_returns_pass(self, critic_service, mock_critic, mock_task):
+        """Test _ai_review returns PASS when mocked."""
+        with patch.object(critic_service, '_ai_review', new_callable=AsyncMock) as mock_ai:
+            mock_ai.return_value = (CriticVerdict.PASS, None, None)
+            
+            verdict, reason, suggestions = await critic_service._ai_review(
+                mock_critic, mock_task, "def login(): pass", CriticType.CODE
+            )
+            
+            assert verdict == CriticVerdict.PASS
+            mock_ai.assert_called_once()
+
+    async def test_ai_review_returns_reject(self, critic_service, mock_critic, mock_task):
+        """Test _ai_review returns REJECT with reason when mocked."""
+        with patch.object(critic_service, '_ai_review', new_callable=AsyncMock) as mock_ai:
+            mock_ai.return_value = (CriticVerdict.REJECT, "No input validation", "Add validation")
+            
+            verdict, reason, suggestions = await critic_service._ai_review(
+                mock_critic, mock_task, "def login(user, pwd): return True", CriticType.CODE
+            )
+            
+            assert verdict == CriticVerdict.REJECT
+            assert reason == "No input validation"
+
+    async def test_execute_review_falls_back_to_rule_based_on_exception(self, critic_service, mock_critic, mock_task, mock_db):
+        """Test _execute_review falls back to rule-based when _ai_review raises exception."""
+        with patch.object(critic_service, '_ai_review', new_callable=AsyncMock) as mock_ai:
+            mock_ai.side_effect = Exception("API timeout")
+            
+            # Should fall back to rule-based (preflight) review
+            verdict, reason, suggestions = await critic_service._execute_review(
+                mock_db, mock_critic, "test-task-123", "def login(): pass", CriticType.CODE
+            )
+            
+            # Rule-based should pass for clean code
+            assert verdict == CriticVerdict.PASS
+
+    async def test_execute_review_runs_preflight_first(self, critic_service, mock_critic, mock_task, mock_db):
+        """Preflight check runs before AI review - dangerous code rejected without AI call."""
+        with patch.object(critic_service, '_ai_review', new_callable=AsyncMock) as mock_ai:
+            mock_ai.return_value = (CriticVerdict.PASS, None, None)
+            
+            verdict, reason, suggestions = await critic_service._execute_review(
+                mock_db, mock_critic, "test-task-123", "eval(user_input)", CriticType.CODE
+            )
+            
+            # Should be rejected by preflight, AI not called
+            assert verdict == CriticVerdict.REJECT
+            assert "eval" in reason.lower()
+            mock_ai.assert_not_called()
