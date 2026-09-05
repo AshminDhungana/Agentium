@@ -930,6 +930,44 @@ class EnhancedIdleGovernanceEngine:
             try:
                 tokens_saved = 0
                 
+                # Check if task requires API and budget allows (Task 2.2)
+                api_required_types = {
+                    TaskType.PREDICTIVE_HEALTH_API,
+                    TaskType.CONSTITUTION_REFINE,
+                    TaskType.ETHOS_OPTIMIZATION,
+                }
+                
+                if task.task_type in api_required_types:
+                    # Estimate cost based on task type
+                    cost_estimates = {
+                        TaskType.PREDICTIVE_HEALTH_API: 0.02,
+                        TaskType.CONSTITUTION_REFINE: 0.05,
+                        TaskType.ETHOS_OPTIMIZATION: 0.03,
+                    }
+                    estimated_cost = cost_estimates.get(task.task_type, 0.02)
+                    
+                    # Estimate savings (simplified - in practice use historical data)
+                    estimated_savings = estimated_cost * 2.0  # assume 2x savings
+                    
+                    can_use, reason = token_optimizer.can_use_api_for_idle_task(
+                        task_type=task.task_type.value,
+                        estimated_cost_usd=estimated_cost,
+                        estimated_savings_usd=estimated_savings
+                    )
+                    
+                    if not can_use:
+                        logger.info(f"⏭️ Skipping {task.task_type.value}: {reason}")
+                        task.status = TaskStatus.IDLE_COMPLETED
+                        task.completion_summary = f"Skipped: {reason}"
+                        task.tokens_used = 0
+                        db.commit()
+                        # Clean up tracking
+                        self.current_idle_tasks.pop(agent.agentium_id, None)
+                        agent.status = AgentStatus.ACTIVE
+                        agent.current_task_id = None
+                        self._agent_last_completed[agent.agentium_id] = datetime.utcnow()
+                        continue
+                
                 if task.task_type == TaskType.PREFERENCE_OPTIMIZATION:
                     # Run sync task in thread pool so it doesn't block HTTP traffic
                     result = await asyncio.wait_for(
