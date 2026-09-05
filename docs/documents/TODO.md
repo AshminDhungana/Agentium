@@ -275,13 +275,13 @@
   - [x] 6.3.3 — Plan Critic (9xxxx) validates DAG soundness
   - [x] 6.3.4 — Critic feedback is incorporated before final response
 
-- [ ] **6.4 — Persistent Council & Idle Governance**
-  - [ ] 6.4.1 — Council agents activate during idle periods
-  - [ ] 6.4.2 — System Optimizer agent runs maintenance tasks
-  - [ ] 6.4.3 — Strategic Planner agent schedules future work
-  - [ ] 6.4.4 — Health Monitor agent checks system health
-  - [ ] 6.4.5 — Idle governance doesn't interfere with active tasks
-  - [ ] 6.4.6 — Token budget for idle tasks respects `DAILY_TOKEN_BUDGET_USD`
+- [x] **6.4 — Persistent Council & Idle Governance**
+  - [x] 6.4.1 — Council agents activate during idle periods
+  - [x] 6.4.2 — System Optimizer agent runs maintenance tasks
+  - [x] 6.4.3 — Strategic Planner agent schedules future work
+  - [x] 6.4.4 — Health Monitor agent checks system health
+  - [x] 6.4.5 — Idle governance doesn't interfere with active tasks
+  - [x] 6.4.6 — Token budget for idle tasks respects `DAILY_TOKEN_BUDGET_USD`
 
 - [/] **6.5 — Agent Initialization Service**
   - [x] 6.5.1 — `InitializationService` sets up all required agents on first boot
