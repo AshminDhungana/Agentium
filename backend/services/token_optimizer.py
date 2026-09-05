@@ -11,10 +11,11 @@ KEY CHANGES (v2):
 
 import asyncio
 import logging
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Tuple
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from sqlalchemy import func
+from dataclasses import dataclass
 
 from backend.models.entities.agents import Agent, AgentStatus, AgentType
 from backend.models.entities.task import Task, TaskStatus, TaskPriority
@@ -25,6 +26,15 @@ from backend.services.model_allocation import init_model_allocator
 from backend.services.chat_context import estimate_tokens
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class IdleBudget:
+    """Idle-specific budget tracking."""
+    limit_usd: float
+    used_usd: float
+    period_hours: int
+    last_reset: datetime
 
 # ---------------------------------------------------------------------------
 # Persistent Budget Configuration (DB-backed)
@@ -142,6 +152,19 @@ class IdleBudgetManager:
         # Compatibility properties expected by main.py / token_optimizer
         self._total_tokens_saved = 0
         self._total_cost_saved = 0.0
+        
+        # Idle-specific budget (separate from active budget)
+        self._idle_budget = IdleBudget(
+            limit_usd=1.0,  # $1/day default for idle API usage
+            used_usd=0.0,
+            period_hours=24,
+            last_reset=datetime.utcnow()
+        )
+
+    @property
+    def idle_budget(self) -> IdleBudget:
+        """Return the idle budget dataclass."""
+        return self._idle_budget
 
     def _ensure_loaded(self):
         """Ensure loaded."""
@@ -294,6 +317,46 @@ class IdleBudgetManager:
             # Source tag so the frontend can display a note
             "data_source": "api_usage_logs",
         }
+
+    def get_idle_budget_status(self) -> Dict[str, Any]:
+        """Return idle-specific budget status."""
+        # Refresh from DB
+        self._refresh_idle_budget_from_logs()
+        
+        return {
+            "idle_daily_cost_limit_usd": self._idle_budget.limit_usd,
+            "idle_cost_used_today_usd": round(self._idle_budget.used_usd, 6),
+            "idle_cost_remaining_usd": round(max(0.0, self._idle_budget.limit_usd - self._idle_budget.used_usd), 6),
+            "idle_cost_percentage_used": min(round((self._idle_budget.used_usd / self._idle_budget.limit_usd) * 100, 2), 100),
+            "idle_period_hours": self._idle_budget.period_hours,
+            "last_reset": self._idle_budget.last_reset.isoformat(),
+        }
+
+    def _refresh_idle_budget_from_logs(self):
+        """Refresh idle budget used_usd from ModelUsageLog for idle tasks."""
+        try:
+            from backend.models.database import get_db_context
+            from backend.models.entities.user_config import ModelUsageLog
+            from sqlalchemy import and_
+
+            period_start = datetime.utcnow() - timedelta(hours=self._idle_budget.period_hours)
+
+            with get_db_context() as db:
+                logs = db.query(ModelUsageLog).filter(
+                    and_(
+                        ModelUsageLog.task_type == 'idle_api',
+                        ModelUsageLog.created_at >= period_start
+                    )
+                ).all()
+                
+                self._idle_budget.used_usd = sum(log.cost_usd or 0.0 for log in logs)
+                # Reset if period has passed
+                if (datetime.utcnow() - self._idle_budget.last_reset).total_seconds() > self._idle_budget.period_hours * 3600:
+                    self._idle_budget.last_reset = datetime.utcnow()
+                    self._idle_budget.used_usd = 0.0
+
+        except Exception:
+            pass  # Use current values
 
 
 # ---------------------------------------------------------------------------
@@ -573,6 +636,76 @@ class TokenOptimizer:
             if api_manager_module.api_manager
             else False,
         }
+
+    def can_use_api_for_idle_task(
+        self,
+        task_type: str,
+        estimated_cost_usd: float,
+        estimated_savings_usd: float
+    ) -> Tuple[bool, str]:
+        """
+        Determine if API usage for an idle task is cost-justified.
+        
+        Policy: Hybrid — local models by default, API only if 
+        estimated_savings > estimated_cost * 1.5 (50% margin).
+        
+        Also checks: idle budget not exhausted, task_type allowed.
+        """
+        # Check idle budget (use idle_budget singleton)
+        idle_budget_status = idle_budget.get_status()
+        cost_used = idle_budget_status.get("cost_used_today_usd", 0.0)
+        cost_limit = idle_budget_status.get("daily_cost_limit_usd", 1.0)
+        
+        if cost_used + estimated_cost_usd > cost_limit:
+            return False, f"Idle budget exhausted ({cost_used:.4f}/{cost_limit:.4f} USD)"
+        
+        # Check cost justification (strict >, not >=)
+        threshold = estimated_cost_usd * 1.5
+        if estimated_savings_usd <= threshold:
+            return False, f"Not cost-justified: savings ${estimated_savings_usd:.4f} <= ${threshold:.4f} (1.5x cost ${estimated_cost_usd:.4f})"
+        
+        # Check if task type is in allowed list for API
+        allowed_api_tasks = {
+            'predictive_health_api',
+            'constitution_refine',
+            'ethos_optimization',
+        }
+        if task_type not in allowed_api_tasks:
+            return False, f"Task type {task_type} not allowed for API usage"
+        
+        return True, f"Cost-justified: savings ${estimated_savings_usd:.4f} > ${threshold:.4f} (1.5x cost)"
+
+    def record_api_usage(self, task_type: str, tokens: int, cost_usd: float):
+        """Record API usage against idle budget."""
+        # The actual cost is recorded via ModelUsageLog in model_provider.py
+        # This method is for tracking/visibility
+        idle_budget_status = idle_budget.get_status()
+        idle_budget_status["cost_used_today_usd"] = idle_budget_status.get("cost_used_today_usd", 0.0) + cost_usd
+        
+        # Also log to audit
+        try:
+            from backend.models.database import get_db_context
+            from backend.models.entities.audit import AuditLog, AuditLevel, AuditCategory
+            
+            with get_db_context() as db:
+                audit = AuditLog.log(
+                    level=AuditLevel.INFO,
+                    category=AuditCategory.GOVERNANCE,
+                    actor_type="system",
+                    actor_id="IDLE_GOVERNANCE",
+                    action="idle_api_usage_recorded",
+                    description=f"Idle API usage recorded for {task_type}",
+                    meta_data={
+                        "task_type": task_type,
+                        "tokens": tokens,
+                        "cost_usd": cost_usd,
+                        "budget_type": "idle"
+                    }
+                )
+                db.add(audit)
+                db.commit()
+        except Exception as e:
+            logger.warning(f"Could not record idle API usage audit: {e}")
 
     def _model_key_from_config_id(self, config_id: str) -> str:
         """The config_id IS the key used in api_manager.models dict."""
