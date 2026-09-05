@@ -690,6 +690,10 @@ class EnhancedIdleGovernanceEngine:
             auto_recovery_action,
             predictive_health_api
         )
+        from backend.services.idle_tasks.maintenance import (
+            constitution_review,
+            predictive_scaling
+        )
 
         # ── Define task categories ───────────────────────────────────────────────
         PER_AGENT_TASKS = [
@@ -714,6 +718,11 @@ class EnhancedIdleGovernanceEngine:
             TaskType.AUTO_RECOVERY_ACTION,
             TaskType.PREDICTIVE_HEALTH_API,
         ]
+        
+        MAINTENANCE_TASKS = [
+            TaskType.CONSTITUTION_REFINE,
+            TaskType.PREDICTIVE_PLANNING,
+        ]
 
         # ── Determine task type based on agent role ──────────────────────────────
         if agent.agentium_id == '00001':
@@ -735,8 +744,27 @@ class EnhancedIdleGovernanceEngine:
             task_type = self._get_next_health_monitor_task()
             if not task_type:
                 return  # All health monitor tasks on cooldown
+        elif agent.agentium_id == '10002':
+            # Strategic Planner gets maintenance tasks if due, otherwise per-agent tasks
+            available_maintenance = self._get_available_maintenance_tasks()
+            if available_maintenance:
+                task_type = available_maintenance[0]
+            else:
+                # Fallback to per-agent tasks
+                last_pref_run = self._last_pref_opt_run.get(agent.agentium_id)
+                if last_pref_run:
+                    elapsed_pref_minutes = int(
+                        (datetime.utcnow() - last_pref_run).total_seconds() / 60
+                    )
+                else:
+                    elapsed_pref_minutes = 9999
+
+                if preference_optimizer_task.should_run(elapsed_pref_minutes):
+                    task_type = TaskType.PREFERENCE_OPTIMIZATION
+                else:
+                    task_type = random.choice(PER_AGENT_TASKS)
         else:
-            # Council members (10001, 10002) get preference optimization if due
+            # Council member 10001 gets preference optimization if due
             last_pref_run = self._last_pref_opt_run.get(agent.agentium_id)
             if last_pref_run:
                 elapsed_pref_minutes = int(
@@ -759,15 +787,32 @@ class EnhancedIdleGovernanceEngine:
                     task_type = random.choice(PER_AGENT_TASKS)
 
         # ── FIX 5: Check if this system task is already assigned to another agent ─
-        if task_type in SYSTEM_WIDE_TASKS or task_type in HEALTH_MONITOR_TASKS:
+        if task_type in SYSTEM_WIDE_TASKS or task_type in HEALTH_MONITOR_TASKS or task_type in MAINTENANCE_TASKS:
             # First check: is this task type on global cooldown?
             last_run = self._recent_system_tasks.get(task_type.value)
             if last_run:
                 elapsed = (datetime.utcnow() - last_run).total_seconds()
-                if elapsed < self.SYSTEM_TASK_COOLDOWN_SECONDS:
+                # Use task-specific cooldown
+                if task_type in MAINTENANCE_TASKS:
+                    cooldown = 7 * 24 * 3600 if task_type == TaskType.CONSTITUTION_REFINE else 24 * 3600
+                elif task_type in HEALTH_MONITOR_TASKS:
+                    # Use health monitor cooldowns
+                    HEALTH_COOLDOWNS = {
+                        TaskType.AGENT_HEALTH_SCAN: 300,
+                        TaskType.SYSTEM_RESOURCE_CHECK: 600,
+                        TaskType.CHANNEL_DEEP_HEALTH: 900,
+                        TaskType.ANOMALY_CORRELATION: 1800,
+                        TaskType.AUTO_RECOVERY_ACTION: 300,
+                        TaskType.PREDICTIVE_HEALTH_API: 86400,
+                    }
+                    cooldown = HEALTH_COOLDOWNS.get(task_type, self.SYSTEM_TASK_COOLDOWN_SECONDS)
+                else:
+                    cooldown = self.SYSTEM_TASK_COOLDOWN_SECONDS
+                
+                if elapsed < cooldown:
                     logger.debug(
                         f"System task {task_type.value} on global cooldown "
-                        f"({elapsed:.0f}s / {self.SYSTEM_TASK_COOLDOWN_SECONDS}s), "
+                        f"({elapsed:.0f}s / {cooldown}s), "
                         f"skipping for {agent.agentium_id}"
                     )
                     return
@@ -859,6 +904,31 @@ class EnhancedIdleGovernanceEngine:
                     available.append((sys_task, last_run))
         
         # Sort by last run time (oldest first) so we rotate through all tasks
+        available.sort(key=lambda x: x[1])
+        return [task for task, _ in available]
+
+    def _get_available_maintenance_tasks(self) -> List[TaskType]:
+        """
+        Get maintenance tasks that haven't been run recently.
+        Each has its own cooldown: constitution_refine (weekly), predictive_planning (daily).
+        """
+        now = datetime.utcnow()
+        available = []
+        
+        MAINTENANCE_COOLDOWNS = {
+            TaskType.CONSTITUTION_REFINE: 7 * 24 * 3600,  # 7 days
+            TaskType.PREDICTIVE_PLANNING: 24 * 3600,      # 1 day
+        }
+        
+        for task_type, cooldown in MAINTENANCE_COOLDOWNS.items():
+            last_run = self._recent_system_tasks.get(task_type.value)
+            if not last_run:
+                available.append((task_type, datetime.min))
+            else:
+                elapsed = (now - last_run).total_seconds()
+                if elapsed >= cooldown:
+                    available.append((task_type, last_run))
+        
         available.sort(key=lambda x: x[1])
         return [task for task, _ in available]
 
@@ -1061,7 +1131,17 @@ class EnhancedIdleGovernanceEngine:
                             system_tasks_completed_this_cycle.add(task.task_type.value)
                             return 0
                         
-                        elif task.task_type in (TaskType.CONSTITUTION_REFINE, TaskType.CONSTITUTION_READ):
+                        elif task.task_type == TaskType.CONSTITUTION_REFINE:
+                            result = await constitution_review(db, agent)
+                            system_tasks_completed_this_cycle.add(task.task_type.value)
+                            return result.get('tokens_used', 0)
+                        
+                        elif task.task_type == TaskType.PREDICTIVE_PLANNING:
+                            result = await predictive_scaling(db, agent)
+                            system_tasks_completed_this_cycle.add(task.task_type.value)
+                            return result.get('tokens_used', 0)
+                        
+                        elif task.task_type == TaskType.CONSTITUTION_READ:
                             await asyncio.wait_for(
                                 loop.run_in_executor(None, agent.read_and_align_constitution, db),
                                 timeout=120
@@ -1104,7 +1184,7 @@ class EnhancedIdleGovernanceEngine:
                     self._agent_last_completed[agent.agentium_id] = datetime.utcnow()
                     
                     # Update system task tracking
-                    if task.task_type in SYSTEM_WIDE_TASKS + HEALTH_MONITOR_TASKS:
+                    if task.task_type in SYSTEM_WIDE_TASKS + HEALTH_MONITOR_TASKS + MAINTENANCE_TASKS:
                         self._recent_system_tasks[task.task_type.value] = datetime.utcnow()
                     
                     # Record metrics
