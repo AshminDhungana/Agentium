@@ -131,6 +131,15 @@ class HealthMonitorIdleTask:
 | `AUTO_RECOVERY_ACTION` | Restart stalled agents, rebalance load, trigger overflow review | Event-driven | Local — $0 |
 | `PREDICTIVE_HEALTH_API` | **Cost-justified**: LLM analyzes patterns, predicts failures, recommends preemptive actions | Daily | API allowed iff `estimated_savings > estimated_cost * 1.5` |
 
+> **Note:** The following `TaskType` enum values need to be added to `backend/models/entities/task.py`:
+> - `SYSTEM_RESOURCE_CHECK = "system_resource_check"`
+> - `CHANNEL_DEEP_HEALTH = "channel_deep_health"`
+> - `ANOMALY_CORRELATION = "anomaly_correlation"`
+> - `AUTO_RECOVERY_ACTION = "auto_recovery_action"`
+> - `PREDICTIVE_HEALTH_API = "predictive_health_api"`
+>
+> Also: `IDLE_COMPLETED` and `IDLE_PAUSED` in the enum are actually `TaskStatus` values (see line 102-103) — they should be moved/removed from `TaskType` to avoid confusion.
+
 #### Integration with Idle Governance Engine
 In `_assign_idle_work()`, Health Monitor (10003) gets priority for system-wide tasks:
 ```python
@@ -207,7 +216,7 @@ async def _execute_idle_work(self, db, agents):
 | **Max 1 concurrent idle task** | `self._idle_semaphore = asyncio.Semaphore(1)` in `__init__`; acquire in `_execute_idle_work` |
 | **Priority yielding** | Idle tasks call `await asyncio.sleep(0)` at yield points; check `self._get_pending_user_tasks(db)` every 5s |
 | **TTL auto-cancel** | Each idle task gets `max_duration_seconds=300`; tracked in `task.started_at`; auto-fail if exceeded |
-| **CPU priority** | `os.nice(10)` at start of idle task execution (Unix); lower thread priority on Windows |
+| **CPU priority** | `os.nice(10)` at start of idle task execution (Unix); `psutil.Process().nice(psutil.BELOW_NORMAL_PRIORITY_CLASS)` on Windows |
 | **DB connection reservation** | Idle tasks use dedicated connection pool (`pool_size=2`) separate from user request pool |
 | **Immediate preemption** | On user task arrival: `_pause_idle_work()` sets `task.status=INTERRUPTED`, cancels LLM stream via `asyncio.CancelledError`, releases resources |
 
@@ -217,13 +226,15 @@ async def _pause_idle_work(self, db: Session, reason: str):
     for task_id in self.current_idle_tasks.values():
         task = db.query(Task).filter_by(id=task_id).first()
         if task and task.status == TaskStatus.IN_PROGRESS:
-            task.status = TaskStatus.INTERRUPTED
+            task.status = TaskStatus.IDLE_PAUSED
             task.completion_summary = f"Preempted: {reason}"
-            # Cancel the executing coroutine
+            # Cancel the executing coroutine (track running tasks)
             if task_id in self._running_idle_tasks:
                 self._running_idle_tasks[task_id].cancel()
     logger.warning(f"⏸️ Idle work preempted: {reason}")
 ```
+
+> **Implementation Note:** The engine needs a `self._running_idle_tasks: Dict[str, asyncio.Task] = {}` dict to track executing idle task coroutines for cancellation. The `_execute_idle_work` method should store the task: `self._running_idle_tasks[task_id] = asyncio.current_task()`. Uses existing `TaskStatus.IDLE_PAUSED`.
 
 ---
 
@@ -283,6 +294,8 @@ if (self.last_predictive_scaling is None or
    └─► _execute_idle_work() with semaphore(1), TTL=300s, yield points
 ```
 
+> **Note:** Current code uses `TaskStatus.IN_PROGRESS` for idle tasks. Consider changing to `TaskStatus.IDLE_RUNNING` for clearer semantics (exists in enum but unused). `TaskStatus.IDLE_COMPLETED` is used on completion.
+
 ### Token Budget Decision
 ```
 Idle task wants API model
@@ -320,7 +333,7 @@ _next process_intent() call → _get_pending_user_tasks() returns non-empty
        ▼
 _idle_loop() → _pause_idle_work() called
        │
-       ├─ Set all idle tasks to INTERRUPTED
+       ├─ Set all idle tasks to IDLE_PAUSED
        ├─ Cancel running coroutines
        ├─ Release semaphore
        └─ Broadcast idle_paused event
