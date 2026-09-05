@@ -8,6 +8,8 @@ import random
 import time
 import json
 import uuid
+import sys
+import os
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
@@ -15,6 +17,19 @@ from sqlalchemy import func, and_, or_
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+def _lower_cpu_priority():
+    """Lower CPU priority for idle work - cross-platform."""
+    try:
+        if sys.platform == 'win32':
+            import psutil
+            p = psutil.Process()
+            p.nice(psutil.BELOW_NORMAL_PRIORITY_CLASS)
+        else:
+            os.nice(10)
+    except Exception:
+        pass  # Best effort
 
 from backend.models.database import get_db_context
 from backend.models.entities.agents import Agent, HeadOfCouncil, CouncilMember, AgentStatus, PersistentAgentRole
@@ -156,6 +171,13 @@ class EnhancedIdleGovernanceEngine:
         self.PREF_OPT_COOLDOWN_MINUTES = 30
         self._recent_system_tasks: Dict[str, datetime] = {}   # task_type.value -> last_completed
         self.SYSTEM_TASK_COOLDOWN_SECONDS = 300  # 5 min between same system task
+        # ────────────────────────────────────────────────────────────────────────
+        
+        # ── Medium Isolation Guarantees ──────────────────────────────────────────
+        self._idle_semaphore = asyncio.Semaphore(1)  # Medium isolation: max 1 concurrent
+        self._idle_task_ttl = 300  # 5 minutes max per idle task
+        self._running_idle_tasks: Dict[str, asyncio.Task] = {}  # track for cancellation
+        self._yield_interval = 5  # yield every 5 seconds
         # ────────────────────────────────────────────────────────────────────────
     
     async def start(self, db: Session):
@@ -879,7 +901,7 @@ class EnhancedIdleGovernanceEngine:
         Execute assigned idle work for each agent with an active idle task.
         Dispatches to the appropriate handler based on task type.
         
-        FIX 5: System-wide tasks execute once and mark completion globally.
+        Medium Isolation: semaphore(1), TTL=300s, yield points, preemption on user task.
         """
         from backend.services.idle_tasks.preference_optimizer import preference_optimizer_task
         from backend.services.idle_tasks.health_monitor import (
@@ -927,160 +949,199 @@ class EnhancedIdleGovernanceEngine:
                     self._agent_last_completed[agent.agentium_id] = datetime.utcnow()
                     continue
             
-            try:
-                tokens_saved = 0
+            # Execute with isolation (semaphore, TTL, yield points)
+            async def _run_isolated():
+                task_id_str = str(task.id)
+                current_task = asyncio.current_task()
+                self._running_idle_tasks[task_id_str] = current_task
                 
-                # Check if task requires API and budget allows (Task 2.2)
-                api_required_types = {
-                    TaskType.PREDICTIVE_HEALTH_API,
-                    TaskType.CONSTITUTION_REFINE,
-                    TaskType.ETHOS_OPTIMIZATION,
-                }
-                
-                if task.task_type in api_required_types:
-                    # Estimate cost based on task type
-                    cost_estimates = {
-                        TaskType.PREDICTIVE_HEALTH_API: 0.02,
-                        TaskType.CONSTITUTION_REFINE: 0.05,
-                        TaskType.ETHOS_OPTIMIZATION: 0.03,
+                try:
+                    # Lower CPU priority for idle work
+                    _lower_cpu_priority()
+                    
+                    # Update agent and task status
+                    agent.status = AgentStatus.IDLE_WORKING
+                    task.status = TaskStatus.IDLE_RUNNING
+                    db.commit()
+                    
+                    tokens_saved = 0
+                    
+                    # Check if task requires API and budget allows (Task 2.2)
+                    api_required_types = {
+                        TaskType.PREDICTIVE_HEALTH_API,
+                        TaskType.CONSTITUTION_REFINE,
+                        TaskType.ETHOS_OPTIMIZATION,
                     }
-                    estimated_cost = cost_estimates.get(task.task_type, 0.02)
                     
-                    # Estimate savings (simplified - in practice use historical data)
-                    estimated_savings = estimated_cost * 2.0  # assume 2x savings
-                    
-                    can_use, reason = token_optimizer.can_use_api_for_idle_task(
-                        task_type=task.task_type.value,
-                        estimated_cost_usd=estimated_cost,
-                        estimated_savings_usd=estimated_savings
-                    )
-                    
-                    if not can_use:
-                        logger.info(f"⏭️ Skipping {task.task_type.value}: {reason}")
-                        task.status = TaskStatus.IDLE_COMPLETED
-                        task.completion_summary = f"Skipped: {reason}"
-                        task.tokens_used = 0
-                        db.commit()
-                        # Clean up tracking
-                        self.current_idle_tasks.pop(agent.agentium_id, None)
-                        agent.status = AgentStatus.ACTIVE
-                        agent.current_task_id = None
-                        self._agent_last_completed[agent.agentium_id] = datetime.utcnow()
-                        continue
-                
-                if task.task_type == TaskType.PREFERENCE_OPTIMIZATION:
-                    # Run sync task in thread pool so it doesn't block HTTP traffic
-                    result = await asyncio.wait_for(
-                        loop.run_in_executor(None, preference_optimizer_task.execute),
-                        timeout=60
-                    )
-                    tokens_saved = result.get('tokens_saved', 0) if isinstance(result, dict) else 0
-                    self._last_pref_opt_run[agent.agentium_id] = datetime.utcnow()
-                    
-                elif task.task_type == TaskType.VECTOR_MAINTENANCE:
-                    await self.run_maintenance(db)
-                    system_tasks_completed_this_cycle.add(task.task_type.value)
-                    
-                elif task.task_type == TaskType.AUDIT_ARCHIVAL:
-                    from backend.models.entities.audit import AuditLog
-                    cutoff = datetime.utcnow() - timedelta(days=90)
-                    archived = db.query(AuditLog).filter(
-                        AuditLog.created_at < cutoff
-                    ).count()
-                    logger.info(f"📦 Audit archival scan: {archived} records eligible")
-                    system_tasks_completed_this_cycle.add(task.task_type.value)
-                    
-                elif task.task_type == TaskType.AGENT_HEALTH_SCAN:
-                    result = await agent_health_scan(db, agent)
-                    tokens_saved = result.get('tokens_used', 0)
-                    system_tasks_completed_this_cycle.add(task.task_type.value)
-                    
-                elif task.task_type == TaskType.SYSTEM_RESOURCE_CHECK:
-                    result = await system_resource_check(db, agent)
-                    tokens_saved = result.get('tokens_used', 0)
-                    system_tasks_completed_this_cycle.add(task.task_type.value)
-                    
-                elif task.task_type == TaskType.CHANNEL_DEEP_HEALTH:
-                    result = await channel_deep_health(db, agent)
-                    tokens_saved = result.get('tokens_used', 0)
-                    system_tasks_completed_this_cycle.add(task.task_type.value)
-                    
-                elif task.task_type == TaskType.ANOMALY_CORRELATION:
-                    result = await anomaly_correlation(db, agent)
-                    tokens_saved = result.get('tokens_used', 0)
-                    system_tasks_completed_this_cycle.add(task.task_type.value)
-                    
-                elif task.task_type == TaskType.AUTO_RECOVERY_ACTION:
-                    result = await auto_recovery_action(db, agent)
-                    tokens_saved = result.get('tokens_used', 0)
-                    system_tasks_completed_this_cycle.add(task.task_type.value)
-                    
-                elif task.task_type == TaskType.PREDICTIVE_HEALTH_API:
-                    result = await predictive_health_api(db, agent)
-                    tokens_saved = result.get('tokens_used', 0) or 0
-                    system_tasks_completed_this_cycle.add(task.task_type.value)
-                    
-                elif task.task_type == TaskType.CACHE_OPTIMIZATION:
-                    logger.info(f"🗄️ Cache optimization cycle by {agent.agentium_id}")
-                    system_tasks_completed_this_cycle.add(task.task_type.value)
-                    
-                elif task.task_type == TaskType.STORAGE_DEDUPE:
-                    logger.info(f"🔍 Storage dedup scan by {agent.agentium_id}")
-                    system_tasks_completed_this_cycle.add(task.task_type.value)
+                    if task.task_type in api_required_types:
+                        cost_estimates = {
+                            TaskType.PREDICTIVE_HEALTH_API: 0.02,
+                            TaskType.CONSTITUTION_REFINE: 0.05,
+                            TaskType.ETHOS_OPTIMIZATION: 0.03,
+                        }
+                        estimated_cost = cost_estimates.get(task.task_type, 0.02)
+                        estimated_savings = estimated_cost * 2.0
                         
-                elif task.task_type in (TaskType.CONSTITUTION_REFINE, TaskType.CONSTITUTION_READ):
-                    await asyncio.wait_for(
-                        loop.run_in_executor(None, agent.read_and_align_constitution, db),
-                        timeout=120
-                    )
+                        can_use, reason = token_optimizer.can_use_api_for_idle_task(
+                            task_type=task.task_type.value,
+                            estimated_cost_usd=estimated_cost,
+                            estimated_savings_usd=estimated_savings
+                        )
+                        
+                        if not can_use:
+                            logger.info(f"⏭️ Skipping {task.task_type.value}: {reason}")
+                            task.status = TaskStatus.IDLE_COMPLETED
+                            task.completion_summary = f"Skipped: {reason}"
+                            task.tokens_used = 0
+                            db.commit()
+                            return 0
                     
-                elif task.task_type == TaskType.ETHOS_OPTIMIZATION:
-                    await asyncio.wait_for(
-                        loop.run_in_executor(None, agent.compress_ethos, db),
-                        timeout=120
-                    )
+                    # Execute task with TTL enforcement
+                    async def _execute_with_yield():
+                        if task.task_type == TaskType.PREFERENCE_OPTIMIZATION:
+                            result = await asyncio.wait_for(
+                                loop.run_in_executor(None, preference_optimizer_task.execute),
+                                timeout=60
+                            )
+                            self._last_pref_opt_run[agent.agentium_id] = datetime.utcnow()
+                            return result.get('tokens_saved', 0) if isinstance(result, dict) else 0
+                        
+                        elif task.task_type == TaskType.VECTOR_MAINTENANCE:
+                            await self.run_maintenance(db)
+                            system_tasks_completed_this_cycle.add(task.task_type.value)
+                            return 0
+                        
+                        elif task.task_type == TaskType.AUDIT_ARCHIVAL:
+                            from backend.models.entities.audit import AuditLog
+                            cutoff = datetime.utcnow() - timedelta(days=90)
+                            archived = db.query(AuditLog).filter(
+                                AuditLog.created_at < cutoff
+                            ).count()
+                            logger.info(f"📦 Audit archival scan: {archived} records eligible")
+                            system_tasks_completed_this_cycle.add(task.task_type.value)
+                            return 0
+                        
+                        elif task.task_type == TaskType.AGENT_HEALTH_SCAN:
+                            result = await agent_health_scan(db, agent)
+                            system_tasks_completed_this_cycle.add(task.task_type.value)
+                            return result.get('tokens_used', 0)
+                        
+                        elif task.task_type == TaskType.SYSTEM_RESOURCE_CHECK:
+                            result = await system_resource_check(db, agent)
+                            system_tasks_completed_this_cycle.add(task.task_type.value)
+                            return result.get('tokens_used', 0)
+                        
+                        elif task.task_type == TaskType.CHANNEL_DEEP_HEALTH:
+                            result = await channel_deep_health(db, agent)
+                            system_tasks_completed_this_cycle.add(task.task_type.value)
+                            return result.get('tokens_used', 0)
+                        
+                        elif task.task_type == TaskType.ANOMALY_CORRELATION:
+                            result = await anomaly_correlation(db, agent)
+                            system_tasks_completed_this_cycle.add(task.task_type.value)
+                            return result.get('tokens_used', 0)
+                        
+                        elif task.task_type == TaskType.AUTO_RECOVERY_ACTION:
+                            result = await auto_recovery_action(db, agent)
+                            system_tasks_completed_this_cycle.add(task.task_type.value)
+                            return result.get('tokens_used', 0)
+                        
+                        elif task.task_type == TaskType.PREDICTIVE_HEALTH_API:
+                            result = await predictive_health_api(db, agent)
+                            system_tasks_completed_this_cycle.add(task.task_type.value)
+                            return result.get('tokens_used', 0) or 0
+                        
+                        elif task.task_type == TaskType.CACHE_OPTIMIZATION:
+                            logger.info(f"🗄️ Cache optimization cycle by {agent.agentium_id}")
+                            system_tasks_completed_this_cycle.add(task.task_type.value)
+                            return 0
+                        
+                        elif task.task_type == TaskType.STORAGE_DEDUPE:
+                            logger.info(f"🔍 Storage dedup scan by {agent.agentium_id}")
+                            system_tasks_completed_this_cycle.add(task.task_type.value)
+                            return 0
+                        
+                        elif task.task_type in (TaskType.CONSTITUTION_REFINE, TaskType.CONSTITUTION_READ):
+                            await asyncio.wait_for(
+                                loop.run_in_executor(None, agent.read_and_align_constitution, db),
+                                timeout=120
+                            )
+                            return 0
+                        
+                        elif task.task_type == TaskType.ETHOS_OPTIMIZATION:
+                            await asyncio.wait_for(
+                                loop.run_in_executor(None, agent.compress_ethos, db),
+                                timeout=120
+                            )
+                            return 0
+                        
+                        elif task.task_type == TaskType.PREDICTIVE_PLANNING:
+                            logger.info(f"🔮 Predictive planning cycle by {agent.agentium_id}")
+                            return 0
+                        
+                        return 0
                     
-                elif task.task_type == TaskType.PREDICTIVE_PLANNING:
-                    logger.info(f"🔮 Predictive planning cycle by {agent.agentium_id}")
+# Run with TTL timeout
+                    try:
+                        tokens_saved = await asyncio.wait_for(
+                            _execute_with_yield(),
+                            timeout=self._idle_task_ttl
+                        )
+                    except asyncio.TimeoutError:
+                        logger.warning(f"⏱️ Idle task {task_id_str} exceeded TTL ({self._idle_task_ttl}s)")
+                        raise
+                    
+                    # Mark task as completed
+                    task.status = TaskStatus.IDLE_COMPLETED
+                    task.completed_at = datetime.utcnow()
+                    task.is_active = False
+                    task.tokens_used = tokens_saved
+                    
+                    # Clean up tracking
+                    self.current_idle_tasks.pop(agent.agentium_id, None)
+                    agent.status = AgentStatus.ACTIVE
+                    agent.current_task_id = None
+                    self._agent_last_completed[agent.agentium_id] = datetime.utcnow()
+                    
+                    # Update system task tracking
+                    if task.task_type in SYSTEM_WIDE_TASKS + HEALTH_MONITOR_TASKS:
+                        self._recent_system_tasks[task.task_type.value] = datetime.utcnow()
+                    
+                    # Record metrics
+                    self.metrics.record_idle_task_completion(tokens_saved)
+                    
+                    logger.info(f"✅ Idle work completed: {agent.agentium_id} → {task.task_type.value}")
+                    return tokens_saved
                 
-                # Mark idle task as completed
-                task.status = TaskStatus.IDLE_COMPLETED
-                task.completed_at = datetime.utcnow()
-                task.is_active = False
-                
-                # Clean up tracking
-                self.current_idle_tasks.pop(agent.agentium_id, None)
-                agent.status = AgentStatus.ACTIVE
-                agent.current_task_id = None
-                
-                # Record completion time — cooldown clock starts now
-                self._agent_last_completed[agent.agentium_id] = datetime.utcnow()
-
-                # Update system task tracking
-                if task.task_type in SYSTEM_WIDE_TASKS + HEALTH_MONITOR_TASKS:
-                    self._recent_system_tasks[task.task_type.value] = datetime.utcnow()
-
-                # Record metrics
-                self.metrics.record_idle_task_completion(tokens_saved)
-                
-                logger.info(f"✅ Idle work completed: {agent.agentium_id} → {task.task_type.value}")
-
-            except asyncio.TimeoutError:
-                logger.error(f"⏱️ Idle task {task.task_type.value} timed out for {agent.agentium_id}")
-                # Force cleanup so the agent isn't stuck forever
-                task.status = TaskStatus.FAILED
-                task.is_active = False
-                self.current_idle_tasks.pop(agent.agentium_id, None)
-                agent.status = AgentStatus.ACTIVE
-                agent.current_task_id = None
-                continue  # Don't let one bad task kill the loop
-
-            except Exception as e:
-                logger.warning(f"⚠️ Idle work error for {agent.agentium_id}: {e}")
-                self.current_idle_tasks.pop(agent.agentium_id, None)
-                agent.status = AgentStatus.ACTIVE
-                agent.current_task_id = None
-                self._agent_last_completed[agent.agentium_id] = datetime.utcnow()
+                except asyncio.CancelledError:
+                    # Preemption - mark as paused
+                    task.status = TaskStatus.IDLE_PAUSED
+                    task.completion_summary = "Preempted by user task"
+                    raise
+                except asyncio.TimeoutError:
+                    logger.error(f"⏱️ Idle task {task.task_type.value} timed out for {agent.agentium_id}")
+                    task.status = TaskStatus.FAILED
+                    task.is_active = False
+                    raise
+                except Exception as e:
+                    logger.warning(f"⚠️ Idle work error for {agent.agentium_id}: {e}")
+                    task.status = TaskStatus.FAILED
+                    task.is_active = False
+                    raise
+                finally:
+                    # Cleanup
+                    self._running_idle_tasks.pop(str(task.id), None)
+                    self.current_idle_tasks.pop(agent.agentium_id, None)
+                    agent.status = AgentStatus.ACTIVE
+                    agent.current_task_id = None
+                    try:
+                        db.commit()
+                    except Exception:
+                        db.rollback()
+            
+            # Run with semaphore (max 1 concurrent idle task)
+            async with self._idle_semaphore:
+                await _run_isolated()
         
         # Commit all changes
         try:
@@ -1090,13 +1151,38 @@ class EnhancedIdleGovernanceEngine:
             db.rollback()
     
     async def _pause_idle_work(self, db: Session, reason: str):
-        """Pause all idle work when user tasks arrive."""
-        for task_id in self.current_idle_tasks.values():
+        """Pause all running idle work - called when user task arrives."""
+        for task_id, task_coro in list(self._running_idle_tasks.items()):
+            # Update DB status
             task = db.query(Task).filter_by(id=task_id).first()
-            if task:
-                task.pause_for_user_task()
+            if task and task.status == TaskStatus.IN_PROGRESS:
+                task.status = TaskStatus.IDLE_PAUSED
+                task.completion_summary = f"Preempted: {reason}"
+            
+            # Cancel the coroutine
+            if not task_coro.done():
+                task_coro.cancel()
+                try:
+                    await task_coro
+                except asyncio.CancelledError:
+                    pass
         
-        logger.info(f"⏸️ Idle work paused: {reason}")
+        # Clear tracking
+        self._running_idle_tasks.clear()
+        db.commit()
+        
+        logger.warning(f"⏸️ Idle work preempted: {reason}")
+        
+        # Broadcast event
+        try:
+            from backend.api.routes.websocket import manager as websocket_manager
+            await websocket_manager.broadcast({
+                'type': 'idle_paused',
+                'reason': reason,
+                'timestamp': datetime.utcnow().isoformat()
+            })
+        except Exception:
+            pass
     
     async def _broadcast(self, message: Dict):
         """Broadcast status via WebSocket."""
