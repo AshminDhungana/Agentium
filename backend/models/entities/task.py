@@ -99,8 +99,13 @@ class TaskType(str, enum.Enum):
     AGENT_HEALTH_SCAN = "agent_health_scan"
     ETHOS_OPTIMIZATION = "ethos_optimization"
     CACHE_OPTIMIZATION = "cache_optimization"
-    IDLE_COMPLETED = "idle_completed"
-    IDLE_PAUSED = "idle_paused"
+    
+    # NEW: Health Monitor task types
+    SYSTEM_RESOURCE_CHECK = "system_resource_check"
+    CHANNEL_DEEP_HEALTH = "channel_deep_health"
+    ANOMALY_CORRELATION = "anomaly_correlation"
+    AUTO_RECOVERY_ACTION = "auto_recovery_action"
+    PREDICTIVE_HEALTH_API = "predictive_health_api"
 
     PREFERENCE_OPTIMIZATION = "preference_optimization"
 

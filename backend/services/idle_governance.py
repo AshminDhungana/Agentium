@@ -660,6 +660,14 @@ class EnhancedIdleGovernanceEngine:
 
         # ── Import idle tasks ────────────────────────────────────────────────────
         from backend.services.idle_tasks.preference_optimizer import preference_optimizer_task
+        from backend.services.idle_tasks.health_monitor import (
+            agent_health_scan,
+            system_resource_check,
+            channel_deep_health,
+            anomaly_correlation,
+            auto_recovery_action,
+            predictive_health_api
+        )
 
         # ── Define task categories ───────────────────────────────────────────────
         PER_AGENT_TASKS = [
@@ -673,8 +681,16 @@ class EnhancedIdleGovernanceEngine:
             TaskType.VECTOR_MAINTENANCE,
             TaskType.STORAGE_DEDUPE,
             TaskType.AUDIT_ARCHIVAL,
-            TaskType.AGENT_HEALTH_SCAN,
             TaskType.CACHE_OPTIMIZATION,
+        ]
+        
+        HEALTH_MONITOR_TASKS = [
+            TaskType.AGENT_HEALTH_SCAN,
+            TaskType.SYSTEM_RESOURCE_CHECK,
+            TaskType.CHANNEL_DEEP_HEALTH,
+            TaskType.ANOMALY_CORRELATION,
+            TaskType.AUTO_RECOVERY_ACTION,
+            TaskType.PREDICTIVE_HEALTH_API,
         ]
 
         # ── Determine task type based on agent role ──────────────────────────────
@@ -692,8 +708,13 @@ class EnhancedIdleGovernanceEngine:
                 task_type = TaskType.PREFERENCE_OPTIMIZATION
             else:
                 task_type = random.choice(PER_AGENT_TASKS)
+        elif agent.agentium_id == '10003':
+            # Health Monitor gets health monitor tasks (rotate through with cooldowns)
+            task_type = self._get_next_health_monitor_task()
+            if not task_type:
+                return  # All health monitor tasks on cooldown
         else:
-            # Council members get preference optimization if due
+            # Council members (10001, 10002) get preference optimization if due
             last_pref_run = self._last_pref_opt_run.get(agent.agentium_id)
             if last_pref_run:
                 elapsed_pref_minutes = int(
@@ -716,7 +737,7 @@ class EnhancedIdleGovernanceEngine:
                     task_type = random.choice(PER_AGENT_TASKS)
 
         # ── FIX 5: Check if this system task is already assigned to another agent ─
-        if task_type in SYSTEM_WIDE_TASKS:
+        if task_type in SYSTEM_WIDE_TASKS or task_type in HEALTH_MONITOR_TASKS:
             # First check: is this task type on global cooldown?
             last_run = self._recent_system_tasks.get(task_type.value)
             if last_run:
@@ -819,6 +840,40 @@ class EnhancedIdleGovernanceEngine:
         available.sort(key=lambda x: x[1])
         return [task for task, _ in available]
 
+    def _get_next_health_monitor_task(self) -> Optional[TaskType]:
+        """
+        Get the next health monitor task that isn't on cooldown.
+        Each task type has its own cooldown period.
+        """
+        now = datetime.utcnow()
+        available = []
+        
+        HEALTH_TASK_COOLDOWNS = {
+            TaskType.AGENT_HEALTH_SCAN: 300,      # 5 min
+            TaskType.SYSTEM_RESOURCE_CHECK: 600,  # 10 min
+            TaskType.CHANNEL_DEEP_HEALTH: 900,    # 15 min
+            TaskType.ANOMALY_CORRELATION: 1800,   # 30 min
+            TaskType.AUTO_RECOVERY_ACTION: 300,   # 5 min (event-driven)
+            TaskType.PREDICTIVE_HEALTH_API: 86400, # 24 hours
+        }
+        
+        for task_type, cooldown in HEALTH_TASK_COOLDOWNS.items():
+            last_run = self._recent_system_tasks.get(task_type.value)
+            if not last_run:
+                # Never run - highest priority
+                available.append((task_type, datetime.min))
+            else:
+                elapsed = (now - last_run).total_seconds()
+                if elapsed >= cooldown:
+                    available.append((task_type, last_run))
+        
+        if not available:
+            return None
+        
+        # Sort by last run time (oldest first) so we rotate through all tasks
+        available.sort(key=lambda x: x[1])
+        return available[0][0]
+
     async def _execute_idle_work(self, db: Session, agents: List[Agent]):
         """
         Execute assigned idle work for each agent with an active idle task.
@@ -827,6 +882,14 @@ class EnhancedIdleGovernanceEngine:
         FIX 5: System-wide tasks execute once and mark completion globally.
         """
         from backend.services.idle_tasks.preference_optimizer import preference_optimizer_task
+        from backend.services.idle_tasks.health_monitor import (
+            agent_health_scan,
+            system_resource_check,
+            channel_deep_health,
+            anomaly_correlation,
+            auto_recovery_action,
+            predictive_health_api
+        )
         
         # Track which system tasks were completed this cycle to avoid duplicates
         system_tasks_completed_this_cycle: set = set()
@@ -847,9 +910,8 @@ class EnhancedIdleGovernanceEngine:
                 TaskType.VECTOR_MAINTENANCE,
                 TaskType.STORAGE_DEDUPE,
                 TaskType.AUDIT_ARCHIVAL,
-                TaskType.AGENT_HEALTH_SCAN,
                 TaskType.CACHE_OPTIMIZATION,
-            ]:
+            ] + HEALTH_MONITOR_TASKS:
                 if task.task_type.value in system_tasks_completed_this_cycle:
                     logger.debug(
                         f"System task {task.task_type.value} already completed this cycle, "
@@ -891,12 +953,33 @@ class EnhancedIdleGovernanceEngine:
                     system_tasks_completed_this_cycle.add(task.task_type.value)
                     
                 elif task.task_type == TaskType.AGENT_HEALTH_SCAN:
-                    all_agents = db.query(Agent).filter_by(is_active=True).all()
-                    unhealthy = [a for a in all_agents if a.status == AgentStatus.SUSPENDED]
-                    if unhealthy:
-                        logger.info(f"🏥 Health scan: {len(unhealthy)} suspended agents found")
-                    else:
-                        logger.info(f"🏥 Health scan: all agents healthy")
+                    result = await agent_health_scan(db, agent)
+                    tokens_saved = result.get('tokens_used', 0)
+                    system_tasks_completed_this_cycle.add(task.task_type.value)
+                    
+                elif task.task_type == TaskType.SYSTEM_RESOURCE_CHECK:
+                    result = await system_resource_check(db, agent)
+                    tokens_saved = result.get('tokens_used', 0)
+                    system_tasks_completed_this_cycle.add(task.task_type.value)
+                    
+                elif task.task_type == TaskType.CHANNEL_DEEP_HEALTH:
+                    result = await channel_deep_health(db, agent)
+                    tokens_saved = result.get('tokens_used', 0)
+                    system_tasks_completed_this_cycle.add(task.task_type.value)
+                    
+                elif task.task_type == TaskType.ANOMALY_CORRELATION:
+                    result = await anomaly_correlation(db, agent)
+                    tokens_saved = result.get('tokens_used', 0)
+                    system_tasks_completed_this_cycle.add(task.task_type.value)
+                    
+                elif task.task_type == TaskType.AUTO_RECOVERY_ACTION:
+                    result = await auto_recovery_action(db, agent)
+                    tokens_saved = result.get('tokens_used', 0)
+                    system_tasks_completed_this_cycle.add(task.task_type.value)
+                    
+                elif task.task_type == TaskType.PREDICTIVE_HEALTH_API:
+                    result = await predictive_health_api(db, agent)
+                    tokens_saved = result.get('tokens_used', 0) or 0
                     system_tasks_completed_this_cycle.add(task.task_type.value)
                     
                 elif task.task_type == TaskType.CACHE_OPTIMIZATION:
@@ -936,13 +1019,7 @@ class EnhancedIdleGovernanceEngine:
                 self._agent_last_completed[agent.agentium_id] = datetime.utcnow()
 
                 # Update system task tracking
-                if task.task_type in [
-                    TaskType.VECTOR_MAINTENANCE,
-                    TaskType.STORAGE_DEDUPE,
-                    TaskType.AUDIT_ARCHIVAL,
-                    TaskType.AGENT_HEALTH_SCAN,
-                    TaskType.CACHE_OPTIMIZATION,
-                ]:
+                if task.task_type in SYSTEM_WIDE_TASKS + HEALTH_MONITOR_TASKS:
                     self._recent_system_tasks[task.task_type.value] = datetime.utcnow()
 
                 # Record metrics
