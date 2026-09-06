@@ -206,7 +206,39 @@ If `agentium_id` values `10001`, `10002`, or `20001` are currently held by non-g
 
 ---
 
-## 11. Future Extensions (Out of Scope)
+## 11. Implementation Notes
+
+### Files Created/Modified
+
+| File | Description |
+|------|-------------|
+| `backend/services/initialization_service.py` | Added `verify_and_repair()` method with config reading |
+| `backend/main.py` | Added lifespan integration for startup verification |
+| `backend/api/routes/agents.py` | New file with `POST /api/v1/agents/verify` endpoint |
+| `backend/services/tasks/verification_tasks.py` | New file with Celery periodic task |
+| `backend/celery_app.py` | Added beat schedule and include for verification task |
+| `.env.example` | Added `AGENT_VERIFICATION_ENABLED`, `AGENT_VERIFICATION_INTERVAL_SECONDS`, `AGENT_VERIFICATION_EXACT_IDS` |
+| `tests/services/test_initialization_service.py` | Unit tests (4 tests) |
+| `tests/api/test_agents_verify.py` | API endpoint tests (2 tests) |
+| `tests/api/test_lifespan_verification.py` | Lifespan integration test (1 test) |
+| `tests/tasks/test_verification_tasks.py` | Celery task tests (2 tests) |
+| `tests/integration/test_agent_verification_flow.py` | End-to-end integration tests (4 tests) |
+
+### Key Implementation Decisions
+
+1. **Exact ID preference**: `force_exact_ids=True` by default attempts exact genesis IDs first. If occupied by wrong agent type, uses next available ID and logs warning.
+
+2. **Async handling in Celery**: The task uses a helper `_run_async()` that detects running event loops and uses `ThreadPoolExecutor` to avoid `asyncio.run()` conflicts in test environments.
+
+3. **Configuration via env vars**: All verification behavior configurable via `AGENT_VERIFICATION_ENABLED`, `AGENT_VERIFICATION_INTERVAL_SECONDS`, `AGENT_VERIFICATION_EXACT_IDS`.
+
+4. **Audit logging**: Every recreation logged to `AuditLog` with category `GOVERNANCE`, action `agent_recreated`.
+
+5. **Graceful degradation**: Unlike genesis, verification doesn't block on missing API keys - just logs warning and continues.
+
+---
+
+## 12. Future Extensions (Out of Scope)
 
 - Configurable required agent list (beyond the 4 genesis agents)
 - Health checks beyond existence (e.g., "agent has checked in within 1 hour")
@@ -220,6 +252,6 @@ These can be added in follow-up specs if needed.
 ## 12. Approval
 
 - [x] Design reviewed and approved
-- [ ] Implementation complete
-- [ ] Tests passing
+- [x] Implementation complete
+- [x] Tests passing (13 tests: 4 unit, 2 API, 1 lifespan, 2 Celery, 4 integration)
 - [ ] Deployed to staging
