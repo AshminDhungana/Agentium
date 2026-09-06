@@ -100,6 +100,12 @@ class InitializationService:
         self._country_name_event: Optional[asyncio.Event] = None
         self.awaiting_country_name: bool = False
         self.country_name_prompt: str = ""
+        
+        # Verification configuration from env vars
+        import os
+        self.verification_enabled = os.environ.get("AGENT_VERIFICATION_ENABLED", "true").lower() == "true"
+        self.verification_exact_ids = os.environ.get("AGENT_VERIFICATION_EXACT_IDS", "true").lower() == "true"
+        self.verification_interval = int(os.environ.get("AGENT_VERIFICATION_INTERVAL_SECONDS", "300"))
 
     # ── API Key availability check ────────────────────────────────────────────
     def _has_any_active_api_key(self) -> bool:
