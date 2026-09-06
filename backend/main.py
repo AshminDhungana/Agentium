@@ -78,6 +78,7 @@ from backend.api.routes import user_preferences as user_preferences_routes
 
 from backend.api.routes import capability_routes
 from backend.api.routes import lifecycle_routes
+from backend.api.routes import agents as agents_routes
 from backend.api.routes import critics as critics_routes          
 from backend.api.routes import checkpoints as checkpoints_routes 
 from backend.api.routes import remote_executor as remote_executor_routes  
@@ -658,6 +659,7 @@ app.include_router(users_routes.router,             prefix="/api/v1")
 app.include_router(voice_routes.router,             prefix="/api/v1")
 app.include_router(capability_routes.router)
 app.include_router(lifecycle_routes.router)
+app.include_router(agents_routes.router)
 app.include_router(reassign_routes.router)
 app.include_router(audit_routes_router.router,      prefix="/api/v1")
 app.include_router(monitoring_router.router,        prefix="/api/v1")
