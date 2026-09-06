@@ -264,6 +264,29 @@ async def lifespan(app: FastAPI):
             logger.error(f"❌ Constitution seed failed (non-fatal): {e}")
 
     # ─────────────────────────────────────────────────────────────
+    # 1c. Verify and repair genesis agents
+    # ─────────────────────────────────────────────────────────────
+    if os.environ.get("TESTING") == "true":
+        logger.info("⏭️ TESTING mode — skipping agent verification")
+    elif os.environ.get("AGENT_VERIFICATION_ENABLED", "true").lower() == "true":
+        try:
+            from backend.models.database import get_db_context
+            from backend.services.initialization_service import InitializationService
+            with get_db_context() as db:
+                init_service = InitializationService(db)
+                result = await init_service.verify_and_repair(db)
+                if result["status"] == "error":
+                    logger.error(f"❌ Agent verification failed: {result}")
+                elif result["status"] == "repaired":
+                    logger.warning(f"🔧 Agent verification repaired missing agents: {result['recreated']}")
+                else:
+                    logger.info("✅ Agent verification: all genesis agents present")
+        except Exception as e:
+            logger.error(f"⚠️ Agent verification error (non-blocking): {e}")
+    else:
+        logger.info("⏭️ Agent verification disabled via AGENT_VERIFICATION_ENABLED")
+
+    # ─────────────────────────────────────────────────────────────
     # 2. Persistent Council — status check only (read-only)
     # ─────────────────────────────────────────────────────────────
     if os.environ.get("TESTING") == "true":
