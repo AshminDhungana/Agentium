@@ -1098,6 +1098,172 @@ class InitializationService:
         except Exception as e:
             self._log("ERROR", f"Clear failed: {e}")
 
+    async def verify_and_repair(
+        self,
+        db: Session,
+        force_exact_ids: Optional[bool] = None
+    ) -> Dict[str, Any]:
+        """
+        Verify all required genesis agents exist; recreate missing ones.
+
+        Required agents:
+        - Head of Council: 00001
+        - Council Members: 10001, 10002
+        - Lead Agent: 20001
+
+        Args:
+            db: Database session
+            force_exact_ids: If True, attempt exact genesis IDs first.
+                             If occupied by different agent, use next available + warning.
+                             If None, uses instance config (env var AGENT_VERIFICATION_EXACT_IDS).
+
+        Returns:
+            Repair report dict with status, checked, missing, recreated, warnings, details.
+        """
+        if force_exact_ids is None:
+            force_exact_ids = getattr(self, 'verification_exact_ids', True)
+
+        # Import here to avoid circular imports
+        from backend.models.entities.agents import Agent
+
+        # First, ensure Head exists (needed as parent for others)
+        head = db.query(HeadOfCouncil).filter_by(agentium_id="00001", is_active=True).first()
+        head_existed = head is not None
+        if not head:
+            head = await self._create_head_of_council()
+            db.flush()
+
+        # Pre-create council members list so we don't call the async method multiple times
+        council_members = None
+
+        async def get_council_1():
+            nonlocal council_members
+            if council_members is None:
+                council_members = await self._create_council_members(head)
+            return council_members[0]
+
+        async def get_council_2():
+            nonlocal council_members
+            if council_members is None:
+                council_members = await self._create_council_members(head)
+            return council_members[1]
+
+        required_agents = [
+            {"id": "00001", "model": HeadOfCouncil, "creator": lambda: head, "tier": "head", "existed": head_existed, "is_async": False},
+            {"id": "10001", "model": CouncilMember, "creator": get_council_1, "tier": "council", "existed": False, "is_async": True},
+            {"id": "10002", "model": CouncilMember, "creator": get_council_2, "tier": "council", "existed": False, "is_async": True},
+            {"id": "20001", "model": LeadAgent, "creator": lambda: self._create_default_lead(head), "tier": "lead", "existed": False, "is_async": True},
+        ]
+
+        results = {
+            "status": "ok",
+            "checked": 0,
+            "missing": [],
+            "recreated": [],
+            "warnings": [],
+            "details": {},
+        }
+
+        for agent_spec in required_agents:
+            agent_id = agent_spec["id"]
+            model = agent_spec["model"]
+            creator = agent_spec["creator"]
+            tier = agent_spec["tier"]
+            prechecked_existed = agent_spec["existed"]
+            is_async = agent_spec["is_async"]
+
+            results["checked"] += 1
+
+            # Check if agent exists and is active
+            if prechecked_existed:
+                existing = head
+            elif agent_id == "00001" and not head_existed:
+                # Head was already checked and doesn't exist
+                existing = None
+            else:
+                existing = db.query(model).filter_by(agentium_id=agent_id, is_active=True).first()
+
+            if existing:
+                results["details"][agent_id] = {"status": "ok", "existed": True}
+                continue
+
+            # Agent missing — attempt recreation
+            results["missing"].append(agent_id)
+
+            # Check if exact ID slot is occupied by a different agent
+            force_exact_for_this = force_exact_ids
+            if force_exact_ids:
+                occupied = db.query(Agent).filter_by(agentium_id=agent_id).first()
+                if occupied:
+                    results["warnings"].append(
+                        f"Slot {agent_id} occupied by {occupied.agent_type.value} "
+                        f"({occupied.agentium_id}); using next available ID in tier"
+                    )
+                    force_exact_for_this = False
+
+            try:
+                if is_async:
+                    new_agent = await creator()
+                else:
+                    new_agent = creator()
+                actual_id = new_agent.agentium_id
+
+                if force_exact_for_this and actual_id != agent_id:
+                    results["warnings"].append(
+                        f"Expected {agent_id} but got {actual_id} (ID generation chose next available)"
+                    )
+
+                results["recreated"].append(actual_id)
+                results["details"][agent_id] = {
+                    "status": "recreated",
+                    "existed": False,
+                    "new_id": actual_id,
+                }
+
+                # Audit log
+                from backend.models.entities.audit import AuditLog, AuditLevel, AuditCategory
+                audit = AuditLog.log(
+                    level=AuditLevel.INFO,
+                    category=AuditCategory.GOVERNANCE,
+                    actor_type="system",
+                    actor_id="VERIFICATION",
+                    action="agent_recreated",
+                    target_type="agent",
+                    target_id=actual_id,
+                    description=f"Genesis agent {agent_id} recreated as {actual_id} during verification",
+                    meta_data={
+                        "requested_id": agent_id,
+                        "actual_id": actual_id,
+                        "tier": tier,
+                        "force_exact_ids": force_exact_for_this,
+                    }
+                )
+                db.add(audit)
+
+            except Exception as e:
+                self._log("ERROR", f"Failed to recreate {agent_id}: {e}")
+                results["details"][agent_id] = {
+                    "status": "error",
+                    "existed": False,
+                    "error": str(e),
+                }
+                results["status"] = "error"
+
+        # Commit all changes
+        if results["status"] != "error":
+            try:
+                db.commit()
+                if results["recreated"]:
+                    results["status"] = "repaired"
+            except Exception as e:
+                db.rollback()
+                results["status"] = "error"
+                results["warnings"].append(f"Commit failed: {e}")
+        else:
+            db.rollback()
+
+        return results
+
     def _log(self, level: str, message: str) -> None:
         """Log to genesis log."""
         entry = f"[{datetime.utcnow().isoformat()}] [{level}] {message}"
