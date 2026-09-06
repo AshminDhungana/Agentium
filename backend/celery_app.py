@@ -23,6 +23,7 @@ celery_app = Celery(
         'backend.services.tasks.task_executor',
         'backend.services.tasks.workflow_tasks',
         'backend.services.tasks.reindex_knowledge',
+        'backend.services.tasks.verification_tasks',
         'backend.services.audit.audit_processor',
         'backend.services.monitoring.health_checks',
         'backend.services.workflow_engine',
@@ -262,6 +263,13 @@ celery_app.conf.beat_schedule = {
             'queue': 'monitoring',   # isolate from business-logic queues
             'expires': 280,          # drop if still queued after 280s (next cycle imminent)
         },
+    },
+
+    # ── Agent Verification ───────────────────────────────────────────────────────
+    # Periodic verification and repair of missing genesis agents.
+    'verify-agents-every-5-minutes': {
+        'task': 'backend.services.tasks.verification_tasks.verify_agents_task',
+        'schedule': 300.0,
     },
 }
 
