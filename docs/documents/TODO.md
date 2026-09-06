@@ -31,6 +31,7 @@
 21. [Production Readiness](#21-production-readiness)
 22. [Log & Audit Verification](#22-log--audit-verification)
 23. [Dependency Updates](#23-dependency-updates)
+24. [Autonomous Video & Audio Generation System](#24-autonomous-video--audio-generation-system)
 
 ---
 
@@ -283,10 +284,10 @@
   - [x] 6.4.5 — Idle governance doesn't interfere with active tasks
   - [x] 6.4.6 — Token budget for idle tasks respects `DAILY_TOKEN_BUDGET_USD`
 
-- [/] **6.5 — Agent Initialization Service**
+- [x] **6.5 — Agent Initialization Service**
   - [x] 6.5.1 — `InitializationService` sets up all required agents on first boot
   - [x] 6.5.2 — Agent capabilities are registered in capability registry (tier-based base capabilities verified)
-  - [ ] 6.5.3 — Missing agents are detected and re-created
+  - [x] 6.5.3 — Missing agents are detected and re-created
 
 ---
 
@@ -892,3 +893,76 @@
 - **23.4 — [P3]** Check `docker-compose.yml` base images for newer security patches; bump and re-test the full stack.
   - [ ] **23.4.1 — Docker Base Image Vulnerability Check**: Review base image tags (Python, Node, PostgreSQL, Redis) in `Dockerfile` and `docker-compose.yml` for upstream security updates.
   - [ ] **23.4.2 — Full Containerized Stack Rebuild & Smoke Test**: Bump container base images, execute `docker-compose build`, and run full containerized integration smoke tests.
+
+---
+
+## 24. Autonomous Video & Audio Generation System
+
+> **Files**: `backend/models/entities/user_config.py`, `backend/services/model_provider.py`, `backend/services/video_service.py`, `backend/services/video_editor_service.py`, `backend/services/video_director_service.py`, `backend/services/chat_service.py`, `backend/api/routes/video_routes.py`, `backend/api/routes/chat.py`, `backend/api/routes/websocket.py`, `backend/tools/_workspace.py`, `frontend/src/pages/VideoStudioPage.tsx`, `frontend/src/components/studio/`, `frontend/src/components/chat/VideoGenerationCard.tsx`, `frontend/src/components/chat/VideoPlayerCard.tsx`, `frontend/src/components/layout/navConfig.ts`, `frontend/src/App.tsx`, `frontend/src/services/videoApi.ts`
+
+- [ ] **24.1 — Video & Audio Model Provider Infrastructure**
+  - [ ] 24.1.1 — Provider schema extension: Add video generation provider types (`LUMA`, `RUNWAY`, `REPLICATE`, `KLING`, `MINIMAX`, `COMFYUI_LOCAL`) to `UserModelConfig` and `ProviderType`
+  - [ ] 24.1.2 — Audio provider schema extension: Add voiceover/audio and music models (`ELEVENLABS`, `OPENAI_TTS`, `KOKORO`, `EDGE_TTS`, `MUSICGEN`, `SUNO`) to `UserModelConfig`
+  - [ ] 24.1.3 — Model capability detection: Add modality tags (`text`, `vision`, `video`, `audio`) and `user_has_video_audio_models(user_id)` helper
+  - [ ] 24.1.4 — Provider credential validation, test generation endpoints, and cost tracking per generation minute
+  - [ ] 24.1.5 — `ModelsPage.tsx` and `ModelConfigForm.tsx` updates: Tabs, filters, and presets for configuring Video and Audio generation providers
+
+- [ ] **24.2 — Chat Intent Detection & Model Verification Gate**
+  - [ ] 24.2.1 — Media intent detection in `ChatService`: Parse incoming chat messages and attachments for video/audio creation intent
+  - [ ] 24.2.2 — Model pre-check gate: Automatically verify that active video and audio models are configured before spawning tasks
+  - [ ] 24.2.3 — Missing-model guidance card: Return actionable instructions and direct link/action card to `/models` if required models are absent
+  - [ ] 24.2.4 — Asset attachment ingestion: Extract and validate user-uploaded reference images, video clips, and script texts from chat turns
+
+- [ ] **24.3 — Video Director Task Agent & Storyboard Decomposition Engine**
+  - [ ] 24.3.1 — Spawning and registration of dedicated `VideoDirectorAgent` (3xxxx tier) off the chat critical path
+  - [ ] 24.3.2 — Storyboard decomposition engine: Break down user prompt, script, and assets into multi-scene graph of 4s–15s clips
+  - [ ] 24.3.3 — Structured scene schema: Scene order, visual prompt, start/end frame references, camera motion, narration text, tone, and transitions
+  - [ ] 24.3.4 — Bi-directional state synchronization: Task agent emits JSON graph state updating the visual studio canvas in real time
+
+- [ ] **24.4 — Autonomous Audio Synthesis Pipeline (Voiceover, BGM & SFX)**
+  - [ ] 24.4.1 — Scene voiceover narration synthesis using configured TTS (OpenAI TTS / ElevenLabs / Kokoro / Edge-TTS)
+  - [ ] 24.4.2 — Precise scene audio duration measurement to lock and synchronize video clip timings
+  - [ ] 24.4.3 — Background music (BGM) generation or ambient audio selection matching video mood and pacing
+  - [ ] 24.4.4 — Sound effect (SFX) cue synthesis and placement at key visual action timestamps
+  - [ ] 24.4.5 — Multi-track audio assembly with automatic audio ducking (attenuating BGM by -14dB during voiceover narration)
+
+- [ ] **24.5 — Multi-Scene Video Clip Generation (AI Video up to 15s/clip)**
+  - [ ] 24.5.1 — Text-to-Video API dispatch for scenes without starting image assets
+  - [ ] 24.5.2 — Image-to-Video API dispatch animating user-provided start and end frame keyframe assets
+  - [ ] 24.5.3 — Frame Chaining (Scene Chaining): Automatically extract the last frame of scene $N$ and chain it as the first frame of scene $N+1$ to preserve character identity, lighting, and camera style consistency across cuts
+  - [ ] 24.5.4 — Draft vs. Final Render Tiers: Support rapid 720p draft prototyping before committing full 1080p production renders
+  - [ ] 24.5.5 — Asynchronous task polling with exponential backoff, rate-limit resilience, and auto-retry on provider failure
+  - [ ] 24.5.6 — Local caching and parallel download of intermediate MP4 scene clips to task workspace cache
+
+- [ ] **24.6 — Autonomous Video Editing, Stitching & Rendering (FFmpeg Engine)**
+  - [ ] 24.6.1 — Video conforming: Standardize resolution (1080p), aspect ratio (16:9 widescreen or 9:16 vertical shorts), and framerate (30fps)
+  - [ ] 24.6.2 — Seamless transitions: Crossfade, dissolve, and cut via FFmpeg `xfade` complex filter graphs
+  - [ ] 24.6.3 — Dual-track audio mixing: Align scene voiceovers to exact timestamps and overlay ducked background music
+  - [ ] 24.6.4 — Subtitle/caption generation and burn-in: Generate SRT captions from narration script/Whisper and render on video
+  - [ ] 24.6.5 — Master render output generation (`output.mp4`) and high-resolution poster thumbnail extraction (`poster.jpg`)
+
+- [ ] **24.7 — File Storage in User Home & Artifact Management**
+  - [ ] 24.7.1 — Persist final video and assets to host-mounted workspace: `/host_home/agentium-workspace/videos/<project_id>/`
+  - [ ] 24.7.2 — Generate `project_manifest.json` containing complete storyboard graph, model metadata, prompts, and timestamps
+  - [ ] 24.7.3 — Static streaming endpoint `/api/v1/files/workspace/videos/{project_id}/{filename}` for zero-copy video playback
+
+- [ ] **24.8 — Frontend: Visual Drag-and-Drop Canvas & Bottom Task Agent Chat Dock (Magnific / Higgsfield Style)**
+  - [ ] 24.8.1 — Register `/studio` route with `Clapperboard` icon under `Workspace` navigation group in `navConfig.ts`
+  - [ ] 24.8.2 — Infinite/pan-zoom visual canvas (Magnific / Higgsfield style) with node-edge wiring:
+    - **Asset Nodes**: Drag-and-drop uploaded reference images, keyframes, and video clips
+    - **Scene Nodes**: Configurable start frame port, end frame port, visual prompt editor, duration (5–15s), camera motion controls, and clip preview player
+    - **Audio Nodes**: Narration script editor, speaker voice selector, and audio waveform preview
+    - **Stitching Node**: Aspect ratio toggle (16:9 vs 9:16), transition selector, render button, and master player
+  - [ ] 24.8.3 — Frame chaining visualization: Visual connector cable linking the end frame of a scene node to the start frame of the succeeding scene node
+  - [ ] 24.8.4 — Single-scene re-generation: Re-generate or edit individual scene clips and prompts without re-rendering the whole project
+  - [ ] 24.8.5 — Bottom-docked Task Agent Chat: Dedicated chat panel docked at the bottom of the studio canvas for direct communication with the assigned `VideoDirectorAgent`
+  - [ ] 24.8.6 — Bi-directional live sync: Agent actions dynamically generate and update canvas nodes, while user node edits update agent context
+  - [ ] 24.8.7 — In-Chat video integration: Live stage progress card and inline HTML5 playable video message in the main Chat page
+
+- [ ] **24.9 — End-to-End Orchestration & Verification**
+  - [ ] 24.9.1 — Unit tests for video and audio model availability detection and fallback messaging
+  - [ ] 24.9.2 — Unit tests for storyboard decomposition, scene chunking (up to 15s), and schema validation
+  - [ ] 24.9.3 — Integration tests for FFmpeg stitching, transitions, audio ducking, and SRT caption generation
+  - [ ] 24.9.4 — WebSocket integration tests for live canvas node updates and task agent chat streaming
+  - [ ] 24.9.5 — End-to-end browser tests for canvas drag-and-drop, start/end frame assignment, frame chaining, and bottom chat agent interaction
+
