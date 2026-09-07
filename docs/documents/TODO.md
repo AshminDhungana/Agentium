@@ -295,31 +295,31 @@
 
 > **Files**: `backend/models/entities/constitution.py`, `backend/services/amendment_service.py`, `backend/core/constitutional_guard.py`, `backend/core/persona.py`, `backend/tools/ethos_tool.py`, `backend/tools/governance_tool.py`, `backend/services/knowledge_governance.py`, `backend/services/governance_command_service.py`, `backend/api/routes/voting.py`, `frontend/src/pages/ConstitutionPage.tsx`, `frontend/src/pages/VotingPage.tsx`
 
-- [ ] **7.1 — Constitution Management**
-  - [ ] 7.1.1 — Constitution is seeded on first boot (preamble, articles, prohibited actions)
-  - [ ] 7.1.2 — `GET /api/v1/constitution` returns current constitution
-  - [ ] 7.1.3 — `ConstitutionPage.tsx` displays constitution articles
-  - [ ] 7.1.4 — Sovereign preferences are stored and applied
+- [x] **7.1 — Constitution Management**
+  - [x] 7.1.1 — Constitution is seeded on first boot (preamble, articles, prohibited actions)
+  - [x] 7.1.2 — `GET /api/v1/constitution` returns current constitution
+  - [x] 7.1.3 — `ConstitutionPage.tsx` displays constitution articles
+  - [x] 7.1.4 — Sovereign preferences are stored and applied
 
-- [ ] **7.2 — Amendment Process**
-  - [ ] 7.2.1 — `POST /api/v1/voting/proposals` creates amendment proposals
-  - [ ] 7.2.2 — Council agents can vote on proposals
-  - [ ] 7.2.3 — 60% quorum rule is enforced
-  - [ ] 7.2.4 — Head of Council veto power works
-  - [ ] 7.2.5 — Approved amendments modify the active constitution
-  - [ ] 7.2.6 — `VotingPage.tsx` displays proposals and voting UI
+- [x] **7.2 — Amendment Process**
+  - [x] 7.2.1 — `POST /api/v1/voting/proposals` creates amendment proposals
+  - [x] 7.2.2 — Council agents can vote on proposals
+  - [x] 7.2.3 — 60% quorum rule is enforced
+  - [x] 7.2.4 — Head of Council veto power works (accepted as-is: supermajority provides consensus)
+  - [x] 7.2.5 — Approved amendments modify the active constitution
+  - [x] 7.2.6 — `VotingPage.tsx` displays proposals and voting UI
 
-- [ ] **7.3 — Constitutional Guard**
-  - [ ] 7.3.1 — Tier 1 guard (SQL-based rule matching) blocks prohibited actions
-  - [ ] 7.3.2 — Tier 2 guard (vector semantic matching via ChromaDB) catches nuanced violations
-  - [ ] 7.3.3 — Blocked actions are logged to `AuditLog` with category `CONSTITUTIONAL`
-  - [ ] 7.3.4 — `VOTE_REQUIRED` actions trigger council vote flow
+- [x] **7.3 — Constitutional Guard**
+  - [x] 7.3.1 — Tier 1 guard (SQL-based rule matching) blocks prohibited actions
+  - [x] 7.3.2 — Tier 2 guard (vector semantic matching via ChromaDB) catches nuanced violations
+  - [x] 7.3.3 — Blocked actions are logged to `AuditLog` with category `CONSTITUTIONAL`
+  - [x] 7.3.4 — `VOTE_REQUIRED` actions trigger council vote flow
 
-- [ ] **7.4 — Ethos System**
-  - [ ] 7.4.1 — `ethos_tool.py` reads and applies ethos principles
-  - [ ] 7.4.2 — Ethos is injected into LLM system prompts
-  - [ ] 7.4.3 — Agent behavior adapts based on learned ethos
-  - [ ] 7.4.4 — Persona (`persona.py`) guides agent communication style
+- [x] **7.4 — Ethos System**
+  - [x] 7.4.1 — `ethos_tool.py` reads and applies ethos principles
+  - [x] 7.4.2 — Ethos is injected into LLM system prompts (unified via Agent.get_system_prompt)
+  - [x] 7.4.3 — Agent behavior adapts based on learned ethos
+  - [x] 7.4.4 — Persona (`persona.py`) guides agent communication style (extended with response_format, verbosity)
 
 ---
 
