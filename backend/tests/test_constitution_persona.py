@@ -408,6 +408,36 @@ def test_preview_persona_renders_draft():
     assert "DRAFT_MARKER" in rendered and "DRAFT_PERSONA_CLAUSE" in rendered
 
 
+def test_persona_includes_response_format_bullet_points():
+    const = _sample_constitution()
+    const["sovereign_preferences"] = {
+        "communication_style": "formal",
+        "response_format": "bullet_points",
+        "verbosity": "verbose"
+    }
+    text = build_persona_directive(const, tier=3)
+    assert "bullet points" in text.lower() or "bullet_points" in text.lower()
+    assert "verbose" in text.lower() or "detail" in text.lower()
+
+
+def test_persona_includes_concise_verbosity():
+    const = _sample_constitution()
+    const["sovereign_preferences"] = {
+        "verbosity": "concise"
+    }
+    text = build_persona_directive(const, tier=3)
+    assert "concise" in text.lower() or "brief" in text.lower()
+
+
+def test_persona_includes_summary_first_format():
+    const = _sample_constitution()
+    const["sovereign_preferences"] = {
+        "response_format": "summary_first"
+    }
+    text = build_persona_directive(const, tier=3)
+    assert "summary" in text.lower()
+
+
 # ─── 5.2.4 System Prompt Injection Tests ────────────────────────────────────
 
 def test_system_prompt_includes_constitution_ethos_and_context(test_db, head_agent):

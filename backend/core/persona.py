@@ -131,12 +131,39 @@ def build_persona_directive(
     comm = sovereign.get("communication_style")
     if comm:
         style_bits.append(str(comm))
+    
+    # NEW: response_format preference
+    response_format = sovereign.get("response_format")
+    if response_format == "summary_first":
+        style_bits.append(
+            "Start responses with a concise standalone summary "
+            "(1-3 sentences) that can stand alone as the full answer, "
+            "then provide detail."
+        )
+    elif response_format == "bullet_points":
+        style_bits.append(
+            "Use bullet points and structured lists for clarity. "
+            "Avoid long paragraphs."
+        )
+    elif response_format == "detailed":
+        style_bits.append(
+            "Provide thorough, detailed explanations with context."
+        )
+    
+    # NEW: verbosity preference
+    verbosity = sovereign.get("verbosity")
+    if verbosity == "concise":
+        style_bits.append("Be concise. Use minimal words. No fluff.")
+    elif verbosity == "verbose":
+        style_bits.append("Be thorough and verbose. Include all relevant details.")
+    # "normal" = no extra instruction
+    
     if channel == "voice":
         style_bits.append(VOICE_ADAPTATION)
     # Summary-first hint for response envelope (non-voice channels)
     if channel != "voice":
         from backend.core.config import get_settings
-        if get_settings().RESPONSE_DELIVERY_ENVELOPE:
+        if get_settings().RESPONSE_DELIVERY_ENVELOPE and response_format != "summary_first":
             style_bits.append(
                 "Start responses with a concise standalone summary "
                 "(1-3 sentences) that can stand alone as the full answer, "
