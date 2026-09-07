@@ -442,6 +442,7 @@ class LLMClient:
                         on_delta=on_delta,
                         on_tool_start=on_tool_start,
                         cancel_event=cancel_event,
+                        channel="text",
                         **kwargs,
                     )
                     effective_config_id = attempt_config_id or "default"

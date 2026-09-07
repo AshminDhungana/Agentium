@@ -1993,6 +1993,7 @@ class ModelService:
         on_delta: Optional[Callable[[str], Awaitable[None]]] = None,
         cancel_event: Optional[asyncio.Event] = None,
         on_tool_start: Optional[Callable[[List[Dict], int], Awaitable[None]]] = None,
+        channel: str = "text",
         # NEW: Output schema validation parameters
         response_model: Optional[Type[BaseModel]] = None,
         max_validation_retries: int = 2,
@@ -2077,20 +2078,14 @@ class ModelService:
         # tracking, and audit entries are all written exactly as before.
         agent_id = getattr(agent, "agentium_id", "system")
 
-        # -- Build system prompt -------
+        # -- Build system prompt using Agent.get_system_prompt (unified) --
         system_prompt = system_prompt_override
         if not system_prompt:
-            ethos = getattr(agent, "ethos", None)
-            system_prompt = (ethos.mission_statement if ethos else None) or "You are an AI assistant."
-            if ethos:
-                try:
-                    rules = json.loads(ethos.behavioral_rules) if ethos.behavioral_rules else []
-                    if rules:
-                        system_prompt += "\n\nBehavioral Rules:\n" + "\n".join(
-                            f"- {r}" for r in rules[:10]
-                        )
-                except Exception:
-                    pass
+            # Use the agent's unified system prompt builder which includes:
+            # - Constitution persona (preamble, articles, prohibited, tier emphasis)
+            # - Sovereign preferences (communication_style, response_format, verbosity)
+            # - Ethos operational context (objective, working_method, capabilities, environment)
+            system_prompt = agent.get_system_prompt(db=db, channel=channel)
 
         # -- Hard response-length enforcement (Gap 3) ---
         # Appended LAST so it cannot be overridden by ethos or caller content.
