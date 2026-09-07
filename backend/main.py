@@ -83,6 +83,7 @@ from backend.api.routes import critics as critics_routes
 from backend.api.routes import checkpoints as checkpoints_routes 
 from backend.api.routes import remote_executor as remote_executor_routes  
 from backend.api.routes import voting as voting_routes           
+from backend.api.routes import constitution as constitution_routes
 from backend.api.routes.ab_testing import router as ab_testing_router
 from backend.api.routes import provider_analytics as provider_analytics_routes
 from backend.api.routes import skills as skills_routes
@@ -669,6 +670,7 @@ app.include_router(critics_routes.router,           prefix="/api/v1")
 app.include_router(checkpoints_routes.router,       prefix="/api/v1")
 app.include_router(remote_executor_routes.router,   prefix="/api/v1")
 app.include_router(voting_routes.router,            prefix="/api/v1")
+app.include_router(constitution_routes.router,      prefix="/api/v1")
 app.include_router(mcp_tools_router)
 app.include_router(tools_routes.router,             prefix="/api/v1")
 app.include_router(user_preferences_routes.router, prefix="/api/v1")
