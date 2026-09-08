@@ -327,10 +327,10 @@
 
 > **Files**: `backend/core/tool_registry.py`, `backend/core/tool_runner.py`, `backend/tools/`, `backend/services/tool_factory.py`, `backend/services/tool_creation_service.py`, `backend/services/tool_versioning.py`, `backend/services/tool_analytics.py`, `backend/services/tool_deprecation.py`, `backend/services/tool_marketplace.py`, `frontend/src/pages/ToolMarketplacePage.tsx`
 
-- [ ] **8.1 — Tool Registry**
-  - [ ] 8.1.1 — `tool_registry` discovers and registers all built-in tools at startup
-  - [ ] 8.1.2 — `GET /api/v1/tools` returns list of available tools
-  - [ ] 8.1.3 — Each tool has valid JSON Schema for parameters
+- [x] **8.1 — Tool Registry**
+  - [x] 8.1.1 — `tool_registry` discovers and registers all built-in tools at startup
+  - [x] 8.1.2 — `GET /api/v1/tools` returns list of available tools
+  - [x] 8.1.3 — Each tool has valid JSON Schema for parameters
 
 - [ ] **8.2 — Individual Tool Verification**
   - [ ] 8.2.1 — `web_search_tool.py` — web search executes and returns results
