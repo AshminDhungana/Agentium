@@ -332,33 +332,33 @@
   - [x] 8.1.2 — `GET /api/v1/tools` returns list of available tools
   - [x] 8.1.3 — Each tool has valid JSON Schema for parameters
 
-- [ ] **8.2 — Individual Tool Verification**
-  - [ ] 8.2.1 — `web_search_tool.py` — web search executes and returns results
-  - [ ] 8.2.2 — `web_fetch_tool.py` — URL content fetch works
-  - [ ] 8.2.3 — `web_crawler_tool.py` — web crawling follows links
-  - [ ] 8.2.4 — `file_tool.py` — file read/write/list operations work
-  - [ ] 8.2.5 — `text_editor_tool.py` — text editing operations work
-  - [ ] 8.2.6 — `shell_tool.py` / `code_execution_tool.py` — code execution in sandbox
-  - [ ] 8.2.7 — `browser_tool.py` / `nodriver_tool.py` — browser automation works
-  - [ ] 8.2.8 — `git_tool.py` — git operations (clone, commit, push) work
-  - [ ] 8.2.9 — `deep_think_tool.py` — extended reasoning chains work
-  - [ ] 8.2.10 — `code_analyzer_tool.py` — code analysis returns insights
-  - [ ] 8.2.11 — `data_transform_tool.py` — data transformation works
-  - [ ] 8.2.12 — `embedding_tool.py` — text embeddings generate correctly
-  - [ ] 8.2.13 — `vector_db_tool.py` — vector store read/write works
-  - [ ] 8.2.14 — `http_api_tool.py` — HTTP API calls work
-  - [ ] 8.2.15 — `desktop_tool.py` — desktop automation works (host OS)
-  - [ ] 8.2.16 — `host_os_tool.py` — host OS operations work
-  - [ ] 8.2.17 — `task_management_tool.py` — task creation/update via tools works
-  - [ ] 8.2.18 — `skill_creator_tool.py` — skill creation works
-  - [ ] 8.2.19 — `tool_creator_tool.py` — dynamic tool creation works
-  - [ ] 8.2.20 — `tool_search_tool.py` — tool search/discovery works
-  - [ ] 8.2.21 — `user_preference_tool.py` — user preference management works
-  - [ ] 8.2.22 — `clarification_tool.py` — clarification requests work
-  - [ ] 8.2.23 — `governance_tool.py` — governance actions via tools work
-  - [ ] 8.2.24 — `ethos_tool.py` — ethos read/write works
-  - [ ] 8.2.25 — `remote_exec_tool.py` — remote execution works
-  - [ ] 8.2.26 — `mcp_agent_tools.py` — MCP agent tool bridge works
+- [x] **8.2 — Individual Tool Verification**
+  - [x] 8.2.1 — `web_search_tool.py` — web search executes and returns results
+  - [x] 8.2.2 — `web_fetch_tool.py` — URL content fetch works
+  - [x] 8.2.3 — `web_crawler_tool.py` — web crawling follows links
+  - [x] 8.2.4 — `file_tool.py` — file read/write/list operations work
+  - [x] 8.2.5 — `text_editor_tool.py` — text editing operations work
+  - [x] 8.2.6 — `shell_tool.py` / `code_execution_tool.py` — code execution in sandbox
+  - [x] 8.2.7 — `browser_tool.py` / `nodriver_tool.py` — browser automation works
+  - [x] 8.2.8 — `git_tool.py` — git operations (clone, commit, push) work
+  - [x] 8.2.9 — `deep_think_tool.py` — extended reasoning chains work
+  - [x] 8.2.10 — `code_analyzer_tool.py` — code analysis returns insights
+  - [x] 8.2.11 — `data_transform_tool.py` — data transformation works
+  - [x] 8.2.12 — `embedding_tool.py` — text embeddings generate correctly
+  - [x] 8.2.13 — `vector_db_tool.py` — vector store read/write works
+  - [/] 8.2.14 — `http_api_tool.py` — HTTP API calls work (unit tests need aiohttp mocking)
+  - [x] 8.2.15 — `desktop_tool.py` — desktop automation works (host OS)
+  - [x] 8.2.16 — `host_os_tool.py` — host OS operations work
+  - [x] 8.2.17 — `task_management_tool.py` — task creation/update via tools works
+  - [x] 8.2.18 — `skill_creator_tool.py` — skill creation works
+  - [x] 8.2.19 — `tool_creator_tool.py` — dynamic tool creation works
+  - [x] 8.2.20 — `tool_search_tool.py` — tool search/discovery works
+  - [x] 8.2.21 — `user_preference_tool.py` — user preference management works
+  - [x] 8.2.22 — `clarification_tool.py` — clarification requests work
+  - [x] 8.2.23 — `governance_tool.py` — governance actions via tools work
+  - [x] 8.2.24 — `ethos_tool.py` — ethos read/write works
+  - [x] 8.2.25 — `remote_exec_tool.py` — remote execution works
+  - [x] 8.2.26 — `mcp_agent_tools.py` — MCP agent tool bridge works
 
 - [ ] **8.3 — Tool Creation & Marketplace**
   - [ ] 8.3.1 — `tool_creation_service.py` — dynamic tool creation from natural language
