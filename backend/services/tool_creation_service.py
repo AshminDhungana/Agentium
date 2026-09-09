@@ -21,6 +21,7 @@ from backend.models.entities.audit import AuditLog, AuditLevel, AuditCategory
 from backend.services.tool_factory import ToolFactory
 from backend.services.tool_versioning import ToolVersioningService
 from backend.services.tool_analytics import ToolAnalyticsService
+from backend.services.tool_code_generation import ToolCodeGenerationService
 from backend.core.tool_registry import tool_registry
 from backend.models.entities.agents import Agent
 from typing import Dict, Any, List, Optional
@@ -444,6 +445,63 @@ class ToolCreationService:
         outcome["tool_name"] = tool_name
         outcome["created"] = outcome.get("proposed", False)
         return outcome
+
+    # ──────────────────────────────────────────────────────────────
+    # NATURAL LANGUAGE TOOL CREATION
+    # ──────────────────────────────────────────────────────────────
+
+    async def create_from_natural_language(
+        self,
+        description: str,
+        agent_id: str,
+        tool_name: Optional[str] = None,
+        authorized_tiers: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Create a tool from natural language description.
+        
+        Uses LLM to generate code, validates it, then proposes via existing workflow.
+        
+        Args:
+            description: Natural language description of desired functionality
+            agent_id: Agentium ID of requesting agent
+            tool_name: Optional explicit tool name
+            authorized_tiers: Optional list of authorized tiers (defaults to agent's tier + Head)
+            
+        Returns:
+            Same structure as propose_tool(): proposed, tool_name, status, etc.
+        """
+        # Task agents (3xxxx) cannot create tools
+        if agent_id.startswith("3"):
+            return {"proposed": False, "error": "Task agents cannot create tools"}
+        
+        # Determine authorized tiers
+        if authorized_tiers is None:
+            creator_tier = f"{agent_id[0]}xxxx"
+            authorized_tiers = [creator_tier, "0xxxx"]
+        
+        # Generate code from natural language
+        code_gen = ToolCodeGenerationService(self.db)
+        
+        try:
+            gen_result = await code_gen.generate(description, agent_id, tool_name)
+        except ValueError as exc:
+            return {"proposed": False, "error": str(exc)}
+        
+        # Build ToolCreationRequest
+        request = ToolCreationRequest(
+            tool_name=gen_result["tool_name"],
+            description=description,
+            parameters=gen_result["parameters"],
+            code_template=gen_result["code_template"],
+            test_cases=[],
+            authorized_tiers=authorized_tiers,
+            created_by_agentium_id=agent_id,
+            rationale=description,
+        )
+        
+        # Propose via existing workflow
+        return self.propose_tool(request)
 
     # ──────────────────────────────────────────────────────────────
 
