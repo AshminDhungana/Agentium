@@ -1839,6 +1839,37 @@ def chat_prune_task(self, dry_run: bool = False, override_inactivity_days: int =
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+# Self-Improvement: Auto-Generate Tools from Usage Patterns
+# ──────────────────────────────────────────────────────────────────────────────
+
+@celery_app.task(name="agentium.tasks.task_executor.generate_auto_tools")
+def generate_auto_tools():
+    """
+    Weekly task to auto-generate tools from repeated usage patterns.
+    
+    Calls SelfImprovementService.generate_auto_tools() which analyzes
+    tool invocation patterns and creates composite tools for sequences
+    executed >= 5 times with > 90% success rate.
+    
+    Runs via Celery Beat (weekly).
+    
+    Returns:
+        Dict with tools_generated, patterns_analyzed, or error.
+    """
+    from backend.celery_app import BeatSessionLocal
+    
+    db = BeatSessionLocal()
+    try:
+        from backend.services.self_improvement_service import self_improvement_service
+        return self_improvement_service.generate_auto_tools(db)
+    except Exception as exc:
+        logger.error(f"generate_auto_tools task failed: {exc}")
+        return {"error": str(exc)}
+    finally:
+        db.close()
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # Celery Throughput Performance Gate No-op Task
 # ──────────────────────────────────────────────────────────────────────────────
 

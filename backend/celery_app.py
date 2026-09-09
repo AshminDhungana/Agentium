@@ -178,6 +178,10 @@ celery_app.conf.beat_schedule = {
         'task': 'agentium.tasks.task_executor.performance_optimization',
         'schedule': 604800.0,
     },
+    'generate-auto-tools-weekly': {
+        'task': 'agentium.tasks.task_executor.generate_auto_tools',
+        'schedule': 604800.0,  # weekly (7 days)
+    },
 
     # ── Phase 13.6: Intelligent Event Processing ──────────────────────────────
     'threshold-event-check': {
