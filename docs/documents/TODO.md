@@ -360,15 +360,15 @@
   - [x] 8.2.25 — `remote_exec_tool.py` — remote execution works
   - [x] 8.2.26 — `mcp_agent_tools.py` — MCP agent tool bridge works
 
-- [ ] **8.3 — Tool Creation & Marketplace**
-  - [ ] 8.3.1 — `tool_creation_service.py` — dynamic tool creation from natural language
-  - [ ] 8.3.2 — Generated tools are stored in `tools/generated/`
-  - [ ] 8.3.3 — Tool staging and review flow works
-  - [ ] 8.3.4 — `ToolMarketplacePage.tsx` lists available tools
-  - [ ] 8.3.5 — Tool install/uninstall from marketplace works
-  - [ ] 8.3.6 — Tool versioning and rollback works (`tool_versioning.py`)
-  - [ ] 8.3.7 — Tool deprecation notices work (`tool_deprecation.py`)
-  - [ ] 8.3.8 — Tool analytics (usage tracking) works (`tool_analytics.py`)
+- [x] **8.3 — Tool Creation & Marketplace**
+  - [x] 8.3.1 — `tool_creation_service.py` — dynamic tool creation from natural language
+  - [x] 8.3.2 — Generated tools are stored in `tools/generated/`
+  - [x] 8.3.3 — Tool staging and review flow works
+  - [x] 8.3.4 — `ToolMarketplacePage.tsx` lists available tools
+  - [x] 8.3.5 — Tool install/uninstall from marketplace works
+  - [x] 8.3.6 — Tool versioning and rollback works (`tool_versioning.py`)
+  - [x] 8.3.7 — Tool deprecation notices work (`tool_deprecation.py`)
+  - [x] 8.3.8 — Tool analytics (usage tracking) works (`tool_analytics.py`)
 
 - [ ] **8.4 — Tool Execution Safety**
   - [ ] 8.4.1 — `execution_guard.py` sandboxes dangerous operations
