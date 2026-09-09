@@ -114,6 +114,12 @@ class UpdateListingRequest(BaseModel):
     pass
 
 
+class FromNaturalLanguageRequest(BaseModel):
+    description: str = Field(..., min_length=10, max_length=5000, description="Natural language description of the tool")
+    tool_name: Optional[str] = Field(None, max_length=100, description="Optional explicit tool name")
+    authorized_tiers: Optional[List[str]] = Field(None, description="Authorized agent tiers")
+
+
 # ═══════════════════════════════════════════════════════════════
 # CORE — Propose, Vote, List
 # ═══════════════════════════════════════════════════════════════
@@ -146,6 +152,42 @@ async def propose_tool(
     result  = service.propose_tool(request)
     if not result.get("proposed") and "error" in result:
         raise BadRequestError(error=result["error"], code="RESULTERROR")
+    return result
+
+
+@router.post(
+    "/from-natural-language",
+    summary="Create Tool from Natural Language",
+    description="Generate a tool from a natural language description. Head (0xxxx) auto-activates; Council (1xxxx)/Lead (2xxxx) trigger Council vote. Task agents (3xxxx) blocked.",
+    responses=build_responses(None),
+)
+async def create_tool_from_natural_language(
+    request: FromNaturalLanguageRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_active_user),
+    agent_tier: str = Depends(get_current_agent_tier),
+    agent_id: str = Depends(get_current_agent_id),
+):
+    """
+    Create a tool from natural language description.
+    
+    - Head (0xxxx): auto-approved and activated immediately
+    - Council (1xxxx) / Lead (2xxxx): triggers Council vote
+    - Task agents (3xxxx): blocked
+    """
+    _require_not_task_agent(agent_tier)
+    
+    service = ToolCreationService(db)
+    result = await service.create_from_natural_language(
+        description=request.description,
+        agent_id=agent_id,
+        tool_name=request.tool_name,
+        authorized_tiers=request.authorized_tiers,
+    )
+    
+    if not result.get("proposed") and "error" in result:
+        raise BadRequestError(error=result["error"], code="RESULTERROR")
+    
     return result
 
 
