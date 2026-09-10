@@ -1708,6 +1708,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tool-management/from-natural-language": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Tool from Natural Language
+         * @description Generate a tool from a natural language description. Head (0xxxx) auto-activates; Council (1xxxx)/Lead (2xxxx) trigger Council vote. Task agents (3xxxx) blocked.
+         */
+        post: operations["create_tool_from_natural_language_api_v1_tool_management_from_natural_language_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tool-management/": {
         parameters: {
             query?: never;
@@ -9579,6 +9599,24 @@ export interface components {
              * @default false
              */
             force: boolean;
+        };
+        /** FromNaturalLanguageRequest */
+        FromNaturalLanguageRequest: {
+            /**
+             * Description
+             * @description Natural language description of the tool
+             */
+            description: string;
+            /**
+             * Tool Name
+             * @description Optional explicit tool name
+             */
+            tool_name?: string | null;
+            /**
+             * Authorized Tiers
+             * @description Authorized agent tiers
+             */
+            authorized_tiers?: string[] | null;
         };
         /** FrontendErrorRequest */
         FrontendErrorRequest: {
@@ -19362,6 +19400,102 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ToolCreationRequest"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponseExample"];
+                };
+            };
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponseExample"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+        };
+    };
+    create_tool_from_natural_language_api_v1_tool_management_from_natural_language_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FromNaturalLanguageRequest"];
             };
         };
         responses: {
