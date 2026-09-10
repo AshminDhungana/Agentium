@@ -370,11 +370,11 @@
   - [x] 8.3.7 — Tool deprecation notices work (`tool_deprecation.py`)
   - [x] 8.3.8 — Tool analytics (usage tracking) works (`tool_analytics.py`)
 
-- [ ] **8.4 — Tool Execution Safety**
-  - [ ] 8.4.1 — `execution_guard.py` sandboxes dangerous operations
-  - [ ] 8.4.2 — Tool parameter validation rejects invalid inputs
-  - [ ] 8.4.3 — Tool timeout limits prevent runaway execution
-  - [ ] 8.4.4 — Remote executor sandbox (`remote_executor/sandbox.py`) isolates code
+- [x] **8.4 — Tool Execution Safety**
+  - [x] 8.4.1 — `execution_guard.py` sandboxes dangerous operations (multi-layer: regex patterns, AST import whitelist, syntax validation; tests: `test_execution_guard_writes.py` 4/4 pass)
+  - [x] 8.4.2 — Tool parameter validation rejects invalid inputs (Pydantic model validation in `execute_tool_async` with strict mode for sensitive tools like `code_execution`, `execute_command`, `remote_exec`, `host_smart_execute`, `desktop_delete_file`)
+  - [x] 8.4.3 — Tool timeout limits prevent runaway execution (`run_tool_async` with `asyncio.wait_for`; per-tool overrides via `tool.get("timeout")`; global `TOOL_TIMEOUT_DEFAULT=60s`; tests: `test_tool_runner.py` 9/9 pass)
+  - [x] 8.4.4 — Remote executor sandbox (`remote_executor/sandbox.py`) isolates code (Docker container with `cap_drop=["ALL"]`, `security_opt=["no-new-privileges"]`, resource limits: CPU, memory, disk; network_mode="none" default, opt-in bridge with egress deny-list labels)
 
 ---
 
@@ -763,11 +763,11 @@
   - [ ] 19.5.3 — Path traversal in file operations is prevented
   - [ ] 19.5.4 — `PayloadSizeLimitMiddleware` rejects oversized requests
 
-- [ ] **19.6 — Execution Safety**
-  - [ ] 19.6.1 — `execution_guard.py` blocks dangerous shell commands
-  - [ ] 19.6.2 — Code execution runs in sandboxed environment
-  - [ ] 19.6.3 — File system access is restricted to workspace
-  - [ ] 19.6.4 — Network access from sandboxed code is controlled
+- [x] **19.6 — Execution Safety**
+  - [x] 19.6.1 — `execution_guard.py` blocks dangerous shell commands (see 8.4.1)
+  - [x] 19.6.2 — Code execution runs in sandboxed environment (see 8.4.4)
+  - [x] 19.6.3 — File system access is restricted to workspace (sandbox read-only rootfs; only /tmp and /workspace writable via tmpfs/volumes)
+  - [x] 19.6.4 — Network access from sandboxed code is controlled (default `network_mode="none"`; opt-in bridge with egress deny-list CIDRs recorded as labels: 169.254.169.254/32, 169.254.0.0/16, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 127.0.0.0/8, ::1/128, fc00::/7)
 
 - [x] **19.7 — Uncertainty Detection**
   - [x] 19.7.1 — `uncertainty_detector.py` identifies low-confidence responses (6 triggers: tool_error, empty_result, missing_expected_fields, hallucinated_tool, conflicting_results, all_tools_failed)
