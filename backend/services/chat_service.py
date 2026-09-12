@@ -84,7 +84,7 @@ class ChatService:
         return history
 
     @staticmethod
-    def send_structured_card(card: "_SIC", db: Session, user_id: str) -> dict:
+    def send_structured_card(card: "_SIC", db: Session, user_id: str, conversation_id: Optional[str] = None) -> dict:
         """Persist an agent-issued structured input card and broadcast it.
 
         Fire-and-forget: the WS broadcast is scheduled on the running loop so the
@@ -100,6 +100,7 @@ class ChatService:
             message_metadata={"card": card.model_dump()},
             created_at=datetime.utcnow(),
             is_deleted="N",
+            conversation_id=conversation_id,
         )
         db.add(msg)
         db.commit()
@@ -125,10 +126,13 @@ class ChatService:
         return msg.to_dict()
 
     @staticmethod
-    async def process_message(head: HeadOfCouncil, message: str, db: Session, extra_metadata: Optional[dict] = None, on_delta: Optional[Callable[[str], Awaitable[None]]] = None, cancel_event: Optional[asyncio.Event] = None, on_tool_start: Optional[Callable[[List[Dict], int], Awaitable[None]]] = None):
+    async def process_message(head: HeadOfCouncil, message: str, db: Session, extra_metadata: Optional[dict] = None, on_delta: Optional[Callable[[str], Awaitable[None]]] = None, cancel_event: Optional[asyncio.Event] = None, on_tool_start: Optional[Callable[[List[Dict], int], Awaitable[None]]] = None, conversation_id: Optional[str] = None):
         """
         Process message with context management and potential reincarnation.
         Preserves task state across reincarnations.
+        
+        Args:
+            conversation_id: Optional conversation to associate messages with.
         """
         # FIX: Extract config values immediately while session is active
         config = head.get_model_config(db)
@@ -237,6 +241,7 @@ class ChatService:
                     user_id=str(sovereign_user.id),
                     role="sovereign",
                     content=message,
+                    conversation_id=conversation_id,
                     message_metadata={**{"source": "websocket"}, **(extra_metadata or {})},
                 ))
                 db.commit()
@@ -534,6 +539,7 @@ Address the Sovereign respectfully. If they issue a command that requires execut
                         head.agentium_id,
                         result.get("model", model_name),
                         [],
+                        conversation_id=conversation_id,
                         # NOTE: db session automatically closed after request in production.
                         # Tests override get_fresh_db to share a session — only there
                         # is the passed session still usable when the task runs.
@@ -851,7 +857,7 @@ Progress: {task_progress or 'N/A'}%"""
 
         This runs in a separate ``asyncio.create_task`` from ``process_message``,
         which means the caller's ``db`` session (closed by the time this runs) must
-        NOT be reused — hence the dedicated ``SessionLocal()`` here.
+        NOT be reused \u2014 hence the dedicated ``SessionLocal()`` here.
         """
         global ws_manager
         try:
@@ -899,6 +905,7 @@ Progress: {task_progress or 'N/A'}%"""
         agent_id: str,
         model: str,
         media_urls: list,
+        conversation_id: Optional[str] = None,
         db: Session = None,  # Passed from process_message; only usable in tests
     ) -> None:
         """
@@ -948,7 +955,7 @@ Progress: {task_progress or 'N/A'}%"""
             if not use_passed_db:
                 db.close()
         await ChatService._persist_head_turn_background(
-            user_id, content, agent_id, model, media_urls, db=db if use_passed_db else None
+            user_id, content, agent_id, model, media_urls, conversation_id=conversation_id, db=db if use_passed_db else None
         )
 
     @staticmethod
@@ -958,6 +965,7 @@ Progress: {task_progress or 'N/A'}%"""
         agent_id: str,
         model: str,
         media_urls: list,
+        conversation_id: Optional[str] = None,
         db: Session = None,  # Passed from _media_and_persist_background if using shared session
     ) -> None:
         """Persist the Head-of-Council turn + media rewrite off the critical path."""
@@ -971,6 +979,7 @@ Progress: {task_progress or 'N/A'}%"""
                 user_id=user_id,
                 role="head_of_council",
                 content=content,
+                conversation_id=conversation_id,
                 message_metadata={
                     "agent_id": agent_id,
                     "model": model,

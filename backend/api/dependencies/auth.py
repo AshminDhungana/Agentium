@@ -36,7 +36,8 @@ async def get_current_user(
         )
 
     # Verify user exists in database
-    user = db.query(User).filter(User.username == payload.get("sub")).first()
+    # Token's "sub" claim contains the user's UUID (id), not username
+    user = db.query(User).filter(User.id == payload.get("sub")).first()
     if not user:
         raise UnauthorizedError(
             error="User not found",

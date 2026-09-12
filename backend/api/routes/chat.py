@@ -39,6 +39,11 @@ from backend.api.schemas.examples import ErrorResponseExample, SuccessResponseEx
 router = APIRouter(prefix="/chat", tags=["Chat"])
 
 
+def _get_user_id(current_user: dict) -> str:
+    """Extract user ID from current_user dict, handling different key names."""
+    return str(current_user.get("id") or current_user.get("agentium_id") or current_user.get("user_id") or "")
+
+
 class ChatMessage(BaseModel):
     message: str
     stream: bool = True
@@ -53,13 +58,19 @@ class ChatMessage(BaseModel):
     # NEW (Jarvis upgrade): optional speaker id from the voice bridge's speaker
     # identification step, used to tag the resulting context.
     speaker_id: Optional[str] = None
+    # NEW: optional conversation_id to associate messages with a conversation
+    conversation_id: Optional[str] = None
 
 
 class ChatResponse(BaseModel):
     response: str
     agent_id: str
     task_created: bool = False
-    task_id: str = None
+    task_id: Optional[str] = None
+    conversation_id: str
+    context_compressed: bool = False
+    raw_turn_count: int = 0
+    estimated_tokens: int = 0
 
 
 def _enrich_with_persona(message: str, persona: Optional[str]) -> str:
@@ -142,7 +153,7 @@ async def list_conversations(
     from backend.models.entities.chat_message import Conversation
 
     query = db.query(Conversation).filter(
-        Conversation.user_id == str(current_user.get("user_id", "")),
+        Conversation.user_id == str(_get_user_id(current_user)),
         Conversation.is_deleted == "N",
     )
 
@@ -157,12 +168,18 @@ async def list_conversations(
     }
 
 
+class ConversationCreateRequest(BaseModel):
+    title: Optional[str] = None
+    context: Optional[str] = None
+
+
 @router.post(
     "/conversations",
     summary="Create a conversation",
     description="Create a new conversation.",
+    status_code=201,
     responses={
-        200: {"description": "Success", "model": SuccessResponseExample},
+        201: {"description": "Success", "model": SuccessResponseExample},
         400: {"description": "Bad Request", "model": ErrorResponseExample},
         401: {"description": "Unauthorized", "model": ErrorResponseExample},
         403: {"description": "Forbidden", "model": ErrorResponseExample},
@@ -172,8 +189,7 @@ async def list_conversations(
     },
 )
 async def create_conversation(
-    title: Optional[str] = None,
-    context: Optional[str] = None,
+    request: ConversationCreateRequest,
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_active_user),
 ):
@@ -181,9 +197,9 @@ async def create_conversation(
     from backend.models.entities.chat_message import Conversation
 
     conversation = Conversation(
-        user_id=str(current_user.get("user_id", "")),
-        title=title or "New Conversation",
-        context=context,
+        user_id=str(_get_user_id(current_user)),
+        title=request.title or "New Conversation",
+        context=request.context,
     )
     db.add(conversation)
     db.commit()
@@ -216,7 +232,7 @@ async def get_conversation(
 
     conversation = db.query(Conversation).filter(
         Conversation.id == conversation_id,
-        Conversation.user_id == str(current_user.get("user_id", "")),
+        Conversation.user_id == str(_get_user_id(current_user)),
         Conversation.is_deleted == "N",
     ).first()
 
@@ -250,7 +266,7 @@ async def archive_conversation(
 
     conversation = db.query(Conversation).filter(
         Conversation.id == conversation_id,
-        Conversation.user_id == str(current_user.get("user_id", "")),
+        Conversation.user_id == str(_get_user_id(current_user)),
     ).first()
 
     if not conversation:
@@ -285,7 +301,7 @@ async def delete_conversation(
 
     conversation = db.query(Conversation).filter(
         Conversation.id == conversation_id,
-        Conversation.user_id == str(current_user.get("user_id", "")),
+        Conversation.user_id == str(_get_user_id(current_user)),
     ).first()
 
     if not conversation:
@@ -294,6 +310,52 @@ async def delete_conversation(
     conversation.is_deleted = "Y"
     db.commit()
     return {"success": True, "message": "Conversation deleted"}
+
+
+class ConversationUpdateRequest(BaseModel):
+    title: Optional[str] = None
+    is_archived: Optional[bool] = None
+
+
+@router.patch(
+    "/conversations/{conversation_id}",
+    summary="Update a conversation",
+    description="Update conversation title or archive status.",
+    responses={
+        200: {"description": "Success", "model": SuccessResponseExample},
+        400: {"description": "Bad Request", "model": ErrorResponseExample},
+        401: {"description": "Unauthorized", "model": ErrorResponseExample},
+        403: {"description": "Forbidden", "model": ErrorResponseExample},
+        404: {"description": "Not Found", "model": ErrorResponseExample},
+        429: {"description": "Too Many Requests", "model": ErrorResponseExample},
+        500: {"description": "Internal Server Error", "model": ErrorResponseExample},
+    },
+)
+async def update_conversation(
+    conversation_id: str,
+    request: ConversationUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_active_user),
+):
+    """Update conversation title or archive status."""
+    from backend.models.entities.chat_message import Conversation
+
+    conversation = db.query(Conversation).filter(
+        Conversation.id == conversation_id,
+        Conversation.user_id == str(_get_user_id(current_user)),
+    ).first()
+
+    if not conversation:
+        raise NotFoundError(error="Conversation not found", code="CONVERSATION_NOT_FOUND")
+
+    if request.title is not None:
+        conversation.title = request.title
+    if request.is_archived is not None:
+        conversation.is_archived = "Y" if request.is_archived else "N"
+
+    db.commit()
+    db.refresh(conversation)
+    return conversation.to_dict()
 
 
 @router.get(
@@ -318,19 +380,20 @@ async def get_chat_stats(
     from backend.models.entities.chat_message import ChatMessage as ChatMsg, Conversation
     from datetime import datetime, timedelta
 
+    user_id = str(_get_user_id(current_user))
     total_conversations = db.query(Conversation).filter(
-        Conversation.user_id == str(current_user.get("user_id", "")),
+        Conversation.user_id == user_id,
         Conversation.is_deleted == "N",
     ).count()
 
     total_messages = db.query(ChatMsg).filter(
-        ChatMsg.user_id == str(current_user.get("user_id", "")),
+        ChatMsg.user_id == user_id,
         ChatMsg.is_deleted == "N",
     ).count()
 
     today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
     messages_today = db.query(ChatMsg).filter(
-        ChatMsg.user_id == str(current_user.get("user_id", "")),
+        ChatMsg.user_id == user_id,
         ChatMsg.created_at >= today_start,
         ChatMsg.is_deleted == "N",
     ).count()
@@ -370,6 +433,7 @@ async def send_message(
     Send message to Head of Council (00001).
     Returns streaming response for real-time updates.
     Attachments are enriched with extracted file content before reaching the AI.
+    Messages are persisted with conversation_id for history tracking.
     """
     head = db.query(HeadOfCouncil).filter_by(agentium_id="00001").first()
 
@@ -379,6 +443,22 @@ async def send_message(
     if head.status.value != "active":
         raise ServiceUnavailableError(error=f"Head of Council is {head.status.value}", code="HEAD_OF_COUNCIL_IS")
 
+    # Determine conversation_id
+    conversation_id = chat_msg.conversation_id
+    if conversation_id is None:
+        # Auto-create or reuse "General" conversation
+        from backend.models.entities.chat_message import Conversation
+        general_conv = db.query(Conversation).filter(
+            Conversation.user_id == _get_user_id(current_user),
+            Conversation.title == "General",
+            Conversation.is_deleted == "N"
+        ).first()
+        if not general_conv:
+            general_conv = Conversation(user_id=_get_user_id(current_user), title="General")
+            db.add(general_conv)
+            db.flush()
+        conversation_id = general_conv.id
+
     if chat_msg.stream:
         return StreamingResponse(
             # FIX: pass attachments so the streaming path can inject file content
@@ -386,6 +466,8 @@ async def send_message(
                 head.agentium_id,
                 chat_msg,
                 chat_msg.attachments,
+                conversation_id=conversation_id,
+                user_id=_get_user_id(current_user),
             ),
             media_type="text/event-stream",
             headers={
@@ -402,12 +484,61 @@ async def send_message(
         chat_msg.message, chat_msg.attachments
     )
     extra_metadata = {"card_response": chat_msg.card_response} if chat_msg.card_response else None
-    response = await ChatService.process_message(head, enriched_message, db, extra_metadata=extra_metadata)
+    
+    # Persist user message first
+    from backend.models.entities.chat_message import ChatMessage as ChatMsg
+    import uuid
+    user_msg = ChatMsg(
+        id=str(uuid.uuid4()),
+        user_id=_get_user_id(current_user),
+        role="sovereign",
+        content=chat_msg.message,
+        conversation_id=conversation_id,
+        attachments=chat_msg.attachments,
+        message_metadata={"source": "chat"},
+    )
+    db.add(user_msg)
+    db.commit()
+    
+    response = await ChatService.process_message(head, enriched_message, db, extra_metadata=extra_metadata, conversation_id=conversation_id)
+    
+    # Persist agent message
+    agent_msg = ChatMsg(
+        id=str(uuid.uuid4()),
+        user_id=_get_user_id(current_user),
+        role="head_of_council",
+        content=response["content"],
+        conversation_id=conversation_id,
+        agent_id=head.agentium_id,
+        message_metadata={
+            "agent_id": head.agentium_id,
+            "model": response.get("model"),
+            "context_compressed": response.get("context_compressed", False),
+            "raw_turn_count": response.get("raw_turn_count", 0),
+            "estimated_tokens": response.get("estimated_tokens", 0),
+            "task_created": response.get("task_created", False),
+            "task_id": response.get("task_id"),
+        }
+    )
+    db.add(agent_msg)
+    
+    # Update conversation last_message_at
+    from backend.models.entities.chat_message import Conversation
+    conv = db.query(Conversation).filter(Conversation.id == conversation_id).first()
+    if conv:
+        conv.last_message_at = datetime.utcnow()
+    
+    db.commit()
+    
     return ChatResponse(
         response=response["content"],
         agent_id=head.agentium_id,
         task_created=response.get("task_created", False),
         task_id=response.get("task_id"),
+        conversation_id=str(conversation_id),
+        context_compressed=response.get("context_compressed", False),
+        raw_turn_count=response.get("raw_turn_count", 0),
+        estimated_tokens=response.get("estimated_tokens", 0),
     )
 
 
@@ -435,7 +566,7 @@ async def send_structured_card(
     current_user: Annotated[dict, Depends(get_current_active_user)],
 ):
     """Persist an agent-issued structured input card and broadcast it to the chat thread."""
-    user_id = str(current_user.get("user_id", ""))
+    user_id = str(_get_user_id(current_user))
     msg = ChatService.send_structured_card(card, db, user_id)
     return {"status": "ok", "message": msg}
 
@@ -476,6 +607,8 @@ async def _stream_response(
     agent_id: str,
     chat_msg: "ChatMessage",
     attachments: Optional[List[dict]] = None,
+    conversation_id: Optional[str] = None,
+    user_id: Optional[str] = None,
 ) -> AsyncGenerator[str, None]:
     """
     Stream response from Head of Council.
@@ -627,19 +760,23 @@ async def _stream_response(
         message_id = str(uuid.uuid4())
 
         if use_envelope:
-            yield f"data: {json.dumps({'type': 'complete', 'stream_id': stream_id, 'seq': seq, 'content': full_text, 'message_id': message_id, 'metadata': {'agent_id': agent_id, 'model': model_name, 'task_created': task_info['created'], 'task_id': task_info.get('task_id'), 'card': None}})}\n\n"
+            yield f"data: {json.dumps({'type': 'complete', 'stream_id': stream_id, 'seq': seq, 'content': full_text, 'message_id': message_id, 'metadata': {'agent_id': agent_id, 'model': model_name, 'task_created': task_info['created'], 'task_id': task_info.get('task_id'), 'card': None, 'conversation_id': conversation_id}})}\n\n"
         else:
-            yield f"data: {json.dumps({'type': 'complete', 'content': '', 'message_id': message_id, 'metadata': {'agent_id': agent_id, 'model': model_name, 'task_created': task_info['created'], 'task_id': task_info.get('task_id'), 'card': None}})}\n\n"
+            yield f"data: {json.dumps({'type': 'complete', 'content': '', 'message_id': message_id, 'metadata': {'agent_id': agent_id, 'model': model_name, 'task_created': task_info['created'], 'task_id': task_info.get('task_id'), 'card': None, 'conversation_id': conversation_id}})}\n\n"
 
         await ChatService.log_interaction(agent_id, chat_msg.message, full_text, config_id, db)
 
-        sovereign_user = db.query(User).filter_by(is_admin=True, is_active=True).first()
+        # Use provided user_id or fall back to sovereign user
+        target_user_id = user_id
+        if not target_user_id:
+            sovereign_user = db.query(User).filter_by(is_admin=True, is_active=True).first()
+            if sovereign_user:
+                target_user_id = str(sovereign_user.id)
 
         # ── Persist both turns to ChatMessage ────────────────────────────────
-        if sovereign_user:
+        if target_user_id:
             try:
                 from backend.models.entities.chat_message import ChatMessage as ChatMsg
-                user_str_id = str(sovereign_user.id)
 
                 # Store original message text + attachment metadata (not extracted content)
                 # The frontend uses attachment metadata (url, name, type) to render previews.
@@ -653,17 +790,19 @@ async def _stream_response(
 
                 db.add(ChatMsg(
                     id=str(uuid.uuid4()),
-                    user_id=user_str_id,
+                    user_id=target_user_id,
                     role="sovereign",
                     content=chat_msg.message,
+                    conversation_id=conversation_id,
                     attachments=stored_attachments,
                     message_metadata={"source": "chat"},
                 ))
                 db.add(ChatMsg(
                     id=message_id,
-                    user_id=user_str_id,
+                    user_id=target_user_id,
                     role="head_of_council",
                     content=full_text,
+                    conversation_id=conversation_id,
                     message_metadata={
                         "agent_id": agent_id,
                         "model": model_name,
@@ -671,6 +810,14 @@ async def _stream_response(
                         "task_id": task_info.get("task_id"),
                     },
                 ))
+                
+                # Update conversation last_message_at
+                if conversation_id:
+                    from backend.models.entities.chat_message import Conversation
+                    conv = db.query(Conversation).filter(Conversation.id == conversation_id).first()
+                    if conv:
+                        conv.last_message_at = datetime.utcnow()
+                
                 db.commit()
             except Exception as _persist_err:
                 logger.error(f"[chat.py] ChatMessage persist failed (non-fatal): {_persist_err}")
@@ -680,16 +827,16 @@ async def _stream_response(
                     pass
         # ─────────────────────────────────────────────────────────────────────
 
-        if sovereign_user and use_envelope:
+        if target_user_id and use_envelope:
             broadcast_payload = {
-                "user_id": sovereign_user.id,
+                "user_id": target_user_id,
                 "content": full_text,
                 "summary": summary_text if not task_info.get("created", False) else full_text,
                 "detail": detail_text if not task_info.get("created", False) else "",
             }
-        elif sovereign_user:
+        elif target_user_id:
             broadcast_payload = {
-                "user_id": sovereign_user.id,
+                "user_id": target_user_id,
                 "content": full_text,
             }
 
@@ -766,7 +913,7 @@ async def get_chat_history(
         messages = (
             db.query(ChatMsg)
             .filter(
-                ChatMsg.user_id == str(current_user.get("user_id", "")),
+                ChatMsg.user_id == str(_get_user_id(current_user)),
                 ChatMsg.is_deleted != True,   # noqa: E712
             )
             .order_by(desc(ChatMsg.created_at))
@@ -795,4 +942,73 @@ async def get_chat_history(
         ],
         "total":    len(messages),
         "has_more": len(messages) == limit,
+    }
+
+
+@router.get(
+    "/conversations/{conversation_id}/messages",
+    summary="Get conversation messages",
+    description="Get paginated messages for a specific conversation.",
+    responses={
+        200: {"description": "Success", "model": SuccessResponseExample},
+        400: {"description": "Bad Request", "model": ErrorResponseExample},
+        401: {"description": "Unauthorized", "model": ErrorResponseExample},
+        403: {"description": "Forbidden", "model": ErrorResponseExample},
+        404: {"description": "Not Found", "model": ErrorResponseExample},
+        429: {"description": "Too Many Requests", "model": ErrorResponseExample},
+        500: {"description": "Internal Server Error", "model": ErrorResponseExample},
+    },
+)
+async def get_conversation_messages(
+    conversation_id: str,
+    limit: int = 50,
+    offset: int = 0,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_active_user),
+):
+    """
+    Get paginated messages for a specific conversation.
+    """
+    from backend.models.entities.chat_message import ChatMessage as ChatMsg, Conversation
+
+    # Verify conversation exists and belongs to user
+    conversation = db.query(Conversation).filter(
+        Conversation.id == conversation_id,
+        Conversation.user_id == str(_get_user_id(current_user)),
+        Conversation.is_deleted == "N",
+    ).first()
+
+    if not conversation:
+        raise NotFoundError(error="Conversation not found", code="CONVERSATION_NOT_FOUND")
+
+    try:
+        msg_query = db.query(ChatMsg).filter(
+            ChatMsg.conversation_id == conversation_id,
+            ChatMsg.is_deleted != "Y",   # noqa: E712
+        ).order_by(ChatMsg.created_at)
+
+        total = msg_query.count()
+        messages = msg_query.offset(offset).limit(limit).all()
+    except Exception as exc:
+        logger = __import__("logging").getLogger(__name__)
+        logger.exception("get_conversation_messages query failed: %s", exc)
+        raise InternalServerError(error="Failed to retrieve conversation messages", code="FAILED_TO_RETRIEVE_CONVERSATION_MESSAGES")
+
+    return {
+        "messages": [
+            {
+                "id":          msg.id,
+                "role":        msg.role,
+                "content":     msg.content,
+                "created_at":  msg.created_at.isoformat() if msg.created_at else None,
+                "metadata":    msg.message_metadata or {},
+                "attachments": msg.attachments or [],
+                "agent_id":    msg.agent_id,
+                "conversation_id": msg.conversation_id,
+            }
+            for msg in messages
+        ],
+        "total": total,
+        "limit": limit,
+        "offset": offset,
     }

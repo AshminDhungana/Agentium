@@ -191,6 +191,8 @@ class Conversation(Base):
             "title": self.title,
             "context": self.context,
             "is_active": self.is_active,
+            "is_archived": self.is_archived,
+            "is_deleted": self.is_deleted,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
             "last_message_at": self.last_message_at.isoformat() if self.last_message_at else None,
