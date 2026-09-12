@@ -465,7 +465,11 @@ export interface paths {
         delete: operations["delete_conversation_api_v1_chat_conversations__conversation_id__delete"];
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Update a conversation
+         * @description Update conversation title or archive status.
+         */
+        patch: operations["update_conversation_api_v1_chat_conversations__conversation_id__patch"];
         trace?: never;
     };
     "/api/v1/chat/conversations/{conversation_id}/archive": {
@@ -580,6 +584,26 @@ export interface paths {
          * @description Get chat history for the current user. Returns messages from the ChatMessage table ordered chronologically.
          */
         get: operations["get_chat_history_api_v1_chat_history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chat/conversations/{conversation_id}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get conversation messages
+         * @description Get paginated messages for a specific conversation.
+         */
+        get: operations["get_conversation_messages_api_v1_chat_conversations__conversation_id__messages_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -8586,6 +8610,8 @@ export interface components {
             voice_persona?: string | null;
             /** Speaker Id */
             speaker_id?: string | null;
+            /** Conversation Id */
+            conversation_id?: string | null;
         };
         /**
          * ChatPruneRequest
@@ -8935,6 +8961,20 @@ export interface components {
             status?: string | null;
             /** Error */
             error?: string | null;
+        };
+        /** ConversationCreateRequest */
+        ConversationCreateRequest: {
+            /** Title */
+            title?: string | null;
+            /** Context */
+            context?: string | null;
+        };
+        /** ConversationUpdateRequest */
+        ConversationUpdateRequest: {
+            /** Title */
+            title?: string | null;
+            /** Is Archived */
+            is_archived?: boolean | null;
         };
         /**
          * CreateKeyRequest
@@ -13080,18 +13120,19 @@ export interface operations {
     };
     create_conversation_api_v1_chat_conversations_post: {
         parameters: {
-            query?: {
-                title?: string | null;
-                context?: string | null;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConversationCreateRequest"];
+            };
+        };
         responses: {
             /** @description Success */
-            200: {
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -13261,6 +13302,95 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponseExample"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+        };
+    };
+    update_conversation_api_v1_chat_conversations__conversation_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConversationUpdateRequest"];
+            };
+        };
         responses: {
             /** @description Success */
             200: {
@@ -13707,6 +13837,94 @@ export interface operations {
             };
             header?: never;
             path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponseExample"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+        };
+    };
+    get_conversation_messages_api_v1_chat_conversations__conversation_id__messages_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
             cookie?: never;
         };
         requestBody?: never;
