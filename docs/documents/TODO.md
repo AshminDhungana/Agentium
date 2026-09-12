@@ -382,12 +382,12 @@
 
 > **Files**: `backend/services/chat_service.py`, `backend/services/chat_context.py`, `backend/services/context_manager.py`, `backend/services/chat_prune_service.py`, `backend/services/clarification_service.py`, `backend/services/clarification_handler.py`, `backend/services/overflow_recovery.py`, `backend/api/routes/chat.py`, `frontend/src/pages/ChatPage.tsx`, `frontend/src/store/chatStore.ts`, `frontend/src/services/chatApi.ts`, `frontend/src/services/chatStream.ts`
 
-- [ ] **9.1 — Chat API**
-  - [ ] 9.1.1 — `POST /api/v1/chat/messages` sends message and receives agent response
-  - [ ] 9.1.2 — Streaming response works (SSE / chunked transfer)
-  - [ ] 9.1.3 — Chat history is persisted to database
-  - [ ] 9.1.4 — `GET /api/v1/chat/conversations` lists conversations
-  - [ ] 9.1.5 — `GET /api/v1/chat/conversations/{id}/messages` returns message history
+- [/] **9.1 — Chat API** (Implemented; test infrastructure issues remain)
+  - [x] 9.1.1 — `POST /api/v1/chat/send` sends message and receives agent response (with conversation_id support)
+  - [x] 9.1.2 — Streaming response works (SSE / chunked transfer)
+  - [x] 9.1.3 — Chat history is persisted to database with conversation association
+  - [x] 9.1.4 — `GET /api/v1/chat/conversations` lists conversations (with archived filter, pagination)
+  - [x] 9.1.5 — `GET /api/v1/chat/conversations/{id}/messages` returns paginated message history
 
 - [ ] **9.2 — Context Management**
   - [ ] 9.2.1 — `ChatContext` builds prompt with constitution + ethos + history
