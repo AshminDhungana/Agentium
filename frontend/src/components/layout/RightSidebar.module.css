@@ -1,0 +1,109 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.3);
+  z-index: 100;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease, visibility 0.2s ease;
+}
+
+.overlay.open {
+  opacity: 1;
+  visibility: visible;
+}
+
+.overlay.mobile .panel {
+  bottom: 0;
+  left: 0;
+  right: 0;
+  top: auto;
+  height: 60vh;
+  max-height: 60vh;
+  border-radius: 16px 16px 0 0;
+  transform: translateY(100%);
+  transition: transform 0.3s ease;
+}
+
+.overlay.mobile.open .panel {
+  transform: translateY(0);
+}
+
+.panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--bg-secondary, #1e1e1e);
+  border-left: 1px solid var(--border-color, #333);
+  display: flex;
+  flex-direction: column;
+  z-index: 101;
+  transform: translateX(100%);
+  transition: transform 0.3s ease, width 0.2s ease;
+}
+
+.overlay.open .panel {
+  transform: translateX(0);
+}
+
+.panel.bottom {
+  border-left: none;
+  border-top: 1px solid var(--border-color, #333);
+}
+
+.handle {
+  position: absolute;
+  top: 50%;
+  left: -12px;
+  transform: translateY(-50%);
+  width: 24px;
+  height: 48px;
+  background: var(--bg-secondary, #1e1e1e);
+  border: 1px solid var(--border-color, #333);
+  border-right: none;
+  border-radius: 8px 0 0 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 102;
+}
+
+.handleIcon {
+  font-size: 14px;
+  color: var(--text-muted, #888);
+  transition: transform 0.2s ease;
+}
+
+.content {
+  flex: 1;
+  overflow: auto;
+  padding: 16px;
+}
+
+.dragHandle {
+  display: none;
+  padding: 12px;
+  text-align: center;
+}
+
+.overlay.mobile .dragHandle {
+  display: block;
+}
+
+.dragBar {
+  width: 40px;
+  height: 4px;
+  background: var(--text-muted, #888);
+  border-radius: 2px;
+  margin: 0 auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overlay,
+  .panel,
+  .handleIcon {
+    transition: none !important;
+  }
+}
