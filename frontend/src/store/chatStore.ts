@@ -4,6 +4,7 @@ import { showToast } from '@/hooks/useToast';
 import { api } from '@/services/api';
 import { chatStreamApi } from '@/services/chatStream';
 import type { StructuredInputCardPayload } from '../types/structuredInput';
+import { chatApi, type Conversation as ApiConversation } from '@/services/chatApi';
 
 export interface MessageAttachment {
     name: string;
@@ -47,44 +48,61 @@ export interface Message {
     attachments?: MessageAttachment[];
 }
 
+export interface Conversation {
+    id: string;
+    title: string;
+    is_archived: boolean;
+    created_at: string;
+    updated_at: string;
+    message_count: number;
+    last_message_preview?: string;
+}
+
 interface ChatState {
     messages: Message[];
     isLoading: boolean;
     currentStreamingMessage: string;
-    // Structured input card lifecycle (only one active card at a time).
     cardStatus: Record<string, 'active' | 'confirmed' | 'expired' | 'dismissed'>;
     activeCardId: string | null;
+    activeStreamId: string | null;
+    _streamBuffer: string;
+    _streamFlushTimer: ReturnType<typeof setInterval> | null;
+
+    // NEW: Conversation state
+    currentConversationId: string | null;
+    conversations: Conversation[];
+    isSidebarOpen: boolean;
+    sidebarWidth: number;
+
     registerCard: (cardId: string, replaceActive: boolean) => void;
     confirmCard: (cardId: string) => void;
     expireCard: (cardId: string) => void;
     dismissCard: (cardId: string) => void;
-    activeStreamId: string | null;
     beginStream: (messageId: string, role: Message['role']) => void;
     appendDelta: (streamId: string, delta: string) => void;
     endStream: (streamId: string, content: string, metadata?: MessageMetadata) => void;
-    /**
-     * Finalize an in-flight stream that was interrupted (e.g. the WebSocket
-     * dropped before a `message_end` arrived). Keeps whatever text was already
-     * revealed, marks the message `sent`, and clears `activeStreamId` so the
-     * Stop button and blinking caret don't get stuck.
-     */
     resetStream: () => void;
-    /**
-     * Buffer of delta text not yet flushed to the rendered message. Flushed in
-     * small slices on a timer so the reply reveals at a readable pace instead of
-     * popping in as fast as the backend emits deltas.
-     */
-    _streamBuffer: string;
-    _streamFlushTimer: ReturnType<typeof setInterval> | null;
     _startFlush: (streamId: string) => void;
     _stopFlush: () => void;
     sendMessage: (content: string) => Promise<void>;
     setMessages: (updater: Message[] | ((prev: Message[]) => Message[])) => void;
     clearHistory: () => void;
     loadHistory: () => Promise<void>;
+
+    // NEW: Conversation actions
+    setConversation: (conversationId: string) => Promise<void>;
+    createConversation: (title?: string) => Promise<string>;
+    loadConversations: () => Promise<void>;
+    deleteConversation: (conversationId: string) => Promise<void>;
+    updateConversation: (conversationId: string, updates: { title?: string; is_archived?: boolean }) => Promise<void>;
+    toggleSidebar: () => void;
+    setSidebarWidth: (width: number) => void;
 }
 
-// All chat API calls are now routed through chatStreamApi service.
+const STORAGE_KEY = 'agentium-chat-messages';
+const CONVERSATION_ID_KEY = 'chat:currentConversationId';
+const SIDEBAR_WIDTH_KEY = 'chat:sidebar:width';
+const SIDEBAR_OPEN_KEY = 'chat:sidebar:open';
 
 export const useChatStore = create<ChatState>()(
     persist(
@@ -98,12 +116,15 @@ export const useChatStore = create<ChatState>()(
             _streamBuffer: '',
             _streamFlushTimer: null,
 
+            // NEW initial state
+            currentConversationId: null,
+            conversations: [],
+            isSidebarOpen: false,
+            sidebarWidth: 320,
+
             registerCard: (cardId, replaceActive) => set((s) => {
-                // Idempotent: a re-delivered card message (e.g. on WS reconnect)
-                // must not revert an already-answered/expired one back to active.
                 if (s.cardStatus[cardId]) return s;
                 const status: ChatState['cardStatus'] = { ...s.cardStatus, [cardId]: 'active' as const };
-                // "only one active card at a time": a new request replaces any unanswered one
                 if (replaceActive && s.activeCardId && s.activeCardId !== cardId) {
                     status[s.activeCardId] = 'dismissed';
                 }
@@ -114,8 +135,6 @@ export const useChatStore = create<ChatState>()(
                 activeCardId: s.activeCardId === cardId ? null : s.activeCardId,
             })),
             expireCard: (cardId) => set((s) => {
-                // Defense-in-depth: never flip an already answered/dismissed card
-                // back to expired even if a stale timer fires after confirmation.
                 if (s.cardStatus[cardId] === 'confirmed' || s.cardStatus[cardId] === 'dismissed') {
                     return s;
                 }
@@ -129,7 +148,6 @@ export const useChatStore = create<ChatState>()(
                 activeCardId: s.activeCardId === cardId ? null : s.activeCardId,
             })),
 
-            // Streaming helpers: drive server-pushed token deltas into a single message.
             beginStream: (messageId, role) => {
                 get()._stopFlush();
                 set((s) => ({
@@ -144,7 +162,6 @@ export const useChatStore = create<ChatState>()(
             },
 
             appendDelta: (streamId, delta) => {
-                // Honour reduced-motion: reveal immediately, no pacing.
                 if (
                     typeof window !== 'undefined' &&
                     window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
@@ -156,18 +173,15 @@ export const useChatStore = create<ChatState>()(
                     }));
                     return;
                 }
-                // Otherwise buffer and reveal in paced slices.
                 set({ _streamBuffer: get()._streamBuffer + delta });
                 get()._startFlush(streamId);
             },
 
             _startFlush: (streamId) => {
-                if (get()._streamFlushTimer != null) return; // already running
+                if (get()._streamFlushTimer != null) return;
                 const timer = setInterval(() => {
                     const pending = get()._streamBuffer;
                     if (!pending) { get()._stopFlush(); return; }
-                    // Reveal a small slice normally, but catch up instantly if a
-                    // large backlog has built up so we never lag far behind.
                     const slice = pending.length > 120 ? pending.length : Math.min(pending.length, 6);
                     const take = pending.slice(0, slice);
                     const rest = pending.slice(slice);
@@ -210,8 +224,6 @@ export const useChatStore = create<ChatState>()(
             endStream: (streamId, content, metadata) => {
                 get()._stopFlush();
                 set((s) => {
-                    // Prefer the authoritative server content; fall back to what
-                    // we have locally (revealed text + any still-buffered text).
                     const localContent = s.messages.find((m) => m.id === streamId)?.content ?? '';
                     const finalContent = content || (localContent + (s._streamBuffer || ''));
                     return {
@@ -251,7 +263,6 @@ export const useChatStore = create<ChatState>()(
                 try {
                     const response = await chatStreamApi.sendMessage(content);
 
-                    // Add assistant message
                     const assistantMessage: Message = {
                         id: crypto.randomUUID(),
                         role: 'head_of_council',
@@ -308,38 +319,162 @@ export const useChatStore = create<ChatState>()(
                     set({ messages: formattedMessages });
                 } catch (error) {
                     console.error('Failed to load chat history:', error);
-                    // Don't show error toast - history is optional
                 }
             },
 
             clearHistory: () => {
                 set({ messages: [], currentStreamingMessage: '' });
-            }
+            },
+
+            // NEW: Conversation actions
+            setConversation: async (conversationId: string) => {
+                const { resetStream } = get();
+                resetStream();
+                set({ isLoading: true });
+                
+                try {
+                    const response = await chatApi.getConversation(conversationId);
+                    const messages = response.messages?.map((m: any) => ({
+                        id: m.id,
+                        role: m.role,
+                        content: m.content,
+                        timestamp: new Date(m.created_at || m.timestamp),
+                        status: 'sent' as const,
+                        attachments: m.attachments,
+                        metadata: m.metadata,
+                    })) || [];
+                    
+                    set({ 
+                        messages, 
+                        currentConversationId: conversationId,
+                        isSidebarOpen: false,
+                        isLoading: false,
+                    });
+                    sessionStorage.setItem(CONVERSATION_ID_KEY, conversationId);
+                } catch (error) {
+                    console.error('Failed to load conversation:', error);
+                    set({ isLoading: false });
+                    throw error;
+                }
+            },
+
+            createConversation: async (title?: string) => {
+                try {
+                    const response = await chatApi.createConversation(title || 'New Conversation');
+                    const newConv: Conversation = {
+                        id: response.id,
+                        title: response.title || 'New Conversation',
+                        is_archived: false,
+                        created_at: response.created_at,
+                        updated_at: response.updated_at,
+                        message_count: 0,
+                    };
+                    set(state => ({ 
+                        conversations: [newConv, ...state.conversations],
+                        currentConversationId: response.id,
+                        messages: [],
+                        isSidebarOpen: false,
+                    }));
+                    sessionStorage.setItem(CONVERSATION_ID_KEY, response.id);
+                    return response.id;
+                } catch (error) {
+                    console.error('Failed to create conversation:', error);
+                    throw error;
+                }
+            },
+
+            loadConversations: async () => {
+                try {
+                    const response = await chatApi.listConversations();
+                    const conversations: Conversation[] = response.conversations.map((c: ApiConversation) => ({
+                        id: c.id,
+                        title: c.title || 'Untitled',
+                        is_archived: false,
+                        created_at: c.created_at,
+                        updated_at: c.updated_at,
+                        message_count: c.message_count || 0,
+                    }));
+                    set({ conversations });
+                } catch (error) {
+                    console.error('Failed to load conversations:', error);
+                }
+            },
+
+            deleteConversation: async (conversationId: string) => {
+                try {
+                    await chatApi.deleteConversation(conversationId);
+                    set(state => {
+                        const newConversations = state.conversations.filter(c => c.id !== conversationId);
+                        const newCurrentId = state.currentConversationId === conversationId 
+                            ? (newConversations[0]?.id || null) 
+                            : state.currentConversationId;
+                        if (newCurrentId === null) {
+                            sessionStorage.removeItem(CONVERSATION_ID_KEY);
+                        }
+                        return { conversations: newConversations, currentConversationId: newCurrentId };
+                    });
+                } catch (error) {
+                    console.error('Failed to delete conversation:', error);
+                    throw error;
+                }
+            },
+
+            updateConversation: async (conversationId: string, updates: { title?: string; is_archived?: boolean }) => {
+                try {
+                    const updatePayload: { title?: string; context?: string } = {};
+                    if (updates.title !== undefined) updatePayload.title = updates.title;
+                    if (updates.is_archived !== undefined) {
+                        // Note: backend uses archiveConversation endpoint for archiving
+                        if (updates.is_archived) {
+                            await chatApi.archiveConversation(conversationId);
+                        }
+                    }
+                    if (updates.title !== undefined) {
+                        await chatApi.updateConversation(conversationId, { title: updates.title });
+                    }
+                    set(state => ({
+                        conversations: state.conversations.map(c => 
+                            c.id === conversationId ? { ...c, ...updates } : c
+                        ),
+                    }));
+                } catch (error) {
+                    console.error('Failed to update conversation:', error);
+                    throw error;
+                }
+            },
+
+            toggleSidebar: () => set(state => {
+                const newOpen = !state.isSidebarOpen;
+                localStorage.setItem(SIDEBAR_OPEN_KEY, String(newOpen));
+                if (newOpen) get().loadConversations();
+                return { isSidebarOpen: newOpen };
+            }),
+
+            setSidebarWidth: (width: number) => {
+                set({ sidebarWidth: width });
+                localStorage.setItem(SIDEBAR_WIDTH_KEY, String(width));
+            },
         }),
         {
-            name: 'agentium-chat-messages',  // sessionStorage key
-            storage: createJSONStorage(() => sessionStorage, {
-                // Rehydrate timestamp strings back to Date objects
-                reviver: (key, value) => {
-                    if (key === 'timestamp' && typeof value === 'string') {
-                        return new Date(value);
-                    }
-                    return value;
-                },
+            name: STORAGE_KEY,
+            storage: createJSONStorage(() => sessionStorage),
+            partialize: (state) => ({
+                messages: state.messages,
+                currentConversationId: state.currentConversationId,
             }),
-            // Only persist messages — skip transient loading/streaming state
-            partialize: (state) => ({ messages: state.messages }),
-            // A stream interrupted by a reload/crash would otherwise rehydrate
-            // with status 'streaming' and blink its caret forever. Finalize any
-            // such message and clear transient stream fields on load.
             onRehydrateStorage: () => (state) => {
                 if (!state) return;
-                state.messages = state.messages.map((m) =>
+                state.messages = state.messages.map((m: any) =>
                     m.status === 'streaming' ? { ...m, status: 'sent' } : m);
                 state.activeStreamId = null;
                 state.currentStreamingMessage = '';
                 state._streamBuffer = '';
                 state._streamFlushTimer = null;
+                // Rehydrate sidebar state from localStorage
+                const savedWidth = localStorage.getItem(SIDEBAR_WIDTH_KEY);
+                const savedOpen = localStorage.getItem(SIDEBAR_OPEN_KEY);
+                if (savedWidth) state.sidebarWidth = parseInt(savedWidth, 10);
+                if (savedOpen) state.isSidebarOpen = savedOpen === 'true';
             },
         }
     )
