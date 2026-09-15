@@ -389,11 +389,11 @@
   - [x] 9.1.4 — `GET /api/v1/chat/conversations` lists conversations (with archived filter, pagination)
   - [x] 9.1.5 — `GET /api/v1/chat/conversations/{id}/messages` returns paginated message history
 
-- [ ] **9.2 — Context Management**
-  - [ ] 9.2.1 — `ChatContext` builds prompt with constitution + ethos + history
-  - [ ] 9.2.2 — `ContextManager` manages context window within token limits
-  - [ ] 9.2.3 — Conversation pruning/summarization preserves essential context
-  - [ ] 9.2.4 — Overflow recovery handles context window exceeded errors
+- [x] **9.2 — Context Management**
+  - [x] 9.2.1 — `ChatContext` builds prompt with constitution + ethos + history
+  - [x] 9.2.2 — `ContextManager` manages context window within token limits
+  - [x] 9.2.3 — Conversation pruning/summarization preserves essential context
+  - [x] 9.2.4 — Overflow recovery handles context window exceeded errors
 
 - [ ] **9.3 — Chat Frontend**
   - [ ] 9.3.1 — `ChatPage.tsx` renders messages with proper formatting (markdown, code blocks)
