@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useChatStore } from '../../store/chatStore';
+import type { Conversation } from '../../store/chatStore';
 import { formatDistanceToNow } from 'date-fns';
 import styles from './ConversationList.module.css';
 
@@ -59,8 +60,6 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
             className={`${styles.item} ${isActive ? styles.active : ''}`}
             onMouseEnter={() => setShowActions(true)}
             onMouseLeave={() => setShowActions(false)}
-            onFocusWithin={() => setShowActions(true)}
-            onBlur={() => setShowActions(false)}
         >
             <button
                 className={styles.mainButton}

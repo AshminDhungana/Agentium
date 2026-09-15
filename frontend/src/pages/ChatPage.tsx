@@ -16,6 +16,8 @@ import type { Message, MessageMetadata, MessageAttachment as Attachment } from '
 import { StructuredInputCard } from '@/components/chat/StructuredInputCard';
 import { MarkdownMessage } from '@/components/chat/MarkdownMessage';
 import { TypingIndicator } from '@/components/chat/TypingIndicator';
+import { RightSidebar } from '@/components/layout/RightSidebar';
+import { ConversationSidebar } from '@/components/chat/ConversationSidebar';
 import { inboxApi, UnifiedConversation, UnifiedMessage } from '@/services/inboxApi';
 import { api } from '@/services/api';
 import {
@@ -125,8 +127,20 @@ export function ChatPage() {
     // ── AI Chat ───────────────────────────────────────────────────────────────
     const [input, setInput] = useState('');
     // ── messages live in the Zustand store so they survive navigation ─────────
-    const { messages, setMessages } = useChatStore(
-        useShallow((s) => ({ messages: s.messages, setMessages: s.setMessages }))
+    const { messages, setMessages, currentConversationId, isSidebarOpen, sidebarWidth, toggleSidebar, setSidebarWidth, setConversation, createConversation, loadConversations, resetStream } = useChatStore(
+        useShallow((s) => ({
+            messages: s.messages,
+            setMessages: s.setMessages,
+            currentConversationId: s.currentConversationId,
+            isSidebarOpen: s.isSidebarOpen,
+            sidebarWidth: s.sidebarWidth,
+            toggleSidebar: s.toggleSidebar,
+            setSidebarWidth: s.setSidebarWidth,
+            setConversation: s.setConversation,
+            createConversation: s.createConversation,
+            loadConversations: s.loadConversations,
+            resetStream: s.resetStream,
+        }))
     );
     // Active streaming message id — drives the Stop button (Task 8).
     const activeStreamId = useChatStore((s) => s.activeStreamId);
@@ -160,6 +174,7 @@ export function ChatPage() {
     const [isAwaitingReply, setIsAwaitingReply] = useState(false);
     const [isThinking, setIsThinking] = useState(false);
     const [toolCount, setToolCount] = useState(0);
+    const [toolNames, setToolNames] = useState<string[]>([]);
 
     /**
      * Dedup set lives in a ref (not React state) — no re-renders,
@@ -227,6 +242,8 @@ export function ChatPage() {
         unreadCount, markAsRead,
         messageHistory, lastMessage,
         genesisJustCompleted,
+        toolCount: wsToolCount,
+        toolNames: wsToolNames,
     } = useWebSocketStore(
         useShallow((s) => ({
             connectionPhase: s.connectionPhase,
@@ -241,6 +258,8 @@ export function ChatPage() {
             messageHistory: s.messageHistory,
             lastMessage: s.lastMessage,
             genesisJustCompleted: s.genesisJustCompleted,
+            toolCount: s.toolCount,
+            toolNames: s.toolNames,
         }))
     );
 
@@ -291,6 +310,24 @@ export function ChatPage() {
         };
     }, []);
 
+    // Sync tool names from websocket store
+    useEffect(() => {
+        setToolNames(wsToolNames || []);
+    }, [wsToolNames]);
+
+    // Handle mobile breakpoint for sidebar position
+    const [sidebarPosition, setSidebarPosition] = useState<'right' | 'bottom'>('right');
+    useEffect(() => {
+        const mediaQuery = window.matchMedia('(max-width: 767px)');
+        const handleChange = (e: MediaQueryListEvent) => {
+            setSidebarPosition(e.matches ? 'bottom' : 'right');
+            if (e.matches) toggleSidebar(); // Close on mobile by default
+        };
+        setSidebarPosition(mediaQuery.matches ? 'bottom' : 'right');
+        mediaQuery.addEventListener('change', handleChange);
+        return () => mediaQuery.removeEventListener('change', handleChange);
+    }, [toggleSidebar]);
+
     // FIX: if the WebSocket drops (or goes into reconnect) while a reply is
     // still streaming, the server never sends `message_end`, so `activeStreamId`
     // and `isAwaitingReply` would hang forever — leaving the Stop button stuck,
@@ -330,6 +367,10 @@ export function ChatPage() {
             }
             if (msg.type === 'tool_progress') {
                 setToolCount(msg.tool_count as number);
+                if ((msg as any).tool_names) {
+                    setToolNames((msg as any).tool_names as string[]);
+                    useWebSocketStore.getState().setToolNames((msg as any).tool_names as string[]);
+                }
                 return;
             }
             if (msg.type === 'message_delta') {
@@ -519,12 +560,23 @@ export function ChatPage() {
         }
     }, [trackId]);
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!input.trim() && uploadedFiles.length === 0) return;
         if (!isConnected) {
             showToast.error('Not connected to Head of Council');
             return;
+        }
+
+        // Auto-create conversation if none exists
+        if (!currentConversationId) {
+            try {
+                await createConversation();
+            } catch (error) {
+                console.error('Failed to create conversation:', error);
+                showToast.error('Failed to create conversation');
+                return;
+            }
         }
 
         const attachments = uploadedFiles
@@ -817,7 +869,7 @@ export function ChatPage() {
 
     // ── Inbox ─────────────────────────────────────────────────────────────────
 
-    const loadConversations = useCallback(async (signal?: AbortSignal) => {
+    const loadInboxConversations = useCallback(async (signal?: AbortSignal) => {
         setInboxLoading(true);
         try {
             const res = await inboxApi.getConversations();
@@ -913,9 +965,9 @@ export function ChatPage() {
     useEffect(() => {
         if (activeTab !== 'inbox' || conversations.length > 0) return;
         const controller = new AbortController();
-        loadConversations(controller.signal);
+        loadInboxConversations(controller.signal);
         return () => controller.abort();
-    }, [activeTab, loadConversations]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [activeTab, loadInboxConversations]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Files: load when tab switches — cancelled if the tab changes again quickly
     useEffect(() => {
@@ -1104,6 +1156,18 @@ export function ChatPage() {
                                 {/* Voice indicator */}
                                 {activeTab === 'ai' && <VoiceIndicator />}
 
+                                {/* Sidebar toggle for AI Chat tab */}
+                                {activeTab === 'ai' && (
+                                    <button
+                                        onClick={toggleSidebar}
+                                        aria-label={isSidebarOpen ? 'Close conversations' : 'Open conversations'}
+                                        aria-expanded={isSidebarOpen}
+                                        className="p-2.5 rounded-xl bg-gray-100 dark:bg-[#0f1117] border border-gray-200 dark:border-[#1e2535] text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-[#1e2535] transition-colors"
+                                    >
+                                        <MessageCircle className="w-5 h-5" />
+                                    </button>
+                                )}
+
                                 {/* Tab switcher */}
                                 <div className="flex items-center bg-gray-100 dark:bg-[#0f1117] rounded-xl p-1 border border-gray-200 dark:border-[#1e2535]">
                                     {([
@@ -1200,9 +1264,9 @@ export function ChatPage() {
                                                                 : message.role === 'system' ? 'bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-900 dark:text-red-300'
                                                                     : 'bg-white dark:bg-[#161b27] border border-gray-200 dark:border-[#1e2535] text-gray-900 dark:text-gray-100 shadow-sm dark:shadow-[0_2px_12px_rgba(0,0,0,0.2)]'
                                                         }`}>
-                                                        {isAwaitingReply && message.status === 'streaming' && !message.content ? (
-                                                            <TypingIndicator thinking={isThinking} toolCount={toolCount} />
-                                                        ) : (
+{isAwaitingReply && message.status === 'streaming' && !message.content ? (
+                                                              <TypingIndicator thinking={isThinking} toolCount={toolCount} toolNames={toolNames} />
+                                                          ) : (
                                                             <MarkdownMessage content={message.content as string} isUser={isUser} status={message.status} />
                                                         )}
                                                         {message.attachments?.map((att, i) => (
@@ -1264,7 +1328,7 @@ export function ChatPage() {
                                             <UserRoundSearch className="w-4 h-4" />
                                         </div>
                                         <div className="px-4 py-3.5 rounded-2xl bg-white dark:bg-[#161b27] border border-gray-200 dark:border-[#1e2535]">
-                                            <TypingIndicator thinking={isThinking} toolCount={toolCount} />
+                                            <TypingIndicator thinking={isThinking} toolCount={toolCount} toolNames={toolNames} />
                                         </div>
                                     </div>
                                 )}
@@ -1619,6 +1683,18 @@ export function ChatPage() {
                             </button>
                         </div>
                     </div>
+                )}
+
+                {/* ── Right Sidebar - Conversations (AI Chat tab only) ── */}
+                {activeTab === 'ai' && (
+                    <RightSidebar
+                        isOpen={isSidebarOpen}
+                        onClose={toggleSidebar}
+                        width={sidebarWidth}
+                        position={sidebarPosition}
+                    >
+                        <ConversationSidebar />
+                    </RightSidebar>
                 )}
 
             </div>

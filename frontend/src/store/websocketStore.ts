@@ -137,6 +137,13 @@ interface WebSocketState {
      */
     apiKeyAddedAt: number | null;
 
+    // Tool tracking for TypingIndicator
+    toolCount: number;
+    toolNames: string[];
+    setToolCount: (count: number) => void;
+    setToolNames: (names: string[]) => void;
+    clearToolState: () => void;
+
     // Internal (prefixed _)
     _ws: WebSocket | null;
     _reconnectTimeout: ReturnType<typeof setTimeout> | null;
@@ -309,10 +316,16 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
     _connectionStable: false,   // BUG 2 FIX
     _lastMessageTimestamp: null,
     _orphanRetryInFlight: false,
+    toolCount: 0,
+    toolNames: [],
 
     // ── Derived helpers (Spec §1: status derives from connectionPhase) ─────
     isConnected: () => get().connectionPhase === 'active',
     isConnecting: () => get().connectionPhase === 'connecting',
+
+    setToolCount: (count: number) => set({ toolCount: count, toolNames: count === 0 ? [] : get().toolNames }),
+    setToolNames: (names: string[]) => set({ toolNames: names }),
+    clearToolState: () => set({ toolCount: 0, toolNames: [] }),
 
     _transition: (event) => {
         const cur = get().connectionPhase;
