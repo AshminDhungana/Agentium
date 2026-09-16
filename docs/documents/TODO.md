@@ -405,10 +405,10 @@
   - [x] 9.3.7 — Chat history reload after page refresh works
   - [x] 9.3.8 — `chatStore.ts` state management is consistent
 
-- [ ] **9.4 — Clarification System**
-  - [ ] 9.4.1 — Agent requests clarification when uncertain
-  - [ ] 9.4.2 — User can respond to clarification requests
-  - [ ] 9.4.3 — Clarification context is incorporated into subsequent responses
+- [x] **9.4 — Clarification System**
+  - [x] 9.4.1 — Agent requests clarification when uncertain (UncertaintyDetector with 6 triggers: tool_error, empty_result, missing_expected_fields, hallucinated_tool, conflicting_results, all_tools_failed; ClarificationHandler with Task→Lead→Council→Head→Sovereign escalation, MAX_CLARIFICATION_ROUNDS=2)
+  - [x] 9.4.2 — User can respond to clarification requests (request_user_clarification tool sends StructuredInputCard; frontend StructuredInputCard.tsx renders multi-type questions; WebSocket/REST handle card_response)
+  - [x] 9.4.3 — Clarification context is incorporated into subsequent responses (supervisor guidance injected as system message; user card responses persisted in chat history; next LLM turn receives full context)
 
 ---
 
