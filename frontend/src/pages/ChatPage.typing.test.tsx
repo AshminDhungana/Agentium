@@ -17,33 +17,40 @@ describe('ChatPage streaming polish', () => {
 
     it('renders three bouncing dots with the expected test id', () => {
         const { container } = render(<TypingIndicator />);
-        const indicator = screen.getByTestId('typing-indicator');
+        const indicator = screen.getByTestId('typing-dots');
         expect(indicator).toBeTruthy();
         expect(indicator.getAttribute('aria-hidden')).toBe('true');
         // Three dot spans (CSS modules mangle classes, so just count descendants)
         expect(container.querySelectorAll('span').length).toBe(3);
     });
 
-    it('shows +N count when toolCount > 0', () => {
+    it('shows tool count when toolCount > 0', () => {
         const { container } = render(<TypingIndicator toolCount={2} />);
-        expect(container.textContent).toContain('+2');
+        expect(container.textContent).toContain('Running tools: 2');
     });
 
-    it('hides +N count when toolCount is 0', () => {
+    it('hides tool count when toolCount is 0', () => {
         const { container } = render(<TypingIndicator toolCount={0} />);
-        expect(container.textContent).not.toContain('+');
+        expect(container.textContent).not.toContain('Running tools');
     });
 
-    it('hides +N count when toolCount is undefined', () => {
+    it('hides tool count when toolCount is undefined', () => {
         const { container } = render(<TypingIndicator />);
-        expect(container.textContent).not.toContain('+');
+        expect(container.textContent).not.toContain('Running tools');
     });
 
-    it('thinking prop is a no-op visually (same dots, no label)', () => {
-        const { container: t1 } = render(<TypingIndicator />);
-        const { container: t2 } = render(<TypingIndicator thinking />);
-        expect(t1.querySelectorAll('span').length).toBe(3);
-        expect(t2.querySelectorAll('span').length).toBe(3);
-        expect(t2.textContent).not.toContain('Thinking…');
+    it('shows thinking label when thinking prop is true', () => {
+        const { container } = render(<TypingIndicator thinking />);
+        expect(container.textContent).toContain('Thinking');
+    });
+
+    it('shows tool names when provided', () => {
+        const { container } = render(<TypingIndicator toolNames={['web_search', 'file_read']} />);
+        expect(container.textContent).toContain('Running: web_search, file_read');
+    });
+
+    it('truncates tool names when more than 3', () => {
+        const { container } = render(<TypingIndicator toolNames={['a', 'b', 'c', 'd']} />);
+        expect(container.textContent).toContain('+1 more');
     });
 });

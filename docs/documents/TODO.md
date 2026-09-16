@@ -395,15 +395,15 @@
   - [x] 9.2.3 — Conversation pruning/summarization preserves essential context
   - [x] 9.2.4 — Overflow recovery handles context window exceeded errors
 
-- [ ] **9.3 — Chat Frontend**
-  - [ ] 9.3.1 — `ChatPage.tsx` renders messages with proper formatting (markdown, code blocks)
-  - [ ] 9.3.2 — Streaming tokens appear in real-time (typing indicator)
-  - [ ] 9.3.3 — Tool call results display inline in chat
-  - [ ] 9.3.4 — File upload in chat works
-  - [ ] 9.3.5 — Conversation switching works without losing state
-  - [ ] 9.3.6 — New conversation creation works
-  - [ ] 9.3.7 — Chat history reload after page refresh works
-  - [ ] 9.3.8 — `chatStore.ts` state management is consistent
+- [x] **9.3 — Chat Frontend** (Completed — see `docs/superpowers/plans/2026-09-15-chat-frontend-completion.md`)
+  - [x] 9.3.1 — `ChatPage.tsx` renders messages with proper formatting (markdown, code blocks)
+  - [x] 9.3.2 — Streaming tokens appear in real-time (typing indicator)
+  - [x] 9.3.3 — Tool call results display inline in chat (enhancement: tool names in typing indicator)
+  - [x] 9.3.4 — File upload in chat works
+  - [x] 9.3.5 — Conversation switching works without losing state (right sidebar implementation)
+  - [x] 9.3.6 — New conversation creation works (right sidebar implementation)
+  - [x] 9.3.7 — Chat history reload after page refresh works
+  - [x] 9.3.8 — `chatStore.ts` state management is consistent
 
 - [ ] **9.4 — Clarification System**
   - [ ] 9.4.1 — Agent requests clarification when uncertain
