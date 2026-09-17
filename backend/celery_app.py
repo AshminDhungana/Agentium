@@ -21,6 +21,7 @@ celery_app = Celery(
     backend=os.getenv('CELERY_RESULT_BACKEND', 'redis://redis:6379/0'),
     include=[
         'backend.services.tasks.task_executor',
+        'backend.services.tasks.scheduled_task_dispatcher',
         'backend.services.tasks.workflow_tasks',
         'backend.services.tasks.reindex_knowledge',
         'backend.services.tasks.verification_tasks',
@@ -274,6 +275,14 @@ celery_app.conf.beat_schedule = {
     'verify-agents-every-5-minutes': {
         'task': 'backend.services.tasks.verification_tasks.verify_agents_task',
         'schedule': 300.0,
+    },
+
+    # ── Section 10.4: Scheduled Tasks ─────────────────────────────────────────────
+    # Fires due ScheduledTask rows exactly once per beat tick (CAS-claimed in
+    # the dispatcher so a multi-worker fleet cannot double-fire).
+    'scheduled-task-dispatcher': {
+        'task': 'agentium.tasks.task_executor.dispatch_due_scheduled_tasks',
+        'schedule': 15.0,   # every 15 seconds
     },
 }
 
