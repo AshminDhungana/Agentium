@@ -6,7 +6,7 @@ Owned by Head 00001, executed by ephemeral Task Agents (3xxxx).
 
 from datetime import datetime
 from typing import Optional, Dict, Any, List
-from sqlalchemy import Column, String, Text, DateTime, ForeignKey, Integer, Enum, Index
+from sqlalchemy import Column, String, Text, DateTime, ForeignKey, Integer, Enum, Index, Boolean
 from sqlalchemy.orm import relationship, validates
 from .base import BaseEntity
 import enum
@@ -49,8 +49,10 @@ class ScheduledTask(BaseEntity):
     description = Column(Text, nullable=True)
     
     # Schedule configuration
-    cron_expression = Column(String(100), nullable=False)  # "0 9 * * *" or "@daily"
+    cron_expression = Column(String(100), nullable=True)  # cron, or None for one-time tasks
     timezone = Column(String(50), default='UTC')
+    run_once = Column(Boolean, nullable=False, default=False)  # one-time (run_at) task
+    run_at = Column(DateTime, nullable=True)                    # fire time for one-time tasks
     
     # Task definition (what to do)
     task_payload = Column(Text, nullable=False)  # JSON: {action_type, params, constraints}
@@ -85,6 +87,10 @@ class ScheduledTask(BaseEntity):
             # Generate Rxxxx ID
             kwargs['agentium_id'] = self._generate_recurring_id()
         super().__init__(**kwargs)
+        self.validate_schedule_config()
+        # Seed the next due time so a freshly-created schedule is immediately
+        # fireable by the dispatcher (cron -> next run; one-time -> run_at).
+        self.next_execution_at = self.calculate_next_run()
     
     def _generate_recurring_id(self) -> str:
         """Generate Rxxxx ID for recurring tasks."""
@@ -94,9 +100,11 @@ class ScheduledTask(BaseEntity):
     
     @validates('cron_expression')
     def validate_cron(self, key, cron):
-        """Basic cron validation."""
+        """Validate cron syntax; None is allowed for one-time (run_once) tasks."""
+        if cron is None:
+            return cron
         if cron.startswith('@'):
-            valid_special = ['@yearly', '@annually', '@monthly', '@weekly', 
+            valid_special = ['@yearly', '@annually', '@monthly', '@weekly',
                            '@daily', '@hourly', '@reboot']
             if cron not in valid_special:
                 raise ValueError(f"Invalid special cron: {cron}")
@@ -105,6 +113,18 @@ class ScheduledTask(BaseEntity):
             if len(parts) != 5:
                 raise ValueError("Cron expression must have 5 parts: min hour day month weekday")
         return cron
+
+    def validate_schedule_config(self):
+        """A schedule is exactly one of cron (run_once=False) or one-time (run_at set)."""
+        has_cron = bool(self.cron_expression)
+        is_once = bool(self.run_once)
+        has_run_at = self.run_at is not None
+        if is_once and not has_run_at:
+            raise ValueError("run_once=True requires run_at")
+        if has_cron and has_run_at:
+            raise ValueError("cron_expression and run_at are mutually exclusive")
+        if not is_once and not has_cron:
+            raise ValueError("schedule requires either cron_expression or run_once+run_at")
     
     def get_task_payload(self) -> Dict[str, Any]:
         """Parse task payload JSON."""
@@ -118,18 +138,12 @@ class ScheduledTask(BaseEntity):
         self.task_payload = json.dumps(payload)
     
     def calculate_next_run(self) -> Optional[datetime]:
-        """Calculate next execution time from cron expression."""
-        try:
-            from croniter import croniter
-            if self.last_execution_at:
-                base = self.last_execution_at
-            else:
-                base = datetime.utcnow()
-            itr = croniter(self.cron_expression, base)
-            return itr.get_next(datetime)
-        except ImportError:
-            # Fallback if croniter not installed
-            return None
+        """Next execution time: run_at for one-time; else the shared cron helper."""
+        from backend.services.scheduling.cron_due import as_aware, next_run
+        if self.run_once:
+            return as_aware(self.run_at, self.timezone or "UTC")
+        return next_run(self.cron_expression, timezone=self.timezone or "UTC",
+                        base=self.last_execution_at)
     
     def mark_running(self, agent_id: str, agentium_id: str):
         """Mark as currently executing by a Task Agent."""
@@ -137,20 +151,32 @@ class ScheduledTask(BaseEntity):
         self.executing_agent_id = agent_id
     
     def mark_completed(self, success: bool = True):
-        """Mark execution complete."""
+        """Mark execution complete.
+
+        One-time (run_once) success -> COMPLETED (retained done-record).
+        Cron success -> advance next_execution_at; COMPLETED when exhausted.
+        """
         now = datetime.utcnow()
         self.last_execution_at = now
         self.execution_count += 1
         self.executing_agent_id = None
-        
-        if success:
-            self.failure_count = 0
-            self.status = ScheduledTaskStatus.ACTIVE
-            self.next_execution_at = self.calculate_next_run()
-        else:
+
+        if not success:
             self.failure_count += 1
             if self.failure_count >= self.max_retries:
                 self.status = ScheduledTaskStatus.ERROR
+            return
+
+        self.failure_count = 0
+        if self.run_once:
+            self.status = ScheduledTaskStatus.COMPLETED
+            self.next_execution_at = None
+            return
+
+        self.status = ScheduledTaskStatus.ACTIVE
+        self.next_execution_at = self.calculate_next_run()
+        if self.next_execution_at is None:
+            self.status = ScheduledTaskStatus.COMPLETED  # cron exhausted
     
     def pause(self):
         """Pause the schedule."""
@@ -168,6 +194,8 @@ class ScheduledTask(BaseEntity):
             'agentium_id': self.agentium_id,
             'name': self.name,
             'cron_expression': self.cron_expression,
+            'run_once': self.run_once,
+            'run_at': self.run_at.isoformat() if self.run_at else None,
             'timezone': self.timezone,
             'task_payload': self.get_task_payload(),
             'owner_agentium_id': self.owner_agentium_id,

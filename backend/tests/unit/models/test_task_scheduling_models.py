@@ -917,3 +917,69 @@ class TestTaskSchedulingIntegration:
         assert sub3.sequence == 3
         assert sub2.dependencies == ["S00001"]
         assert sub3.dependencies == ["S00002"]
+
+
+# =========================================================================
+# One-time (run_once / run_at) lifecycle tests
+# =========================================================================
+
+def test_one_time_task_requires_run_at(db_session):
+    with pytest.raises(ValueError):
+        ScheduledTask(
+            name="Once no run_at", cron_expression=None, run_once=True,
+            task_payload=json.dumps({"action_type": "notify"}),
+            owner_agentium_id="00001",
+        )
+
+
+def test_cron_and_run_at_are_mutually_exclusive(db_session):
+    with pytest.raises(ValueError):
+        ScheduledTask(
+            name="Both", cron_expression="0 9 * * *", run_once=True,
+            run_at=datetime(2026, 9, 20, 9, 0),
+            task_payload=json.dumps({"action_type": "notify"}),
+            owner_agentium_id="00001",
+        )
+
+
+def test_recurring_task_computes_next_run(db_session):
+    t = ScheduledTask(
+        name="Daily", cron_expression="0 9 * * *", run_once=False,
+        task_payload=json.dumps({"action_type": "notify"}),
+        owner_agentium_id="00001",
+    )
+    db_session.add(t)
+    db_session.commit()
+    assert t.next_execution_at is not None
+    # next run for "0 9 * * *" is always at 09:00, strictly in the future
+    assert t.next_execution_at.hour == 9
+
+
+def test_one_time_task_success_goes_completed(db_session):
+    t = ScheduledTask(
+        name="OneShot", cron_expression=None, run_once=True,
+        run_at=datetime.utcnow(),
+        task_payload=json.dumps({"action_type": "notify"}),
+        owner_agentium_id="00001",
+    )
+    db_session.add(t)
+    db_session.commit()
+    assert t.status == ScheduledTaskStatus.ACTIVE
+    t.mark_completed(success=True)
+    assert t.status == ScheduledTaskStatus.COMPLETED
+    assert t.next_execution_at is None
+
+
+def test_cron_failure_reaches_error_after_max_retries(db_session):
+    t = ScheduledTask(
+        name="Daily", cron_expression="0 9 * * *", run_once=False,
+        task_payload=json.dumps({"action_type": "notify"}),
+        owner_agentium_id="00001", max_retries=2,
+    )
+    db_session.add(t)
+    db_session.commit()
+    t.mark_completed(success=False)
+    assert t.status == ScheduledTaskStatus.ACTIVE  # still under max_retries
+    t.mark_completed(success=False)
+    assert t.status == ScheduledTaskStatus.ERROR
+    assert t.failure_count == 2
