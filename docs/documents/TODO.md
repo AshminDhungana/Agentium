@@ -445,12 +445,14 @@
 > - **10.2.3 verified**: Task→Lead→Council escalation via `handle_task_escalation` / `_simulate_council_decision` in `task_executor.py`; `escalation_hops` max 3.
 > - **10.2.4 verified**: stalled detection via `check_stalled_reasoning` (max 3 resume attempts through `agent_orchestrator.StalledReasoningError`), `check_escalation_timeouts`.
 
-- [ ] **10.3 — Task Execution**
-  - [ ] 10.3.1 — Celery `task_executor.py` processes tasks asynchronously
-  - [ ] 10.3.2 — Agent is assigned and executes the task
-  - [ ] 10.3.3 — Tool calls during task execution work
-  - [ ] 10.3.4 — Task results are stored correctly
-  - [ ] 10.3.5 — Task failure creates proper error records
+- [x] **10.3 — Task Execution** (code audit; `backend/services/tasks/task_executor.py`)
+  - [x] 10.3.1 — Celery `task_executor.py` processes tasks asynchronously (`execute_task_async` is `@celery_app.task(bind=True, max_retries=1)`; opens its own session via `get_task_db()`; regression: `TestExecuteTaskAsyncIntegration` suite green)
+  - [x] 10.3.2 — Agent is assigned and executes the task (task loaded by `agentium_id`; agent resolved from `agent_id` arg, else first `status=='active'`; executes via `agent.execute_with_skill_rag(task, db)`)
+  - [x] 10.3.3 — Tool calls during task execution work (execution routes through `LLMClient.generate` with API-key failover — `skill_rag.py` — supporting tool-use; tool safety/Sandbox per §8.4; `TestExecuteTaskAsyncIntegration` green)
+  - [x] 10.3.4 — Task results are stored correctly (`task.complete(result_summary=content[:500], result_data=…{full_output, skills_used, model, tokens_used, workspace_path, artifacts})`)
+  - [x] 10.3.5 — Task failure creates proper error records (`task.mark_failed(reason, error_message)` + `AuditLog` CRITICAL entries — `task_failed_exhaustion`/`execution_failed` — + commit + `task_degraded` WebSocket broadcast; terminal-state guarantee: marks FAILED after `max_retries` exhausted instead of stranding in IN_PROGRESS)
+
+  > **Notes (10.3)** — Verified by code audit (no live LLM provider exercised, consistent with the §10.1 decision). Provider-exhaustion is handled as a distinguishable `RuntimeError` (`all_keys_invalid`/`rate_limited`/`provider_unreachable`) that fails cleanly rather than re-queuing forever. `workspace_ready` and `task_degraded` events are broadcast over WebSocket for live UI updates.
 
 - [ ] **10.4 — Scheduled Tasks**
   - [ ] 10.4.1 — Cron-style scheduled tasks fire at correct intervals
