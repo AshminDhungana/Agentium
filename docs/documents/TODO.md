@@ -416,13 +416,21 @@
 
 > **Files**: `backend/models/entities/task.py`, `backend/models/entities/scheduled_task.py`, `backend/services/task_state_machine.py`, `backend/api/routes/tasks.py`, `backend/services/tasks/task_executor.py`, `frontend/src/pages/TasksPage.tsx`, `frontend/src/services/tasks.ts`
 
-- [ ] **10.1 — Task CRUD**
-  - [ ] 10.1.1 — `POST /api/v1/tasks` creates a new task
-  - [ ] 10.1.2 — `GET /api/v1/tasks` returns task list with pagination
-  - [ ] 10.1.3 — `GET /api/v1/tasks/{id}` returns task details
-  - [ ] 10.1.4 — `PATCH /api/v1/tasks/{id}` updates task
-  - [ ] 10.1.5 — Task types (CODE, RESEARCH, ANALYSIS, etc.) are handled correctly
-  - [ ] 10.1.6 — Task priorities (LOW, MEDIUM, HIGH, CRITICAL) affect scheduling
+- [x] **10.1 — Task CRUD**
+  - [x] 10.1.1 — `POST /api/v1/tasks` creates a new task (`backend/api/routes/tasks.py` — `create_task`, 201, validation, `TASK_CREATED` event)
+  - [x] 10.1.2 — `GET /api/v1/tasks` returns task list with pagination (`list_tasks`, `skip`/`limit` + status/agent/parent/my-tasks filters, `hide_system` on by default)
+  - [x] 10.1.3 — `GET /api/v1/tasks/{id}` returns task details (`get_task`, optional `include_events` + subtasks)
+  - [x] 10.1.4 — `PATCH /api/v1/tasks/{id}` updates task (`update_task`, status changes gated by `TaskStateMachine.validate_transition` → 400 `STRE` on illegal transitions)
+  - [x] 10.1.5 — Task types (CODE, RESEARCH, ANALYSIS, etc.) are handled correctly (`TaskType` enum + schema coercion in `schemas/task.py:76`; no literal `CODE` — maps to `code_generation`/`code_review`/`debugging`; `task_type`/`veto_authority` validated)
+  - [x] 10.1.6 — Task priorities (LOW, NORMAL, HIGH, CRITICAL) affect scheduling (see Notes below; priority is a governance/routing signal, not a run-queue order)
+
+  > **Notes (10.1.6)** — Priority affects how a task is governed and routed rather than FIFO run-queue ordering:
+  > - **Deliberation skip**: CRITICAL / SOVEREIGN / IDLE skip council deliberation (`task.py` `@validates('priority')`, `requires_deliberation=False`).
+  > - **Delegation tier**: CRITICAL / SOVEREIGN get +2 complexity score → delegated up to a higher-tier agent (`auto_delegation_service.py:82`).
+  > - **Model allocation**: HIGH / CRITICAL get a capability boost → higher-tier model; CRITICAL verifies budget first (`model_allocation.py:217`).
+  > - **Escalation outcome**: after max retries, CRITICAL / SOVEREIGN are allocated resources, others liquidated (`task_executor.py` `_simulate_council_decision`).
+  > - **Critical-path protection / SLA**: CRITICAL / SOVEREIGN tagged & protected (`self_healing_service.py:673`); SLA monitor groups compliance by priority (`task_executor.py:1420`); predictive scaling can pause non-critical tasks first (`predictive_scaling.py:304`).
+  > - Enum ordering: `SOVEREIGN > CRITICAL > HIGH > NORMAL > LOW > IDLE` (checklist "MEDIUM" ↔ enum `NORMAL`; there is no `MEDIUM` value).
 
 - [ ] **10.2 — Task State Machine**
   - [ ] 10.2.1 — State transitions: PENDING → IN_PROGRESS → COMPLETED / FAILED
