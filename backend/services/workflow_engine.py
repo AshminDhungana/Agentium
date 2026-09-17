@@ -15,7 +15,7 @@ from backend.models.entities.workflow import (
     WorkflowExecutionStatus,
     WorkflowStepType
 )
-from backend.models.entities.task import Task, TaskPriority, TaskType
+from backend.models.entities.task import Task, TaskStatus, TaskPriority, TaskType
 from backend.models.database import get_db_context
 
 logger = logging.getLogger(__name__)
@@ -228,12 +228,29 @@ class WorkflowEngine:
         )
         db.add(task)
         db.flush()
-        
-        # Dispatch the task to the agent pool asynchronously.
-        # Workflow pauses until the task completion hook resumes it.
+
+        # Workflow bookkeeping first, before any state-machine work. The
+        # transitions below (set_status(IN_PROGRESS)) trigger a checkpoint
+        # that commits internally; doing that while the execution row has
+        # pending changes would expire the object and drop them, so persist
+        # the bookkeeping first.
         execution.status = WorkflowExecutionStatus.PAUSED
-        execution.context_data[f"step_{step.step_index}_task_id"] = task.id
-        execution.context_data[f"step_{step.step_index}_task_status"] = "dispatched"
+        new_context = dict(execution.context_data or {})
+        new_context[f"step_{step.step_index}_task_id"] = task.id
+        new_context[f"step_{step.step_index}_task_status"] = "dispatched"
+        # context_data is a plain JSON column: SQLAlchemy only tracks
+        # whole-attribute replacement, so in-place dict mutation would be
+        # silently lost. Assign a new dict.
+        execution.context_data = new_context
+        db.commit()
+
+        # Route the task through the legal state-machine path before dispatch.
+        # A Task is created at PENDING; the Celery executor will later call
+        # task.complete()/task.fail(), which are only legal from IN_PROGRESS.
+        # Advancing here (PENDING -> APPROVED -> IN_PROGRESS) via set_status
+        # keeps those downstream transitions legal and records the audit trail.
+        task.set_status(TaskStatus.APPROVED, note="workflow step dispatch: approved")
+        task.set_status(TaskStatus.IN_PROGRESS, note="workflow step dispatch: so executor complete()/fail() are legal")
         db.commit()
 
         # Enqueue the task via Celery as the agent dispatch trigger.

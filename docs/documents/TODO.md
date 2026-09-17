@@ -432,11 +432,18 @@
   > - **Critical-path protection / SLA**: CRITICAL / SOVEREIGN tagged & protected (`self_healing_service.py:673`); SLA monitor groups compliance by priority (`task_executor.py:1420`); predictive scaling can pause non-critical tasks first (`predictive_scaling.py:304`).
   > - Enum ordering: `SOVEREIGN > CRITICAL > HIGH > NORMAL > LOW > IDLE` (checklist "MEDIUM" ↔ enum `NORMAL`; there is no `MEDIUM` value).
 
-- [ ] **10.2 — Task State Machine**
-  - [ ] 10.2.1 — State transitions: PENDING → IN_PROGRESS → COMPLETED / FAILED
-  - [ ] 10.2.2 — Invalid state transitions are rejected
-  - [ ] 10.2.3 — Task escalation from Task → Lead → Council works
-  - [ ] 10.2.4 — Stalled task detection and recovery works
+- [x] **10.2 — Task State Machine**
+  - [x] 10.2.1 — State transitions: PENDING → IN_PROGRESS → COMPLETED / FAILED
+  - [x] 10.2.2 — Invalid state transitions are rejected
+  - [x] 10.2.3 — Task escalation from Task → Lead → Council works
+  - [x] 10.2.4 — Stalled task detection and recovery works
+
+> **Notes (10.2)** — State machine is `TaskStateMachine` (`backend/services/task_state_machine.py`); `LEGAL_TRANSITIONS` maps `PENDING→{DELIBERATING, APPROVED, CANCELLED}` (no direct PENDING→IN_PROGRESS), and `Task.set_status()` (`backend/models/entities/task.py`) is the only validated status changer — it validates, appends to `status_history`, emits a `STATUS_CHANGED` event, and fires a checkpoint on IN_PROGRESS/REVIEW/COMPLETED/WAITING.
+> - **10.2.1 verified**: legal sequence is `PENDING → APPROVED → IN_PROGRESS → COMPLETED/FAILED`; FAILED→RETRYING/ESCALATED also legal. **Fixed**: two dispatch sites bypassed the state machine — `WorkflowEngine._execute_task_step` (`backend/services/workflow_engine.py`) left step tasks PENDING (making executor `complete()/fail()` illegal), and `process_dependency_graph` (`backend/services/tasks/task_executor.py`) assigned `.status =` directly (silent, no audit trail). Both now route tasks through `set_status(APPROVED)` → `set_status(IN_PROGRESS)` before dispatch. Covered by `tests/integration/test_workflow_task_dispatch.py` and `TestDependencyGraphParallelDispatch::test_dispatched_child_advances_status_through_state_machine`.
+> - **10.2.1 bug found & fixed**: `TaskEvent.agentium_id` is UNIQUE; it was generated at millisecond precision, so the two back-to-back APPROVED→IN_PROGRESS `STATUS_CHANGED` events collided and rolled back the whole dispatch. Generator now uses microsecond precision (`backend/models/entities/task_events.py`); regression locked by `tests/unit/test_task_event_id.py`.
+> - **10.2.2 verified**: invalid transitions rejected via `TaskStateMachine.validate_transition` under `set_status` (e.g. PENDING→COMPLETED raises).
+> - **10.2.3 verified**: Task→Lead→Council escalation via `handle_task_escalation` / `_simulate_council_decision` in `task_executor.py`; `escalation_hops` max 3.
+> - **10.2.4 verified**: stalled detection via `check_stalled_reasoning` (max 3 resume attempts through `agent_orchestrator.StalledReasoningError`), `check_escalation_timeouts`.
 
 - [ ] **10.3 — Task Execution**
   - [ ] 10.3.1 — Celery `task_executor.py` processes tasks asynchronously

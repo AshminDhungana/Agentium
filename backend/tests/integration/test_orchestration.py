@@ -434,6 +434,48 @@ class TestDependencyGraphParallelDispatch:
         assert children[1].status == TaskStatus.IN_PROGRESS
         assert dependent_dep.status == "dispatched"
 
+    def test_dispatched_child_advances_status_through_state_machine(self, seeded_db: Session):
+        """
+        process_dependency_graph must advance a PENDING child into execution via
+        the state machine (set_status), leaving an audit trail in status_history.
+        Mutating .status directly bypasses TaskStateMachine and records no
+        transition — the defect 10.2.2 is meant to catch.
+        """
+        from backend.services.tasks.task_executor import process_dependency_graph
+
+        head = seeded_db.query(HeadOfCouncil).filter_by(agentium_id="00001").first()
+        agent = _spawn_task_agent(seeded_db, head, "DAG-StateMachine-Worker")
+
+        parent, children = self._make_parent_with_children(
+            seeded_db, n_children=1, agent_id=agent.agentium_id
+        )
+
+        dep = TaskDependency(
+            agentium_id=f"DEP{uuid.uuid4().hex[:6].upper()}",
+            parent_task_id=parent.id,
+            child_task_id=children[0].id,
+            dependency_order=0,
+            status="pending",
+        )
+        seeded_db.add(dep)
+        seeded_db.commit()
+
+        with patch("backend.services.tasks.task_executor.execute_task_async.delay"):
+            result = process_dependency_graph(db=seeded_db)
+
+        assert result["dispatched"] == 1
+
+        seeded_db.refresh(children[0])
+        assert children[0].status == TaskStatus.IN_PROGRESS
+
+        # The PENDING -> (APPROVED) -> IN_PROGRESS advance went through set_status,
+        # so the transition must be recorded in the task's status_history.
+        history = children[0].status_history or []
+        assert any(
+            entry.get("status") == TaskStatus.IN_PROGRESS.value
+            for entry in history
+        ), "dispatch bypassed the state machine — no IN_PROGRESS in status_history"
+
 
 # ===========================================================================
 # Group 3 — Crash detection (stale heartbeat) -> reincarnation from checkpoint

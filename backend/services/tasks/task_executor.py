@@ -1185,8 +1185,22 @@ def process_dependency_graph(db=None):
                         continue
 
                     try:
-                        child.status = TaskStatus.IN_PROGRESS
-                        child.started_at = datetime.utcnow()
+                        # child is guaranteed PENDING by the guard above. Route it
+                        # through the legal state-machine path (PENDING -> APPROVED
+                        # -> IN_PROGRESS) via set_status so the executor's later
+                        # complete()/fail() are legal and the transitions are
+                        # recorded in status_history. Directly assigning .status
+                        # previously bypassed both the validation and the audit.
+                        child.set_status(
+                            TaskStatus.APPROVED,
+                            note="DAG dispatch: pre-dispatch approval",
+                        )
+                        child.set_status(
+                            TaskStatus.IN_PROGRESS,
+                            note="DAG dispatch: advancing to executing",
+                        )
+                        if child.started_at is None:
+                            child.started_at = datetime.utcnow()
                         dep.status = "dispatched"
                         dispatched += 1
 

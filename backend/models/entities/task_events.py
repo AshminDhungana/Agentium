@@ -65,10 +65,16 @@ class TaskEvent(BaseEntity):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         if not self.agentium_id:
-            # Prefix 'E' for Event. Column is VARCHAR(10): 1 (prefix) +
-            # 6 (HHMMSS) + 3 (millisecond-precision suffix) = 10 chars exactly.
+            # Prefix 'E' for Event. agentium_id is UNIQUE across the whole
+            # table (see base.py:24), so the time-based id must not collide
+            # when multiple events are created back-to-back. The legal
+            # PENDING -> APPROVED -> IN_PROGRESS dispatch path emits two
+            # STATUS_CHANGED events within the same millisecond.
+            # Use microsecond precision (%f = 6 digits) so those rapid
+            # transitions get distinct ids. Full id "E"+HHMMSS+%f = 13 chars,
+            # within the VARCHAR(20) column.
             now = datetime.utcnow()
-            self.agentium_id = f"E{now.strftime('%H%M%S')}{now.strftime('%f')[:3]}"
+            self.agentium_id = f"E{now.strftime('%H%M%S')}{now.strftime('%f')}"
     
     @classmethod
     def reconstruct_state(cls, task_id: str, db_session) -> Dict[str, Any]:
