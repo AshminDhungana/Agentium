@@ -454,10 +454,10 @@
 
   > **Notes (10.3)** — Verified by code audit (no live LLM provider exercised, consistent with the §10.1 decision). Provider-exhaustion is handled as a distinguishable `RuntimeError` (`all_keys_invalid`/`rate_limited`/`provider_unreachable`) that fails cleanly rather than re-queuing forever. `workspace_ready` and `task_degraded` events are broadcast over WebSocket for live UI updates.
 
-- [ ] **10.4 — Scheduled Tasks**
-  - [ ] 10.4.1 — Cron-style scheduled tasks fire at correct intervals
-  - [ ] 10.4.2 — One-time scheduled tasks execute and are cleaned up
-  - [ ] 10.4.3 — Event-triggered tasks fire on condition match
+- [x] **10.4 — Scheduled Tasks**
+  - [x] 10.4.1 — Cron-style scheduled tasks fire at correct intervals
+  - [x] 10.4.2 — One-time scheduled tasks execute and are cleaned up
+  - [x] 10.4.3 — Event-triggered tasks fire on condition match
 
 - [ ] **10.5 — Task Frontend**
   - [ ] 10.5.1 — `TasksPage.tsx` displays tasks with status, priority, type filters
