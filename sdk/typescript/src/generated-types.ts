@@ -2864,6 +2864,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/scheduled-tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Scheduled Tasks */
+        get: operations["list_scheduled_tasks_api_v1_scheduled_tasks_get"];
+        put?: never;
+        /** Create Scheduled Task */
+        post: operations["create_scheduled_task_api_v1_scheduled_tasks_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/scheduled-tasks/{schedule_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Scheduled Task */
+        get: operations["get_scheduled_task_api_v1_scheduled_tasks__schedule_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Scheduled Task */
+        delete: operations["delete_scheduled_task_api_v1_scheduled_tasks__schedule_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Scheduled Task */
+        patch: operations["update_scheduled_task_api_v1_scheduled_tasks__schedule_id__patch"];
+        trace?: never;
+    };
     "/api/v1/files/upload": {
         parameters: {
             query?: never;
@@ -10704,6 +10741,74 @@ export interface components {
         ScheduleSunsetRequest: {
             /** Sunset Days */
             sunset_days: number;
+        };
+        /** ScheduledTaskCreate */
+        ScheduledTaskCreate: {
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
+            /**
+             * Cron Expression
+             * @description cron, or None for one-time
+             */
+            cron_expression?: string | null;
+            /**
+             * Timezone
+             * @default UTC
+             */
+            timezone: string;
+            /**
+             * Run Once
+             * @default false
+             */
+            run_once: boolean;
+            /** Run At */
+            run_at?: string | null;
+            /** Task Payload */
+            task_payload?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Owner Agentium Id
+             * @default 00001
+             */
+            owner_agentium_id: string;
+            /**
+             * Priority
+             * @default 1
+             */
+            priority: number;
+            /**
+             * Max Retries
+             * @default 3
+             */
+            max_retries: number;
+        };
+        /** ScheduledTaskUpdate */
+        ScheduledTaskUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Cron Expression */
+            cron_expression?: string | null;
+            /** Timezone */
+            timezone?: string | null;
+            /** Run Once */
+            run_once?: boolean | null;
+            /** Run At */
+            run_at?: string | null;
+            /** Task Payload */
+            task_payload?: {
+                [key: string]: unknown;
+            } | null;
+            /** Priority */
+            priority?: number | null;
+            /** Max Retries */
+            max_retries?: number | null;
+            /** Paused */
+            paused?: boolean | null;
         };
         /** ScrapeRequest */
         ScrapeRequest: {
@@ -25068,6 +25173,168 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_scheduled_tasks_api_v1_scheduled_tasks_get: {
+        parameters: {
+            query?: {
+                status?: string | null;
+                owner_agentium_id?: string | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_scheduled_task_api_v1_scheduled_tasks_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScheduledTaskCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_scheduled_task_api_v1_scheduled_tasks__schedule_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                schedule_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_scheduled_task_api_v1_scheduled_tasks__schedule_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                schedule_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_scheduled_task_api_v1_scheduled_tasks__schedule_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                schedule_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScheduledTaskUpdate"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
