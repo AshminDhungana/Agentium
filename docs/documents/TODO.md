@@ -459,6 +459,16 @@
   - [x] 10.4.2 — One-time scheduled tasks execute and are cleaned up
   - [x] 10.4.3 — Event-triggered tasks fire on condition match
 
+  > **Notes (10.4)** — Built per `docs/superpowers/plans/2026-09-17-scheduled-tasks.md` (merged to `main` at `981c78b`, 104-test §10.4 suite green).
+  > - **Model/schedule**: `ScheduledTask` gained `run_once` + `run_at` (mutually exclusive with `cron_expression`, both validated by `validate_schedule_config()`); `calculate_next_run()` seeds `next_execution_at`; one-time rows reach `COMPLETED` and never re-fire. Cron math centralized in `backend/services/scheduling/cron_due.py` (single `croniter` home).
+  > - **Dispatcher**: `backend/services/scheduling/scheduled_task_dispatcher.py` with CAS on `agentium_id` so concurrent beats can't double-dispatch; shares `create_and_dispatch_task` builder. Beat entries `scheduled-task-dispatcher` + `schedule-trigger-check` (15s).
+  > - **Event trigger**: `evaluate_schedule_triggers` + `_dispatch_task` in `event_processor.py` (`SCHEDULE` EventTrigger) with `dispatch_task_when_no_workflow` branch; verified end-to-end that it produces a real routed Task.
+  > - **API**: CRUD `/api/v1/scheduled-tasks` (`backend/api/routes/scheduled_tasks.py`, schemas in `backend/api/schemas/scheduled_task.py`), sovereign-scoped, pause/resume via `PATCH`, delete via `DELETE` (204).
+  > - **Migration `024`** (`024_scheduled_task_run_once.py`) adds `run_once`/`run_at`, makes `cron_expression` nullable, and **back-fills pre-existing drift**: `scheduled_task_executions` was missing BaseEntity `agentium_id`/`updated_at` since the `000` migration — would have broken dispatcher `_record_execution` and `to_dict()` serialization. Integration suite builds schema via Alembic, not `create_all`, so this was a hard requirement.
+  > - **Contract corrections (plan authorized "adjust if shape differs")**: `get_current_active_user()` has no `id` (owner resolved from `agentium_id`; sovereign = role `primary_sovereign`/`is_admin`, not `sovereign`); and with no global `RequestValidationError → 400` handler, the schema `model_validator` was dropped so mutual-exclusion/config errors surface as the documented **400** via the model (`validate_schedule_config` → route `ValueError` → `BadRequestError`), not a pydantic 422.
+  > - **`create_reminder`** (`workflow_tools.py`) rewritten to persist a valid one-time ScheduledTask row (`run_once=True` + `run_at`, JSON payload) instead of always-throwing kwargs — regression-locked by `test_create_reminder.py`.
+  > - **Remaining (not done)**: push `origin/main` (10 commits ahead, user chose local merge); manual live celery beat+worker smoke (plan Task 8 Step 3).
+
 - [ ] **10.5 — Task Frontend**
   - [ ] 10.5.1 — `TasksPage.tsx` displays tasks with status, priority, type filters
   - [ ] 10.5.2 — Task creation modal/form works
