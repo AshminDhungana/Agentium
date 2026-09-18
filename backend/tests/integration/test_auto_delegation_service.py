@@ -510,8 +510,7 @@ class TestDelegationEngineIntegration:
         from backend.models.entities.agents import HeadOfCouncil
 
         head = seeded_db.query(HeadOfCouncil).filter_by(agentium_id="00001").first()
-        council = seeded_db.query(CouncilMember).first()
-        assert council is not None
+        assert head is not None
 
         decision = Decision(
             action=DecisionAction.DISPATCH_TASK,
@@ -524,7 +523,20 @@ class TestDelegationEngineIntegration:
 
         assert target_id is not None
         assert target_id.startswith("1")  # Council tier
-        assert target_id == council.agentium_id  # Should pick the seeded council member
+        # The registry picks the LEAST-LOADED active Council member
+        # (ORDER BY tasks_completed.asc); with a tie it may surface any of the
+        # seeded members (10001, 10002, 10003 from the seed fixture), so assert
+        # membership among active Council members rather than a single row.
+        active_council_ids = {
+            c.agentium_id
+            for c in seeded_db.query(CouncilMember)
+            .filter(
+                CouncilMember.status == AgentStatus.ACTIVE,
+                CouncilMember.is_active == True,  # noqa: E712
+            )
+            .all()
+        }
+        assert target_id in active_council_ids
 
 
     @pytest.mark.asyncio
