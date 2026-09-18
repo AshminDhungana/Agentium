@@ -196,36 +196,45 @@ async def _send_email(params: dict) -> dict:
 @register("create_reminder")
 async def _create_reminder(params: dict) -> dict:
     """
-    Persist an immediate reminder as a WorkflowSubTask-style record.
+    Persist a one-time reminder as a ScheduledTask (run_once + run_at).
+
+    The reminder fires on the next 15s dispatcher tick once ``run_at`` is in
+    the past; the dispatcher creates a regular Task from the task_payload,
+    routes it through the state machine, then marks the row COMPLETED.
 
     params:
         message       (str)
-        delay_seconds (int)  — 0 = fire immediately (stored for audit only)
+        delay_seconds (int)  — 0 = fire immediately (fires on the next 15s tick)
     """
+    import json
     import uuid
     from datetime import datetime, timedelta
+
     from backend.models.database import get_db_context
+    from backend.models.entities.scheduled_task import ScheduledTask
 
     message = params.get("message", "Reminder")
     delay = int(params.get("delay_seconds", 0))
     fire_at = datetime.utcnow() + timedelta(seconds=delay)
 
-    # Try the ScheduledTask model if it exists and has the expected fields;
-    # fall back to a simple log record so the workflow never hard-fails here.
     try:
-        from backend.models.entities.scheduled_task import ScheduledTask
         with get_db_context() as db:
             task = ScheduledTask(
-                id=str(uuid.uuid4()),
                 name=f"reminder_{uuid.uuid4().hex[:8]}",
-                task_type="reminder",
-                payload={"message": message},
-                scheduled_for=fire_at,
-                status="pending",
+                description=f"Reminder: {message[:200]}",
+                cron_expression=None,
+                run_once=True,
+                run_at=fire_at,
+                owner_agentium_id="00001",
+                task_payload=json.dumps(
+                    {"action_type": "reminder", "params": {"message": message}}
+                ),
             )
+            # __init__ already seeds next_execution_at via calculate_next_run();
+            # commit so the dispatcher sweep will see the ACTIVE, due row.
             db.add(task)
             db.commit()
-            reminder_id = task.id
+            reminder_id = task.agentium_id
     except Exception as exc:
         logger.warning(
             f"[create_reminder] ScheduledTask write failed ({exc}); "
