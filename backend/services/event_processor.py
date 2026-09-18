@@ -352,6 +352,113 @@ class EventProcessorService:
 
         return results
 
+    # ── Schedule check (called from Celery beat) ──────────────────────────
+
+    @staticmethod
+    def evaluate_schedule_triggers(db: Session) -> Dict[str, Any]:
+        """
+        Evaluate all active schedule triggers. A schedule trigger is due when
+        its cron expression's next run (shared cron math) falls at or before
+        now. Honors the per-trigger circuit-breaker and cooldown, persists an
+        EventLog, then dispatches the configured action.
+        """
+        from backend.services.scheduling.cron_due import is_due
+
+        triggers = (
+            db.query(EventTrigger)
+            .filter(
+                EventTrigger.trigger_type == TriggerType.SCHEDULE,
+                EventTrigger.is_active == True,
+            )
+            .all()
+        )
+        results = {"checked": 0, "fired": 0, "skipped": 0}
+
+        for trigger in triggers:
+            results["checked"] += 1
+
+            if _is_trigger_paused(trigger):
+                results["skipped"] += 1
+                continue
+
+            cfg = trigger.config or {}
+            cron_expression = cfg.get("cron_expression", "")
+            timezone = cfg.get("timezone", "UTC")
+            if not cron_expression:
+                results["skipped"] += 1
+                continue
+
+            cooldown = cfg.get("cooldown_seconds", 60)
+            if trigger.last_fired_at:
+                elapsed = (datetime.utcnow() - trigger.last_fired_at).total_seconds()
+                if elapsed < cooldown:
+                    results["skipped"] += 1
+                    continue
+
+            # Shared cron math (same 'due' rule as the ScheduledTask dispatcher).
+            if not is_due(cron_expression, timezone=timezone, last_run=trigger.last_fired_at):
+                results["skipped"] += 1
+                continue
+
+            if _check_rate_limit(trigger, db):
+                results["skipped"] += 1
+                continue
+
+            payload = {
+                "cron_expression": cron_expression,
+                "timezone": timezone,
+                "fired_at": datetime.utcnow().isoformat(),
+            }
+            log = EventLog(
+                trigger_id=trigger.id,
+                event_payload=payload,
+                status=EventLogStatus.PROCESSED,
+                correlation_id=str(uuid.uuid4()),
+            )
+            db.add(log)
+            trigger.fire_count = (trigger.fire_count or 0) + 1
+            trigger.last_fired_at = datetime.utcnow()
+            db.commit()
+
+            EventProcessorService._dispatch_action(
+                trigger, payload, db, dispatch_task_when_no_workflow=True,
+            )
+            results["fired"] += 1
+
+        return results
+
+    @staticmethod
+    def _dispatch_task(
+        trigger: EventTrigger, payload: Dict[str, Any], db: Session,
+    ) -> None:
+        """
+        Dispatch a regular Task for a trigger that has no target_workflow_id,
+        reusing the shared scheduled-task task builder so dispatch logic and
+        the state-machine path are identical everywhere.
+        """
+        from backend.models.entities.task import TaskType
+        from backend.services.tasks.scheduled_task_dispatcher import create_and_dispatch_task
+
+        cfg = trigger.config or {}
+        task_payload = cfg.get("task_payload") or {}
+        title = task_payload.get("title") or trigger.name
+        description = task_payload.get("description") or f"Event-triggered task: {trigger.name}"
+        raw_type = task_payload.get("task_type", "execution")
+        try:
+            task_type = TaskType(raw_type)
+        except ValueError:
+            task_type = TaskType.EXECUTION
+
+        create_and_dispatch_task(
+            db,
+            description=description,
+            title=title,
+            task_type=task_type,
+            execution_context={"trigger_id": trigger.id, "event_payload": payload},
+            note_fragment=f"trigger:{trigger.name}",
+            agent_id=trigger.target_agent_id or "",
+        )
+
     # ── Dead letter queue ─────────────────────────────────────────────────
 
     @staticmethod
@@ -446,10 +553,12 @@ class EventProcessorService:
     @staticmethod
     def _dispatch_action(
         trigger: EventTrigger, payload: Dict[str, Any], db: Session,
+        dispatch_task_when_no_workflow: bool = False,
     ) -> None:
         """
         Execute the configured action for a trigger: start a workflow,
-        create a task, or emit a WebSocket notification.
+        dispatch a task (when dispatch_task_when_no_workflow and no workflow
+        target), or emit a WebSocket notification.
         """
         try:
             if trigger.target_workflow_id:
@@ -470,6 +579,17 @@ class EventProcessorService:
                         "Failed to dispatch workflow for trigger %s: %s",
                         trigger.name, exc,
                     )
+            elif dispatch_task_when_no_workflow:
+                # No workflow target — dispatch a regular Task instead.
+                try:
+                    EventProcessorService._dispatch_task(trigger, payload, db)
+                except Exception as exc:
+                    logger.error(
+                        "Failed to dispatch task for trigger %s: %s",
+                        trigger.name, exc,
+                    )
+            # else: no configured action — webhook/threshold/api_poll keep
+            # their pre-existing broadcast-only behavior.
 
             # WebSocket broadcast regardless
             try:

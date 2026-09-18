@@ -1401,6 +1401,25 @@ def external_api_poll():
             return {"error": str(e)}
 
 
+@celery_app.task(name='agentium.tasks.task_executor.schedule_trigger_check')
+def schedule_trigger_check():
+    """Schedule event trigger check."""
+
+    with get_task_db() as db:
+        try:
+            from backend.services.event_processor import EventProcessorService
+            result = EventProcessorService.evaluate_schedule_triggers(db)
+            if result.get("fired", 0) > 0:
+                logger.info(
+                    f"🗓️ Schedule trigger check: {result['fired']} fire(s) "
+                    f"out of {result['checked']} checked"
+                )
+            return result
+        except Exception as e:
+            logger.error(f"schedule_trigger_check failed: {e}")
+            return {"error": str(e)}
+
+
 # ═══════════════════════════════════════════════════════════
 # Phase 13.7 — Zero-Touch Operations Dashboard Tasks
 # ═══════════════════════════════════════════════════════════

@@ -193,6 +193,10 @@ celery_app.conf.beat_schedule = {
         'task': 'agentium.tasks.task_executor.external_api_poll',
         'schedule': 60.0,
     },
+    'schedule-trigger-check': {
+        'task': 'agentium.tasks.task_executor.schedule_trigger_check',
+        'schedule': 15.0,
+    },
 
     # ── Phase 13.7: Zero-Touch Operations Dashboard ───────────────────────────
     'anomaly-detection': {
