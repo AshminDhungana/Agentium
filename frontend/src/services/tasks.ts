@@ -50,6 +50,7 @@ export const tasksService = {
         parent_task_id?: string;
         my_tasks?: boolean;
         hide_system?: boolean;
+        task_type?: string;
     }): Promise<Task[]> => {
         const params = new URLSearchParams();
         if (filters?.status) params.append('status', filters.status);
@@ -57,6 +58,7 @@ export const tasksService = {
         if (filters?.parent_task_id) params.append('parent_task_id', filters.parent_task_id);
         if (filters?.my_tasks) params.append('my_tasks', 'true');
         if (filters?.hide_system !== undefined) params.append('hide_system', String(filters.hide_system));
+        if (filters?.task_type) params.append('task_type', filters.task_type);
 
         const query = params.toString() ? `?${params.toString()}` : '';
         const response = await api.get<Task[]>(`/api/v1/tasks/${query}`);
@@ -128,6 +130,11 @@ export const tasksService = {
 
     getDependencyGraph: async (taskId: string): Promise<any> => {
         const response = await api.get(`/api/v1/tasks/${taskId}/dependency-graph`);
+        return response.data;
+    },
+
+    cancelTask: async (taskId: string): Promise<any> => {
+        const response = await api.post(`/api/v1/tasks/${taskId}/cancel`);
         return response.data;
     },
 };

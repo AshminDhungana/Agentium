@@ -469,12 +469,12 @@
   > - **`create_reminder`** (`workflow_tools.py`) rewritten to persist a valid one-time ScheduledTask row (`run_once=True` + `run_at`, JSON payload) instead of always-throwing kwargs — regression-locked by `test_create_reminder.py`.
   > - **Remaining (not done)**: push `origin/main` (10 commits ahead, user chose local merge); manual live celery beat+worker smoke (plan Task 8 Step 3).
 
-- [ ] **10.5 — Task Frontend**
-  - [ ] 10.5.1 — `TasksPage.tsx` displays tasks with status, priority, type filters
-  - [ ] 10.5.2 — Task creation modal/form works
-  - [ ] 10.5.3 — Task detail view shows execution log and results
-  - [ ] 10.5.4 — Real-time task status updates via WebSocket
-  - [ ] 10.5.5 — Task cancellation from UI works
+- [x] **10.5 — Task Frontend**
+  - [x] 10.5.1 — `TasksPage.tsx` displays tasks with status, priority, type filters
+  - [x] 10.5.2 — Task creation modal/form works
+  - [x] 10.5.3 — Task detail view shows execution log and results
+  - [x] 10.5.4 — Real-time task status updates via WebSocket
+  - [x] 10.5.5 — Task cancellation from UI works
 
 ---
 

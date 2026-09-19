@@ -348,6 +348,10 @@ export interface Task {
     created_at: string | null;
     updated_at?: string | null;
     event_count?: number;
+    /** Summary of task execution results */
+    result_summary?: string;
+    /** Structured data from task execution */
+    result_data?: any;
 }
 
 // ─── Subtask & Critic types ───────────────────────────────────────────────────
