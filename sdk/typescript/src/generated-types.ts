@@ -8336,11 +8336,8 @@ export interface components {
         };
         /** Body_transcribe_audio_api_v1_audio_transcribe_post */
         Body_transcribe_audio_api_v1_audio_transcribe_post: {
-            /**
-             * Audio
-             * Format: binary
-             */
-            audio: string;
+            /** Audio */
+            audio?: string | null;
             /** Language */
             language?: string | null;
         };
@@ -41362,7 +41359,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody: {
+        requestBody?: {
             content: {
                 "multipart/form-data": components["schemas"]["Body_transcribe_audio_api_v1_audio_transcribe_post"];
             };
