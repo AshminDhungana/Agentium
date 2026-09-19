@@ -43,6 +43,8 @@ def main():
     mic = MicLevelCapture()
 
     bridge.voice_state_changed.connect(overlay.on_voice_state)
+    bridge.transcript_received.connect(overlay.on_transcript)
+    bridge.audio_level_received.connect(overlay.on_mic_level)
     mic.mic_level.connect(overlay.on_mic_level)
 
     tray_icon = QSystemTrayIcon()

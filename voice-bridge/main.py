@@ -61,8 +61,13 @@ from typing import Optional, Tuple
 # even when openWakeWord/Silero/Kokoro are not installed on the host. vad and
 # tts_engine are imported lazily inside _run_voice_loop_once so the bridge can
 # be imported (and wake-word mode exercised) before those modules land.
-from audio_source import MicrophoneSource
+from audio_source import MicrophoneSource, compute_rms_level
 from wake_word import WakeWordDetector
+from vad import VAD
+from tts_engine import TTSEngine
+
+# Microphone capture enabled state (can be toggled by frontend set_mic)
+_mic_enabled: bool = True
 
 # ── Logging ────────────────────────────────────────────────────────────────────
 
@@ -285,12 +290,11 @@ VOSK_SAMPLE_RATE = 16000
 VOSK_SAMPLE_WIDTH = 2  # bytes (16-bit PCM)
 
 
-def _recognize_with_vosk(audio: "sr.AudioData") -> Optional[str]:
+def _recognize_with_vosk(audio: "sr.AudioData | bytes") -> Optional[str]:
     """
-    Transcribe an already-captured AudioData object using the local Vosk
+    Transcribe an already-captured AudioData object or raw PCM bytes using the local Vosk
     model. Returns None on any failure (model missing, decode error, no
-    speech recognized) so the caller can fall back to "no speech detected"
-    semantics identical to a Google STT miss.
+    speech recognized).
     """
     model = _get_vosk_model()
     if model is None:
@@ -300,9 +304,10 @@ def _recognize_with_vosk(audio: "sr.AudioData") -> Optional[str]:
         import vosk
         rec = vosk.KaldiRecognizer(model, VOSK_SAMPLE_RATE)
         rec.SetWords(False)
-        # Resample to 16kHz/16-bit regardless of the mic's native capture
-        # rate — Vosk's bundled models expect this specific format.
-        raw = audio.get_raw_data(convert_rate=VOSK_SAMPLE_RATE, convert_width=VOSK_SAMPLE_WIDTH)
+        if isinstance(audio, (bytes, bytearray)):
+            raw = bytes(audio)
+        else:
+            raw = audio.get_raw_data(convert_rate=VOSK_SAMPLE_RATE, convert_width=VOSK_SAMPLE_WIDTH)
         rec.AcceptWaveform(raw)
         result = json.loads(rec.FinalResult())
         text = (result.get("text") or "").strip()
@@ -312,36 +317,62 @@ def _recognize_with_vosk(audio: "sr.AudioData") -> Optional[str]:
         return None
 
 
+def _recognize_pcm_fallback(pcm_bytes: bytes) -> Optional[str]:
+    """Offline/in-memory fallback when backend STT is unreachable (avoids re-recording mic)."""
+    # 1. Try offline Vosk model
+    text = _recognize_with_vosk(pcm_bytes)
+    if text:
+        return text
+    # 2. Try speech_recognition Google STT on captured buffer
+    if SR_AVAILABLE:
+        try:
+            import speech_recognition as sr
+            recognizer = sr.Recognizer()
+            audio_data = sr.AudioData(pcm_bytes, 16000, 2)
+            return recognizer.recognize_google(audio_data)
+        except Exception as exc:
+            logger.debug("[bridge] In-memory STT fallback: %s", exc)
+    return None
+
+
 def _transcribe_via_backend(audio_wav: bytes) -> Optional[str]:
     """
-    Relay WAV audio bytes to the backend's whisper.cpp STT endpoint.
+    Relay WAV audio bytes to the backend's whisper.cpp STT endpoint as multipart/form-data.
 
-    Returns the transcript string, or None if the backend call fails (in
-    which case the caller falls back to the offline Vosk model). The backend
-    requires an authenticated user; the bridge sends its VOICE_TOKEN.
+    Returns the transcript string, or None if the backend call fails.
     """
     import urllib.request
     import urllib.error
+    import uuid
 
     if not VOICE_TOKEN:
         logger.debug("[bridge] No VOICE_TOKEN — cannot call backend STT")
         return None
     try:
+        boundary = f"----AgentiumVoiceBoundary{uuid.uuid4().hex}"
+        part_header = (
+            f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="audio"; filename="speech.wav"\r\n'
+            f"Content-Type: audio/wav\r\n\r\n"
+        ).encode("utf-8")
+        part_footer = f"\r\n--{boundary}--\r\n".encode("utf-8")
+        body = part_header + audio_wav + part_footer
+
         req = urllib.request.Request(
             STT_BACKEND_URL,
-            data=audio_wav,
+            data=body,
             headers={
-                "Content-Type": "audio/wav",
+                "Content-Type": f"multipart/form-data; boundary={boundary}",
                 "Authorization": f"Bearer {VOICE_TOKEN}",
             },
             method="POST",
         )
         with urllib.request.urlopen(req, timeout=WHISPER_RELAY_TIMEOUT) as resp:
-            body = json.loads(resp.read().decode())
-            text = (body.get("text") or "").strip()
+            body_dict = json.loads(resp.read().decode())
+            text = (body_dict.get("text") or body_dict.get("transcript") or "").strip()
             return text or None
     except Exception as exc:
-        logger.warning("[WARN] Backend STT relay failed: %s — using Vosk", exc)
+        logger.warning("[WARN] Backend STT relay failed: %s — using fallback", exc)
         return None
 
 
@@ -407,8 +438,10 @@ def _play_wake_chime() -> None:
 def _get_tts_engine() -> "TTSEngine":
     """Lazily construct and cache the TTS engine (Kokoro or OpenAI)."""
     global _tts_engine_instance
+    from tts_engine import TTSEngine as _RealTTSEngine
+    if TTSEngine is not _RealTTSEngine:
+        return TTSEngine(VOICE_TTS_VOICE, VOICE_TTS_PROVIDER)
     if _tts_engine_instance is None:
-        from tts_engine import TTSEngine
         _tts_engine_instance = TTSEngine(VOICE_TTS_VOICE, VOICE_TTS_PROVIDER)
     return _tts_engine_instance
 
@@ -894,55 +927,48 @@ async def _stream_chat(text: str, persona: Optional[str] = None,
                        speaker_id: Optional[str] = None) -> "asyncio.AsyncIterator[str]":
     """POST to the chat endpoint with stream:true and parse SSE deltas.
 
-    Reuses _RESOLVED_CHAT_ENDPOINT + _auth_headers. Yields text content as it
-    arrives so TTS can start on the first sentence (Phase E). Accepts an
-    optional persona (Phase F) and speaker_id (Phase G) threaded into the body.
+    Uses aiohttp for fully asynchronous HTTP so streaming tokens never block
+    the asyncio event loop (WebSocket broadcasts, barge-in checks, and HUD
+    updates continue uninterrupted). Yields text content as it arrives so TTS
+    can start on the first sentence (Phase E). Accepts an optional persona
+    (Phase F) and speaker_id (Phase G) threaded into the body.
     """
     payload = {"message": text, "stream": True}
     if persona:
         payload["voice_persona"] = persona
     if speaker_id:
         payload["speaker_id"] = speaker_id
-    data = json.dumps(payload).encode()
-    req = urllib.request.Request(
-        _RESOLVED_CHAT_ENDPOINT, data=data, headers=_auth_headers(), method="POST"
-    )
-    loop = asyncio.get_event_loop()
-    raw = await loop.run_in_executor(_executor, lambda: urllib.request.urlopen(req, timeout=30))
-    try:
-        for line in raw:
-            line = line.decode() if isinstance(line, (bytes, bytearray)) else line
-            line = line.strip()
-            if not line or not line.startswith("data:"):
-                continue
-            payload_str = line[len("data:"):].strip()
-            if not payload_str:
-                continue
-            try:
-                evt = json.loads(payload_str)
-            except json.JSONDecodeError:
-                continue
-            evt_type = evt.get("type")
-            if evt_type == "ack":
-                continue
-            if evt_type == "summary" and evt.get("content"):
-                yield evt["content"]
-            elif evt_type == "detail" and evt.get("content"):
-                yield evt["content"]
-            elif evt_type == "content" and evt.get("content"):
-                yield evt["content"]
-            elif evt_type == "part_end":
-                yield "\n"
-            elif evt_type in ("complete", "done"):
-                break
-            elif evt_type == "error":
-                yield ""
-                break
-    finally:
-        try:
-            raw.close()
-        except Exception:
-            pass
+    headers = _auth_headers()
+    async with aiohttp.ClientSession() as session:
+        async with session.post(
+            _RESOLVED_CHAT_ENDPOINT,
+            json=payload,
+            headers=headers,
+            timeout=aiohttp.ClientTimeout(total=60),
+        ) as resp:
+            async for raw_line in resp.content:
+                line = raw_line.decode("utf-8", errors="replace").strip()
+                if not line or not line.startswith("data:"):
+                    continue
+                payload_str = line[len("data:"):].strip()
+                if not payload_str:
+                    continue
+                try:
+                    evt = json.loads(payload_str)
+                except json.JSONDecodeError:
+                    continue
+                evt_type = evt.get("type")
+                if evt_type == "ack":
+                    continue
+                if evt_type in ("summary", "detail", "content") and evt.get("content"):
+                    yield evt["content"]
+                elif evt_type == "part_end":
+                    yield "\n"
+                elif evt_type in ("complete", "done"):
+                    break
+                elif evt_type == "error":
+                    yield ""
+                    break
 
 
 SPEAKER_ID_URL = f"{BACKEND_URL}/api/v1/audio/speakers/identify"
@@ -1014,16 +1040,23 @@ async def _ws_handler(websocket) -> None:
                 logger.warning("[WARN][WS] Invalid JSON from browser: %s", exc)
                 continue
 
-            # The frontend pushes a long-lived host voice token here so the
-            # bridge can authenticate to the backend even when no browser
-            # session is logged in.  Persisted to env.conf for restarts.
-            if isinstance(msg, dict) and msg.get("type") == "set_token":
-                token = msg.get("token")
-                if token:
-                    _set_voice_token(token)
-                    if _token_ready is not None:
-                        _token_ready.set()
-                    await _broadcast({"type": "voice_token_set", "ts": time.time()})
+            if isinstance(msg, dict):
+                msg_type = msg.get("type")
+                if msg_type == "set_token":
+                    token = msg.get("token")
+                    if token:
+                        _set_voice_token(token)
+                        if _token_ready is not None:
+                            _token_ready.set()
+                        await _broadcast({"type": "voice_token_set", "ts": time.time()})
+                elif msg_type == "set_mic":
+                    global _mic_enabled
+                    _mic_enabled = bool(msg.get("enabled", True))
+                    logger.info("[bridge][WS] Microphone enabled set to %s", _mic_enabled)
+                elif msg_type == "cancel_speech":
+                    tts = _get_tts_engine()
+                    if tts:
+                        tts.flush()
     except Exception:
         pass
     finally:
@@ -1092,7 +1125,7 @@ async def _run_ws_server_once() -> None:
 
 # ── Session mode ───────────────────────────────────────────────────────────────
 
-async def _run_session() -> None:
+async def _run_session(mic=None, vad=None, tts=None, persona=None) -> None:
     """
     Run a single voice session after the wake word has been detected.
 
@@ -1105,12 +1138,25 @@ async def _run_session() -> None:
       • The total wall-clock time exceeds SESSION_MAX_DURATION seconds.
 
     On exit the caller (the main loop) returns to passive wake-word scanning.
+
+    When called with mic/vad/tts, delegates to VoiceSession for consistent
+    state-machine behavior (barge-in, streaming TTS, echo gating) instead
+    of the legacy listen_once() path that conflicts with MicrophoneSource.
     """
+    # Primary path: delegate to VoiceSession state machine.
+    if mic is not None and vad is not None and tts is not None:
+        session = VoiceSession(mic, vad, tts, persona=persona)
+        await session.run()
+        return
+
+    # Legacy fallback: if called without args (e.g. from older code paths),
+    # use the listen_once() approach.  This should not be reached in normal
+    # operation since _run_voice_loop_once passes all three arguments.
     session_start = time.monotonic()
     turn = 0
 
     logger.info(
-        "[bridge] Session started (no_speech_timeout=%.1fs, max_duration=%.0fs)",
+        "[bridge] Session started (legacy path — no_speech_timeout=%.1fs, max_duration=%.0fs)",
         SESSION_NO_SPEECH_TIMEOUT, SESSION_MAX_DURATION,
     )
 
@@ -1146,44 +1192,24 @@ async def _run_session() -> None:
         logger.info("[bridge] Session turn %d: '%s'", turn, command)
 
         await _broadcast({
-            "type": "transcript",
-            "role": "user",
-            "text": command,
-            "ts":   time.time(),
+            "type": "transcript", "role": "user", "text": command, "ts": time.time(),
         })
 
-        # Query the backend
         reply = await query_backend(command)
         if not reply:
             reply = "I'm having trouble reaching the backend right now."
             logger.warning("[WARN] Backend returned no reply for: '%s'", command)
 
         logger.info("[bridge] Reply: '%s'", reply[:120])
-
-        # Speak the reply and broadcast to any connected browser tabs
         await speak(reply)
 
         await _broadcast({
-            "type": "transcript",
-            "role": "agent",
-            "text": reply,
-            "ts":   time.time(),
+            "type": "transcript", "role": "agent", "text": reply, "ts": time.time(),
         })
-
         await _broadcast({
-            "type":  "voice_interaction",
-            "user":  command,
-            "reply": reply,
-            "ts":    time.time(),
+            "type": "voice_interaction", "user": command, "reply": reply, "ts": time.time(),
         })
 
-        # Loop continues — the no-speech timer effectively resets because the
-        # next listen_once() call starts fresh after the reply has been spoken.
-        logger.info(
-            "[bridge] Staying in session — %.1fs elapsed, %.1fs remaining",
-            time.monotonic() - session_start,
-            SESSION_MAX_DURATION - (time.monotonic() - session_start),
-        )
 
 
 # ── Main voice loop ────────────────────────────────────────────────────────────
@@ -1194,9 +1220,10 @@ async def _capture_utterance(
 ):
     """Capture one VAD-bounded utterance and transcribe it.
 
-    Until the VAD stage (Phase B) is live, falls back to the existing blocking
-    energy-gated listener. Returns the transcript string (or (text, wav) tuple
-    when return_wav=True) or None on timeout.
+    Distinguishes two states:
+    1. WAITING_FOR_SPEECH: Allows up to `timeout` seconds for user speech to start.
+    2. IN_SPEECH: Once speech has begun, allows up to `vad.silence_base_ms` of trailing silence
+       before endpointing the turn.
     """
     loop = asyncio.get_event_loop()
     if vad is None or not vad.available:
@@ -1204,28 +1231,71 @@ async def _capture_utterance(
             _executor, _listen_sync, timeout, 15.0, SESSION_PAUSE_THRESHOLD
         )
         return (text, b"") if return_wav else text
+
+    pre_roll: list[bytes] = []
     chunks: list[bytes] = []
     silence_ms = 0.0
+    speech_ms = 0.0
     frame_ms = 80.0
     elapsed = 0.0
-    while elapsed < timeout * 1000:
+    started_speaking = False
+    base_silence = getattr(vad, "silence_base_ms", 700.0)
+
+    while elapsed < timeout * 1000.0:
         frame = await loop.run_in_executor(_executor, mic.read_frame)
-        chunks.append(frame)
+        if not frame:
+            break
+
+        # Broadcast mic level for HUD overlay if browsers/clients are listening
+        if _connected_browsers:
+            rms = compute_rms_level(frame)
+            asyncio.create_task(_broadcast({"type": "audio_level", "level": rms, "ts": time.time()}))
+
         score = await loop.run_in_executor(_executor, vad.push_frame, frame)
-        if vad.is_speech(score):
-            silence_ms = 0.0
+        is_speech_frame = vad.is_speech(score)
+
+        if not started_speaking:
+            # Keep up to 4 frames (320ms) of pre-roll audio so initial word isn't clipped
+            pre_roll.append(frame)
+            if len(pre_roll) > 4:
+                pre_roll.pop(0)
+
+            if is_speech_frame:
+                speech_ms += frame_ms
+                if speech_ms >= 160.0:  # 2 consecutive speech frames
+                    started_speaking = True
+                    chunks.extend(pre_roll)
+                    chunks.append(frame)
+                    silence_ms = 0.0
+            else:
+                speech_ms = 0.0
+            elapsed += frame_ms
         else:
-            silence_ms += frame_ms
-            if vad.should_endpoint("", silence_ms, vad.silence_base_ms):
+            chunks.append(frame)
+            if is_speech_frame:
+                silence_ms = 0.0
+            else:
+                silence_ms += frame_ms
+                if hasattr(vad, "should_endpoint"):
+                    endpointed = vad.should_endpoint("", silence_ms, base_silence)
+                else:
+                    endpointed = silence_ms >= base_silence
+                if endpointed:
+                    break
+
+            if len(chunks) * frame_ms >= 15000.0:  # 15s max phrase length
                 break
-        elapsed += frame_ms
-    if not chunks:
+
+    if not chunks or (not started_speaking and not chunks):
         return (None, b"") if return_wav else None
-    wav = _frames_to_wav(b"".join(chunks))
+
+    pcm = b"".join(chunks)
+    wav = _frames_to_wav(pcm)
+
     text = await loop.run_in_executor(_executor, _transcribe_via_backend, wav)
     if not text:
-        # Vosk needs AudioData; reuse the blocking listener for the fallback.
-        text = await loop.run_in_executor(_executor, _listen_sync, 1.0, 15.0, SESSION_PAUSE_THRESHOLD)
+        text = await loop.run_in_executor(_executor, _recognize_pcm_fallback, pcm)
+
     return (text, wav) if return_wav else text
 
 
@@ -1243,14 +1313,17 @@ def _frames_to_wav(pcm: bytes) -> bytes:
 
 async def _process_direct(text: str) -> None:
     """Handle a single utterance in direct (no wake word) mode."""
+    await _broadcast({"type": "transcript", "role": "user", "text": text, "ts": time.time()})
     reply = await query_backend(text)
     if not reply:
         reply = "I'm having trouble reaching the backend right now."
+    await _broadcast({"type": "transcript", "role": "agent", "text": reply, "ts": time.time()})
     tts = _get_tts_engine()
     if tts.available:
-        audio = tts.synth(text)
+        audio = tts.synth(reply)
         if audio:
             tts.play(audio)
+            tts.wait_done_sync()
     else:
         await _speak_fallback(reply)
     await _broadcast({"type": "voice_interaction", "user": text, "reply": reply, "ts": time.time()})
@@ -1301,13 +1374,24 @@ class VoiceSession:
         while True:
             self.phase = "LISTENING"
             await self._broadcast_state("listening")
-            result = await _capture_utterance(self.mic, self.vad, return_wav=True)
+            result = await _capture_utterance(self.mic, self.vad, timeout=SESSION_NO_SPEECH_TIMEOUT, return_wav=True)
             if isinstance(result, tuple):
                 text, wav = result
             else:
                 text, wav = result, None
             if not text:
+                logger.info("[bridge] No speech detected in session turn — ending session")
+                self.phase = "IDLE"
+                await self._broadcast_state("idle")
                 return  # no-speech timeout ends the session
+
+            await _broadcast({
+                "type": "transcript",
+                "role": "user",
+                "text": text,
+                "ts": time.time(),
+            })
+
             # Identify speaker (Phase G) and personalize the greeting.
             if wav and self.speaker_id is None:
                 info = _identify_speaker(wav)
@@ -1322,11 +1406,25 @@ class VoiceSession:
             self.phase = "SPEAKING"
             await self._broadcast_state("speaking")
             full_reply = await self._speak_reply_stream(text)
+
+            # Wait for audio output to finish playing while monitoring for barge-in
+            while getattr(self.tts, "is_playing", False):
+                if self.barge_in and await self._check_barge_in(loop):
+                    self._abort.set()
+                    self.tts.flush()
+                    break
+                await asyncio.sleep(0.04)
+
+            # Clear mic playback echo gating
+            if hasattr(self.mic, "clear_playback"):
+                self.mic.clear_playback()
+
             if self._abort.is_set():
                 self._abort.clear()
                 self.phase = "INTERRUPTED"
                 await self._broadcast_state("interrupted")
                 continue  # loop back to LISTENING
+
             await _broadcast({
                 "type": "voice_interaction", "user": text, "reply": full_reply,
                 "ts": time.time(), "speaker_id": self.speaker_id,
@@ -1347,7 +1445,8 @@ class VoiceSession:
             self._greeting = ""
             audio = self.tts.synth(greeting) if self.tts.available else b""
             if audio:
-                self.mic.feed_playback(audio)
+                if hasattr(self.mic, "feed_playback"):
+                    self.mic.feed_playback(audio)
                 self.tts.play(audio)
             else:
                 await _speak_fallback(greeting)
@@ -1357,19 +1456,27 @@ class VoiceSession:
             async for delta in _stream_chat(text, self.persona, self.speaker_id):
                 buffer += delta
                 full.append(delta)
-                while "." in buffer or "?" in buffer or "!" in buffer:
-                    idx = max(buffer.find("."), buffer.find("?"), buffer.find("!"))
-                    if idx < 0:
+                while True:
+                    candidates = [buffer.find(p) for p in (".", "?", "!") if buffer.find(p) != -1]
+                    if not candidates:
                         break
+                    idx = min(candidates)
                     sentence = buffer[:idx + 1].strip()
                     buffer = buffer[idx + 1:]
                     if not sentence:
                         continue
+                    await _broadcast({
+                        "type": "transcript",
+                        "role": "agent",
+                        "text": sentence,
+                        "ts": time.time(),
+                    })
                     if self.barge_in and await self._check_barge_in(loop):
                         return "".join(full)
                     audio = self.tts.synth(sentence) if self.tts.available else b""
                     if audio:
-                        self.mic.feed_playback(audio)
+                        if hasattr(self.mic, "feed_playback"):
+                            self.mic.feed_playback(audio)
                         self.tts.play(audio)
                     else:
                         await _speak_fallback(sentence)
@@ -1379,17 +1486,31 @@ class VoiceSession:
             if fb:
                 full.append(fb)
                 for sentence in _split_sentences(fb):
+                    await _broadcast({
+                        "type": "transcript",
+                        "role": "agent",
+                        "text": sentence,
+                        "ts": time.time(),
+                    })
                     audio = self.tts.synth(sentence) if self.tts.available else b""
                     if audio:
-                        self.mic.feed_playback(audio)
+                        if hasattr(self.mic, "feed_playback"):
+                            self.mic.feed_playback(audio)
                         self.tts.play(audio)
                     else:
                         await _speak_fallback(sentence)
         remainder = buffer.strip()
         if remainder:
+            await _broadcast({
+                "type": "transcript",
+                "role": "agent",
+                "text": remainder,
+                "ts": time.time(),
+            })
             audio = self.tts.synth(remainder) if self.tts.available else b""
             if audio:
-                self.mic.feed_playback(audio)
+                if hasattr(self.mic, "feed_playback"):
+                    self.mic.feed_playback(audio)
                 self.tts.play(audio)
             else:
                 await _speak_fallback(remainder)
@@ -1446,8 +1567,6 @@ async def _run_voice_loop_once() -> None:
         return
     mic.open()
 
-    from vad import VAD
-    from tts_engine import TTSEngine
     detector = WakeWordDetector(WAKE_WORD_MODEL) if VOICE_REQUIRE_WAKE_WORD else None
     vad = VAD()
     tts = _get_tts_engine()
@@ -1481,6 +1600,9 @@ async def _run_voice_loop_once() -> None:
 
     try:
         while True:
+            if not _mic_enabled:
+                await asyncio.sleep(0.1)
+                continue
             frame = await loop.run_in_executor(_executor, mic.read_frame)
             if VOICE_REQUIRE_WAKE_WORD and detector is not None:
                 if detector.available:
@@ -1488,6 +1610,7 @@ async def _run_voice_loop_once() -> None:
                     if detector.is_triggered(score):
                         logger.info("[bridge] Wake word detected — starting session")
                         _play_wake_chime()
+                        await asyncio.sleep(0.1)
                         session = VoiceSession(mic, vad, tts, persona=_load_persona())
                         await session.run()
                         continue

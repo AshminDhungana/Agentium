@@ -1,6 +1,6 @@
 """Streaming wake-word detection via openWakeWord.
 
-Buffers 80 ms mic frames into 1 s windows and runs openWakeWord inference.
+Buffers 80 ms mic frames into 1 s sliding windows and runs openWakeWord inference.
 Degrades to `available=False` if the library or model is missing so the
 caller can fall back to REQUIRE_WAKE_WORD=false behavior.
 """
@@ -40,7 +40,7 @@ class WakeWordDetector:
         self.threshold = _WAKE_WORD_THRESHOLD
 
     def push_frame(self, frame: bytes) -> Optional[float]:
-        """Append one 80 ms frame; return best score once 1 s is buffered."""
+        """Append one 80 ms frame; return best score once 1 s is buffered with sliding window."""
         if not self.available:
             return None
         samples = np.frombuffer(frame, dtype=np.int16)
@@ -48,7 +48,9 @@ class WakeWordDetector:
         if len(self._buf) < 16000:
             return None
         window = self._buf[:16000].copy()
-        self._buf = self._buf[16000:]  # slide, keep remainder
+        # Slide by the frame size (keeping overlap) rather than dropping the whole 1s buffer
+        stride = len(samples) if len(samples) > 0 else 1280
+        self._buf = self._buf[stride:]
         try:
             scores: Dict[str, float] = self._model.predict(window)
         except Exception:

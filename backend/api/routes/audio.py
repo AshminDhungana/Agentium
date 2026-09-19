@@ -53,22 +53,32 @@ async def audio_status(
     responses=build_responses(None),
 )
 async def transcribe_audio(
-    audio: UploadFile = File(...),
+    request: Request,
+    audio: Optional[UploadFile] = File(None),
     language: Optional[str] = Form(None),
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_voice_or_active_user),
 ):
-    """Single-shot audio transcription via OpenAI Whisper."""
+    """Single-shot audio transcription via OpenAI Whisper. Supports multipart or raw audio body."""
     svc = get_audio_service()
     identifier = get_speaker_identifier()
     try:
-        audio_bytes = await audio.read()
+        if audio is not None:
+            audio_bytes = await audio.read()
+            filename = audio.filename or "audio.wav"
+        else:
+            audio_bytes = await request.body()
+            filename = "audio.wav"
+
+        if not audio_bytes:
+            raise BadRequestError(error="No audio content provided", code="EMPTY_AUDIO")
+
         text = await svc.transcribe(
             db,
             str(current_user.get("user_id")),
             audio_bytes,
             language=language,
-            filename=audio.filename or "audio.wav",
+            filename=filename,
         )
         speaker_info = (
             identifier.identify(db, audio_bytes)

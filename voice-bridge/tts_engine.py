@@ -3,14 +3,16 @@
 Supports Kokoro (offline) and OpenAI (cloud) providers.
 synth(text) returns WAV bytes from the active provider.
 play() streams audio to the host speaker via sounddevice; flush() aborts
-playback queue for barge-in (<60ms target).
+playback queue for barge-in (<60ms target) without killing worker thread.
 """
 from __future__ import annotations
 
+import asyncio
 import io
 import os
 import queue
 import threading
+import time
 import logging
 from typing import Optional, Dict, Any
 
@@ -49,11 +51,18 @@ class KokoroProvider:
         if not self._pipeline:
             raise RuntimeError("Kokoro not available")
         import soundfile as sf  # type: ignore
+        import numpy as np
         out = io.BytesIO()
         try:
+            chunks = []
             for _, _, audio in self._pipeline(text, voice=voice, speed=speed):
                 arr = audio.cpu().numpy() if hasattr(audio, "cpu") else audio
-                sf.write(out, arr, 24000, format="WAV")
+                if arr is not None and len(arr) > 0:
+                    chunks.append(arr)
+            if not chunks:
+                return b""
+            full_audio = np.concatenate(chunks)
+            sf.write(out, full_audio, 24000, format="WAV")
         except Exception:
             raise
         return out.getvalue()
@@ -117,44 +126,79 @@ class PlaybackQueue:
     def __init__(self):
         self._q: "queue.Queue[bytes]" = queue.Queue()
         self._abort = threading.Event()
-        self._thread: Optional[threading.Thread] = None
+        self._is_playing = threading.Event()
+        self._shutdown = threading.Event()
 
     @property
     def aborted(self) -> bool:
         return self._abort.is_set()
 
+    @property
+    def is_playing(self) -> bool:
+        return self._is_playing.is_set() or not self._q.empty()
+
     def put(self, audio: bytes):
+        self._abort.clear()
         self._q.put(audio)
 
     def abort(self):
         self._abort.set()
+        # Immediately stop hardware playback
+        try:
+            import sounddevice as sd  # type: ignore
+            sd.stop()
+        except Exception:
+            pass
+        # Drain the queue
         try:
             while True:
                 self._q.get_nowait()
         except queue.Empty:
             pass
+        self._is_playing.clear()
+
+    def close(self):
+        self._shutdown.set()
+        self.abort()
 
     def play_loop(self, samplerate: int):
         try:
             import sounddevice as sd  # type: ignore
             import numpy as np
+            import soundfile as sf
         except Exception:
             return
-        self._abort.clear()
-        while not self._abort.is_set():
+
+        while not self._shutdown.is_set():
             try:
                 audio = self._q.get(timeout=0.05)
             except queue.Empty:
                 continue
-            arr = np.frombuffer(audio, dtype=np.int16).astype(np.float32) / 32768.0
-            sd.play(arr, samplerate)
-            sd.wait()
+
             if self._abort.is_set():
+                continue
+
+            self._is_playing.set()
+            try:
+                target_rate = samplerate
                 try:
-                    sd.stop()
+                    data, sr = sf.read(io.BytesIO(audio), dtype="float32")
+                    target_rate = sr
+                    arr = data
                 except Exception:
-                    pass
-                break
+                    arr = np.frombuffer(audio, dtype=np.int16).astype(np.float32) / 32768.0
+
+                if not self._abort.is_set():
+                    sd.play(arr, target_rate)
+                    while sd.get_stream() and sd.get_stream().active:
+                        if self._abort.is_set():
+                            sd.stop()
+                            break
+                        sd.sleep(20)
+            except Exception as exc:
+                logger.warning("[bridge][TTS] Audio playback error: %s", exc)
+            finally:
+                self._is_playing.clear()
 
 
 class TTSEngine:
@@ -170,6 +214,22 @@ class TTSEngine:
             target=self._queue.play_loop, args=(self._samplerate,), daemon=True
         )
         self._player_thread.start()
+
+    @property
+    def is_playing(self) -> bool:
+        return self._queue.is_playing
+
+    async def wait_done(self, timeout: float = 15.0) -> None:
+        """Asynchronously wait for the playback queue and current sound output to complete."""
+        deadline = time.monotonic() + timeout
+        while self.is_playing and time.monotonic() < deadline:
+            await asyncio.sleep(0.04)
+
+    def wait_done_sync(self, timeout: float = 15.0) -> None:
+        """Synchronously wait for the playback queue to finish."""
+        deadline = time.monotonic() + timeout
+        while self.is_playing and time.monotonic() < deadline:
+            time.sleep(0.04)
 
     def set_voice(self, voice: str, provider: Optional[str] = None):
         self.voice = voice

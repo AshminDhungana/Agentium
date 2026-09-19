@@ -6,7 +6,9 @@ Supports PyAudio (preferred) and sounddevice (fallback with Python 3.14 wheels).
 """
 from __future__ import annotations
 
+import math
 import queue
+import struct
 import threading
 from typing import Optional
 
@@ -25,6 +27,20 @@ except Exception:
     sd = None  # type: ignore
     np = None  # type: ignore
     _SOUNDDEVICE_AVAILABLE = False
+
+
+def compute_rms_level(pcm_frame: bytes) -> float:
+    """Calculate normalized RMS energy (0.0 to 1.0) of a 16-bit mono PCM frame."""
+    if not pcm_frame or len(pcm_frame) < 2:
+        return 0.0
+    num_samples = len(pcm_frame) // 2
+    try:
+        samples = struct.unpack(f"<{num_samples}h", pcm_frame)
+        sum_sq = sum(s * s for s in samples)
+        rms = math.sqrt(sum_sq / num_samples)
+        return min(rms / 32768.0, 1.0)
+    except Exception:
+        return 0.0
 
 
 class _PyAudioImpl:
@@ -112,10 +128,15 @@ class MicrophoneSource:
         self.rate = rate
         self.frame_bytes = frame_bytes
         self._impl: Optional[object] = None
+        self._playback_active: bool = False
 
     @property
     def available(self) -> bool:
         return _PYAUDIO_AVAILABLE or _SOUNDDEVICE_AVAILABLE
+
+    @property
+    def is_playback_active(self) -> bool:
+        return self._playback_active
 
     def open(self) -> None:
         if _PYAUDIO_AVAILABLE:
@@ -132,7 +153,11 @@ class MicrophoneSource:
         return self._impl.read_frame()
 
     def feed_playback(self, audio: bytes) -> None:
-        pass
+        """Mark playback state for echo gating and AEC processing."""
+        self._playback_active = bool(audio)
+
+    def clear_playback(self) -> None:
+        self._playback_active = False
 
     def close(self) -> None:
         if self._impl is not None:

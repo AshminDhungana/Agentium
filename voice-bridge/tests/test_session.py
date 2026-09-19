@@ -90,17 +90,15 @@ def test_wake_triggers_session_and_chime(monkeypatch):
         def is_triggered(self, s):
             return s is not None and s >= self.threshold
 
+    monkeypatch.setattr(bridge, "SR_AVAILABLE", True)
     monkeypatch.setattr(bridge, "MicrophoneSource", lambda *a, **k: FakeMic())
     monkeypatch.setattr(bridge, "WakeWordDetector", lambda *a, **k: _TriggeredDetector())
     monkeypatch.setattr(bridge, "_play_wake_chime", lambda: state.__setitem__("chime", 1))
     monkeypatch.setattr(bridge, "VAD", lambda *a, **k: _SilentVAD())
     monkeypatch.setattr(bridge, "TTSEngine", lambda *a, **k: _NoopTTS())
 
-    orig_run = bridge.VoiceSession.run
-
     async def _once(self):
         state["session"] = 1
-        await orig_run(self)
         raise asyncio.CancelledError()
 
     monkeypatch.setattr(bridge.VoiceSession, "run", _once)
@@ -108,11 +106,17 @@ def test_wake_triggers_session_and_chime(monkeypatch):
     # End the session quickly: capture returns None after first call.
     cap_calls = {"n": 0}
 
-    async def _cap(mic, vad=None, timeout=8.0):
+    async def _cap(mic, vad=None, timeout=8.0, **kwargs):
         cap_calls["n"] += 1
         return None if cap_calls["n"] > 1 else "hello"
 
+    async def _fake_stream(*a, **k):
+        if False:
+            yield ""
+
     monkeypatch.setattr(bridge, "_capture_utterance", _cap)
+    monkeypatch.setattr(bridge, "_stream_chat", _fake_stream)
+    monkeypatch.setattr(bridge, "_maybe_handle_pending_card", lambda: asyncio.sleep(0))
 
     async def go():
         await bridge._run_voice_loop_once()
@@ -142,15 +146,21 @@ def test_barge_in_interrupts_speaking(monkeypatch):
 
         def __init__(self):
             self.cancelled = False
+            self._playing = False
+
+        @property
+        def is_playing(self):
+            return self._playing and not self.cancelled
 
         def synth(self, text):
             return b"audio"
 
         def play(self, audio):
-            pass
+            self._playing = True
 
         def flush(self):
             self.cancelled = True
+            self._playing = False
 
     class FakeMic:
         available = True
@@ -166,7 +176,7 @@ def test_barge_in_interrupts_speaking(monkeypatch):
 
         def read_frame(self):
             self.n += 1
-            if state["phase"] == "SPEAKING" and self.n >= 3:
+            if state["phase"].upper() == "SPEAKING" and self.n >= 3:
                 return (np.ones(1280, dtype=np.int16) * 200).tobytes()
             return (np.zeros(1280, dtype=np.int16)).tobytes()
 
@@ -180,7 +190,7 @@ def test_barge_in_interrupts_speaking(monkeypatch):
 
         def push_frame(self, f):
             self.n += 1
-            return 1.0 if state["phase"] == "SPEAKING" and self.n >= 3 else 0.0
+            return 1.0 if state["phase"].upper() == "SPEAKING" and self.n >= 3 else 0.0
 
         def is_speech(self, s):
             return s == 1.0
@@ -190,14 +200,14 @@ def test_barge_in_interrupts_speaking(monkeypatch):
     tts = FakeTTS()
     monkeypatch.setattr(bridge, "TTSEngine", lambda *a, **k: tts)
 
-    async def _q(_):
-        return "This is a long answer that should be interrupted."
+    async def _stream(*a, **k):
+        yield "This is a long answer that should be interrupted. "
 
-    monkeypatch.setattr(bridge, "query_backend", _q)
+    monkeypatch.setattr(bridge, "_stream_chat", _stream)
 
     cap_calls = {"n": 0}
 
-    async def _cap(mic, vad=None, timeout=8.0):
+    async def _cap(mic, vad=None, timeout=8.0, **kwargs):
         cap_calls["n"] += 1
         return "hello" if cap_calls["n"] == 1 else None
 
@@ -212,7 +222,7 @@ def test_barge_in_interrupts_speaking(monkeypatch):
     except Exception:
         pass
     assert tts.cancelled is True, "TTS should be flushed on barge-in"
-    assert state["phase"] in ("INTERRUPTED", "LISTENING", "IDLE")
+    assert state["phase"].upper() in ("INTERRUPTED", "LISTENING", "IDLE")
 
 
 class _SilentVAD:
@@ -240,35 +250,65 @@ class _NoopTTS:
         pass
 
 
+class _FakeAiohttpContent:
+    def __init__(self, lines):
+        self._lines = list(lines)
+        self._idx = 0
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        if self._idx >= len(self._lines):
+            raise StopAsyncIteration
+        val = self._lines[self._idx]
+        self._idx += 1
+        return val
+
+
+class _FakeAiohttpResponse:
+    def __init__(self, lines):
+        self.content = _FakeAiohttpContent(lines)
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *args):
+        pass
+
+
+class _FakeAiohttpSession:
+    def __init__(self, lines, on_post=None):
+        self.lines = lines
+        self.on_post = on_post
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *args):
+        pass
+
+    def post(self, url, **kwargs):
+        if self.on_post:
+            self.on_post(url, kwargs)
+        return _FakeAiohttpResponse(self.lines)
+
+
 def test_stream_chat_yields_sentences(monkeypatch):
-    import asyncio, json
+    import asyncio, aiohttp
 
     lines = [
-        b'data: {"type":"content","content":"The time is "}',
-        b"data: {\"type\":\"content\",\"content\":\"ten o'clock.\"}",
-        b'data: {"type":"done"}',
+        b'data: {"type":"content","content":"The time is "}\n',
+        b"data: {\"type\":\"content\",\"content\":\"ten o'clock.\"}\n",
+        b'data: {"type":"done"}\n',
     ]
 
-    class FakeResp:
-        def __init__(self):
-            self._it = iter(lines)
-
-        def __iter__(self):
-            return self
-
-        def __next__(self):
-            return next(self._it)
-
-    def _fake_urlopen(req, timeout=None):
-        body = req.data.decode()
-        assert '"stream": true' in body, "must request streaming"
-        r = FakeResp()
-        r.__enter__ = lambda: r
-        r.__exit__ = lambda *a: None
-        return r
+    def _post_check(url, kwargs):
+        body = kwargs.get("json", {})
+        assert body.get("stream") is True, "must request streaming"
 
     monkeypatch.setattr(bridge, "VOICE_TOKEN", "t")
-    monkeypatch.setattr("urllib.request.urlopen", _fake_urlopen)
+    monkeypatch.setattr(aiohttp, "ClientSession", lambda *a, **k: _FakeAiohttpSession(lines, _post_check))
 
     async def go():
         out = [c async for c in bridge._stream_chat("time?")]
@@ -326,16 +366,16 @@ def test_first_sentence_spoken_before_last(monkeypatch):
     monkeypatch.setattr(bridge, "VAD", lambda *a, **k: _NoSpeechVAD())
     monkeypatch.setattr(bridge, "TTSEngine", lambda *a, **k: FakeTTS())
 
-    async def _stream():
+    async def _stream(*a, **k):
         for c in chunks:
             yield c
 
-    monkeypatch.setattr(bridge, "_stream_chat", lambda *a, **k: _stream())
+    monkeypatch.setattr(bridge, "_stream_chat", _stream)
 
     # Capture returns a dummy text so run() proceeds into SPEAKING.
     cap_calls = {"n": 0}
 
-    async def _cap(mic, vad=None, timeout=8.0):
+    async def _cap(mic, vad=None, timeout=8.0, **kwargs):
         cap_calls["n"] += 1
         return "go" if cap_calls["n"] == 1 else None
 
@@ -386,32 +426,34 @@ def test_proactive_announces_when_enabled(monkeypatch):
 def test_identify_speaker_returns_name(monkeypatch):
     import json
 
-    def _fake(req, timeout=None):
-        r = type("R", (), {"read": lambda self: json.dumps(
-            {"speaker_id": "s1", "name": "Ashmin", "confidence": 0.9}).encode()})()
-        r.__enter__ = lambda: r
-        r.__exit__ = lambda *a: None
-        return r
+    class FakeResp:
+        def read(self):
+            return json.dumps(
+                {"speaker_id": "s1", "name": "Ashmin", "confidence": 0.9}
+            ).encode()
 
-    monkeypatch.setattr("urllib.request.urlopen", _fake)
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            pass
+
+    monkeypatch.setattr("urllib.request.urlopen", lambda req, timeout=None: FakeResp())
     monkeypatch.setattr(bridge, "VOICE_TOKEN", "t")
     sp = bridge._identify_speaker(b"WAVDATA")
     assert sp.get("name") == "Ashmin"
 
 
 def test_stream_chat_includes_speaker_id(monkeypatch):
-    import asyncio, json
+    import asyncio, aiohttp
 
     captured = {}
 
-    def _fake(req, timeout=None):
-        captured["body"] = json.loads(req.data.decode())
-        r = type("R", (), {"read": lambda self: b'data: {"type":"done"}\n\n'})()
-        r.__enter__ = lambda: r
-        r.__exit__ = lambda *a: None
-        return r
+    def _post(url, kwargs):
+        captured["body"] = kwargs.get("json", {})
 
-    monkeypatch.setattr("urllib.request.urlopen", _fake)
+    lines = [b'data: {"type":"done"}\n']
+    monkeypatch.setattr(aiohttp, "ClientSession", lambda *a, **k: _FakeAiohttpSession(lines, _post))
     monkeypatch.setattr(bridge, "VOICE_TOKEN", "t")
 
     async def go():
@@ -422,35 +464,19 @@ def test_stream_chat_includes_speaker_id(monkeypatch):
 
 
 def test_stream_chat_handles_envelope_events(monkeypatch):
-    import asyncio, json
+    import asyncio, aiohttp
 
     lines = [
-        b'data: {"type":"ack","stream_id":"s1","seq":1,"content":"Thinking..."}',
-        b'data: {"type":"summary","stream_id":"s1","seq":2,"content":"Battery at 42%."}',
-        b'data: {"type":"part_end","stream_id":"s1","seq":3,"part":"summary"}',
-        b'data: {"type":"detail","stream_id":"s1","seq":4,"content":"Discharging at 5%/h."}',
-        b'data: {"type":"part_end","stream_id":"s1","seq":5,"part":"detail"}',
-        b'data: {"type":"complete","stream_id":"s1","seq":6,"content":"Battery at 42%. Discharging at 5%/h."}',
+        b'data: {"type":"ack","stream_id":"s1","seq":1,"content":"Thinking..."}\n',
+        b'data: {"type":"summary","stream_id":"s1","seq":2,"content":"Battery at 42%."}\n',
+        b'data: {"type":"part_end","stream_id":"s1","seq":3,"part":"summary"}\n',
+        b'data: {"type":"detail","stream_id":"s1","seq":4,"content":"Discharging at 5%/h."}\n',
+        b'data: {"type":"part_end","stream_id":"s1","seq":5,"part":"detail"}\n',
+        b'data: {"type":"complete","stream_id":"s1","seq":6,"content":"Battery at 42%. Discharging at 5%/h."}\n',
     ]
 
-    class FakeResp:
-        def __init__(self):
-            self._it = iter(lines)
-
-        def __iter__(self):
-            return self
-
-        def __next__(self):
-            return next(self._it)
-
-    def _fake_urlopen(req, timeout=None):
-        r = FakeResp()
-        r.__enter__ = lambda: r
-        r.__exit__ = lambda *a: None
-        return r
-
     monkeypatch.setattr(bridge, "VOICE_TOKEN", "t")
-    monkeypatch.setattr("urllib.request.urlopen", _fake_urlopen)
+    monkeypatch.setattr(aiohttp, "ClientSession", lambda *a, **k: _FakeAiohttpSession(lines))
 
     async def go():
         out = [c async for c in bridge._stream_chat("battery?")]
@@ -461,3 +487,111 @@ def test_stream_chat_handles_envelope_events(monkeypatch):
     assert "Battery at 42%" in text
     assert "Discharging at 5%/h" in text
     assert "Thinking..." not in text
+
+
+def test_capture_tolerates_initial_silence(monkeypatch):
+    """Verify that _capture_utterance does not cut off during initial silence before speech starts."""
+    import asyncio
+
+    # 10 silent frames (800ms) + 3 speech frames (240ms) + 12 silent frames (endpoint)
+    frames_list = (
+        [(np.zeros(1280, dtype=np.int16)).tobytes()] * 10
+        + [(np.ones(1280, dtype=np.int16) * 300).tobytes()] * 3
+        + [(np.zeros(1280, dtype=np.int16)).tobytes()] * 12
+    )
+
+    class FakeMic:
+        available = True
+        def open(self): pass
+        def close(self): pass
+        def __init__(self):
+            self.it = iter(frames_list)
+        def read_frame(self):
+            return next(self.it, (np.zeros(1280, dtype=np.int16)).tobytes())
+
+    class DelayedSpeechVAD:
+        available = True
+        threshold = 0.5
+        silence_base_ms = 700
+
+        def __init__(self):
+            self.call_idx = 0
+
+        def push_frame(self, f):
+            self.call_idx += 1
+            # Frames 11..13 are speech
+            return 1.0 if 11 <= self.call_idx <= 13 else 0.0
+
+        def is_speech(self, score):
+            return score == 1.0
+
+        def should_endpoint(self, text, silence_ms, base):
+            return silence_ms >= base
+
+    monkeypatch.setattr(bridge, "_transcribe_via_backend", lambda wav: "captured after pause")
+    monkeypatch.setattr(bridge, "_recognize_pcm_fallback", lambda pcm: None)
+
+    out = asyncio.run(bridge._capture_utterance(FakeMic(), DelayedSpeechVAD(), timeout=5.0))
+    assert out == "captured after pause"
+
+
+def test_session_broadcasts_transcripts(monkeypatch):
+    """Verify that VoiceSession broadcasts transcript events for user and agent."""
+    import asyncio
+
+    broadcast_events = []
+
+    async def _fake_broadcast(evt):
+        broadcast_events.append(evt)
+
+    monkeypatch.setattr(bridge, "_broadcast", _fake_broadcast)
+
+    class _SilentMic:
+        available = True
+        def open(self): pass
+        def close(self): pass
+        def read_frame(self):
+            return (np.zeros(1280, dtype=np.int16)).tobytes()
+
+    class _DummyVAD:
+        available = True
+        threshold = 0.5
+        silence_base_ms = 700
+        def push_frame(self, f): return 0.0
+        def is_speech(self, s): return False
+
+    class _MockTTS:
+        available = True
+        is_playing = False
+        def synth(self, t): return b"wav"
+        def play(self, a): pass
+        def flush(self): pass
+
+    # First call returns user text, second call returns None to end session
+    cap_count = {"n": 0}
+    async def _cap(*a, **k):
+        cap_count["n"] += 1
+        if cap_count["n"] == 1:
+            return "turn off lights", b""
+        return None, b""
+
+    monkeypatch.setattr(bridge, "_capture_utterance", _cap)
+
+    async def _stream(*a, **k):
+        yield "Acknowledged. "
+        yield "Lights turned off."
+
+    monkeypatch.setattr(bridge, "_stream_chat", _stream)
+
+    sess = bridge.VoiceSession(_SilentMic(), _DummyVAD(), _MockTTS(), barge_in=False)
+    asyncio.run(sess.run())
+
+    transcripts = [e for e in broadcast_events if e.get("type") == "transcript"]
+    roles = [t.get("role") for t in transcripts]
+    texts = [t.get("text") for t in transcripts]
+
+    assert "user" in roles
+    assert "turn off lights" in texts
+    assert "agent" in roles
+    assert any("Acknowledged." in t for t in texts)
+

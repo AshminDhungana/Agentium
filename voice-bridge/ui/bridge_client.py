@@ -5,6 +5,8 @@ from PySide6.QtWebSockets import QWebSocket
 
 class BridgeClient(QObject):
     voice_state_changed = Signal(str)
+    transcript_received = Signal(str, str)
+    audio_level_received = Signal(float)
     connected = Signal()
     disconnected = Signal()
 
@@ -42,9 +44,20 @@ class BridgeClient(QObject):
     def _on_message(self, text: str):
         try:
             data = json.loads(text)
-            if data.get("type") == "voice_state":
+            if not isinstance(data, dict):
+                return
+            msg_type = data.get("type")
+            if msg_type == "voice_state":
                 self.voice_state_changed.emit(data.get("state", "idle"))
-        except json.JSONDecodeError:
+            elif msg_type == "transcript":
+                transcript_text = data.get("text", "")
+                role = data.get("role", "agent")
+                if transcript_text:
+                    self.transcript_received.emit(transcript_text, role)
+            elif msg_type == "audio_level":
+                level = float(data.get("level", 0.0))
+                self.audio_level_received.emit(level)
+        except (json.JSONDecodeError, ValueError):
             pass
 
     def _on_error(self, error):
