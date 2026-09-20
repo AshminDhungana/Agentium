@@ -1426,7 +1426,7 @@ class ChannelManager:
         success = False
         retry_count = 0
         max_retries = 3
-        
+
         while retry_count < max_retries and not success:
             try:
                 ct = channel.channel_type
@@ -1448,19 +1448,23 @@ class ChannelManager:
                 else:
                     success = await ChannelManager._send_plain_text(ct, config, message.sender_id, response_content)
 
+                if not success:
+                    # If the adapter returned False, treat it as a failure to trigger retry logic
+                    raise Exception("Adapter returned False")
+
                 if success:
                     circuit_breaker.record_success(channel.id)
                     message.mark_responded(response_content, agent_id)
-                    
+
                     # --- UNIFIED INBOX SYNCHRONISATION ---
                     # Record the outgoing response as a system/agent ChatMessage
                     if channel.user_id:
                         # Find the active conversation for this user
                         conversation = db.query(Conversation).filter_by(
-                            user_id=channel.user_id, 
+                            user_id=channel.user_id,
                             is_active=True
                         ).order_by(Conversation.updated_at.desc()).first()
-                        
+
                         if conversation:
                             # We create a ChatMessage from the agent
                             agent_msg = ChatMessage(
@@ -1479,7 +1483,7 @@ class ChannelManager:
                             db.add(agent_msg)
                             conversation.last_message_at = datetime.utcnow()
                     # -------------------------------------
-                    
+
                     AuditLog.log(
                         level=AuditLevel.INFO,
                         category=AuditCategory.COMMUNICATION,
@@ -1503,22 +1507,22 @@ class ChannelManager:
             except Exception as e:
                 retry_count += 1
                 logger.error(f"[ChannelManager] Send attempt {retry_count} failed: {e}")
-                
+
                 if retry_count >= max_retries:
                     circuit_opened = circuit_breaker.record_failure(channel.id)
                     message.error_count += 1
                     message.last_error = f"Failed after {max_retries} retries: {str(e)}"
-                    
+
                     if circuit_opened:
                         channel.status = ChannelStatus.ERROR
                         channel.error_message = f"Circuit breaker opened: {str(e)}"
-                    
+
                     db.commit()
-                    
+
                     # Queue for retry later
                     await ChannelManager._queue_for_retry(message_id, agent_id, response_content, rich_media)
                     break
-                
+
                 # Exponential backoff
                 await asyncio.sleep(2 ** retry_count)
 
