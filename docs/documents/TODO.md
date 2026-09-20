@@ -489,11 +489,11 @@
   - [x] 11.1.4 — `ChannelsPage.tsx` shows channels with health indicators
 
 - [ ] **11.2 — WhatsApp Bridge**
-  - [ ] 11.2.1 — QR code pairing flow works end-to-end
-  - [ ] 11.2.2 — Incoming WhatsApp messages are received and processed
-  - [ ] 11.2.3 — Agent responses are sent back via WhatsApp
-  - [ ] 11.2.4 — Media messages (images, audio) are handled
-  - [ ] 11.2.5 — Reconnection after disconnect works
+  - [x] 11.2.1 — QR code pairing flow works end-to-end
+  - [x] 11.2.2 — Incoming WhatsApp messages are received and processed
+  - [x] 11.2.3 — Agent responses are sent back via WhatsApp
+  - [x] 11.2.4 — Media messages (images, audio) are handled
+  - [x] 11.2.5 — Reconnection after disconnect works
 
 - [ ] **11.3 — Other Channel Bridges**
   - [ ] 11.3.1 — Slack integration sends/receives messages
