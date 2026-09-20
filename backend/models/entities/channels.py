@@ -79,23 +79,25 @@ class ExternalChannel(BaseEntity):
 
     def to_dict(self) -> Dict[str, Any]:
         base = super().to_dict()
+        # Mask sensitive credentials in config for security
+        masked_config = dict(self.config)
+        sensitive_keys = ['access_token', 'api_key', 'bot_token', 'smtp_pass', 'imap_pass', 'bridge_token']
+        for key in sensitive_keys:
+            if key in masked_config:
+                masked_config[key] = '********'
+
         base.update({
             'name':    self.name,
             'user_id': self.user_id,
             'type':    self.channel_type.value,
             'status':  self.status.value,
+            'webhook_path': self.webhook_path,
             'config': {
-                'phone_number':    self.config.get('phone_number'),
+                **masked_config,
                 'has_credentials': bool(
-                    self.config.get('api_key') or self.config.get('access_token')
+                    masked_config.get('api_key') or masked_config.get('access_token')
                 ),
-                'webhook_url':     self.config.get('webhook_url_display'),
-                'provider':        self.config.get('provider', 'cloud_api'),
-                'allowed_senders': self.config.get('allowed_senders', []),
-                # Phase 15.3 — per-channel settings persisted in config
-                'rate_limit_per_minute': self.config.get('rate_limit_per_minute'),
-                'rate_limit_per_hour':   self.config.get('rate_limit_per_hour'),
-                'content_filters':       self.config.get('content_filters', []),
+                'webhook_url':     masked_config.get('webhook_url_display'),
             },
             'routing': {
                 # Return the internal agent UUID (FK target) so it matches the

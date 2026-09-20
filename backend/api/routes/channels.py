@@ -212,9 +212,13 @@ def create_channel(
         webhook_path=webhook_path,
     )
 
-    db.add(channel)
-    db.commit()
-    db.refresh(channel)
+    try:
+        db.add(channel)
+        db.commit()
+        db.refresh(channel)
+    except Exception as e:
+        db.rollback()
+        raise InternalServerError(error=f"Failed to create channel: {str(e)}", code="CHANNEL_CREATION_FAILED")
 
     # Initialize channel resources (IMAP, circuit breaker, etc.)
     background_tasks.add_task(ChannelManager.initialize_channel, db, channel)
@@ -951,7 +955,7 @@ def get_channel_health(
     rate_status = rate_limiter.get_status(channel_id)
     platform_limits = PLATFORM_RATE_LIMITS.get(channel.channel_type, RateLimitConfig())
     hourly_limit = platform_limits.requests_per_hour or 1
-    hourly_used = rate_status.get("requests_this_hour", 0) if isinstance(rate_status, dict) else 0
+    hourly_used = rate_status.get("hour_usage", 0) if isinstance(rate_status, dict) else 0
     utilization_pct = round(min(hourly_used / hourly_limit * 100, 100), 1)
 
     return {

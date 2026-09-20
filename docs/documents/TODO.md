@@ -483,10 +483,10 @@
 > **Files**: `backend/services/channel_manager.py`, `backend/services/channels/`, `backend/api/routes/channels.py`, `bridges/whatsapp/`, `frontend/src/pages/ChannelsPage.tsx`, `frontend/src/services/channelMessages.ts`, `frontend/src/services/channelMetrics.ts`
 
 - [ ] **11.1 — Channel Management**
-  - [ ] 11.1.1 — `GET /api/v1/channels` lists all configured channels
-  - [ ] 11.1.2 — Channel creation (connect new bridge) works for each type
-  - [ ] 11.1.3 — Channel health status reflects actual connectivity
-  - [ ] 11.1.4 — `ChannelsPage.tsx` shows channels with health indicators
+  - [x] 11.1.1 — `GET /api/v1/channels` lists all configured channels
+  - [x] 11.1.2 — Channel creation (connect new bridge) works for each type
+  - [x] 11.1.3 — Channel health status reflects actual connectivity
+  - [x] 11.1.4 — `ChannelsPage.tsx` shows channels with health indicators
 
 - [ ] **11.2 — WhatsApp Bridge**
   - [ ] 11.2.1 — QR code pairing flow works end-to-end
