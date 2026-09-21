@@ -503,10 +503,10 @@
   - [x] 11.3.5 — SMS (Twilio) integration works
   - [x] 11.3.6 — Signal / Google Chat / Teams / Matrix / iMessage / Zalo status
 
-- [ ] **11.4 — Message Log**
-  - [ ] 11.4.1 — `MessageLogPage.tsx` displays cross-channel message history
-  - [ ] 11.4.2 — Messages are searchable and filterable
-  - [ ] 11.4.3 — Message timestamps are correct across timezones
+- [x] **11.4 — Message Log**
+  - [x] 11.4.1 — `MessageLogPage.tsx` displays cross-channel message history
+  - [x] 11.4.2 — Messages are searchable and filterable
+  - [x] 11.4.3 — Message timestamps are correct across timezones
 
 - [ ] **11.5 — Channel Health & Heartbeat**
   - [ ] 11.5.1 — Celery `check_channel_health` task runs every 5 minutes
