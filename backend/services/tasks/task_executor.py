@@ -912,23 +912,24 @@ def cleanup_old_channel_messages(days: int = 30):
 def check_channel_health():
     """Periodic health check for all channels."""
     from backend.services.channel_manager import ChannelManager, CircuitState
-    
+
     with get_task_db() as db:
+        # Check ACTIVE channels for health issues
         channels = db.query(ExternalChannel).filter(
             ExternalChannel.status == ChannelStatus.ACTIVE
         ).all()
-        
+
         results = []
         for channel in channels:
             health = ChannelManager.get_channel_health(channel.id)
-            
-            if (health['overall_status'] == 'degraded' and 
+
+            if (health['overall_status'] == 'degraded' and
                 health['circuit_breaker']['success_rate'] < 0.5):
-                
+
                 channel.status = ChannelStatus.ERROR
                 channel.error_message = "Auto-disabled due to low success rate"
                 db.commit()
-                
+
                 results.append({
                     "channel_id": channel.id,
                     "action": "auto_disabled",
@@ -939,7 +940,7 @@ def check_channel_health():
                     f"Auto-disabled channel {channel.id} "
                     f"(success rate: {health['circuit_breaker']['success_rate']:.2%})"
                 )
-            
+
             elif health['circuit_breaker']['circuit_state'] != 'closed':
                 results.append({
                     "channel_id": channel.id,
@@ -947,10 +948,60 @@ def check_channel_health():
                     "state": health['circuit_breaker']['circuit_state'],
                     "consecutive_failures": health['circuit_breaker']['consecutive_failures']
                 })
-        
-        logger.info(f"Health check completed for {len(channels)} channels, {len(results)} actions taken")
+
+        # Also check ERROR channels for possible reconnection
+        error_channels = db.query(ExternalChannel).filter(
+            ExternalChannel.status == ChannelStatus.ERROR
+        ).all()
+
+        reconnection_results = []
+        for channel in error_channels:
+            # Only consider reconnection if it's been at least 5 minutes since last message
+            if channel.last_message_at:
+                time_since_last_message = (datetime.utcnow() - channel.last_message_at).total_seconds()
+                if time_since_last_message < 300:  # 5 minutes
+                    continue  # Too soon to try reconnection
+
+            health = ChannelManager.get_channel_health(channel.id)
+            circuit_state = health['circuit_breaker']['circuit_state']
+            success_rate = health['circuit_breaker']['success_rate']
+
+            # If circuit breaker is closed and success rate is acceptable, consider channel recovered
+            if circuit_state == 'closed' and success_rate >= 0.5:
+                channel.status = ChannelStatus.ACTIVE
+                channel.error_message = None
+                db.commit()
+
+                reconnection_results.append({
+                    "channel_id": channel.id,
+                    "action": "auto_reconnected",
+                    "reason": "circuit_breaker_closed",
+                    "success_rate": success_rate,
+                    "time_since_last_message": time_since_last_message if channel.last_message_at else None
+                })
+                logger.info(
+                    f"Auto-reconnected channel {channel.id} "
+                    f"(circuit breaker closed, success rate: {success_rate:.2%})"
+                )
+
+                # Broadcast the channel recovery event
+                try:
+                    from backend.api.websocket import manager as ws_manager
+                    asyncio.run(ws_manager.broadcast({
+                        "type": "channel_recovered",
+                        "channel_id": channel.id,
+                        "timestamp": datetime.utcnow().isoformat()
+                    }))
+                except Exception as broadcast_err:
+                    logger.error(f"Failed to broadcast channel recovery: {broadcast_err}")
+
+        # Combine results
+        results.extend(reconnection_results)
+
+        logger.info(f"Health check completed for {len(channels)} channels checked, {len(error_channels)} error channels evaluated, {len(results)} total actions taken")
         return {
-            "checked": len(channels), 
+            "checked": len(channels),
+            "error_channels_evaluated": len(error_channels),
             "actions": results,
             "timestamp": datetime.utcnow().isoformat()
         }

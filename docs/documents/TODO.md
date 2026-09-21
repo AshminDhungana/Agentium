@@ -508,11 +508,11 @@
   - [x] 11.4.2 — Messages are searchable and filterable
   - [x] 11.4.3 — Message timestamps are correct across timezones
 
-- [ ] **11.5 — Channel Health & Heartbeat**
-  - [ ] 11.5.1 — Celery `check_channel_health` task runs every 5 minutes
-  - [ ] 11.5.2 — `send_channel_heartbeat` keeps connections alive
-  - [ ] 11.5.3 — Dead channels are marked and auto-reconnect is attempted
-  - [ ] 11.5.4 — `channelHealth.ts` frontend utility shows correct status colors
+- [x] **11.5 — Channel Health & Heartbeat**
+  - [x] 11.5.1 — Celery `check_channel_health` task runs every 5 minutes
+  - [x] 11.5.2 — `send_channel_heartbeat` keeps connections alive
+  - [x] 11.5.3 — Dead channels are marked and auto-reconnect is attempted
+  - [x] 11.5.4 — `channelHealth.ts` frontend utility shows correct status colors
 
 ---
 
