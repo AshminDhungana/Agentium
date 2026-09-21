@@ -1,0 +1,5 @@
+- [Service Docstrings 100%](service-docstrings-complete.md) — Phase 18.4 Service Docstrings completed at 100% interrogate coverage
+- [Use sonnet for agents](use-sonnet-for-agents.md) — dispatch subagents on sonnet by default (user correction)
+- [Plan writing pattern](feedback_plan_writing_pattern.md) — create empty, add parts incrementally, self-review at end
+- [§10.4 Scheduled Tasks resume](scheduled-tasks-10.4-resume.md) — T1-T4 done; Task 5 (SCHEDULE evaluator) next on feat/scheduled-tasks-10.4
+- [Other Channel Bridges Completion](other_channel_bridges_completion.md) — Completed implementation and testing of Other Channel Bridges (Slack, Telegram, Discord, Email, SMS/Twilio) as per TODO 11.3

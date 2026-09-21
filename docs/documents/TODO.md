@@ -495,13 +495,13 @@
   - [x] 11.2.4 — Media messages (images, audio) are handled
   - [x] 11.2.5 — Reconnection after disconnect works
 
-- [ ] **11.3 — Other Channel Bridges**
-  - [ ] 11.3.1 — Slack integration sends/receives messages
-  - [ ] 11.3.2 — Telegram bot integration works
-  - [ ] 11.3.3 — Discord gateway integration works
-  - [ ] 11.3.4 — Email (IMAP/SMTP) send/receive works
-  - [ ] 11.3.5 — SMS (Twilio) integration works
-  - [ ] 11.3.6 — Signal / Google Chat / Teams / Matrix / iMessage / Zalo status
+- [x] **11.3 — Other Channel Bridges**
+  - [x] 11.3.1 — Slack integration sends/receives messages
+  - [x] 11.3.2 — Telegram bot integration works
+  - [x] 11.3.3 — Discord gateway integration works
+  - [x] 11.3.4 — Email (IMAP/SMTP) send/receive works
+  - [x] 11.3.5 — SMS (Twilio) integration works
+  - [x] 11.3.6 — Signal / Google Chat / Teams / Matrix / iMessage / Zalo status
 
 - [ ] **11.4 — Message Log**
   - [ ] 11.4.1 — `MessageLogPage.tsx` displays cross-channel message history
