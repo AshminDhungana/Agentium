@@ -523,7 +523,7 @@
 - [ ] **12.1 — Routing & Navigation**
   - [x] 12.1.1 — All routes in `App.tsx` resolve to correct pages
   - [x] 12.1.2 — Protected routes redirect to `/login` when not authenticated
-  - [ ] 12.1.3 — `MainLayout` renders sidebar navigation correctly
+  - [x] 12.1.3 — `MainLayout` renders sidebar navigation correctly
   - [ ] 12.1.4 — Lazy loading (`React.lazy`) works — no blank pages on first visit
   - [ ] 12.1.5 — Page transitions (AnimatePresence) are smooth
 
