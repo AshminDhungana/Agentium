@@ -520,12 +520,12 @@
 
 > **Files**: `frontend/src/pages/`, `frontend/src/components/`, `frontend/src/App.tsx`
 
-- [ ] **12.1 — Routing & Navigation**
+- [x] **12.1 — Routing & Navigation**
   - [x] 12.1.1 — All routes in `App.tsx` resolve to correct pages
   - [x] 12.1.2 — Protected routes redirect to `/login` when not authenticated
   - [x] 12.1.3 — `MainLayout` renders sidebar navigation correctly
-  - [ ] 12.1.4 — Lazy loading (`React.lazy`) works — no blank pages on first visit
-  - [ ] 12.1.5 — Page transitions (AnimatePresence) are smooth
+  - [x] 12.1.4 — Lazy loading (`React.lazy`) works — no blank pages on first visit
+  - [x] 12.1.5 — Page transitions (AnimatePresence) are smooth
 
 - [ ] **12.2 — Dashboard**
   - [ ] 12.2.1 — `Dashboard.tsx` loads without error
