@@ -34,13 +34,12 @@ The Settings Page (`SettingsPage.tsx`) will be expanded from 2 tabs (Account Set
 frontend/src/
 ├── components/
 │   └── settings/
-│       ├── PreferencesTab.tsx       # Main preferences panel with 9 collapsible sections
+│       ├── PreferencesTab.tsx       # Main preferences panel with 8 collapsible sections
 │       ├── PreferenceSection.tsx    # Single category renderer (category + inputs)
 │       ├── PreferenceInput.tsx      # Polymorphic input based on data_type
 │       ├── ThemeSelector.tsx        # Theme toggle (dark/light/system)
 │       ├── ApiKeysTab.tsx           # Embedded model config management
-│       ├── NotificationsTab.tsx     # Notification preferences UI
-│       └── SettingsTab.tsx          # Base tab component (optional)
+│       └── NotificationsTab.tsx     # Notification preferences UI
 ├── hooks/
 │   └── useUserPreferences.ts        # Fetch/save preferences hook
 ├── services/
@@ -59,8 +58,8 @@ frontend/src/
 - Handles optimistic updates with rollback on error
 
 #### `PreferencesTab`
-- Renders 9 collapsible sections (one per `PreferenceCategory`)
-- Sections: General, UI, Chat, Notifications, Agents, Tasks, Models, Tools, Privacy
+- Renders 8 collapsible sections (one per `PreferenceCategory`)
+- Sections: UI, Chat, Notifications, Agents, Tasks, Models, Tools, Privacy, Custom
 - Each section uses `PreferenceSection`
 
 #### `PreferenceSection`
@@ -78,9 +77,10 @@ frontend/src/
 | json | Textarea with JSON validation |
 
 #### `ThemeSelector`
-- Three options: Light, Dark, System (follows OS)
-- On change: calls `setDarkMode()` + persists `ui.theme` preference
-- On mount: reads `ui.theme` preference, applies to `document.documentElement`
+- Three options: Light, Dark, System (follows OS `prefers-color-scheme` media query)
+- On change: calls `setDarkMode()` + persists `ui.theme` preference (`light` | `dark` | `system`)
+- On mount: reads `ui.theme` preference, applies to `document.documentElement`; if `system`, evaluates `window.matchMedia('(prefers-color-scheme: dark)')`
+- `ui.theme` value `system` means: no `dark` class on `<html>`, rely on CSS `@media (prefers-color-scheme: dark)` (Tailwind `dark:` uses class strategy, so `system` = apply `dark` class when media query matches)
 
 #### `ApiKeysTab`
 - Lists existing model configs (from `useModelConfigs` hook)
@@ -115,7 +115,6 @@ frontend/src/
 
 | Category | Keys (examples) |
 |----------|-----------------|
-| GENERAL | — |
 | UI | `ui.theme`, `ui.language`, `ui.sidebar_collapsed`, `ui.font_size` |
 | CHAT | `chat.history_limit`, `chat.context_window_size`, `chat.auto_save`, `chat.show_typing_indicator`, `chat.prune_*` |
 | NOTIFICATIONS | `notifications.enabled`, `notifications.sound`, `notifications.channels` |
@@ -124,6 +123,7 @@ frontend/src/
 | MODELS | `models.default_temperature`, `models.default_max_tokens` |
 | TOOLS | `tools.max_execution_time`, `tools.auto_retry_failed` |
 | PRIVACY | `privacy.share_usage_analytics` |
+| CUSTOM | User-defined preferences (free-form key/value) |
 
 ---
 
