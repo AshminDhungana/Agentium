@@ -527,11 +527,11 @@
   - [x] 12.1.4 — Lazy loading (`React.lazy`) works — no blank pages on first visit
   - [x] 12.1.5 — Page transitions (AnimatePresence) are smooth
 
-- [ ] **12.2 — Dashboard**
-  - [ ] 12.2.1 — `Dashboard.tsx` loads without error
-  - [ ] 12.2.2 — Stat cards display real data from API
-  - [ ] 12.2.3 — `useDashboardData` hook fetches data correctly
-  - [ ] 12.2.4 — Dashboard widgets update in real-time
+- [x] **12.2 — Dashboard**
+  - [x] 12.2.1 — `Dashboard.tsx` loads without error
+  - [x] 12.2.2 — Stat cards display real data from API
+  - [x] 12.2.3 — `useDashboardData` hook fetches data correctly
+  - [x] 12.2.4 — Dashboard widgets update in real-time
 
 - [ ] **12.3 — Settings Page**
   - [ ] 12.3.1 — `SettingsPage.tsx` renders all settings sections

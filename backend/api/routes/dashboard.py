@@ -120,7 +120,7 @@ def get_dashboard_summary(
     # ── Agents ────────────────────────────────────────────────────────────────
     all_agents: List[Agent] = (
         db.query(Agent)
-        .filter(Agent.is_terminated.is_(False))
+        .filter(Agent.status != AgentStatus.TERMINATED)
         .all()
     )
 
