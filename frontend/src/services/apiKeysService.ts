@@ -45,7 +45,7 @@ export interface FailoverTestResponse {
 
 // ─── Service ──────────────────────────────────────────────────────────────────
 
-const apiKeysService = {
+export const apiKeysService = {
   /**
    * Soft-delete an API key configuration.
    *
@@ -95,3 +95,5 @@ const apiKeysService = {
     return response.data;
   },
 };
+
+export default apiKeysService;

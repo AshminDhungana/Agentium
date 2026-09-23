@@ -533,11 +533,11 @@
   - [x] 12.2.3 — `useDashboardData` hook fetches data correctly
   - [x] 12.2.4 — Dashboard widgets update in real-time
 
-- [ ] **12.3 — Settings Page**
-  - [ ] 12.3.1 — `SettingsPage.tsx` renders all settings sections
-  - [ ] 12.3.2 — User preferences save and persist
-  - [ ] 12.3.3 — Dark/light theme toggle works globally
-  - [ ] 12.3.4 — API key management settings work
+- [x] **12.3 — Settings Page**
+  - [x] 12.3.1 — `SettingsPage.tsx` renders all settings sections
+  - [x] 12.3.2 — User preferences save and persist
+  - [x] 12.3.3 — Dark/light theme toggle works globally
+  - [x] 12.3.4 — API key management settings work
 
 - [ ] **12.4 — Sovereign Dashboard**
   - [ ] 12.4.1 — `SovereignDashboard.tsx` loads (admin-only route)
