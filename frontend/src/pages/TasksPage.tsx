@@ -1786,7 +1786,7 @@ const PreferencesTab: React.FC = () => {
                                             bg-white dark:bg-[#1e2535] text-gray-900 dark:text-white
                                             focus:ring-2 focus:ring-blue-500 outline-none"
                                     >
-                                        {PREFERENCE_CATEGORIES.map(cat => (
+                                        {PREFERENCE_CATEGORIES.map((cat: { id: string; name: string }) => (
                                             <option key={cat.id} value={cat.id}>{cat.name}</option>
                                         ))}
                                     </select>
