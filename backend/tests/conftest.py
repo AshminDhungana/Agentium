@@ -13,6 +13,31 @@ from backend.models.entities.user_config import UserModelConfig, ProviderType, C
 from backend.core.auth import create_access_token
 import uuid
 
+@pytest.fixture(autouse=True)
+def _reset_inprocess_middleware_state(monkeypatch):
+    """Reset in-process middleware state that survives between tests.
+
+    SessionLimitMiddleware is registered unconditionally in main.py and
+    tracks sessions by token hash under the admin user's id — every test
+    that mints a fresh JWT adds one, so suite-order runs cross
+    settings.MAX_CONCURRENT_SESSIONS (5) and every later request is rejected
+    with SESSION_LIMIT_EXCEEDED. Its dispatch honors TESTING=true, but these
+    tests deliberately run the full middleware stack, so clear the counter
+    between tests instead.
+
+    The unified RateLimitMiddleware fail-opens (Redis is down in this env),
+    but its dispatch reads the module-level _skip_rate_limit() hook, which
+    exists so tests can skip it reliably — use that contract.
+    """
+    try:
+        from backend.core.security_middleware import SessionLimitMiddleware
+        if SessionLimitMiddleware._instance is not None:
+            SessionLimitMiddleware._instance._sessions.clear()
+    except Exception:
+        pass
+    monkeypatch.setattr("backend.core.middleware._skip_rate_limit", lambda: True)
+
+
 @pytest.fixture(scope="function")
 def db_session():
     """Function-scoped DB session with rollback."""
