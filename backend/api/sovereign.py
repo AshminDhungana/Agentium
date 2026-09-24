@@ -223,12 +223,18 @@ async def manage_container(
         target_type="container",
         target_id=container_id,
         description=f"Sovereign manually {action}ed container {container_id}",
-        after_state={"action": action, "container": container_id},
+        after_state=json.dumps({"action": action, "container": container_id}),
         is_active=True,
         created_at=datetime.utcnow()
     )
     db.add(audit)
     db.commit()
+
+    # C11: close the command_log contract — push the audit to open sovereign
+    # dashboards. Payload shape is identical to GET /commands items, so the
+    # frontend maps both paths with one mapper. Fires before execution,
+    # matching the audit-before-action ordering.
+    await notify_sovereign({"type": "command_log", "payload": audit.to_dict()})
 
     result = head.manage_container(action, container_id)
     if not result.get("success"):
@@ -269,12 +275,18 @@ async def execute_sovereign_command(
         target_type="host_system",
         target_id="root",
         description=f"Sovereign executed: {command_req.command}",
-        after_state={"command": command_req.command, "params": command_req.params},
+        after_state=json.dumps({"command": command_req.command, "params": command_req.params}),
         is_active=True,
         created_at=datetime.utcnow()
     )
     db.add(audit)
     db.commit()
+
+    # C11: close the command_log contract — push the audit to open sovereign
+    # dashboards. Payload shape is identical to GET /commands items, so the
+    # frontend maps both paths with one mapper. Fires before execution,
+    # matching the audit-before-action ordering.
+    await notify_sovereign({"type": "command_log", "payload": audit.to_dict()})
 
     # Execute command
     if command_req.command == "execute":
@@ -362,7 +374,7 @@ async def block_agent(
         target_type="agent",
         target_id=agentium_id,
         description=f"Agent {agentium_id} blocked by sovereign: {req.reason}",
-        after_state={"reason": req.reason, "blocked": True},
+        after_state=json.dumps({"reason": req.reason, "blocked": True}),
         is_active=True,
         created_at=datetime.utcnow()
     )
@@ -400,7 +412,7 @@ async def unblock_agent(
         target_type="agent",
         target_id=agentium_id,
         description=f"Agent {agentium_id} unblocked by sovereign",
-        after_state={"blocked": False},
+        after_state=json.dumps({"blocked": False}),
         is_active=True,
         created_at=datetime.utcnow()
     )
