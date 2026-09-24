@@ -19,7 +19,7 @@ def test_query_path_prefixed():
 def test_document_path_not_prefixed():
     fake = MagicMock()
     fake.encode.return_value = _fake_encode()
-    with patch("backend.core.vector_store.SentenceTransformer", return_value=fake):
+    with patch("sentence_transformers.SentenceTransformer", return_value=fake):
         fn = BgeEmbeddingFunction()
         fn.embed_documents(["stored passage text"])
         called_text = fake.encode.call_args[0][0]
@@ -30,7 +30,7 @@ def test_document_path_not_prefixed():
 def test_query_path_encodes_prefixed():
     fake = MagicMock()
     fake.encode.return_value = _fake_encode()
-    with patch("backend.core.vector_store.SentenceTransformer", return_value=fake):
+    with patch("sentence_transformers.SentenceTransformer", return_value=fake):
         fn = BgeEmbeddingFunction()
         fn.embed_query("how do I spawn")
         called_text = fake.encode.call_args[0][0]
@@ -46,7 +46,7 @@ def test_embed_query_accepts_list_like_chromadb():
         return np.array([[0.1] * 768 for _ in texts])
 
     fake.encode.side_effect = _multi
-    with patch("backend.core.vector_store.SentenceTransformer", return_value=fake):
+    with patch("sentence_transformers.SentenceTransformer", return_value=fake):
         fn = BgeEmbeddingFunction()
         out = fn.embed_query(["q1", "q2"])
         assert isinstance(out, list) and len(out) == 2

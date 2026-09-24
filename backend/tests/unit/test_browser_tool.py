@@ -42,6 +42,15 @@ class MockBrowser:
     def __init__(self):
         self.contexts = []
 
+    # browser_tool's _ensure_browser calls launch() on the object returned by
+    # playwright.chromium, then new_page() on the object launch() returned.
+    async def launch(self, headless=True, args=None):
+        return self
+
+    async def new_page(self):
+        ctx = await self.new_context()
+        return await ctx.new_page()
+
     async def new_context(self, **kwargs):
         ctx = MockContext()
         self.contexts.append(ctx)
@@ -54,6 +63,10 @@ class MockBrowser:
 class MockPlaywright:
     def __init__(self):
         self.browsers = []
+
+    # _ensure_browser awaits async_playwright().start(), not __aenter__.
+    async def start(self):
+        return self
 
     async def __aenter__(self):
         return self
@@ -72,7 +85,7 @@ def test_browser_tool_navigate(monkeypatch):
     from backend.tools.browser_tool import BrowserTool
 
     mock_pw = MockPlaywright()
-    monkeypatch.setattr("playwright.async_api.async_playwright", lambda: mock_pw)
+    monkeypatch.setattr("backend.tools.browser_tool.async_playwright", lambda: mock_pw)
 
     tool = BrowserTool()
     result = asyncio_run(tool.execute(action="navigate", url="https://example.com"))
@@ -86,7 +99,7 @@ def test_browser_tool_screenshot(monkeypatch):
     from backend.tools.browser_tool import BrowserTool
 
     mock_pw = MockPlaywright()
-    monkeypatch.setattr("playwright.async_api.async_playwright", lambda: mock_pw)
+    monkeypatch.setattr("backend.tools.browser_tool.async_playwright", lambda: mock_pw)
 
     tool = BrowserTool()
     asyncio_run(tool.execute(action="navigate", url="https://example.com"))
@@ -100,7 +113,7 @@ def test_browser_tool_close(monkeypatch):
     from backend.tools.browser_tool import BrowserTool
 
     mock_pw = MockPlaywright()
-    monkeypatch.setattr("playwright.async_api.async_playwright", lambda: mock_pw)
+    monkeypatch.setattr("backend.tools.browser_tool.async_playwright", lambda: mock_pw)
 
     tool = BrowserTool()
     asyncio_run(tool.execute(action="navigate", url="https://example.com"))
@@ -113,7 +126,7 @@ def test_browser_tool_invalid_action(monkeypatch):
     from backend.tools.browser_tool import BrowserTool
 
     mock_pw = MockPlaywright()
-    monkeypatch.setattr("playwright.async_api.async_playwright", lambda: mock_pw)
+    monkeypatch.setattr("backend.tools.browser_tool.async_playwright", lambda: mock_pw)
 
     tool = BrowserTool()
     result = asyncio_run(tool.execute(action="invalid_action"))

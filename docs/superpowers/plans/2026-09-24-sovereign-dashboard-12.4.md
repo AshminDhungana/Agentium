@@ -131,13 +131,19 @@ async def test_verify_returns_sovereign_fields_from_db(db_session):
 
 
 async def test_verify_for_nonadmin_still_has_db_role(db_session):
+    suffix = f"{datetime.now(timezone.utc).timestamp():.0f}"
     user_row = User(
-        username=f"plainuser_{datetime.now(timezone.utc).timestamp():.0f}",
-        email="plain@agentium.local",
+        username=f"plainuser_{suffix}",
+        email=f"plain_{suffix}@agentium.local",
         hashed_password=User.hash_password("password123"),
         is_admin=False,
         is_active=True,
         is_pending=False,
+        # Non-observer role: ObserverReadOnlyMiddleware 403s POST /verify for
+        # observers, so the DB-role passthrough is only reachable via a valid
+        # non-observer role. deputy_sovereign also pins the 12.4.2 boundary —
+        # sovereign-adjacent but NOT primary_sovereign.
+        role="deputy_sovereign",
     )
     db_session.add(user_row)
     db_session.commit()
@@ -146,7 +152,7 @@ async def test_verify_for_nonadmin_still_has_db_role(db_session):
     token = create_access_token(data={
         "sub": user_row.username,
         "user_id": user_row.id,
-        "role": "observer",
+        "role": "deputy_sovereign",
         "is_admin": False,
         "is_active": True,
     })
@@ -169,14 +175,14 @@ async def test_verify_for_nonadmin_still_has_db_role(db_session):
     user = resp.json()["user"]
     # Non-admin: effective_role == the raw role column — unchanged behavior.
     assert user["is_sovereign"] is False
-    assert user["role"] == "observer"
+    assert user["role"] == "deputy_sovereign"
 ```
 
 - [ ] **Step 3: Run test to verify it fails**
 
 Run (from repo root):
 `python -m pytest backend/tests/api/test_auth_verify_sovereign.py -v --no-cov`
-Expected: FAIL — `test_verify_returns_sovereign_fields_from_db` fails on `user["is_sovereign"] is True` (key absent / role is `"observer"`). The non-admin test PASSES already (unchanged behavior).
+Expected: FAIL — `test_verify_returns_sovereign_fields_from_db` fails on `user["is_sovereign"] is True` (key absent / role is `"observer"`). The non-admin test also fails on `KeyError: 'is_sovereign'` (the field doesn't exist yet — the implementation adds it for all users). Requires the test-infra Postgres: `docker compose -f docker-compose.test.yml up -d postgres`, then bootstrap the schema once: `DATABASE_URL=postgresql://agentium:agentium@localhost:5432/agentium_test python -c "from backend.models.database import init_db; init_db()"`.
 
 - [ ] **Step 4: Write minimal implementation**
 
@@ -216,6 +222,12 @@ git commit -m "fix(auth): /verify returns DB sovereign fields so refresh keeps d
 ---
 
 ### Task 2: Fix 2 (backend) — `command_log` WebSocket push
+
+> **Execution corrections (found while running this task):**
+> 1. The conftest `auth_client` token 401s on `/api/v1/sovereign/*` with `USER_NOT_FOUND`: the sovereign router uses `backend/api/middleware/auth.py`'s `get_current_user`, which resolves the JWT `sub` against `User.username`, but the fixture sets `sub` to the UUID id. Tests use a local `sovereign_client` fixture (same override pattern, `sub=username` — the production login shape) instead of `auth_client`.
+> 2. sovereign.py's four `AuditLog(...)` constructor calls passed **raw dicts** to the Text-typed `after_state` column — a pre-existing production bug (psycopg2 `can't adapt type 'dict'`, 500 on every sovereign container action/command/block before execution, per the C9 audit-first ordering). Fixed with `json.dumps(...)` on all four, matching the `AuditLog.log()` factory.
+> 3. Test infra bootstrap: `docker compose -f docker-compose.test.yml up -d postgres` + one-time `DATABASE_URL=postgresql://agentium:agentium@localhost:5432/agentium_test python -c "from backend.models.database import init_db; init_db()"`.
+> 4. Async fixtures need `@pytest_asyncio.fixture` even with `asyncio_mode = auto`, and their names must not start with `_` (pytest skips underscore-prefixed names as private).
 
 **Files:**
 - Modify: `backend/api/sovereign.py` (`manage_container` ~line 230, `execute_sovereign_command` ~line 277 — both right after their audit commit)
@@ -825,6 +837,14 @@ git commit -m "fix: address regressions found during TODO 12.4 verification suit
 ```
 
 If no fixes were needed, skip this step — the previous commits stand.
+
+> **Execution corrections (found while running this task):** the full suites were NOT green at the start of this task — four pre-existing broken-test categories (none caused by Tasks 1–4; the three frontend files and both backend files are byte-identical to main) were fixed forward per this task's mandate:
+> 1. **`backend/tests/unit/test_browser_tool.py` hung mid-suite** (the 10-minute timeout killed two full-suite runs): the tests monkeypatched `playwright.async_api.async_playwright`, but `browser_tool.py` does `from playwright.async_api import async_playwright` at module load — the code resolved the REAL function and the tests were silently launching real Chromium + real network navigation to example.com (4.5s isolated, IOCP-selector deadlock mid-suite). Fixed: repoint all four `monkeypatch.setattr` to `backend.tools.browser_tool.async_playwright` (the binding the code actually reads) and add the mock methods the code calls (`MockPlaywright.start`, `MockBrowser.launch`, `MockBrowser.new_page`). Result: 4 passed in 0.23s, no real browser, no hang.
+> 2. **`backend/tests/unit/test_bge_prefix.py` 3 tests failed**: `patch("backend.core.vector_store.SentenceTransformer", ...)` requires the attribute to exist, but vector_store moved to a lazy import (`from sentence_transformers import SentenceTransformer` inside `_get_sentence_transformer`) so the module-level name no longer exists. Fixed: patch target → `sentence_transformers.SentenceTransformer` (the source module the lazy import reads). Result: 4 passed.
+> 3. **`frontend/src/components/chat/__tests__/chat-tokens.test.ts` failed to parse**: JSX (`<FloatingChatWidget />`) in a `.ts` file — a phantom test that could never have run. Fixed: `git mv` to `.tsx` + rewrite to attach `styles/chat-tokens.css` to the jsdom document (jsdom has no cascade for `:root` custom properties from external sheets; `getComputedStyle` on `document.documentElement` after injecting the sheet resolves them). Result: 1 passed.
+> 4. **`ChatPage`/`SettingsPage.a11y.browser.test.tsx` failed color-contrast in the unit (jsdom) project**: the pre-existing broad `src/pages/**/*.test.tsx` include line caught these real-browser a11y tests (added in `811b197` with their own CI gate — their home is the `a11y` project). Fixed: unit project `exclude: ['src/**/*.a11y.browser.test.{ts,tsx}']`. In real Chromium both files pass both themes (a11y suite 38 files / 78 tests green).
+>
+> Final state: backend `backend/tests/api backend/tests/unit` all green (with the fixed files, no deselects); frontend unit 70 files / 302 tests green; a11y 38 files / 78 tests green; production build ✓ 57s.
 
 ---
 

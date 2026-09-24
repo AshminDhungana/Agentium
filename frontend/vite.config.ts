@@ -64,6 +64,10 @@ export default defineConfig({
         environment: 'jsdom',
         globals: true,
         setupFiles: ['./src/test/setup.ts'],
+        // Real-browser a11y tests (added in 811b197 with their own CI gate)
+        // are owned by the 'a11y' project — running them here too would fail
+        // on color-contrast, which needs real layout/getComputedStyle.
+        exclude: ['src/**/*.a11y.browser.test.{ts,tsx}'],
         include: [
           'src/components/chat/**/*.test.{ts,tsx}',
           'src/components/tasks/**/*.test.{ts,tsx}',
