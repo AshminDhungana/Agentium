@@ -1,3 +1,8 @@
+// frontend/src/store/__tests__/authStore.test.ts
+// Session-management tests (pre-existing) + deriveIsSovereign truth table
+// (12.4.2 artifact). Plain is_admin is deliberately NOT sufficient (B6: not
+// all admins are sovereign); the sovereign flag or the primary_sovereign role
+// is required.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const storageMap = new Map<string, string>();
@@ -35,7 +40,7 @@ vi.mock('@/services/api', () => ({
   },
 }));
 
-import { useAuthStore } from '../authStore';
+import { useAuthStore, deriveIsSovereign } from '../authStore';
 import { api } from '@/services/api';
 
 describe('authStore session management', () => {
@@ -136,5 +141,31 @@ describe('authStore session management', () => {
     expect(mockLocalStorage.getItem('access_token')).toBeNull();
     expect(useAuthStore.getState().user).toBeNull();
     expect(useAuthStore.getState().isInitialized).toBe(true);
+  });
+});
+
+describe('deriveIsSovereign', () => {
+  it('returns true for the is_sovereign flag (DB path)', () => {
+    expect(deriveIsSovereign({ is_sovereign: true })).toBe(true);
+  });
+
+  it('returns true for the primary_sovereign role', () => {
+    expect(deriveIsSovereign({ role: 'primary_sovereign' })).toBe(true);
+  });
+
+  it('returns false for a plain admin (not all admins are sovereign)', () => {
+    expect(deriveIsSovereign({ is_admin: true, role: 'admin' })).toBe(false);
+  });
+
+  it('returns false for the observer role', () => {
+    expect(deriveIsSovereign({ role: 'observer' })).toBe(false);
+  });
+
+  it('returns false for the JWT-fallback shape (no role/is_sovereign claims)', () => {
+    expect(deriveIsSovereign({ is_admin: true })).toBe(false);
+  });
+
+  it('returns false for an empty user', () => {
+    expect(deriveIsSovereign({})).toBe(false);
   });
 });

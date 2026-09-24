@@ -76,7 +76,7 @@ const extractUserFromToken = (token: string): Partial<User> | null => {
 //     and `role: "sovereign"` for the backdoor fallback user.
 //     Checking is_sovereign (from to_dict) covers the DB path; role string
 //     covers both paths including the sovereign backdoor.
-function deriveIsSovereign(user: {
+export function deriveIsSovereign(user: {
     role?: string;
     is_admin?: boolean;
     is_sovereign?: boolean;
