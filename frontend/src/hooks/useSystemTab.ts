@@ -33,6 +33,27 @@ export interface CommandLog {
     executor?: string;
 }
 
+// ── Audit dict → display type (Fix 2, TODO 12.4.3) ───────────────────────────
+// Both the REST seed and the WS handler consume raw AuditLog.to_dict() shapes;
+// this mapper is the single translation point. Backend result only carries
+// success/error, so the display status is derived: success → executed,
+// error → rejected, neither → pending (audit written before the action
+// completes, so pending entries are real).
+export function mapAuditToCommandLog(audit: Record<string, unknown>): CommandLog {
+    const result = (audit.result ?? {}) as { success?: boolean; error?: string | null };
+    const status: CommandLog['status'] =
+        result.success === true ? 'executed'
+        : result.error ? 'rejected'
+        : 'pending';
+    return {
+        id: String(audit.id ?? `cmd_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`),
+        command: String(audit.action ?? 'unknown_action'),
+        status,
+        timestamp: new Date((audit.timestamp as string) ?? Date.now()),
+        executor: (audit.actor as { id?: string } | null)?.id,
+    };
+}
+
 // ── Hook ──────────────────────────────────────────────────────────────────────
 
 export function useSystemTab() {
@@ -77,7 +98,7 @@ export function useSystemTab() {
                 } else if (data.type === 'container_update') {
                     refreshContainers();
                 } else if (data.type === 'command_log') {
-                    setCommandLogs((prev) => [data.payload, ...prev]);
+                    setCommandLogs((prev) => [mapAuditToCommandLog(data.payload), ...prev]);
                 }
             },
             () => {
@@ -89,6 +110,22 @@ export function useSystemTab() {
             },
         );
     }, [refreshStatus, refreshContainers]);
+
+    // ── REST seed for command history ──────────────────────────────────────
+    // The WS only carries pushes from the moment of connection; history
+    // before that point arrives only from GET /commands. Seed once per
+    // connection so the panel is not permanently empty on load.
+    const seedCommandHistory = useCallback(async () => {
+        try {
+            const logs = await hostAccessApi.getCommandHistory(50);
+            if (mountedRef.current && Array.isArray(logs)) {
+                setCommandLogs(logs.map(mapAuditToCommandLog));
+            }
+        } catch {
+            // Seed failure must not surface as an error — the WS push path
+            // and the pollers above still work.
+        }
+    }, []);
 
     // ── Container actions ──────────────────────────────────────────────────
 
@@ -119,15 +156,16 @@ export function useSystemTab() {
 
         if (backendStatus.status !== 'connected') return;
 
-        // Command-log WebSocket (push-only)
+        // Command-log WebSocket (push-only) + one-time REST seed
         connectWebSocket();
+        void seedCommandHistory();
 
         return () => {
             mountedRef.current = false;
             if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
             wsRef.current?.close();
         };
-    }, [backendStatus.status, connectWebSocket]);
+    }, [backendStatus.status, connectWebSocket, seedCommandHistory]);
 
     return {
         systemStatus: systemStatus ?? null,
