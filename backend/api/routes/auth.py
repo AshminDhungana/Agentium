@@ -384,6 +384,12 @@ async def verify_token_endpoint(
     }
     if user:
         user_payload["avatar_url"] = user.avatar_url
+        # Fix 1 (TODO 12.4.2): return DB truth for the sovereign fields so the
+        # frontend's deriveIsSovereign() stays correct across page refreshes.
+        # The JWT role claim carries the raw role column ("observer" for the
+        # default admin), which would downgrade the sovereign on refresh.
+        user_payload["is_sovereign"] = user.is_sovereign
+        user_payload["role"] = user.effective_role
 
     return VerifyResponse(
         valid=True,
