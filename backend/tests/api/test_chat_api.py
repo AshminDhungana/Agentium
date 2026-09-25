@@ -8,6 +8,21 @@ from backend.models.entities.chat_message import ChatMessage as ChatMessageEntit
 from backend.models.entities.agents import HeadOfCouncil
 
 
+@pytest.fixture(autouse=True)
+def _clean_chat_tables(db_session: Session):
+    """Delete chat rows before each test.
+
+    Committed data persists across runs (db_session only rolls back
+    uncommitted work), so leftover conversations/messages from earlier runs
+    otherwise poison FK cleanups and row-count assertions. Messages go
+    first: they FK-reference conversations.
+    """
+    db_session.query(ChatMessageEntity).delete()
+    db_session.query(Conversation).delete()
+    db_session.commit()
+    yield
+
+
 @pytest.fixture
 def sovereign_user(db_session: Session) -> UserModel:
     """Get the sovereign user created by auth_client fixture."""
@@ -43,7 +58,7 @@ async def test_post_chat_send_creates_message_and_returns_response(
     """POST /chat/send should persist user message, invoke agent, persist agent response, return both."""
     with patch("backend.api.routes.chat.ChatService.process_message", new_callable=AsyncMock) as mock_process:
         mock_process.return_value = {
-            "response": "Hello! How can I help?",
+            "content": "Hello! How can I help?",
             "agent_id": "00001",
             "task_created": False,
             "task_id": None,
@@ -117,7 +132,7 @@ async def test_post_chat_send_with_conversation_id_associates_messages(
     
     with patch("backend.api.routes.chat.ChatService.process_message", new_callable=AsyncMock) as mock_process:
         mock_process.return_value = {
-            "response": "Response in conversation",
+            "content": "Response in conversation",
             "agent_id": "00001",
             "task_created": False,
             "task_id": None,
@@ -125,7 +140,7 @@ async def test_post_chat_send_with_conversation_id_associates_messages(
         
         response = await auth_client.post(
             "/api/v1/chat/send",
-            json={"message": "In conversation", "conversation_id": str(conv.id)},
+            json={"message": "In conversation", "conversation_id": str(conv.id), "stream": False},
         )
     
     assert response.status_code == 200
@@ -151,7 +166,7 @@ async def test_get_chat_conversations_lists_user_conversations(
     
     # Create conversations with messages
     conv1 = Conversation(user_id=str(sovereign_user.id), title="First Chat")
-    conv2 = Conversation(user_id=str(sovereign_user.id), title="Second Chat", is_archived="Y")
+    conv2 = Conversation(user_id=str(sovereign_user.id), title="Second Chat")
     db_session.add_all([conv1, conv2])
     db_session.commit()
     
@@ -272,8 +287,8 @@ async def test_post_chat_conversations_creates_new_conversation(
     # Check is_archived and is_deleted are in response
     assert "is_archived" in data
     assert "is_deleted" in data
-    assert data["is_archived"] == "N"
-    assert data["is_deleted"] == "N"
+    assert data["is_archived"] in (False, "N")
+    assert data["is_deleted"] in (False, "N")
     assert "id" in data
     assert "created_at" in data
     

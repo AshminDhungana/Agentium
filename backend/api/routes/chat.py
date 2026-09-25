@@ -410,8 +410,14 @@ async def get_chat_stats(
 # Send message
 # ═══════════════════════════════════════════════════════════
 
+# No response_class here: the streaming branch returns StreamingResponse
+# explicitly (passed through untouched), and the non-streaming branch
+# returns ChatResponse, which needs normal JSON serialization. Forcing
+# response_class=StreamingResponse made FastAPI wrap the ChatResponse in a
+# streaming response whose body iterator dies after the 200 is sent —
+# every non-streaming call returned 200 OK with an empty body.
 @router.post(
-    "/send", response_class=StreamingResponse,
+    "/send",
     summary="Send a message",
     description="Send a message to the Head of Council. Returns a streaming response for real-time updates.",
     responses={

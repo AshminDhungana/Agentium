@@ -9,7 +9,17 @@ import uuid
 from sqlalchemy import Column, String, DateTime, Text, ForeignKey, JSON, Integer, Index, Boolean
 from sqlalchemy.orm import relationship
 
-from .base import Base   
+from .base import Base
+
+
+def _is_not_deleted(flag) -> bool:
+    """True unless the soft-delete flag marks the row deleted.
+
+    The model declares String(1) 'N'/'Y' but live Postgres columns are
+    BOOLEAN, so the flag can arrive as False or 'N' depending on which
+    schema wrote/read the row — treat both as not-deleted.
+    """
+    return flag in (False, "N", None)
 
 
 class ChatMessage(Base):
@@ -197,10 +207,14 @@ class Conversation(Base):
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
             "last_message_at": self.last_message_at.isoformat() if self.last_message_at else None,
             "message_count": len(self.messages) if self.messages else 0,
+            "last_message_preview": next(
+                (m.content for m in reversed(self.messages or []) if _is_not_deleted(m.is_deleted)),
+                None,
+            ),
         }
         
         if include_messages and self.messages:
-            result["messages"] = [m.to_dict() for m in self.messages if m.is_deleted == 'N']
+            result["messages"] = [m.to_dict() for m in self.messages if _is_not_deleted(m.is_deleted)]
         
         return result
     
