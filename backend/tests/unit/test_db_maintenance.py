@@ -27,6 +27,7 @@ from datetime import datetime
 # dependable only by accident.
 _DB_FILE = tempfile.NamedTemporaryFile(suffix=".sqlite", delete=False)
 _DB_FILE.close()
+_OLD_DATABASE_URL = os.environ.get("DATABASE_URL")
 os.environ["DATABASE_URL"] = f"sqlite:///{_DB_FILE.name}"
 
 # Patch JSONB → SQLA JSON so SQLite can compile DDL (`create_all`) for
@@ -46,6 +47,17 @@ from backend.models.database import engine, SessionLocal  # noqa: E402
 from backend.models.entities.audit import AuditLog, AuditLevel, AuditCategory  # noqa: E402
 from backend.models.entities.task import Task, TaskStatus, TaskType, TaskPriority  # noqa: E402
 from backend.models.entities.constitution import Constitution  # noqa: E402
+
+# Restore the saved DATABASE_URL now that the backend imports are done. Under
+# pytest the global engine was already bound by tests/conftest.py (imported
+# before any test module), so this module's SQLite URL never rebinds it —
+# leaving it set would only leak into later-collected modules whose lazy
+# readers do os.environ["DATABASE_URL"] (e.g. test_skill_alembic_default's
+# information_schema check), poisoning suite-order runs.
+if _OLD_DATABASE_URL is None:
+    os.environ.pop("DATABASE_URL", None)
+else:
+    os.environ["DATABASE_URL"] = _OLD_DATABASE_URL
 
 
 # Create all tables on whatever engine is bound. We import the Base off
@@ -122,6 +134,57 @@ def db():
     session = SessionLocal()
     yield session
     session.close()
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _clean_constitutions():
+    """Snapshot + clear the constitutions table for this module's tests.
+
+    The shared agentium_test DB can hold rows seeded by a real app boot
+    (version 'v1.0.0' / version_number 1 collide UNIQUE-wise with the seeds
+    below) plus debris from earlier runs. Snapshot the rows, delete all,
+    and restore them afterwards so other suites' expectations (e.g. tests
+    querying the active constitution) are untouched.
+
+    amendment_votings FK-references constitutions.id and individual_votes
+    FK-references amendment_votings, so rows are snapshotted/cleared leaf-to-root
+    (individual_votes → amendment_votings → constitutions) and restored in the
+    reverse order.
+    """
+    from backend.models.entities.voting import AmendmentVoting, IndividualVote
+
+    def _snapshot(session, model):
+        return [dict(r.__dict__) for r in session.query(model).all()]
+
+    def _clear(session, model):
+        session.query(model).delete(synchronize_session="fetch")
+
+    snap_session = SessionLocal()
+    try:
+        ivotes = _snapshot(snap_session, IndividualVote)
+        votes = _snapshot(snap_session, AmendmentVoting)
+        constitutions = _snapshot(snap_session, Constitution)
+        _clear(snap_session, IndividualVote)
+        _clear(snap_session, AmendmentVoting)
+        _clear(snap_session, Constitution)
+        snap_session.commit()
+    finally:
+        snap_session.close()
+    yield
+    restore_session = SessionLocal()
+    try:
+        for row in constitutions:
+            row.pop("_sa_instance_state", None)
+            restore_session.add(Constitution(**row))
+        for row in votes:
+            row.pop("_sa_instance_state", None)
+            restore_session.add(AmendmentVoting(**row))
+        for row in ivotes:
+            row.pop("_sa_instance_state", None)
+            restore_session.add(IndividualVote(**row))
+        restore_session.commit()
+    finally:
+        restore_session.close()
 
 
 def test_cleanup_drops_audit_older_than_retention(db):

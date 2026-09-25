@@ -14,6 +14,8 @@ import os
 # connections in worker threads, and pysqlite rejects cross-thread
 # connection use by default. This flag is SQLite-specific (Postgres
 # production has no equivalent constraint).
+_OLD_DATABASE_URL = os.environ.get("DATABASE_URL")
+_OLD_DATABASE_URL_SET = _OLD_DATABASE_URL is not None
 os.environ["DATABASE_URL"] = (
     "sqlite:///file:memdb1?mode=memory&cache=shared&uri=true&check_same_thread=False"
 )
@@ -31,6 +33,17 @@ import time
 from sqlalchemy import text
 
 from backend.models.database import engine, get_db_context
+
+# Restore the saved DATABASE_URL now that the backend imports are done. Under
+# pytest the global engine was already bound by tests/conftest.py (imported
+# before any test module), so this module's SQLite URL never rebinds it —
+# leaving it set only leaks into later-collected modules whose lazy readers
+# do os.environ["DATABASE_URL"] and poison suite-order runs. Its tests use
+# the already-bound global engine either way ("runs on any backend").
+if _OLD_DATABASE_URL_SET:
+    os.environ["DATABASE_URL"] = _OLD_DATABASE_URL
+else:
+    os.environ.pop("DATABASE_URL", None)
 
 
 def test_checked_out_returns_to_baseline_after_traffic():
