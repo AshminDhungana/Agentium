@@ -167,6 +167,10 @@ async def test_record_header_insight_pauses(monkeypatch):
             raise RuntimeError("force fallback")
 
     rl._redis = _FakeRedis()
+    # _get_redis() treats a client whose _redis_loop isn't the running loop as
+    # stale and replaces it with a real connection — pin the loop so the fake
+    # is used (no real Redis in unit tests).
+    rl._redis_loop = asyncio.get_running_loop()
     headers = {"x-ratelimit-remaining-requests": "1",
                "x-ratelimit-reset-requests": "5"}  # 5s delta
 

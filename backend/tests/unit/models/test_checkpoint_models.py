@@ -357,6 +357,10 @@ class TestCheckpointIntegration:
             task_id=task_id,
             phase=CheckpointPhase.PLAN_APPROVED,
         )
+        # id's default is evaluated at flush time, so cp1.id is None at
+        # construction — flush first or the chain below captures None.
+        db_session.add(cp1)
+        db_session.flush()
         cp2 = ExecutionCheckpoint(
             agentium_id="CP30002",
             session_id="link_session",
@@ -364,6 +368,10 @@ class TestCheckpointIntegration:
             phase=CheckpointPhase.EXECUTION_COMPLETE,
             parent_checkpoint_id=cp1.id,
         )
+        # cp2.id is still None here (flush-time default) — flush before
+        # building the next link in the chain.
+        db_session.add(cp2)
+        db_session.flush()
         cp3 = ExecutionCheckpoint(
             agentium_id="CP30003",
             session_id="link_session",
