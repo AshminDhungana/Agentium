@@ -539,10 +539,19 @@
   - [x] 12.3.3 — Dark/light theme toggle works globally
   - [x] 12.3.4 — API key management settings work
 
-- [ ] **12.4 — Sovereign Dashboard**
-  - [ ] 12.4.1 — `SovereignDashboard.tsx` loads (admin-only route)
-  - [ ] 12.4.2 — `SovereignRoute` component enforces sovereign access
-  - [ ] 12.4.3 — System-wide controls function correctly
+- [x] **12.4 — Sovereign Dashboard**
+  - [x] 12.4.1 — `SovereignDashboard.tsx` loads (admin-only route)
+  - [x] 12.4.2 — `SovereignRoute` component enforces sovereign access
+  - [x] 12.4.3 — System-wide controls function correctly
+
+  > **Notes (12.4)** — Verified by code audit + full suites (backend 1318 passed / 2 skipped, 0 errors with `--cov`, coverage 57.71%; frontend unit 302 tests, a11y 78 checks in real Chromium, `npm run build` green) + live-stack smoke (`frontend/e2e/sovereign-live-smoke.mjs`, 13/13 checks, env-guarded by `LIVE_STACK=1`, non-destructive — history seeded via a nonexistent container id). Two bugs found & fixed:
+  > - **12.4.2 bug found & fixed**: the login JWT embedded the raw role column (`"observer"` for the default admin) and `POST /api/v1/auth/verify` built its response from JWT claims, so on page refresh `deriveIsSovereign()` saw a non-sovereign and `SovereignRoute` redirected the sovereign to `/`. `/verify` now returns DB truth (`is_sovereign`, `effective_role`) when the persisted user exists (`backend/api/routes/auth.py`); JWT claims untouched (minimal blast radius). Locked by `tests/api/test_auth_verify_sovereign.py`, the `deriveIsSovereign` truth table, and `SovereignRoute` guard tests.
+  > - **12.4.3 bug found & fixed (phantom contract)**: the backend never emitted a `command_log` WS message and the frontend never called `GET /api/v1/sovereign/commands` (`getCommandHistory` existed unused), so the Command History panel was permanently empty (invisible behind keep-alive tabs). Both sides closed: sovereign command/container endpoints emit `notify_sovereign({"type": "command_log", "payload": audit.to_dict()})` right after the audit commit (`backend/api/sovereign.py`), and `useSystemTab` seeds history from the REST endpoint on connect + maps audit dicts via the shared `mapAuditToCommandLog()`. Locked by `tests/api/test_sovereign_commands.py` + `useSystemTab` unit tests.
+  > - **12.4.1 verified**: `/sovereign` wired inside `SovereignRoute` (lazy-loaded, sidebar nav + route preload), 13-tab keep-alive panel gates on `isSovereign`; a11y suite passes light+dark; `npm run build` green.
+  > - **12.4.3 verified (controls)**: system status via psutil (`/host` disk fallback), containers via Docker socket (mounted `:rw` in compose), command history (post-fix), audit endpoint filters, agent block/unblock (audit + WS notify). Non-sovereign gets 403 `SOVEREIGN_ONLY` on every `/api/v1/sovereign/*` endpoint and is redirected from `/sovereign`; WS closes 4001 (missing/invalid token) / 4003 (non-admin).
+  > - **Related observation (no product change)**: the smoke's one-time reload bounce can also be triggered by `useModelRedirect` (`App.tsx:38-90`) — once per login session, an instance with zero model configs navigates `/sovereign` → `/models`. Deliberate onboarding behavior, outside 12.4 scope; the smoke tolerates one bounce (sessionStorage key prevents the second).
+  > - **Incidental repairs during verification** (commits `e83e356`, `0d8f9d3`, `3ea54de`, `8eb23e3`): POSIX-absolute passthrough in the workspace resolver (Python 3.13 `ntpath.isabs` change), completion of the chunked-delete refactor in `cleanup_stale_data_once`, and repair of stale/phantom unit tests (rate-limiter loop pinning, checkpoint pre-flush ids, aiohttp-protocol http tool mocks, missing `client` fixture) found by the full-suite run.
+  > - **Accepted limitations**: single-worker WS registry (module-level `active_connections`); restricted host-access mode; embedded tabs deferred to 12.5–12.9; `/verify-session` (voice bridge) shares the raw-role gap but doesn't consume `isSovereign`.
 
 - [ ] **12.5 — Developer Portal**
   - [ ] 12.5.1 — `DeveloperPortalPage.tsx` renders API documentation
