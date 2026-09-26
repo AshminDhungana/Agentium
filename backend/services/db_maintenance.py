@@ -97,9 +97,11 @@ class DatabaseMaintenanceService:
                 days=settings.AUDIT_LOG_RETENTION_DAYS
             )
             report["audit_logs_deleted"] = (
-                db.query(AuditLog)
-                .filter(AuditLog.created_at < audit_cutoff)
-                .delete()
+                await DatabaseMaintenanceService._chunked_delete(
+                    db=db,
+                    model=AuditLog,
+                    filter_factory=lambda: AuditLog.created_at < audit_cutoff,
+                )
             )
 
             # 2. Archive completed/cancelled/failed tasks older than
@@ -108,20 +110,19 @@ class DatabaseMaintenanceService:
                 days=settings.TASK_ARCHIVE_DAYS
             )
             report["tasks_deleted"] = (
-                db.query(Task)
-                .filter(
-                    Task.status.in_(
+                await DatabaseMaintenanceService._chunked_delete(
+                    db=db,
+                    model=Task,
+                    filter_factory=lambda: Task.status.in_(
                         ["completed", "cancelled", "failed"]
-                    ),
-                    Task.updated_at < task_cutoff,
+                    ) & (Task.updated_at < task_cutoff),
                 )
-                .delete()
             )
 
             # 3. Constitution version cleanup
             #    Keep last N versions, NEVER delete version 1
             report["constitution_versions_pruned"] = (
-                DatabaseMaintenanceService._prune_constitution_versions(
+                await DatabaseMaintenanceService._prune_constitution_versions_chunked(
                     db
                 )
             )

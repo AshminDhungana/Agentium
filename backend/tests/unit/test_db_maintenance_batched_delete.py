@@ -1,5 +1,6 @@
+import asyncio
 import time
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 from backend.services.db_maintenance import DatabaseMaintenanceService
 
 
@@ -117,37 +118,40 @@ def test_batch_delete_empty_result_returns_zero():
 
 
 def test_cleanup_stale_data_uses_batched_delete_for_audit_logs():
-    """Verify cleanup_stale_data calls batched delete for audit_logs."""
+    """Verify cleanup_stale_data_once routes bulk deletes through _chunked_delete.
+
+    cleanup_stale_data (the 24h loop) delegates a single tick to
+    cleanup_stale_data_once; the once-method awaits _chunked_delete for the
+    audit-log and task deletes — first call must be for AuditLog.
+    """
     from backend.models.entities.audit import AuditLog
     from backend.models.entities.task import Task
-    
-    with patch.object(DatabaseMaintenanceService, "_batch_delete") as mock_batch:
-        mock_batch.return_value = 100
-        
-        # Mock the db context manager
-        with patch("backend.services.db_maintenance.get_db_context") as mock_ctx:
-            mock_db = MagicMock()
-            mock_ctx.return_value.__enter__.return_value = mock_db
-            
-            # Mock constitution query to return empty list
-            mock_constitution_query = MagicMock()
-            mock_constitution_query.order_by.return_value.all.return_value = []
-            mock_db.query.return_value = mock_constitution_query
-            
-            # Run one iteration of cleanup (mock the sleep to exit loop)
-            import asyncio
-            async def run_once():
-                task = asyncio.create_task(DatabaseMaintenanceService.cleanup_stale_data())
-                await asyncio.sleep(0.01)
-                task.cancel()
-                try:
-                    await task
-                except asyncio.CancelledError:
-                    pass
-            asyncio.run(run_once())
-            
+
+    with patch.object(
+        DatabaseMaintenanceService, "_chunked_delete", new_callable=AsyncMock
+    ) as mock_chunk:
+        mock_chunk.return_value = 100
+
+        with patch.object(
+            DatabaseMaintenanceService,
+            "_prune_constitution_versions_chunked",
+            new_callable=AsyncMock,
+        ) as mock_prune:
+            mock_prune.return_value = 0
+
+            # Mock the db context manager
+            with patch("backend.services.db_maintenance.get_db_context") as mock_ctx:
+                mock_db = MagicMock()
+                mock_ctx.return_value.__enter__.return_value = mock_db
+
+                # Run one tick directly — no 24-hour sleep loop to cancel.
+                asyncio.run(DatabaseMaintenanceService.cleanup_stale_data_once())
+
             # Verify batched delete was called for audit_logs
-            assert mock_batch.called
+            assert mock_chunk.called
             # First call should be for AuditLog
-            first_call_args = mock_batch.call_args_list[0]
-            assert first_call_args[0][1] == AuditLog  # model is AuditLog
+            first_call_args = mock_chunk.call_args_list[0]
+            assert first_call_args.kwargs["model"] == AuditLog  # model is AuditLog
+            # The task delete is chunked too
+            second_call_args = mock_chunk.call_args_list[1]
+            assert second_call_args.kwargs["model"] == Task
