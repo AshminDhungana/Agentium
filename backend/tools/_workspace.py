@@ -62,7 +62,10 @@ def resolve_in_workspace(path: str, agent_id: str) -> str:
         return path
     if path.startswith("/host/") or path.startswith("/host_home/"):
         return path
-    if os.path.isabs(path):
+    # Python 3.13's ntpath.isabs classifies drive-relative '/x' paths as NOT
+    # absolute on Windows, which would root container-local paths like /tmp
+    # into the workspace. Treat any POSIX-style absolute path as passthrough.
+    if path.startswith("/") or os.path.isabs(path):
         return path
     return _join(agent_workspace_path(agent_id), path)
 
