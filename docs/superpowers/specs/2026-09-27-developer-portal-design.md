@@ -52,8 +52,8 @@ Registered in `entities/__init__.py`. Alembic migration `025_developer_api_keys.
 - Key format: `sk-ag_` + `secrets.token_urlsafe(32)`. Only the SHA-256 hash is stored; the plaintext is returned exactly once, in the generate response.
 - New router `backend/api/routes/developer.py`, prefix `/api/v1/developer` (mirrors the `sovereign.py` pattern), registered in `main.py` (route modules 44 → 45):
   - `POST /keys` — body `{name, expires_at?}` → `{id, name, key, key_prefix, created_at}`; writes an AuditLog entry.
-  - `GET /keys` — the current user's keys: `{id, name, key_prefix, created_at, last_used_at, revoked_at, expires_at, status}`.
-  - `DELETE /keys/{id}` — soft revoke (sets `revoked_at`); owner or admin only; AuditLog entry.
+  - `GET /keys` — the current user's keys: `{id, name, key_prefix, created_at, last_used_at, revoked_at, expires_at, status}`. `status` is derived at read time, never stored: `revoked` if `revoked_at` is set, else `expired` if `expires_at` is past, else `active`.
+  - `DELETE /keys/{id}` — soft revoke (sets `revoked_at`); owner or admin only; a non-owner (and non-admin) receives 404, consistent with not revealing other users' keys; AuditLog entry.
 
 ### 3.3 Backend — dual-header auth
 
@@ -83,7 +83,7 @@ New `frontend/src/services/developerApi.ts` following the existing typed-service
 
 ### 3.6 Testing & verification
 
-- **Backend API tests** (`tests/api/` pattern, cf. `test_auth_verify_sovereign.py`): valid key → 200; invalid / revoked / expired key → 401; JWT coexistence (Bearer still works, and takes precedence when both headers present); deactivated owner → 403; revoke ownership (non-owner rejected); audit entries created on generate + revoke.
+- **Backend API tests** (`tests/api/` pattern, cf. `test_auth_verify_sovereign.py`): valid key → 200; invalid / revoked / expired key → 401; JWT coexistence (Bearer still works, and takes precedence when both headers present); deactivated owner → 403; revoke ownership (non-owner, non-admin → 404); audit entries created on generate + revoke.
 - **Backend unit tests**: key format (`sk-ag_` prefix, length), hash round-trip, prefix derivation.
 - **Frontend unit tests**: API Keys tab — generate flow, copy-once modal, revoke flow.
 - **a11y**: extend `DeveloperPortalPage.a11y.browser.test.tsx` to audit the API Keys tab; light + dark.
