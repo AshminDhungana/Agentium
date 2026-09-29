@@ -9,8 +9,9 @@ Provides REST endpoints for:
 - Health reports
 """
 
+import logging
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, BackgroundTasks, Query
 from backend.core.exceptions import BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, TooLargeError, RateLimitError, InternalServerError, ServiceUnavailableError
 from pydantic import BaseModel, Field
@@ -20,11 +21,12 @@ from backend.models.database import get_db
 from backend.models.entities.user_config import UserModelConfig, ProviderType, ConnectionStatus
 from backend.services.api_key_manager import api_key_manager, APIKeyHealthStatus
 from backend.core.auth import get_current_user
-from backend.api.schemas.examples import ErrorResponseExample, SuccessResponseExample
-
 from backend.api.schemas.examples import ErrorResponseExample, SuccessResponseExample, build_responses
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/api-keys", tags=["API Key Resilience"])
+
 
 
 # =============================================================================

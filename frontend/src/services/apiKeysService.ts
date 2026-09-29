@@ -2,7 +2,9 @@
  * apiKeysService.ts
  *
  * Frontend service for extended API key management operations.
- * Covers the three backend endpoints not yet wired into the React layer:
+ * Covers the backend endpoints for key CRUD:
+ *   POST    /api/v1/api-keys/                    (create)
+ *   GET     /api/v1/api-keys/health               (list via health report)
  *   DELETE  /api/v1/api-keys/{key_id}
  *   GET     /api/v1/api-keys/{key_id}/spend-history
  *   POST    /api/v1/api-keys/test-failover
@@ -11,6 +13,44 @@
 import { api } from './api';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+
+export interface CreateKeyRequest {
+  provider: string;
+  api_key: string;
+  config_name: string;
+  model_name: string;
+  monthly_budget_usd?: number;
+  priority?: number;
+  is_default?: boolean;
+}
+
+export interface CreateKeyResponse {
+  success: boolean;
+  key_id: string;
+  provider: string;
+  config_name: string;
+  genesis_triggered: boolean;
+  message: string;
+}
+
+export interface KeyHealthInfo {
+  id: string;
+  provider: string;
+  priority: number;
+  status: string;
+  failure_count: number;
+  cooldown_until: string | null;
+  monthly_budget_usd: number;
+  current_spend_usd: number;
+  budget_remaining_pct: number;
+}
+
+export interface HealthReportResponse {
+  overall_status: string;
+  providers: Record<string, { total_keys: number; healthy: number; keys: KeyHealthInfo[] }>;
+  summary: Record<string, unknown>;
+  generated_at: string;
+}
 
 export interface DeleteKeyResponse {
   success: boolean;
@@ -46,6 +86,32 @@ export interface FailoverTestResponse {
 // ─── Service ──────────────────────────────────────────────────────────────────
 
 export const apiKeysService = {
+  /**
+   * Create a new API key configuration.
+   *
+   * Encrypts and persists the key. If genesis hasn't run, auto-triggers it.
+   */
+  createKey: async (data: CreateKeyRequest): Promise<CreateKeyResponse> => {
+    const response = await api.post<CreateKeyResponse>(
+      '/api/v1/api-keys/',
+      data,
+    );
+    return response.data;
+  },
+
+  /**
+   * List all API keys via the health report endpoint.
+   *
+   * Returns the full health report with per-provider key breakdowns.
+   */
+  listKeys: async (provider?: string): Promise<HealthReportResponse> => {
+    const response = await api.get<HealthReportResponse>(
+      '/api/v1/api-keys/health',
+      { params: provider ? { provider } : {} },
+    );
+    return response.data;
+  },
+
   /**
    * Soft-delete an API key configuration.
    *
@@ -96,4 +162,4 @@ export const apiKeysService = {
   },
 };
 
-export default apiKeysService;
+export default apiKeysService;

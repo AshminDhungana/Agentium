@@ -553,9 +553,22 @@
   > - **Incidental repairs during verification** (commits `e83e356`, `0d8f9d3`, `3ea54de`, `8eb23e3`): POSIX-absolute passthrough in the workspace resolver (Python 3.13 `ntpath.isabs` change), completion of the chunked-delete refactor in `cleanup_stale_data_once`, and repair of stale/phantom unit tests (rate-limiter loop pinning, checkpoint pre-flush ids, aiohttp-protocol http tool mocks, missing `client` fixture) found by the full-suite run.
   > - **Accepted limitations**: single-worker WS registry (module-level `active_connections`); restricted host-access mode; embedded tabs deferred to 12.5–12.9; `/verify-session` (voice bridge) shares the raw-role gap but doesn't consume `isSovereign`.
 
-- [ ] **12.5 — Developer Portal**
-  - [ ] 12.5.1 — `DeveloperPortalPage.tsx` renders API documentation
-  - [ ] 12.5.2 — API key generation from portal works
+- [x] **12.5 — Developer Portal**
+  - [x] 12.5.1 — `DeveloperPortalPage.tsx` renders API documentation
+  - [x] 12.5.2 — API key generation from portal works
+
+  > **Notes (12.5)** — Verified by code audit, backend and frontend unit suites, a11y browser test, and production build:
+  > - **12.5.1 verified & repaired**: `DeveloperPortalPage.tsx` renders API documentation across 6 tabs (API Reference, API Keys, Python SDK, TypeScript SDK, cURL, Webhook Events). Repaired code samples: fixed JS-style comments `//` in Python sample to `#`, fixed broken `forEach` commented-out closing paren in TypeScript sample.
+  > - **12.5.2 implemented & verified**: Added interactive API Key Management tab to `DeveloperPortalPage.tsx` with key generation form (provider selection, model name, API key input with toggle visibility, budget limit, priority, default toggle) and key list with status badges, copy-to-clipboard, and delete actions. Extended [apiKeysService.ts](file:///e:/Ongoing%20Projects/Agentium/frontend/src/services/apiKeysService.ts) with `createKey()` and `listKeys()` wired to existing backend endpoints.
+  > - **Backend bugs found & fixed**:
+  >   - `backend/api/routes/api_keys.py`: Added missing `import logging` and `logger = logging.getLogger(__name__)` (previously crashed with `NameError` on `create_api_key`).
+  >   - `backend/api/routes/api_keys.py`: Added missing `timedelta` import in `datetime` import list (previously crashed with `NameError` in `get_spend_history`).
+  >   - Cleaned up duplicate import of `ErrorResponseExample, SuccessResponseExample`.
+  > - **Test coverage locked**:
+  >   - Frontend unit suite: `frontend/src/pages/__tests__/DeveloperPortalPage.test.tsx` (5/5 passed) verifying tab switching, doc rendering, key listing, key generation form submission, and key deletion.
+  >   - Frontend a11y browser audit: `frontend/src/pages/DeveloperPortalPage.a11y.browser.test.tsx` (2/2 passed, 0 violations in light and dark themes).
+  >   - Backend API tests: `tests/api/test_api_keys_routes.py` (3/3 passed) covering key creation, provider validation, and spend history aggregation.
+  >   - Full frontend test suite: 71 test files, 307 tests passed; `npm run build` (`tsc && vite build`) green.
 
 - [ ] **12.6 — Skills Page**
   - [ ] 12.6.1 — `SkillsPage.tsx` lists agent skills
