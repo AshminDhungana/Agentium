@@ -72,8 +72,25 @@ export const SkillsPage: React.FC = () => {
   const [mySubmissions, setMySubmissions] = useState<Skill[]>([]);
 
   const userRole = user?.role as string | undefined;
-  const isPrivileged = userRole === 'council' || userRole === 'head' || userRole === 'lead';
-  const canAutoVerify = userRole === 'council' || userRole === 'head';
+  const isPrivileged =
+    userRole === 'council' ||
+    userRole === 'head' ||
+    userRole === 'lead' ||
+    userRole === 'primary_sovereign' ||
+    userRole === 'deputy_sovereign' ||
+    userRole === 'sovereign' ||
+    userRole === 'admin' ||
+    Boolean(user?.is_admin) ||
+    Boolean(user?.isSovereign);
+  const canAutoVerify =
+    userRole === 'council' ||
+    userRole === 'head' ||
+    userRole === 'primary_sovereign' ||
+    userRole === 'deputy_sovereign' ||
+    userRole === 'sovereign' ||
+    userRole === 'admin' ||
+    Boolean(user?.is_admin) ||
+    Boolean(user?.isSovereign);
 
   useEffect(() => {
     loadPopularSkills();

@@ -570,10 +570,24 @@
   >   - Backend API tests: `tests/api/test_api_keys_routes.py` (3/3 passed) covering key creation, provider validation, and spend history aggregation.
   >   - Full frontend test suite: 71 test files, 307 tests passed; `npm run build` (`tsc && vite build`) green.
 
-- [ ] **12.6 — Skills Page**
-  - [ ] 12.6.1 — `SkillsPage.tsx` lists agent skills
-  - [ ] 12.6.2 — Skill creation/editing UI works
-  - [ ] 12.6.3 — Skill RAG search works (`skill_rag.py` backend)
+- [x] **12.6 — Skills Page**
+  - [x] 12.6.1 — `SkillsPage.tsx` lists agent skills
+  - [x] 12.6.2 — Skill creation/editing UI works
+  - [x] 12.6.3 — Skill RAG search works (`skill_rag.py` backend)
+
+  > **Notes (12.6)** — Verified by code audit, backend and frontend unit test suites, TypeScript compilation, and production build:
+  > - **12.6.1 verified**: `SkillsPage.tsx` correctly lists agent skills with popular skills grid (`getPopular`), search results (`search`), empty state handling, and tabs (Browse, My Submissions, Citation Graph).
+  > - **12.6.2 verified & fixed**: Skill creation, editing, and deletion UI works with complete form validation (display name, type, domain, complexity, description, steps). Fixed Sovereign/Admin permission gates (`isPrivileged` and `canAutoVerify`) so primary/deputy sovereign and admin roles can edit, delete, and auto-verify skills without requiring council approval.
+  > - **12.6.3 verified & fixed**: Skill RAG search powered by `skill_rag.py` and `skill_manager.py` works seamlessly. Fixed query param vs JSON body mismatch in `execute_with_skill` endpoint (`ExecuteRequest` Pydantic model) and `create_skill` (`Body(...)` annotation).
+  > - **Bugs found & fixed**:
+  >   - `backend/api/routes/skills.py`: Resolved user UUID to creator agent `00001`'s `agentium_id` when filtering by `creator_id` in `search_skills`, fixing empty "My Submissions" list for Sovereign users.
+  >   - `backend/api/routes/skills.py`: Added `ExecuteRequest(BaseModel)` for `POST /{skill_id}/execute` to parse `task_input` from JSON body instead of expecting a query parameter.
+  >   - `backend/api/routes/skills.py`: Added `Body(...)` annotation for `skill_data` dict in `create_skill`.
+  >   - `frontend/src/pages/SkillsPage.tsx`: Extended `isPrivileged` and `canAutoVerify` checks to include `primary_sovereign`, `deputy_sovereign`, `sovereign`, `admin`, `is_admin`, and `isSovereign` matching backend tier mappings.
+  > - **Test coverage locked**:
+  >   - Frontend unit suite: `frontend/src/pages/__tests__/SkillsPage.test.tsx` (10/10 passed) verifying Knowledge Library layout, search bar, popular skills listing, create modal, create submission with auto-verify, delete confirmation and deprecation, RAG search with relevance scores, search clearing, and My Submissions tab.
+  >   - Backend API tests: `tests/api/test_skills_routes.py` (7/7 passed) covering RAG search, creator_id UUID resolution, skill creation, auto-verify privilege enforcement, skill deprecation, 404 handling, and popular skills retrieval.
+  >   - Type safety & production build: `npx tsc --noEmit` clean (0 errors), `npm run build` (`tsc && vite build`) green.
 
 - [ ] **12.7 — AB Testing Page**
   - [ ] 12.7.1 — `ABTestingPage.tsx` displays experiments

@@ -7,7 +7,7 @@ Supports both User (Sovereign) and Agent authentication.
 from typing import Optional
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Body, Depends
 from backend.core.exceptions import BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, TooLargeError, RateLimitError, InternalServerError, ServiceUnavailableError
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
@@ -120,6 +120,11 @@ class ReviewRequest(BaseModel):
     notes: Optional[str] = None
 
 
+class ExecuteRequest(BaseModel):
+    """Body for POST /{skill_id}/execute (Fix P2 — was a bare query param)."""
+    task_input: str
+
+
 # ===========================================================================
 # FIXED-PATH ROUTES — must appear before /{skill_id} routes (Fix 2)
 # ===========================================================================
@@ -166,10 +171,20 @@ async def search_skills(
     )
 
     # Post-filter by creator_id when requested (Fix 4)
+    # Fix P1: When the caller is a User, their user.id (UUID) doesn't match
+    # creator_id in skill metadata (which stores agent.agentium_id, e.g. "00001").
+    # Resolve the user UUID to the mapped agent's agentium_id before filtering.
     if creator_id:
+        resolved_creator_id = creator_id
+        if auth_context["type"] == "user":
+            # Sovereign users create skills via agent "00001"; resolve their
+            # user UUID to that agent's agentium_id.
+            mapping_agent = db.query(Agent).filter(Agent.agentium_id == "00001").first()
+            if mapping_agent:
+                resolved_creator_id = mapping_agent.agentium_id
         results = [
             r for r in results
-            if str(r.get("metadata", {}).get("creator_id", "")) == str(creator_id)
+            if str(r.get("metadata", {}).get("creator_id", "")) == str(resolved_creator_id)
         ]
 
     return {
@@ -292,7 +307,7 @@ async def review_submission(
     responses=build_responses(None),
 )
 async def create_skill(
-    skill_data: dict,
+    skill_data: dict = Body(...),
     auto_verify: bool = False,
     db: Session = Depends(get_db),
     auth_context: dict = Depends(get_current_user_or_agent),
@@ -536,7 +551,7 @@ async def update_skill(
 )
 async def execute_with_skill(
     skill_id: str,
-    task_input: str,
+    body: ExecuteRequest,
     db: Session = Depends(get_db),
     auth_context: dict = Depends(get_current_user_or_agent),
 ):
@@ -556,7 +571,7 @@ async def execute_with_skill(
         raise ForbiddenError(error="Execution requires agent context", code="EXECUTION_REQUIRES_AGENT_CONTEXT")
 
     result = await skill_rag.execute_with_skills(
-        task_description=task_input,
+        task_description=body.task_input,
         agent=agent,
         db=db,
     )
