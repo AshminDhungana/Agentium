@@ -9317,6 +9317,14 @@ export interface components {
             };
         };
         /**
+         * ExecuteRequest
+         * @description Body for POST /{skill_id}/execute (Fix P2 — was a bare query param).
+         */
+        ExecuteRequest: {
+            /** Task Input */
+            task_input: string;
+        };
+        /**
          * ExecutionSummaryResponse
          * @description Response with execution record.
          */
@@ -40326,16 +40334,18 @@ export interface operations {
     };
     execute_with_skill_api_v1_skills__skill_id__execute_post: {
         parameters: {
-            query: {
-                task_input: string;
-            };
+            query?: never;
             header?: never;
             path: {
                 skill_id: string;
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExecuteRequest"];
+            };
+        };
         responses: {
             /** @description Success */
             200: {
