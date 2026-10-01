@@ -11,7 +11,7 @@ import {
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Legend, RadarChart, PolarGrid,
-  PolarAngleAxis, Radar,
+  PolarAngleAxis, Radar, Cell,
 } from 'recharts';
 import { useAuthStore } from '@/store/authStore';
 import { useWebSocketStore } from '@/store/websocketStore';
@@ -788,7 +788,7 @@ function ExperimentDetailPanel({
                         />
                         <Bar dataKey="latency" radius={[4, 4, 0, 0]}>
                           {models.map((_, i) => (
-                            <rect key={i} fill={MODEL_COLORS[i % MODEL_COLORS.length]} />
+                            <Cell key={i} fill={MODEL_COLORS[i % MODEL_COLORS.length]} />
                           ))}
                         </Bar>
                       </BarChart>

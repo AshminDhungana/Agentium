@@ -589,10 +589,17 @@
   >   - Backend API tests: `tests/api/test_skills_routes.py` (7/7 passed) covering RAG search, creator_id UUID resolution, skill creation, auto-verify privilege enforcement, skill deprecation, 404 handling, and popular skills retrieval.
   >   - Type safety & production build: `npx tsc --noEmit` clean (0 errors), `npm run build` (`tsc && vite build`) green.
 
-- [ ] **12.7 — AB Testing Page**
-  - [ ] 12.7.1 — `ABTestingPage.tsx` displays experiments
-  - [ ] 12.7.2 — Create/edit/delete experiments works
-  - [ ] 12.7.3 — Experiment results and metrics display correctly
+- [x] **12.7 — AB Testing Page**
+  - [x] 12.7.1 — `ABTestingPage.tsx` displays experiments
+  - [x] 12.7.2 — Create/edit/delete experiments works
+  - [x] 12.7.3 — Experiment results and metrics display correctly
+  > **Verified & Audited**:
+  > - **Bug fixes applied**:
+  >   - `frontend/src/pages/ABTestingPage.tsx`: Replaced raw `<rect>` children with Recharts `<Cell>` components in `ExperimentDetailPanel` to enable distinct per-bar coloring for latency comparisons.
+  > - **Test coverage locked**:
+  >   - Frontend unit suite: `frontend/src/pages/__tests__/ABTestingPage.test.tsx` (11/11 passed) covering access gating, experiment list, filter/search/pagination, stats summary cards, empty states, create experiment modal, delete confirmation modal, quick test modal, experiment detail panel with winner determination and metrics comparison, and recommendations tab.
+  >   - Backend API tests: `tests/api/test_ab_testing_routes.py` (15/15 passed) covering admin authorization enforcement, experiment creation with auto-start, paginated list retrieval, status filtering, invalid status handling, experiment detail serialization with runs and comparison, 404 error handling, cascade deletion, deletion rejection for running experiments, cancellation flow, run counts, progress computation, summary serialization, and recommendation structures.
+  > - Type safety & production build: `npx tsc --noEmit` clean (0 errors), `npm run build` (`tsc && vite build`) green.
 
 - [ ] **12.8 — Scaling Dashboard**
   - [ ] 12.8.1 — `ScalingDashboard.tsx` shows auto-scaling metrics
