@@ -135,12 +135,23 @@ class PredictiveScalingService:
         elif next_6h < current_capacity * 0.3:
             recommendation = "liquidate"
 
+        # Surface token budget data for the dashboard gauge
+        budget_limit = float(os.getenv("DAILY_TOKEN_BUDGET_USD", "10.00"))
+        token_spend = 0.0
+        try:
+            status = token_optimizer.get_status()
+            token_spend = float(status.get('budget_status', {}).get('cost_used_today_usd', 0.0))
+        except Exception:
+            pass
+
         return {
             "next_1h": round(next_1h, 2),
             "next_6h": round(next_6h, 2),
             "next_24h": round(next_24h, 2),
             "current_capacity": current_capacity,
-            "recommendation": recommendation
+            "recommendation": recommendation,
+            "token_spend": round(token_spend, 4),
+            "budget_limit": budget_limit
         }
 
     @staticmethod

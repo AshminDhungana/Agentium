@@ -20,6 +20,8 @@ interface Predictions {
     next_24h: number;
     current_capacity: number;
     recommendation: string;
+    token_spend: number;
+    budget_limit: number;
 }
 
 interface ScalingEvent {
@@ -27,7 +29,6 @@ interface ScalingEvent {
     action: string;
     description: string;
     created_at: string;
-    status: string;
     level: string;
 }
 
@@ -102,12 +103,10 @@ export const ScalingDashboard: React.FC = () => {
         { time: '+24h', capacity: null, predicted: predictions.next_24h },
     ] : [];
 
-    // Mock Budget Gauge properties
-    const BUDGET_LIMIT = 10.00;
-    // We would fetch actual token spend, but mock for display if not available from prediction endpoints directly right now.
-    // In actual implementation, we'd query the Token Optimizer status via another endpoint.
-    const tokenSpend = 0.00; // placeholder
-    const budgetPercentage = Math.min((tokenSpend / BUDGET_LIMIT) * 100, 100);
+    // Token budget gauge — sourced from predictions API (backed by TokenOptimizer)
+    const BUDGET_LIMIT = predictions?.budget_limit ?? 10.00;
+    const tokenSpend = predictions?.token_spend ?? 0.00;
+    const budgetPercentage = BUDGET_LIMIT > 0 ? Math.min((tokenSpend / BUDGET_LIMIT) * 100, 100) : 0;
 
     return (
         <div className="p-6 max-w-7xl mx-auto space-y-6">

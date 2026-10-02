@@ -601,9 +601,21 @@
   >   - Backend API tests: `tests/api/test_ab_testing_routes.py` (15/15 passed) covering admin authorization enforcement, experiment creation with auto-start, paginated list retrieval, status filtering, invalid status handling, experiment detail serialization with runs and comparison, 404 error handling, cascade deletion, deletion rejection for running experiments, cancellation flow, run counts, progress computation, summary serialization, and recommendation structures.
   > - Type safety & production build: `npx tsc --noEmit` clean (0 errors), `npm run build` (`tsc && vite build`) green.
 
-- [ ] **12.8 — Scaling Dashboard**
-  - [ ] 12.8.1 — `ScalingDashboard.tsx` shows auto-scaling metrics
-  - [ ] 12.8.2 — Manual scaling controls work
+- [x] **12.8 — Scaling Dashboard**
+  - [x] 12.8.1 — `ScalingDashboard.tsx` shows auto-scaling metrics
+  - [x] 12.8.2 — Manual scaling controls work
+  > **Verified & Audited**:
+  > - **Bug fixes applied**:
+  >   - `backend/services/predictive_scaling.py`: Sourced `token_spend` from `TokenOptimizer` status and surfaced `token_spend` and `budget_limit` in `get_predictions()` payload so the dashboard Token Budget gauge reflects real spend against daily limit.
+  >   - `backend/api/routes/scaling.py`:
+  >     - Added `current_user: dict = Depends(get_current_user)` authentication dependency to `GET /predictions/load` and `GET /history` endpoints for consistent security enforcement.
+  >     - Fixed `POST /scaling/override`: mapped tier target integer (`1, 2, 3`) to appropriate `AgentType` enum (`COUNCIL_MEMBER`, `LEAD_AGENT`, `TASK_AGENT`) and queried valid active lifecycle states (`ACTIVE`, `WORKING`, `IDLE_WORKING`, `IDLE_PAUSED`) instead of non-existent `Agent.tier` and invalid `AgentStatus.IDLE`.
+  >     - Fixed `AuditLog.log()` invocation: removed invalid `db=db` argument and explicitly persisted audit entries via `db.add()` and `db.commit()`.
+  >   - `frontend/src/pages/ScalingDashboard.tsx`: Removed dead `status` field from `ScalingEvent` interface; wired `tokenSpend` and `BUDGET_LIMIT` dynamically from `predictions` API.
+  > - **Test coverage locked**:
+  >   - Frontend unit suite: `frontend/src/pages/__tests__/ScalingDashboard.test.tsx` (11/11 passed) covering heading render, 4 summary metric cards (Active Agents, Predicted 1h, Token Budget, System Mode), API fetching on mount, recommendation banner visibility (shown for non-neutral, hidden for neutral), admin override controls display, non-admin access gating, manual spawn button API interaction, manual liquidate button API interaction, empty state handling, and dual-responsive activity log table/card rendering.
+  >   - Backend API tests: `backend/tests/api/test_scaling_routes.py` (8/8 passed in 0.46s) covering authenticated load predictions schema and fields, 401 unauthenticated rejection for predictions, authenticated scaling history retrieval, 401 unauthenticated rejection for history, admin manual spawn execution, admin manual liquidation execution, 403 forbidden rejection for non-admin overrides, and 400 bad request handling for invalid actions.
+  > - **Type safety & production build**: `npx tsc --noEmit` clean (0 errors), `npm run build` (`tsc && vite build`) green (built in 37.8s).
 
 - [ ] **12.9 — Learning Impact Dashboard**
   - [ ] 12.9.1 — `LearningImpactDashboard.tsx` shows learning metrics

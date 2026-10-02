@@ -8,7 +8,7 @@ from backend.models.database import get_db
 from backend.core.auth import get_current_user
 from backend.services.predictive_scaling import predictive_scaling_service
 from backend.models.entities.audit import AuditLog, AuditCategory
-from backend.models.entities.agents import HeadOfCouncil, Agent, AgentStatus
+from backend.models.entities.agents import HeadOfCouncil, Agent, AgentStatus, AgentType
 from backend.services.reincarnation_service import ReincarnationService
 from backend.api.schemas.examples import ErrorResponseExample, SuccessResponseExample
 
@@ -28,7 +28,7 @@ router = APIRouter(tags=["Scaling"])
         500: {"description": "Internal Server Error", "model": ErrorResponseExample},
     },
 )
-async def get_load_predictions():
+async def get_load_predictions(current_user: dict = Depends(get_current_user)):
     """Return next_1h, next_6h, next_24h predictions and current capacity."""
     try:
         predictions = predictive_scaling_service.get_predictions()
@@ -50,7 +50,10 @@ async def get_load_predictions():
         500: {"description": "Internal Server Error", "model": ErrorResponseExample},
     },
 )
-async def get_scaling_history(db: Session = Depends(get_db)):
+async def get_scaling_history(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
     """Fetch the last 100 scaling decisions from AuditLog."""
     logs = db.query(AuditLog).filter(
         AuditLog.category == AuditCategory.GOVERNANCE,
@@ -115,8 +118,7 @@ async def manual_scaling_override(
             except Exception as e:
                 pass
 
-        AuditLog.log(
-            db=db,
+        audit_entry = AuditLog.log(
             level="INFO",
             category=AuditCategory.GOVERNANCE,
             actor_type="user",
@@ -125,13 +127,27 @@ async def manual_scaling_override(
             description=f"Manual override: spawn {spawned} agents.",
             after_state={"action": "spawn", "count": count, "spawned": spawned}
         )
+        db.add(audit_entry)
+        db.commit()
         return {"status": "success", "spawned": spawned}
 
     elif action == "liquidate":
-        # Find active task agents
+        tier_to_type = {
+            1: AgentType.COUNCIL_MEMBER,
+            2: AgentType.LEAD_AGENT,
+            3: AgentType.TASK_AGENT
+        }
+        target_agent_type = tier_to_type.get(tier, AgentType.TASK_AGENT)
+
+        # Find active agents matching the target tier
         agents = db.query(Agent).filter(
-            Agent.tier == tier,
-            Agent.status.in_([AgentStatus.ACTIVE, AgentStatus.IDLE]),
+            Agent.agent_type == target_agent_type,
+            Agent.status.in_([
+                AgentStatus.ACTIVE,
+                AgentStatus.WORKING,
+                AgentStatus.IDLE_WORKING,
+                AgentStatus.IDLE_PAUSED
+            ]),
             Agent.is_persistent == False
         ).limit(count).all()
 
@@ -143,8 +159,7 @@ async def manual_scaling_override(
 
         db.commit()
 
-        AuditLog.log(
-            db=db,
+        audit_entry = AuditLog.log(
             level="INFO",
             category=AuditCategory.GOVERNANCE,
             actor_type="user",
@@ -153,6 +168,8 @@ async def manual_scaling_override(
             description=f"Manual override: liquidated {liquidated} agents.",
             after_state={"action": "liquidate", "count": count, "liquidated": liquidated}
         )
+        db.add(audit_entry)
+        db.commit()
         return {"status": "success", "liquidated": liquidated}
     else:
         raise BadRequestError(error="Invalid action", code="INVALID_ACTION")
