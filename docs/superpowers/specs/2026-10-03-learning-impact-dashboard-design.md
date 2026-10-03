@@ -29,7 +29,7 @@ Phase 13's own contract (`backend/tests/integration/test_phase13_success_criteri
 
 ## Design (Approach A — route-level compute)
 
-All truth is computed at request time in `improvements.py`. The Redis hash becomes a best-effort write-back audit cache, not a read source. Nothing in the task-execution hot path changes.
+All truth is computed at request time in `improvements.py`. The Redis hash becomes a best-effort write-back audit cache — never read for *computed* stats (`success_rate_delta`, `tools_generated`, `history`). The only Redis read is the `anti_patterns_warned` counter, whose write side lives in `task_executor.py:328`. Nothing in the task-execution hot path changes.
 
 ### Backend — `backend/api/routes/improvements.py` (rewritten)
 
@@ -41,7 +41,7 @@ All truth is computed at request time in `improvements.py`. The Redis hash becom
   - `history` = 7 daily points `{date, success_rate}` computed from Task outcomes; days with no completed-or-failed tasks get rate 0.
   - Best-effort write-back of all four values into the Redis hash (Redis down → skip silently; DB truth still returned).
   - Unexpected failure → raise `InternalServerError` (no `{"error": ...}` with HTTP 200).
-- **`GET /patterns`**: query ChromaDB `task_patterns` collection (via `backend.core.vector_store.get_vector_store()`), map documents → `{id, type, content, confidence}` (`id` = doc id, `type` = metadata type, `content` = document text, `confidence` = metadata confidence), return the ~20 most recent. ChromaDB failure → raise `InternalServerError` (required dependency per §1.2).
+- **`GET /patterns`**: query ChromaDB `task_patterns` collection (via `backend.core.vector_store.get_vector_store()`), map documents → `{id, type, content, confidence}` (`id` = doc id, `type` = metadata type, `content` = document text, `confidence` = metadata confidence). ChromaDB `.get()` has no native ordering, so sort client-side by `extracted_at` (metadata) descending and return the 20 most recent. ChromaDB failure → raise `InternalServerError` (required dependency per §1.2).
 - **`POST /consolidate`**: inline run of `analyze_outcomes` + `decay_outdated_learnings` + `share_learnings_across_agents` on a fresh DB session. Returns a real summary: `{status, processed, best_practices, anti_patterns, decayed, pruned, shared, ...}` (each sub-result merged; per-function errors reported in the payload rather than failing the whole request).
 - Response models: replace `SuccessResponseExample`/`ErrorResponseExample` placeholders with accurate responses metadata.
 
