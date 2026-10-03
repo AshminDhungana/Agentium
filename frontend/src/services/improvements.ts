@@ -4,6 +4,7 @@ export interface ImpactStats {
     success_rate_delta: number;
     tools_generated: number;
     anti_patterns_warned: number;
+    total_reviews_processed?: number;
     history: Array<{ date: string; success_rate: number }>;
 }
 

@@ -617,9 +617,21 @@
   >   - Backend API tests: `backend/tests/api/test_scaling_routes.py` (8/8 passed in 0.46s) covering authenticated load predictions schema and fields, 401 unauthenticated rejection for predictions, authenticated scaling history retrieval, 401 unauthenticated rejection for history, admin manual spawn execution, admin manual liquidation execution, 403 forbidden rejection for non-admin overrides, and 400 bad request handling for invalid actions.
   > - **Type safety & production build**: `npx tsc --noEmit` clean (0 errors), `npm run build` (`tsc && vite build`) green (built in 37.8s).
 
-- [ ] **12.9 — Learning Impact Dashboard**
-  - [ ] 12.9.1 — `LearningImpactDashboard.tsx` shows learning metrics
-  - [ ] 12.9.2 — Data from `autonomous_learning.py` feeds correctly
+- [x] **12.9 — Learning Impact Dashboard**
+  - [x] 12.9.1 — `LearningImpactDashboard.tsx` shows learning metrics
+  - [x] 12.9.2 — Data from `autonomous_learning.py` feeds correctly
+  > **Verified & Audited**:
+  > - **Bug fixes applied**:
+  >   - `backend/api/routes/improvements.py`: Replaced all 3 hardcoded/stub endpoints with real data sourced from `AutonomousLearningEngine.get_learning_stats()`, `CritiqueReview` database queries, and ChromaDB `task_patterns` collection. Removed per-request `aioredis.from_url()` (Redis now used as optional enrichment only). Added `Depends(get_current_user)` auth guard and `Depends(get_db)` session injection to all 3 endpoints. Replaced bare `except → return {"error": ...}` with proper `raise InternalServerError(...)` using project exception hierarchy.
+  >   - `backend/api/routes/improvements.py`: `GET /impact` now computes `success_rate_delta` by comparing last-7-day vs previous-7-day CritiqueReview pass rates, generates dynamic 7-day `history` from real review timestamps, and returns new `total_reviews_processed` field from both engine stats and DB count.
+  >   - `backend/api/routes/improvements.py`: `GET /patterns` now queries ChromaDB `task_patterns` collection via `get_vector_store().get_collection("task_patterns").get(...)` and maps documents to `Pattern` schema. Returns empty list gracefully when vector store is unavailable.
+  >   - `backend/api/routes/improvements.py`: `POST /consolidate` now calls `get_learning_engine().analyze_outcomes(db)` and returns the result. Gated behind admin/sovereign permissions (matching scaling override pattern).
+  >   - `frontend/src/pages/LearningImpactDashboard.tsx`: Added 4th KPI card (Total Reviews Processed), Success Rate Trend `<LineChart>` (Recharts) using `history` array from API, error banner with retry button for failed fetches, admin/sovereign permission gating on Trigger Consolidation button, and dark theme–responsive chart styling.
+  >   - `frontend/src/services/improvements.ts`: Added `total_reviews_processed?: number` to `ImpactStats` interface.
+  > - **Test coverage locked**:
+  >   - Frontend unit suite: `frontend/src/pages/__tests__/LearningImpactDashboard.test.tsx` (9/9 passed) covering heading render, 4 KPI metric cards with correct values, success rate trend chart with history data points, pattern badges and content rendering, empty state when no patterns, refresh button re-fetching, admin trigger consolidation, non-admin consolidation button disabled, and error banner with retry.
+  >   - Backend API tests: `backend/tests/api/test_improvements_routes.py` (8/8 passed) covering authenticated impact schema and fields, 401 unauthenticated rejection for impact, authenticated patterns retrieval from ChromaDB mock, 401 unauthenticated rejection for patterns, admin consolidation trigger with analyze_outcomes execution, 403 forbidden for non-admin consolidation, 401 unauthenticated rejection for consolidation, and impact computation with real DB review mocks (success_rate_delta = 100.0).
+  >   - Type safety & production build: `npx tsc --noEmit` clean (0 errors).
 
 - [ ] **12.10 — Shared Components**
   - [ ] 12.10.1 — `ErrorBoundary` catches and displays errors gracefully

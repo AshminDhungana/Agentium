@@ -1,14 +1,22 @@
 import { useState, useEffect } from 'react';
-import { Sparkles, TrendingUp, AlertTriangle, Cpu, RefreshCw, CheckCircle, Wrench, Search } from 'lucide-react';
+import { 
+  Sparkles, TrendingUp, AlertTriangle, Cpu, RefreshCw, 
+  CheckCircle, Wrench, Search, ClipboardCheck, AlertCircle 
+} from 'lucide-react';
+import { 
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer 
+} from 'recharts';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { showToast } from '@/hooks/useToast';
 import { improvementsApi } from '@/services/improvements';
+import { useAuthStore } from '@/store/authStore';
 
 interface ImpactStats {
   success_rate_delta: number;
   tools_generated: number;
   anti_patterns_warned: number;
+  total_reviews_processed?: number;
   history: Array<{ date: string; success_rate: number }>;
 }
 
@@ -20,10 +28,33 @@ interface Pattern {
 }
 
 export function LearningImpactDashboard() {
+  const { user } = useAuthStore();
   const [stats, setStats] = useState<ImpactStats | null>(null);
   const [patterns, setPatterns] = useState<Pattern[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [triggering, setTriggering] = useState(false);
+  const [isDark, setIsDark] = useState(() => 
+    typeof document !== 'undefined' ? document.documentElement.classList.contains('dark') : false
+  );
+
+  const canConsolidate = Boolean(
+    user?.is_admin ||
+    user?.is_sovereign ||
+    user?.isSovereign ||
+    user?.role === 'admin' ||
+    user?.role === 'primary_sovereign' ||
+    user?.role === 'deputy_sovereign'
+  );
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const observer = new MutationObserver(() => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     fetchData();
@@ -32,13 +63,17 @@ export function LearningImpactDashboard() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const dataStats = await improvementsApi.getImpactStats();
+      setError(null);
+      const [dataStats, dataPatterns] = await Promise.all([
+        improvementsApi.getImpactStats(),
+        improvementsApi.getPatterns(),
+      ]);
       setStats(dataStats);
-
-      const dataPatterns = await improvementsApi.getPatterns();
       setPatterns(dataPatterns.patterns || []);
-    } catch (error) {
-      console.error('Failed to fetch learning impact data', error);
+    } catch (err: any) {
+      console.error('Failed to fetch learning impact data', err);
+      const msg = err?.message || 'Failed to load learning impact data';
+      setError(msg);
       showToast.error('Failed to load learning impact data');
     } finally {
       setLoading(false);
@@ -46,11 +81,16 @@ export function LearningImpactDashboard() {
   };
 
   const manuallyConsolidate = async () => {
+    if (!canConsolidate) {
+      showToast.error('Admin permissions required to trigger consolidation.');
+      return;
+    }
     setTriggering(true);
     try {
       await improvementsApi.triggerConsolidation();
       showToast.success('Manual knowledge consolidation triggered successfully!');
-    } catch (e) {
+      await fetchData();
+    } catch (e: any) {
       console.error(e);
       showToast.error('Error triggering consolidation.');
     } finally {
@@ -68,8 +108,24 @@ export function LearningImpactDashboard() {
 
   return (
     <div className="space-y-6">
+      {/* Error Banner */}
+      {error && !stats && (
+        <div className="p-4 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded-xl flex items-center justify-between text-red-700 dark:text-red-400">
+          <div className="flex items-center gap-3">
+            <AlertCircle className="w-5 h-5 shrink-0" />
+            <p className="text-sm font-medium">{error}</p>
+          </div>
+          <button
+            onClick={fetchData}
+            className="px-3 py-1.5 text-xs font-semibold bg-red-100 hover:bg-red-200 dark:bg-red-900/50 dark:hover:bg-red-900 text-red-800 dark:text-red-200 rounded-lg transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
       {/* Header section with actions */}
-      <div className="flex justify-between items-center bg-white dark:bg-[#161b27] p-6 rounded-xl border border-gray-200 dark:border-[#1e2535] shadow-sm">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-[#161b27] p-6 rounded-xl border border-gray-200 dark:border-[#1e2535] shadow-sm">
         <div>
           <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-purple-600" />
@@ -79,18 +135,19 @@ export function LearningImpactDashboard() {
             Real-time learning metrics, anti-pattern detection, and knowledge consolidation.
           </p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex items-center gap-3 w-full sm:w-auto">
           <button 
             onClick={fetchData}
-            className="flex items-center gap-2 px-4 py-2 border border-gray-200 dark:border-[#1e2535] rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-white/5 text-gray-700 dark:text-gray-300 transition-colors"
+            className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 border border-gray-200 dark:border-[#1e2535] rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-white/5 text-gray-700 dark:text-gray-300 transition-colors"
           >
             <RefreshCw className="w-4 h-4" />
             Refresh
           </button>
           <button 
             onClick={manuallyConsolidate}
-            disabled={triggering}
-            className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+            disabled={triggering || !canConsolidate}
+            title={!canConsolidate ? 'Admin or Sovereign role required' : 'Trigger autonomous learning review and knowledge extraction'}
+            className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Cpu className="w-4 h-4" />
             {triggering ? 'Consolidating...' : 'Trigger Consolidation'}
@@ -98,8 +155,8 @@ export function LearningImpactDashboard() {
         </div>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      {/* 4 KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="bg-white dark:bg-[#161b27] p-6 rounded-xl border border-gray-200 dark:border-[#1e2535] shadow-sm flex items-start gap-4">
           <div className="p-3 bg-green-100 dark:bg-green-500/10 rounded-lg">
             <TrendingUp className="w-6 h-6 text-green-600 dark:text-green-400" />
@@ -111,6 +168,7 @@ export function LearningImpactDashboard() {
             </div>
           </div>
         </div>
+
         <div className="bg-white dark:bg-[#161b27] p-6 rounded-xl border border-gray-200 dark:border-[#1e2535] shadow-sm flex items-start gap-4">
           <div className="p-3 bg-purple-100 dark:bg-purple-500/10 rounded-lg">
             <Wrench className="w-6 h-6 text-purple-600 dark:text-purple-400" />
@@ -118,10 +176,11 @@ export function LearningImpactDashboard() {
           <div>
             <p className="text-sm text-gray-600 dark:text-gray-400 font-medium">Auto-Generated Tools</p>
             <div className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
-              {stats?.tools_generated || 0}
+              {stats?.tools_generated ?? 0}
             </div>
           </div>
         </div>
+
         <div className="bg-white dark:bg-[#161b27] p-6 rounded-xl border border-gray-200 dark:border-[#1e2535] shadow-sm flex items-start gap-4">
           <div className="p-3 bg-red-100 dark:bg-red-500/10 rounded-lg">
             <AlertTriangle className="w-6 h-6 text-red-600 dark:text-red-400" />
@@ -129,9 +188,80 @@ export function LearningImpactDashboard() {
           <div>
             <p className="text-sm text-gray-600 dark:text-gray-400 font-medium">Anti-Patterns Prevented</p>
             <div className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
-              {stats?.anti_patterns_warned || 0}
+              {stats?.anti_patterns_warned ?? 0}
             </div>
           </div>
+        </div>
+
+        <div className="bg-white dark:bg-[#161b27] p-6 rounded-xl border border-gray-200 dark:border-[#1e2535] shadow-sm flex items-start gap-4">
+          <div className="p-3 bg-blue-100 dark:bg-blue-500/10 rounded-lg">
+            <ClipboardCheck className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+          </div>
+          <div>
+            <p className="text-sm text-gray-600 dark:text-gray-400 font-medium">Total Reviews Processed</p>
+            <div className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
+              {stats?.total_reviews_processed ?? 0}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Success Rate Trend Chart */}
+      <div className="bg-white dark:bg-[#161b27] p-6 rounded-xl border border-gray-200 dark:border-[#1e2535] shadow-sm">
+        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+          <TrendingUp className="w-5 h-5 text-purple-600" />
+          Success Rate Trend (7-Day History)
+        </h3>
+        <div className="h-64 w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart 
+              data={stats?.history || []} 
+              margin={{ top: 10, right: 20, bottom: 5, left: -10 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
+              <XAxis 
+                dataKey="date" 
+                stroke={isDark ? '#9ca3af' : '#6b7280'} 
+                fontSize={12}
+                tickFormatter={(val) => {
+                  try {
+                    const parts = val.split('-');
+                    return parts.length >= 3 ? `${parts[1]}/${parts[2]}` : val;
+                  } catch {
+                    return val;
+                  }
+                }}
+              />
+              <YAxis 
+                stroke={isDark ? '#9ca3af' : '#6b7280'} 
+                fontSize={12}
+                domain={[0, 100]}
+                tickFormatter={(v) => `${v}%`}
+              />
+              <Tooltip 
+                contentStyle={{
+                  backgroundColor: isDark ? '#1f2937' : '#ffffff',
+                  borderColor: isDark ? '#374151' : '#e5e7eb',
+                  color: isDark ? '#f9fafb' : '#111827',
+                  borderRadius: '0.5rem',
+                  boxShadow: isDark
+                    ? '0 4px 6px rgba(0,0,0,0.4)'
+                    : '0 4px 6px rgba(0,0,0,0.08)',
+                }}
+                formatter={(value: any) => [`${value}%`, 'Success Rate']}
+                labelFormatter={(label) => `Date: ${label}`}
+              />
+              <Line 
+                type="monotone" 
+                dataKey="success_rate" 
+                stroke="#8b5cf6" 
+                strokeWidth={3} 
+                dot={{ r: 4, fill: '#8b5cf6' }}
+                activeDot={{ r: 7 }} 
+                name="Success Rate"
+              />
+            </LineChart>
+          </ResponsiveContainer>
         </div>
       </div>
 
