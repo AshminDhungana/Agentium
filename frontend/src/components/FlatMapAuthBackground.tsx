@@ -351,6 +351,8 @@ export function FlatMapAuthBackground({ variant = 'login' }: FlatMapAuthBackgrou
 
     const animate = () => {
       animationId = requestAnimationFrame(animate);
+      // Keep singleton in sync so cleanup cancels the latest frame
+      if (globalSceneInstance) globalSceneInstance.animationId = animationId;
       
       const currentTime = performance.now();
       const delta = (currentTime - lastTime) / 1000;

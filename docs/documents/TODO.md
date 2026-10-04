@@ -633,14 +633,27 @@
   >   - Backend API tests: `backend/tests/api/test_improvements_routes.py` (8/8 passed) covering authenticated impact schema and fields, 401 unauthenticated rejection for impact, authenticated patterns retrieval from ChromaDB mock, 401 unauthenticated rejection for patterns, admin consolidation trigger with analyze_outcomes execution, 403 forbidden for non-admin consolidation, 401 unauthenticated rejection for consolidation, and impact computation with real DB review mocks (success_rate_delta = 100.0).
   >   - Type safety & production build: `npx tsc --noEmit` clean (0 errors).
 
-- [ ] **12.10 — Shared Components**
-  - [ ] 12.10.1 — `ErrorBoundary` catches and displays errors gracefully
-  - [ ] 12.10.2 — `LoadingSpinner` displays during async operations
-  - [ ] 12.10.3 — `HealthIndicator` shows correct system health
-  - [ ] 12.10.4 — `BudgetControl.tsx` displays and controls token budget
-  - [ ] 12.10.5 — `SignatureMark.tsx` / `SignatureWatermark.tsx` render correctly
-  - [ ] 12.10.6 — Toast notifications (`useToast`) display and dismiss properly
-  - [ ] 12.10.7 — `FlatMapAuthBackground.tsx` (Three.js) renders without WebGL errors
+- [x] **12.10 — Shared Components**
+  - [x] 12.10.1 — `ErrorBoundary` catches and displays errors gracefully
+  - [x] 12.10.2 — `LoadingSpinner` displays during async operations
+  - [x] 12.10.3 — `HealthIndicator` shows correct system health
+  - [x] 12.10.4 — `BudgetControl.tsx` displays and controls token budget
+  - [x] 12.10.5 — `SignatureMark.tsx` / `SignatureWatermark.tsx` render correctly
+  - [x] 12.10.6 — Toast notifications (`useToast`) display and dismiss properly
+  - [x] 12.10.7 — `FlatMapAuthBackground.tsx` (Three.js) renders without WebGL errors
+  > **Verified & Audited**:
+  > - **Bug fixes applied**:
+  >   - `frontend/src/components/FlatMapAuthBackground.tsx`: Fixed stale `animationId` in singleton — the `globalSceneInstance.animationId` was only set once at initialization but `requestAnimationFrame` returns a new ID each frame. `cancelAnimationFrame` on cleanup was cancelling the wrong (first) frame, causing an animation leak. Now `globalSceneInstance.animationId` is updated inside the animate loop on every frame.
+  > - **Test coverage locked**:
+  >   - `frontend/src/components/common/__tests__/ErrorBoundary.test.tsx` (5/5 passed): renders children normally, widget variant fallback with retry button, page variant fallback with both Reload/Try Again buttons, retry clears error and re-renders children (400ms setTimeout), errorReportingApi.report() called with correct payload.
+  >   - `frontend/src/components/ui/__tests__/LoadingSpinner.test.tsx` (9/9 passed): default md size + aria-label, animate-spin class, all 5 size variants (xs/sm/md/lg/xl) apply correct CSS classes, label text rendering, no label span without prop, custom className merge.
+  >   - `frontend/src/components/__tests__/HealthIndicator.test.tsx` (10/10 passed): green dot for connected/healthy, yellow+pulse for connecting, red for disconnected/critical, yellow (no pulse) for warning, custom label override, all 3 size variants, no polling when status prop provided, starts polling when using backend store.
+  >   - `frontend/src/components/__tests__/BudgetControl.test.tsx` (10/10 passed): loading state, token+cost cards with values, idle mode banner, red >90% alert, amber >75% warning, admin form visibility, non-admin read-only message, successful update with POST + toast, failed update with error banner + toast, loading spinner in button.
+  >   - `frontend/src/components/__tests__/SignatureMark.test.tsx` (4/4 passed): SVG renders with correct viewBox, fill=currentColor, aria-hidden=true, className passthrough.
+  >   - `frontend/src/components/SignatureWatermark.test.tsx` (3/3 passed — pre-existing): SVG renders, clip-path animation on mount, reduced motion instant show.
+  >   - `frontend/src/hooks/__tests__/useToast.test.ts` (9/9 passed): success (3s, green), error (5s, red), info (4s, ℹ️), warning (4s, ⚠️), loading (persistent), dismiss/promise forwarded, custom options override defaults, useToast() hook returns showToast object.
+  >   - `frontend/src/components/__tests__/FlatMapAuthBackground.test.tsx` (7/7 passed): renders without throwing (mocked Three.js), fixed container div, HealthIndicator sub-component, SignatureWatermark sub-component, login gradient default, signup gradient variant, WebGL canvas appended to container.
+  >   - Type safety & production build: `npx tsc --noEmit` clean (0 errors).
 
 ---
 
