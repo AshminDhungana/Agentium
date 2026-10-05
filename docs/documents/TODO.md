@@ -661,12 +661,12 @@
 
 > **Files**: `backend/api/routes/websocket.py`, `backend/services/message_bus.py`, `backend/services/event_processor.py`, `frontend/src/store/websocketStore.ts`, `frontend/src/components/GlobalWebSocketProvider.tsx`
 
-- [ ] **13.1 — WebSocket Connection**
-  - [ ] 13.1.1 — `ws://localhost:8000/ws/chat` connection establishes
-  - [ ] 13.1.2 — Authentication via token in WebSocket handshake works
-  - [ ] 13.1.3 — Reconnection after disconnect with exponential backoff
-  - [ ] 13.1.4 — `websocketStore.ts` manages connection state correctly
-  - [ ] 13.1.5 — `GlobalWebSocketProvider` initializes connection on app mount
+- [x] **13.1 — WebSocket Connection**
+  - [x] 13.1.1 — `ws://localhost:8000/ws/chat` connection establishes
+  - [x] 13.1.2 — Authentication via token in WebSocket handshake works
+  - [x] 13.1.3 — Reconnection after disconnect with exponential backoff
+  - [x] 13.1.4 — `websocketStore.ts` manages connection state correctly
+  - [x] 13.1.5 — `GlobalWebSocketProvider` initializes connection on app mount
 
 - [ ] **13.2 — Event Types**
   - [ ] 13.2.1 — `agent_status` events update agent state in real-time
