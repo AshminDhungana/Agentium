@@ -53,6 +53,7 @@ export const AGENT_WS_EVENT_TYPES = [
     'agent_liquidated',
     'agent_promoted',
     'agent_status_changed',
+    'agent_status',
 ] as const;
 
 export const AGENT_WS_CONTENT_PREFIXES = [

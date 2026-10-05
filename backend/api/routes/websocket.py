@@ -451,8 +451,128 @@ class ConnectionManager:
             "agent_name": agent_name,
             "old_status": old_status,
             "new_status": new_status,
+            "status":     new_status,
             "timestamp":  datetime.utcnow().isoformat(),
         })
+
+    async def emit_agent_status(
+        self,
+        agent_id: str,
+        status: str,
+        agent_name: Optional[str] = None,
+        old_status: Optional[str] = None,
+    ) -> None:
+        """Broadcast agent status update in real-time (TODO 13.2.1)."""
+        await self.broadcast({
+            "type":       "agent_status",
+            "agent_id":   agent_id,
+            "agent_name": agent_name or agent_id,
+            "status":     status,
+            "new_status": status,
+            "old_status": old_status,
+            "timestamp":  datetime.utcnow().isoformat(),
+        })
+
+    async def emit_task_update(
+        self,
+        task_id: str,
+        status: str,
+        progress: Optional[int] = None,
+        title: Optional[str] = None,
+        result_summary: Optional[str] = None,
+        metadata: Optional[dict] = None,
+    ) -> None:
+        """Broadcast task progress and state update in real-time (TODO 13.2.2)."""
+        await self.broadcast({
+            "type":           "task_update",
+            "task_id":        task_id,
+            "status":         status,
+            "progress":       progress,
+            "title":          title,
+            "result_summary": result_summary,
+            "metadata":       metadata or {},
+            "timestamp":      datetime.utcnow().isoformat(),
+        })
+
+    async def emit_channel_status(
+        self,
+        channel_id: str,
+        status: str,
+        health_status: Optional[str] = None,
+        metrics: Optional[dict] = None,
+        error: Optional[str] = None,
+    ) -> None:
+        """Broadcast channel status and health update in real-time (TODO 13.2.5)."""
+        await self.broadcast({
+            "type":          "channel_status",
+            "channel_id":    channel_id,
+            "status":        status,
+            "health_status": health_status or status,
+            "metrics":       metrics or {},
+            "error":         error,
+            "timestamp":     datetime.utcnow().isoformat(),
+        })
+
+    async def emit_system_alert(
+        self,
+        message: str,
+        severity: str = "warning",
+        alert_type: str = "general",
+        metadata: Optional[dict] = None,
+    ) -> None:
+        """Broadcast system alert notification to all connected clients (TODO 13.2.6)."""
+        await self.broadcast({
+            "type":       "system_alert",
+            "message":    message,
+            "severity":   severity,
+            "alert_type": alert_type,
+            "metadata":   metadata or {},
+            "timestamp":  datetime.utcnow().isoformat(),
+        })
+
+    async def emit_vote_update(
+        self,
+        vote_id: str,
+        vote_type: str,
+        voter: str,
+        vote: str,
+        tally: dict,
+        status: Optional[str] = None,
+    ) -> None:
+        """Broadcast vote tally update to all connected clients (TODO 13.2.7)."""
+        await self.broadcast({
+            "type":      "vote_update",
+            "vote_id":   vote_id,
+            "vote_type": vote_type,
+            "voter":     voter,
+            "vote":      vote,
+            "tally":     tally,
+            "status":    status,
+            "timestamp": datetime.utcnow().isoformat(),
+        })
+
+    async def emit_tool_execution(
+        self,
+        tool_name: Optional[str] = None,
+        status: str = "in_progress",
+        tool_count: Optional[int] = None,
+        tool_names: Optional[List[str]] = None,
+        stream_id: Optional[str] = None,
+        agent_id: Optional[str] = None,
+    ) -> None:
+        """Broadcast tool execution progress in real-time (TODO 13.2.8)."""
+        names = tool_names or ([tool_name] if tool_name else [])
+        await self.broadcast({
+            "type":        "tool_execution",
+            "tool_name":   tool_name or (names[0] if names else "tool"),
+            "tool_names":  names,
+            "tool_count":  tool_count or len(names),
+            "status":      status,
+            "stream_id":   stream_id,
+            "agent_id":    agent_id,
+            "timestamp":   datetime.utcnow().isoformat(),
+        })
+
 
     # ── Phase 15.2: MCP stats broadcast ──────────────────────────────────────
 
@@ -666,8 +786,8 @@ async def websocket_chat_endpoint(
                     ev.set()
                 continue
 
-            # ── Chat message ──────────────────────────────────────────────────
-            if msg_type == "message":
+            # ── Chat message (supports 'message' and 'chat_message' - TODO 13.2.3) ──
+            if msg_type in ("message", "chat_message"):
                 content     = data.get("content", "").strip()
                 attachments: List[dict] = data.get("attachments") or []
                 card_response = data.get("card_response")
@@ -732,10 +852,19 @@ async def websocket_chat_endpoint(
 
                 async def on_delta(text: str, sid: str = stream_id) -> None:
                     try:
+                        # Existing message_delta
                         await websocket.send_json({
                             "type":      "message_delta",
                             "stream_id": sid,
                             "delta":     text,
+                        })
+                        # chat_stream event for TODO 13.2.4
+                        await websocket.send_json({
+                            "type":      "chat_stream",
+                            "stream_id": sid,
+                            "chunk":     text,
+                            "delta":     text,
+                            "timestamp": datetime.utcnow().isoformat(),
                         })
                     except Exception:
                         pass  # socket may be closing; the task handles it
@@ -746,10 +875,28 @@ async def websocket_chat_endpoint(
                     sid: str = stream_id,
                 ) -> None:
                     try:
+                        tool_names = [
+                            tc.get("function", {}).get("name", "tool")
+                            if isinstance(tc, dict)
+                            else getattr(getattr(tc, "function", None), "name", "tool")
+                            for tc in tool_calls
+                        ]
+                        # tool_execution event for TODO 13.2.8
+                        await websocket.send_json({
+                            "type":        "tool_execution",
+                            "stream_id":   sid,
+                            "tool_names":  tool_names,
+                            "tool_name":   tool_names[0] if tool_names else "tool",
+                            "tool_count":  cumulative,
+                            "status":      "in_progress",
+                            "timestamp":   datetime.utcnow().isoformat(),
+                        })
+                        # tool_progress for backward compatibility
                         await websocket.send_json({
                             "type":       "tool_progress",
                             "stream_id":  sid,
                             "tool_count": cumulative,
+                            "tool_names": tool_names,
                         })
                     except Exception:
                         pass
@@ -781,26 +928,38 @@ async def websocket_chat_endpoint(
                             )
 
                             finish = response.get("finish_reason", "stop") or "stop"
+                            timestamp = datetime.utcnow().isoformat()
+                            metadata = {
+                                "model":        response.get("model"),
+                                "tokens_used":  response.get("tokens_used", 0),
+                                "task_created": response.get("task_created", False),
+                                "task_id":      response.get("task_id"),
+                                "agent_spawned": response.get("agent_spawned"),
+                                "context_compressed": response.get("context_compressed", False),
+                                "raw_turn_count": response.get("raw_turn_count", 0),
+                                "estimated_tokens": response.get("estimated_tokens", 0),
+                                "card": (response.get("metadata") or {}).get("card")
+                                if isinstance(response.get("metadata"), dict) else None,
+                                "media_urls": (response.get("metadata") or {}).get("media_urls", [])
+                                if isinstance(response.get("metadata"), dict) else [],
+                            }
                             await websocket.send_json({
                                 "type":         "message_end",
                                 "stream_id":    sid,
                                 "content":      response.get("content", ""),
-                                "metadata": {
-                                    "model":        response.get("model"),
-                                    "tokens_used":  response.get("tokens_used", 0),
-                                    "task_created": response.get("task_created", False),
-                                    "task_id":      response.get("task_id"),
-                                    "agent_spawned": response.get("agent_spawned"),
-                                    "context_compressed": response.get("context_compressed", False),
-                                    "raw_turn_count": response.get("raw_turn_count", 0),
-                                    "estimated_tokens": response.get("estimated_tokens", 0),
-                                    "card": (response.get("metadata") or {}).get("card")
-                                    if isinstance(response.get("metadata"), dict) else None,
-                                    "media_urls": (response.get("metadata") or {}).get("media_urls", [])
-                                    if isinstance(response.get("metadata"), dict) else [],
-                                },
+                                "metadata":     metadata,
                                 "finish_reason": finish,
-                                "timestamp":    datetime.utcnow().isoformat(),
+                                "timestamp":    timestamp,
+                            })
+                            # Deliver chat_message event for TODO 13.2.3
+                            await websocket.send_json({
+                                "type":         "chat_message",
+                                "role":         "head_of_council",
+                                "content":      response.get("content", ""),
+                                "message_id":   message_id,
+                                "stream_id":    sid,
+                                "metadata":     metadata,
+                                "timestamp":    timestamp,
                             })
                     except asyncio.CancelledError:
                         raise

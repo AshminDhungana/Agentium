@@ -126,8 +126,8 @@ class AlertManager:
     async def _broadcast_websocket(self, alert: MonitoringAlert, message: str):
         """Broadcast alert to all connected WebSocket clients (Frontend Dashboard)."""
         try:
-            # Lazy import to avoid circular dependency with backend.main
-            from backend.main import manager as websocket_manager
+            # Lazy import to avoid circular dependency
+            from backend.api.routes.websocket import manager as websocket_manager
 
             await websocket_manager.broadcast(
                 {

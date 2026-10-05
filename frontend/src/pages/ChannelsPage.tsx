@@ -5,6 +5,7 @@ import { useState, useReducer, useCallback, useEffect } from 'react';
 import { ChannelDetailPanel } from '@/components/channels/ChannelDetailPanel';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { api } from '@/services/api';
+import { useWebSocketStore } from '@/store/websocketStore';
 import { channelMetricsApi } from '@/services/channelMetrics';
 import { MessageLogViewer } from '@/components/channels/MessageLogViewer';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -438,6 +439,19 @@ export function ChannelsPage() {
         placeholderData:             keepPreviousData,
         enabled:                     channels.length > 0,
     });
+
+    // ── Real-time channel status and health via WebSocket (TODO 13.2.5) ──────
+    useEffect(() => {
+        const unsub = useWebSocketStore.subscribe((state, prev) => {
+            const msg = state.lastMessage;
+            if (!msg || msg === prev.lastMessage) return;
+            if (msg.type === 'channel_status' || msg.type === 'channel_error') {
+                queryClient.invalidateQueries({ queryKey: ['channels'] });
+                queryClient.invalidateQueries({ queryKey: ['all-channel-metrics'] });
+            }
+        });
+        return unsub;
+    }, [queryClient]);
 
     // ── Mutations ─────────────────────────────────────────────────────────────
 

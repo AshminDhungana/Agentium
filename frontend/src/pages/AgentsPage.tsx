@@ -282,9 +282,9 @@ export const AgentsPage: React.FC = () => {
             return;
         }
 
-        if (type === 'agent_status_changed') {
+        if (type === 'agent_status_changed' || type === 'agent_status') {
             const agentId   = (lastMessage.agent_id as string) ?? metadata?.agent_id as string;
-            const newStatus = lastMessage.new_status as Agent['status'];
+            const newStatus = ((lastMessage.status as string) || (lastMessage.new_status as string)) as Agent['status'];
             if (agentId && newStatus) {
                 dispatch({ type: 'UPDATE_AGENT_STATUS', agentiumId: agentId, status: newStatus });
             }

@@ -365,16 +365,19 @@ export function ChatPage() {
                 // during the thinking/tool phase; it clears on the first delta.
                 return;
             }
-            if (msg.type === 'tool_progress') {
-                setToolCount(msg.tool_count as number);
-                if ((msg as any).tool_names) {
-                    setToolNames((msg as any).tool_names as string[]);
-                    useWebSocketStore.getState().setToolNames((msg as any).tool_names as string[]);
+            if (msg.type === 'tool_progress' || msg.type === 'tool_execution') {
+                const count = typeof msg.tool_count === 'number' ? msg.tool_count : (msg as any).count ?? 0;
+                setToolCount(count);
+                const names = (msg as any).tool_names || ((msg as any).tool_name ? [(msg as any).tool_name] : null);
+                if (names) {
+                    setToolNames(names as string[]);
+                    useWebSocketStore.getState().setToolNames(names as string[]);
                 }
                 return;
             }
-            if (msg.type === 'message_delta') {
-                useChatStore.getState().appendDelta(msg.stream_id as string, msg.delta as string);
+            if (msg.type === 'message_delta' || msg.type === 'chat_stream') {
+                const chunk = (msg.chunk as string) ?? (msg.delta as string) ?? '';
+                useChatStore.getState().appendDelta(msg.stream_id as string, chunk);
                 setIsAwaitingReply(false);
                 setIsThinking(false);
                 setToolCount(0);
@@ -393,8 +396,12 @@ export function ChatPage() {
                 return;
             }
 
-            // ── Legacy single-shot message (unchanged) ───────────────────────
-            if (msg.type === 'message') {
+            // ── Single-shot message (supports 'message' & 'chat_message' - TODO 13.2.3) ──
+            if (msg.type === 'message' || msg.type === 'chat_message') {
+                // If stream is currently active with this message_id/stream_id, endStream already handled it
+                if (msg.stream_id && useChatStore.getState().messages.some((m) => m.id === msg.stream_id)) {
+                    return;
+                }
                 // FIX #2: prefer server-assigned message_id over timestamp
                 const messageId = (msg.message_id as string | undefined) || (msg.timestamp as string | undefined) || crypto.randomUUID();
 

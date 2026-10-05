@@ -847,6 +847,31 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
                         return;
                     }
 
+                    // ── System alert notification (TODO 13.2.6) ──────────────────
+                    if (data.type === 'system_alert') {
+                        const alertMsg = String(data.message || data.content || 'System alert');
+                        const sev = String(data.severity || '').toLowerCase();
+                        if (sev === 'critical' || sev === 'major' || sev === 'error') {
+                            showToast.error(`🚨 ${alertMsg}`);
+                        } else if (sev === 'warning' || sev === 'warn') {
+                            showToast.warning(`⚠️ ${alertMsg}`);
+                        } else {
+                            showToast.info(`ℹ️ ${alertMsg}`);
+                        }
+                    }
+
+                    // ── Tool execution progress (TODO 13.2.8) ───────────────────
+                    if (data.type === 'tool_execution' || data.type === 'tool_progress') {
+                        if (typeof data.tool_count === 'number') {
+                            get().setToolCount(data.tool_count);
+                        }
+                        if (Array.isArray(data.tool_names)) {
+                            get().setToolNames(data.tool_names as string[]);
+                        } else if (typeof data.tool_name === 'string') {
+                            get().setToolNames([data.tool_name]);
+                        }
+                    }
+
                     // ── Genesis nation-name prompt (live broadcast) ──────────────
                     // After Head 00001 is early-committed, the WS reconnects
                     // successfully (active phase) and never enters the genesis-
@@ -891,8 +916,8 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
                     get()._setLastMessage(data);
                     get().addMessageToHistory(data);
 
-                    // ── Toast deduplication for Head of Council messages ──
-                    if (data.type === 'message' && data.role === 'head_of_council') {
+                    // ── Toast deduplication for Head of Council messages (supports 'message' & 'chat_message') ──
+                    if ((data.type === 'message' || data.type === 'chat_message') && data.role === 'head_of_council') {
                         // Genesis-sourced messages (the "Nation Established" welcome)
                         // are automated system output, not genuine unread replies.
                         // Never count them as unread or surface a toast for them —

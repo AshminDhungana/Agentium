@@ -253,15 +253,30 @@ async def cast_amendment_vote(
         vote_record = amendment.cast_vote(user_id, vote_enum, vote_data.rationale)
         db.commit()
 
+        tally = {
+            "for": amendment.votes_for,
+            "against": amendment.votes_against,
+            "abstain": amendment.votes_abstain,
+        }
+
+        try:
+            from backend.api.routes.websocket import manager as ws_manager
+            await ws_manager.emit_vote_update(
+                vote_id=amendment_id,
+                vote_type="amendment",
+                voter=user_id,
+                vote=vote_data.vote,
+                tally=tally,
+                status=amendment.status.value,
+            )
+        except Exception:
+            pass
+
         return VoteResponse(
             amendment_id=amendment_id,
             voter=user_id,
             vote=vote_data.vote,
-            tally={
-                "for": amendment.votes_for,
-                "against": amendment.votes_against,
-                "abstain": amendment.votes_abstain,
-            },
+            tally=tally,
         )
     except ValueError as e:
         raise BadRequestError(error=str(e), code="STRE")
@@ -484,15 +499,30 @@ async def cast_deliberation_vote(
         vote_record = deliberation.cast_vote(user_id, vote_enum, vote_data.rationale)
         db.commit()
 
+        tally = {
+            "for": deliberation.votes_for,
+            "against": deliberation.votes_against,
+            "abstain": deliberation.votes_abstain,
+        }
+
+        try:
+            from backend.api.routes.websocket import manager as ws_manager
+            await ws_manager.emit_vote_update(
+                vote_id=deliberation_id,
+                vote_type="deliberation",
+                voter=user_id,
+                vote=vote_data.vote,
+                tally=tally,
+                status=deliberation.status.value,
+            )
+        except Exception:
+            pass
+
         return VoteResponse(
             deliberation_id=deliberation_id,
             voter=user_id,
             vote=vote_data.vote,
-            tally={
-                "for": deliberation.votes_for,
-                "against": deliberation.votes_against,
-                "abstain": deliberation.votes_abstain,
-            },
+            tally=tally,
         )
     except ValueError as e:
         raise BadRequestError(error=str(e), code="STRE")

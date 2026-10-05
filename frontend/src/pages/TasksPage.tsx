@@ -2146,6 +2146,32 @@ export const TasksPage: React.FC = () => {
             if (msg.type === 'task_created' && (msg as any).task_id) {
                 showToast.info(`New task ${(msg as any).task_id} created via the Head's delegation`);
                 loadTasks(true);
+            } else if (msg.type === 'task_update' && (msg as any).task_id) {
+                const taskId = (msg as any).task_id as string;
+                const status = (msg as any).status as string | undefined;
+                const progress = (msg as any).progress as number | undefined;
+                const summary = (msg as any).result_summary as string | undefined;
+
+                setTasks(prevTasks =>
+                    prevTasks.map(t => {
+                        if (t.id === taskId || t.agentium_id === taskId) {
+                            return {
+                                ...t,
+                                ...(status ? { status } : {}),
+                                ...(typeof progress === 'number' ? { progress } : {}),
+                                ...(summary ? { result_summary: summary } : {}),
+                            };
+                        }
+                        return t;
+                    })
+                );
+
+                if (status === 'completed') {
+                    showToast.success(`Task ${taskId} completed successfully`);
+                } else if (status === 'failed') {
+                    showToast.error(`Task ${taskId} failed: ${summary ?? 'Execution error'}`);
+                }
+                loadTasks(true);
             } else if (msg.type === 'task_failed') {
                 showToast.error(`Task delegation failed: ${msg.content ?? 'unknown error'}`);
             }

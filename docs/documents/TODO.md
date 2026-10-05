@@ -668,15 +668,24 @@
   - [x] 13.1.4 — `websocketStore.ts` manages connection state correctly
   - [x] 13.1.5 — `GlobalWebSocketProvider` initializes connection on app mount
 
-- [ ] **13.2 — Event Types**
-  - [ ] 13.2.1 — `agent_status` events update agent state in real-time
-  - [ ] 13.2.2 — `task_update` events reflect task progress
-  - [ ] 13.2.3 — `chat_message` events deliver new messages
-  - [ ] 13.2.4 — `chat_stream` events deliver streaming token chunks
-  - [ ] 13.2.5 — `channel_status` events update channel health
-  - [ ] 13.2.6 — `system_alert` events display notifications
-  - [ ] 13.2.7 — `vote_update` events update voting UI
-  - [ ] 13.2.8 — `tool_execution` events show tool call progress
+- [x] **13.2 — Event Types**
+  - [x] 13.2.1 — `agent_status` events update agent state in real-time
+  - [x] 13.2.2 — `task_update` events reflect task progress
+  - [x] 13.2.3 — `chat_message` events deliver new messages
+  - [x] 13.2.4 — `chat_stream` events deliver streaming token chunks
+  - [x] 13.2.5 — `channel_status` events update channel health
+  - [x] 13.2.6 — `system_alert` events display notifications
+  - [x] 13.2.7 — `vote_update` events update voting UI
+  - [x] 13.2.8 — `tool_execution` events show tool call progress
+  > *Implementation Note (13.2)*:
+  > - Added `emit_agent_status`, `emit_task_update`, `emit_channel_status`, `emit_system_alert`, `emit_vote_update`, and `emit_tool_execution` to `ConnectionManager` in `backend/api/routes/websocket.py`.
+  > - `backend/api/routes/websocket.py` chat endpoint streams `chat_stream` token chunks and `tool_execution` call progress with tool names, and delivers `chat_message` events.
+  > - `backend/services/alert_manager.py` manager import fixed; broadcasts `system_alert` notifications.
+  > - `backend/services/channel_manager.py` websocket import fixed; broadcasts `channel_status` on health/status changes.
+  > - `backend/api/routes/voting.py` broadcasts `vote_update` with vote tallies on amendment and deliberation votes.
+  > - `backend/services/tasks/task_executor.py` broadcasts `task_update` on task completion and failure.
+  > - Frontend: `websocketStore.ts` handles `system_alert` toasts, `tool_execution` tracking, and `chat_message` unread counts; `ChatPage.tsx` handles `chat_stream`, `tool_execution`, and `chat_message`; `AgentsPage.tsx` and `constants/agents.ts` support `agent_status`; `TasksPage.tsx` updates task progress in real time on `task_update`; `ChannelsPage.tsx` invalidates query cache on `channel_status`.
+  > - Tests: Backend unit suite `backend/tests/unit/test_websocket_event_types.py` (7/7 passed), `backend/tests/unit/test_websocket_revocation_broadcast.py` (1/1 passed); Frontend Vitest suite `src/store/__tests__/websocketStore.events.test.ts` (4/4 passed) and `src/store` (70/70 passed); TypeScript clean (`npx tsc --noEmit` 0 errors).
 
 - [ ] **13.3 — Message Bus**
   - [ ] 13.3.1 — `MessageBus` dispatches events to correct WebSocket clients

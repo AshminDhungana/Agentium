@@ -166,6 +166,17 @@ def execute_task_async(self, task_id: str, agent_id: str):
                 result_summary=result["content"][:500],
                 result_data=result_data
             )
+            try:
+                from backend.api.routes.websocket import manager as ws_mgr
+                asyncio.run(ws_mgr.emit_task_update(
+                    task_id=task_id,
+                    status="completed",
+                    progress=100,
+                    title=task.title,
+                    result_summary=result["content"][:500],
+                ))
+            except Exception as ws_err:
+                logger.warning(f"task_update completed broadcast failed: {ws_err}")
 
             # 8.4: completed checkpoint — query Chroma + web-search + write-back
             try:
@@ -241,6 +252,14 @@ def execute_task_async(self, task_id: str, agent_id: str):
 
             try:
                 task.mark_failed(reason=reason, error_message=str(exc))
+                from backend.api.routes.websocket import manager as ws_mgr
+                asyncio.run(ws_mgr.emit_task_update(
+                    task_id=task_id,
+                    status="failed",
+                    progress=getattr(task, "progress", 0),
+                    title=getattr(task, "title", f"Task {task_id}"),
+                    result_summary=f"Failed: {reason}",
+                ))
             except Exception as mark_exc:
                 logger.error(f"mark_failed failed for {task_id}: {mark_exc}")
             try:

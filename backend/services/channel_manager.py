@@ -1275,15 +1275,21 @@ class ChannelManager:
                 
                 # Broadcast circuit open event
                 try:
-                    from backend.api.websocket import manager as ws_manager
+                    from backend.api.routes.websocket import manager as ws_manager
+                    await ws_manager.emit_channel_status(
+                        channel_id=channel_id,
+                        status="error",
+                        health_status="degraded",
+                        error=f"Circuit breaker opened: {str(e)}",
+                    )
                     await ws_manager.broadcast({
                         "type": "channel_error",
                         "channel_id": channel_id,
                         "error": "Circuit breaker opened due to repeated failures",
                         "timestamp": datetime.utcnow().isoformat()
                     })
-                except:
-                    pass
+                except Exception as ws_err:
+                    logger.error(f"[ChannelManager] WebSocket circuit open broadcast failed: {ws_err}")
             
             raise
 
@@ -1359,7 +1365,7 @@ class ChannelManager:
         # Broadcast WebSocket event
         if channel.require_approval:
             try:
-                from backend.api.websocket import manager as ws_manager
+                from backend.api.routes.websocket import manager as ws_manager
                 await ws_manager.broadcast({
                     "type": "message_routed",
                     "channel": channel.channel_type.value,
