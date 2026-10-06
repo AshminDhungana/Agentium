@@ -96,3 +96,70 @@ async def test_broadcast_from_head_also_publishes_to_websocket():
         event = call_args[1].get('event')
     assert event["type"] == "notification"
     assert event["content"] == "Test alert"
+
+
+@pytest.mark.asyncio
+async def test_route_up_publishes_to_websocket_for_user_recipient():
+    """13.3.1/13.3.3: MessageBus.route_up calls publish_to_websocket when recipient is a user-agent."""
+    message_bus = MessageBus()
+    message_bus.publish = AsyncMock()
+    message_bus.publish_to_websocket = AsyncMock()
+    message_bus._get_parent_id = AsyncMock(return_value="00001")  # Head is parent
+    message_bus.get_usernames_for_agent = AsyncMock(return_value=["alice"])
+
+    # Create a task completion message going up to Lead agent
+    message = AgentMessage(
+        message_id="task-123-done",
+        sender_id="30001",  # Task agent
+        recipient_id="20001",  # Lead agent (will be changed to parent)
+        message_type="execution",
+        content="Task completed",
+        route_direction="up"
+    )
+
+    await message_bus.route_up(message)
+
+    # Should have changed recipient to parent (Head)
+    assert message.recipient_id == "00001"
+
+    # Should call publish_to_websocket since Head agent (0xxxx) maps to user events
+    message_bus.publish_to_websocket.assert_called_once()
+    call_args = message_bus.publish_to_websocket.call_args
+    if call_args[0]:  # positional args
+        event = call_args[0][0]
+    else:  # keyword args
+        event = call_args[1].get('event')
+    assert event["type"] == "execution"
+    assert event["content"] == "Task completed"
+    assert "usernames" in call_args[1] if len(call_args) > 1 else "usernames" in call_args[0]
+
+
+@pytest.mark.asyncio
+async def test_route_down_publishes_to_websocket_for_user_recipient():
+    """13.3.1/13.3.3: MessageBus.route_down calls publish_to_websocket when recipient is a user-agent."""
+    message_bus = MessageBus()
+    message_bus.publish = AsyncMock()
+    message_bus.publish_to_websocket = AsyncMock()
+    message_bus.get_usernames_for_agent = AsyncMock(return_value=["alice"])
+
+    # Create a delegation message going down to Task agent
+    message = AgentMessage(
+        message_id="delegation-456",
+        sender_id="10001",  # Council agent
+        recipient_id="30001",  # Task agent
+        message_type="delegation",
+        content="New task assigned",
+        route_direction="down"
+    )
+
+    await message_bus.route_down(message)
+
+    # Should call publish_to_websocket since Task agent (3xxxx) maps to user events
+    message_bus.publish_to_websocket.assert_called_once()
+    call_args = message_bus.publish_to_websocket.call_args
+    if call_args[0]:  # positional args
+        event = call_args[0][0]
+    else:  # keyword args
+        event = call_args[1].get('event')
+    assert event["type"] == "delegation"
+    assert event["content"] == "New task assigned"

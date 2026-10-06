@@ -418,16 +418,34 @@ class MessageBus:
             parent_id = await self._get_parent_id(message.sender_id)
             if parent_id:
                 message.recipient_id = parent_id
-        
+
         message.route_direction = "up"
-        
+
         # Inject constitutional context for escalations
         if message.message_type in ["escalation", "violation"]:
             context = await self._enrich_context(message)
             message.rag_context = context
-        
-        return await self.publish(message)
-    
+
+        result = await self.publish(message)
+
+        # NEW: If the final recipient is a user-agent (Head of Council), publish to WebSocket
+        if message.recipient_id == "00001":  # Head of Council
+            usernames = await self.get_usernames_for_agent(message.recipient_id)
+            if usernames:  # Only publish if we found users
+                await self.publish_to_websocket(
+                    event={
+                        "type": message.message_type,
+                        "message_id": message.message_id,
+                        "sender_id": message.sender_id,
+                        "recipient_id": message.recipient_id,
+                        "content": message.content,
+                        "timestamp": datetime.utcnow().isoformat()
+                    },
+                    usernames=usernames
+                )
+
+        return result
+
     async def route_down(self, message: AgentMessage) -> RouteResult:
         """
         Route message down the hierarchy (delegation).
@@ -440,7 +458,25 @@ class MessageBus:
                 error=f"route_down requires a recipient, got {message.recipient_id!r}",
             )
         message.route_direction = "down"
-        return await self.publish(message)
+
+        result = await self.publish(message)
+
+        # NEW: If the recipient has associated users, publish to WebSocket
+        usernames = await self.get_usernames_for_agent(message.recipient_id)
+        if usernames:
+            await self.publish_to_websocket(
+                event={
+                    "type": message.message_type,
+                    "message_id": message.message_id,
+                    "sender_id": message.sender_id,
+                    "recipient_id": message.recipient_id,
+                    "content": message.content,
+                    "timestamp": datetime.utcnow().isoformat()
+                },
+                usernames=usernames
+            )
+
+        return result
     
     async def broadcast_from_head(self, message: AgentMessage) -> List[RouteResult]:
         """
