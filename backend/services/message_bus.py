@@ -679,7 +679,51 @@ class MessageBus:
         except Exception as e:
             logger.error(f"Context enrichment error: {e}")
             return None
-    
+
+    async def publish_to_websocket(
+        self,
+        event: Dict[str, Any],
+        usernames: Optional[List[str]] = None,
+        room_ids: Optional[List[str]] = None,
+        persistent: bool = True
+    ) -> None:
+        """
+        Publish event to WebSocket clients via Redis Pub/Sub.
+
+        Args:
+            event: Event dict with 'type' and payload
+            usernames: If provided, publish to ws:user:{username} for each
+            room_ids: If provided, publish to ws:room:{room_id} for each (future)
+            persistent: If True, also append to per-user history streams
+        """
+        # Ensure Redis connection
+        if self._redis is None:
+            await self.connect()
+
+        # 1. Global broadcast
+        if not usernames and not room_ids:
+            await self._redis.publish("ws:broadcast", json.dumps(event))
+
+        # 2. Per-user
+        if usernames:
+            for uname in usernames:
+                await self._redis.publish(f"ws:user:{uname}", json.dumps(event))
+                if persistent:
+                    await self._append_user_history(uname, event)
+
+        # 3. Per-room (future)
+        if room_ids:
+            for rid in room_ids:
+                await self._redis.publish(f"ws:room:{rid}", json.dumps(event))
+
+    async def _append_user_history(self, username: str, event: Dict[str, Any]) -> None:
+        """Append event to per-user history stream (maxlen=500)."""
+        if self._redis is None:
+            await self.connect()
+
+        stream_key = f"ws:user:{username}:history"
+        await self._redis.xadd(stream_key, {"data": json.dumps(event)}, maxlen=500, approximate=True)
+
     async def health_check(self) -> Dict[str, Any]:
         """Check message bus health."""
         try:
