@@ -1178,10 +1178,11 @@ async def genesis_status(current_user=Depends(get_current_user)):
     tags=["WebSocket"],
 )
 async def replay_events(
-    since: str,
-    username: Optional[str] = Query(None, description="Username for per-user replay (sovereign only)"),
+    since: str = Query(..., description="Timestamp to fetch events since"),
+    username: Optional[str] = Query(default=None, description="Username for per-user replay (sovereign only)"),
     current_user=Depends(get_current_user)
 ):
+    print('DEBUG: replay_events function loaded')  # DEBUG
     """
     Fetch missed events for reconnection replay.
 
