@@ -321,7 +321,7 @@ def broadcast_mcp_stats():
         from backend.services import mcp_stats_service
         stats = mcp_stats_service.get_all_stats()
     except Exception as exc:
-        logger.warning("[MCPStats] broadcast_mcp_stats: failed to read Redis stats: %s", exc)
+        logger.warning(f"[MCPStats] broadcast_mcp_stats: failed to read Redis stats: {exc}")
         return
 
     if not stats:
@@ -342,13 +342,13 @@ def broadcast_mcp_stats():
         loop = asyncio.new_event_loop()
         try:
             loop.run_until_complete(manager.broadcast(message))
-            logger.debug("[MCPStats] Broadcast %d tool stats to connected clients", len(stats))
+            logger.debug(f"[MCPStats] Broadcast {len(stats)} tool stats to connected clients")
         finally:
             loop.close()
 
     except Exception as exc:
         # Non-fatal: frontend can always fall back to polling GET /mcp-tools/stats
-        logger.debug("[MCPStats] WebSocket broadcast skipped (non-fatal): %s", exc)
+        logger.debug(f"[MCPStats] WebSocket broadcast skipped (non-fatal): {exc}")
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -421,10 +421,10 @@ def broadcast_channel_health():
                 loop.close()
 
         except Exception as exc:
-            logger.debug("[ChannelHealth] WebSocket broadcast skipped (non-fatal): %s", exc)
+            logger.debug(f"[ChannelHealth] WebSocket broadcast skipped (non-fatal): {exc}")
 
     except Exception as exc:
-        logger.error("[ChannelHealth] broadcast_channel_health task failed: %s", exc)
+        logger.error(f"[ChannelHealth] broadcast_channel_health task failed: {exc}")
     finally:
         db.close()
 
@@ -541,10 +541,10 @@ def broadcast_provider_metrics():
                 bcast_loop.close()
 
         except Exception as exc:
-            logger.debug("[ProviderMetrics] WebSocket broadcast skipped (non-fatal): %s", exc)
+            logger.debug(f"[ProviderMetrics] WebSocket broadcast skipped (non-fatal): {exc}")
 
     except Exception as exc:
-        logger.error("[ProviderMetrics] broadcast_provider_metrics task failed: %s", exc)
+        logger.error(f"[ProviderMetrics] broadcast_provider_metrics task failed: {exc}")
     finally:
         db.close()
 

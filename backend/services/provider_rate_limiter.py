@@ -159,7 +159,7 @@ class ProviderRateLimiter:
                 try:
                     self._sha = await r.script_load(_TOKEN_BUCKET_LUA)
                 except Exception as exc:  # pragma: no cover - degraded path
-                    logger.warning("ProviderRateLimiter: script_load failed: %s", exc)
+                    logger.warning(f"ProviderRateLimiter: script_load failed: {exc}")
                     self._sha = None
             return self._sha
 
@@ -379,7 +379,7 @@ class ProviderRateLimiter:
             ttl = max(1, int(pause_until - now) + 5)
             await r.set(key, pause_until, ex=ttl)
         except Exception as exc:
-            logger.debug("record_header_insight skipped: %s", exc)
+            logger.debug(f"record_header_insight skipped: {exc}")
 
     async def _check_pause(self, config_id: str) -> None:
         """If this config is paused by ``record_header_insight``, wait it out."""

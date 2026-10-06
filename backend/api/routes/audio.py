@@ -97,7 +97,7 @@ async def transcribe_audio(
     except ServerSTTUnavailable:
         raise  # let the global handler return 503 + STT_UNAVAILABLE
     except Exception as exc:
-        logger.error("Transcription failed: %s", exc)
+        logger.error(f"Transcription failed: {exc}")
         raise InternalServerError(error="Transcription failed", code="TRANSCRIPTION_FAILED")
 
 
@@ -130,7 +130,7 @@ async def synthesize_speech(
     except ValueError as exc:
         raise BadRequestError(error=str(exc), code="STREXC")
     except Exception as exc:
-        logger.error("Synthesis failed: %s", exc)
+        logger.error(f"Synthesis failed: {exc}")
         raise InternalServerError(error="Speech synthesis failed", code="SPEECH_SYNTHESIS_FAILED")
 
 # ── Speaker Identification Endpoints ────────────────────────────────────────────
@@ -158,7 +158,7 @@ async def register_speaker(
             raise BadRequestError(error="Failed to extract embedding from audio sample.", code="FAILED_TO_EXTRACT_EMBEDDING_FROM")
         return profile.to_dict()
     except Exception as exc:
-        logger.error("Speaker registration failed: %s", exc)
+        logger.error(f"Speaker registration failed: {exc}")
         raise InternalServerError(error="Speaker registration failed", code="SPEAKER_REGISTRATION_FAILED")
 
 @router.post(
@@ -195,7 +195,7 @@ async def identify_speaker(
         result = identifier.identify(db, audio_bytes)
         return result
     except Exception as exc:
-        logger.error("Speaker identification failed: %s", exc)
+        logger.error(f"Speaker identification failed: {exc}")
         raise InternalServerError(error="Speaker identification failed", code="SPEAKER_ID_FAILED")
 @router.get(
     "/speakers",
@@ -314,7 +314,7 @@ async def audio_stream(websocket: WebSocket):
                                 )
                                 await websocket.send_bytes(tts_bytes)
                             except Exception as tts_err:
-                                logger.debug("TTS response failed: %s", tts_err)
+                                logger.debug(f"TTS response failed: {tts_err}")
 
                     except Exception as exc:
                         await websocket.send_json({
@@ -333,6 +333,6 @@ async def audio_stream(websocket: WebSocket):
     except WebSocketDisconnect:
         logger.info("Audio WebSocket disconnected")
     except Exception as exc:
-        logger.error("Audio WebSocket error: %s", exc)
+        logger.error(f"Audio WebSocket error: {exc}")
     finally:
         db.close()

@@ -518,7 +518,7 @@ Address the Sovereign respectfully. If they issue a command that requires execut
                     summarize_history(db, str(sovereign_user.id), config_id)
                 )
             except Exception as _summ_err:  # pragma: no cover - best-effort
-                logger.debug("Chat summarization schedule failed: %s", _summ_err)
+                logger.debug(f"Chat summarization schedule failed: {_summ_err}")
 
         # Update context usage
         tokens_used = result.get("tokens_used", 0)

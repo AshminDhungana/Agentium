@@ -1538,7 +1538,7 @@ def trigger_genesis_if_needed(db) -> bool:
             except Exception as bexc:
                 logger.warning(f"genesis_complete broadcast failed: {bexc}")
         except Exception as exc:
-            logger.error("❌ Auto-genesis failed: %s", exc, exc_info=True)
+            logger.error(f"❌ Auto-genesis failed: {exc}", exc_info=True)
             try:
                 await _redis.set(
                     "genesis:state",

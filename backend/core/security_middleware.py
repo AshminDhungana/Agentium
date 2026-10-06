@@ -118,7 +118,7 @@ class IPBlocklistMiddleware(BaseHTTPMiddleware):
         try:
             blocked = await self.redis.exists(f"agentium:blocked:ips:{ip}")
             if blocked:
-                logger.warning("Phase 17.1 blocklist: rejected %s", ip)
+                logger.warning(f"Phase 17.1 blocklist: rejected {ip}")
                 return make_error_response(
                     status_code=403,
                     error="Access temporarily restricted.",
@@ -127,7 +127,7 @@ class IPBlocklistMiddleware(BaseHTTPMiddleware):
                 )
         except Exception as exc:
             # Redis failure must never block legitimate traffic
-            logger.debug("IPBlocklistMiddleware: Redis check failed (non-fatal): %s", exc)
+            logger.debug(f"IPBlocklistMiddleware: Redis check failed (non-fatal): {exc}")
 
         return await call_next(request)
 
@@ -212,7 +212,7 @@ class ErrorCounterMiddleware(BaseHTTPMiddleware):
                     time.time(), self.window, weight,
                 )
             except Exception as exc:
-                logger.debug("ErrorCounterMiddleware: Redis call failed (non-fatal): %s", exc)
+                logger.debug(f"ErrorCounterMiddleware: Redis call failed (non-fatal): {exc}")
 
         return response
 

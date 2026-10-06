@@ -311,7 +311,7 @@ class EventProcessorService:
                     resp.raise_for_status()
                     body_hash = hashlib.sha256(resp.content).hexdigest()
             except Exception as exc:
-                logger.warning("API poll failed for trigger %s: %s", trigger.name, exc)
+                logger.warning(f"API poll failed for trigger {trigger.name}: {exc}")
                 results["errors"] += 1
                 continue
 
@@ -505,7 +505,7 @@ class EventProcessorService:
             log.retry_count = (log.retry_count or 0) + 1
             log.error = str(exc)
             db.commit()
-            logger.error("Dead-letter retry failed for %s: %s", log_id, exc)
+            logger.error(f"Dead-letter retry failed for {log_id}: {exc}")
             return {"status": "error", "detail": str(exc)}
 
     # ── Event correlation ─────────────────────────────────────────────────
@@ -615,4 +615,4 @@ class EventProcessorService:
             except Exception:
                 pass  # WS broadcast is best-effort
         except Exception as exc:
-            logger.error("Dispatch action failed for trigger %s: %s", trigger.name, exc)
+            logger.error(f"Dispatch action failed for trigger {trigger.name}: {exc}")

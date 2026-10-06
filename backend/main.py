@@ -182,7 +182,7 @@ async def lifespan(app: FastAPI):
         try:
             run_security_startup_checks()
         except Exception as sec_err:  # a strict guard raises RuntimeError
-            logger.error("❌ Security startup check failed: %s", sec_err)
+            logger.error(f"❌ Security startup check failed: {sec_err}")
             raise
 
     # ─────────────────────────────────────────────────────────────
@@ -205,7 +205,7 @@ async def lifespan(app: FastAPI):
             elif workspace_enabled():
                 logger.info("✅ Host workspace persistence configured")
         except Exception as ws_cfg_err:  # pragma: no cover - non-fatal guard
-            logger.warning("⚠️ Workspace config check failed (non-fatal): %s", ws_cfg_err)
+            logger.warning(f"⚠️ Workspace config check failed (non-fatal): {ws_cfg_err}")
 
     # ─────────────────────────────────────────────────────────────
     # 1. Initialize Database
@@ -493,13 +493,12 @@ async def lifespan(app: FastAPI):
                 from backend.services.knowledge_service import get_knowledge_service
                 result = get_knowledge_service().initialize_knowledge_base(db)
                 logger.info(
-                    "✅ Knowledge base bootstrapped — constitution: %s",
-                    result["constitution_embedded"],
+                    f"✅ Knowledge base bootstrapped — constitution: {result['constitution_embedded']}",
                 )
             finally:
                 db.close()
         except Exception as e:
-            logger.error("❌ Knowledge base bootstrap failed: %s", e)
+            logger.error(f"❌ Knowledge base bootstrap failed: {e}")
 
     # ─────────────────────────────────────────────────────────────
     # 9b. Optional folder-skill seeding (backend/.agentium/skills)
@@ -509,7 +508,7 @@ async def lifespan(app: FastAPI):
             from backend.scripts.seed_skills import main as seed_main
             seed_main()
         except Exception as e:  # noqa: BLE001
-            logger.warning("⚠️ Skill seeding on boot failed: %s", e)
+            logger.warning(f"⚠️ Skill seeding on boot failed: {e}")
 
     # ─────────────────────────────────────────────────────────────
     # 9c. Auto-generate VOICE_JWT_SECRET if missing
@@ -614,9 +613,8 @@ try:
     logger.info("✅ DDoS middleware stack registered")
 except Exception as _mw_exc:
     logger.warning(
-        "⚠️ Phase 17.1 middleware could not load Redis client (%s). "
-        "IPBlocklist and ErrorCounter disabled — PayloadSizeLimit still active.",
-        _mw_exc,
+        f"⚠️ Phase 17.1 middleware could not load Redis client ({_mw_exc}). "
+        "IPBlocklist and ErrorCounter disabled — PayloadSizeLimit still active."
     )
     app.add_middleware(PayloadSizeLimitMiddleware)
 
@@ -627,7 +625,7 @@ try:
     app.add_middleware(RateLimitMiddleware, redis=_redis_rl)
     logger.info("Unified RateLimitMiddleware registered (Redis-backed)")
 except Exception as exc:
-    logger.error("Failed to register RateLimitMiddleware: %s", exc)
+    logger.error(f"Failed to register RateLimitMiddleware: {exc}")
 
 app.add_middleware(SessionLimitMiddleware)
 app.add_middleware(InputSanitizationMiddleware)

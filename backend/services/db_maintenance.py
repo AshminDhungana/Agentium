@@ -323,10 +323,10 @@ class DatabaseMaintenanceService:
             except ImportError as e:
                 # ChromaDB or sentence-transformers not installed — skip silently.
                 logger.warning(
-                    "Vector DB optimization skipped (missing dependency): %s", e
+                    f"Vector DB optimization skipped (missing dependency): {e}"
                 )
             except Exception as e:
-                logger.error("Error in vector_db_optimization: %s", e)
+                logger.error(f"Error in vector_db_optimization: {e}")
 
             await asyncio.sleep(604800)  # Weekly
 

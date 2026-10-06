@@ -79,7 +79,7 @@ async def get_learning_impact(
                 tools_generated = max(tools_generated, bp_count)
                 anti_patterns_warned = max(anti_patterns_warned, ap_count)
         except Exception as vs_err:
-            logger.debug("Vector store check skipped in get_learning_impact: %s", vs_err)
+            logger.debug(f"Vector store check skipped in get_learning_impact: {vs_err}")
 
         # Check Redis if available (optional metrics enrichment)
         try:
@@ -147,7 +147,7 @@ async def get_learning_impact(
             "history": history,
         }
     except Exception as e:
-        logger.error("Error retrieving learning impact: %s", e)
+        logger.error(f"Error retrieving learning impact: {e}")
         raise InternalServerError(error=f"Failed to fetch learning impact: {str(e)}", code="LEARNING_IMPACT_ERROR")
 
 @router.get(
@@ -191,7 +191,7 @@ async def get_patterns(
                     "confidence": float(meta.get("confidence", 0.8)),
                 })
     except Exception as e:
-        logger.warning("Could not fetch patterns from vector store: %s", e)
+        logger.warning(f"Could not fetch patterns from vector store: {e}")
 
     return {"patterns": patterns}
 
@@ -231,7 +231,7 @@ async def trigger_consolidation(
         result = engine.analyze_outcomes(db)
         return {"status": "completed", "result": result}
     except Exception as e:
-        logger.error("Failed during learning consolidation: %s", e)
+        logger.error(f"Failed during learning consolidation: {e}")
         raise InternalServerError(
             error=f"Consolidation failed: {str(e)}",
             code="CONSOLIDATION_FAILED",

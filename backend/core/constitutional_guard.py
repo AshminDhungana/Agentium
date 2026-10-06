@@ -208,7 +208,7 @@ class ConstitutionalGuard:
             r = _redis.from_url(url, decode_responses=True)
             r.delete("constitutional_guard:active_constitution")
         except Exception as exc:  # pragma: no cover - best effort
-            logger.warning("Could not invalidate active constitution cache: %s", exc)
+            logger.warning(f"Could not invalidate active constitution cache: {exc}")
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -222,13 +222,13 @@ class ConstitutionalGuard:
             redis_url = os.getenv("REDIS_URL", "redis://redis:6379/0")
             self._redis = await aioredis.from_url(redis_url, decode_responses=True)
         except Exception as exc:
-            logger.warning("Redis unavailable for ConstitutionalGuard cache: %s", exc)
+            logger.warning(f"Redis unavailable for ConstitutionalGuard cache: {exc}")
 
         try:
             from backend.core.vector_store import get_vector_store
             self._vector_store = get_vector_store()
         except Exception as exc:
-            logger.warning("VectorStore unavailable for Tier 2 checks: %s", exc)
+            logger.warning(f"VectorStore unavailable for Tier 2 checks: {exc}")
 
     # ------------------------------------------------------------------
     # Public API
@@ -455,7 +455,7 @@ class ConstitutionalGuard:
             return decision
 
         except Exception as exc:
-            logger.error("Tier 2 semantic check failed: %s", exc, exc_info=True)
+            logger.error(f"Tier 2 semantic check failed: {exc}", exc_info=True)
             return ConstitutionalDecision(
                 verdict=Verdict.ALLOW,
                 severity=ViolationSeverity.LOW,
@@ -563,7 +563,7 @@ class ConstitutionalGuard:
 
             return data
         except Exception as exc:
-            logger.error("Failed to load constitution: %s", exc)
+            logger.error(f"Failed to load constitution: {exc}")
             return None
 
     def _build_action_description(
@@ -769,7 +769,7 @@ class ConstitutionalGuard:
                     logger.error(f"Failed to auto-propose amendment: {eval_e}")
 
         except Exception as exc:
-            logger.error("Failed to log constitutional decision: %s", exc)
+            logger.error(f"Failed to log constitutional decision: {exc}")
             try:
                 self.db.rollback()
             except Exception:

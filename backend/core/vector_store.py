@@ -257,7 +257,7 @@ class VectorStore:
             try:
                 self._collections[key] = self.get_collection(key)
             except Exception:  # noqa: BLE001
-                logger.exception("Could not initialise collection '%s'", key)
+                logger.exception(f"Could not initialise collection '{key}'")
 
         return self._client
 
@@ -466,7 +466,7 @@ class VectorStore:
         try:
             collection.delete(where={"parent_id": parent_id})
         except Exception:  # noqa: BLE001
-            logger.debug("No prior chunks to delete for %s", parent_id)
+            logger.debug(f"No prior chunks to delete for {parent_id}")
 
         ids = [f"{parent_id}#chunk{i}" for i in range(chunk_count)]
         metadatas = [
@@ -546,7 +546,7 @@ class VectorStore:
                 result = collection.query(**query_kwargs)
                 raw_results.append(result)
             except Exception:  # noqa: BLE001
-                logger.exception("Query failed for collection '%s'", key)
+                logger.exception(f"Query failed for collection '{key}'")
 
         # Deduplicate chunks by parent_id, keeping the best raw-distance chunk.
         best_by_parent: Dict[str, Dict[str, Any]] = {}

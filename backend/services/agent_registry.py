@@ -42,7 +42,7 @@ class AgentRegistry:
                     db.commit()
                     return new_agent.agentium_id
             except Exception as e:
-                logger.warning("AgentRegistry auto-spawn failed: %s", e)
+                logger.warning(f"AgentRegistry auto-spawn failed: {e}")
             return None
         # For Lead-tier targets (2xxxx) reuse existing Lead selection logic of caller.
         if decision.target_tier and decision.target_tier[:1] == "2":

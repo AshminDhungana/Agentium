@@ -695,7 +695,7 @@ class KnowledgeService:
 
         if active_const:
             self.embed_constitution(db, active_const)
-            logger.info("Embedded Constitution %s", active_const.version)
+            logger.info(f"Embedded Constitution {active_const.version}")
 
         from backend.core.environment_context import (
             AGENT_ENVIRONMENT_CONTEXT,

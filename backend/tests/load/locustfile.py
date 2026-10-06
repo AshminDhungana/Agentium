@@ -168,8 +168,7 @@ class MockProviderServer:
         self._server = ThreadingHTTPServer((self.host, self.port), handler)
         self._thread = threading.Thread(target=self._server.serve_forever, daemon=True)
         self._thread.start()
-        logger.info("MockProviderServer listening on %s:%d (429 ratio=%.2f)",
-                    self.host, self.port, self.err_ratio)
+        logger.info(f"MockProviderServer listening on {self.host}:{self.port} (429 ratio={self.err_ratio:.2f})")
 
     def stop(self) -> None:
         if self._server is not None:
@@ -277,12 +276,12 @@ if _HAS_LOCUST:
                                        attempt + 1, max_retries, backoff)
                         time.sleep(backoff)
                     else:
-                        logger.error("Auth failed: HTTP %s", resp.status_code)
+                        logger.error(f"Auth failed: HTTP {resp.status_code}")
                         return
                 except Exception as exc:
-                    logger.error("Auth exception: %s", exc)
+                    logger.error(f"Auth exception: {exc}")
                     return
-            logger.error("Auth exhausted all %d retries", max_retries)
+            logger.error(f"Auth exhausted all {max_retries} retries")
 
     class ConstitutionalCheckUser(LocustAuthenticatedUser):
         """Exercises endpoints that run ConstitutionalGuard checks. Weight: 50."""
@@ -307,7 +306,7 @@ if _HAS_LOCUST:
                         a["agentium_id"] for a in agents if a.get("agentium_id")
                     ]
             except Exception as exc:
-                logger.warning("Failed to fetch agent IDs: %s", exc)
+                logger.warning(f"Failed to fetch agent IDs: {exc}")
 
         @task(3)
         def list_agents(self):
@@ -525,14 +524,10 @@ def _emit_provider_report(environment) -> Dict[str, Any]:
 
     logger.info("=" * 64)
     logger.info("PROVIDER-FACING LOAD REPORT (Task 26)")
-    logger.info("  RPS reaching mock provider : %.2f  (total=%d over %.1fs)",
-                report["provider_rps"], stats["requests_total"], run_seconds)
-    logger.info("  queue depth (pending_count): %s",
-                report["pending_count"] if pending is not None else "n/a (host unreachable)")
-    logger.info("  retry count (429s served)  : %d  (429 ratio=%.3f)",
-                retry_count, provider_429_ratio)
-    logger.info("  worker stability           : %s  (errors=%d, inflight_peak=%d)",
-                report["worker_stability"], stats["errors"], stats["inflight_peak"])
+    logger.info(f"  RPS reaching mock provider : {report['provider_rps']:.2f}  (total={stats['requests_total']} over {run_seconds:.1f}s)")
+    logger.info(f"  queue depth (pending_count): {report['pending_count'] if pending is not None else 'n/a (host unreachable)'}")
+    logger.info(f"  retry count (429s served)  : {retry_count}  (429 ratio={provider_429_ratio:.3f})")
+    logger.info(f"  worker stability           : {report['worker_stability']}  (errors={stats['errors']}, inflight_peak={stats['inflight_peak']})")
     logger.info("=" * 64)
     return report
 
@@ -561,7 +556,7 @@ if _HAS_LOCUST:
                 else:
                     target = _THRESHOLD_GENERAL_API
                 status = "PASS" if p95 <= target else "FAIL"
-                logger.info("  %s: p95=%.2fms (target=%dms) [%s]", name, p95, target, status)
+                logger.info(f"  {name}: p95={p95:.2f}ms (target={target}ms) [{status}]")
 
         # Task 26: always emit the provider-facing four-metric report.
         _emit_provider_report(environment)

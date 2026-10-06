@@ -258,7 +258,7 @@ class WorkflowEngine:
         try:
             execute_task_async.delay(task.agentium_id, None)
         except Exception:
-            logger.warning("Task dispatch failed for %s, workflow will wait", task.agentium_id, exc_info=True)
+            logger.warning(f"Task dispatch failed for {task.agentium_id}, workflow will wait", exc_info=True)
         return True
 
     @staticmethod
@@ -411,7 +411,7 @@ class WorkflowEngine:
             WorkflowExecution.id == execution_id
         ).first()
         if not execution:
-            logger.warning("resume_after_wait: execution %s not found", execution_id)
+            logger.warning(f"resume_after_wait: execution {execution_id} not found")
             return
 
         ctx            = execution.context_data or {}
@@ -452,11 +452,11 @@ class WorkflowEngine:
                             "schedule": schedule_entry,
                             "args": (str(wf.id),),
                         }
-                        logger.info("Registered cron schedule for workflow %s", wf.id)
+                        logger.info(f"Registered cron schedule for workflow {wf.id}")
                     except (ValueError, IndexError) as e:
-                        logger.error("Failed to register cron for workflow %s: %s", wf.id, e)
+                        logger.error(f"Failed to register cron for workflow {wf.id}: {e}")
         except Exception as e:
-            logger.error("Error syncing workflow cron schedules: %s", e)
+            logger.error(f"Error syncing workflow cron schedules: {e}")
 
     @staticmethod
     def calculate_eta(db: Session, workflow_id: str) -> dict:

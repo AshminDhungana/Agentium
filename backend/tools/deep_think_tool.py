@@ -129,7 +129,7 @@ class DeepThinkTool:
                 result = self._run_cot_no_config(problem, context)
 
         except Exception as exc:
-            logger.exception("[DeepThinkTool] execution error: %s", exc)
+            logger.exception(f"[DeepThinkTool] execution error: {exc}")
             return {
                 "thinking_text": "",
                 "conclusion":    f"Deep thinking failed: {exc}",
@@ -169,7 +169,7 @@ class DeepThinkTool:
                 .all()
             )
         except Exception as exc:
-            logger.warning("[DeepThinkTool] DB config lookup failed: %s", exc)
+            logger.warning(f"[DeepThinkTool] DB config lookup failed: {exc}")
             return None, None
 
         anthropic_cfg = None

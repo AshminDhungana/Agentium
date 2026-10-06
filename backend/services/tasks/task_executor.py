@@ -645,7 +645,7 @@ def _scale_redis():
             url = os.getenv("REDIS_URL", "redis://redis:6379/0")
             _SCALE_REDIS = redis_sync.from_url(url, decode_responses=True)
         except Exception as exc:  # pragma: no cover - degraded path
-            logger.warning("auto_scale_check: Redis unavailable: %s", exc, error=str(exc))
+            logger.warning(f"auto_scale_check: Redis unavailable: {exc}", error=str(exc))
             _SCALE_REDIS = None
     return _SCALE_REDIS
 
@@ -704,7 +704,7 @@ def auto_scale_check():
                         }
                     r.set(cd_key, "1", ex=cooldown)
                 except Exception as cd_exc:  # Redis hiccup → proceed without gate
-                    logger.warning("auto_scale_check: cooldown gate skipped: %s", cd_exc, error=str(cd_exc))
+                    logger.warning(f"auto_scale_check: cooldown gate skipped: {cd_exc}", error=str(cd_exc))
 
             logger.info(
                 f"Queue depth {pending_count} exceeds threshold {threshold} "
@@ -1602,8 +1602,7 @@ def poll_execution_conditions():
                         summary["skipped"] += 1
                 except Exception as exc:
                     summary["errors"] += 1
-                    logger.error("Error evaluating EXECUTION WaitCondition %s: %s",
-                                 condition.agentium_id, exc, exc_info=True)
+                    logger.error(f"Error evaluating EXECUTION WaitCondition {condition.agentium_id}: {exc}", exc_info=True)
 
             db.commit()
             if any(v > 0 for v in summary.values()):
@@ -1731,7 +1730,7 @@ def update_citation_boosts():
                         collection.update(ids=ids_to_update, metadatas=metas_to_update)
                         total_updated += len(ids_to_update)
                 except Exception as coll_exc:
-                    logger.debug("Phase 16.3: boost update skipped for %s: %s", coll_key, coll_exc)
+                    logger.debug(f"Phase 16.3: boost update skipped for {coll_key}: {coll_exc}")
 
             if total_updated > 0:
                 AuditLog.log(
@@ -1741,7 +1740,7 @@ def update_citation_boosts():
                     description=f"Phase 16.3: Updated citation_boost for {total_updated} ChromaDB documents",
                     after_state={"updated": total_updated},
                 )
-            logger.info("📊 Citation boost update completed: %d documents updated", total_updated)
+            logger.info(f"📊 Citation boost update completed: {total_updated} documents updated")
             return {"updated": total_updated}
         except Exception as e:
             logger.error(f"update_citation_boosts failed: {e}")
@@ -1765,7 +1764,7 @@ def cleanup_citation_edges():
                     description=f"Phase 16.3: Cleaned up {deleted} citation edges older than 90 days",
                     after_state={"deleted": deleted},
                 )
-            logger.info("🧹 Citation edge cleanup completed: %d edges removed", deleted)
+            logger.info(f"🧹 Citation edge cleanup completed: {deleted} edges removed")
             return {"deleted": deleted}
         except Exception as e:
             logger.error(f"cleanup_citation_edges failed: {e}")
@@ -1904,7 +1903,7 @@ def detect_suspicious_patterns(self):
         }
 
     except Exception as exc:
-        logger.error("detect_suspicious_patterns failed: %s", exc)
+        logger.error(f"detect_suspicious_patterns failed: {exc}")
         raise self.retry(exc=exc)
     finally:
         try:

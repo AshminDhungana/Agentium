@@ -148,7 +148,7 @@ class EthosTool:
             agent.compress_ethos(db, completed_steps=completed_steps)
             db.flush()
         except Exception as exc:  # compression must never hard-fail the agent turn
-            logger.warning("ethos compress failed for %s: %s", agent_id, exc)
+            logger.warning(f"ethos compress failed for {agent_id}: {exc}")
             db.rollback()
             return _result(False, error=f"compress failed: {exc}")
         ethos = _load_ethos(db, agent_id)

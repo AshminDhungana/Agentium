@@ -68,7 +68,7 @@ class MCPClient:
     async def connect(self) -> None:
         """Establish connection to the MCP server."""
         if not MCP_AVAILABLE:
-            logger.debug("[MCPClient] mcp package absent — using mock mode for %s", self.server_url)
+            logger.debug(f"[MCPClient] mcp package absent — using mock mode for {self.server_url}")
             return
 
         try:
@@ -78,7 +78,7 @@ class MCPClient:
                 timeout=self.timeout_seconds,
             )
             await self._session.initialize()
-            logger.info("[MCPClient] Connected to %s", self.server_url)
+            logger.info(f"[MCPClient] Connected to {self.server_url}")
         except asyncio.TimeoutError:
             raise MCPConnectionError(f"Timed out connecting to MCP server: {self.server_url}")
         except Exception as exc:

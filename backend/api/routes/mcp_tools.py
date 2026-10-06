@@ -305,7 +305,7 @@ async def revoke_mcp_tool(
         )
     except Exception as exc:
         # Non-fatal: frontend has polling fallback
-        logger.warning("[MCPTools] WebSocket revocation broadcast failed: %s", exc)
+        logger.warning(f"[MCPTools] WebSocket revocation broadcast failed: {exc}")
 
     return MCPToolResponse(**tool.to_dict())
 

@@ -139,8 +139,7 @@ class AgentOrchestrator:
                 )
             except StalledReasoningError as stall_exc:
                 logger.warning(
-                    "execute_task: StalledReasoningError for task=%s agent=%s (attempt %d/%d): %s",
-                    getattr(task, "agentium_id", "?"), agent.agentium_id, attempt + 1, max_retries, stall_exc,
+                    f"execute_task: StalledReasoningError for task={getattr(task, 'agentium_id', '?')} agent={agent.agentium_id} (attempt {attempt + 1}/{max_retries}): {stall_exc}",
                     task_id=getattr(task, "agentium_id", "?"), agent_id=agent.agentium_id,
                     attempt=attempt + 1, max_retries=max_retries, status="stalled",
                 )
@@ -155,8 +154,7 @@ class AgentOrchestrator:
 
                 if attempt >= max_retries - 1:
                     logger.error(
-                        "execute_task: max stall retries (%d) reached for task=%s — giving up.",
-                        max_retries, getattr(task, "agentium_id", "?"),
+                        f"execute_task: max stall retries ({max_retries}) reached for task={getattr(task, 'agentium_id', '?')} — giving up.",
                         task_id=getattr(task, "agentium_id", "?"), agent_id=agent.agentium_id,
                         status="max_retries_exceeded",
                     )
@@ -164,18 +162,17 @@ class AgentOrchestrator:
                     try:
                         agent.compress_ethos(db)
                     except Exception as compress_exc:
-                        logger.warning("execute_task: ethos compression failed: %s", compress_exc, error=str(compress_exc))
+                        logger.warning(f"execute_task: ethos compression failed: {compress_exc}", error=str(compress_exc))
                     raise
 
                 # Compress ethos to shed bloat accumulated before the stall
                 try:
                     agent.compress_ethos(db)
                 except Exception as compress_exc:
-                    logger.warning("execute_task: ethos compression failed: %s", compress_exc, error=str(compress_exc))
+                    logger.warning(f"execute_task: ethos compression failed: {compress_exc}", error=str(compress_exc))
 
                 logger.info(
-                    "execute_task: resuming task=%s (attempt %d/%d) from checkpoint.",
-                    getattr(task, "agentium_id", "?"), attempt + 1, max_retries,
+                    f"execute_task: resuming task={getattr(task, 'agentium_id', '?')} (attempt {attempt + 1}/{max_retries}) from checkpoint.",
                     task_id=getattr(task, "agentium_id", "?"), agent_id=agent.agentium_id,
                     attempt=attempt + 1, max_retries=max_retries, status="resuming",
                 )
@@ -349,7 +346,7 @@ class AgentOrchestrator:
         try:
             decision = await DecisionEngine().decide(source, raw_input, self.db)
         except Exception as exc:
-            logger.warning("DecisionEngine failed in process_intent: %s", exc, error=str(exc), source_id=source_id)
+            logger.warning(f"DecisionEngine failed in process_intent: {exc}", error=str(exc), source_id=source_id)
             decision = None
         if decision is not None and decision.action in (
             DecisionAction.CREATE_TASK, DecisionAction.SPAWN_AGENT,
@@ -400,7 +397,7 @@ class AgentOrchestrator:
                             metadata=gov_result,
                         )
                     except PermissionError as pe:
-                        logger.warning("Governance command rejected (no authority): %s", pe, error=str(pe), source_id=source_id, action="governance_command")
+                        logger.warning(f"Governance command rejected (no authority): {pe}", error=str(pe), source_id=source_id, action="governance_command")
                         # Fall through to normal routing below.
 
         # Determine target
@@ -517,8 +514,7 @@ class AgentOrchestrator:
                     choice = should_use_stealth_browser_with_runtime(url)
                     tool_name = choice.tool_name
                     logger.debug(
-                        "_detect_tool_intent: browser route for %r → %s (%s)",
-                        url, tool_name, choice.reason,
+                        f"_detect_tool_intent: browser route for {url!r} → {tool_name} ({choice.reason})",
                         url=url, tool_name=tool_name, reason=choice.reason, agent_id=agent_id
                     )
 
@@ -575,9 +571,8 @@ class AgentOrchestrator:
                 if hostname:
                     register_stealth_domain(hostname)
                     logger.warning(
-                        "_execute_tool_directly: bot-detection on %s — "
+                        f"_execute_tool_directly: bot-detection on {hostname} — "
                         "registered as stealth domain, retrying with nodriver",
-                        hostname,
                         hostname=hostname, tool_name=tool_name, agent_id=agent_id, status="bot_detected"
                     )
                     result = tool_svc.execute_tool(
@@ -677,8 +672,7 @@ class AgentOrchestrator:
             code_template = dedent(raw_code).strip()
         except Exception as exc:
             logger.warning(
-                "_handle_tool_creation_request: LLM code-gen failed for %s: %s",
-                agent_id, exc,
+                f"_handle_tool_creation_request: LLM code-gen failed for {agent_id}: {exc}",
                 agent_id=agent_id, tool_name=tool_name, error=str(exc)
             )
             return await self.escalate_to_council(
@@ -697,8 +691,7 @@ class AgentOrchestrator:
         validation = factory.validate_tool_code(code_template)
         if not validation["valid"]:
             logger.warning(
-                "_handle_tool_creation_request: generated code invalid for %s: %s",
-                agent_id, validation["error"],
+                f"_handle_tool_creation_request: generated code invalid for {agent_id}: {validation['error']}",
                 agent_id=agent_id, tool_name=tool_name, error=validation["error"]
             )
             return await self.escalate_to_council(
@@ -890,14 +883,12 @@ class AgentOrchestrator:
             )
             if spawned:
                 logger.info(
-                    "Spawned critics for task %s: %s",
-                    db_task_id, spawned,
+                    f"Spawned critics for task {db_task_id}: {spawned}",
                     task_id=db_task_id, lead_id=lead_id, spawned_critics=spawned, status="critics_spawned"
                 )
             else:
                 logger.warning(
-                    "No critics spawned for task %s (type=%s) — review will auto-pass",
-                    db_task_id, task_type_str,
+                    f"No critics spawned for task {db_task_id} (type={task_type_str}) — review will auto-pass",
                     task_id=db_task_id, task_type=task_type_str, status="no_critics"
                 )
 
@@ -966,8 +957,7 @@ class AgentOrchestrator:
 
             if verdict == "reject":
                 logger.warning(
-                    "Critic REJECTED output for task %s (attempt %d/%d). Retrying…",
-                    db_task_id, retry_count + 1, critic_service.DEFAULT_MAX_RETRIES,
+                    f"Critic REJECTED output for task {db_task_id} (attempt {retry_count + 1}/{critic_service.DEFAULT_MAX_RETRIES}). Retrying…",
                     task_id=db_task_id, attempt=retry_count + 1, max_retries=critic_service.DEFAULT_MAX_RETRIES,
                     status="critic_rejected", blocking_type=blocking_type
                 )
@@ -981,8 +971,7 @@ class AgentOrchestrator:
 
             elif verdict == "escalate":
                 logger.error(
-                    "Critic ESCALATING task %s to Council after %d failed retries.",
-                    db_task_id, retry_count,
+                    f"Critic ESCALATING task {db_task_id} to Council after {retry_count} failed retries.",
                     task_id=db_task_id, retry_count=retry_count, blocking_type=blocking_type,
                     status="critic_escalated"
                 )
@@ -1186,9 +1175,8 @@ class AgentOrchestrator:
         self.db.flush()
 
         logger.info(
-            "AgentOrchestrator.enter_wait: task %s → WAITING "
-            "(condition=%s, strategy=%s)",
-            task_id, condition.agentium_id, strategy,
+            f"AgentOrchestrator.enter_wait: task {task_id} → WAITING "
+            f"(condition={condition.agentium_id}, strategy={strategy})",
             task_id=task_id, condition_id=condition.agentium_id, strategy=strategy, actor_id=actor_id
         )
 
@@ -1245,7 +1233,7 @@ class AgentOrchestrator:
         if cb["state"] == CB_OPEN:
             if cb["opened_at"] and (time.monotonic() - cb["opened_at"]) >= CB_RECOVERY_SECONDS:
                 cb["state"] = CB_HALF_OPEN
-                logger.info("Circuit breaker for %s transitioning to HALF_OPEN", agent_id, agent_id=agent_id, state="half_open")
+                logger.info(f"Circuit breaker for {agent_id} transitioning to HALF_OPEN", agent_id=agent_id, state="half_open")
                 return None
             return RouteResult(
                 success=False,
@@ -1266,7 +1254,7 @@ class AgentOrchestrator:
 
         if success:
             if cb["state"] in (CB_HALF_OPEN, CB_OPEN):
-                logger.info("Circuit breaker for %s RESET to CLOSED", agent_id, agent_id=agent_id, state="closed")
+                logger.info(f"Circuit breaker for {agent_id} RESET to CLOSED", agent_id=agent_id, state="closed")
             cb["state"]     = CB_CLOSED
             cb["failures"]  = 0
             cb["opened_at"] = None
@@ -1275,13 +1263,12 @@ class AgentOrchestrator:
             if cb["state"] == CB_HALF_OPEN:
                 cb["state"]     = CB_OPEN
                 cb["opened_at"] = time.monotonic()
-                logger.warning("Circuit breaker for %s re-OPENED after failed probe", agent_id, agent_id=agent_id, state="open", reason="failed_probe")
+                logger.warning(f"Circuit breaker for {agent_id} re-OPENED after failed probe", agent_id=agent_id, state="open", reason="failed_probe")
             elif cb["failures"] >= CB_FAILURE_THRESHOLD:
                 cb["state"]     = CB_OPEN
                 cb["opened_at"] = time.monotonic()
                 logger.warning(
-                    "Circuit breaker OPENED for %s after %d failures",
-                    agent_id, cb["failures"],
+                    f"Circuit breaker OPENED for {agent_id} after {cb['failures']} failures",
                     agent_id=agent_id, state="open", failures=cb["failures"], threshold=CB_FAILURE_THRESHOLD
                 )
                 
@@ -1379,8 +1366,7 @@ class AgentOrchestrator:
         )
         if existing:
             logger.info(
-                "Dispatcher reuse: binding existing Task Agent %s to Lead %s",
-                existing.agentium_id, lead_id,
+                f"Dispatcher reuse: binding existing Task Agent {existing.agentium_id} to Lead {lead_id}",
                 existing_agent_id=existing.agentium_id, lead_id=lead_id, status="reused"
             )
             return existing.agentium_id
@@ -1396,13 +1382,12 @@ class AgentOrchestrator:
                 )
                 self.db.commit()
                 logger.info(
-                    "Dispatcher auto-spawned Task Agent %s under Lead %s",
-                    agent.agentium_id, lead_id,
+                    f"Dispatcher auto-spawned Task Agent {agent.agentium_id} under Lead {lead_id}",
                     new_agent_id=agent.agentium_id, lead_id=lead_id, status="auto_spawned"
                 )
                 return agent.agentium_id
         except Exception as e:
-            logger.warning("Dispatcher auto-spawn under %s failed: %s", lead_id, e, lead_id=lead_id, error=str(e))
+            logger.warning(f"Dispatcher auto-spawn under {lead_id} failed: {e}", lead_id=lead_id, error=str(e))
 
         return None
 

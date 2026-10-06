@@ -221,7 +221,7 @@ async def _duckduckgo(query: str, max_results: int) -> List[Dict]:
                     for i, r in enumerate(result.results)
                 ]
     except Exception as exc:
-        logger.debug("web_search: BrowserService path failed (%s), using httpx", exc)
+        logger.debug(f"web_search: BrowserService path failed ({exc}), using httpx")
 
     # ── Attempt 2: httpx POST (no browser dependency) ─────────────────────────
     async with httpx.AsyncClient(
@@ -351,7 +351,7 @@ class WebSearchTool:
                 break
             except Exception as exc:
                 last_error = f"{pname}: {exc}"
-                logger.warning("web_search: provider %s failed — %s", pname, exc)
+                logger.warning(f"web_search: provider {pname} failed — {exc}")
 
         latency_ms = int((time.monotonic() - start) * 1000)
 
@@ -372,10 +372,7 @@ class WebSearchTool:
         }
 
         _cache_set(ckey, output)
-        logger.info(
-            "web_search: query=%r provider=%s results=%d latency=%dms",
-            query, provider_used, len(results), latency_ms,
-        )
+        logger.info(f"web_search: query={query!r} provider={provider_used} results={len(results)} latency={latency_ms}ms")
         return output
 
     # ── Internal dispatch ─────────────────────────────────────────────────────

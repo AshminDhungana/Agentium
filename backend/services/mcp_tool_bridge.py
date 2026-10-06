@@ -238,7 +238,7 @@ class MCPToolBridge:
             self._register(tool)
             registered += 1
 
-        logger.info("[MCPBridge] Startup sync complete — %d MCP tools registered", registered)
+        logger.info(f"[MCPBridge] Startup sync complete — {registered} MCP tools registered")
         return registered
 
     def sync_one(self, tool: MCPTool) -> None:
@@ -260,7 +260,7 @@ class MCPToolBridge:
             return
 
         self._register(tool)
-        logger.info("[MCPBridge] Registered MCP tool: %s", _registry_name(tool))
+        logger.info(f"[MCPBridge] Registered MCP tool: {_registry_name(tool)}")
 
     def deregister(self, tool: MCPTool) -> None:
         """
@@ -271,9 +271,9 @@ class MCPToolBridge:
         key = _registry_name(tool)
         removed = self._registry.deregister_tool(key)
         if removed:
-            logger.warning("[MCPBridge] Deregistered MCP tool (revoked/disabled): %s", key)
+            logger.warning(f"[MCPBridge] Deregistered MCP tool (revoked/disabled): {key}")
         else:
-            logger.debug("[MCPBridge] deregister called for unknown key: %s", key)
+            logger.debug(f"[MCPBridge] deregister called for unknown key: {key}")
 
     def list_mcp_registry_keys(self) -> List[str]:
         """Return all registry keys that belong to MCP tools."""

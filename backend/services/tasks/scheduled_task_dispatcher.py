@@ -180,7 +180,7 @@ def _dispatch_one(db, row) -> None:
             after_state={"task_id": row.agentium_id, "error": str(exc)},
         )
         db.commit()
-        logger.error("dispatch failed for scheduled task %s: %s", row.agentium_id, exc)
+        logger.error(f"dispatch failed for scheduled task {row.agentium_id}: {exc}")
         return
 
     row.mark_completed(success=True)
@@ -221,7 +221,7 @@ def _sweep(db) -> dict:
             results["dispatched"] += 1
         except Exception as exc:  # one bad row never aborts the sweep
             results["errors"] += 1
-            logger.error("sweep error for %s: %s", row.agentium_id, exc, exc_info=True)
+            logger.error(f"sweep error for {row.agentium_id}: {exc}", exc_info=True)
 
     db.commit()
     return results
@@ -236,5 +236,5 @@ def dispatch_due_scheduled_tasks():
         try:
             return _sweep(db)
         except Exception as exc:
-            logger.error("dispatch_due_scheduled_tasks failed: %s", exc)
+            logger.error(f"dispatch_due_scheduled_tasks failed: {exc}")
             return {"error": str(exc)}

@@ -262,7 +262,7 @@ async def dispatch_task(
     try:
         await orchestrator.initialize()
     except Exception as e:
-        logger.warning("dispatch_task: orchestrator init failed: %s", e)
+        logger.warning(f"dispatch_task: orchestrator init failed: {e}")
     task_dict = {
         "id": task.id,
         "task_type": task.task_type.value if task.task_type else "general",

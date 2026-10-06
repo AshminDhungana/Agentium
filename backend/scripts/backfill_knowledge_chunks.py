@@ -65,14 +65,14 @@ def backfill_collection(vs, db, collection_key: str) -> int:
             try:
                 collection.delete(ids=[doc_id])
             except Exception:  # noqa: BLE001
-                logger.debug("Could not delete legacy doc %s", doc_id)
+                logger.debug(f"Could not delete legacy doc {doc_id}")
             migrated += 1
 
         if len(ids) < _BATCH:
             break
         offset = (offset or 0) + len(ids)
 
-    logger.info("Backfilled %d legacy docs in '%s'", migrated, collection_key)
+    logger.info(f"Backfilled {migrated} legacy docs in '{collection_key}'")
     return migrated
 
 
@@ -100,7 +100,7 @@ def main() -> None:
             n = backfill_collection(vs, db, args.collection)
         else:
             n = backfill_all(vs, db)
-        logger.info("Backfill complete: %d documents migrated.", n)
+        logger.info(f"Backfill complete: {n} documents migrated.")
     finally:
         db.close()
 

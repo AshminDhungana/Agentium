@@ -1216,7 +1216,7 @@ class ChannelManager:
                             db.add(unified_msg)
                             db.commit()
                         except Exception as _ce:  # noqa: BLE001
-                            logger.warning("Channel card answer parse failed: %s", _ce)
+                            logger.warning(f"Channel card answer parse failed: {_ce}")
 
             if has_unified_msg:
                 # Broadcast the new message to web clients

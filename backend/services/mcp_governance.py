@@ -106,7 +106,7 @@ class MCPGovernanceService:
         self.db.add(tool)
         self.db.commit()
         self.db.refresh(tool)
-        logger.info("[MCPGovernance] Tool proposed: %s (tier=%s) by %s", name, tier, proposed_by)
+        logger.info(f"[MCPGovernance] Tool proposed: {name} (tier={tier}) by {proposed_by}")
         return tool
 
     def _lazy_bridge(self):
@@ -151,9 +151,7 @@ class MCPGovernanceService:
             async with MCPClient(server_url) as client:
                 discovered = await client.list_tools()
         except MCPConnectionError as exc:
-            logger.warning(
-                "[MCPGovernance] Discovery failed for %s: %s", server_url, exc
-            )
+            logger.warning(f"[MCPGovernance] Discovery failed for {server_url}: {exc}")
             return {
                 "proposed": False,
                 "error": f"Could not connect to MCP server: {exc}",
@@ -241,10 +239,7 @@ class MCPGovernanceService:
         tool.voting_id = str(voting.id)
         self.db.commit()
 
-        logger.info(
-            "[MCPGovernance] MCP proposal %s opened Council vote %s",
-            tool.name, voting.id,
-        )
+        logger.info(f"[MCPGovernance] MCP proposal {tool.name} opened Council vote {voting.id}")
         return {
             "proposed": True,
             "status": "pending_vote",
@@ -355,9 +350,9 @@ class MCPGovernanceService:
             from backend.services import mcp_stats_service
             mcp_stats_service.remove_from_revoked(str(tool.id))
         except Exception as exc:
-            logger.debug("[MCPGovernance] Could not clear revocation SET on approve: %s", exc)
+            logger.debug(f"[MCPGovernance] Could not clear revocation SET on approve: {exc}")
 
-        logger.info("[MCPGovernance] Tool approved: %s by %s (vote=%s)", tool.name, approved_by, vote_id)
+        logger.info(f"[MCPGovernance] Tool approved: {tool.name} by {approved_by} (vote={vote_id})")
         return tool
 
     def revoke_mcp_tool(
@@ -387,12 +382,11 @@ class MCPGovernanceService:
             mcp_stats_service.add_to_revoked(str(tool.id))
         except Exception as exc:
             logger.error(
-                "[MCPGovernance] CRITICAL: Redis revocation SET write failed for %s: %s — "
-                "DB status is set but Redis check will not fire until service restarts.",
-                tool.name, exc,
+                f"[MCPGovernance] CRITICAL: Redis revocation SET write failed for {tool.name}: {exc} — "
+                "DB status is set but Redis check will not fire until service restarts."
             )
 
-        logger.warning("[MCPGovernance] Tool REVOKED: %s by %s — %s", tool.name, revoked_by, reason)
+        logger.warning(f"[MCPGovernance] Tool REVOKED: {tool.name} by {revoked_by} — {reason}")
         return tool
 
     # ══════════════════════════════════════════════════════════════════════════
@@ -453,15 +447,13 @@ class MCPGovernanceService:
         try:
             from backend.services import mcp_stats_service as _stats
             if _stats.is_revoked(str(tool.id)):
-                logger.warning(
-                    "[MCPGovernance] Tool %s blocked by Redis revocation SET", tool.name
-                )
+                logger.warning(f"[MCPGovernance] Tool {tool.name} blocked by Redis revocation SET")
                 return self._blocked_response(
                     tool.name,
                     "Tool has been revoked (Redis fast-path). Access denied immediately.",
                 )
         except Exception as exc:
-            logger.debug("[MCPGovernance] Redis revocation check error (continuing): %s", exc)
+            logger.debug(f"[MCPGovernance] Redis revocation check error (continuing): {exc}")
 
         # ── State guard (DB-authoritative fallback) ───────────────────────────
         if tool.status != STATUS_APPROVED:
@@ -569,7 +561,7 @@ class MCPGovernanceService:
             from backend.services import mcp_stats_service as _stats
             _stats.record_invocation(str(tool.id), latency_ms, invocation_success)
         except Exception as exc:
-            logger.debug("[MCPGovernance] Stats record failed (non-fatal): %s", exc)
+            logger.debug(f"[MCPGovernance] Stats record failed (non-fatal): {exc}")
 
         # ── Audit ──────────────────────────────────────────────────────────────
         self._audit(tool, agent_id, params, success=result.get("success", False), error=result.get("error"))
@@ -612,8 +604,7 @@ class MCPGovernanceService:
             tool.health_status = "down"
             self.db.commit()
             logger.error(
-                "[MCPGovernance] Tool auto-disabled after %d consecutive failures: %s",
-                tool.consecutive_failures, tool.name,
+                f"[MCPGovernance] Tool auto-disabled after {tool.consecutive_failures} consecutive failures: {tool.name}"
             )
             return True
         return False
@@ -641,15 +632,14 @@ class MCPGovernanceService:
             from backend.services import mcp_stats_service as _stats
             revoked_ids = set(_stats.get_revoked_ids())
         except Exception as exc:
-            logger.debug("[MCPGovernance] Redis revocation filter unavailable (skip): %s", exc)
+            logger.debug(f"[MCPGovernance] Redis revocation filter unavailable (skip): {exc}")
 
         if revoked_ids:
             before_count = len(tools)
             tools = [t for t in tools if str(t.id) not in revoked_ids]
             if len(tools) < before_count:
                 logger.info(
-                    "[MCPGovernance] Filtered %d revoked tool(s) from approved list via Redis SET",
-                    before_count - len(tools),
+                    f"[MCPGovernance] Filtered {before_count - len(tools)} revoked tool(s) from approved list via Redis SET"
                 )
 
         if agent_tier and (agent_tier.startswith("2") or agent_tier.startswith("3")):
@@ -695,7 +685,7 @@ class MCPGovernanceService:
                 return list(stats_map.values())
             return _stats.get_all_stats()
         except Exception as exc:
-            logger.warning("[MCPGovernance] get_live_stats error: %s", exc)
+            logger.warning(f"[MCPGovernance] get_live_stats error: {exc}")
             return []
 
     # ══════════════════════════════════════════════════════════════════════════

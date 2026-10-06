@@ -74,7 +74,7 @@ def set_connection_params(dbapi_conn, connection_record):
             cursor.close()
         except Exception:
             pass
-        logger.debug("Skipping connection SET commands (not a Postgres connection): %s", e)
+        logger.debug(f"Skipping connection SET commands (not a Postgres connection): {e}")
 
 
 def get_db() -> Generator[Session, None, None]:
@@ -145,9 +145,7 @@ def _ensure_tool_usage_log_columns(db: Session):
             if "already exists" not in str(e).lower() and "duplicate" not in str(e).lower():
                 raise
 
-    logger.info(
-        "✅ Reconciled tool_usage_logs columns (%d added)", len(columns_to_add)
-    )
+    logger.info(f"✅ Reconciled tool_usage_logs columns ({len(columns_to_add)} added)")
 
 
 def _ensure_api_key_resilience_columns(db: Session):
@@ -458,7 +456,7 @@ def init_db():
         with get_db_context() as db:
             ensure_pg_stat_statements(db)
     except Exception as exc:  # pragma: no cover - optional, non-fatal
-        logger.warning("[init_db] pg_stat_statements enable skipped: %s", exc)
+        logger.warning(f"[init_db] pg_stat_statements enable skipped: {exc}")
 
     # Seed initial/system data
     with get_db_context() as db:

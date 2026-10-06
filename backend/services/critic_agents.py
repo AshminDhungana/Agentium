@@ -117,7 +117,7 @@ class CriticService:
                         ct.value, critic.agentium_id, task_id,
                     )
             except Exception as exc:
-                logger.error("Failed to spawn %s critic for task %s: %s", ct.value, task_id, exc)
+                logger.error(f"Failed to spawn {ct.value} critic for task {task_id}: {exc}")
 
         if spawned:
             db.commit()
@@ -417,7 +417,7 @@ class CriticService:
                     metadata={"critic_type": critic_type.value, "task_id": task_id},
                 )
             except Exception as exc:
-                logger.error("Failed to index case law: %s", exc)
+                logger.error(f"Failed to index case law: {exc}")
 
         if verdict == CriticVerdict.ESCALATE:
             result["escalation"] = await self._escalate_to_council(
@@ -636,7 +636,7 @@ Respond ONLY with a JSON object — no markdown, no preamble:
                 return (verdict,
                         reason_match.group(1) if reason_match else "Parsed via regex fallback",
                         suggestions_match.group(1) if suggestions_match else "AI response was not valid JSON")
-            logger.warning("Critic AI returned non-JSON: %s", raw_response[:200])
+            logger.warning(f"Critic AI returned non-JSON: {raw_response[:200]}")
             return (CriticVerdict.PASS, None, "AI response was not valid JSON — manual review recommended")
 
         verdict_str = str(data.get("verdict", "pass")).lower()
