@@ -17,9 +17,11 @@ export interface GenesisStatusResponse {
 }
 
 export const websocketReplayApi = {
-    fetchReplay: async (since: string): Promise<ReplayEvent[]> => {
+    fetchReplay: async (since: string, username?: string): Promise<ReplayEvent[]> => {
+        const params = new URLSearchParams({ since });
+        if (username) params.append('username', username);
         const data = await rawFetch<ReplayResponse>(
-            `/ws/replay?since=${encodeURIComponent(since)}`,
+            `/ws/replay?${params.toString()}`,
         );
         return data.events || [];
     },

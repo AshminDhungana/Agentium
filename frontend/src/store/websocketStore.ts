@@ -9,6 +9,7 @@ import { websocketReplayApi } from '@/services/websocketReplay';
 import { logger } from '@/utils/logger';
 import type { StructuredInputAnswer } from '../types/structuredInput';
 import { useChatStore } from './chatStore';
+import { useAuthStore } from './authStore';
 import {
   ConnectionPhase, PhaseEvent, nextPhase,
   isActive, isConnectingPhase, canReconnect, isGenesisProgress, phaseFromGenesisStatus,
@@ -590,10 +591,14 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
     _fetchReplay: async () => {
         const since = get()._lastMessageTimestamp;
         if (!since) return;
+
+        // Get current username from auth store
+        const username = useAuthStore.getState().user?.username;
+
         try {
-            const events = await websocketReplayApi.fetchReplay(since);
+            const events = await websocketReplayApi.fetchReplay(since, username);
             if (events.length > 0) {
-                logger.debug(`[WebSocket] Replaying ${events.length} missed events`);
+                logger.debug(`[WebSocket] Replaying ${events.length} missed events for ${username}`);
             }
             const ws = get()._ws;
             if (!ws || !ws.onmessage) return;
