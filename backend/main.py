@@ -107,9 +107,11 @@ from backend.core.security_middleware import (
 from backend.core.middleware import RateLimitMiddleware
 from backend.core.observer_middleware import ObserverReadOnlyMiddleware
 from backend.core.timing_middleware import TimingMiddleware
+from backend.services.structured_logging import setup_structured_logging
+from backend.core.correlation_middleware import CorrelationIdMiddleware
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
+# Configure structured logging with JSON formatter
+setup_structured_logging(logging.INFO)
 logger = logging.getLogger(__name__)
 celery = celery_app
 
@@ -599,6 +601,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Correlation ID middleware - must be early to wrap entire request lifecycle
+app.add_middleware(CorrelationIdMiddleware)
 
 try:
     from backend.core.redis import get_redis_client as _get_redis

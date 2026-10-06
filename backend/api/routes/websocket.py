@@ -25,6 +25,7 @@ from backend.api.dependencies.auth import get_current_user
 from backend.core.redis import get_redis_client
 import redis.asyncio as redis
 
+from backend.core.correlation_middleware import ws_correlation_manager
 from backend.api.schemas.examples import ErrorResponseExample, SuccessResponseExample, build_responses
 
 router = APIRouter()
@@ -223,6 +224,8 @@ class ConnectionManager:
             if username:
                 # Run unsubscribe in background since we're in a sync method
                 asyncio.create_task(self.unsubscribe_user(username))
+            # Clear WebSocket correlation context
+            ws_correlation_manager.clear_connection_context(websocket)
             logger.error(f"[WebSocket] ❌ Disconnected: {username}")
         return username
 
@@ -776,6 +779,10 @@ async def websocket_chat_endpoint(
     """
     await websocket.accept()
 
+    # Extract correlation ID from headers for distributed tracing
+    request_id = websocket.headers.get("x-request-id") or websocket.headers.get("x-correlation-id")
+    ws_correlation_manager.set_connection_context(websocket, request_id)
+
     user_info: Optional[Dict[str, Any]] = None
 
     # Per-connection registry of in-flight streams so a later `cancel` message
@@ -814,35 +821,38 @@ async def websocket_chat_endpoint(
                 await websocket.send_json({"type": "error", "content": "Invalid JSON"})
                 continue
 
-            msg_type = data.get("type", "")
+            # Use message context for correlation ID propagation
+            message_request_id = data.get("request_id")
+            with ws_correlation_manager.message_context(websocket, message_request_id):
+                msg_type = data.get("type", "")
 
-            # ── Auth message ──────────────────────────────────────────────────
-            if msg_type == "auth":
-                if user_info is not None:
+                # ── Auth message ──────────────────────────────────────────────────
+                if msg_type == "auth":
+                    if user_info is not None:
+                        await websocket.send_json({
+                            "type":      "system",
+                            "content":   "Already authenticated.",
+                            "timestamp": datetime.utcnow().isoformat(),
+                        })
+                        continue
+
+                    auth_token = data.get("token", "")
+                    user_info  = await manager.authenticate(websocket, auth_token)
+                    if not user_info:
+                        return
+
                     await websocket.send_json({
                         "type":      "system",
-                        "content":   "Already authenticated.",
+                        "role":      "system",
+                        "content":   (
+                            f"Welcome {user_info['username']}. "
+                            f"Connected to Head of Council ({user_info['head_agentium_id']})."
+                        ),
                         "timestamp": datetime.utcnow().isoformat(),
                     })
+                    # See comment above — push genesis prompt if awaiting.
+                    await _send_genesis_prompt_if_awaiting(websocket)
                     continue
-
-                auth_token = data.get("token", "")
-                user_info  = await manager.authenticate(websocket, auth_token)
-                if not user_info:
-                    return
-
-                await websocket.send_json({
-                    "type":      "system",
-                    "role":      "system",
-                    "content":   (
-                        f"Welcome {user_info['username']}. "
-                        f"Connected to Head of Council ({user_info['head_agentium_id']})."
-                    ),
-                    "timestamp": datetime.utcnow().isoformat(),
-                })
-                # See comment above — push genesis prompt if awaiting.
-                await _send_genesis_prompt_if_awaiting(websocket)
-                continue
 
             # ── Require authentication ────────────────────────────────────────
             if user_info is None:

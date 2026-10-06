@@ -1,10 +1,9 @@
 """
 Task execution handlers for Celery.
-Includes: task execution, constitution review, idle processing, 
+Includes: task execution, constitution review, idle processing,
 self-healing execution loop, data retention, and channel message retry.
 
 """
-import logging
 import asyncio
 import json
 import os
@@ -33,7 +32,9 @@ from backend.services.reincarnation_service import ReincarnationService
 from backend.services.knowledge_assist import checkpoint_write
 from backend.services.chat_prune_service import run_chat_prune_task
 
-logger = logging.getLogger(__name__)
+from backend.services.structured_logging import get_structured_logger, timed_step, set_task_id, set_agent_id
+
+logger = get_structured_logger(__name__)
 
 
 # ═══════════════════════════════════════════════════════════
@@ -113,7 +114,7 @@ def execute_task_async(self, task_id: str, agent_id: str):
     """
     with get_task_db() as db:
         try:
-            logger.info(f"Executing task {task_id} with agent {agent_id}")
+            logger.info(f"Executing task {task_id} with agent {agent_id}", task_id=task_id, agent_id=agent_id, status="started")
 
             # Load task and agent
             task = db.query(Task).filter_by(agentium_id=task_id).first()
@@ -131,15 +132,19 @@ def execute_task_async(self, task_id: str, agent_id: str):
             if not agent:
                 raise ValueError(f"No active agent found for task {task_id}")
 
+            # Set context for structured logging
+            set_task_id(task_id)
+            set_agent_id(agent.agentium_id)
+
             # 8.4: received checkpoint — query Chroma + web-search + write-back
             try:
                 asyncio.run(checkpoint_write("received", task, agent, db))
             except Exception as cp_exc:  # noqa: BLE001
-                logger.warning(f"received checkpoint failed for {task_id}: {cp_exc}")
+                logger.warning(f"received checkpoint failed for {task_id}: {cp_exc}", task_id=task_id, agent_id=agent.agentium_id, error=str(cp_exc))
 
             # Execute with skill RAG
             result = agent.execute_with_skill_rag(task, db)
-            
+
             # Update task with result
             ws_path, arts = _extract_workspace(result)
             result_data = {
@@ -161,7 +166,7 @@ def execute_task_async(self, task_id: str, agent_id: str):
                         "artifact_count": len(arts or []),
                     }))
                 except Exception as ws_err:  # pragma: no cover - broadcast is best-effort
-                    logger.warning(f"workspace_ready broadcast failed: {ws_err}")
+                    logger.warning(f"workspace_ready broadcast failed: {ws_err}", task_id=task_id, agent_id=agent.agentium_id, error=str(ws_err))
             task.complete(
                 result_summary=result["content"][:500],
                 result_data=result_data
@@ -176,13 +181,13 @@ def execute_task_async(self, task_id: str, agent_id: str):
                     result_summary=result["content"][:500],
                 ))
             except Exception as ws_err:
-                logger.warning(f"task_update completed broadcast failed: {ws_err}")
+                logger.warning(f"task_update completed broadcast failed: {ws_err}", task_id=task_id, agent_id=agent.agentium_id, error=str(ws_err))
 
             # 8.4: completed checkpoint — query Chroma + web-search + write-back
             try:
                 asyncio.run(checkpoint_write("completed", task, agent, db))
             except Exception as cp_exc:  # noqa: BLE001
-                logger.warning(f"completed checkpoint failed for {task_id}: {cp_exc}")
+                logger.warning(f"completed checkpoint failed for {task_id}: {cp_exc}", task_id=task_id, agent_id=agent.agentium_id, error=str(cp_exc))
 
             # 8.4: mid checkpoint — only when the agent self-signaled a gap
             if isinstance(result, dict) and result.get("knowledge_needed"):
@@ -192,7 +197,7 @@ def execute_task_async(self, task_id: str, agent_id: str):
                         query=result.get("knowledge_query"),
                     ))
                 except Exception as cp_exc:  # noqa: BLE001
-                    logger.warning(f"mid checkpoint failed for {task_id}: {cp_exc}")
+                    logger.warning(f"mid checkpoint failed for {task_id}: {cp_exc}", task_id=task_id, agent_id=agent.agentium_id, error=str(cp_exc))
 
             # Record success for used skills
             for skill in result.get("skills_used", []):
@@ -208,9 +213,9 @@ def execute_task_async(self, task_id: str, agent_id: str):
                 from backend.services.autonomous_learning import get_learning_engine
                 engine = get_learning_engine()
                 learning_stats = engine.analyze_outcomes(db)
-                logger.info(f"Real-Time Learning executed for task {task_id}: {learning_stats}")
+                logger.info(f"Real-Time Learning executed for task {task_id}: {learning_stats}", task_id=task_id, agent_id=agent.agentium_id, learning_stats=str(learning_stats))
             except Exception as learning_exc:
-                logger.error(f"Real-Time Learning extraction failed for task {task_id}: {learning_exc}")
+                logger.error(f"Real-Time Learning extraction failed for task {task_id}: {learning_exc}", task_id=task_id, agent_id=agent.agentium_id, error=str(learning_exc))
 
             # Phase 16.2: Validation Boost
             try:
@@ -225,10 +230,11 @@ def execute_task_async(self, task_id: str, agent_id: str):
                     boost_result = ks.boost_retrieved_learnings(retrieved_ids)
                     logger.info(
                         f"Phase 16.2: Validation boost for task {task_id}: "
-                        f"boosted {boost_result.get('boosted', 0)} entries"
+                        f"boosted {boost_result.get('boosted', 0)} entries",
+                        task_id=task_id, agent_id=agent.agentium_id, boosted=boost_result.get('boosted', 0)
                     )
             except Exception as boost_exc:
-                logger.debug(f"Validation boost skipped for task {task_id}: {boost_exc}")
+                logger.debug(f"Validation boost skipped for task {task_id}: {boost_exc}", task_id=task_id, agent_id=agent.agentium_id, error=str(boost_exc))
 
             return {
                 "status": "completed",
@@ -303,13 +309,13 @@ def execute_task_async(self, task_id: str, agent_id: str):
             return {"status": "failed", "task_id": task_id, "reason": reason}
 
         except Exception as exc:
-            logger.error(f"Task execution failed: {exc}")
-            
+            logger.error(f"Task execution failed: {exc}", task_id=task_id, agent_id=agent.agentium_id, error=str(exc))
+
             # Phase 13.4: Anti-Pattern Early Warning
             try:
                 from backend.core.vector_store import get_vector_store
                 from backend.api.routes.websocket import manager
-                
+
                 vs = get_vector_store()
                 try:
                     results = vs.get_collection("task_patterns").query(
@@ -320,10 +326,10 @@ def execute_task_async(self, task_id: str, agent_id: str):
                     if results.get("documents") and results["documents"][0]:
                         distances = results["distances"][0] if results.get("distances") else []
                         similar_count = sum(1 for d in distances if d < 0.2)
-                        
+
                         if similar_count >= 3:
                             warning_msg = f"Anti-Pattern Detected: Similar failure occurred {similar_count} times. Error: {str(exc)[:100]}"
-                            logger.warning(warning_msg)
+                            logger.warning(warning_msg, task_id=task_id, agent_id=agent.agentium_id, similar_count=similar_count, error=str(exc)[:100])
 
                             try:
                                 asyncio.run(manager.broadcast({
@@ -351,9 +357,9 @@ def execute_task_async(self, task_id: str, agent_id: str):
                             except Exception:
                                 pass
                 except Exception as inner_exc:
-                    logger.debug(f"Anti-Pattern scan skipped or failed: {inner_exc}")
+                    logger.debug(f"Anti-Pattern scan skipped or failed: {inner_exc}", task_id=task_id, agent_id=agent.agentium_id, error=str(inner_exc))
             except Exception as eval_exc:
-                logger.error(f"Anti-pattern evaluation failed: {eval_exc}")
+                logger.error(f"Anti-pattern evaluation failed: {eval_exc}", task_id=task_id, agent_id=agent.agentium_id, error=str(eval_exc))
 
             countdown = min(2 ** self.request.retries, 60)
 
@@ -372,7 +378,7 @@ def execute_task_async(self, task_id: str, agent_id: str):
                             error_message=str(exc),
                         )
                 except Exception as mark_exc:
-                    logger.error(f"mark_failed failed for {task_id}: {mark_exc}")
+                    logger.error(f"mark_failed failed for {task_id}: {mark_exc}", task_id=task_id, agent_id=agent.agentium_id, error=str(mark_exc))
 
                 try:
                     entry = AuditLog.log(
@@ -399,7 +405,7 @@ def execute_task_async(self, task_id: str, agent_id: str):
                     "reason": "execution_failed",
                 }
 
-            logger.info(f"Retrying task {task_id} in {countdown}s (attempt {self.request.retries + 1})")
+            logger.info(f"Retrying task {task_id} in {countdown}s (attempt {self.request.retries + 1})", task_id=task_id, agent_id=agent.agentium_id, countdown=countdown, attempt=self.request.retries + 1)
             raise self.retry(exc=exc, countdown=countdown)
 
 
@@ -433,17 +439,17 @@ def handle_task_escalation():
                 Task.status == TaskStatus.ESCALATED,
                 Task.is_active == True
             ).all()
-            
+
             if not escalated_tasks:
                 return {"processed": 0}
-            
+
             council_members = db.query(CouncilMember).filter_by(is_active=True).all()
             head = db.query(HeadOfCouncil).filter_by(agentium_id="00001").first()
-            
+
             results = []
-            
+
             for task in escalated_tasks:
-                logger.info(f"Processing escalated task {task.agentium_id}: {task.title}")
+                logger.info(f"Processing escalated task {task.agentium_id}: {task.title}", task_id=task.agentium_id, task_title=task.title)
 
                 try:
                     decision = _simulate_council_decision(task)
@@ -489,23 +495,23 @@ def handle_task_escalation():
                     })
                     
                 except Exception as e:
-                    logger.error(f"Failed to process escalated task {task.agentium_id}: {e}")
+                    logger.error(f"Failed to process escalated task {task.agentium_id}: {e}", task_id=task.agentium_id, error=str(e))
                     results.append({
                         "task_id": task.agentium_id,
                         "error": str(e)
                     })
-            
+
             db.commit()
-            
-            logger.info(f"Processed {len(results)} escalated tasks")
+
+            logger.info(f"Processed {len(results)} escalated tasks", processed=len(results))
             return {
                 "processed": len(results),
                 "details": results,
                 "timestamp": datetime.utcnow().isoformat()
             }
-            
+
         except Exception as e:
-            logger.error(f"Error in handle_task_escalation: {e}")
+            logger.error(f"Error in handle_task_escalation: {e}", error=str(e))
             return {"error": str(e)}
 
 
@@ -606,15 +612,15 @@ def sovereign_data_retention():
                 results["errors"].append(f"Ethos cleanup error: {e}")
             
             db.commit()
-            logger.info(f"Data retention complete: {results}")
+            logger.info(f"Data retention complete: {results}", tasks_archived=results.get('tasks_archived', 0), embeddings_removed=results.get('embeddings_removed', 0), logs_compressed=results.get('logs_compressed', 0), ethos_removed=results.get('ethos_removed', 0))
             return {
                 "status": "completed",
                 "results": results,
                 "timestamp": datetime.utcnow().isoformat()
             }
-            
+
         except Exception as e:
-            logger.error(f"Error in sovereign_data_retention: {e}")
+            logger.error(f"Error in sovereign_data_retention: {e}", error=str(e))
             return {"error": str(e)}
 
 
@@ -639,7 +645,7 @@ def _scale_redis():
             url = os.getenv("REDIS_URL", "redis://redis:6379/0")
             _SCALE_REDIS = redis_sync.from_url(url, decode_responses=True)
         except Exception as exc:  # pragma: no cover - degraded path
-            logger.warning("auto_scale_check: Redis unavailable: %s", exc)
+            logger.warning("auto_scale_check: Redis unavailable: %s", exc, error=str(exc))
             _SCALE_REDIS = None
     return _SCALE_REDIS
 
@@ -698,11 +704,12 @@ def auto_scale_check():
                         }
                     r.set(cd_key, "1", ex=cooldown)
                 except Exception as cd_exc:  # Redis hiccup → proceed without gate
-                    logger.warning("auto_scale_check: cooldown gate skipped: %s", cd_exc)
+                    logger.warning("auto_scale_check: cooldown gate skipped: %s", cd_exc, error=str(cd_exc))
 
             logger.info(
                 f"Queue depth {pending_count} exceeds threshold {threshold} "
-                f"(live={live_agents}/{max_live}), requesting scaling"
+                f"(live={live_agents}/{max_live}), requesting scaling",
+                pending_count=pending_count, threshold=threshold, live_agents=live_agents, max_live=max_live
             )
 
             head = db.query(HeadOfCouncil).filter_by(agentium_id="00001").first()
@@ -754,7 +761,7 @@ def auto_scale_check():
                     )
                     spawned += 1
                 except Exception as spawn_exc:
-                    logger.error(f"auto_scale_check: spawn {i+1}/{recommended_agents} failed: {spawn_exc}")
+                    logger.error(f"auto_scale_check: spawn {i+1}/{recommended_agents} failed: {spawn_exc}", spawn_index=i+1, total=recommended_agents, error=str(spawn_exc))
                     spawn_errors.append(str(spawn_exc))
 
             return {
@@ -770,7 +777,7 @@ def auto_scale_check():
             }
             
         except Exception as e:
-            logger.error(f"Error in auto_scale_check: {e}")
+            logger.error(f"Error in auto_scale_check: {e}", error=str(e))
             return {"error": str(e)}
 
 
@@ -795,7 +802,7 @@ def check_stalled_reasoning():
 
                 task = db.query(Task).filter_by(agentium_id=task_id, is_active=True).first()
                 if not task:
-                    logger.warning(f"check_stalled_reasoning: task {task_id} not found, skipping re-queue")
+                    logger.warning(f"check_stalled_reasoning: task {task_id} not found, skipping re-queue", task_id=task_id, agent_id=agent_id)
                     results.append({"task_id": task_id, "action": "skipped_not_found"})
                     continue
 
@@ -804,7 +811,8 @@ def check_stalled_reasoning():
                 if resume_count >= 3:
                     logger.warning(
                         f"check_stalled_reasoning: task {task_id} has stalled {resume_count} times — "
-                        "not re-queuing, escalating."
+                        "not re-queuing, escalating.",
+                        task_id=task_id, agent_id=agent_id, resume_count=resume_count
                     )
                     task.set_status(TaskStatus.ESCALATED, "WATCHDOG", "Max stall retries exceeded")
                     results.append({"task_id": task_id, "action": "escalated"})
@@ -817,7 +825,8 @@ def check_stalled_reasoning():
                 execute_task_async.delay(task_id, agent_id)
                 logger.info(
                     f"check_stalled_reasoning: re-queued stalled task {task_id} "
-                    f"(resume attempt {resume_count + 1}/3)"
+                    f"(resume attempt {resume_count + 1}/3)",
+                    task_id=task_id, agent_id=agent_id, attempt=resume_count + 1
                 )
                 results.append({"task_id": task_id, "action": "re_queued", "attempt": resume_count + 1})
 
@@ -828,7 +837,7 @@ def check_stalled_reasoning():
             }
 
         except Exception as e:
-            logger.error(f"check_stalled_reasoning: unexpected error: {e}")
+            logger.error(f"check_stalled_reasoning: unexpected error: {e}", error=str(e))
             return {"error": str(e)}
 
 
@@ -845,22 +854,22 @@ def retry_channel_message(self, message_id: str, agent_id: str, content: str, ri
             
             message = db.query(ExternalMessage).filter_by(id=message_id).first()
             if not message:
-                logger.error(f"Message {message_id} not found for retry")
+                logger.error(f"Message {message_id} not found for retry", message_id=message_id)
                 return {"success": False, "error": "Message not found"}
-            
+
             channel = db.query(ExternalChannel).filter_by(id=message.channel_id).first()
             if not channel or channel.status != ChannelStatus.ACTIVE:
-                logger.warning(f"Channel {message.channel_id} not active, aborting retry")
+                logger.warning(f"Channel {message.channel_id} not active, aborting retry", channel_id=message.channel_id, message_id=message_id)
                 return {"success": False, "error": "Channel not active"}
-            
+
             if not circuit_breaker.can_execute(channel.id):
-                logger.info(f"Circuit breaker open for channel {channel.id}, rescheduling retry")
+                logger.info(f"Circuit breaker open for channel {channel.id}, rescheduling retry", channel_id=channel.id, message_id=message_id)
                 raise self.retry(countdown=600)
-            
+
             rich_media = None
             if rich_media_dict:
                 rich_media = RichMediaContent(**rich_media_dict)
-            
+
             success = ChannelManager.send_response(
                 message_id=message_id,
                 response_content=content,
@@ -868,28 +877,28 @@ def retry_channel_message(self, message_id: str, agent_id: str, content: str, ri
                 rich_media=rich_media,
                 db=db
             )
-            
+
             if not success:
                 raise Exception("Send returned False")
-            
+
             circuit_breaker.record_success(channel.id)
-            logger.info(f"Successfully retried message {message_id}")
-            
+            logger.info(f"Successfully retried message {message_id}", message_id=message_id, agent_id=agent_id)
+
             return {
-                "success": True, 
-                "message_id": message_id, 
+                "success": True,
+                "message_id": message_id,
                 "retries": self.request.retries
             }
-            
+
         except Exception as exc:
             retry_count = self.request.retries
-            
+
             if retry_count < 3:
                 countdown = 300 * (2 ** retry_count)
-                logger.warning(f"Retry {retry_count + 1}/3 for message {message_id} in {countdown}s: {exc}")
+                logger.warning(f"Retry {retry_count + 1}/3 for message {message_id} in {countdown}s: {exc}", message_id=message_id, retry_count=retry_count + 1, countdown=countdown, error=str(exc))
                 raise self.retry(exc=exc, countdown=countdown)
-            
-            logger.error(f"Max retries exceeded for message {message_id}: {exc}")
+
+            logger.error(f"Max retries exceeded for message {message_id}: {exc}", message_id=message_id, agent_id=agent_id, error=str(exc))
             
             message = db.query(ExternalMessage).filter_by(id=message_id).first()
             if message:
@@ -923,7 +932,7 @@ def cleanup_old_channel_messages(days: int = 30):
             msg.status = "archived"
             count += 1
         
-        logger.info(f"Archived {count} old channel messages")
+        logger.info(f"Archived {count} old channel messages", archived=count, cutoff_days=days)
         return {"archived": count, "cutoff_days": days}
 
 
@@ -957,7 +966,8 @@ def check_channel_health():
                 })
                 logger.warning(
                     f"Auto-disabled channel {channel.id} "
-                    f"(success rate: {health['circuit_breaker']['success_rate']:.2%})"
+                    f"(success rate: {health['circuit_breaker']['success_rate']:.2%})",
+                    channel_id=channel.id, success_rate=health['circuit_breaker']['success_rate']
                 )
 
             elif health['circuit_breaker']['circuit_state'] != 'closed':
@@ -1000,7 +1010,8 @@ def check_channel_health():
                 })
                 logger.info(
                     f"Auto-reconnected channel {channel.id} "
-                    f"(circuit breaker closed, success rate: {success_rate:.2%})"
+                    f"(circuit breaker closed, success rate: {success_rate:.2%})",
+                    channel_id=channel.id, success_rate=success_rate
                 )
 
                 # Broadcast the channel recovery event
@@ -1012,12 +1023,12 @@ def check_channel_health():
                         "timestamp": datetime.utcnow().isoformat()
                     }))
                 except Exception as broadcast_err:
-                    logger.error(f"Failed to broadcast channel recovery: {broadcast_err}")
+                    logger.error(f"Failed to broadcast channel recovery: {broadcast_err}", error=str(broadcast_err), channel_id=channel.id)
 
         # Combine results
         results.extend(reconnection_results)
 
-        logger.info(f"Health check completed for {len(channels)} channels checked, {len(error_channels)} error channels evaluated, {len(results)} total actions taken")
+        logger.info(f"Health check completed for {len(channels)} channels checked, {len(error_channels)} error channels evaluated, {len(results)} total actions taken", checked=len(channels), error_channels=len(error_channels), actions=len(results))
         return {
             "checked": len(channels),
             "error_channels_evaluated": len(error_channels),
@@ -1062,9 +1073,9 @@ def start_imap_receivers():
                         imap_receiver.start_channel(channel_data['id'], channel_config)
                     )
                     started += 1
-                    logger.info(f"Started/verified IMAP for channel {channel_data['id']}")
+                    logger.info(f"Started/verified IMAP for channel {channel_data['id']}", channel_id=channel_data['id'])
                 except Exception as e:
-                    logger.error(f"Failed to start IMAP for channel {channel_data['id']}: {e}")
+                    logger.error(f"Failed to start IMAP for channel {channel_data['id']}: {e}", channel_id=channel_data['id'], error=str(e))
         
         return {
             "email_channels": len(email_channels),
@@ -1091,10 +1102,10 @@ def send_channel_heartbeat():
                 channel.updated_at = now
                 heartbeats_sent += 1
             except Exception as e:
-                logger.error(f"Failed to update channel {channel.id}: {e}")
-        
+                logger.error(f"Failed to update channel {channel.id}: {e}", channel_id=channel.id, error=str(e))
+
         db.commit()
-        logger.info(f"Heartbeat sent to {heartbeats_sent} channels")
+        logger.info(f"Heartbeat sent to {heartbeats_sent} channels", channels=heartbeats_sent)
         return {"channels": heartbeats_sent}
 
 
@@ -1137,7 +1148,7 @@ def broadcast_to_channels(channel_ids: list, message: str, agent_id: str):
                 })
 
             except Exception as e:
-                logger.error(f"Failed to broadcast to channel {channel_id}: {e}")
+                logger.error(f"Failed to broadcast to channel {channel_id}: {e}", channel_id=channel_id, error=str(e))
                 results.append({
                     "channel_id": channel_id,
                     "success": False,
