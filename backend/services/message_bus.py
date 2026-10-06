@@ -311,7 +311,37 @@ class MessageBus:
             await self._pubsub.close()
         if self._redis:
             await self._redis.close()
-    
+
+    async def get_usernames_for_agent(self, agent_id: str) -> List[str]:
+        """
+        Get usernames associated with an agent.
+
+        In the single-sovereign Agentium architecture, all agents ultimately
+        work for the primary sovereign user(s). This method returns the
+        usernames of all active sovereign users.
+
+        Args:
+            agent_id: The agentium_id of the agent
+
+        Returns:
+            List of usernames that should receive events for this agent
+        """
+        try:
+            from backend.models.database import SessionLocal
+            from backend.models.entities.user import User, ROLE_PRIMARY_SOVEREIGN, ROLE_DEPUTY_SOVEREIGN
+
+            with SessionLocal() as db:
+                # Query for active sovereign users
+                sovereign_users = db.query(User).filter(
+                    User.is_active == True,
+                    User.role.in_([ROLE_PRIMARY_SOVEREIGN, ROLE_DEPUTY_SOVEREIGN])
+                ).all()
+
+                return [user.username for user in sovereign_users]
+        except Exception as e:
+            logger.error(f"Error getting usernames for agent {agent_id}: {e}")
+            return []
+
     def _get_rate_limit(self, agent_id: str) -> int:
         """Get rate limit for agent tier."""
         tier = agent_id[0] if agent_id else "3"
