@@ -109,6 +109,11 @@ class ConnectionManager:
         # so a client bound to a closed loop raises "Event loop is closed".
         self._redis_loop: Optional["asyncio.AbstractEventLoop"] = None
 
+        # ── Pub/Sub for cross-worker event distribution (13.3) ──────────────────
+        self._pubsub: Optional["redis.client.PubSub"] = None
+        self._pubsub_task: Optional[asyncio.Task] = None
+        self._user_channels: set = set()  # Track subscribed ws:user:{username}
+
     async def _get_redis(self) -> redis.Redis:
         current_loop = asyncio.get_running_loop()
         if self.redis_client is None or self._redis_loop is not current_loop:
@@ -199,6 +204,10 @@ class ConnectionManager:
 
         self.active_connections[websocket] = user_info
         self.user_connections[username]    = websocket
+
+        # Subscribe to user's per-user Pub/Sub channel
+        await self.subscribe_user(username)
+
         logger.info(f"[WebSocket] ✅ Authenticated: {username} ({datetime.utcnow().isoformat()})")
         return user_info
 
@@ -210,8 +219,82 @@ class ConnectionManager:
             username  = user_info.get("username")
             if username and username in self.user_connections:
                 del self.user_connections[username]
+            # Unsubscribe from user's per-user Pub/Sub channel
+            if username:
+                # Run unsubscribe in background since we're in a sync method
+                asyncio.create_task(self.unsubscribe_user(username))
             logger.error(f"[WebSocket] ❌ Disconnected: {username}")
         return username
+
+    # ── Pub/Sub for cross-worker event distribution (13.3) ──────────────────────
+
+    async def _ensure_pubsub(self):
+        """Lazy-init Pub/Sub subscription to ws:broadcast."""
+        if self._pubsub is None:
+            r = await self._get_redis()
+            self._pubsub = await r.pubsub()
+            await self._pubsub.subscribe("ws:broadcast")
+            self._pubsub_task = asyncio.create_task(self._listen_pubsub())
+            logger.info("[ConnectionManager] Pub/Sub initialized, subscribed to ws:broadcast")
+
+    async def subscribe_user(self, username: str):
+        """Subscribe to per-user channel when user connects."""
+        await self._ensure_pubsub()
+        channel = f"ws:user:{username}"
+        if channel not in self._user_channels:
+            await self._pubsub.subscribe(channel)
+            self._user_channels.add(channel)
+            logger.info(f"[ConnectionManager] Subscribed to {channel} for user {username}")
+
+    async def unsubscribe_user(self, username: str):
+        """Unsubscribe from per-user channel when user disconnects."""
+        if self._pubsub:
+            channel = f"ws:user:{username}"
+            if channel in self._user_channels:
+                await self._pubsub.unsubscribe(channel)
+                self._user_channels.discard(channel)
+                logger.info(f"[ConnectionManager] Unsubscribed from {channel} for user {username}")
+
+    async def _listen_pubsub(self):
+        """Background task: forward Pub/Sub messages to local WebSocket connections."""
+        try:
+            async for message in self._pubsub.listen():
+                if message['type'] == 'message':
+                    try:
+                        event = json.loads(message['data'])
+                        channel = message['channel']
+
+                        # Determine target: global, user, or room
+                        if channel == "ws:broadcast":
+                            await self._broadcast_local(event)
+                        elif channel.startswith("ws:user:"):
+                            username = channel.split("ws:user:", 1)[1]
+                            await self.send_personal_message(event, username)
+                        elif channel.startswith("ws:room:"):
+                            # Future: forward to all users in room
+                            pass
+                    except json.JSONDecodeError:
+                        logger.warning(f"[ConnectionManager] Invalid JSON in Pub/Sub message: {message['data']}")
+                    except Exception as e:
+                        logger.error(f"[ConnectionManager] Error processing Pub/Sub message: {e}")
+        except asyncio.CancelledError:
+            logger.info("[ConnectionManager] Pub/Sub listener cancelled")
+        except Exception as e:
+            logger.error(f"[ConnectionManager] Pub/Sub listen error: {e}")
+
+    async def _broadcast_local(self, message: dict, exclude: Optional[WebSocket] = None) -> None:
+        """Broadcast JSON message to local connections only (no Redis Pub/Sub)."""
+        disconnected = []
+        for connection, user_info in list(self.active_connections.items()):
+            if connection is exclude:
+                continue
+            try:
+                await connection.send_json(message)
+            except Exception as exc:
+                logger.error(f"[WebSocket] Local broadcast error to {user_info.get('username')}: {exc}")
+                disconnected.append(connection)
+        for conn in disconnected:
+            self.disconnect(conn)
 
     # ── send helpers ─────────────────────────────────────────────────────────
 
