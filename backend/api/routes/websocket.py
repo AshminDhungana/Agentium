@@ -10,7 +10,7 @@ from contextlib import contextmanager
 from datetime import datetime
 from typing import Optional, Dict, Any, List
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, Query
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, Query, HTTPException
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 
@@ -1163,24 +1163,51 @@ async def genesis_status(current_user=Depends(get_current_user)):
 @router.get(
     "/replay",
     summary="Replay Events",
-    description="Fetch buffered broadcast events for reconnection replay.",
+    description="Fetch buffered broadcast events for reconnection replay. Supports per-user history streams.",
     responses=build_responses(None),
     tags=["WebSocket"],
 )
-async def replay_events(since: str, current_user=Depends(get_current_user)):
-    """Fetch buffered broadcast events for reconnection replay."""
-    try:
-        r          = await manager._get_redis()
-        events_str = await r.lrange("agentium:ws:buffer", 0, 99)
-        events     = []
-        for e_str in events_str:
-            try:
-                e_obj = json.loads(e_str)
-                if e_obj.get("timestamp", "") > since:
-                    events.append(e_obj)
-            except Exception:
-                pass
+async def replay_events(
+    since: str,
+    username: Optional[str] = Query(None, description="Username for per-user replay (sovereign only)"),
+    current_user=Depends(get_current_user)
+):
+    """
+    Fetch missed events for reconnection replay.
 
+    - If username is provided and current_user is sovereign, replay that user's events
+    - If username is not provided, replay current user's events
+    - Non-sovereign users can only replay their own events
+    """
+    # Determine target user for replay
+    target_username = username or current_user["username"]
+
+    # Authorization: users can only replay their own events unless sovereign
+    if target_username != current_user["username"] and current_user.get("role") != "sovereign":
+        raise HTTPException(
+            status_code=403,
+            detail="Cannot replay other users' events"
+        )
+
+    try:
+        r = await manager._get_redis()
+        stream_key = f"ws:user:{target_username}:history"
+
+        # Read from per-user history stream since timestamp
+        # xread with count=500 to match stream maxlen
+        entries = await r.xread({stream_key: since}, count=500)
+
+        events = []
+        for stream_name, stream_entries in entries:
+            for msg_id, fields in stream_entries:
+                try:
+                    event_data = fields.get("data", "{}")
+                    event = json.loads(event_data)
+                    events.append(event)
+                except Exception:
+                    pass
+
+        # Sort by timestamp
         events.sort(key=lambda x: x.get("timestamp", ""))
         return {"events": events}
     except Exception as exc:
