@@ -453,7 +453,7 @@ class MessageBus:
                 message_id=message.message_id,
                 error="Only Head of Council (00001) can broadcast"
             )]
-        
+
         results = []
         from backend.models.entities.agents import Agent, AgentType
         active_agents = self.db.query(Agent).filter(
@@ -466,7 +466,18 @@ class MessageBus:
             msg_copy.recipient_id = agent.agentium_id
             result = await self.publish(msg_copy)
             results.append(result)
-        
+
+        # NEW: Also publish to WebSocket clients for global events
+        await self.publish_to_websocket(
+            event={
+                "type": message.message_type,
+                "message_id": message.message_id,
+                "sender_id": message.sender_id,
+                "content": message.content,
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        )
+
         return results
     
     async def subscribe(self, agent_id: str, callback: Callable[[AgentMessage], Any]):

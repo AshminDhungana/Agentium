@@ -10,6 +10,7 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock
 import json
 from backend.services.message_bus import MessageBus
+from backend.models.schemas.messages import AgentMessage
 
 
 @pytest.mark.asyncio
@@ -60,3 +61,38 @@ async def test_publish_to_websocket_no_persistence():
 
     message_bus._redis.publish.assert_called_once_with("ws:user:alice", json.dumps(event))
     message_bus._append_user_history.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_broadcast_from_head_also_publishes_to_websocket():
+    """13.3.1: MessageBus.broadcast_from_head calls publish_to_websocket for global events."""
+    message_bus = MessageBus()
+    message_bus.publish = AsyncMock()
+    message_bus.publish_to_websocket = AsyncMock()
+    # Mock db to avoid actual database queries
+    from unittest.mock import MagicMock
+    message_bus.db = MagicMock()
+    message_bus.db.query.return_value.filter.return_value.filter.return_value.all.return_value = []
+
+    # Create a test message
+    message = AgentMessage(
+        message_id="test-123",
+        sender_id="00001",
+        recipient_id="broadcast",
+        message_type="notification",
+        content="Test alert",
+        route_direction="broadcast"
+    )
+
+    await message_bus.broadcast_from_head(message)
+
+    # Should call publish_to_websocket for global broadcast
+    message_bus.publish_to_websocket.assert_called_once()
+    call_args = message_bus.publish_to_websocket.call_args
+    # call_args is a tuple of (args, kwargs)
+    if call_args[0]:  # positional args
+        event = call_args[0][0]
+    else:  # keyword args
+        event = call_args[1].get('event')
+    assert event["type"] == "notification"
+    assert event["content"] == "Test alert"
