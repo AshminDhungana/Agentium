@@ -737,10 +737,10 @@
   - [x] 14.5.2 — Backend persists frontend error reports to `AuditLog` (SYSTEM/WARNING)
   - [x] 14.5.3 — `MonitoringPage.tsx` displays ingested frontend errors (Operations tab: "Frontend Errors (24h)" metric)
 
-- [ ] **14.6 — Structured Logging**
-  - [ ] 14.6.1 — All agent steps emit structured JSON logs
-  - [ ] 14.6.2 — Logs contain: `timestamp`, `request_id`, `step`, `duration_ms`, `tokens`, `status`
-  - [ ] 14.6.3 — `request_id` correlates across HTTP → Celery → WebSocket
+- [x] **14.6 — Structured Logging**
+  - [x] 14.6.1 — All agent steps emit structured JSON logs
+  - [x] 14.6.2 — Logs contain: `timestamp`, `request_id`, `step`, `duration_ms`, `tokens`, `status`
+  - [x] 14.6.3 — `request_id` correlates across HTTP → Celery → WebSocket
 
 - [/] **14.7 — Alert Manager** (Partial — no deduplication)
   - [x] 14.7.1 — `alert_manager.py` fires alerts on threshold breaches (Z-score anomaly detection)
