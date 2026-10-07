@@ -14,7 +14,7 @@ the reincarnation service (defence-in-depth).
 from __future__ import annotations
 
 import re
-import logging
+
 from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
@@ -33,9 +33,8 @@ from backend.models.entities.task import Task, TaskType, TaskPriority
 from backend.services.capability_registry import Capability, CapabilityRegistry
 from backend.services.reincarnation_service import reincarnation_service
 
-logger = logging.getLogger(__name__)
-
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 @dataclass
 class GovernanceCommand:
     """A parsed provisioning directive."""
@@ -44,7 +43,6 @@ class GovernanceCommand:
     name: Optional[str] = None
     description: Optional[str] = None
     capabilities: Optional[List[str]] = None
-
 
 class GovernanceCommandService:
     """Deterministic detector + executor for provisioning directives."""

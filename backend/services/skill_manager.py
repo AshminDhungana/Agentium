@@ -3,7 +3,6 @@ Skill lifecycle management service.
 Handles creation, retrieval, updating, and governance of skills.
 """
 
-import logging
 import uuid
 from datetime import datetime
 from typing import List, Optional, Dict, Any
@@ -15,9 +14,8 @@ from backend.models.entities.agents import Agent
 from backend.core.vector_store import get_vector_store, BgeEmbeddingFunction
 from backend.services.knowledge_governance import KnowledgeGovernanceService
 
-logger = logging.getLogger(__name__)
-
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 class SkillManager:
     """
     Central service for skill CRUD operations and ChromaDB integration.
@@ -582,7 +580,6 @@ class SkillManager:
         )
 
         db.commit()
-
 
 # Global instance
 skill_manager = SkillManager()

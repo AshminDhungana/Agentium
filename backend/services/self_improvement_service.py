@@ -1,6 +1,5 @@
 """<module>."""
 
-import logging
 from datetime import datetime, timedelta
 from typing import Dict, Any, List
 import os
@@ -12,8 +11,8 @@ from sqlalchemy import func
 from backend.models.entities.audit import AuditLog, AuditCategory, AuditLevel
 from backend.models.entities.task import Task
 
-logger = logging.getLogger(__name__)
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 class SelfImprovementService:
     """SelfImprovementService."""
     def __init__(self):

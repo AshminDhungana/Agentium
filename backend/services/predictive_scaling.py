@@ -3,7 +3,7 @@
 import os
 import time
 import json
-import logging
+
 from datetime import datetime, timedelta
 import pytz
 import redis
@@ -16,8 +16,8 @@ from backend.models.entities.audit import AuditLog, AuditCategory, AuditLevel
 from backend.services.reincarnation_service import ReincarnationService
 from backend.services.token_optimizer import token_optimizer
 
-logger = logging.getLogger(__name__)
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 REDIS_URL = os.getenv("CELERY_BROKER_URL", "redis://redis:6379/0")
 redis_client = redis.Redis.from_url(REDIS_URL, decode_responses=True)
 
@@ -25,7 +25,6 @@ redis_client = redis.Redis.from_url(REDIS_URL, decode_responses=True)
 SCALING_METRICS_KEY = "agentium:scaling:metrics"
 BUDGET_EXCEEDED_WS_EVENT = "budget_exceeded"
 SCALING_WS_EVENT = "scaling_event"
-
 
 class PredictiveScalingService:
     """PredictiveScalingService."""
@@ -87,7 +86,6 @@ class PredictiveScalingService:
         
         logger.info(f"PredictiveScaling: snapshotted metrics: {metric_data}")
         return metric_data
-
 
     @staticmethod
     def get_predictions() -> dict:
@@ -223,7 +221,6 @@ class PredictiveScalingService:
             except Exception:
                 pass
 
-
         # ── Pre-Liquidation ───────────────────────────────────────────────────
         elif next_6h < current_capacity * 0.3 and current_capacity > 2:
             logger.info(f"PredictiveScaling: next_6h ({next_6h}) < 30% capacity ({current_capacity}). Liquidating idle agents.")
@@ -285,7 +282,6 @@ class PredictiveScalingService:
                     loop.create_task(manager.broadcast({"type": SCALING_WS_EVENT, "action": "liquidate", "count": liquidated}))
                 except Exception:
                     pass
-
 
     @staticmethod
     def enforce_token_budget_guard(db: Session):

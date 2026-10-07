@@ -11,7 +11,6 @@ Central orchestrator for all self-healing behaviors:
  - Daily self-diagnostic routine
 """
 
-import logging
 import json
 import os
 from datetime import datetime, timedelta
@@ -25,13 +24,12 @@ from backend.models.entities.task import Task, TaskStatus, TaskPriority
 from backend.models.entities.audit import AuditLog, AuditLevel, AuditCategory
 from backend.models.entities.voting import TaskDeliberation, DeliberationStatus
 
-logger = logging.getLogger(__name__)
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 # ── Configurable thresholds ───────────────────────────────────────────────────
 HEARTBEAT_STALE_SECONDS = 120     # 2 minutes without heartbeat → crash
 CRITICAL_PATH_RESERVED_SLOTS = 1  # Agent slots reserved for critical chains
 SELF_DIAG_VIOLATION_THRESHOLD = 3 # Repeated failures before proposing amendment
-
 
 class SelfHealingService:
     """

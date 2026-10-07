@@ -27,7 +27,6 @@ The flow is idempotent: the Redis lock + TTL guarantees a single review; if the
 temporary Head dies, the TTL clears the flag and a later spawn failure retries.
 """
 
-import logging
 import os
 import json
 from datetime import datetime, timedelta
@@ -42,24 +41,21 @@ from backend.models.entities.constitution import Ethos
 from backend.models.entities.audit import AuditLog, AuditLevel, AuditCategory
 from backend.services.reincarnation_service import ReincarnationService, ID_RANGES
 
-logger = logging.getLogger(__name__)
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 OVERFLOW_PROACTIVE_THRESHOLD = 50  # free task slots at/below which we proactively review
 OVERFLOW_REVIEW_KEY = "overflow_review:in_progress"
 OVERFLOW_REPORT_KEY = "overflow_review:report"
 OVERFLOW_REVIEW_TTL = 3600  # seconds; safety net so a dead temp head unblocks spawning
 IDLE_THRESHOLD_DAYS = 7  # mirrors EnhancedIdleGovernanceEngine.IDLE_THRESHOLD_DAYS
 
-
 class CapacityRecoveryInProgress(Exception):
     """Raised when a spawn/dispatch is paused because overflow recovery is running."""
-
 
 def _sync_redis():
     import redis
     url = os.getenv("REDIS_URL", "redis://redis:6379/0")
     return redis.Redis.from_url(url, decode_responses=True)
-
 
 class OverflowRecoveryService:
     """Static service implementing the temporary-Head overflow recovery flow."""

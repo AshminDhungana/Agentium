@@ -19,7 +19,7 @@ Integration points:
 
 import json
 import os
-import logging
+
 from typing import Optional, Dict, Any, List
 from datetime import datetime, timedelta
 
@@ -32,9 +32,8 @@ from backend.models.entities.voting import (
 from backend.models.entities.audit import AuditLog, AuditLevel, AuditCategory
 from backend.models.entities.agents import Agent, AgentType
 
-logger = logging.getLogger(__name__)
-
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
@@ -48,7 +47,6 @@ DEBATES_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
     "docs_ministry", "debates",
 )
-
 
 # ---------------------------------------------------------------------------
 # Amendment Service
@@ -492,8 +490,7 @@ class AmendmentService:
             }
             ConfigVersioningService.commit_snapshot("constitution_article", new_constitution.id, actor_id, content_dict)
         except Exception as exc:
-            import logging
-            logging.getLogger(__name__).error(f"Config versioning failed: {exc}")
+            logger.error("Config versioning failed", exc_info=exc)
 
         # Update amendment status
         amendment.status = AmendmentStatus.RATIFIED

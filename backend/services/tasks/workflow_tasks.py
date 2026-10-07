@@ -8,12 +8,11 @@ Both tasks create their own DB sessions (NullPool) so they work safely inside
 the Celery worker process, independent of FastAPI's request-scoped sessions.
 """
 import asyncio
-import logging
 
 from backend.celery_app import celery_app
 
-logger = logging.getLogger(__name__)
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 # ---------------------------------------------------------------------------
 # Shared helper — build a throw-away DB session inside a worker
 # ---------------------------------------------------------------------------
@@ -26,7 +25,6 @@ def _make_session():
     """
     from backend.services.tasks.task_executor import CelerySessionLocal
     return CelerySessionLocal()
-
 
 # ---------------------------------------------------------------------------
 # Task: fire_reminder
@@ -84,7 +82,6 @@ def fire_reminder(self, message: str, workflow_id: str = None):
         raise self.retry(exc=exc)
     finally:
         db.close()
-
 
 # ---------------------------------------------------------------------------
 # Task: execute_deferred_subtask

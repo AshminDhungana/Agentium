@@ -13,13 +13,13 @@ import httpx
 from typing import Optional, Dict, Any, AsyncGenerator, List, Callable, Tuple, Awaitable, Type
 from abc import ABC, abstractmethod
 from datetime import datetime
-import logging
+
 from unittest.mock import MagicMock
 
 from pydantic import BaseModel
 
-logger = logging.getLogger(__name__)
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 from backend.models.database import get_db_context
 from backend.models.entities.user_config import UserModelConfig, ProviderType, ModelUsageLog, ConnectionStatus
 
@@ -40,7 +40,6 @@ from backend.core.response_validator import ResponseValidator
 # Uncertainty detection & clarification (Task 21.1.5)
 from backend.core.uncertainty_detector import UncertaintyDetector
 from backend.services.clarification_handler import ClarificationHandler
-
 
 async def _build_reprompt_message(
     original_content: str,
@@ -67,7 +66,6 @@ async def _build_reprompt_message(
         f"Please output ONLY valid JSON matching the schema. No markdown, no explanations.\n\n"
         f"Schema:\n{json.dumps(schema, indent=2)}"
     )
-
 
 async def retry_with_validation(
     response_model: Type[BaseModel],
@@ -157,7 +155,6 @@ async def retry_with_validation(
     error["attempts"] = attempts
     return None, error
 
-
 async def _record_provider_headers(config) -> None:
     """Read + clear the headers captured by the SDK httpx hook (Task 17).
 
@@ -168,7 +165,6 @@ async def _record_provider_headers(config) -> None:
     if headers:
         provider = getattr(config.provider, "value", config.provider)
         await provider_rate_limiter.record_header_insight(config.id, provider, headers)
-
 
 # ---------------
 # Task 17 -- Reuse a single SDK client per provider config.
@@ -187,7 +183,6 @@ async def _record_provider_headers(config) -> None:
 # client on the next request for that same config.
 _CLIENT_CACHE: Dict[Tuple, Any] = {}
 
-
 def _header_capture_hook(config_id: str):
     """Return an httpx response hook that records raw rate-limit headers.
 
@@ -202,7 +197,6 @@ def _header_capture_hook(config_id: str):
         except Exception:
             pass
     return _hook
-
 
 def _attach_header_hook(client: Any, config_id: str) -> None:
     """Append the rate-limit header capture hook to an SDK client.
@@ -219,7 +213,6 @@ def _attach_header_hook(client: Any, config_id: str) -> None:
             )
     except Exception:
         pass
-
 
 def _get_cached_sdk_client(
     config,
@@ -400,7 +393,6 @@ _PROVIDER_FALLBACK_RATES: Dict[ProviderType, float] = {
     ProviderType.CUSTOM:             1.00,
 }
 
-
 def calculate_cost(
     model_name: str,
     provider: ProviderType,
@@ -466,7 +458,6 @@ def calculate_cost(
         cost = ((prompt_tokens + completion_tokens) / 1_000_000) * blended
 
     return round(cost, 8)
-
 
 # ---------------
 
@@ -603,7 +594,6 @@ class BaseModelProvider(ABC):
             is_permanent=tier == ErrorTier.PERMANENT_KEY_FAILURE,
         )
 
-
 def _normalize_tool_choice(tool_choice: Any) -> Any:
     """
     Collapse the dict form of ``tool_choice`` to its string equivalent.
@@ -624,7 +614,6 @@ def _normalize_tool_choice(tool_choice: Any) -> Any:
     ):
         return tool_choice["type"]
     return tool_choice
-
 
 # ---------------
 # Extended-thinking wiring (Task 3).
@@ -678,7 +667,6 @@ def _is_anthropic_adaptive(model: str) -> bool:
     """True for Anthropic models that require adaptive thinking (no budget_tokens)."""
     return bool(_ANTHROPIC_ADAPTIVE.search(model or ""))
 
-
 def _thinking_mode_from_kwargs(tk: Dict[str, Any]) -> str:
     """Classify the resolved thinking shape for logs/metadata."""
     if not tk:
@@ -697,7 +685,6 @@ def _thinking_mode_from_kwargs(tk: Dict[str, Any]) -> str:
         return "budget"
     return "none"
 
-
 def _enforce_anthropic_budget_max_tokens(create_kwargs: Dict[str, Any]) -> None:
     """Legacy manual thinking requires max_tokens > budget_tokens (else HTTP 400).
 
@@ -711,7 +698,6 @@ def _enforce_anthropic_budget_max_tokens(create_kwargs: Dict[str, Any]) -> None:
             min_max = budget + 2048
             if create_kwargs.get("max_tokens", 0) < min_max:
                 create_kwargs["max_tokens"] = min_max
-
 
 def _resolve_thinking_kwargs(config) -> Dict[str, Any]:
     """Return provider-specific thinking kwargs, or {} when disabled/unsupported.
@@ -754,11 +740,9 @@ def _resolve_thinking_kwargs(config) -> Dict[str, Any]:
     # openai-compatible family
     return {"extra_body": {"reasoning_effort": _OPENAI_EFFORT[effort]}}
 
-
 def is_thinking_config(config) -> bool:
     """True when the config enables extended thinking for a supported model."""
     return _resolve_thinking_kwargs(config) != {}
-
 
 class OpenAICompatibleProvider(BaseModelProvider):
     """
@@ -1056,7 +1040,6 @@ class OpenAICompatibleProvider(BaseModelProvider):
             }
         """
         print(f"DEBUG ENTRY: generate_with_tools called, max_iterations={max_iterations}")
-
 
         actual_model = kwargs.get("model", self.config.default_model)
         client = getattr(self, "_client", None) or _get_cached_sdk_client(
@@ -1776,7 +1759,6 @@ class AnthropicProvider(BaseModelProvider):
             "clarification_resolved": True,
         }
 
-
 class LocalProvider(OpenAICompatibleProvider):
     """Local models via Ollama, llama.cpp, LM Studio, etc."""
 
@@ -1849,7 +1831,6 @@ class LocalProvider(OpenAICompatibleProvider):
     # generate_with_tools() is fully inherited from OpenAICompatibleProvider
     # since LocalProvider already delegates to the OpenAI-compat endpoint.
 
-
 # Provider factory -- UNIVERSAL mapping
 PROVIDERS = {
     ProviderType.ANTHROPIC:       AnthropicProvider,
@@ -1871,7 +1852,6 @@ PROVIDERS = {
     ProviderType.OPENAI_COMPATIBLE: OpenAICompatibleProvider,
     ProviderType.LOCAL:           LocalProvider,
 }
-
 
 def build_tool_executor(
     agent_id: str,
@@ -1903,7 +1883,6 @@ def build_tool_executor(
         return json.dumps(result)
 
     return tool_executor
-
 
 class ModelService:
     """Service to manage model interactions with any provider."""

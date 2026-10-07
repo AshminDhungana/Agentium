@@ -35,7 +35,7 @@ forbidden     → []                                      (never registered)
 """
 
 import asyncio
-import logging
+
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy.orm import Session
@@ -49,8 +49,8 @@ from backend.services.mcp_governance import (
     TIER_RESTRICTED,
 )
 
-logger = logging.getLogger(__name__)
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 # Prefix added to every MCP tool name in the registry so they are easy to
 # identify and filter without touching the tool's human-readable name.
 MCP_PREFIX = "mcp__"
@@ -61,7 +61,6 @@ _TIER_TO_AUTHORIZED: Dict[str, List[str]] = {
     TIER_RESTRICTED:   ["0xxxx", "1xxxx"],
     TIER_FORBIDDEN:    [],   # never registered
 }
-
 
 def _build_pydantic_model_from_jsonschema(schema: Dict[str, Any]):
     """
@@ -132,11 +131,9 @@ def _build_pydantic_model_from_jsonschema(schema: Dict[str, Any]):
 
     return model
 
-
 def _registry_name(tool: MCPTool) -> str:
     """Canonical registry key for an MCPTool: 'mcp__<tool.name>'."""
     return f"{MCP_PREFIX}{tool.name}"
-
 
 def _build_invoke_fn(tool_id: str, tool_name: str, db_factory):
     """
@@ -194,7 +191,6 @@ def _build_invoke_fn(tool_id: str, tool_name: str, db_factory):
     # Give the function a readable name for debugging
     _mcp_invoke.__name__ = f"mcp_invoke_{tool_name}"
     return _mcp_invoke
-
 
 class MCPToolBridge:
     """
@@ -340,12 +336,10 @@ class MCPToolBridge:
         if mcp_models:
             self._registry.tools[key]["mcp_input_models"] = mcp_models
 
-
 # ── Module-level singleton ─────────────────────────────────────────────────────
 # Instantiated lazily in main.py after the DB and registry are ready.
 # Access via: from backend.services.mcp_tool_bridge import mcp_bridge
 mcp_bridge: Optional["MCPToolBridge"] = None
-
 
 def init_bridge(tool_registry, db_factory) -> "MCPToolBridge":
     """

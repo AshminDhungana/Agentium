@@ -1,13 +1,11 @@
 """Find public methods without docstrings in the specified files."""
-import logging
-
 
 import ast
 import sys
 from pathlib import Path
 from typing import List, Tuple
-logger = logging.getLogger(__name__)
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 FILES = [
     "alert_manager.py", "amendment_service.py", "api_manager.py", "audio_service.py",
     "audit_service.py", "autonomous_learning.py", "capability_registry.py",
@@ -19,7 +17,6 @@ FILES = [
     "user_preference_service.py", "channels/whatsapp_unified.py",
     "idle_tasks/preference_optimizer.py", "tasks/workflow_tasks.py",
 ]
-
 
 if __name__ == "__main__":
     base = Path("backend/services")

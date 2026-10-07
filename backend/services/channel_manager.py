@@ -35,10 +35,10 @@ from dataclasses import dataclass, field
 from enum import Enum
 from collections import defaultdict
 import threading
-import logging
-import re
-logger = logging.getLogger(__name__)
 
+import re
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 from sqlalchemy.orm import Session
 
 from backend.models.database import get_db_context
@@ -50,7 +50,6 @@ from backend.models.entities.chat_message import ChatMessage, Conversation
 from backend.models.entities.user import User
 from backend.services.model_provider import ModelService
 
-
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Rate Limiting & Circuit Breaker Infrastructure
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -61,7 +60,6 @@ class CircuitState(Enum):
     OPEN = "open"          # Failing, reject requests
     HALF_OPEN = "half_open"  # Testing if recovered
 
-
 @dataclass
 class RateLimitConfig:
     """Platform-specific rate limits."""
@@ -70,14 +68,12 @@ class RateLimitConfig:
     burst_allowance: int = 10
     retry_after_seconds: int = 60
 
-
 @dataclass
 class CircuitBreakerConfig:
     """Circuit breaker configuration."""
     failure_threshold: int = 5
     recovery_timeout: int = 60
     half_open_max_calls: int = 3
-
 
 @dataclass
 class ChannelMetrics:
@@ -101,7 +97,6 @@ class ChannelMetrics:
             return 1.0
         return self.successful_requests / self.total_requests
 
-
 # Platform-specific rate limits
 PLATFORM_RATE_LIMITS: Dict[ChannelType, RateLimitConfig] = {
     ChannelType.WHATSAPP: RateLimitConfig(requests_per_minute=80, requests_per_hour=5000),
@@ -116,7 +111,6 @@ PLATFORM_RATE_LIMITS: Dict[ChannelType, RateLimitConfig] = {
     ChannelType.MATRIX: RateLimitConfig(requests_per_minute=60, requests_per_hour=6000),
     ChannelType.IMESSAGE: RateLimitConfig(requests_per_minute=15, requests_per_hour=200),
 }
-
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Global Rate Limiter & Circuit Breaker Manager
@@ -411,11 +405,9 @@ class CircuitBreaker:
             'last_failure': metrics.last_failure_time.isoformat() if metrics.last_failure_time else None,
         }
 
-
 # Global instances
 rate_limiter = RateLimiter()
 circuit_breaker = CircuitBreaker()
-
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Rich Media Format Translation
@@ -429,7 +421,6 @@ class RichMediaContent:
     attachments: List[Dict[str, Any]] = field(default_factory=list)
     actions: List[Dict[str, Any]] = field(default_factory=list)
     metadata: Dict[str, Any] = field(default_factory=dict)
-
 
 class MediaTranslator:
     """Translate rich media between platform formats."""
@@ -715,7 +706,6 @@ class MediaTranslator:
         
         return media
 
-
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Email IMAP Receiver (Background Service)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -908,10 +898,8 @@ class IMAPEmailReceiver:
             await self.stop_channel(channel_id)
         self._running = False
 
-
 # Global IMAP receiver instance
 imap_receiver = IMAPEmailReceiver()
-
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Channel Manager (Core Router) - UPDATED
@@ -1665,7 +1653,6 @@ class ChannelManager:
                 
         return broadcast_count
 
-
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Channel Adapters (Updated with Rich Media Support)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1811,7 +1798,6 @@ class WhatsAppAdapter:
             )
             return media_resp.content
 
-
 class SlackAdapter:
     """
     Slack Bot API.
@@ -1925,7 +1911,6 @@ class SlackAdapter:
             signing_secret.encode(), base.encode(), hashlib.sha256
         ).hexdigest()
         return hmac.compare_digest(computed, signature)
-
 
 class TelegramAdapter:
     """
@@ -2108,7 +2093,6 @@ class TelegramAdapter:
                 return f"https://api.telegram.org/file/bot{bot_token}/{file_path}"
             raise ValueError(f"Cannot get file: {data}")
 
-
 class EmailAdapter:
     """
     Email via SMTP (send) / IMAP (receive).
@@ -2227,7 +2211,6 @@ class EmailAdapter:
         except Exception as e:
             logger.error(f"[EmailAdapter] IMAP verification failed: {e}")
             return False
-
 
 class DiscordAdapter:
     """
@@ -2417,7 +2400,6 @@ class DiscordAdapter:
             )
             return response.status_code == 200
 
-
 class SignalAdapter:
     """
     Signal via signal-cli (https://github.com/AsamK/signal-cli).
@@ -2539,7 +2521,6 @@ class SignalAdapter:
                 except Exception as e:
                     logger.error(f"[SignalAdapter] Receive error: {e}")
                     await asyncio.sleep(5)
-
 
 class GoogleChatAdapter:
     """
@@ -2697,7 +2678,6 @@ class GoogleChatAdapter:
             response = await client.post(webhook_url, json=body)
             return response.status_code == 200
 
-
 class TeamsAdapter:
     """
     Microsoft Teams via Bot Framework or Incoming Webhooks.
@@ -2828,7 +2808,6 @@ class TeamsAdapter:
             'raw_payload': payload
         }
 
-
 class ZaloAdapter:
     """
     Zalo Official Account (OA) API.
@@ -2938,7 +2917,6 @@ class ZaloAdapter:
             'event_name': event_name,
             'raw_payload': payload
         }
-
 
 class MatrixAdapter:
     """
@@ -3072,7 +3050,6 @@ class MatrixAdapter:
                 'device_id': data.get('device_id'),
                 'user_id': data.get('user_id')
             }
-
 
 class iMessageAdapter:
     """

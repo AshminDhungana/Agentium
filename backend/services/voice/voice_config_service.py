@@ -5,14 +5,12 @@ Voice Configuration Service for managing user TTS preferences.
 from typing import Optional, Dict, Any
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
-import logging
 
 from backend.models.entities.voice_config import VoiceConfig
 from backend.core.exceptions import NotFoundError, ConflictError
 
-logger = logging.getLogger(__name__)
-
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 class VoiceConfigService:
     """
     Service for managing voice configuration preferences.

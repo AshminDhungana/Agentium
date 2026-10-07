@@ -12,7 +12,7 @@ MIN_SKILL_CHARS so every result gets at least a meaningful snippet.
 """
 
 import json
-import logging
+
 from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
 
@@ -21,8 +21,8 @@ from backend.services.model_provider import ModelService
 from backend.core.llm_client import LLMClient
 from backend.models.entities.agents import Agent
 
-logger = logging.getLogger(__name__)
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 # ---------------------------------------------------------------------------
 # RAG context budget constants
 # ---------------------------------------------------------------------------
@@ -30,7 +30,6 @@ logger = logging.getLogger(__name__)
 MAX_CONTEXT_CHARS: int = 3_000
 # Floor so every retrieved skill gets at least a meaningful snippet
 MIN_SKILL_CHARS: int = 200
-
 
 class SkillRAG:
     """
@@ -321,7 +320,6 @@ class SkillRAG:
         except Exception as e:
             logger.error("suggest_skill_creation: unexpected error — %s", e)
             return None
-
 
 # Global instance
 skill_rag = SkillRAG()

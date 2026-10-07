@@ -9,7 +9,7 @@ import uuid
 import hmac
 import hashlib
 import time
-import logging
+
 from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
 
@@ -22,9 +22,8 @@ from backend.models.entities.federation import FederatedInstance, FederatedTask,
 from backend.models.entities.task import Task, TaskStatus, TaskPriority, TaskType
 from backend.core.config import settings
 
-logger = logging.getLogger(__name__)
-
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 # ──────────────────────────────────────────────────────────────────────────────
 # HMAC helpers
 # ──────────────────────────────────────────────────────────────────────────────
@@ -36,7 +35,6 @@ def _sign_payload(secret: str, body_bytes: bytes, timestamp: int) -> str:
     """
     message = f"{timestamp}:".encode() + body_bytes
     return hmac.new(secret.encode(), message, hashlib.sha256).hexdigest()
-
 
 def _verify_signature(
     stored_hash: str,
@@ -61,7 +59,6 @@ def _verify_signature(
         return False
     expected = _sign_payload(stored_hash, raw_body, timestamp)
     return hmac.compare_digest(expected, incoming_sig)
-
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Service
@@ -610,7 +607,6 @@ class FederationService:
             .limit(limit)
             .all()
         )
-
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Utility

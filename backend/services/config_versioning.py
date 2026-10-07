@@ -6,7 +6,7 @@ full history tracking, diff detection, and point-in-time restore.
 """
 import os
 import json
-import logging
+
 import threading
 from datetime import datetime
 from typing import Dict, Any, List
@@ -14,8 +14,8 @@ from typing import Dict, Any, List
 import git
 from git.exc import InvalidGitRepositoryError, BadName
 
-logger = logging.getLogger(__name__)
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 REPO_PATH = "/data/config-repo"
 
 # Module-level lock — prevents concurrent GitPython index corruption when
@@ -26,7 +26,6 @@ _repo_lock = threading.Lock()
 # ~/.gitconfig never raise "Please tell me who you are" errors.
 _GIT_NAME = "Agentium"
 _GIT_EMAIL = "agentium@agentium.system"
-
 
 class ConfigVersioningService:
     """Provides Git-backed snapshotting, history, and snapshot restore."""

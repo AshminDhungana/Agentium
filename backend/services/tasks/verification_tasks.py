@@ -2,15 +2,14 @@
 Celery tasks for agent verification.
 """
 import asyncio
-import logging
+
 from celery import shared_task
 from backend.celery_app import celery_app
 from backend.models.database import get_db_context
 from backend.services.initialization_service import InitializationService
 
-logger = logging.getLogger(__name__)
-
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 def _run_async(coro):
     """Run async coroutine, handling both sync and async contexts."""
     try:
@@ -24,7 +23,6 @@ def _run_async(coro):
         with concurrent.futures.ThreadPoolExecutor() as executor:
             future = executor.submit(asyncio.run, coro)
             return future.result()
-
 
 @celery_app.task(
     name="backend.services.tasks.verification_tasks.verify_agents_task",

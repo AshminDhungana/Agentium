@@ -12,7 +12,7 @@ Enhanced with:
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 from sqlalchemy.orm import Session
-import logging
+
 import asyncio
 import smtplib
 from email.mime.text import MIMEText
@@ -31,13 +31,12 @@ from backend.core.config import settings
 # at module level causes: ImportError: cannot import name 'manager' from partially
 # initialized module 'backend.main'.
 
-logger = logging.getLogger(__name__)
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 # Extended alert types for Phase 9
 ALERT_TYPE_CRITIC_VETO = "critic_veto"
 ALERT_TYPE_EMERGENCY = "emergency"
 ALERT_TYPE_ALL_KEYS_DOWN = "all_api_keys_down"
-
 
 class AlertManager:
     """Central service for managing and dispatching system alerts."""
@@ -292,7 +291,6 @@ class AlertManager:
                 f"Alert escalated to Head of Council "
                 f"({head.agentium_id}): {alert.alert_type}"
             )
-
 
 def get_alert_manager(db: Session) -> AlertManager:
     """Get alert manager."""

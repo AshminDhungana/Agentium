@@ -12,7 +12,7 @@ Improvements (from verification review):
 from typing import Optional, Dict, List, Any, Tuple 
 from datetime import datetime, timedelta
 import uuid
-import logging
+
 import json
 import hashlib
 
@@ -22,9 +22,8 @@ from backend.models.entities.task import Task, TaskStatus, TaskType, TaskPriorit
 from backend.models.entities.agents import Agent, AgentStatus
 from backend.models.entities.audit import AuditLog, AuditLevel, AuditCategory
 
-logger = logging.getLogger(__name__)
-
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 class CheckpointService:
     """
     Manages state snapshots for tasks, allowing resumption, 
@@ -453,8 +452,6 @@ class CheckpointService:
 
             if "completion_percentage" in snap:
                 subtask.completion_percentage = snap.get("completion_percentage")
-
-
 
     # ═══════════════════════════════════════════════════════════
     # PHASE 7: IMPORT / EXPORT OPERATIONS

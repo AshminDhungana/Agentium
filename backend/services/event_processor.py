@@ -8,7 +8,7 @@ dead-letter queue.
 import hashlib
 import hmac
 import json
-import logging
+
 import os
 import uuid
 from datetime import datetime, timedelta
@@ -24,11 +24,10 @@ from backend.models.entities.event_trigger import (
     TriggerType,
 )
 
-logger = logging.getLogger(__name__)
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
 _redis: Optional[redis.Redis] = None
-
 
 def _get_redis() -> redis.Redis:
     """Return a shared Redis client initialised from the configured REDIS_URL."""
@@ -47,7 +46,6 @@ def _get_redis() -> redis.Redis:
         )
     return _redis
 
-
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def verify_hmac(secret: str, body: bytes, signature: str) -> bool:
@@ -56,7 +54,6 @@ def verify_hmac(secret: str, body: bytes, signature: str) -> bool:
         return False
     expected = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
     return hmac.compare_digest(expected, signature[7:])
-
 
 def _is_duplicate(correlation_id: str) -> bool:
     """24-hour Redis deduplication by correlation_id."""
@@ -67,13 +64,11 @@ def _is_duplicate(correlation_id: str) -> bool:
     r.setex(key, 86400, "1")
     return False
 
-
 def _is_trigger_paused(trigger: EventTrigger) -> bool:
     """Return True when the trigger's circuit breaker is active."""
     if trigger.paused_until and trigger.paused_until > datetime.utcnow():
         return True
     return False
-
 
 def _check_rate_limit(trigger: EventTrigger, db: Session) -> bool:
     """
@@ -98,7 +93,6 @@ def _check_rate_limit(trigger: EventTrigger, db: Session) -> bool:
     pipe.expire(key, 60)
     pipe.execute()
     return False
-
 
 # ── Webhook Processing ────────────────────────────────────────────────────────
 

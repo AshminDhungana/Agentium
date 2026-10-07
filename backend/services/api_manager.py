@@ -2,7 +2,7 @@
 APIManager - Manages multiple LLM providers and assigns best models per task.
 Supports OpenAI, Anthropic, Local Kimi, and custom models.
 """
-import logging
+
 import json
 from enum import Enum
 from dataclasses import dataclass, field
@@ -15,10 +15,8 @@ from backend.models.entities.user_config import ProviderType, ConnectionStatus
 if TYPE_CHECKING:
     from backend.models.entities.task import Task
 
-
-logger = logging.getLogger(__name__)
-
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 class ModelCapability(Enum):
     """Model capabilities for task matching."""
     CODE = "code"
@@ -26,7 +24,6 @@ class ModelCapability(Enum):
     CREATIVE = "creative"
     SIMPLE = "simple"
     IDLE = "idle"
-
 
 # Capability priority order (highest → lowest)
 CAPABILITY_PRIORITY = [
@@ -36,7 +33,6 @@ CAPABILITY_PRIORITY = [
     ModelCapability.SIMPLE,
     ModelCapability.IDLE,
 ]
-
 
 @dataclass
 class ModelConfig:
@@ -66,7 +62,6 @@ class ModelConfig:
             "is_available": self.is_available,
             "current_load": self.current_load
         }
-
 
 class APIManager:
     """
@@ -267,12 +262,10 @@ class APIManager:
         )
         return sorted(available, key=lambda m: m.cost_per_1k_tokens)[0]
 
-
 # ---------------------------------------------------------------------------
 # Global instance — initialised once at startup via init_api_manager()
 # ---------------------------------------------------------------------------
 api_manager: Optional[APIManager] = None
-
 
 def _ollama_reachable(base_url: str, timeout: float = 2.0) -> bool:
     """
@@ -294,7 +287,6 @@ def _ollama_reachable(base_url: str, timeout: float = 2.0) -> bool:
     except Exception as exc:
         logger.info(f"Ollama reachability check failed for {base_url}: {exc}")
         return False
-
 
 def init_api_manager(db: Session) -> APIManager:
     """

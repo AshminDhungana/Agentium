@@ -7,15 +7,14 @@ Raw data NEVER leaves this module – only schema, stats, and small samples.
 import sys
 import json
 import time
-import logging
+
 import traceback
 from typing import Any, Dict, List
 from io import StringIO
 from contextlib import redirect_stdout, redirect_stderr
 
-logger = logging.getLogger(__name__)
-
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 class ExecutionResult:
     """Result of code execution – contains summary only."""
 
@@ -84,7 +83,6 @@ class ExecutionResult:
             "error_message": self.error_message
         }
 
-
 def analyze_dataframe(df) -> Dict[str, Any]:
     """Analyze a pandas DataFrame and return a schema and stats summary.
 
@@ -128,7 +126,6 @@ def analyze_dataframe(df) -> Dict[str, Any]:
         "sample": sample,
         "stats": stats
     }
-
 
 def execute_code(
     code: str,
@@ -237,7 +234,6 @@ def execute_code(
             stderr=stderr_capture.getvalue(),
             execution_time_ms=execution_time_ms
         )
-
 
 if __name__ == "__main__":
     # Test execution

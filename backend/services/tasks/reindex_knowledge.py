@@ -9,14 +9,14 @@ use. It iterates the configured ``REINDEX_VERSIONS`` (default ``["v2"]``).
 The Constitutional Guard's ``supreme_law_v2`` collection is just another entry
 in ``COLLECTIONS`` / ``domain_knowledge`` and is covered automatically.
 """
-import logging
+
 from typing import Any, Dict, List, Optional
 
 from backend.core.vector_store import COLLECTIONS, get_vector_store
 from backend.celery_app import celery_app
 
-logger = logging.getLogger(__name__)
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 # Version to refresh on each weekly run. v1 (MiniLM) was retired, so the only
 # supported version is now v2 (bge).
 REINDEX_VERSIONS: List[str] = ["v2"]
@@ -24,7 +24,6 @@ REINDEX_VERSIONS: List[str] = ["v2"]
 # All logical RAG collections, including the ad-hoc domain_knowledge store
 # that lives outside the canonical COLLECTIONS registry.
 _REINDEX_KEYS: List[str] = list(COLLECTIONS.keys()) + ["domain_knowledge"]
-
 
 def reindex_collection(key: str, version: str = "v2") -> Dict[str, Any]:
     """Re-embed a single collection at ``version`` in place.
@@ -45,7 +44,6 @@ def reindex_collection(key: str, version: str = "v2") -> Dict[str, Any]:
     logger.info("Reindexed %s@%s: %d documents", key, version, count)
     return {"key": key, "count": count, "metadata_mismatch": 0}
 
-
 def weekly_reindex(versions: Optional[List[str]] = None) -> List[Dict[str, Any]]:
     """Re-embed every RAG collection at each requested version.
 
@@ -60,7 +58,6 @@ def weekly_reindex(versions: Optional[List[str]] = None) -> List[Dict[str, Any]]
             stat["version"] = version
             stats.append(stat)
     return stats
-
 
 @celery_app.task(
     name="agentium.tasks.reindex_knowledge.weekly_reindex_task",

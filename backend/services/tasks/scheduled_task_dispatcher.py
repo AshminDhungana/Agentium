@@ -17,7 +17,7 @@ once). The dispatched Task's eventual success/failure/retry is owned entirely
 by the reused 10.1-10.3 TaskExecutor pipeline.
 """
 import json
-import logging
+
 from datetime import datetime
 
 from sqlalchemy import and_, or_, update
@@ -33,9 +33,8 @@ from backend.models.entities.scheduled_task import (
 from backend.models.entities.task import Task, TaskPriority, TaskStatus, TaskType
 from backend.services.scheduling.cron_due import utc_now
 
-logger = logging.getLogger(__name__)
-
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 def _claim(row, db) -> bool:
     """Optimistic CAS claim: only the worker whose conditional UPDATE matches
     (rowcount == 1) wins the row; an already-RUNNING row is never double-fired."""
@@ -49,7 +48,6 @@ def _claim(row, db) -> bool:
     )
     return db.execute(stmt).rowcount == 1
 
-
 def _allocate_task_id(db) -> str:
     """Allocate the next T##### id using the PASSED session (Postgres regex).
     Tests monkeypatch this to a fixed id so no second DB connection is opened."""
@@ -61,13 +59,11 @@ def _allocate_task_id(db) -> str:
     )).scalar()
     return f"T{int(row[1:]) + 1:05d}" if row else "T00001"
 
-
 def _submit_execution(task_id: str, agent_id: str) -> None:
     """Enqueue the task for the TaskExecutor worker. Monkeypatchable in tests."""
     from backend.services.tasks.task_executor import execute_task_async
 
     execute_task_async.delay(task_id, agent_id)
-
 
 def create_and_dispatch_task(
     db,
@@ -109,7 +105,6 @@ def create_and_dispatch_task(
     _submit_execution(task.agentium_id, agent_id)
     return task
 
-
 def _record_execution(db, row, success: bool, task_id: str = None, error: str = None) -> None:
     import uuid
 
@@ -127,7 +122,6 @@ def _record_execution(db, row, success: bool, task_id: str = None, error: str = 
     )
     db.add(record)
 
-
 def _audit(db, row, *, action: str, level, description: str, after_state: dict) -> None:
     entry = AuditLog.log(
         level=level,
@@ -141,7 +135,6 @@ def _audit(db, row, *, action: str, level, description: str, after_state: dict) 
         after_state=after_state,
     )
     db.add(entry)
-
 
 def _dispatch_one(db, row) -> None:
     """Claim-and-dispatch a single due row. Raises RuntimeError on enqueue failure."""
@@ -194,7 +187,6 @@ def _dispatch_one(db, row) -> None:
     )
     db.commit()
 
-
 def _sweep(db) -> dict:
     """Sweep all due ACTIVE rows and dispatch each. Callable from tests without a broker."""
     now = utc_now()
@@ -225,7 +217,6 @@ def _sweep(db) -> dict:
 
     db.commit()
     return results
-
 
 @celery_app.task(name="agentium.tasks.task_executor.dispatch_due_scheduled_tasks")
 def dispatch_due_scheduled_tasks():

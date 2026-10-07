@@ -10,7 +10,7 @@ KEY CHANGES (v2):
 """
 
 import asyncio
-import logging
+
 from typing import Optional, Dict, Any, List, Tuple
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
@@ -25,9 +25,8 @@ import backend.services.model_allocation as model_allocation_module
 from backend.services.model_allocation import init_model_allocator
 from backend.services.chat_context import estimate_tokens
 
-logger = logging.getLogger(__name__)
-
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 @dataclass
 class IdleBudget:
     """Idle-specific budget tracking."""
@@ -126,7 +125,6 @@ class SystemBudgetConfig:
         except Exception as e:
             # Non-fatal: in-memory fallback is already updated
             logger.warning(f"Could not persist budget to DB: {e}")
-
 
 # ---------------------------------------------------------------------------
 # IdleBudgetManager — sources real usage from ModelUsageLog
@@ -357,7 +355,6 @@ class IdleBudgetManager:
 
         except Exception:
             pass  # Use current values
-
 
 # ---------------------------------------------------------------------------
 # TokenOptimizer
@@ -764,14 +761,12 @@ class TokenOptimizer:
         
         return trimmed
 
-
 # ---------------------------------------------------------------------------
 # Singletons
 # ---------------------------------------------------------------------------
 
 token_optimizer = TokenOptimizer()
 idle_budget = IdleBudgetManager()   # Loads persisted limits from DB on first use
-
 
 def init_token_optimizer(db: Session, agents: List[Agent] = None):
     """Initialize token optimizer with database and agents."""

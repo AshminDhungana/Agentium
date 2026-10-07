@@ -1,7 +1,7 @@
 """
 Scheduled maintenance idle tasks for Strategic Planner (10002).
 """
-import logging
+
 import json
 from datetime import datetime, timedelta
 from typing import Dict, List, Any
@@ -12,9 +12,8 @@ from backend.models.entities.agents import Agent
 from backend.models.entities.task import Task, TaskStatus, TaskType
 from backend.models.entities.constitution import Constitution
 
-logger = logging.getLogger(__name__)
-
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 async def _broadcast_event(event_type: str, data: Dict[str, Any]):
     """
     Best-effort WebSocket broadcast.

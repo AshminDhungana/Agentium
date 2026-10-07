@@ -3,7 +3,6 @@ Chat service for Head of Council interactions.
 Handles message processing, task creation, context management, and reincarnation.
 """
 
-import logging
 import httpx
 import time
 from datetime import datetime
@@ -36,11 +35,10 @@ from io import BytesIO
 
 ws_manager = None
 
-logger = logging.getLogger(__name__)
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 _SYSTEM_CONTEXT_TTL = 20.0
 _system_context_cache: dict = {"ts": 0.0, "value": None}
-
 
 class ChatService:
     """Service for handling Sovereign ↔ Head of Council chat with reincarnation support."""

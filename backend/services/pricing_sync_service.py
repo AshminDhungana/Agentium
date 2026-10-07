@@ -3,15 +3,13 @@ Pricing Synchronization Service for Agentium.
 Fetches up-to-date pricing data from the LiteLLM registry and stores it in the database.
 """
 
-import logging
 import httpx
 from typing import Optional, Dict, Tuple
 from sqlalchemy.orm import Session
 from backend.models.entities.model_pricing import ModelPricing
 
-logger = logging.getLogger(__name__)
-
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 class PricingSyncService:
     """PricingSyncService."""
     # Class-level cache (model_id_lower -> (input_rate_per_1m, output_rate_per_1m, context_window))

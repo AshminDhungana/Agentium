@@ -1,13 +1,12 @@
 from __future__ import annotations
-import logging
+
 import uuid
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import List, Optional
 
-logger = logging.getLogger(__name__)
-
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 class DecisionAction(str, Enum):
     REPLY = "reply"
     CREATE_TASK = "create_task"
@@ -15,7 +14,6 @@ class DecisionAction(str, Enum):
     DISPATCH_TASK = "dispatch_task"
     VOTE = "vote"
     DELEGATE = "delegate"
-
 
 @dataclass
 class Decision:
@@ -26,7 +24,6 @@ class Decision:
     tools_considered: List[str] = field(default_factory=list)
     confidence: float = 0.0
     decision_id: str = field(default_factory=lambda: str(uuid.uuid4()))
-
 
 class DecisionEngine:
     """Single structured decision layer used by all agent tiers."""

@@ -7,7 +7,7 @@ Executes tasks across multiple models and compares results.
 import uuid
 import asyncio
 import time
-import logging
+
 from typing import List, Dict, Optional, Any
 from datetime import datetime
 from sqlalchemy.orm import Session
@@ -20,15 +20,14 @@ from backend.models.entities.user_config import UserModelConfig
 from backend.models.database import SessionLocal
 from backend.services.model_provider import ModelService, calculate_cost
 
-logger = logging.getLogger(__name__)
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 # ── Transient error types that warrant a retry ────────────────────────────────
 try:
     import aiohttp
     _TRANSIENT_ERRORS = (asyncio.TimeoutError, aiohttp.ClientError)
 except ImportError:
     _TRANSIENT_ERRORS = (asyncio.TimeoutError,)
-
 
 # ── Critic service ────────────────────────────────────────────────────────────
 
@@ -110,7 +109,6 @@ class CriticService:
                 "output": "Heuristic evaluation",
             },
         }
-
 
 # ── Main service ──────────────────────────────────────────────────────────────
 

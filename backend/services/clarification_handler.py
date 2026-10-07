@@ -1,13 +1,12 @@
-import logging
+
 from typing import List, Dict, Any, Tuple, Optional
 from sqlalchemy.orm import Session
 
 from backend.services.clarification_service import ClarificationService
 from backend.core.uncertainty_detector import UncertaintySignal
 
-logger = logging.getLogger(__name__)
-
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 class ClarificationHandler:
     """
     Orchestrates clarification within the agentic loop.

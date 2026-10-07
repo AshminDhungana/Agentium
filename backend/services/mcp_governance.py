@@ -2,7 +2,7 @@
 MCP Governance Service
 ================================================
 """
-import logging
+
 import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Optional
@@ -14,8 +14,8 @@ from backend.models.entities.constitution import Constitution
 from backend.models.entities.voting import AmendmentVoting, AmendmentStatus
 from backend.services.mcp_client import MCPClient, MCPConnectionError
 
-logger = logging.getLogger(__name__)
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 # ── Constants ──────────────────────────────────────────────────────────────────
 
 AUTO_DISABLE_THRESHOLD = 5
@@ -30,7 +30,6 @@ STATUS_REJECTED = "rejected"
 STATUS_REVOKED  = "revoked"
 STATUS_DISABLED = "disabled"
 
-
 # ── Verdict enum ───────────────────────────────────────────────────────────────
 
 class MCPVerdict:
@@ -39,7 +38,6 @@ class MCPVerdict:
     BLOCK         = "block"
     VOTE_REQUIRED = "vote_required"
     HEAD_REQUIRED = "head_required"
-
 
 # ── Service ────────────────────────────────────────────────────────────────────
 

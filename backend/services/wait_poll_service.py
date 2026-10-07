@@ -12,7 +12,6 @@ Strategy handlers
 
 from __future__ import annotations
 
-import logging
 from datetime import datetime, timedelta
 from typing import Any, Dict, Optional, Tuple
 
@@ -26,9 +25,8 @@ from backend.models.entities.wait_condition import (
 from backend.models.entities.task import Task, TaskStatus
 from backend.models.entities.remote_execution import RemoteExecutionRecord, ExecutionStatus
 
-logger = logging.getLogger(__name__)
-
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 class WaitPollService:
     """
     Stateless service — all methods are class methods so they can be called

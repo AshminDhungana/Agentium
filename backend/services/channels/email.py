@@ -1,5 +1,5 @@
 """Email (SMTP/IMAP) adapter."""
-import logging
+
 from typing import Dict, Any
 import smtplib
 import imaplib
@@ -11,8 +11,8 @@ from email.utils import formatdate
 from .base import BaseChannelAdapter
 from backend.models.entities.channels import ExternalMessage
 
-logger = logging.getLogger(__name__)
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 class EmailAdapter(BaseChannelAdapter):
     """
     Adapter for Email (SMTP send / IMAP receive).

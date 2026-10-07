@@ -6,12 +6,12 @@ Intentionally kept thin — all governance logic lives in mcp_governance.py.
 import asyncio
 import hashlib
 import json
-import logging
+
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-logger = logging.getLogger(__name__)
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 # ── Graceful degradation if the mcp package is not yet installed ───────────────
 try:
     from mcp import ClientSession, StdioServerParameters  # type: ignore
@@ -24,14 +24,11 @@ except ImportError:
         "Run: pip install mcp>=1.0.0"
     )
 
-
 class MCPConnectionError(Exception):
     """Raised when the client cannot connect to an MCP server."""
 
-
 class MCPToolNotFoundError(Exception):
     """Raised when the requested tool does not exist on the server."""
-
 
 class MCPClient:
     """

@@ -8,7 +8,7 @@ import os
 import json
 import asyncio
 import fnmatch
-import logging
+
 import redis.asyncio as redis
 from typing import Optional, Dict, Any, List, Callable, Set
 from datetime import datetime
@@ -18,9 +18,8 @@ from contextlib import asynccontextmanager
 from backend.models.schemas.messages import AgentMessage, MessageReceipt, RouteResult
 from backend.core.vector_store import vector_store, get_vector_store
 
-logger = logging.getLogger(__name__)
-
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 @dataclass
 class RateLimitConfig:
     """Rate limiting per agent tier."""
@@ -28,7 +27,6 @@ class RateLimitConfig:
     COUNCIL: int = 20   # 1xxxx - 20 msg/sec
     LEAD: int = 10      # 2xxxx - 10 msg/sec
     TASK: int = 5       # 3xxxx - 5 msg/sec
-
 
 class HierarchyValidator:
     """
@@ -126,7 +124,6 @@ class HierarchyValidator:
 # This design ensures orthogonal failure modes — a compromised
 # planning layer cannot influence critic judgement.
 # ═══════════════════════════════════════════════════════════
-
 
 class ContextRayTracer:
     """
@@ -278,7 +275,6 @@ class ContextRayTracer:
         ``filter_messages`` already), provided for semantic clarity.
         """
         return cls.filter_messages(messages, agent_id)
-
 
 class MessageBus:
     """
@@ -814,10 +810,8 @@ class MessageBus:
         except Exception as e:
             return {'status': 'unhealthy', 'error': str(e)}
 
-
 # Global instance
 message_bus = MessageBus()
-
 
 async def get_message_bus() -> MessageBus:
     """Get initialized message bus."""

@@ -2,7 +2,7 @@
 Host System Access Service for Head of Council (00001).
 Provides root-level access to the host system while maintaining audit trails.
 """
-import logging
+
 import subprocess
 import os
 import docker
@@ -10,8 +10,8 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime
 from backend.models.entities.audit import AuditLog, AuditLevel, AuditCategory
 
-logger = logging.getLogger(__name__)
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 class HostAccessService:
     """
     Grants Head of Council full root access to host system.
@@ -319,7 +319,6 @@ class HostAccessService:
                 'error': str(e),
                 'agentium_id': agentium_id
             }
-
 
 class RestrictedHostAccess:
     """

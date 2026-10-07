@@ -10,7 +10,6 @@ Flow:
     score confidence → detect contradictions → format citations
 """
 
-import logging
 import re
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -18,9 +17,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from backend.core.vector_store import VectorStore, get_vector_store
 
-logger = logging.getLogger(__name__)
-
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 # ---------------------------------------------------------------------------
 # Data structures
 # ---------------------------------------------------------------------------
@@ -35,7 +33,6 @@ class SourceReference:
     doc_id: str = ""
     relevance: float = 0.0
 
-
 @dataclass
 class ContradictionReport:
     """A detected contradiction between a claim and stored knowledge."""
@@ -44,7 +41,6 @@ class ContradictionReport:
     source: SourceReference
     similarity: float = 0.0
     explanation: str = ""
-
 
 @dataclass
 class FactCheckResult:
@@ -95,7 +91,6 @@ class FactCheckResult:
             ],
             "checked_at": self.checked_at,
         }
-
 
 # ---------------------------------------------------------------------------
 # FactChecker
@@ -469,7 +464,6 @@ class FactChecker:
         neg_b = bool(set(text_b.lower().split()) & negation_words)
         return "contradicts" if neg_a != neg_b else "supports"
 
-
 # ---------------------------------------------------------------------------
 # Cross-Document Citation Graph (Phase 10.2)
 # ---------------------------------------------------------------------------
@@ -480,7 +474,6 @@ class CitationGraphNode:
     doc_id: str
     metadata: Dict[str, Any] = field(default_factory=dict)
 
-
 @dataclass
 class CitationGraphEdge:
     """A directed edge in the citation graph."""
@@ -488,7 +481,6 @@ class CitationGraphEdge:
     target_id: str
     relationship: str  # "supports" or "contradicts"
     similarity: float = 0.0
-
 
 class CitationGraph:
     """
@@ -549,13 +541,11 @@ class CitationGraph:
             "stats": {"node_count": self.node_count, "edge_count": self.edge_count},
         }
 
-
 # ---------------------------------------------------------------------------
 # Singleton
 # ---------------------------------------------------------------------------
 
 _fact_checker: Optional[FactChecker] = None
-
 
 def get_fact_checker() -> FactChecker:
     """Return the singleton FactChecker."""

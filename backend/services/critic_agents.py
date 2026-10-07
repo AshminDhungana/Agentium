@@ -18,7 +18,7 @@ rejections — no cold-start penalty on a retry.
 
 import hashlib
 import json
-import logging
+
 import re
 import time
 from datetime import datetime
@@ -35,9 +35,8 @@ from backend.services.acceptance_criteria import (
     AcceptanceCriteriaService, AcceptanceCriterion, CriterionResult
 )
 
-logger = logging.getLogger(__name__)
-
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
@@ -68,7 +67,6 @@ TASK_TYPE_CRITIC_MAP: Dict[str, List[CriticType]] = {
 }
 
 DEFAULT_CRITIC_TYPES: List[CriticType] = [CriticType.OUTPUT]
-
 
 class CriticService:
     """
@@ -889,7 +887,6 @@ Respond ONLY with a JSON object — no markdown, no preamble:
             ),
             "by_type": by_type,
         }
-
 
 # Singleton instance
 critic_service = CriticService()

@@ -5,7 +5,6 @@ Records citation edges during RAG retrieval and provides BFS graph
 traversal, citation frequency computation, and boost calculation.
 """
 
-import logging
 import uuid
 from collections import defaultdict, deque
 from datetime import datetime, timedelta
@@ -16,9 +15,8 @@ from sqlalchemy.orm import Session
 
 from backend.models.entities.citation_edge import CitationEdge
 
-logger = logging.getLogger(__name__)
-
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 class CitationGraphService:
     """Manages the cross-document citation graph stored in PostgreSQL."""
 
@@ -313,12 +311,10 @@ class CitationGraphService:
         )
         return count
 
-
 # ---------------------------------------------------------------------------
 # Singleton factory
 # ---------------------------------------------------------------------------
 _citation_graph_service: Optional[CitationGraphService] = None
-
 
 def get_citation_graph_service() -> CitationGraphService:
     """Return the singleton CitationGraphService."""

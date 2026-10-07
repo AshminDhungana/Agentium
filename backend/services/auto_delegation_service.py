@@ -11,7 +11,6 @@ Provides:
   DelegationEngine    — single entry point orchestrating the above
 """
 
-import logging
 import uuid
 from datetime import datetime
 from typing import List, Dict, Any, Optional, Tuple
@@ -25,9 +24,8 @@ from backend.models.entities.agents import Agent, AgentStatus
 from backend.models.entities.audit import AuditLog, AuditLevel, AuditCategory
 from backend.core.llm_client import LLMClient
 
-logger = logging.getLogger(__name__)
-
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 # ═══════════════════════════════════════════════════════════
 # Complexity Analyzer
 # ═══════════════════════════════════════════════════════════
@@ -42,7 +40,6 @@ COMPLEXITY_KEYWORDS_MED = {
     "api", "service", "endpoint", "configure", "optimize", "debug",
     "analyze", "transform", "validate", "process", "schedule",
 }
-
 
 class ComplexityAnalyzer:
     """
@@ -96,7 +93,6 @@ class ComplexityAnalyzer:
             score -= 1
 
         return max(1, min(10, score))
-
 
 # ═══════════════════════════════════════════════════════════
 # Agent Ranker
@@ -176,7 +172,6 @@ class AgentRanker:
         # Sort by score descending
         scored.sort(key=lambda x: x[1], reverse=True)
         return scored
-
 
 # ═══════════════════════════════════════════════════════════
 # Sub-Task Breaker
@@ -297,7 +292,6 @@ class SubTaskBreaker:
             logger.error(f"SubTaskBreaker: decomposition failed: {e}")
             return []
 
-
 # ═══════════════════════════════════════════════════════════
 # Smart Retry Router
 # ═══════════════════════════════════════════════════════════
@@ -367,7 +361,6 @@ class SmartRetryRouter:
         )
         return best_agent
 
-
 # ═══════════════════════════════════════════════════════════
 # Cost-Aware Delegator
 # ═══════════════════════════════════════════════════════════
@@ -402,7 +395,6 @@ class CostAwareDelegator:
             logger.debug(f"CostAwareDelegator: could not check budget: {e}")
 
         return False
-
 
 # ═══════════════════════════════════════════════════════════
 # Delegation Engine (Orchestrator)

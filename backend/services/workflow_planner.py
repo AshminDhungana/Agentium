@@ -9,12 +9,12 @@ Strategy:
 """
 import json
 import uuid
-import logging
+
 from dataclasses import dataclass, field
 from typing import List, Optional
 
-logger = logging.getLogger(__name__)
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 # ---------------------------------------------------------------------------
 # System prompt injected into the LLM call
 # ---------------------------------------------------------------------------
@@ -38,7 +38,6 @@ Parameter examples:
 
 Return ONLY the raw JSON array — no markdown fences, no prose."""
 
-
 # ---------------------------------------------------------------------------
 # Data classes
 # ---------------------------------------------------------------------------
@@ -52,14 +51,12 @@ class SubTaskSpec:
     schedule_offset_days: int = 0
     step_index: int = 0
 
-
 @dataclass
 class WorkflowPlan:
     """WorkflowPlan."""
     workflow_id: str
     original_message: str
     subtasks: List[SubTaskSpec]
-
 
 # ---------------------------------------------------------------------------
 # Planner

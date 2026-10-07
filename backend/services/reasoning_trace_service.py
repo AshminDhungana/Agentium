@@ -25,7 +25,7 @@ in real time.
 from __future__ import annotations
 
 import json
-import logging
+
 import time
 import uuid
 from contextlib import asynccontextmanager
@@ -36,9 +36,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from sqlalchemy.orm import Session
 
-logger = logging.getLogger(__name__)
-
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 # ─────────────────────────────────────────────────────────────────────────────
 # Enums & Data Classes
 # ─────────────────────────────────────────────────────────────────────────────
@@ -54,7 +53,6 @@ class TracePhase(str, Enum):
     COMPLETED           = "completed"
     FAILED              = "failed"
 
-
 class StepOutcome(str, Enum):
     """Possible outcomes for a reasoning step."""
 
@@ -63,7 +61,6 @@ class StepOutcome(str, Enum):
     SKIPPED   = "skipped"
     FAILED    = "failed"
     RETRIED   = "retried"
-
 
 @dataclass
 class ReasoningStep:
@@ -98,7 +95,6 @@ class ReasoningStep:
         d["phase"]   = self.phase.value
         d["outcome"] = self.outcome.value
         return d
-
 
 @dataclass
 class ReasoningTrace:
@@ -183,7 +179,6 @@ class ReasoningTrace:
             "total_duration_ms": round(self.total_duration_ms, 1),
         }
 
-
 # ─────────────────────────────────────────────────────────────────────────────
 # Outcome Validator
 # ─────────────────────────────────────────────────────────────────────────────
@@ -249,7 +244,6 @@ class OutcomeValidator:
         passed  = len(issues) == 0
         summary = "All validation checks passed." if passed else "; ".join(issues)
         return passed, summary, issues
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # ReasoningTraceService
@@ -720,7 +714,6 @@ class ReasoningTraceService:
         except Exception as exc:
             logger.debug("[Trace %s] WebSocket broadcast skipped: %s", trace.trace_id, exc)
 
-
 # ─────────────────────────────────────────────────────────────────────────────
 # Integration patches
 # ─────────────────────────────────────────────────────────────────────────────
@@ -844,7 +837,6 @@ class TracedSkillRAG:
             rag_result["trace_id"]           = trace.trace_id
             return rag_result
 
-
 # ─────────────────────────────────────────────────────────────────────────────
 # Small utility functions
 # ─────────────────────────────────────────────────────────────────────────────
@@ -855,7 +847,6 @@ def _extract_key_entities(text: str) -> List[str]:
     # Return capitalised words as rough entity proxies
     entities = [w.strip(".,;:!?") for w in words if w and w[0].isupper() and len(w) > 2]
     return list(dict.fromkeys(entities))[:10]   # Dedup, max 10
-
 
 def _derive_plan_from_skills(goal: str, skill_names: List[str]) -> List[str]:
     """Build a simple plan list from goal + available skills."""
@@ -868,7 +859,6 @@ def _derive_plan_from_skills(goal: str, skill_names: List[str]) -> List[str]:
         "Return result",
     ]
     return plan
-
 
 def _infer_task_type(task) -> str:
     """Infer task type string for OutcomeValidator."""
@@ -883,7 +873,6 @@ def _infer_task_type(task) -> str:
     except Exception:
         pass
     return "general"
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Singleton

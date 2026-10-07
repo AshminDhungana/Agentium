@@ -1,13 +1,13 @@
 """Sandbox container management for remote code execution."""
 import os
 import uuid
-import logging
+
 from datetime import datetime
 from typing import Optional, Dict, Any, List
 from dataclasses import dataclass, field
 
-logger = logging.getLogger(__name__)
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 # Import docker conditionally to allow module loading without docker installed
 try:
     import docker
@@ -17,7 +17,6 @@ except ImportError:
     docker = None  # type: ignore
     DOCKER_AVAILABLE = False
     logger.warning("docker-py not installed – SandboxManager will operate in stub mode")
-
 
 # Egress allowlist for opt-in network. We deny private/loopback/link-local and
 # cloud IMDS ranges so a sandbox can never exfiltrate to internal infra or steal
@@ -33,11 +32,9 @@ _BLOCKED_NETS = (
     "fc00::/7",            # ULA
 )
 
-
 def blocked_egress_cidrs() -> tuple:
     """CIDRs the sandbox egress must never reach (private/IMDS/loopback)."""
     return _BLOCKED_NETS
-
 
 def effective_egress_policy(config: "SandboxConfig") -> dict:
     """Return the effective egress policy for a sandbox config.
@@ -55,7 +52,6 @@ def effective_egress_policy(config: "SandboxConfig") -> dict:
         "blocked": list(blocked_egress_cidrs()),
     }
 
-
 @dataclass
 class SandboxConfig:
     """Configuration for sandbox container."""
@@ -68,7 +64,6 @@ class SandboxConfig:
     image: str = "python:3.11-slim"  # Base image
     workspace_enabled: bool = False  # Mount a writable /workspace tmpfs for artifact persistence
     workspace_tmpfs_size_mb: int = 256  # Size of the /workspace tmpfs
-
 
 class SandboxManager:
     """

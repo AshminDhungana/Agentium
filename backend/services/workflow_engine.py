@@ -3,7 +3,7 @@
 import json
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
-import logging
+
 from sqlalchemy.orm import Session
 from celery import shared_task
 
@@ -18,8 +18,8 @@ from backend.models.entities.workflow import (
 from backend.models.entities.task import Task, TaskStatus, TaskPriority, TaskType
 from backend.models.database import get_db_context
 
-logger = logging.getLogger(__name__)
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 class WorkflowEngine:
     """
     Core orchestration engine for the Workflow Automation Pipeline.
@@ -492,7 +492,6 @@ class WorkflowEngine:
             doc += f"- Step {s.step_index}: {s.step_type.value} -> On success go to {s.on_success_step}\n"
             
         return doc
-
 
 @shared_task(name="agentium.services.workflow_engine.workflow_step_runner")
 def workflow_step_runner(execution_id: str):

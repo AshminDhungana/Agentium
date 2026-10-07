@@ -19,19 +19,17 @@ agentium:mcp:revoked           → SET of tool_id strings (no TTL)
 
 from __future__ import annotations
 
-import logging
 import os
 import time
 from typing import Any, Dict, List, Optional
 
-logger = logging.getLogger(__name__)
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 # ── Key constants ──────────────────────────────────────────────────────────────
 _STATS_PREFIX   = "agentium:mcp:stats:"
 _REVOKED_KEY    = "agentium:mcp:revoked"
 _STATS_INDEX    = "agentium:mcp:tools_with_stats"   # SET of tool_ids that have stats
 _STATS_TTL      = 86_400 * 7                         # 7-day rolling TTL (refreshed on write)
-
 
 def _get_redis():
     """
@@ -51,7 +49,6 @@ def _get_redis():
         return client
     except Exception as exc:
         raise RuntimeError(f"Redis unavailable: {exc}") from exc
-
 
 # ── Stats recording ────────────────────────────────────────────────────────────
 
@@ -89,7 +86,6 @@ def record_invocation(
         # Non-fatal — stats are best-effort
         logger.debug("[MCPStats] record_invocation failed for %s: %s", tool_id, exc)
 
-
 # ── Stats reading ──────────────────────────────────────────────────────────────
 
 def _parse_stats(tool_id: str, raw: Dict[str, str]) -> Dict[str, Any]:
@@ -111,7 +107,6 @@ def _parse_stats(tool_id: str, raw: Dict[str, str]) -> Dict[str, Any]:
         "last_used_ts":     last_used_ts,
     }
 
-
 def get_tool_stats(tool_id: str) -> Optional[Dict[str, Any]]:
     """
     Return live stats for a single tool, or ``None`` if no data exists.
@@ -126,7 +121,6 @@ def get_tool_stats(tool_id: str) -> Optional[Dict[str, Any]]:
     except Exception as exc:
         logger.debug("[MCPStats] get_tool_stats failed for %s: %s", tool_id, exc)
         return None
-
 
 def get_all_stats() -> List[Dict[str, Any]]:
     """
@@ -158,7 +152,6 @@ def get_all_stats() -> List[Dict[str, Any]]:
         logger.warning("[MCPStats] get_all_stats failed: %s", exc)
         return []
 
-
 def get_stats_for_tools(tool_ids: List[str]) -> Dict[str, Dict[str, Any]]:
     """
     Return a mapping of tool_id → stats for the given list.
@@ -182,7 +175,6 @@ def get_stats_for_tools(tool_ids: List[str]) -> Dict[str, Dict[str, Any]]:
         logger.warning("[MCPStats] get_stats_for_tools failed: %s", exc)
         return {}
 
-
 # ── Revocation ─────────────────────────────────────────────────────────────────
 
 def add_to_revoked(tool_id: str) -> bool:
@@ -200,7 +192,6 @@ def add_to_revoked(tool_id: str) -> bool:
         logger.error("[MCPStats] add_to_revoked failed for %s: %s", tool_id, exc)
         return False
 
-
 def remove_from_revoked(tool_id: str) -> bool:
     """
     Remove ``tool_id`` from the Redis revocation SET (e.g. after re-approval).
@@ -215,7 +206,6 @@ def remove_from_revoked(tool_id: str) -> bool:
         logger.error("[MCPStats] remove_from_revoked failed for %s: %s", tool_id, exc)
         return False
 
-
 def is_revoked(tool_id: str) -> bool:
     """
     Return True if ``tool_id`` is in the Redis revocation SET.
@@ -229,7 +219,6 @@ def is_revoked(tool_id: str) -> bool:
         logger.debug("[MCPStats] is_revoked check failed for %s (fail-open): %s", tool_id, exc)
         return False
 
-
 def get_revoked_ids() -> List[str]:
     """Return all currently revoked tool IDs from Redis."""
     try:
@@ -238,7 +227,6 @@ def get_revoked_ids() -> List[str]:
     except Exception as exc:
         logger.warning("[MCPStats] get_revoked_ids failed: %s", exc)
         return []
-
 
 # ── Health ─────────────────────────────────────────────────────────────────────
 

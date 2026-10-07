@@ -20,7 +20,6 @@ Failover Architecture:
         → ALERT: Notify all channels + frontend
 """
 
-import logging
 import asyncio
 import os
 import time
@@ -39,9 +38,8 @@ from backend.models.entities.monitoring import MonitoringAlert, ViolationSeverit
 from backend.core.security import decrypt_api_key
 from backend.core.dependencies import with_db_session
 
-logger = logging.getLogger(__name__)
-
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 class APIKeyHealthStatus:
     """Health status enumeration for API keys."""
     HEALTHY = "healthy"
@@ -50,7 +48,6 @@ class APIKeyHealthStatus:
     EXHAUSTED = "exhausted"  # Budget exceeded
     ERROR = "error"
     DISABLED = "disabled"
-
 
 class APIKeyManager:
     """
@@ -1159,9 +1156,7 @@ class APIKeyManager:
             and selected is not None,
         }
 
-
 api_key_manager = APIKeyManager()
-
 
 def init_api_key_manager(db: Session):
     """Initialize the API Key Manager (called during app startup)."""

@@ -3,7 +3,7 @@ Health Monitor idle tasks for Persistent Council Member 10003.
 All tasks use local models/queries — zero API cost except predictive_health_api.
 """
 import asyncio
-import logging
+
 import json
 import sys
 from datetime import datetime, timedelta
@@ -27,9 +27,8 @@ from backend.models.entities.task import Task, TaskStatus, TaskType
 from backend.models.entities.audit import AuditLog, AuditLevel, AuditCategory
 from backend.services.token_optimizer import token_optimizer
 
-logger = logging.getLogger(__name__)
-
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 async def _broadcast_event(event_type: str, data: Dict[str, Any]):
     """
     Best-effort WebSocket broadcast.
@@ -50,13 +49,11 @@ async def _broadcast_event(event_type: str, data: Dict[str, Any]):
     except Exception as e:
         logger.debug(f"WebSocket broadcast skipped: {e}")
 
-
 async def _send_channel_health_check(channel_name: str, payload: Dict[str, Any], timeout: int = 5) -> Dict[str, Any]:
     """Send health check to channel - placeholder for actual bridge implementation."""
     # This is a placeholder - actual implementation would use the agent bridge
     # For now, return a mock healthy response
     return {'status': 'ok', 'channel': channel_name}
-
 
 async def _reconnect_channel(channel_name: str):
     """Attempt to reconnect a channel - placeholder for actual bridge implementation."""

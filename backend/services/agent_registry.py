@@ -4,11 +4,9 @@ from backend.services.decision_engine import Decision, DecisionAction
 from backend.models.entities.agents import Agent, AgentType, AgentStatus
 from backend.services.capability_registry import CapabilityRegistry, Capability
 from backend.services.reincarnation_service import ReincarnationService
-import logging
 
-logger = logging.getLogger(__name__)
-
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 class AgentRegistry:
     # Task agents span 3xxxx-6xxxx (AgentType.TASK_AGENT).
     TASK_TIER_PREFIXES = {"3", "4", "5", "6"}

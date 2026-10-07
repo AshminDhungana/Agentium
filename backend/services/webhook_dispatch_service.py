@@ -10,7 +10,7 @@ Fires outbound webhook events to all matching subscriptions with:
 import hashlib
 import hmac
 import json
-import logging
+
 import uuid
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
@@ -20,8 +20,8 @@ from sqlalchemy.orm import Session
 
 from backend.models.entities.webhook import WebhookSubscription, WebhookDeliveryLog
 
-logger = logging.getLogger(__name__)
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 # Retry delays in seconds: 10s, 30s, 90s, 270s, 810s
 RETRY_DELAYS = [10, 30, 90, 270, 810]
 MAX_ATTEMPTS = 5
@@ -37,7 +37,6 @@ SUPPORTED_EVENTS = {
     "agent.spawned",
     "agent.terminated",
 }
-
 
 class WebhookDispatchService:
     """Dispatch outbound webhook events to registered subscriptions."""
@@ -229,7 +228,6 @@ class WebhookDispatchService:
 
         db.commit()
         return retried
-
 
 # Module-level convenience function
 async def dispatch_webhook_event(

@@ -13,9 +13,9 @@ from enum import Enum
 import httpx
 import hmac
 import hashlib
-import logging
-logger = logging.getLogger(__name__)
 
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 try:
     from backend.core.config import settings
 except ImportError:
@@ -24,12 +24,10 @@ except ImportError:
 from backend.services.channels.base import BaseChannelAdapter
 from backend.models.entities.channels import ExternalMessage, ExternalChannel, ChannelStatus
 
-
 class WhatsAppProvider(Enum):
     """WhatsAppProvider."""
     CLOUD_API = "cloud_api"      # Official Meta Graph API
     WEB_BRIDGE = "web_bridge"    # Baileys/WebSocket bridge
-
 
 @dataclass
 class BridgeConnection:
@@ -41,7 +39,6 @@ class BridgeConnection:
     authenticated: bool = False
     last_ping: Optional[datetime] = None
     message_queue: list = field(default_factory=list)
-
 
 class UnifiedWhatsAppAdapter(BaseChannelAdapter):
     """

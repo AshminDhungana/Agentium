@@ -3,7 +3,6 @@ Idle Task for User Preference Optimization.
 Runs during system idle time to maintain preference health.
 """
 
-import logging
 from datetime import datetime, timedelta
 from typing import Dict, Any, List
 
@@ -12,9 +11,8 @@ from backend.models.entities.user_preference import UserPreference, UserPreferen
 from backend.services.user_preference_service import UserPreferenceService
 from backend.models.entities.audit import AuditLog, AuditLevel, AuditCategory
 
-logger = logging.getLogger(__name__)
-
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 class PreferenceOptimizerIdleTask:
     """
     Idle task that optimizes user preferences.
@@ -182,7 +180,6 @@ class PreferenceOptimizerIdleTask:
 
         score = 100 - history_penalty - churn_penalty
         return max(0.0, round(score, 2))
-
 
 # Singleton instance
 preference_optimizer_task = PreferenceOptimizerIdleTask()

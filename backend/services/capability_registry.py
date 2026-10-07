@@ -11,10 +11,8 @@ from enum import Enum
 from backend.models.entities.agents import Agent, AgentType
 from backend.models.entities.audit import AuditLog, AuditLevel, AuditCategory
 
-import logging
-logger = logging.getLogger(__name__)
-
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 class Capability(str, Enum):
     """All possible capabilities in the system."""
     
@@ -62,7 +60,6 @@ class Capability(str, Enum):
     QUERY_KNOWLEDGE = "query_knowledge"              # Query knowledge base (read-only)
     USE_TOOLS = "use_tools"                          # Use approved tools
     REQUEST_CLARIFICATION = "request_clarification"  # Ask for task clarification
-
 
 # ═══════════════════════════════════════════════════════════
 # TIER-BASED CAPABILITY MAPPING
@@ -168,7 +165,6 @@ for t in ["7", "8", "9"]:
         Capability.REPORT_STATUS,
         Capability.QUERY_KNOWLEDGE,
     }
-
 
 class CapabilityRegistry:
     """
@@ -551,7 +547,6 @@ class CapabilityRegistry:
             ]
         }
 
-
 # ═══════════════════════════════════════════════════════════
 # DECORATOR FOR CAPABILITY ENFORCEMENT
 # ═══════════════════════════════════════════════════════════
@@ -580,7 +575,6 @@ def require_capability(capability: Capability):
         
         return wrapper
     return decorator
-
 
 # Singleton instance
 capability_registry = CapabilityRegistry()

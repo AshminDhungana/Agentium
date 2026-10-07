@@ -5,7 +5,6 @@ Implements the full clarification hierarchy (Workflow §2.3):
   Sovereign → Head → Council → Lead → Task → Critics
 """
 
-import logging
 from typing import Dict, Any, Optional, List
 from sqlalchemy.orm import Session
 
@@ -13,8 +12,8 @@ from backend.models.entities import Agent
 from backend.models.entities.agents import AgentType, AgentStatus
 from backend.models.entities.constitution import Ethos
 
-logger = logging.getLogger(__name__)
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 # Full hierarchy chain for clarification (Workflow §2.3)
 # Index 0 = highest authority; higher index = lower tier.
 HIERARCHY_ORDER: List[AgentType] = [
@@ -26,7 +25,6 @@ HIERARCHY_ORDER: List[AgentType] = [
     AgentType.OUTPUT_CRITIC,
     AgentType.PLAN_CRITIC,
 ]
-
 
 class ClarificationService:
     """
@@ -224,7 +222,6 @@ class ClarificationService:
             "supervisor": agent.parent.agentium_id if agent.parent else "The Sovereign",
             "subordinates": [sub.agentium_id for sub in agent.subordinates]
         }
-
 
 # Singleton
 clarification_service = ClarificationService()

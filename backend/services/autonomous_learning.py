@@ -12,7 +12,6 @@ Scheduling:
     Registered with APScheduler to run every 6 hours.
 """
 
-import logging
 import os
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -21,9 +20,8 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-logger = logging.getLogger(__name__)
-
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 # ---------------------------------------------------------------------------
 # Data structures
 # ---------------------------------------------------------------------------
@@ -48,7 +46,6 @@ class LearningExtraction:
             "extracted_at": self.extracted_at,
         }
 
-
 @dataclass
 class LearningStats:
     """Statistics about the autonomous learning engine."""
@@ -57,7 +54,6 @@ class LearningStats:
     anti_patterns_extracted: int = 0
     last_run_at: Optional[str] = None
     next_run_at: Optional[str] = None
-
 
 # ---------------------------------------------------------------------------
 # Engine
@@ -458,13 +454,11 @@ class AutonomousLearningEngine:
             logger.error("Cross-agent learning sharing failed: %s", exc)
             return {"shared": 0, "error": str(exc)}
 
-
 # ---------------------------------------------------------------------------
 # Singleton
 # ---------------------------------------------------------------------------
 
 _learning_engine: Optional[AutonomousLearningEngine] = None
-
 
 def get_learning_engine() -> AutonomousLearningEngine:
     """Return the singleton AutonomousLearningEngine."""

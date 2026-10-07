@@ -10,7 +10,7 @@ with Firebase Admin SDK (FCM) or Apple Push Notification service (APNs).
 """
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
-import logging
+
 import json
 
 from sqlalchemy.orm import Session
@@ -21,9 +21,8 @@ from backend.models.entities.mobile import DeviceToken, NotificationPreference
 from backend.models.entities.user import User
 from backend.core.config import settings
 
-logger = logging.getLogger(__name__)
-
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 class PushNotificationService:
     """PushNotificationService."""
 

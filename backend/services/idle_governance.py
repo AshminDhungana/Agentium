@@ -14,11 +14,9 @@ from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, or_
-import logging
 
-logger = logging.getLogger(__name__)
-
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 def _lower_cpu_priority():
     """Lower CPU priority for idle work - cross-platform."""
     try:
@@ -37,7 +35,6 @@ from backend.models.entities.task import Task, TaskType, TaskStatus, TaskPriorit
 from backend.services.persistent_council import persistent_council
 from backend.services.token_optimizer import token_optimizer, idle_budget
 from backend.services.reincarnation_service import reincarnation_service
-
 
 class IdleGovernanceMetrics:
     """
@@ -126,7 +123,6 @@ class IdleGovernanceMetrics:
             "idle_termination_rate": self.get_idle_termination_rate(),
             "resource_utilization": self.get_resource_utilization()
         }
-
 
 class EnhancedIdleGovernanceEngine:
     """

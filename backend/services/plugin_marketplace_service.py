@@ -11,14 +11,12 @@ from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session
 from fastapi import status
 from backend.core.exceptions import BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, TooLargeError, RateLimitError, InternalServerError, ServiceUnavailableError
-import logging
 
 from backend.models.entities.plugin import Plugin, PluginInstallation, PluginReview
 from backend.models.entities.user import User
 
-logger = logging.getLogger(__name__)
-
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 class PluginMarketplaceService:
     """Manage the plugin marketplace lifecycle: submit, verify, install, and uninstall."""
 
@@ -182,8 +180,7 @@ class PluginMarketplaceService:
                 {"config": installation.config, "plugin_id": installation.plugin_id, "is_active": installation.is_active}
             )
         except Exception as e:
-            import logging
-            logging.getLogger(__name__).error(f"Config versioning failed: {e}")
+            logger.error("Config versioning failed", exc_info=e)
             
         return installation
         

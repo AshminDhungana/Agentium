@@ -15,12 +15,12 @@ from backend.models.entities.monitoring import (
 from backend.models.entities.task import Task, SubTask, TaskStatus
 from backend.models.database import get_db_context
 from backend.models.database import get_system_agent_id
-import logging
+
 import asyncio
 import uuid
 
-logger = logging.getLogger(__name__)
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 class MonitoringService:
     """
     Implements the checks and balances monitoring system.

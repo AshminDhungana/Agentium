@@ -8,7 +8,6 @@ the response text with permanent S3/MinIO URLs.
 
 from __future__ import annotations
 
-import logging
 import re
 import uuid
 from dataclasses import dataclass
@@ -20,9 +19,8 @@ from sqlalchemy.orm import Session
 
 from backend.services.storage_service import storage_service
 
-logger = logging.getLogger(__name__)
-
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 @dataclass
 class MediaMatch:
     """A detected media reference in text."""
@@ -32,7 +30,6 @@ class MediaMatch:
     start: int             # Start index in source text
     end: int               # End index in source text (exclusive)
     is_markdown: bool      # True if ![alt](url), False if raw URL
-
 
 class MediaInterceptor:
     """

@@ -6,7 +6,6 @@ the admin API route and the Celery audit task share a single implementation.
 """
 from __future__ import annotations
 
-import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Optional
@@ -14,10 +13,9 @@ from typing import Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
-logger = logging.getLogger(__name__)
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 _SUPPORTED_WARNING_LOGGED = False
-
 
 @dataclass
 class SlowQuery:
@@ -31,7 +29,6 @@ class SlowQuery:
     max_duration_ms: float
     rows_per_call: float
     last_seen: Optional[str]
-
 
 def _extension_available(db: Session) -> bool:
     """Return True if pg_stat_statements is installed in this database."""
@@ -53,7 +50,6 @@ def _extension_available(db: Session) -> bool:
             _SUPPORTED_WARNING_LOGGED = True
         db.rollback()
         return False
-
 
 def ensure_pg_stat_statements(db: Session) -> bool:
     """
@@ -80,7 +76,6 @@ def ensure_pg_stat_statements(db: Session) -> bool:
         )
     return available
 
-
 def _has_stats_info_column(db: Session) -> bool:
     """
     pg_stat_statements.stats_since was added in PG 14.
@@ -98,7 +93,6 @@ def _has_stats_info_column(db: Session) -> bool:
     except Exception:
         db.rollback()
         return False
-
 
 def get_slow_queries(
     db: Session,
@@ -166,7 +160,6 @@ def get_slow_queries(
         logger.warning("[SlowQueryService] get_slow_queries failed: %s", exc)
         return []
 
-
 def reset_stats(db: Session) -> bool:
     """
     Reset pg_stat_statements counters (admin only).
@@ -182,7 +175,6 @@ def reset_stats(db: Session) -> bool:
     except Exception as exc:
         logger.warning("[SlowQueryService] reset_stats failed: %s", exc)
         return False
-
 
 def get_summary(db: Session) -> dict:
     """

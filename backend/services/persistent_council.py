@@ -4,18 +4,18 @@ Manages the 3 eternal agents: Head (00001) + 2 Council Members (10001, 10002).
 """
 
 import json
-import logging
+
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from sqlalchemy.orm import Session
 
 from backend.models.entities.agents import Agent, HeadOfCouncil, CouncilMember, AgentType, AgentStatus, PersistentAgentRole
 
-logger = logging.getLogger(__name__)
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 from backend.models.entities.constitution import Ethos
 from backend.models.database import get_db_context
 from backend.services.host_access import HostAccessService, RestrictedHostAccess
-
 
 class PersistentCouncilService:
     """
@@ -733,7 +733,6 @@ autonomy. This is my motivation. This is my religion. This is Agentium.
         agent.idle_tokens_saved += tokens_saved
         
         db.commit()
-
 
 # Singleton instance
 persistent_council = PersistentCouncilService()

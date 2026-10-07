@@ -14,14 +14,13 @@ Built-in tools
   schedule_followup   — enqueue a Celery countdown task for a deferred reminder
   generic_task        — no-op pass-through for unrecognised intents
 """
-import logging
+
 from typing import Any, Callable, Dict
 
-logger = logging.getLogger(__name__)
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 # Internal registry: intent name → async callable
 _REGISTRY: Dict[str, Callable] = {}
-
 
 def register(name: str):
     """Decorator that registers an async function under *name*."""
@@ -30,7 +29,6 @@ def register(name: str):
         _REGISTRY[name] = fn
         return fn
     return decorator
-
 
 async def execute(name: str, params: dict, context: dict = None) -> dict:
     """
@@ -50,12 +48,10 @@ async def execute(name: str, params: dict, context: dict = None) -> dict:
     logger.info(f"[workflow_tools] Executing '{name}'")
     return await _REGISTRY[name](merged)
 
-
 def list_tools() -> list:
     """List tools."""
 
     return list(_REGISTRY.keys())
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Tool: fetch_stock_price
@@ -88,7 +84,6 @@ async def _fetch_stock_price(params: dict) -> dict:
     except Exception as exc:
         raise RuntimeError(f"Could not fetch price for '{ticker}': {exc}") from exc
 
-
 async def _fetch_alpha_vantage(ticker: str) -> dict:
     """Fetch alpha vantage."""
 
@@ -114,7 +109,6 @@ async def _fetch_alpha_vantage(ticker: str) -> dict:
         "currency": "INR",
         "display": f"{ticker}: INR {price}",
     }
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Tool: send_email
@@ -188,7 +182,6 @@ async def _send_email(params: dict) -> dict:
         logger.error(f"[send_email] Failed: {exc}")
         return {"sent": False, "error": str(exc)}
 
-
 # ─────────────────────────────────────────────────────────────────────────────
 # Tool: create_reminder
 # ─────────────────────────────────────────────────────────────────────────────
@@ -250,7 +243,6 @@ async def _create_reminder(params: dict) -> dict:
         "scheduled_for": fire_at.isoformat(),
     }
 
-
 # ─────────────────────────────────────────────────────────────────────────────
 # Tool: schedule_followup
 # ─────────────────────────────────────────────────────────────────────────────
@@ -286,7 +278,6 @@ async def _schedule_followup(params: dict) -> dict:
     except Exception as exc:
         logger.error(f"[schedule_followup] Enqueue failed: {exc}")
         return {"scheduled": False, "error": str(exc)}
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Tool: generic_task (pass-through for unrecognised intents)

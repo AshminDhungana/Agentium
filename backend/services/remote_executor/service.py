@@ -11,7 +11,7 @@ Architecture:
 import os
 import json
 import uuid
-import logging
+
 import subprocess
 import subprocess as sp
 from datetime import datetime
@@ -27,9 +27,8 @@ from backend.tools._workspace import (
     _manifest,
 )
 
-logger = logging.getLogger(__name__)
-
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 class RemoteExecutorService:
     """
     Service for executing code in isolated sandboxes.
@@ -381,9 +380,6 @@ import os
 import json
 import time
 import traceback
-import logging
-
-logger = logging.getLogger("agentium.executor")
 
 def analyze_result(result):
     """Analyze result and return summary only."""
@@ -424,7 +420,6 @@ def analyze_result(result):
         'sample': [{'value': str(result)[:500]}],
         'stats': {}
     }
-
 
 # Read input data
 with open('/tmp/input.json', 'r') as f:

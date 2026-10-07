@@ -9,7 +9,6 @@ Implements two-tier pruning:
 Triggered daily via Celery Beat (chat_prune_task).
 """
 
-import logging
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List
 from sqlalchemy.orm import Session
@@ -19,12 +18,11 @@ from backend.models.entities.chat_message import ChatMessage, Conversation
 from backend.models.database import SessionLocal
 from backend.services.user_preference_service import UserPreferenceService
 
-logger = logging.getLogger(__name__)
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 DEFAULT_INACTIVITY_DAYS = 7
 DEFAULT_HARD_DELETE_DAYS = 30
 DEFAULT_RETAIN_COUNT = 10
-
 
 def get_prune_preferences(db: Session) -> Dict[str, Any]:
     """Get chat prune preferences from user preferences (system defaults)."""
@@ -35,7 +33,6 @@ def get_prune_preferences(db: Session) -> Dict[str, Any]:
         "hard_delete_days": pref_svc.get_value("chat.prune_hard_delete_days", default=DEFAULT_HARD_DELETE_DAYS),
         "retain_count": pref_svc.get_value("chat.prune_retain_count", default=DEFAULT_RETAIN_COUNT),
     }
-
 
 def get_conversations_due_for_soft_delete(
     db: Session,
@@ -75,7 +72,6 @@ def get_conversations_due_for_soft_delete(
 
     return conversations
 
-
 def get_messages_to_soft_delete(
     db: Session,
     conversation_id: str,
@@ -110,7 +106,6 @@ def get_messages_to_soft_delete(
 
     return messages_to_delete
 
-
 def soft_delete_messages(db: Session, messages: List[ChatMessage], dry_run: bool = False) -> int:
     """Soft-delete a list of messages by setting is_deleted='Y'."""
     if not messages:
@@ -127,7 +122,6 @@ def soft_delete_messages(db: Session, messages: List[ChatMessage], dry_run: bool
         logger.info(f"DRY RUN: Would soft-delete {count} messages")
 
     return count
-
 
 def get_soft_deleted_messages_due_for_hard_delete(
     db: Session,
@@ -149,7 +143,6 @@ def get_soft_deleted_messages_due_for_hard_delete(
 
     return messages
 
-
 def hard_delete_messages(db: Session, messages: List[ChatMessage], dry_run: bool = False) -> int:
     """Hard-delete (DELETE) a list of soft-deleted messages."""
     if not messages:
@@ -165,7 +158,6 @@ def hard_delete_messages(db: Session, messages: List[ChatMessage], dry_run: bool
         logger.info(f"DRY RUN: Would hard-delete {count} messages")
 
     return count
-
 
 def run_chat_prune_task(
     dry_run: bool = False,

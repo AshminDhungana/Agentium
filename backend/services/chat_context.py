@@ -17,15 +17,15 @@ All of this is scoped to the chat path; agentic task execution is untouched.
 """
 
 import json
-import logging
+
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy.orm import Session
 
 from backend.models.entities.chat_message import ChatMessage as ChatMsg
 
-logger = logging.getLogger(__name__)
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 # DB role -> OpenAI-style role
 _ROLE_MAP = {"sovereign": "user", "head_of_council": "assistant"}
 
@@ -38,17 +38,14 @@ _SUMMARY_KEY_PREFIX = "agentium:chat_summary:"
 # Chat is user-driven and effectively serial, so the race window is negligible.
 _CHAT_REQUEST: Dict[str, Any] = {}
 
-
 def set_chat_request(*, user_id: str, db: Session) -> None:
     """Bind the current sovereign user + DB session for the chat tools."""
     _CHAT_REQUEST["user_id"] = user_id
     _CHAT_REQUEST["db"] = db
 
-
 def clear_chat_request() -> None:
     """Clear the per-request chat context after a turn completes."""
     _CHAT_REQUEST.clear()
-
 
 # ═══════════════════════════════════════════════════════════════════════════
 # Token estimation
@@ -75,7 +72,6 @@ def estimate_tokens(messages: List[Dict[str, str]], system_prompt: str = "") -> 
         for m in messages:
             chars += len(m.get("content", "")) + 8  # role/structural overhead
         return max(1, chars // 4)
-
 
 # ═══════════════════════════════════════════════════════════════════════════
 # Context builder (sliding window + pinning + graceful truncation)
@@ -186,7 +182,6 @@ class ChatContextBuilder:
             history = history[:drop] + history[drop + 1:]
         return history, compressed
 
-
 # ═══════════════════════════════════════════════════════════════════════════
 # Background summarization (async, stored in Redis)
 # ═══════════════════════════════════════════════════════════════════════════
@@ -198,7 +193,6 @@ _SUMMARY_SYSTEM = (
     "Keep entries short. Preserve the user's original intent, proper names, "
     "and any explicit instructions or commitments."
 )
-
 
 async def load_summary(user_id: str) -> Optional[str]:
     """Load the rolling summary string for a user from Redis (None if absent)."""
@@ -212,7 +206,6 @@ async def load_summary(user_id: str) -> Optional[str]:
         logger.debug("Chat summary load failed (non-fatal): %s", exc)
         return None
 
-
 async def save_summary(user_id: str, summary: str) -> None:
     """Persist the rolling summary for a user in Redis (7-day TTL)."""
     try:
@@ -222,7 +215,6 @@ async def save_summary(user_id: str, summary: str) -> None:
         await r.set(_SUMMARY_KEY_PREFIX + user_id, summary, ex=60 * 60 * 24 * 7)
     except Exception as exc:  # pragma: no cover - redis optional
         logger.debug("Chat summary save failed (non-fatal): %s", exc)
-
 
 async def summarize_history(
     db: Session,
@@ -297,7 +289,6 @@ async def summarize_history(
             except Exception:
                 pass
 
-
 def _extract_json_object(text: str) -> Optional[dict]:
     """Best-effort extraction of a JSON object from a model response."""
     try:
@@ -312,7 +303,6 @@ def _extract_json_object(text: str) -> Optional[dict]:
         except Exception:
             return None
     return None
-
 
 def format_summary_for_prompt(summary_json: str) -> str:
     """Render the stored summary JSON into a compact human-readable block."""
@@ -330,7 +320,6 @@ def format_summary_for_prompt(summary_json: str) -> str:
         if items:
             parts.append(f"{label}: " + "; ".join(str(i) for i in items))
     return "\n".join(parts)
-
 
 # ═══════════════════════════════════════════════════════════════════════════
 # On-demand full-history tools (registered in tool_registry)
@@ -364,7 +353,6 @@ def _fetch_chat_rows(db: Session, limit: int, query: Optional[str] = None):
         out.append({"role": mapped, "content": r.content})
     return out
 
-
 def get_full_history(limit: int = 50, db_session=None) -> Dict[str, Any]:
     """Tool: return the full (deduped, chronological) chat history."""
     db = db_session or _CHAT_REQUEST.get("db")
@@ -376,7 +364,6 @@ def get_full_history(limit: int = 50, db_session=None) -> Dict[str, Any]:
         "message_count": len(rows),
         "history": rows,
     }
-
 
 def search_chat_history(query: str, limit: int = 20, db_session=None) -> Dict[str, Any]:
     """Tool: search past chat turns containing ``query``."""

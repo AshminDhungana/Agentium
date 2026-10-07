@@ -23,14 +23,13 @@ the client divides ``float(res[1]) / 1000.0``.
 """
 
 import asyncio
-import logging
+
 import os
 import time
 from typing import Any, Dict, Optional, Tuple
 
-logger = logging.getLogger(__name__)
-
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 # Token bucket: capacity 1, refill = rate per second.
 #   KEYS[1] = bucket hash key
 #   ARGV[1] = now (float seconds)
@@ -93,7 +92,6 @@ if cur > maxc then
 end
 return {1, cur}
 """
-
 
 class ProviderRateLimiter:
     """Per-config outbound rate limiter (Redis token bucket + fail-open)."""
@@ -466,7 +464,6 @@ class ProviderRateLimiter:
         except Exception:
             # Counter drift on a dead Redis is harmless — fail-open already served.
             pass
-
 
 # Module-level singleton — imported by model_provider.py and the test harness.
 provider_rate_limiter = ProviderRateLimiter()

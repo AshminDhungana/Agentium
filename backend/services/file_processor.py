@@ -23,12 +23,12 @@ Design principles
 from __future__ import annotations
 
 import io
-import logging
+
 from pathlib import Path
 from typing import Optional
 
-logger = logging.getLogger(__name__)
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
@@ -56,7 +56,6 @@ _TEXT_MIME_PREFIXES: tuple[str, ...] = (
     "text/", "application/json", "application/xml",
     "application/javascript", "application/x-yaml",
 )
-
 
 # ---------------------------------------------------------------------------
 # Magic Byte Validation
@@ -110,7 +109,6 @@ def verify_magic_bytes(content: bytes, declared_mime: str) -> bool:
 
     # No signature matched — unknown format, pass through
     return True
-
 
 # ---------------------------------------------------------------------------
 # PDF Extraction
@@ -179,7 +177,6 @@ def extract_pdf_text(content: bytes, max_chars: int = DEFAULT_MAX_PDF_CHARS) -> 
         logger.warning("[file_processor] PDF extraction failed: %s", exc)
         return None
 
-
 # ---------------------------------------------------------------------------
 # Image Metadata Extraction
 # ---------------------------------------------------------------------------
@@ -213,7 +210,6 @@ def extract_image_metadata(content: bytes, filename: str) -> dict:
     except Exception as exc:
         logger.debug("[file_processor] Image metadata extraction failed: %s", exc)
         return {}
-
 
 # ---------------------------------------------------------------------------
 # AI Context Builder
@@ -292,7 +288,6 @@ def build_file_context_for_ai(
         parts.append(content_block)
 
     return "\n\n".join(parts)
-
 
 # ---------------------------------------------------------------------------
 # Utility

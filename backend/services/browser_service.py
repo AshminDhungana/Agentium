@@ -13,7 +13,7 @@ All URLs are validated through URLSafetyGuard before any navigation.
 import asyncio
 import base64
 import ipaddress
-import logging
+
 import re
 import time
 from dataclasses import dataclass, field
@@ -26,13 +26,12 @@ from sqlalchemy.orm import Session
 from backend.core.config import settings
 from backend.models.entities.audit import AuditLog, AuditLevel, AuditCategory
 
-logger = logging.getLogger(__name__)
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 # WebSocket manager used to broadcast browser frames. Populated lazily by
 # _capture_loop (avoids an import cycle at module load) and kept at module
 # level so it can be patched in tests.
 websocket_manager = None
-
 
 # ---------------------------------------------------------------------------
 # URL Safety Guard — SSRF Prevention
@@ -59,7 +58,6 @@ _DEFAULT_BLOCKED_DOMAINS = [
 
 _ALLOWED_SCHEMES = {"http", "https"}
 
-
 @dataclass
 class URLCheckResult:
     """Result of a URL safety check."""
@@ -67,7 +65,6 @@ class URLCheckResult:
     url: str
     reason: str = ""
     checked_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
-
 
 class URLSafetyGuard:
     """
@@ -135,7 +132,6 @@ class URLSafetyGuard:
 
         return URLCheckResult(safe=True, url=url)
 
-
 # ---------------------------------------------------------------------------
 # Data structures
 # ---------------------------------------------------------------------------
@@ -149,7 +145,6 @@ class NavigateResult:
     success: bool
     error: str = ""
 
-
 @dataclass
 class ScrapeResult:
     """ScrapeResult."""
@@ -159,7 +154,6 @@ class ScrapeResult:
     success: bool
     word_count: int = 0
     error: str = ""
-
 
 @dataclass
 class ScreenshotResult:
@@ -171,14 +165,12 @@ class ScreenshotResult:
     audit_log_id: Optional[str] = None
     error: str = ""
 
-
 @dataclass
 class SearchResultItem:
     """SearchResultItem."""
     title: str
     url: str
     snippet: str
-
 
 @dataclass
 class SearchResult:
@@ -204,7 +196,6 @@ class BrowserSession:
     _page: Any = field(default=None, repr=False)
     _cdp: Any = field(default=None, repr=False)  # CDP session for Page.startScreencast
     _capture_task: Any = field(default=None, repr=False)
-
 
 # ---------------------------------------------------------------------------
 # Browser Service
@@ -702,13 +693,11 @@ class BrowserService:
         """Expose URL safety guard for external callers."""
         return self._safety_guard.check_url(url)
 
-
 # ---------------------------------------------------------------------------
 # Singleton
 # ---------------------------------------------------------------------------
 
 _browser_service: Optional[BrowserService] = None
-
 
 def get_browser_service() -> BrowserService:
     """Return the singleton BrowserService."""

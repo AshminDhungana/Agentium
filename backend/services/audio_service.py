@@ -11,7 +11,7 @@ and implements fallback logic between providers.
 
 import io
 from dataclasses import dataclass, field
-import logging
+
 import tempfile
 import uuid
 from pathlib import Path
@@ -28,9 +28,8 @@ from backend.services.whisper_cpp_service import (
 from backend.services.voice.voice_config_service import VoiceConfigService
 from backend.core.exceptions import ServerSTTUnavailable, ProviderUnavailableError
 
-logger = logging.getLogger(__name__)
-
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
@@ -77,7 +76,6 @@ AVAILABLE_TTS_VOICES = {
     "openai": OPENAI_TTS_VOICES,
     "kokoro": KOKORO_TTS_VOICES
 }
-
 
 # ---------------------------------------------------------------------------
 # AudioService
@@ -529,11 +527,9 @@ class AudioService:
         identifier = speaker_identifier or get_speaker_identifier()
         return identifier.identify(db, audio_bytes)
 
-
 def get_audio_service() -> "AudioService":
     """Return a fresh AudioService instance (lazy factory used by the API routes)."""
     return AudioService()
-
 
 # ---------------------------------------------------------------------------
 # Speaker Identification (Phase 10.3 / 15.4)
@@ -545,7 +541,6 @@ import uuid
 import tempfile
 import numpy as np
 
-
 @dataclass
 class SpeakerIDConfig:
     """Runtime configuration for speaker identification."""
@@ -555,7 +550,6 @@ class SpeakerIDConfig:
     min_duration_s: float = 1.0
     cache_dir: str = "./models/speechbrain"
     require_liveness: bool = False
-
 
 def load_speaker_id_config() -> SpeakerIDConfig:
     """Build a SpeakerIDConfig from application Settings."""
@@ -569,11 +563,9 @@ def load_speaker_id_config() -> SpeakerIDConfig:
         require_liveness=settings.SPEAKER_ID_REQUIRE_LIVENESS,
     )
 
-
 class SpeakerEncoder(Protocol):
     """Embedding backend contract. Implementations turn audio bytes into a vector."""
     def embed(self, audio_bytes: bytes) -> List[float]: ...
-
 
 class SpeechBrainEncoder:
     """
@@ -635,7 +627,6 @@ class SpeechBrainEncoder:
             return []
         finally:
             os.remove(tmp_path)
-
 
 class SpeakerIdentifier:
     """
@@ -823,11 +814,9 @@ class SpeakerIdentifier:
         ).order_by(SpeakerProfile.created_at.desc()).all()
         return [p.to_dict() for p in profiles]
 
-
 # ---------------------------------------------------------------------------
 
 _speaker_identifier: Optional[SpeakerIdentifier] = None
-
 
 def get_speaker_identifier() -> SpeakerIdentifier:
     """Return the process-wide SpeakerIdentifier singleton (lazy)."""

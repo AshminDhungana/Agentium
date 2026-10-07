@@ -4,7 +4,7 @@ Council-managed approval workflow for collective memory.
 """
 
 import json
-import logging
+
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
 from enum import Enum
@@ -16,12 +16,10 @@ from backend.models.entities.audit import AuditLog, AuditCategory, AuditLevel
 from backend.core.vector_store import get_vector_store
 from backend.services.knowledge_service import get_knowledge_service
 
-
-logger = logging.getLogger(__name__)
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 # Redis key for staged submissions persistence
 _KNOWLEDGE_STAGING_KEY_PREFIX = "agentium:knowledge:staging"
-
 
 class KnowledgeStatus(str, Enum):
     """Status of knowledge submission."""
@@ -32,7 +30,6 @@ class KnowledgeStatus(str, Enum):
     CHANGES_REQUESTED = "changes_requested"
     EXPIRED = "expired"          # Auto-expired (24h timeout)
 
-
 class KnowledgeCategory(str, Enum):
     """Categories of knowledge."""
     CONSTITUTIONAL = "constitutional"    # Amends to constitution
@@ -40,7 +37,6 @@ class KnowledgeCategory(str, Enum):
     DOMAIN_KNOWLEDGE = "domain_knowledge" # Subject matter expertise
     LESSON_LEARNED = "lesson_learned"    # Post-mortems
     TOOL_USAGE = "tool_usage"            # How to use tools
-
 
 class KnowledgeSubmission:
     """Represents a knowledge submission awaiting approval."""
@@ -71,7 +67,6 @@ class KnowledgeSubmission:
         self.approved_at = None
         self.approved_by = None
         self.vector_doc_id = None
-
 
 class KnowledgeGovernanceService:
     """
@@ -568,7 +563,6 @@ class KnowledgeGovernanceService:
         for member in council:
             submission.council_reviewers.append(member.agentium_id)
 
-        logger = logging.getLogger(__name__)
         logger.info(
             "Council notified: new %s submission from %s",
             submission.category.value, submission.submitter_agentium_id
@@ -597,7 +591,6 @@ class KnowledgeGovernanceService:
         """Get count of pending submissions."""
         return len([s for s in self.staged_submissions.values() 
                    if s.status == KnowledgeStatus.STAGED])
-
 
 # Convenience function
 async def submit_for_approval(db: Session,

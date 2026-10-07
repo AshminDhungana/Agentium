@@ -5,7 +5,7 @@ Genesis protocol - bootstraps the governance system from scratch.
 import os
 import asyncio
 import json
-import logging
+
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -27,18 +27,15 @@ from backend.models.entities.voting import IndividualVote
 from backend.services.knowledge_service import get_knowledge_service
 from backend.services.capability_registry import CapabilityRegistry, Capability
 
-logger = logging.getLogger(__name__)
-
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 class InitializationError(Exception):
     """Raised when genesis protocol fails."""
     pass
 
-
 class CountryNameTimeoutError(Exception):
     """Raised when country name selection times out."""
     pass
-
 
 # Module-level handle to the running genesis instance so the country-name
 # submission endpoint can deliver the Sovereign's chosen nation name to the
@@ -46,11 +43,9 @@ class CountryNameTimeoutError(Exception):
 # asyncio.create_task, so a plain module global is sufficient.
 _ACTIVE_GENESIS: Optional["InitializationService"] = None
 
-
 def get_active_genesis() -> Optional["InitializationService"]:
     """Return the currently running genesis instance, or None."""
     return _ACTIVE_GENESIS
-
 
 def submit_country_name(name: str) -> bool:
     """
@@ -66,7 +61,6 @@ def submit_country_name(name: str) -> bool:
         return False
     svc.set_country_name(name)
     return True
-
 
 class InitializationService:
     """
@@ -1462,7 +1456,6 @@ class InitializationService:
 
         return constitution
 
-
 def trigger_genesis_if_needed(db) -> bool:
     """
     Check if genesis is needed (using the caller's session) and, if so,
@@ -1565,7 +1558,6 @@ def trigger_genesis_if_needed(db) -> bool:
     logger.info("🚀 Genesis protocol triggered after API key configuration")
     return True
 
-
 # Convenience function
 async def initialize_agentium(
     db: Optional[Session] = None,
@@ -1588,7 +1580,6 @@ async def initialize_agentium(
     else:
         service = InitializationService(db)
         return await service.run_genesis_protocol(force, country_name)
-
 
 async def _replay_genesis_welcome(ws_manager) -> None:
     """

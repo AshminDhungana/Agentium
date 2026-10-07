@@ -4,7 +4,7 @@ RAG pipeline and semantic memory management.
 """
 
 import json
-import logging
+
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -16,8 +16,8 @@ from backend.models.entities.agents import Agent, AgentType
 from backend.models.entities.constitution import Constitution, Ethos
 from backend.models.entities.task import Task
 
-logger = logging.getLogger(__name__)
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 # Similarity distance below which an entry is considered a duplicate.
 # Used for v1 collections, which live in ChromaDB L2 space.
 _DEFAULT_SIMILARITY_THRESHOLD: float = 0.15
@@ -30,13 +30,11 @@ _DEFAULT_SIMILARITY_THRESHOLD: float = 0.15
 # all observed duplicates with a large safety margin below the distinct floor.
 _V2_SIMILARITY_THRESHOLD: float = 0.2
 
-
 def _passes_min_relevance(relevance: float, threshold: float) -> bool:
     """Drop segments below the configured min-relevance (cosine space)."""
     if threshold <= 0.0:
         return True
     return relevance >= threshold
-
 
 class KnowledgeService:
     """
@@ -613,7 +611,6 @@ class KnowledgeService:
 
         return {"boosted": boosted, "doc_ids": boosted_ids}
 
-
     # ------------------------------------------------------------------
     # Compliance
     # ------------------------------------------------------------------
@@ -716,12 +713,10 @@ class KnowledgeService:
             ),
         }
 
-
 # ---------------------------------------------------------------------------
 # Singleton factory — never instantiate KnowledgeService directly
 # ---------------------------------------------------------------------------
 _knowledge_service: Optional[KnowledgeService] = None
-
 
 def get_knowledge_service() -> KnowledgeService:
     """Return the singleton KnowledgeService."""

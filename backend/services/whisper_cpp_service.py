@@ -9,15 +9,15 @@ from __future__ import annotations
 
 import asyncio
 import ctypes
-import logging
+
 import os
 import subprocess
 import tempfile
 from pathlib import Path
 from typing import Optional
 
-logger = logging.getLogger(__name__)
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 # ── Config (env, with defaults) ──────────────────────────────────────────────
 WHISPER_CPP_BIN = os.getenv("WHISPER_CPP_BIN", "/usr/local/bin/whisper-cli")
 WHISPER_MODEL = os.getenv("WHISPER_MODEL", "base.en")
@@ -25,14 +25,11 @@ WHISPER_MODEL_DIR = os.getenv("WHISPER_MODEL_DIR", "/opt/whisper/models")
 WHISPER_TIMEOUT = float(os.getenv("WHISPER_TIMEOUT", "60"))
 WHISPER_MAX_CONCURRENCY = int(os.getenv("WHISPER_MAX_CONCURRENCY", "1"))
 
-
 class LocalSTTError(Exception):
     """whisper.cpp local STT failed (missing binary/model, crash, timeout)."""
 
-
 def _model_path() -> Path:
     return Path(WHISPER_MODEL_DIR) / f"ggml-{WHISPER_MODEL}.bin"
-
 
 def _gpu_available() -> bool:
     """Best-effort: is an NVIDIA GPU usable at runtime?
@@ -47,7 +44,6 @@ def _gpu_available() -> bool:
         return True
     except OSError:
         return False
-
 
 class WhisperCppService:
     def __init__(self) -> None:
@@ -100,9 +96,7 @@ class WhisperCppService:
             finally:
                 Path(tmp_path).unlink(missing_ok=True)
 
-
 _service: Optional[WhisperCppService] = None
-
 
 def get_whisper_cpp_service() -> WhisperCppService:
     """Return the singleton WhisperCppService (lazy init)."""

@@ -1,13 +1,13 @@
 """Telegram Bot API adapter."""
-import logging
+
 from typing import Dict, Any
 import httpx
 
 from .base import BaseChannelAdapter
 from backend.models.entities.channels import ExternalMessage
 
-logger = logging.getLogger(__name__)
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 class TelegramAdapter(BaseChannelAdapter):
     """
     Adapter for Telegram Bot API.

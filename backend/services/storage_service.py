@@ -30,22 +30,21 @@ APP_BASE_URL           Used to build download URLs in local mode.
 
 import io
 import os
-import logging
+
 import shutil
 from backend.core.config import settings
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import BinaryIO, Dict, Any, List, Optional
 
-logger = logging.getLogger(__name__)
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 # Well-known insecure MinIO default shipped by the old Compose config. The
 # backend refuses to use MinIO with these credentials and falls back to local
 # disk (see _init_backend). Must stay in sync with
 # backend/core/security_checks.py.
 _DEFAULT_MINIO_USER = "minioadmin"
 _DEFAULT_MINIO_PASSWORD = "minioadmin"
-
 
 # ── Read environment ──────────────────────────────────────────────────────────
 
@@ -57,7 +56,6 @@ _REGION           = os.getenv("AWS_REGION", "us-east-1")
 _FORCE_PATH_STYLE = os.getenv("S3_FORCE_PATH_STYLE", "true").lower() == "true"
 _LOCAL_ROOT       = Path(os.getenv("STORAGE_LOCAL_PATH", "./data/uploads")).resolve()
 _APP_BASE_URL     = os.getenv("APP_BASE_URL", settings.BASE_API_URL).rstrip("/")
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # S3 / MinIO backend
@@ -185,7 +183,6 @@ class _S3Backend:
             return f"{base}/{self._bucket}/{object_name}"
         return f"https://{self._bucket}.s3.{_REGION}.amazonaws.com/{object_name}"
 
-
 # ─────────────────────────────────────────────────────────────────────────────
 # Local filesystem fallback backend
 # ─────────────────────────────────────────────────────────────────────────────
@@ -289,7 +286,6 @@ class _LocalBackend:
             return f"{_APP_BASE_URL}/api/v1/files/download/{user_id}/{filename}"
         return f"{_APP_BASE_URL}/api/v1/files/local/{object_name}"
 
-
 # ─────────────────────────────────────────────────────────────────────────────
 # StorageService — public façade
 # ─────────────────────────────────────────────────────────────────────────────
@@ -378,7 +374,6 @@ class StorageService:
     def backend_name(self) -> str:
         """'s3' or 'local' — useful for health-check endpoints."""
         return self._backend.name
-
 
 # ── Module-level singleton ────────────────────────────────────────────────────
 # Instantiated once at import time. Any startup error is caught internally

@@ -10,6 +10,9 @@ from backend.models.entities.task import Task, TaskType, TaskPriority
 from backend.models.entities.user_config import UserModelConfig, ProviderType, ConnectionStatus
 from backend.services import api_manager as api_manager_module
 from backend.services.api_manager import ModelCapability, ModelConfig
+from backend.services.structured_logging import get_structured_logger
+
+logger = get_structured_logger(__name__)
 
 
 class ModelAllocationService:
@@ -150,8 +153,7 @@ class ModelAllocationService:
                 if not idle_budget.check_budget(code_model.cost_per_1k_tokens * 10):
                     # Over budget for critical path — still use best code model,
                     # just log the warning rather than silently downgrading.
-                    import logging
-                    logging.getLogger(__name__).warning(
+                    logger.warning(
                         "Budget tight for CRITICAL code task but proceeding with best model"
                     )
             except Exception:

@@ -13,7 +13,7 @@ Execution rules
    the API can return live status at any point.
 """
 import asyncio
-import logging
+
 from datetime import datetime, timedelta
 from typing import Dict, List
 
@@ -22,9 +22,8 @@ from backend.models.entities.workflow import WorkflowExecution, WorkflowSubTask
 from backend.services.workflow_planner import WorkflowPlan, SubTaskSpec
 import backend.services.workflow_tools as workflow_tools   # avoids circular import
 
-logger = logging.getLogger(__name__)
-
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 class WorkflowExecutor:
     """Execute a WorkflowPlan as a DAG with concurrent sub-tasks and deferred scheduling."""
 

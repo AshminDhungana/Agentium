@@ -8,15 +8,15 @@ Owns two public coroutines:
     enforcing the shared 6.6 metadata schema with a deterministic dedup key.
 """
 import hashlib
-import logging
+
 import re
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-logger = logging.getLogger(__name__)
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 from backend.tools.web_search_tool import web_search_tool  # noqa: E402
 
 KNOWLEDGE_SUFFICIENCY_DISTANCE = 0.45
@@ -27,7 +27,6 @@ DEFAULT_RETRIEVAL_KEYS = [
     "task_patterns",
 ]
 
-
 @dataclass
 class RetrievalOutcome:
     query: str
@@ -36,7 +35,6 @@ class RetrievalOutcome:
     wrote_back: bool
     context_text: str
     fallback_used: bool
-
 
 def enrich_knowledge_metadata(
     metadata: Optional[Dict[str, Any]],
@@ -71,15 +69,12 @@ def enrich_knowledge_metadata(
     meta.setdefault("citation_boost", 1.0)
     return meta
 
-
 def _normalize_query(q: str) -> str:
     return " ".join((q or "").lower().split())
-
 
 def _parent_id_for_query(q: str) -> str:
     digest = hashlib.sha256(_normalize_query(q).encode("utf-8")).hexdigest()[:16]
     return f"web:{digest}"
-
 
 def _top_distance(chroma: Optional[Dict[str, Any]]) -> Optional[float]:
     if not chroma or not chroma.get("ids") or not chroma["ids"][0]:
@@ -92,7 +87,6 @@ def _top_distance(chroma: Optional[Dict[str, Any]]) -> Optional[float]:
         return None
     return float(dists[0][0])
 
-
 def _synthesize_web_doc(query: str, results: List[Dict[str, Any]], k: int = 3,
                         heading: str = "Web search results for:") -> str:
     lines = [f"{heading} {query}", ""]
@@ -102,7 +96,6 @@ def _synthesize_web_doc(query: str, results: List[Dict[str, Any]], k: int = 3,
         snippet = r.get("snippet") or ""
         lines.append(f"{i}. {title} ({url})\n   {snippet}")
     return "\n".join(lines)
-
 
 def _format_context(chroma: Optional[Dict[str, Any]]) -> str:
     if not chroma or not chroma.get("ids") or not chroma["ids"][0]:
@@ -117,11 +110,9 @@ def _format_context(chroma: Optional[Dict[str, Any]]) -> str:
             out.append(doc)
     return "\n\n".join(out)
 
-
 def get_vector_store():
     from backend.core.vector_store import get_vector_store as _gvs
     return _gvs()
-
 
 async def write_knowledge(
     parent_id: str,
@@ -155,7 +146,6 @@ async def write_knowledge(
     meta["updated_at"] = now
     meta["revision_id"] = uuid.uuid4().hex
     return store.upsert_document(collection_key, parent_id, text, meta, db)
-
 
 async def retrieve_or_search(
     query: str,
@@ -216,9 +206,7 @@ async def retrieve_or_search(
         fallback_used=fallback_used,
     )
 
-
 CHECKPOINT_STAGES = ("received", "completed", "mid")
-
 
 @dataclass
 class CheckpointOutcome:
@@ -229,14 +217,11 @@ class CheckpointOutcome:
     fallback_used: bool = False
     parent_id: Optional[str] = None
 
-
 _NEED_KNOWLEDGE_TAG = "<<NEED_KNOWLEDGE>>"
-
 
 def _parent_id_for_checkpoint(stage: str, query: str) -> str:
     digest = hashlib.sha256(_normalize_query(query).encode("utf-8")).hexdigest()[:16]
     return f"ckpt:{stage}:{digest}"
-
 
 def parse_knowledge_needed(text: str) -> Optional[str]:
     """Return the agent's stated gap query if ``<<NEED_KNOWLEDGE>>`` is present.
@@ -249,7 +234,6 @@ def parse_knowledge_needed(text: str) -> Optional[str]:
         return None
     q = m.group(1).strip()
     return q or None
-
 
 async def checkpoint_write(
     stage: str,

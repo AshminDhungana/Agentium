@@ -17,10 +17,9 @@ from backend.models.entities.audit import AuditLog, AuditLevel, AuditCategory
 from backend.services.context_manager import context_manager
 from backend.core.llm_client import LLMClient
 from backend.services.capability_registry import CapabilityRegistry, Capability
-import logging 
 
-logger = logging.getLogger(__name__)
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 # ═══════════════════════════════════════════════════════════
 # ID GENERATION CONSTANTS
 # ═══════════════════════════════════════════════════════════
@@ -1325,7 +1324,6 @@ Provide a concise summary (max 300 words) that the successor agent will inherit.
             "wisdom_summary": wisdom_entries[-1] if wisdom_entries else None,
             "context": ethos.mission_statement[:500] if ethos.mission_statement else None,
         }
-
 
 # Singleton
 reincarnation_service = ReincarnationService()

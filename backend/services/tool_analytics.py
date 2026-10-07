@@ -23,15 +23,14 @@ from datetime import datetime, timedelta
 from contextlib import contextmanager
 import hashlib
 import json
-import logging
+
 import time
 
 from backend.models.database import get_db_context
 from backend.models.entities.tool_usage_log import ToolUsageLog
 
-logger = logging.getLogger(__name__)
-
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 class _RecordingContext:
     """Context object passed into the `with analytics.record(...)` block."""
 
@@ -52,7 +51,6 @@ class _RecordingContext:
         """Set output size."""
 
         self.output_size_bytes = size
-
 
 class ToolAnalyticsService:
     """

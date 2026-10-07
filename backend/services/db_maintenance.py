@@ -7,7 +7,7 @@ vector DB optimization, backup rotation, and triggers basic snapshot logical bac
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from sqlalchemy import text, and_
-import logging
+
 import asyncio
 import os
 import glob
@@ -23,9 +23,8 @@ from backend.models.entities.monitoring import MonitoringAlert, ViolationSeverit
 from backend.core.config import settings
 from backend.models.database import get_system_agent_id
 
-logger = logging.getLogger(__name__)
-
-
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 class DatabaseMaintenanceService:
     """Handles routine database cleanup, archival, and trigger for backups."""
 
