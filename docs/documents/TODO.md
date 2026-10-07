@@ -742,10 +742,10 @@
   - [x] 14.6.2 — Logs contain: `timestamp`, `request_id`, `step`, `duration_ms`, `tokens`, `status`
   - [x] 14.6.3 — `request_id` correlates across HTTP → Celery → WebSocket
 
-- [/] **14.7 — Alert Manager** (Partial — no deduplication)
+- [x] **14.7 — Alert Manager**
   - [x] 14.7.1 — `alert_manager.py` fires alerts on threshold breaches (Z-score anomaly detection)
   - [x] 14.7.2 — Alerts sent via configured channels (WebSocket, Email/SMTP, Webhook, Telegram, Discord, Slack, WhatsApp)
-  - [ ] 14.7.3 — Alert deduplication prevents notification storms (NOT IMPLEMENTED)
+  - [x] 14.7.3 — Alert deduplication prevents notification storms
 
 ---
 
