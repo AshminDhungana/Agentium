@@ -5,7 +5,7 @@ Uses pydantic-settings for environment variable handling.
 """
 
 from functools import lru_cache
-from typing import Optional
+from typing import Optional, Dict
 
 from pydantic_settings import BaseSettings
 from pydantic import Field
@@ -113,6 +113,17 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: Optional[str] = Field(default=None, env="SMTP_PASSWORD")
     ALERT_EMAIL_TO: Optional[str] = Field(default=None, env="ALERT_EMAIL_TO")
     WEBHOOK_ALERT_URL: Optional[str] = Field(default=None, env="WEBHOOK_ALERT_URL")
+
+    # Phase 14.7.3: Alert Deduplication
+    ALERT_DEDUP_WINDOW_SECONDS: int = Field(default=300, env="ALERT_DEDUP_WINDOW_SECONDS")  # Default 5 minutes
+    ALERT_DEDUP_WINDOWS: Dict[str, int] = Field(default_factory=lambda: {
+        "constitutional_patrol_suspension": 600,    # 10 min for constitutional suspensions
+        "stale_task_detected": 3600,                 # 1 hour for stale tasks
+        "council_member_inactive": 1800,             # 30 min for council issues
+        "critic_queue_stuck": 600,                   # 10 min for critic queue
+        "termination_recommended": 1800,             # 30 min for termination recommendations
+        "anomaly_detected": 300,                     # 5 min for anomalies (default)
+    }, env="ALERT_DEDUP_WINDOWS")
     
     # Phase 9: Memory Management — retention / archival periods
     AUDIT_LOG_RETENTION_DAYS: int = Field(default=90, env="AUDIT_LOG_RETENTION_DAYS")
