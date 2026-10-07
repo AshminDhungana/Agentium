@@ -143,6 +143,10 @@ def log_structured(
     **kwargs
 ) -> None:
     """Log a structured message with correlation IDs and optional metrics."""
+    # Extract special logging parameters that should not go in extra
+    exc_info = kwargs.pop("exc_info", None)
+    stack_info = kwargs.pop("stack_info", None)
+
     extra = {}
 
     # Add context IDs
@@ -173,7 +177,7 @@ def log_structured(
     # Add any additional kwargs
     extra.update(kwargs)
 
-    logger.log(level, message, extra=extra)
+    logger.log(level, message, extra=extra, exc_info=exc_info, stack_info=stack_info)
 
 
 class StructuredLogger:
@@ -182,26 +186,31 @@ class StructuredLogger:
     def __init__(self, name: str):
         self.logger = logging.getLogger(name)
 
-    def _log(self, level: int, message: str, **kwargs):
+    def _log(self, level: int, message: str, *args, **kwargs):
+        # Handle standard logging positional args (e.g., "msg %s", arg)
+        if args:
+            message = message % args
         log_structured(self.logger, level, message, **kwargs)
 
-    def debug(self, message: str, **kwargs):
-        self._log(logging.DEBUG, message, **kwargs)
+    def debug(self, message: str, *args, **kwargs):
+        self._log(logging.DEBUG, message, *args, **kwargs)
 
-    def info(self, message: str, **kwargs):
-        self._log(logging.INFO, message, **kwargs)
+    def info(self, message: str, *args, **kwargs):
+        self._log(logging.INFO, message, *args, **kwargs)
 
-    def warning(self, message: str, **kwargs):
-        self._log(logging.WARNING, message, **kwargs)
+    def warning(self, message: str, *args, **kwargs):
+        self._log(logging.WARNING, message, *args, **kwargs)
 
-    def error(self, message: str, **kwargs):
-        self._log(logging.ERROR, message, **kwargs)
+    def error(self, message: str, *args, **kwargs):
+        self._log(logging.ERROR, message, *args, **kwargs)
 
-    def critical(self, message: str, **kwargs):
-        self._log(logging.CRITICAL, message, **kwargs)
+    def critical(self, message: str, *args, **kwargs):
+        self._log(logging.CRITICAL, message, *args, **kwargs)
 
-    def exception(self, message: str, **kwargs):
-        self._log(logging.ERROR, message, **kwargs)
+    def exception(self, message: str, *args, **kwargs):
+        # exception() should include exc_info
+        kwargs.setdefault("exc_info", True)
+        self._log(logging.ERROR, message, *args, **kwargs)
 
 
 def get_structured_logger(name: str) -> StructuredLogger:
