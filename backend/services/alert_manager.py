@@ -50,6 +50,29 @@ class AlertManager:
     async def dispatch_alert(self, alert: MonitoringAlert):
         """Dispatch an alert to the configured channels based on severity."""
 
+        # 0. Check deduplication first
+        from backend.services.alert_deduplicator import get_alert_deduplicator
+        deduplicator = get_alert_deduplicator()
+
+        should_suppress = await deduplicator.should_suppress(
+            alert_type=alert.alert_type,
+            affected_agent_id=alert.affected_agent_id,
+            severity=alert.severity
+        )
+
+        if should_suppress:
+            logger.info(
+                "Alert suppressed by deduplication",
+                alert_type=alert.alert_type,
+                severity=alert.severity.value,
+                affected_agent_id=alert.affected_agent_id
+            )
+            # Still persist to DB for audit trail
+            self.db.add(alert)
+            self.db.commit()
+            # But skip all channel dispatch
+            return
+
         # 1. Format the alert message
         message = self._format_alert_message(alert)
         logger.info(
@@ -82,6 +105,17 @@ class AlertManager:
         # 6. Escalate to Head of Council / Sovereign if Critical
         if alert.severity == ViolationSeverity.CRITICAL:
             self._escalate_critical_alert(alert)
+
+        # 7. Record alert in deduplication store (only after successful dispatch)
+        await deduplicator.record_alert(
+            alert_type=alert.alert_type,
+            affected_agent_id=alert.affected_agent_id,
+            severity=alert.severity
+        )
+
+        # 8. Persist alert to DB
+        self.db.add(alert)
+        self.db.commit()
 
     def _format_alert_message(self, alert: MonitoringAlert) -> str:
         """Format an alert into a readable message string."""
