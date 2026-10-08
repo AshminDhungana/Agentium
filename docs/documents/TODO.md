@@ -794,10 +794,12 @@
 
   > **Verified:** 33 integration tests in `backend/tests/integration/test_federation_api.py` pass (peer CRUD + pagination, dual-mode webhook auth [HMAC + legacy secret] with replay-window rejection, task receive/result webhooks, Celery heartbeat probing/suspension/recovery with 300s beat, stale cleanup with 3600s beat). Two bugs found & fixed: `get_current_user_from_token` returned 500 (not 401) on missing token (`rbac.py`), and `receive_delegated_task` violated the `local_task_id → tasks.id` FK on Postgres by storing `agentium_id` (`federation_service.py`). Known gap (out of scope): `send_federation_result` Celery task is defined but not yet wired to task completion (falls under 16.2.1).
 
-- [ ] **16.2 — Cross-Instance Communication**
-  - [ ] 16.2.1 — Task delegation to peer instances works
-  - [ ] 16.2.2 — Knowledge sharing between peers works
-  - [ ] 16.2.3 — Agent migration between instances works
+- [x] **16.2 — Cross-Instance Communication**
+  - [x] 16.2.1 — Task delegation to peer instances works
+  - [x] 16.2.2 — Knowledge sharing between peers works
+  - [x] 16.2.3 — Agent migration between instances works
+
+  > **Verified:** 28 new integration tests (61 federation tests total, all passing): `test_federation_delegation.py` (7 — outbound `delegate_task` record creation, Celery dispatch args, dispatch-failure resilience, inactive/unknown peer rejection), `test_federation_knowledge.py` (6 — knowledge-share webhook peer-auth + federated-metadata ingest, admin-gated constitution sync), `test_federation_migration.py` (15 — definition-only move: receive webhook recreates Agent + Ethos identity from `agentium/agent-definition/v1` snapshot, `build_agent_snapshot` carries identity not working memory, migrate route terminates local agent only on 200 ack; peer failures raise 503 and leave the agent untouched). Known gap (out of scope): `send_federation_result` Celery task (celery_app.py) is still defined but not wired to task completion — carried forward from 16.1.
 
 - [ ] **16.3 — Federation Frontend**
   - [ ] 16.3.1 — `FederationPage.tsx` displays connected peers
