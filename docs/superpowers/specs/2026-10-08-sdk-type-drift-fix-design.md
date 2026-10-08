@@ -1,7 +1,7 @@
 # SDK Type Drift — Fix + Guard
 
 **Date:** 2026-10-08
-**Status:** Approved
+**Status:** Implemented
 **Trigger:** CI failure — "TypeScript SDK Smoke Tests (Node 22)": `Type drift detected — generated types don't match committed files`
 
 ## Root Cause
