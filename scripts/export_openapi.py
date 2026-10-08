@@ -28,7 +28,10 @@ def main() -> None:
 
     spec = app.openapi()
     out_path = REPO_ROOT / "sdk" / "typescript" / "openapi.json"
-    out_path.write_text(json.dumps(spec, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    # No sort_keys: key order must match the live server's /openapi.json
+    # (dict insertion order), since openapi-typescript preserves input order
+    # and CI diffs its output byte-exactly against the committed file.
+    out_path.write_text(json.dumps(spec, indent=2) + "\n", encoding="utf-8")
     print(f"Wrote {out_path}")
 
 

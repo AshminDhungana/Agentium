@@ -6574,6 +6574,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/federation/agents/{agent_id}/migrate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Migrate Agent To Peer
+         * @description Move an agent to a peer instance (definition-only). The local agent is terminated only after the peer confirms receipt. Sovereign only.
+         */
+        post: operations["migrate_agent_api_v1_federation_agents__agent_id__migrate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/federation/tasks": {
         parameters: {
             query?: never;
@@ -6648,6 +6668,26 @@ export interface paths {
          * @description Respond to an active heartbeat probe from a peer. authenticate_peer already updates last_heartbeat_at, so we just return OK.
          */
         post: operations["receive_heartbeat_api_v1_federation_webhooks_heartbeat_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/federation/webhooks/agents/receive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Receive Migrated Agent
+         * @description Webhook: a peer instance sends an agent definition snapshot; recreate the agent locally. Definition-only (no memory, no knowledge).
+         */
+        post: operations["receive_migrated_agent_api_v1_federation_webhooks_agents_receive_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -8077,6 +8117,30 @@ export interface components {
         AdminPasswordChangeRequest: {
             /** New Password */
             new_password: string;
+        };
+        /** AgentMigrateRequest */
+        AgentMigrateRequest: {
+            /** Target Peer Id */
+            target_peer_id: string;
+        };
+        /** AgentMigrationSnapshotRequest */
+        AgentMigrationSnapshotRequest: {
+            /** Schema */
+            schema?: string;
+            /** Source Instance */
+            source_instance: string;
+            /** Source Agentium Id */
+            source_agentium_id: string;
+            /** Agent */
+            agent: {
+                [key: string]: unknown;
+            };
+            /** Preferred Model Config Name */
+            preferred_model_config_name?: string | null;
+            /** Ethos */
+            ethos?: {
+                [key: string]: unknown;
+            } | null;
         };
         /** AgentSpawnRequest */
         AgentSpawnRequest: {
@@ -43030,6 +43094,104 @@ export interface operations {
             };
         };
     };
+    migrate_agent_api_v1_federation_agents__agent_id__migrate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                agent_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgentMigrateRequest"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponseExample"];
+                };
+            };
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponseExample"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+        };
+    };
     list_federated_tasks_api_v1_federation_tasks_get: {
         parameters: {
             query?: never;
@@ -43320,6 +43482,107 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponseExample"];
+                };
+            };
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponseExample"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+        };
+    };
+    receive_migrated_agent_api_v1_federation_webhooks_agents_receive_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-agentium-peer-url"?: string | null;
+                "x-agentium-signature"?: string | null;
+                "x-agentium-timestamp"?: string | null;
+                "x-agentium-secret"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgentMigrationSnapshotRequest"];
+            };
+        };
         responses: {
             /** @description Success */
             200: {
