@@ -59,6 +59,15 @@ class TaskResultRequest(BaseModel):
     result_data: Optional[Dict[str, Any]] = None
 
 
+class AgentMigrationSnapshotRequest(BaseModel):
+    schema: str
+    source_instance: str
+    source_agentium_id: str
+    agent: Dict[str, Any]
+    preferred_model_config_name: Optional[str] = None
+    ethos: Optional[Dict[str, Any]] = None
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Peer authentication dependency  (used on all webhook endpoints)
 # ──────────────────────────────────────────────────────────────────────────────
@@ -375,6 +384,31 @@ async def receive_heartbeat(
         "instance": getattr(settings, "FEDERATION_INSTANCE_NAME", "Agentium"),
         "timestamp": int(time.time()),
     }
+
+# ── 16.2.3: Agent migration ─────────────────────────────────────────────────
+
+@router.post(
+    "/webhooks/agents/receive",
+    summary="Receive Migrated Agent",
+    description="Webhook: a peer instance sends an agent definition snapshot; "
+                "recreate the agent locally. Definition-only (no memory, no knowledge).",
+    responses=build_responses(None),
+)
+async def receive_migrated_agent(
+    snapshot: AgentMigrationSnapshotRequest,
+    db: Session = Depends(get_db),
+    peer=Depends(authenticate_peer),
+):
+    """
+    Webhook: a peer instance sends an agent definition snapshot;
+    recreate the agent locally (definition-only).
+    """
+    return FederationService.receive_migrated_agent(
+        db=db,
+        source_peer=peer,
+        snapshot=snapshot.model_dump(),
+    )
+
 
 # ── Phase 11.2: Knowledge & Voting Routes ─────────────────────────────────
 

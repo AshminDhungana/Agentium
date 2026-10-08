@@ -8,6 +8,7 @@ Handles peer instance registration, cross-instance messaging, and federated task
 import uuid
 import hmac
 import hashlib
+import json
 import time
 
 from datetime import datetime, timedelta
@@ -611,6 +612,113 @@ class FederationService:
             .limit(limit)
             .all()
         )
+
+    # ── 16.2.3: Agent migration ───────────────────────────────────────────────
+
+    SNAPSHOT_SCHEMA = "agentium/agent-definition/v1"
+
+    # agent_type -> ID-generation tier understood by
+    # ReincarnationService.generate_id_with_retry
+    AGENT_TYPE_TIER_MAP = {
+        "head_of_council": "head",
+        "council_member": "council",
+        "lead_agent": "lead",
+        "task_agent": "task",
+        "code_critic": "critic",
+        "output_critic": "critic",
+        "plan_critic": "critic",
+    }
+
+    @staticmethod
+    def receive_migrated_agent(
+        db: Session,
+        source_peer: FederatedInstance,
+        snapshot: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """
+        Recreate an agent from a migration snapshot sent by a peer.
+
+        Definition-only: agent fields, model-config NAME, and Ethos
+        identity fields. Working memory, task history, and knowledge do
+        NOT transfer. Returns {"agentium_id", "id"} for the ack.
+        """
+        if snapshot.get("schema") != FederationService.SNAPSHOT_SCHEMA:
+            raise BadRequestError(
+                error=f"Unsupported snapshot schema '{snapshot.get('schema')}'.",
+                code="UNSUPPORTED_SNAPSHOT_SCHEMA",
+            )
+
+        from backend.services.reincarnation_service import ReincarnationService
+        from backend.models.entities.agents import Agent, AgentType, AgentStatus
+        from backend.models.entities.constitution import Ethos
+
+        agent_data = snapshot.get("agent") or {}
+        try:
+            agent_type = AgentType(agent_data.get("agent_type", "task_agent"))
+        except ValueError:
+            raise BadRequestError(
+                error=f"Unknown agent_type '{agent_data.get('agent_type')}'.",
+                code="UNKNOWN_AGENT_TYPE",
+            )
+
+        tier = FederationService.AGENT_TYPE_TIER_MAP[agent_type.value]
+        new_agentium_id = ReincarnationService.generate_id_with_retry(tier, db)
+
+        # Resolve the model-config NAME against local configs — names port
+        # between instances; local FK ids do not.
+        preferred_config_id = None
+        config_name = snapshot.get("preferred_model_config_name")
+        if config_name:
+            from backend.models.entities.user_config import UserModelConfig
+            cfg = db.query(UserModelConfig).filter(
+                UserModelConfig.config_name == config_name
+            ).first()
+            if cfg:
+                preferred_config_id = cfg.id
+
+        agent = Agent(
+            agentium_id=new_agentium_id,
+            agent_type=agent_type,
+            name=agent_data.get("name", f"Migrated from {source_peer.name}"),
+            description=agent_data.get("description"),
+            system_prompt_override=agent_data.get("system_prompt_override"),
+            persistent_role=agent_data.get("persistent_role"),
+            preferred_config_id=preferred_config_id,
+            status=AgentStatus.INITIALIZING,
+        )
+        db.add(agent)
+        db.flush()
+
+        ethos_data = snapshot.get("ethos")
+        if ethos_data:
+            # E-id convention: "E" + the agent's numeric id (see
+            # overflow_recovery._spawn_overflow_review_head). Default
+            # authority is the Head of Council ("00001"), matching the
+            # system-ethos pattern.
+            ethos = Ethos(
+                agentium_id=f"E{new_agentium_id}",
+                agent_type=agent_type.value,
+                agent_id=str(agent.id),
+                mission_statement=ethos_data.get(
+                    "mission_statement", "Migrated agent"),
+                core_values=ethos_data.get("core_values", "[]"),
+                behavioral_rules=ethos_data.get("behavioral_rules", "[]"),
+                restrictions=ethos_data.get("restrictions", "[]"),
+                capabilities=ethos_data.get("capabilities", "[]"),
+                environment_context=ethos_data.get("environment_context"),
+                created_by_agentium_id="00001",
+            )
+            db.add(ethos)
+            db.flush()
+            agent.ethos_id = ethos.id
+
+        db.commit()
+        db.refresh(agent)
+        logger.info(
+            f"Federation: received migrated agent '{agent.name}' "
+            f"({agent.agentium_id}) from '{source_peer.name}'"
+        )
+        return {"agentium_id": agent.agentium_id, "id": str(agent.id)}
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Utility
