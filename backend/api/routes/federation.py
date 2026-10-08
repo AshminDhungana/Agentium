@@ -46,6 +46,10 @@ class TaskDelegateRequest(BaseModel):
     payload: Dict[str, Any]
 
 
+class AgentMigrateRequest(BaseModel):
+    target_peer_id: str
+
+
 class TaskReceiveRequest(BaseModel):
     original_task_id: str
     payload: Dict[str, Any]
@@ -265,6 +269,33 @@ def delegate_task(
         "status": fed_task.status,
         "message": "Delivery queued via Celery worker.",
     }
+
+
+@router.post(
+    "/agents/{agent_id}/migrate",
+    summary="Migrate Agent To Peer",
+    description="Move an agent to a peer instance (definition-only). The local "
+                "agent is terminated only after the peer confirms receipt. "
+                "Sovereign only.",
+    responses=build_responses(None),
+)
+def migrate_agent(
+    agent_id: str,
+    request: AgentMigrateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_from_token),
+):
+    """Move an agent to a peer instance (definition-only, move semantics)."""
+    if not current_user.is_admin:
+        raise ForbiddenError(
+            error="Only Sovereign can migrate agents.",
+            code="ONLY_SOVEREIGN_CAN_MIGRATE_AGENTS",
+        )
+    return FederationService.migrate_agent(
+        db=db,
+        agent_id=agent_id,
+        target_peer_id=request.target_peer_id,
+    )
 
 
 @router.get(

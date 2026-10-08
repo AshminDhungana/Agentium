@@ -720,6 +720,140 @@ class FederationService:
         )
         return {"agentium_id": agent.agentium_id, "id": str(agent.id)}
 
+    @staticmethod
+    def build_agent_snapshot(db: Session, agent) -> Dict[str, Any]:
+        """
+        Build the portable agentium/agent-definition/v1 snapshot for an
+        agent: agent fields, model-config NAME, Ethos identity fields.
+        Working memory, task history, and knowledge never transfer.
+        """
+        from backend.models.entities.user_config import UserModelConfig
+
+        config_name = None
+        if agent.preferred_config_id:
+            cfg = db.query(UserModelConfig).filter(
+                UserModelConfig.id == agent.preferred_config_id
+            ).first()
+            if cfg:
+                config_name = cfg.config_name
+
+        ethos_snapshot = None
+        if agent.ethos_id:
+            from backend.models.entities.constitution import Ethos
+            ethos = db.query(Ethos).filter(Ethos.id == agent.ethos_id).first()
+            if ethos:
+                # Identity fields ONLY — never working memory
+                ethos_snapshot = {
+                    "agent_type": ethos.agent_type,
+                    "mission_statement": ethos.mission_statement,
+                    "core_values": ethos.core_values,
+                    "behavioral_rules": ethos.behavioral_rules,
+                    "restrictions": ethos.restrictions,
+                    "capabilities": ethos.capabilities,
+                    "environment_context": ethos.environment_context,
+                }
+
+        return {
+            "schema": FederationService.SNAPSHOT_SCHEMA,
+            "source_instance": getattr(settings, "FEDERATION_INSTANCE_URL", ""),
+            "source_agentium_id": agent.agentium_id,
+            "agent": {
+                "name": agent.name,
+                "description": agent.description,
+                "agent_type": agent.agent_type.value if hasattr(agent.agent_type, "value") else agent.agent_type,
+                "system_prompt_override": agent.system_prompt_override,
+                "persistent_role": agent.persistent_role,
+            },
+            "preferred_model_config_name": config_name,
+            "ethos": ethos_snapshot,
+        }
+
+    @classmethod
+    def migrate_agent(
+        cls,
+        db: Session,
+        agent_id: str,
+        target_peer_id: str,
+    ) -> Dict[str, Any]:
+        """
+        Move an agent to a peer instance — synchronous, definition-only.
+
+        POSTs the snapshot to the peer's receive webhook. ONLY on a 200
+        ack is the local agent terminated (with provenance in
+        termination_reason). Any failure raises ServiceUnavailableError
+        and leaves the local agent untouched.
+        """
+        from backend.models.entities.agents import Agent, AgentStatus
+
+        agent = db.query(Agent).filter(Agent.id == agent_id).first()
+        if not agent:
+            raise NotFoundError(error="Agent not found.", code="AGENT_NOT_FOUND")
+
+        peer = cls.get_peer(db, target_peer_id)
+        if peer.status != "active":
+            raise BadRequestError(
+                error="Target peer is not active.",
+                code="TARGET_PEER_IS_NOT_ACTIVE",
+            )
+
+        snapshot = cls.build_agent_snapshot(db, agent)
+        body = json.dumps(snapshot).encode()
+        ts = int(time.time())
+        my_secret = getattr(settings, "FEDERATION_SHARED_SECRET", "")
+        sig = _sign_payload(cls._derive_signing_key(my_secret), body, ts)
+
+        try:
+            resp = httpx.post(
+                f"{peer.base_url}/api/v1/federation/webhooks/agents/receive",
+                content=body,
+                headers={
+                    "Content-Type": "application/json",
+                    "X-Agentium-Peer-Url": getattr(settings, "FEDERATION_INSTANCE_URL", ""),
+                    "X-Agentium-Timestamp": str(ts),
+                    "X-Agentium-Signature": f"sha256={sig}",
+                },
+                timeout=30,
+            )
+        except Exception as exc:
+            logger.warning(
+                f"Federation: migration of agent {agent.agentium_id} to "
+                f"'{peer.name}' failed: {exc}"
+            )
+            raise ServiceUnavailableError(
+                error=f"Peer '{peer.name}' unreachable: {exc}",
+                code="PEER_UNREACHABLE_DURING_MIGRATION",
+            )
+
+        if resp.status_code != 200:
+            logger.warning(
+                f"Federation: migration of agent {agent.agentium_id} to "
+                f"'{peer.name}' returned {resp.status_code}"
+            )
+            raise ServiceUnavailableError(
+                error=f"Peer '{peer.name}' rejected the migration "
+                      f"(HTTP {resp.status_code}).",
+                code="PEER_REJECTED_MIGRATION",
+            )
+
+        ack = resp.json()
+
+        # Peer acknowledged — NOW terminate locally (move semantics)
+        agent.status = AgentStatus.TERMINATED
+        agent.terminated_at = datetime.utcnow()
+        agent.termination_reason = f"migrated_to:{peer.id}"
+        db.commit()
+
+        logger.info(
+            f"Federation: migrated agent '{agent.name}' ({agent.agentium_id}) "
+            f"to '{peer.name}' as {ack.get('agentium_id')}"
+        )
+        return {
+            "source_agentium_id": agent.agentium_id,
+            "new_agentium_id": ack.get("agentium_id"),
+            "new_agent_id": ack.get("id"),
+            "peer_name": peer.name,
+        }
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Utility
 # ──────────────────────────────────────────────────────────────────────────────

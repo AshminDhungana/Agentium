@@ -10,12 +10,16 @@ import hashlib
 import hmac
 import json
 import time
+import uuid
+from types import SimpleNamespace
 
+import httpx
 import pytest
 
 from backend.core.config import settings
 from backend.models.entities.agents import Agent, AgentType, AgentStatus
 from backend.models.entities.user import User
+from backend.services.federation_service import FederationService
 
 pytestmark = pytest.mark.integration
 
@@ -223,3 +227,217 @@ class TestReceiveMigratedAgentWebhook:
         agent = seeded_db.query(Agent).filter(
             Agent.id == resp.json()["id"]).one()
         assert agent.ethos_id is None
+
+
+def _make_agent(db, name="Local Agent", agentium_id="30123",
+                system_prompt_override=None, with_ethos=True,
+                with_config=None):
+    from backend.models.entities.agents import Agent, AgentType, AgentStatus
+    agent = Agent(
+        agentium_id=agentium_id,
+        agent_type=AgentType.TASK_AGENT,
+        name=name,
+        description="A local worker",
+        system_prompt_override=system_prompt_override,
+        status=AgentStatus.ACTIVE,
+    )
+    if with_config is not None:
+        agent.preferred_config_id = with_config.id
+    db.add(agent)
+    db.flush()
+
+    if with_ethos:
+        from backend.models.entities.constitution import Ethos
+        ethos = Ethos(
+            agentium_id=f"E{agentium_id}",
+            agent_type="task_agent",
+            agent_id=str(agent.id),
+            mission_statement="Do good work",
+            core_values='["diligence"]',
+            behavioral_rules='["be honest"]',
+            restrictions='["no lying"]',
+            capabilities='["tasks"]',
+            environment_context="hosted locally",
+            created_by_agentium_id="00001",
+            # Working-memory fields set — these must NOT transfer
+            current_objective="secret in-flight objective",
+            active_plan='{"step": 1}',
+        )
+        db.add(ethos)
+        db.flush()
+        agent.ethos_id = ethos.id
+    return agent
+
+
+class TestBuildAgentSnapshot:
+    """FederationService.build_agent_snapshot — portable definition dict."""
+
+    def test_snapshot_carries_identity_not_memory(
+        self, seeded_db, fed_enabled, peer,
+    ):
+        agent = _make_agent(seeded_db, system_prompt_override="Be terse.")
+        snap = FederationService.build_agent_snapshot(seeded_db, agent)
+
+        assert snap["schema"] == FederationService.SNAPSHOT_SCHEMA
+        assert snap["source_agentium_id"] == "30123"
+        assert snap["agent"]["name"] == "Local Agent"
+        assert snap["agent"]["agent_type"] == "task_agent"
+        assert snap["agent"]["system_prompt_override"] == "Be terse."
+        # Identity transfers...
+        assert snap["ethos"]["mission_statement"] == "Do good work"
+        assert snap["ethos"]["environment_context"] == "hosted locally"
+        # ...working memory does NOT
+        assert "current_objective" not in snap["ethos"]
+        assert "active_plan" not in snap["ethos"]
+
+    def test_snapshot_resolves_model_config_name(
+        self, seeded_db, fed_enabled, peer,
+    ):
+        from backend.models.entities.user_config import UserModelConfig, ProviderType
+        cfg = UserModelConfig(
+            config_name="local-openai",
+            provider=ProviderType.OPENAI,
+            default_model="gpt-4o",
+        )
+        seeded_db.add(cfg)
+        seeded_db.flush()
+
+        agent = _make_agent(seeded_db, with_config=cfg)
+        snap = FederationService.build_agent_snapshot(seeded_db, agent)
+        assert snap["preferred_model_config_name"] == "local-openai"
+
+    def test_snapshot_without_config_and_ethos(
+        self, seeded_db, fed_enabled, peer,
+    ):
+        agent = _make_agent(seeded_db, with_ethos=False)
+        snap = FederationService.build_agent_snapshot(seeded_db, agent)
+        assert snap["preferred_model_config_name"] is None
+        assert snap["ethos"] is None
+
+
+class TestMigrateAgentRoute:
+    """POST /agents/{agent_id}/migrate — synchronous move."""
+
+    def _mock_peer_accept(self, monkeypatch):
+        """Mock httpx.post so the peer 'accepts' the migration."""
+        captured = {}
+
+        def fake_post(url, content=None, headers=None, timeout=None, **kw):
+            captured["url"] = url
+            captured["headers"] = headers
+            captured["body"] = content
+            return SimpleNamespace(
+                status_code=200,
+                json=lambda: {"agentium_id": "30999", "id": "new-agent-uuid"},
+            )
+
+        monkeypatch.setattr(httpx, "post", fake_post)
+        return captured
+
+    def test_migrate_success_terminates_local_agent(
+        self, client, seeded_db, fed_enabled, peer, auth_headers, monkeypatch,
+    ):
+        agent = _make_agent(seeded_db)
+        captured = self._mock_peer_accept(monkeypatch)
+
+        resp = client.post(
+            f"/api/v1/federation/agents/{agent.id}/migrate",
+            headers=auth_headers,
+            json={"target_peer_id": peer.id},
+        )
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        assert data["source_agentium_id"] == "30123"
+        assert data["new_agentium_id"] == "30999"
+        assert data["peer_name"] == "Peer Alpha"
+
+        # Outbound call went to the peer's receive webhook, HMAC-signed
+        assert captured["url"] == (
+            f"{PEER_URL}/api/v1/federation/webhooks/agents/receive")
+        assert "X-Agentium-Signature" in captured["headers"]
+
+        # Move semantics: local agent terminated with provenance
+        seeded_db.refresh(agent)
+        assert agent.status == AgentStatus.TERMINATED
+        assert agent.terminated_at is not None
+        assert agent.termination_reason == f"migrated_to:{peer.id}"
+
+    def test_migrate_requires_admin(
+        self, client, seeded_db, fed_enabled, peer,
+    ):
+        _make_user(seeded_db, "plainuser", is_admin=False)
+        plain = _login(client, "plainuser")
+        agent = _make_agent(seeded_db, agentium_id="30150")
+
+        resp = client.post(
+            f"/api/v1/federation/agents/{agent.id}/migrate",
+            headers=plain,
+            json={"target_peer_id": peer.id},
+        )
+        assert resp.status_code == 403
+
+    def test_migrate_unknown_agent_404(
+        self, client, seeded_db, fed_enabled, peer, auth_headers,
+    ):
+        resp = client.post(
+            f"/api/v1/federation/agents/{uuid.uuid4()}/migrate",
+            headers=auth_headers,
+            json={"target_peer_id": peer.id},
+        )
+        assert resp.status_code == 404
+
+    def test_migrate_inactive_peer_400(
+        self, client, seeded_db, fed_enabled, auth_headers, monkeypatch,
+    ):
+        suspended = _make_peer(seeded_db, "Suspended", "http://susp-mig.local",
+                               status="suspended")
+        agent = _make_agent(seeded_db, agentium_id="30160")
+        self._mock_peer_accept(monkeypatch)
+
+        resp = client.post(
+            f"/api/v1/federation/agents/{agent.id}/migrate",
+            headers=auth_headers,
+            json={"target_peer_id": suspended.id},
+        )
+        assert resp.status_code == 400
+
+    def test_migrate_peer_unreachable_leaves_agent_untouched(
+        self, client, seeded_db, fed_enabled, peer, auth_headers, monkeypatch,
+    ):
+        agent = _make_agent(seeded_db, agentium_id="30170")
+
+        def fake_post(url, **kw):
+            raise httpx.ConnectError("connection refused")
+
+        monkeypatch.setattr(httpx, "post", fake_post)
+
+        resp = client.post(
+            f"/api/v1/federation/agents/{agent.id}/migrate",
+            headers=auth_headers,
+            json={"target_peer_id": peer.id},
+        )
+        assert resp.status_code == 503
+        seeded_db.refresh(agent)
+        assert agent.status == AgentStatus.ACTIVE
+        assert agent.terminated_at is None
+        assert agent.termination_reason is None
+
+    def test_migrate_peer_non_200_leaves_agent_untouched(
+        self, client, seeded_db, fed_enabled, peer, auth_headers, monkeypatch,
+    ):
+        agent = _make_agent(seeded_db, agentium_id="30180")
+
+        def fake_post(url, **kw):
+            return SimpleNamespace(status_code=500, json=lambda: {})
+
+        monkeypatch.setattr(httpx, "post", fake_post)
+
+        resp = client.post(
+            f"/api/v1/federation/agents/{agent.id}/migrate",
+            headers=auth_headers,
+            json={"target_peer_id": peer.id},
+        )
+        assert resp.status_code == 503
+        seeded_db.refresh(agent)
+        assert agent.status == AgentStatus.ACTIVE
+        assert agent.termination_reason is None
