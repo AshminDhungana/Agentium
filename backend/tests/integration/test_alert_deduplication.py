@@ -130,3 +130,48 @@ class TestAlertManagerDeduplication:
                             # Both should be dispatched
                             assert mock_dedup.should_suppress.call_count == 2
                             assert mock_dedup.record_alert.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_constitutional_patrol_deduplication(self, alert_manager, mock_db):
+        """Constitutional patrol alerts for same agent should be deduplicated."""
+
+        with patch('backend.services.alert_deduplicator.get_alert_deduplicator') as mock_get_dedup:
+            mock_dedup = AsyncMock()
+            # First call allows, second suppresses
+            mock_dedup.should_suppress.side_effect = [False, True]
+            mock_dedup.record_alert = AsyncMock()
+            mock_get_dedup.return_value = mock_dedup
+
+            with patch.object(alert_manager, '_broadcast_websocket', AsyncMock()):
+                with patch.object(alert_manager, '_notify_external_channels', AsyncMock()):
+                    with patch.object(alert_manager, '_send_email_alert', AsyncMock()):
+                        with patch.object(alert_manager, '_send_webhook_alert', AsyncMock()):
+                            # First alert - agent suspended
+                            alert1 = MonitoringAlert(
+                                alert_type="constitutional_patrol_suspension",
+                                severity=ViolationSeverity.CRITICAL,
+                                detected_by_agent_id="system",
+                                affected_agent_id="agent-001",
+                                message="Auto-suspended agent-001 due to 3 open violations."
+                            )
+                            alert1.id = "alert-1"
+                            alert1.created_at = datetime.utcnow()
+
+                            await alert_manager.dispatch_alert(alert1)
+
+                            # Second alert - same agent, same type, same severity (within 10 min window)
+                            alert2 = MonitoringAlert(
+                                alert_type="constitutional_patrol_suspension",
+                                severity=ViolationSeverity.CRITICAL,
+                                detected_by_agent_id="system",
+                                affected_agent_id="agent-001",
+                                message="Auto-suspended agent-001 due to 3 open violations."
+                            )
+                            alert2.id = "alert-2"
+                            alert2.created_at = datetime.utcnow()
+
+                            await alert_manager.dispatch_alert(alert2)
+
+                            # First dispatched, second suppressed
+                            assert mock_dedup.should_suppress.call_count == 2
+                            assert mock_dedup.record_alert.call_count == 1  # Only first recorded
