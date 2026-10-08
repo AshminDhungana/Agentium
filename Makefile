@@ -1,6 +1,6 @@
 # Agentium Makefile
 
-.PHONY: up down restart setup voice-reinstall voice-logs voice-status uninstall-voice test hallmark test-integration load-test benchmark perf-gate test-staging audit audit-fix pin-digests docker-scout seed-skills backfill-knowledge backfill-knowledge-collection
+.PHONY: up down restart setup voice-reinstall voice-logs voice-status uninstall-voice test hallmark test-integration load-test benchmark perf-gate test-staging audit audit-fix pin-digests docker-scout seed-skills backfill-knowledge backfill-knowledge-collection regen-sdk-types
 
 # -- First-run env bootstrap (P0 #1.5) --
 # Generates a secure .env with unique, non-default MinIO credentials if one
@@ -172,3 +172,11 @@ backfill-knowledge:
 # -- Backfill a single collection --
 backfill-knowledge-collection:
 	@docker compose exec -T backend python backend/scripts/backfill_knowledge_chunks.py --collection $(COLLECTION)
+
+# -- Regenerate TypeScript SDK types from the current backend OpenAPI spec --
+regen-sdk-types:
+	@if [ -d /run/desktop/mnt/host ] || uname -s | grep -qiE "MINGW|MSYS|CYGWIN"; then \
+	  powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/regen-sdk-types.ps1; \
+	else \
+	  bash scripts/regen-sdk-types.sh; \
+	fi
