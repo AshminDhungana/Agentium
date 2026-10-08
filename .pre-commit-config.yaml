@@ -9,3 +9,12 @@ repos:
       - id: detect-secrets
         args: [--baseline, .secrets.baseline]
         language_version: python3
+
+  - repo: local
+    hooks:
+      - id: check-sdk-type-drift
+        name: check SDK type drift
+        entry: python scripts/check_sdk_type_drift.py
+        language: system
+        pass_filenames: false
+        stages: [pre-commit]
