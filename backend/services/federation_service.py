@@ -314,7 +314,11 @@ class FederationService:
         fed_task = FederatedTask(
             source_instance_id=source_peer.id,
             original_task_id=original_task_id,
-            local_task_id=new_task.agentium_id,
+            # Must be the local Task's UUID PK — local_task_id has an FK to
+            # tasks.id, so agentium_id ("T00001") would violate the constraint
+            # on PostgreSQL (FKs are unenforced on the SQLite used by quick
+            # unit tests, which is why this previously slipped through).
+            local_task_id=str(new_task.id),
             status="accepted",
         )
         db.add(fed_task)

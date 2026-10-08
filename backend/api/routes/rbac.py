@@ -53,6 +53,15 @@ def get_current_user_from_token(
     """
     from backend.core.auth import verify_token
 
+    # HTTPBearer(auto_error=False) yields None when the header is missing —
+    # without this check every unauthenticated request crashes with a 500
+    # instead of a clean 401.
+    if not credentials or not credentials.credentials:
+        raise UnauthorizedError(
+            error="Missing authentication credentials",
+            code="MISSING_AUTHENTICATION_CREDENTIALS",
+        )
+
     token = credentials.credentials  # HTTPAuthorizationCredentials → str
 
     payload = verify_token(token)

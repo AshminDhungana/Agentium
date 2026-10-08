@@ -786,11 +786,13 @@
 
 > **Files**: `backend/services/federation_service.py`, `backend/api/routes/federation.py`, `frontend/src/pages/FederationPage.tsx`, `frontend/src/services/federation.ts`
 
-- [ ] **16.1 — Federation API**
-  - [ ] 16.1.1 — `POST /api/v1/federation/peers` registers a peer instance
-  - [ ] 16.1.2 — `GET /api/v1/federation/peers` lists connected peers
-  - [ ] 16.1.3 — Peer heartbeat keeps connections alive (5-min interval)
-  - [ ] 16.1.4 — Stale peer cleanup runs (hourly)
+- [x] **16.1 — Federation API**
+  - [x] 16.1.1 — `POST /api/v1/federation/peers` registers a peer instance
+  - [x] 16.1.2 — `GET /api/v1/federation/peers` lists connected peers
+  - [x] 16.1.3 — Peer heartbeat keeps connections alive (5-min interval)
+  - [x] 16.1.4 — Stale peer cleanup runs (hourly)
+
+  > **Verified:** 33 integration tests in `backend/tests/integration/test_federation_api.py` pass (peer CRUD + pagination, dual-mode webhook auth [HMAC + legacy secret] with replay-window rejection, task receive/result webhooks, Celery heartbeat probing/suspension/recovery with 300s beat, stale cleanup with 3600s beat). Two bugs found & fixed: `get_current_user_from_token` returned 500 (not 401) on missing token (`rbac.py`), and `receive_delegated_task` violated the `local_task_id → tasks.id` FK on Postgres by storing `agentium_id` (`federation_service.py`). Known gap (out of scope): `send_federation_result` Celery task is defined but not yet wired to task completion (falls under 16.2.1).
 
 - [ ] **16.2 — Cross-Instance Communication**
   - [ ] 16.2.1 — Task delegation to peer instances works
