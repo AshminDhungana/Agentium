@@ -171,6 +171,14 @@ def execute_task_async(self, task_id: str, agent_id: str):
                 result_summary=result["content"][:500],
                 result_data=result_data
             )
+            # Phase 16.3: report the result to the delegating peer
+            # (no-op for non-federated tasks; never raises)
+            try:
+                from backend.services.federation_service import FederationService
+                FederationService.notify_federation_result(db, task, "completed")
+            except Exception as fed_exc:  # pragma: no cover - import safety
+                logger.warning(f"Federation result callback failed for {task_id}: {fed_exc}")
+
             try:
                 from backend.api.routes.websocket import manager as ws_mgr
                 asyncio.run(ws_mgr.emit_task_update(
@@ -288,6 +296,15 @@ def execute_task_async(self, task_id: str, agent_id: str):
                 )
             db.commit()
 
+            # Phase 16.3: report failure to the delegating peer
+            try:
+                from backend.services.federation_service import FederationService
+                FederationService.notify_federation_result(
+                    db, task, "failed", result_summary=f"Failed: {reason}",
+                )
+            except Exception as fed_exc:  # pragma: no cover - import safety
+                logger.warning(f"Federation result callback failed for {task_id}: {fed_exc}")
+
             # Phase 19.3 (Task 15): surface a friendly degradation message to the
             # user instead of a stack trace. The task is already terminal; this
             # just tells any connected dashboard that the provider is exhausted.
@@ -398,6 +415,16 @@ def execute_task_async(self, task_id: str, agent_id: str):
                         exc_info=True,
                     )
                 db.commit()
+
+                # Phase 16.3: report failure to the delegating peer
+                if task is not None:
+                    try:
+                        from backend.services.federation_service import FederationService
+                        FederationService.notify_federation_result(
+                            db, task, "failed", result_summary=f"Failed after retries: {exc}",
+                        )
+                    except Exception as fed_exc:  # pragma: no cover - import safety
+                        logger.warning(f"Federation result callback failed for {task_id}: {fed_exc}")
 
                 return {
                     "status": "failed",
