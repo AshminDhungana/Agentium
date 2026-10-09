@@ -256,7 +256,7 @@ class FederationService:
 
         # ── Dispatch delivery via Celery (non-blocking) ───────────────────────
         try:
-            from backend.services.tasks.task_executor import deliver_federated_task
+            from backend.celery_app import deliver_federated_task
             deliver_federated_task.delay(
                 fed_task_id=fed_task.id,
                 target_url=f"{peer.base_url}/api/v1/federation/webhooks/tasks/receive",

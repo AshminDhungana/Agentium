@@ -83,12 +83,11 @@ class TestDelegateTask:
                 calls.append(kwargs)
 
         monkeypatch.setattr(
-            "backend.services.tasks.task_executor.deliver_federated_task",
+            "backend.celery_app.deliver_federated_task",
             _FakeTask(),
-            raising=False,
         )
-        # delegate_task imports deliver_federated_task inside the function
-        # body, so patching the module attribute it resolves from is enough.
+        # delegate_task imports deliver_federated_task from backend.celery_app
+        # inside the function body, so patching that module attribute is enough.
 
         FederationService.delegate_task(
             db=seeded_db,
@@ -120,9 +119,8 @@ class TestDelegateTask:
                 raise RuntimeError("broker down")
 
         monkeypatch.setattr(
-            "backend.services.tasks.task_executor.deliver_federated_task",
+            "backend.celery_app.deliver_federated_task",
             _BoomTask(),
-            raising=False,
         )
 
         fed_task = FederationService.delegate_task(
