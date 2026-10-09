@@ -126,3 +126,81 @@ describe('FederationPage — 16.3.1 displays connected peers', () => {
         expect(state.listFederatedTasks).not.toHaveBeenCalled();
     });
 });
+
+// ── 16.3.2 — peer connection/disconnection ───────────────────────────────────
+
+describe('FederationPage — 16.3.2 peer connection/disconnection', () => {
+    beforeEach(resetMocks);
+
+    it('registers a new peer through the Add Peer modal', async () => {
+        state.registerPeer.mockResolvedValue(PEERS[0]);
+        render(<FederationPage />);
+        await screen.findByText('Peer Alpha');
+
+        fireEvent.click(screen.getByRole('button', { name: 'Add new peer instance' }));
+        fireEvent.change(screen.getByLabelText('Peer Name'), { target: { value: 'Peer Gamma' } });
+        fireEvent.change(screen.getByLabelText('Base URL'), { target: { value: 'http://peer-gamma.local' } });
+        fireEvent.change(screen.getByLabelText('Shared Secret'), { target: { value: 's3cret' } });
+        fireEvent.change(screen.getByLabelText(/Capabilities/), { target: { value: 'tasks' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Add Peer' }));
+
+        await waitFor(() => expect(state.registerPeer).toHaveBeenCalledTimes(1));
+        expect(state.registerPeer).toHaveBeenCalledWith(expect.objectContaining({
+            name: 'Peer Gamma',
+            base_url: 'http://peer-gamma.local',
+            shared_secret: 's3cret',
+            trust_level: 'limited',
+            capabilities: ['tasks'],
+        }));
+        // list refreshed after successful registration
+        expect(state.listPeers.mock.calls.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it('shows an error toast and keeps the modal open when registration fails', async () => {
+        state.registerPeer.mockRejectedValue(new Error('Failed to register peer: boom'));
+        render(<FederationPage />);
+        await screen.findByText('Peer Alpha');
+
+        fireEvent.click(screen.getByRole('button', { name: 'Add new peer instance' }));
+        fireEvent.change(screen.getByLabelText('Peer Name'), { target: { value: 'Peer Gamma' } });
+        fireEvent.change(screen.getByLabelText('Base URL'), { target: { value: 'http://peer-gamma.local' } });
+        fireEvent.change(screen.getByLabelText('Shared Secret'), { target: { value: 's3cret' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Add Peer' }));
+
+        await waitFor(() => expect(vi.mocked(showToast.error)).toHaveBeenCalledWith('Failed to register peer: boom'));
+        // modal stays open for a retry
+        expect(screen.getByLabelText('Peer Name')).toBeInTheDocument();
+    });
+
+    it('removes a peer via the inline delete confirmation', async () => {
+        state.deletePeer.mockResolvedValue(undefined);
+        render(<FederationPage />);
+        await screen.findByText('Peer Alpha');
+
+        fireEvent.click(screen.getByRole('button', { name: 'Remove peer Peer Alpha' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Confirm removal of Peer Alpha' }));
+
+        await waitFor(() => expect(state.deletePeer).toHaveBeenCalledWith('p1'));
+    });
+
+    it('cancelling the inline delete leaves the peer in place', async () => {
+        render(<FederationPage />);
+        await screen.findByText('Peer Alpha');
+
+        fireEvent.click(screen.getByRole('button', { name: 'Remove peer Peer Alpha' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel removal' }));
+
+        expect(state.deletePeer).not.toHaveBeenCalled();
+        expect(screen.getByText('Peer Alpha')).toBeInTheDocument();
+    });
+
+    it('updates a peer trust level from the row select', async () => {
+        state.updatePeerTrust.mockResolvedValue(PEERS[0]);
+        render(<FederationPage />);
+        await screen.findByText('Peer Alpha');
+
+        fireEvent.change(screen.getByLabelText('Trust level for Peer Alpha'), { target: { value: 'full' } });
+
+        await waitFor(() => expect(state.updatePeerTrust).toHaveBeenCalledWith('p1', 'full'));
+    });
+});
