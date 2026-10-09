@@ -801,10 +801,12 @@
 
   > **Verified:** 28 new integration tests (61 federation tests total, all passing): `test_federation_delegation.py` (7 — outbound `delegate_task` record creation, Celery dispatch args, dispatch-failure resilience, inactive/unknown peer rejection), `test_federation_knowledge.py` (6 — knowledge-share webhook peer-auth + federated-metadata ingest, admin-gated constitution sync), `test_federation_migration.py` (15 — definition-only move: receive webhook recreates Agent + Ethos identity from `agentium/agent-definition/v1` snapshot, `build_agent_snapshot` carries identity not working memory, migrate route terminates local agent only on 200 ack; peer failures raise 503 and leave the agent untouched). Known gap (out of scope): `send_federation_result` Celery task (celery_app.py) is still defined but not wired to task completion — carried forward from 16.1.
 
-- [ ] **16.3 — Federation Frontend**
-  - [ ] 16.3.1 — `FederationPage.tsx` displays connected peers
-  - [ ] 16.3.2 — Peer connection/disconnection UI works
-  - [ ] 16.3.3 — Cross-instance task status is visible
+- [x] **16.3 — Federation Frontend**
+  - [x] 16.3.1 — `FederationPage.tsx` displays connected peers
+  - [x] 16.3.2 — Peer connection/disconnection UI works
+  - [x] 16.3.3 — Cross-instance task status is visible
+
+  > **Verified:** Behavioral suite in `frontend/src/pages/__tests__/FederationPage.test.tsx` passes (peer table rendering/search/empty states, Sovereign gate now skips fetching for non-Sovereign users, Add Peer → register → refresh flow, inline delete-confirm, trust-level editing, task status badges with direction + completion timestamps, delegate-task modal, disabled Delegate when no active peers); existing a11y contrast suite unaffected. Closes the `send_federation_result` gap carried forward from 16.1/16.2: `FederationService.notify_federation_result` (federation_service.py) updates the incoming `FederatedTask` row and dispatches the Celery result callback from all three terminal paths in `task_executor.py` (completion, provider exhaustion, retry exhaustion) — 7 new integration tests in `backend/tests/integration/test_federation_result_callback.py`. Verified live end-to-end via `scripts/fake_federation_peer.py` (delegate from the UI's endpoints → signed delivery via Celery worker → fake peer's signed result callback → status shows Completed in the tasks list) plus peer register/remove round-trip. The live run surfaced and fixed two production defects: `delegate_task` imported `deliver_federated_task` from the wrong module (dispatch never fired outside tests — 8125787), and the delivery task's status update could clobber a terminal `completed` status set by a fast peer's callback (race guard + 2 regression tests — 02056dc).
 
 ---
 
