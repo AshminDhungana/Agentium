@@ -76,9 +76,10 @@ export function FederationPage() {
     // ── Bootstrap ─────────────────────────────────────────────────────────────
 
     useEffect(() => {
+        if (!user?.isSovereign) return;
         void fetchPeers();
         void fetchTasks();
-    }, []);
+    }, [user?.isSovereign]);
 
     // ── Data fetching ─────────────────────────────────────────────────────────
 
