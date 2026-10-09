@@ -301,7 +301,7 @@ class FederationService:
             created_by="federation",
             requires_deliberation=False,  # Federated tasks skip internal deliberation
             constitutional_basis=f"Delegated by federated peer: {source_peer.name} (trust={source_peer.trust_level})",
-            execution_context=str({
+            execution_context=json.dumps({
                 "federated": True,
                 "source_instance": source_peer.name,
                 "source_instance_id": source_peer.id,
@@ -378,6 +378,95 @@ class FederationService:
             f"status={status} from '{source_peer.name}'"
         )
         return fed_task
+
+    # ── Result callback (outbound) ────────────────────────────────────────────
+
+    @staticmethod
+    def notify_federation_result(
+        db: Session,
+        task: Task,
+        status: str,
+        result_summary: Optional[str] = None,
+        result_data: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """
+        Phase 16.3: fire a result callback to the delegating instance when a
+        federated local task reaches a terminal state ("completed" | "failed").
+
+        Also flips the incoming FederatedTask row's status so the receiving
+        instance's own Delegated Tasks tab reflects the outcome (16.3.3).
+
+        Best-effort and total: NEVER raises — a broken callback must not fail
+        the task it reports on. Safe to call for every task, federated or not.
+        """
+        try:
+            ctx: Dict[str, Any] = {}
+            if task.execution_context:
+                try:
+                    parsed = json.loads(task.execution_context)
+                    if isinstance(parsed, dict):
+                        ctx = parsed
+                except (TypeError, ValueError):
+                    ctx = {}
+            if not ctx.get("federated"):
+                return  # normal local task — nothing to do
+
+            fed_task = (
+                db.query(FederatedTask)
+                .filter(FederatedTask.local_task_id == str(task.id))
+                .first()
+            )
+            if not fed_task:
+                logger.warning(f"Federation: no FederatedTask row for local task {task.id} — callback skipped")
+                return
+
+            # 1. Reflect the terminal state on the incoming record first —
+            #    this must happen even if the outbound callback cannot be sent.
+            fed_task.status = status
+            fed_task.completed_at = datetime.utcnow() if status == "completed" else None
+            db.commit()
+
+            # 2. Best-effort outbound callback to the source instance.
+            callback_url = ctx.get("callback_url")
+            if not callback_url:
+                logger.warning(f"Federation: task {task.id} has no callback_url — status recorded, callback skipped")
+                return
+
+            source_peer_id = ctx.get("source_instance_id")
+            source_peer = None
+            if source_peer_id:
+                source_peer = (
+                    db.query(FederatedInstance)
+                    .filter(FederatedInstance.id == source_peer_id)
+                    .first()
+                )
+            if not source_peer:
+                logger.warning(f"Federation: source peer {source_peer_id} not found — status recorded, callback skipped")
+                return
+
+            data = result_data if isinstance(result_data, dict) else (
+                task.result_data if isinstance(task.result_data, dict) else {}
+            )
+            summary = result_summary or task.result_summary or ""
+
+            from backend.celery_app import send_federation_result
+            send_federation_result.delay(
+                callback_url=callback_url,
+                peer_url=(settings.FEDERATION_INSTANCE_URL or "").rstrip("/"),
+                signing_key=source_peer.signing_key,
+                original_task_id=ctx.get("source_task_id") or fed_task.original_task_id,
+                local_task_id=fed_task.local_task_id,
+                task_status=status,
+                result_summary=summary[:500],
+                result_data=data,
+            )
+            logger.info(f"Federation: queued result callback for task {task.id} → {callback_url}")
+        except Exception as exc:
+            logger.error(f"Federation: notify_federation_result failed for task {getattr(task, 'id', '?')}: {exc}")
+            try:
+                db.rollback()
+            except Exception:
+                pass
 
     # ── Heartbeat probe ───────────────────────────────────────────────────────
 
