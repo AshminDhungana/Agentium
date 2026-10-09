@@ -26,6 +26,12 @@ import sys
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+# On Windows, stdout redirected to a file/pipe defaults to the ANSI codepage
+# (cp1252), which cannot encode the log arrows below — reconfigure to UTF-8.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace", line_buffering=True)
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace", line_buffering=True)
+
 try:
     import httpx
 except ImportError:

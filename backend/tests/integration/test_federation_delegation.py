@@ -184,3 +184,96 @@ class TestListFederatedTasks:
             ))
         seeded_db.flush()
         assert len(FederationService.list_federated_tasks(seeded_db, limit=3)) == 3
+
+
+class TestDeliverFederatedTaskStatusGuard:
+    """deliver_federated_task must only promote pending → delivered.
+
+    A fast peer can post its result callback before the delivering worker's
+    post-POST status update runs (seen live in the 16.3 verification run):
+    the unconditional update resurrected the task from 'completed' back to
+    'delivered' while completed_at stayed set.
+    """
+
+    @pytest.fixture
+    def fake_http(self, monkeypatch):
+        class _Resp:
+            def raise_for_status(self):
+                pass
+
+        class _Client:
+            def __init__(self, timeout=None):
+                pass
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return False
+
+            def post(self, url, content=None, headers=None):
+                return _Resp()
+
+        monkeypatch.setattr("httpx.Client", _Client)
+
+    class _NoCloseSession:
+        """Proxy the task's BeatSessionLocal over the fixture session.
+
+        deliver_federated_task closes the session it was handed; closing the
+        fixture's own session would detach every seeded object, so swallow it.
+        """
+
+        def __init__(self, session):
+            self._session = session
+
+        def query(self, *args, **kwargs):
+            return self._session.query(*args, **kwargs)
+
+        def commit(self):
+            self._session.commit()
+
+        def close(self):
+            pass
+
+    def _deliver(self, seeded_db, monkeypatch, fed_task_id):
+        from backend.celery_app import deliver_federated_task
+
+        monkeypatch.setattr(
+            "backend.celery_app.BeatSessionLocal",
+            lambda: self._NoCloseSession(seeded_db),
+        )
+        return deliver_federated_task.apply(args=(
+            fed_task_id,
+            f"{PEER_URL}/api/v1/federation/webhooks/tasks/receive",
+            "http://primary.local",
+            _derive_signing_key(SECRET),
+            {"original_task_id": "T-race"},
+        )).get()
+
+    def test_completed_status_survives_delivery_update(
+        self, seeded_db, fed_enabled, peer, monkeypatch, fake_http,
+    ):
+        # Simulate the race: the peer's callback already completed the task
+        # before the worker's delivery-ack update runs.
+        fed_task = FederatedTask(
+            target_instance_id=peer.id, original_task_id="T-race", status="completed")
+        seeded_db.add(fed_task)
+        seeded_db.flush()
+
+        result = self._deliver(seeded_db, monkeypatch, str(fed_task.id))
+
+        assert result["delivered"] is True
+        assert fed_task.status == "completed"
+
+    def test_pending_is_promoted_to_delivered(
+        self, seeded_db, fed_enabled, peer, monkeypatch, fake_http,
+    ):
+        fed_task = FederatedTask(
+            target_instance_id=peer.id, original_task_id="T-promote", status="pending")
+        seeded_db.add(fed_task)
+        seeded_db.flush()
+
+        result = self._deliver(seeded_db, monkeypatch, str(fed_task.id))
+
+        assert result["delivered"] is True
+        assert fed_task.status == "delivered"

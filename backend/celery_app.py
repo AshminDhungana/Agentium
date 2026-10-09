@@ -594,7 +594,10 @@ def deliver_federated_task(
         try:
             from backend.models.entities.federation import FederatedTask
             ft = db.query(FederatedTask).filter_by(id=fed_task_id).first()
-            if ft:
+            # Only promote pending → delivered. A fast peer can post its result
+            # callback before this update runs; overwriting a terminal status
+            # (completed/failed) would resurrect the task and lose the result.
+            if ft and ft.status == "pending":
                 ft.status = "delivered"
                 db.commit()
         finally:
