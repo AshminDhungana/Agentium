@@ -204,3 +204,59 @@ describe('FederationPage — 16.3.2 peer connection/disconnection', () => {
         await waitFor(() => expect(state.updatePeerTrust).toHaveBeenCalledWith('p1', 'full'));
     });
 });
+
+// ── 16.3.3 — cross-instance task status ───────────────────────────────────────
+
+describe('FederationPage — 16.3.3 cross-instance task status', () => {
+    beforeEach(resetMocks);
+
+    const openTasksTab = async () => {
+        render(<FederationPage />);
+        await screen.findByText('Peer Alpha');
+        fireEvent.click(screen.getByRole('tab', { name: /Delegated Tasks/ }));
+    };
+
+    it('lists federated tasks with status badges, direction and completion time', async () => {
+        await openTasksTab();
+        const list = screen.getByLabelText('Federated task list');
+
+        expect(within(list).getByText('T0100')).toBeInTheDocument();
+        expect(within(list).getByText('T9900')).toBeInTheDocument();
+        expect(within(list).getByText('Completed')).toBeInTheDocument();
+        expect(within(list).getByText('Accepted')).toBeInTheDocument();
+        // Direction text lives inside a <p> with the date, so match by substring
+        expect(within(list).getByText(/↑ Outgoing/)).toBeInTheDocument();
+        expect(within(list).getByText(/↓ Incoming/)).toBeInTheDocument();
+    });
+
+    it('shows the empty state when there are no federated tasks', async () => {
+        state.listFederatedTasks.mockResolvedValue([]);
+        await openTasksTab();
+        expect(await screen.findByText('No Delegated Tasks')).toBeInTheDocument();
+    });
+
+    it('disables Delegate Task when there are no active peers', async () => {
+        state.listPeers.mockResolvedValue([PEERS[1]]); // suspended peer only
+        render(<FederationPage />);
+        await screen.findByText('Peer Beta'); // the only peer in this fixture
+        fireEvent.click(screen.getByRole('tab', { name: /Delegated Tasks/ }));
+        expect(screen.getByRole('button', { name: 'Delegate a task to a peer' })).toBeDisabled();
+    });
+
+    it('delegates a task through the modal', async () => {
+        state.delegateTask.mockResolvedValue({ id: 'f9', status: 'pending', message: 'queued' });
+        await openTasksTab();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Delegate a task to a peer' }));
+        fireEvent.change(screen.getByLabelText('Target Peer'), { target: { value: 'p1' } });
+        fireEvent.change(screen.getByLabelText('Original Task ID'), { target: { value: 'T0100' } });
+        fireEvent.change(screen.getByLabelText(/Payload/), { target: { value: '{"title": "hello"}' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Delegate' }));
+
+        await waitFor(() => expect(state.delegateTask).toHaveBeenCalledWith({
+            target_peer_id: 'p1',
+            original_task_id: 'T0100',
+            payload: { title: 'hello' },
+        }));
+    });
+});
