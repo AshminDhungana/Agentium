@@ -814,11 +814,11 @@
 
 > **Files**: `backend/services/mcp_client.py`, `backend/services/mcp_tool_bridge.py`, `backend/services/mcp_governance.py`, `backend/services/mcp_stats_service.py`, `backend/api/routes/mcp_tools.py`, `backend/models/entities/mcp_tool.py`, `frontend/src/services/mcpToolsApi.ts`
 
-- [ ] **17.1 — MCP Client**
-  - [ ] 17.1.1 — `mcp_client.py` connects to external MCP servers
-  - [ ] 17.1.2 — Tool discovery from MCP servers works
-  - [ ] 17.1.3 — Tool invocation via MCP protocol works
-  - [ ] 17.1.4 — MCP tool bridge registers external tools in local registry
+- [x] **17.1 — MCP Client**
+  - [x] 17.1.1 — `mcp_client.py` connects to external MCP servers
+  - [x] 17.1.2 — Tool discovery from MCP servers works
+  - [x] 17.1.3 — Tool invocation via MCP protocol works
+  - [x] 17.1.4 — MCP tool bridge registers external tools in local registry
 
 - [ ] **17.2 — MCP Governance**
   - [ ] 17.2.1 — Constitutional guard applies to MCP tool invocations

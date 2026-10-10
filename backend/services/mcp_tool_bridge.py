@@ -118,16 +118,24 @@ def _build_pydantic_model_from_jsonschema(schema: Dict[str, Any]):
 
     # Handle additionalProperties
     additional_props = schema.get("additionalProperties", True)
-    if additional_props is False:
-        config = {"extra": "forbid"}
-    else:
-        config = {"extra": "ignore"}
+    extra_value = "forbid" if additional_props is False else "ignore"
 
-    model = create_model(
-        f"MCPParams_{hash(tuple(sorted(fields.keys())))}",
-        __config__=config,
-        **fields
-    )
+    # Pydantic v2 uses model_config=ConfigDict; v1 uses __config__=<class>.
+    try:
+        from pydantic import ConfigDict
+        model = create_model(
+            f"MCPParams_{hash(tuple(sorted(fields.keys())))}",
+            model_config=ConfigDict(extra=extra_value),
+            **fields,
+        )
+    except TypeError:
+        # Pydantic v1 fallback
+        _cfg = type("Config", (), {"extra": extra_value})
+        model = create_model(
+            f"MCPParams_{hash(tuple(sorted(fields.keys())))}",
+            __config__=_cfg,
+            **fields,
+        )
 
     return model
 
@@ -328,7 +336,7 @@ class MCPToolBridge:
 
         # Build Pydantic models for each sub-tool's inputSchema
         mcp_models = {}
-        for cap in tool.capabilities:
+        for cap in (tool.capabilities or []):
             if isinstance(cap, dict) and cap.get("input_schema"):
                 sub_tool_name = cap.get("name")
                 if sub_tool_name:

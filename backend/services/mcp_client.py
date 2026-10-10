@@ -46,6 +46,8 @@ class MCPClient:
         self.server_url = server_url
         self.timeout_seconds = timeout_seconds
         self._session: Optional[Any] = None
+        # Holds the stdio_client async context manager so we can exit it properly.
+        self._stdio_cm: Optional[Any] = None
 
     # ── Context manager ────────────────────────────────────────────────────────
 
@@ -68,27 +70,38 @@ class MCPClient:
             logger.debug(f"[MCPClient] mcp package absent — using mock mode for {self.server_url}")
             return
 
+        # Guard against double-connect.
+        if self._session is not None:
+            return
+
         try:
             params = StdioServerParameters(command=self.server_url, args=[])
+            # Store the context manager so __aexit__ can clean it up properly,
+            # including terminating the spawned subprocess.
+            self._stdio_cm = stdio_client(params)
             self._transport, self._session = await asyncio.wait_for(
-                stdio_client(params).__aenter__(),
+                self._stdio_cm.__aenter__(),
                 timeout=self.timeout_seconds,
             )
             await self._session.initialize()
             logger.info(f"[MCPClient] Connected to {self.server_url}")
         except asyncio.TimeoutError:
+            self._stdio_cm = None
             raise MCPConnectionError(f"Timed out connecting to MCP server: {self.server_url}")
         except Exception as exc:
+            self._stdio_cm = None
             raise MCPConnectionError(f"Failed to connect to {self.server_url}: {exc}") from exc
 
     async def disconnect(self) -> None:
-        """Close the MCP server connection."""
-        if self._session:
+        """Close the MCP server connection and terminate the subprocess."""
+        cm = getattr(self, "_stdio_cm", None)
+        if cm is not None:
             try:
-                await self._session.__aexit__(None, None, None)
+                await cm.__aexit__(None, None, None)
             except Exception:
                 pass
-            self._session = None
+        self._session = None
+        self._stdio_cm = None
 
     # ── Core operations ────────────────────────────────────────────────────────
 

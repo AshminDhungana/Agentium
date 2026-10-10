@@ -158,8 +158,8 @@ class MCPGovernanceService:
         capabilities = [
             {
                 "name": t.get("name"),
-                "description": getattr(t, "description", ""),
-                "input_schema": getattr(t, "inputSchema", {}),
+                "description": t.get("description", ""),
+                "input_schema": t.get("input_schema", {}),
             }
             for t in discovered
             if isinstance(t, dict) and t.get("name")
@@ -441,6 +441,9 @@ class MCPGovernanceService:
 
         tool = self._get_tool_or_404(tool_id)
 
+        # Ensure params is always a dict (never None) before any access.
+        params = params or {}
+
         # ── Phase 15.2: Redis revocation check (fast path, no DB) ────────────
         try:
             from backend.services import mcp_stats_service as _stats
@@ -473,7 +476,13 @@ class MCPGovernanceService:
             }
 
         # ── Execute ────────────────────────────────────────────────────────────
-        target_tool = tool_name or (tool.capabilities[0] if tool.capabilities else tool.name)
+        # Resolve target sub-tool: use explicit override, then first capability name,
+        # then fall back to the server-level tool name.
+        caps = tool.capabilities or []
+        first_cap = caps[0] if caps else None
+        target_tool = tool_name or (
+            first_cap.get("name") if isinstance(first_cap, dict) else first_cap
+        ) or tool.name
 
         if async_callback_url:
             _tool_id    = tool.id

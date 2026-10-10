@@ -50,8 +50,8 @@ class MCPTool(BaseEntity):
     revocation_reason: Optional[str] = Column(Text, nullable=True)
 
     # ── Capabilities advertised by the MCP server ──────────────────────────────
-    # Stored as JSON list of capability-name strings returned by list_tools()
-    capabilities: List[str] = Column(JSON, nullable=False, default=list)
+    # Stored as JSON list of capability dicts: [{name, description, input_schema}, ...]
+    capabilities: List[dict] = Column(JSON, nullable=False, default=list)
 
     # ── Health tracking ────────────────────────────────────────────────────────
     # Values: "healthy" | "degraded" | "down" | "unknown"
