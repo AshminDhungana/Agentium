@@ -90,40 +90,42 @@ TIER_CAPABILITIES: Dict[str, List[str]] = {
         "veto", "amendment", "liquidate_any", "admin_vector_db",
         "broadcast", "spawn_any", "override_vote", "modify_constitution",
         "execute_command", "read_file", "write_file", "browser_control",
-        "reassign_agent",
+        "reassign_agent", "mcp_tool_invoke",
     ],
     "1": [  # Council Members
         "propose_amendment", "allocate_resources", "audit",
         "moderate_knowledge", "spawn_lead", "vote", "escalate",
-        "read_file", "reassign_agent",
+        "read_file", "reassign_agent", "mcp_tool_invoke",
     ],
     "2": [  # Lead Agents
         "spawn_task_agent", "delegate_work", "request_resources",
         "submit_knowledge", "report_status", "reassign_agent",
+        "mcp_tool_invoke",
     ],
     "3": [  # Task Agents
         "execute_task", "report_status", "escalate_blocker",
-        "query_knowledge",
+        "query_knowledge", "mcp_tool_invoke",
     ],
     # Named keys (for test compatibility)
     "head": [  # Head of Council
         "veto", "amendment", "liquidate_any", "admin_vector_db",
         "broadcast", "spawn_any", "override_vote", "modify_constitution",
         "execute_command", "read_file", "write_file", "browser_control",
-        "spawn_agent", "reassign_agent",
+        "spawn_agent", "reassign_agent", "mcp_tool_invoke",
     ],
     "council": [  # Council Members
         "propose_amendment", "allocate_resources", "audit",
         "moderate_knowledge", "spawn_lead", "vote", "escalate",
-        "read_file", "reassign_agent",
+        "read_file", "reassign_agent", "mcp_tool_invoke",
     ],
     "lead": [  # Lead Agents
         "spawn_task_agent", "delegate_work", "request_resources",
         "submit_knowledge", "report_status", "reassign_agent",
+        "mcp_tool_invoke",
     ],
     "task": [  # Task Agents
         "execute_task", "report_status", "escalate_blocker",
-        "query_knowledge",
+        "query_knowledge", "mcp_tool_invoke",
     ],
 }
 
@@ -324,7 +326,7 @@ class ConstitutionalGuard:
         agent_tier = agent_id[0] if agent_id else "3"
         allowed_actions = TIER_CAPABILITIES.get(agent_tier, [])
 
-        if action not in allowed_actions and action not in ("query", "process_intent"):
+        if action not in allowed_actions and action not in ("query", "process_intent", "mcp_tool_invoke"):
             return ConstitutionalDecision(
                 verdict=Verdict.BLOCK,
                 severity=ViolationSeverity.MEDIUM,
@@ -735,7 +737,7 @@ class ConstitutionalGuard:
                     description=decision.explanation or f"Constitutional violation: {action}",
                     severity=severity_to_audit_level.get(decision.severity, AuditLevel.WARNING),
                     attempted_action=f"{action} {json.dumps({})}",
-                    detected_by="CONSTITUTIONAL_GUARD",
+                    detected_by="GUARD",
                     detection_method="pre_execution_check",
                     blocked=(decision.verdict == Verdict.BLOCK),
                     context={"verdict": decision.verdict.value, "citations": decision.citations},
