@@ -40,11 +40,26 @@ class MCPClient:
             result = await client.call_tool("search", {"query": "hello"})
     """
 
-    def __init__(self, server_url: str, timeout_seconds: int = 30):
+    def __init__(
+        self,
+        server_url: str,
+        timeout_seconds: int = 30,
+        auth_token: Optional[str] = None,
+        headers: Optional[Dict[str, str]] = None,
+        env: Optional[Dict[str, str]] = None,
+    ):
         """Init."""
 
         self.server_url = server_url
         self.timeout_seconds = timeout_seconds
+        self.auth_token = auth_token
+        self.headers: Dict[str, str] = dict(headers or {})
+        self.env: Dict[str, str] = dict(env or {})
+        if auth_token:
+            self.headers.setdefault("Authorization", f"Bearer {auth_token}")
+            self.env.setdefault("MCP_AUTH_TOKEN", auth_token)
+            self.env.setdefault("AUTHORIZATION", f"Bearer {auth_token}")
+
         self._session: Optional[Any] = None
         # Holds the stdio_client async context manager so we can exit it properly.
         self._stdio_cm: Optional[Any] = None
@@ -75,7 +90,11 @@ class MCPClient:
             return
 
         try:
-            params = StdioServerParameters(command=self.server_url, args=[])
+            params = StdioServerParameters(
+                command=self.server_url,
+                args=[],
+                env=self.env if self.env else None,
+            )
             # Store the context manager so __aexit__ can clean it up properly,
             # including terminating the spawned subprocess.
             self._stdio_cm = stdio_client(params)
@@ -227,4 +246,8 @@ class MCPClient:
             "result": [{"type": "text", "text": f"[MOCK] Called {tool_name} with {params}"}],
             "timestamp": datetime.utcnow().isoformat(),
             "mock": True,
+            "config": {
+                "server_url": self.server_url,
+                "authenticated": bool(self.auth_token or "Authorization" in self.headers or self.env.get("MCP_AUTH_TOKEN")),
+            },
         }

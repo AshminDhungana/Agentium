@@ -54,6 +54,50 @@ export interface ProposeMCPToolRequest {
   server_url: string;
   tier_access?: MCPTierAccess;
   schema?: Record<string, unknown>;
+  auth_token?: string;
+  headers?: Record<string, string>;
+  env?: Record<string, string>;
+}
+
+export interface InvokeMCPToolRequest {
+  tool_name?: string;
+  tool_id?: string;
+  params?: Record<string, unknown>;
+  agent_id?: string;
+  agent_tier?: string;
+  has_head_approval_token?: boolean;
+  sub_tool?: string;
+}
+
+export interface ConfigureMCPToolRequest {
+  server_url?: string;
+  auth_token?: string;
+  headers?: Record<string, string>;
+  env?: Record<string, string>;
+  tier?: string;
+  constitutional_article?: string;
+}
+
+export interface MCPToolConfig {
+  tool_id: string;
+  tool_name: string;
+  server_url: string;
+  tier: string;
+  has_auth: boolean;
+  auth_type?: string | null;
+  headers?: Record<string, string>;
+  env_keys?: string[];
+  constitutional_article?: string | null;
+}
+
+export interface MCPExecutionResponse {
+  success: boolean;
+  tool: string;
+  result?: unknown;
+  error?: string | null;
+  verdict?: string | null;
+  timestamp?: string;
+  mock?: boolean;
 }
 
 // ─── Phase 15.2: Stats types ──────────────────────────────────────────────────
@@ -179,6 +223,35 @@ export const mcpToolsApi = {
    */
   getRevoked: async (): Promise<MCPRevokedResponse> => {
     const response = await api.get<MCPRevokedResponse>(`${BASE}/revoked`);
+    return response.data;
+  },
+
+  // ─── Phase 17.3: Unified Invocation and Configuration ──────────────────────
+
+  /**
+   * Execute an MCP tool via POST /api/v1/mcp/tools/invoke (or fallback /mcp-tools/invoke).
+   */
+  invokeTool: async (request: InvokeMCPToolRequest): Promise<MCPExecutionResponse> => {
+    const response = await api.post<MCPExecutionResponse>('/api/v1/mcp/tools/invoke', request);
+    return response.data;
+  },
+
+  /**
+   * Fetch server URL and authentication configuration for an MCP tool.
+   */
+  getToolConfig: async (toolId: string): Promise<MCPToolConfig> => {
+    const response = await api.get<MCPToolConfig>(`/api/v1/mcp/tools/${toolId}/config`);
+    return response.data;
+  },
+
+  /**
+   * Update server URL and authentication configuration for an MCP tool.
+   */
+  configureTool: async (
+    toolId: string,
+    request: ConfigureMCPToolRequest,
+  ): Promise<MCPTool> => {
+    const response = await api.put<MCPTool>(`/api/v1/mcp/tools/${toolId}/config`, request);
     return response.data;
   },
 };

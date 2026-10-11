@@ -73,7 +73,7 @@ from backend.api.routes import audit_routes as audit_routes_router
 from backend.services.api_key_manager import init_api_key_manager, api_key_manager
 from backend.api.routes import genesis as genesis_route
 from backend.api.routes import api_keys as api_keys_routes
-from backend.api.routes.mcp_tools import router as mcp_tools_router
+from backend.api.routes.mcp_tools import router as mcp_tools_router, mcp_router
 from backend.api.routes import tools as tools_routes  
 from backend.api.routes import user_preferences as user_preferences_routes
 
@@ -677,6 +677,7 @@ app.include_router(remote_executor_routes.router,   prefix="/api/v1")
 app.include_router(voting_routes.router,            prefix="/api/v1")
 app.include_router(constitution_routes.router,      prefix="/api/v1")
 app.include_router(mcp_tools_router)
+app.include_router(mcp_router)
 app.include_router(tools_routes.router,             prefix="/api/v1")
 app.include_router(user_preferences_routes.router, prefix="/api/v1")
 app.include_router(ab_testing_router, prefix="/api/v1")

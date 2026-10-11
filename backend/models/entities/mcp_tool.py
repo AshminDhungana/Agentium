@@ -74,7 +74,38 @@ class MCPTool(BaseEntity):
     # Link to the AmendmentVoting that governs this proposal's approval
     voting_id: Optional[str] = Column(String(64), nullable=True)
 
+    def get_config(self) -> dict:
+        """Retrieve stored server configuration (auth, headers, env)."""
+        caps = self.capabilities or []
+        for c in caps:
+            if isinstance(c, dict) and c.get("_type") == "mcp_config":
+                return dict(c.get("config", {}))
+        return {}
+
+    def set_config(self, config: dict) -> None:
+        """Store or update server configuration in the JSON capabilities payload."""
+        caps = list(self.capabilities or [])
+        caps = [c for c in caps if not (isinstance(c, dict) and c.get("_type") == "mcp_config")]
+        caps.append({"_type": "mcp_config", "config": config})
+        self.capabilities = caps
+
     def to_dict(self) -> dict:
+        cfg = self.get_config()
+        clean_caps = [
+            c for c in (self.capabilities or [])
+            if not (isinstance(c, dict) and c.get("_type") == "mcp_config")
+        ]
+        sanitized_cfg = {
+            k: ("***" if any(s in k.lower() for s in ("token", "key", "secret", "auth", "pass")) else v)
+            for k, v in cfg.items()
+        } if cfg else {}
+        has_auth = bool(
+            cfg.get("auth_token")
+            or cfg.get("headers")
+            or cfg.get("env")
+            or "@" in (self.server_url or "")
+        )
+
         return {
             "id": str(self.id),
             "name": self.name,
@@ -90,7 +121,7 @@ class MCPTool(BaseEntity):
             "revoked_at": self.revoked_at.isoformat() if self.revoked_at else None,
             "revoked_by": self.revoked_by,
             "revocation_reason": self.revocation_reason,
-            "capabilities": self.capabilities or [],
+            "capabilities": clean_caps,
             "health_status": self.health_status,
             "last_health_check_at": self.last_health_check_at.isoformat() if self.last_health_check_at else None,
             "failure_count": self.failure_count,
@@ -100,6 +131,8 @@ class MCPTool(BaseEntity):
             "proposed_by": self.proposed_by,
             "proposed_at": self.proposed_at.isoformat() if self.proposed_at else None,
             "voting_id": self.voting_id,
+            "has_auth": has_auth,
+            "config": sanitized_cfg,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }

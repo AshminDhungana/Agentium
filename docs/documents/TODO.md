@@ -820,15 +820,19 @@
   - [x] 17.1.3 — Tool invocation via MCP protocol works
   - [x] 17.1.4 — MCP tool bridge registers external tools in local registry
 
-- [ ] **17.2 — MCP Governance**
-  - [ ] 17.2.1 — Constitutional guard applies to MCP tool invocations
-  - [ ] 17.2.2 — MCP tool access respects agent tier permissions
-  - [ ] 17.2.3 — Usage statistics are tracked (`mcp_stats_service.py`)
+- [x] **17.2 — MCP Governance**
+  - [x] 17.2.1 — Constitutional guard applies to MCP tool invocations
+  - [x] 17.2.2 — MCP tool access respects agent tier permissions
+  - [x] 17.2.3 — Usage statistics are tracked (`mcp_stats_service.py`)
 
-- [ ] **17.3 — MCP API**
-  - [ ] 17.3.1 — `GET /api/v1/mcp/tools` lists available MCP tools
-  - [ ] 17.3.2 — `POST /api/v1/mcp/tools/invoke` executes MCP tool
-  - [ ] 17.3.3 — MCP tool configuration (server URL, auth) works
+  > **Verified:** 38 integration tests in `backend/tests/integration/test_mcp_governance_17_2.py`, all passing. **17.2.1** — `ConstitutionalGuard.check_action` wired into `MCPGovernanceService.execute_mcp_tool` (before the tier check): BLOCK verdict from the guard rejects the invocation with a governed audit entry; guard errors are non-fatal (degrade gracefully if ChromaDB/constitution unavailable). Context spy confirms `action="mcp_tool_invoke"` with `tool_name`, `tool_tier`, and `params` forwarded. **17.2.2** — `check_tier_access` matrix verified: `pre_approved` → ALLOW for all four tiers (0–3); `restricted` → BLOCK for tier-2/3, HEAD_REQUIRED for tier-0/1, ALLOW for tier-0/1 with head-approval token; `forbidden` → BLOCK unconditionally including Head+token. `get_approved_tools` correctly filters by agent tier (tier-3 sees only `pre_approved`, forbidden never returned). End-to-end `execute_mcp_tool` enforcement confirmed. **17.2.3** — `record_invocation` atomically increments `invocation_count`, `error_count`, and `total_latency_ms` in Redis; `get_tool_stats` / `get_all_stats` / `get_stats_for_tools` all return correct rolling stats; revocation SET (`add_to_revoked` / `remove_from_revoked` / `is_revoked`) provides sub-second revocation; successful and failed end-to-end invocations both record stats; `get_live_stats` proxy returns live Redis data; `redis_health` reports healthy.
+
+- [x] **17.3 — MCP API**
+  - [x] 17.3.1 — `GET /api/v1/mcp/tools` lists available MCP tools
+  - [x] 17.3.2 — `POST /api/v1/mcp/tools/invoke` executes MCP tool
+  - [x] 17.3.3 — MCP tool configuration (server URL, auth) works
+
+  > **Verified:** 19 integration tests in `backend/tests/integration/test_mcp_api_17_3.py` (and 43 passing regression tests in `test_mcp_revocation.py` & `test_mcp_governance_17_2.py`), all passing. **17.3.1** — `GET /api/v1/mcp/tools` verified with status filtering (`approved` vs `pending`), tier filtering (`pre_approved` vs `restricted`), and agent tier visibility enforcement (tier-3 sees only `pre_approved`, forbidden tools never exposed). Full schema and backward compatibility parity with `/api/v1/mcp-tools` confirmed. **17.3.2** — `POST /api/v1/mcp/tools/invoke` (and `/api/v1/mcp-tools/invoke`) verified: execution by `tool_name` and `tool_id`; missing identifier returns 400 Bad Request; non-existent tool returns 404 Not Found; sub-second Redis revocation blocks execution immediately; forbidden tier blocked by constitutional guard; restricted tier enforces Head approval token; token-approved invocations execute cleanly. **17.3.3** — MCP tool configuration verified: `POST /api/v1/mcp/tools` stores `server_url`, `auth_token`, `headers`, and `env` into tool metadata (`has_auth=True` and sanitized config in responses); `GET /api/v1/mcp/tools/{id}/config` returns configuration metadata with masked credentials and env keys; `PUT /api/v1/mcp/tools/{id}/config` (and `PATCH`) updates server URL and auth configurations with admin/sovereign authorization; `POST /api/v1/mcp/tools/{id}/test-connection` tests live reachability; end-to-end execution forwards configured `auth_token`, `headers`, and `env` to `MCPClient`. Frontend client methods (`invokeTool`, `getToolConfig`, `configureTool`) added to `mcpToolsApi.ts`.
 
 ---
 

@@ -1,5 +1,5 @@
 """
-Pydantic Schemas for MCP Tools API — Phase 6.7
+Pydantic Schemas for MCP Tools API — Phase 6.7 / Phase 17.3
 """
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
@@ -14,6 +14,10 @@ class ProposeMCPServerRequest(BaseModel):
     tier: str = Field(..., description="pre_approved | restricted | forbidden")
     constitutional_article: Optional[str] = Field(None, description="Governing Constitution article")
     capabilities: Optional[List[str]] = Field(default=[], description="Known capability names")
+    auth_token: Optional[str] = Field(None, description="Optional bearer token or secret for authentication")
+    headers: Optional[Dict[str, str]] = Field(None, description="Optional custom HTTP headers")
+    env: Optional[Dict[str, str]] = Field(None, description="Optional environment variables for command execution")
+    config: Optional[Dict[str, Any]] = Field(None, description="Optional server configuration")
 
 
 class ApproveMCPToolRequest(BaseModel):
@@ -34,6 +38,34 @@ class ExecuteMCPToolRequest(BaseModel):
     has_head_approval_token: bool = Field(False, description="Whether Head approval is present")
 
 
+class InvokeMCPToolRequest(BaseModel):
+    """
+    Unified invocation schema for POST /api/v1/mcp/tools/invoke.
+    Allows specifying tool by tool_name, name, or tool_id.
+    """
+    tool_name: Optional[str] = Field(None, description="Name or agentium_id of the MCP tool")
+    tool_id: Optional[str] = Field(None, description="UUID of the MCP tool")
+    name: Optional[str] = Field(None, description="Alias for tool_name")
+    params: Dict[str, Any] = Field(default_factory=dict, description="Parameters to pass to the MCP tool")
+    agent_id: Optional[str] = Field(None, description="Calling agent ID (defaults to current user)")
+    agent_tier: Optional[str] = Field(None, description="Calling agent tier (defaults to user/agent tier or 3xxxx)")
+    has_head_approval_token: bool = Field(False, description="Head approval token for restricted tools")
+    sub_tool: Optional[str] = Field(None, description="Sub-tool / capability name if tool exposes multiple")
+    async_callback_url: Optional[str] = Field(None, description="Optional async webhook callback URL")
+
+
+class ConfigureMCPToolRequest(BaseModel):
+    """Configuration update for an MCP tool (server URL, auth, headers, env)."""
+    server_url: Optional[str] = Field(None, description="MCP server URL or command path")
+    auth_token: Optional[str] = Field(None, description="Bearer token or secret for authentication")
+    headers: Optional[Dict[str, str]] = Field(None, description="Custom HTTP headers")
+    env: Optional[Dict[str, str]] = Field(None, description="Environment variables for command execution")
+    tier: Optional[str] = Field(None, description="pre_approved | restricted | forbidden")
+    constitutional_article: Optional[str] = Field(None, description="Governing Constitution article")
+    capabilities: Optional[List[str]] = Field(None, description="Known capability names")
+    config: Optional[Dict[str, Any]] = Field(None, description="Additional configuration dictionary")
+
+
 # ── Response schemas ───────────────────────────────────────────────────────────
 
 class MCPToolResponse(BaseModel):
@@ -51,7 +83,7 @@ class MCPToolResponse(BaseModel):
     revoked_at: Optional[str]
     revoked_by: Optional[str]
     revocation_reason: Optional[str]
-    capabilities: List[str]
+    capabilities: List[Any]
     health_status: str
     last_health_check_at: Optional[str]
     failure_count: int
@@ -60,11 +92,26 @@ class MCPToolResponse(BaseModel):
     last_used_at: Optional[str]
     proposed_by: Optional[str]
     proposed_at: Optional[str]
+    voting_id: Optional[str] = None
+    has_auth: Optional[bool] = False
+    config: Optional[Dict[str, Any]] = None
     created_at: Optional[str]
     updated_at: Optional[str]
 
     class Config:
         from_attributes = True
+
+
+class MCPToolConfigResponse(BaseModel):
+    tool_id: str
+    tool_name: str
+    server_url: str
+    tier: str
+    has_auth: bool
+    auth_type: Optional[str] = None
+    headers: Optional[Dict[str, str]] = None
+    env_keys: List[str] = Field(default_factory=list)
+    constitutional_article: Optional[str] = None
 
 
 class MCPToolListResponse(BaseModel):

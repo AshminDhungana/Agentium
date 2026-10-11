@@ -70,6 +70,10 @@ class MCPGovernanceService:
         proposed_by: str,
         constitutional_article: Optional[str] = None,
         capabilities: Optional[List[str]] = None,
+        auth_token: Optional[str] = None,
+        headers: Optional[Dict[str, str]] = None,
+        env: Optional[Dict[str, str]] = None,
+        config: Optional[Dict[str, Any]] = None,
     ) -> MCPTool:
         """
         Council member proposes a new MCP server for review.
@@ -101,6 +105,16 @@ class MCPGovernanceService:
             is_active=True,
             agentium_id=f"mcp-{uuid.uuid4().hex[:12]}",
         )
+        tool_cfg = dict(config or {})
+        if auth_token:
+            tool_cfg["auth_token"] = auth_token
+        if headers:
+            tool_cfg["headers"] = headers
+        if env:
+            tool_cfg["env"] = env
+        if tool_cfg:
+            tool.set_config(tool_cfg)
+
         self.db.add(tool)
         self.db.commit()
         self.db.refresh(tool)
@@ -460,7 +474,41 @@ class MCPGovernanceService:
         if tool.status != STATUS_APPROVED:
             return self._blocked_response(tool.name, f"Tool status is '{tool.status}' — not approved for use.")
 
-        # ── Constitutional Guard ───────────────────────────────────────────────
+        # ── 17.2.1: ConstitutionalGuard — semantic + hard-rule check ──────────
+        # Runs before the tier-access check so that constitutionally prohibited
+        # actions (e.g. a destroy-all shell command wrapped in an MCP tool) are
+        # caught regardless of agent tier.  Non-fatal: if ChromaDB or the active
+        # constitution is unavailable the guard degrades gracefully and the tier
+        # check below remains the authoritative fallback.
+        try:
+            from backend.core.constitutional_guard import ConstitutionalGuard, Verdict as _Verdict
+            _guard = ConstitutionalGuard(self.db)
+            await _guard.initialize()
+            _decision = await _guard.check_action(
+                agent_id=agent_id,
+                action="mcp_tool_invoke",
+                context={
+                    "tool_name": tool.name,
+                    "tool_tier": tool.tier,
+                    "params":    params,
+                },
+            )
+            if _decision.verdict == _Verdict.BLOCK:
+                self._audit(
+                    tool, agent_id, params,
+                    success=False,
+                    error=f"Constitutional guard block: {_decision.explanation}",
+                )
+                return self._blocked_response(
+                    tool.name,
+                    f"Constitutional guard blocked this MCP invocation: {_decision.explanation}",
+                )
+        except Exception as _cg_exc:
+            logger.debug(
+                f"[MCPGovernance] ConstitutionalGuard check skipped (non-fatal): {_cg_exc}"
+            )
+
+        # ── Tier-access guard ─────────────────────────────────────────────────
         verdict = self.check_tier_access(tool.tier, agent_tier, has_head_approval_token)
 
         if verdict == MCPVerdict.BLOCK:
@@ -476,13 +524,21 @@ class MCPGovernanceService:
             }
 
         # ── Execute ────────────────────────────────────────────────────────────
-        # Resolve target sub-tool: use explicit override, then first capability name,
-        # then fall back to the server-level tool name.
-        caps = tool.capabilities or []
-        first_cap = caps[0] if caps else None
+        # Resolve target sub-tool: filter internal config, use explicit override,
+        # then first capability name, then fall back to the server-level tool name.
+        clean_caps = [
+            c for c in (tool.capabilities or [])
+            if not (isinstance(c, dict) and c.get("_type") == "mcp_config")
+        ]
+        first_cap = clean_caps[0] if clean_caps else None
         target_tool = tool_name or (
             first_cap.get("name") if isinstance(first_cap, dict) else first_cap
         ) or tool.name
+
+        cfg = tool.get_config()
+        _auth_token = cfg.get("auth_token")
+        _headers = cfg.get("headers")
+        _env = cfg.get("env")
 
         if async_callback_url:
             _tool_id    = tool.id
@@ -495,7 +551,12 @@ class MCPGovernanceService:
                 t_start = _time.monotonic()
                 success = False
                 try:
-                    async with MCPClient(_server_url) as client:
+                    async with MCPClient(
+                        _server_url,
+                        auth_token=_auth_token,
+                        headers=_headers,
+                        env=_env,
+                    ) as client:
                         call_res = await client.call_tool(target_tool, params)
                         result_payload = call_res
                         success = True
@@ -536,7 +597,12 @@ class MCPGovernanceService:
         invocation_success = False
 
         try:
-            async with MCPClient(tool.server_url) as client:
+            async with MCPClient(
+                tool.server_url,
+                auth_token=_auth_token,
+                headers=_headers,
+                env=_env,
+            ) as client:
                 result = await client.call_tool(target_tool, params)
 
             tool.consecutive_failures = 0
@@ -587,7 +653,13 @@ class MCPGovernanceService:
         """Ping the MCP server and record health status."""
         tool = self._get_tool_or_404(tool_id)
 
-        client = MCPClient(tool.server_url)
+        cfg = tool.get_config()
+        client = MCPClient(
+            tool.server_url,
+            auth_token=cfg.get("auth_token"),
+            headers=cfg.get("headers"),
+            env=cfg.get("env"),
+        )
         health = await client.health_check()
 
         tool.health_status = "healthy" if health["healthy"] else "down"
@@ -675,6 +747,78 @@ class MCPGovernanceService:
         return log[-limit:]
 
     # ══════════════════════════════════════════════════════════════════════════
+    # TOOL CONFIGURATION
+    # ══════════════════════════════════════════════════════════════════════════
+
+    def configure_mcp_tool(
+        self,
+        tool_id: str,
+        *,
+        server_url: Optional[str] = None,
+        auth_token: Optional[str] = None,
+        headers: Optional[Dict[str, str]] = None,
+        env: Optional[Dict[str, str]] = None,
+        tier: Optional[str] = None,
+        constitutional_article: Optional[str] = None,
+        config: Optional[Dict[str, Any]] = None,
+    ) -> MCPTool:
+        """Update tool configuration (server URL, auth, headers, env, tier)."""
+        tool = self._get_tool_or_404(tool_id)
+        if server_url is not None:
+            tool.server_url = server_url
+        if tier is not None:
+            if tier not in (TIER_PRE_APPROVED, TIER_RESTRICTED, TIER_FORBIDDEN):
+                raise ValueError(f"Invalid tier '{tier}'.")
+            tool.tier = tier
+        if constitutional_article is not None:
+            tool.constitutional_article = constitutional_article
+
+        current_cfg = tool.get_config()
+        if auth_token is not None:
+            current_cfg["auth_token"] = auth_token
+        if headers is not None:
+            current_cfg["headers"] = headers
+        if env is not None:
+            current_cfg["env"] = env
+        if config is not None:
+            current_cfg.update(config)
+
+        tool.set_config(current_cfg)
+        self.db.commit()
+        self.db.refresh(tool)
+        logger.info(f"[MCPGovernance] Tool configured: {tool.name} (server_url={tool.server_url})")
+        return tool
+
+    def get_tool_config(self, tool_id: str) -> Dict[str, Any]:
+        """Return configuration summary for a tool."""
+        tool = self._get_tool_or_404(tool_id)
+        cfg = tool.get_config()
+        has_auth = bool(
+            cfg.get("auth_token")
+            or cfg.get("headers")
+            or cfg.get("env")
+            or "@" in (tool.server_url or "")
+        )
+        auth_type = (
+            "bearer" if cfg.get("auth_token")
+            else ("custom_headers" if cfg.get("headers")
+            else ("url_credentials" if "@" in (tool.server_url or "")
+            else ("env_credentials" if cfg.get("env")
+            else None)))
+        )
+        return {
+            "tool_id": str(tool.id),
+            "tool_name": tool.name,
+            "server_url": tool.server_url,
+            "tier": tool.tier,
+            "has_auth": has_auth,
+            "auth_type": auth_type,
+            "headers": {k: ("***" if any(s in k.lower() for s in ("auth", "key", "token", "secret")) else v) for k, v in cfg.get("headers", {}).items()},
+            "env_keys": list(cfg.get("env", {}).keys()),
+            "constitutional_article": tool.constitutional_article,
+        }
+
+    # ══════════════════════════════════════════════════════════════════════════
     # PHASE 15.2 — LIVE STATS (proxy to mcp_stats_service)
     # ══════════════════════════════════════════════════════════════════════════
 
@@ -699,13 +843,24 @@ class MCPGovernanceService:
     # PRIVATE HELPERS
     # ══════════════════════════════════════════════════════════════════════════
 
-    def _get_tool_or_404(self, tool_id: str) -> MCPTool:
-        """Get tool or 404."""
-
-        tool = self.db.query(MCPTool).filter(MCPTool.id == tool_id).first()
+    def get_tool_by_identifier(self, identifier: str) -> MCPTool:
+        """Find tool by id, agentium_id, or name."""
+        tool = (
+            self.db.query(MCPTool)
+            .filter(
+                (MCPTool.id == identifier)
+                | (MCPTool.agentium_id == identifier)
+                | (MCPTool.name == identifier)
+            )
+            .first()
+        )
         if not tool:
-            raise ValueError(f"MCP tool '{tool_id}' not found.")
+            raise ValueError(f"MCP tool '{identifier}' not found.")
         return tool
+
+    def _get_tool_or_404(self, tool_id: str) -> MCPTool:
+        """Get tool or 404 by id, agentium_id, or name."""
+        return self.get_tool_by_identifier(tool_id)
 
     def _audit(
         self,
@@ -717,10 +872,16 @@ class MCPGovernanceService:
         error: Optional[str] = None,
     ) -> None:
         """Append one entry to the tool's persistent audit_log JSON column."""
+        try:
+            h = MCPClient.hash_params(params)
+            input_hash = str(h) if not isinstance(h, str) else h
+        except Exception:
+            input_hash = "hash_err"
+
         entry: Dict[str, Any] = {
             "agent_id":   agent_id,
             "timestamp":  datetime.utcnow().isoformat(),
-            "input_hash": MCPClient.hash_params(params),
+            "input_hash": input_hash,
             "success":    success,
         }
         if error:
