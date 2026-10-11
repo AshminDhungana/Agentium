@@ -5122,6 +5122,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/mcp-tools/invoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Invoke Mcp Tool via /mcp-tools
+         * @description Unified invocation path.
+         */
+        post: operations["invoke_mcp_tool_legacy_route_api_v1_mcp_tools_invoke_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/mcp-tools/stats": {
         parameters: {
             query?: never;
@@ -5131,7 +5151,7 @@ export interface paths {
         };
         /**
          * Get All Mcp Stats
-         * @description Return real-time invocation stats for all MCP tools from Redis. Response time target: <50 ms (pure Redis read, no DB query). Each item contains: tool_id, invocation_count, error_count, avg_latency_ms, error_rate, last_used_ts.
+         * @description Return real-time invocation stats for all MCP tools from Redis.
          */
         get: operations["get_all_mcp_stats_api_v1_mcp_tools_stats_get"];
         put?: never;
@@ -5202,6 +5222,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/mcp-tools/{tool_id}/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Tool Configuration
+         * @description Return configuration details for the tool.
+         */
+        get: operations["get_tool_config_legacy_api_v1_mcp_tools__tool_id__config_get"];
+        /**
+         * Update Tool Configuration
+         * @description Update server URL and auth configuration.
+         */
+        put: operations["update_tool_config_legacy_api_v1_mcp_tools__tool_id__config_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/mcp-tools/{tool_id}/stats": {
         parameters: {
             query?: never;
@@ -5211,7 +5255,7 @@ export interface paths {
         };
         /**
          * Get Tool Stats
-         * @description Return real-time invocation stats for a single MCP tool. Reads from Redis — no DB query.
+         * @description Return real-time invocation stats for a single MCP tool.
          */
         get: operations["get_tool_stats_api_v1_mcp_tools__tool_id__stats_get"];
         put?: never;
@@ -5233,7 +5277,7 @@ export interface paths {
         put?: never;
         /**
          * Approve Mcp Tool
-         * @description Approve a pending MCP tool. Immediately registers it into the live ToolRegistry so agents can use it. Phase 15.2: also removes tool from the Redis revocation SET if present.
+         * @description Approve a pending MCP tool. Immediately registers it into the live ToolRegistry.
          */
         post: operations["approve_mcp_tool_api_v1_mcp_tools__tool_id__approve_post"];
         delete?: never;
@@ -5253,7 +5297,7 @@ export interface paths {
         put?: never;
         /**
          * Revoke Mcp Tool
-         * @description Emergency revocation — removes tool from live ToolRegistry in < 1s. Phase 15.2: also writes to Redis revocation SET for immediate enforcement. Agents attempting to use a revoked tool receive 404/block immediately.
+         * @description Emergency revocation — removes tool from live ToolRegistry and adds to Redis revocation SET.
          */
         post: operations["revoke_mcp_tool_api_v1_mcp_tools__tool_id__revoke_post"];
         delete?: never;
@@ -5273,7 +5317,7 @@ export interface paths {
         put?: never;
         /**
          * Execute Mcp Tool
-         * @description Admin/direct execution path. Agents should use /tools/execute instead.
+         * @description Direct execution path by tool ID.
          */
         post: operations["execute_mcp_tool_api_v1_mcp_tools__tool_id__execute_post"];
         delete?: never;
@@ -5316,6 +5360,118 @@ export interface paths {
         get: operations["get_tool_audit_log_api_v1_mcp_tools__tool_id__audit_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/mcp/tools": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List MCP Tools (17.3.1)
+         * @description List available MCP tools. Filterable by status and tier.
+         */
+        get: operations["mcp_list_tools_api_v1_mcp_tools_get"];
+        put?: never;
+        /**
+         * Propose / Register MCP Server (17.3.3)
+         * @description Register or propose an MCP server with server URL, auth, and constitutional classification.
+         */
+        post: operations["mcp_propose_tool_api_v1_mcp_tools_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/mcp/tools/invoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Invoke MCP Tool (17.3.2)
+         * @description Execute an MCP tool by tool_name or tool_id with governance and parameters.
+         */
+        post: operations["mcp_invoke_tool_api_v1_mcp_tools_invoke_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/mcp/tools/{tool_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get MCP Tool
+         * @description Retrieve details for a single MCP tool.
+         */
+        get: operations["mcp_get_tool_api_v1_mcp_tools__tool_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/mcp/tools/{tool_id}/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get MCP Tool Configuration (17.3.3)
+         * @description Retrieve server URL and authentication status for an MCP tool.
+         */
+        get: operations["mcp_get_tool_config_api_v1_mcp_tools__tool_id__config_get"];
+        /**
+         * Update MCP Tool Configuration (17.3.3)
+         * @description Update server URL, auth token, headers, or environment variables.
+         */
+        put: operations["mcp_update_tool_config_put_api_v1_mcp_tools__tool_id__config_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Patch MCP Tool Configuration (17.3.3)
+         * @description Patch server URL, auth token, headers, or environment variables.
+         */
+        patch: operations["mcp_update_tool_config_patch_api_v1_mcp_tools__tool_id__config_patch"];
+        trace?: never;
+    };
+    "/api/v1/mcp/tools/{tool_id}/test-connection": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Test Connection to MCP Server
+         * @description Verifies reachability and auth configuration against the target MCP server.
+         */
+        post: operations["mcp_test_tool_connection_api_v1_mcp_tools__tool_id__test_connection_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -8963,6 +9119,58 @@ export interface components {
             /** Created At */
             created_at: string | null;
         };
+        /**
+         * ConfigureMCPToolRequest
+         * @description Configuration update for an MCP tool (server URL, auth, headers, env).
+         */
+        ConfigureMCPToolRequest: {
+            /**
+             * Server Url
+             * @description MCP server URL or command path
+             */
+            server_url?: string | null;
+            /**
+             * Auth Token
+             * @description Bearer token or secret for authentication
+             */
+            auth_token?: string | null;
+            /**
+             * Headers
+             * @description Custom HTTP headers
+             */
+            headers?: {
+                [key: string]: string;
+            } | null;
+            /**
+             * Env
+             * @description Environment variables for command execution
+             */
+            env?: {
+                [key: string]: string;
+            } | null;
+            /**
+             * Tier
+             * @description pre_approved | restricted | forbidden
+             */
+            tier?: string | null;
+            /**
+             * Constitutional Article
+             * @description Governing Constitution article
+             */
+            constitutional_article?: string | null;
+            /**
+             * Capabilities
+             * @description Known capability names
+             */
+            capabilities?: string[] | null;
+            /**
+             * Config
+             * @description Additional configuration dictionary
+             */
+            config?: {
+                [key: string]: unknown;
+            } | null;
+        };
         /** ConfigureSessionRequest */
         ConfigureSessionRequest: {
             /** Fps */
@@ -9852,6 +10060,61 @@ export interface components {
             conflicts?: components["schemas"]["ImportConflict"][] | null;
             validation?: components["schemas"]["ValidationResult"] | null;
         };
+        /**
+         * InvokeMCPToolRequest
+         * @description Unified invocation schema for POST /api/v1/mcp/tools/invoke.
+         *     Allows specifying tool by tool_name, name, or tool_id.
+         */
+        InvokeMCPToolRequest: {
+            /**
+             * Tool Name
+             * @description Name or agentium_id of the MCP tool
+             */
+            tool_name?: string | null;
+            /**
+             * Tool Id
+             * @description UUID of the MCP tool
+             */
+            tool_id?: string | null;
+            /**
+             * Name
+             * @description Alias for tool_name
+             */
+            name?: string | null;
+            /**
+             * Params
+             * @description Parameters to pass to the MCP tool
+             */
+            params?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Agent Id
+             * @description Calling agent ID (defaults to current user)
+             */
+            agent_id?: string | null;
+            /**
+             * Agent Tier
+             * @description Calling agent tier (defaults to user/agent tier or 3xxxx)
+             */
+            agent_tier?: string | null;
+            /**
+             * Has Head Approval Token
+             * @description Head approval token for restricted tools
+             * @default false
+             */
+            has_head_approval_token: boolean;
+            /**
+             * Sub Tool
+             * @description Sub-tool / capability name if tool exposes multiple
+             */
+            sub_tool?: string | null;
+            /**
+             * Async Callback Url
+             * @description Optional async webhook callback URL
+             */
+            async_callback_url?: string | null;
+        };
         /** KeyHealthResponse */
         KeyHealthResponse: {
             /** Id */
@@ -10017,6 +10280,29 @@ export interface components {
             /** Error */
             error?: string | null;
         };
+        /** MCPToolConfigResponse */
+        MCPToolConfigResponse: {
+            /** Tool Id */
+            tool_id: string;
+            /** Tool Name */
+            tool_name: string;
+            /** Server Url */
+            server_url: string;
+            /** Tier */
+            tier: string;
+            /** Has Auth */
+            has_auth: boolean;
+            /** Auth Type */
+            auth_type?: string | null;
+            /** Headers */
+            headers?: {
+                [key: string]: string;
+            } | null;
+            /** Env Keys */
+            env_keys?: string[];
+            /** Constitutional Article */
+            constitutional_article?: string | null;
+        };
         /** MCPToolListResponse */
         MCPToolListResponse: {
             /** Tools */
@@ -10059,7 +10345,7 @@ export interface components {
             /** Revocation Reason */
             revocation_reason: string | null;
             /** Capabilities */
-            capabilities: string[];
+            capabilities: unknown[];
             /** Health Status */
             health_status: string;
             /** Last Health Check At */
@@ -10076,6 +10362,17 @@ export interface components {
             proposed_by: string | null;
             /** Proposed At */
             proposed_at: string | null;
+            /** Voting Id */
+            voting_id?: string | null;
+            /**
+             * Has Auth
+             * @default false
+             */
+            has_auth: boolean | null;
+            /** Config */
+            config?: {
+                [key: string]: unknown;
+            } | null;
             /** Created At */
             created_at: string | null;
             /** Updated At */
@@ -10503,6 +10800,32 @@ export interface components {
              * @default []
              */
             capabilities: string[] | null;
+            /**
+             * Auth Token
+             * @description Optional bearer token or secret for authentication
+             */
+            auth_token?: string | null;
+            /**
+             * Headers
+             * @description Optional custom HTTP headers
+             */
+            headers?: {
+                [key: string]: string;
+            } | null;
+            /**
+             * Env
+             * @description Optional environment variables for command execution
+             */
+            env?: {
+                [key: string]: string;
+            } | null;
+            /**
+             * Config
+             * @description Optional server configuration
+             */
+            config?: {
+                [key: string]: unknown;
+            } | null;
         };
         /** ProposeUpdateRequest */
         ProposeUpdateRequest: {
@@ -35688,6 +36011,7 @@ export interface operations {
             query?: {
                 status?: string | null;
                 tier?: string | null;
+                agent_tier?: string | null;
             };
             header?: never;
             path?: never;
@@ -35788,6 +36112,102 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ProposeMCPServerRequest"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponseExample"];
+                };
+            };
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponseExample"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+        };
+    };
+    invoke_mcp_tool_legacy_route_api_v1_mcp_tools_invoke_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InvokeMCPToolRequest"];
             };
         };
         responses: {
@@ -36133,6 +36553,198 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponseExample"];
+                };
+            };
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponseExample"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+        };
+    };
+    get_tool_config_legacy_api_v1_mcp_tools__tool_id__config_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tool_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponseExample"];
+                };
+            };
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponseExample"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+        };
+    };
+    update_tool_config_legacy_api_v1_mcp_tools__tool_id__config_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tool_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfigureMCPToolRequest"];
+            };
+        };
         responses: {
             /** @description Success */
             200: {
@@ -36704,6 +37316,772 @@ export interface operations {
             query?: {
                 limit?: number;
             };
+            header?: never;
+            path: {
+                tool_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponseExample"];
+                };
+            };
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponseExample"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+        };
+    };
+    mcp_list_tools_api_v1_mcp_tools_get: {
+        parameters: {
+            query?: {
+                status?: string | null;
+                tier?: string | null;
+                agent_tier?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponseExample"];
+                };
+            };
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponseExample"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+        };
+    };
+    mcp_propose_tool_api_v1_mcp_tools_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProposeMCPServerRequest"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponseExample"];
+                };
+            };
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponseExample"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+        };
+    };
+    mcp_invoke_tool_api_v1_mcp_tools_invoke_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InvokeMCPToolRequest"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponseExample"];
+                };
+            };
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponseExample"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+        };
+    };
+    mcp_get_tool_api_v1_mcp_tools__tool_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tool_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponseExample"];
+                };
+            };
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponseExample"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+        };
+    };
+    mcp_get_tool_config_api_v1_mcp_tools__tool_id__config_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tool_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponseExample"];
+                };
+            };
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponseExample"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+        };
+    };
+    mcp_update_tool_config_put_api_v1_mcp_tools__tool_id__config_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tool_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfigureMCPToolRequest"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponseExample"];
+                };
+            };
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponseExample"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+        };
+    };
+    mcp_update_tool_config_patch_api_v1_mcp_tools__tool_id__config_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tool_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfigureMCPToolRequest"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponseExample"];
+                };
+            };
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponseExample"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseExample"];
+                };
+            };
+        };
+    };
+    mcp_test_tool_connection_api_v1_mcp_tools__tool_id__test_connection_post: {
+        parameters: {
+            query?: never;
             header?: never;
             path: {
                 tool_id: string;
