@@ -52,6 +52,125 @@ class WorkflowEngine:
         return workflow
 
     @staticmethod
+    def validate_dag(template_json: Dict[str, Any]) -> List[str]:
+        """
+        Validate a workflow DAG template for structural correctness.
+
+        Checks performed
+        ----------------
+        1. ``template_json`` must be a dict with a ``steps`` key.
+        2. Each step must have: ``step_index`` (int), ``type`` (valid WorkflowStepType).
+        3. ``step_index`` values must be unique across the template.
+        4. ``on_success_step`` / ``on_failure_step`` references, when present, must
+           point to an existing step_index within the same template.
+        5. No directed cycle may exist in the graph formed by those references
+           (cycle-free is the "acyclic" part of DAG).
+
+        Returns a (possibly empty) list of human-readable error strings.
+        An empty list means the template is valid.
+        """
+        errors: List[str] = []
+
+        if not isinstance(template_json, dict):
+            return ["template_json must be a JSON object"]
+
+        steps_data = template_json.get("steps")
+        if steps_data is None:
+            return ["template_json must contain a 'steps' key"]
+        if not isinstance(steps_data, list):
+            return ["template_json['steps'] must be a list"]
+        if not steps_data:
+            return ["template_json['steps'] must not be empty"]
+
+        valid_step_types = {t.value for t in WorkflowStepType}
+        seen_indices: Dict[int, int] = {}  # step_index → position in list
+        step_index_set: set = set()
+
+        # Pass 1 — per-step field validation and index uniqueness
+        for pos, step in enumerate(steps_data):
+            if not isinstance(step, dict):
+                errors.append(f"Step at position {pos} must be a JSON object")
+                continue
+
+            # step_index
+            if "step_index" not in step:
+                errors.append(f"Step at position {pos} is missing 'step_index'")
+            else:
+                idx = step["step_index"]
+                if not isinstance(idx, int):
+                    errors.append(f"Step at position {pos}: 'step_index' must be an integer, got {type(idx).__name__!r}")
+                else:
+                    if idx in seen_indices:
+                        errors.append(
+                            f"Duplicate step_index {idx} at positions {seen_indices[idx]} and {pos}"
+                        )
+                    else:
+                        seen_indices[idx] = pos
+                        step_index_set.add(idx)
+
+            # type
+            if "type" not in step:
+                errors.append(f"Step at position {pos} is missing 'type'")
+            else:
+                stype = step["type"]
+                if stype not in valid_step_types:
+                    errors.append(
+                        f"Step at position {pos} has invalid type {stype!r}. "
+                        f"Must be one of: {sorted(valid_step_types)}"
+                    )
+
+        # Pass 2 — cross-reference validation (only if indices are all known)
+        if not errors:
+            for pos, step in enumerate(steps_data):
+                for field in ("on_success_step", "on_failure_step"):
+                    ref = step.get(field)
+                    if ref is not None:
+                        if not isinstance(ref, int):
+                            errors.append(
+                                f"Step {step.get('step_index', pos)}: '{field}' must be an integer or null"
+                            )
+                        elif ref not in step_index_set:
+                            errors.append(
+                                f"Step {step.get('step_index', pos)}: '{field}' references "
+                                f"non-existent step_index {ref}"
+                            )
+
+        # Pass 3 — cycle detection via DFS (only if no structural errors so far)
+        if not errors:
+            adjacency: Dict[int, List[int]] = {idx: [] for idx in step_index_set}
+            for step in steps_data:
+                src = step["step_index"]
+                for field in ("on_success_step", "on_failure_step"):
+                    dst = step.get(field)
+                    if dst is not None:
+                        adjacency[src].append(dst)
+
+            # DFS-based cycle detection
+            WHITE, GRAY, BLACK = 0, 1, 2
+            color = {idx: WHITE for idx in step_index_set}
+
+            def _dfs(node: int) -> bool:
+                """Return True if a cycle is detected from *node*."""
+                color[node] = GRAY
+                for neighbour in adjacency[node]:
+                    if color[neighbour] == GRAY:
+                        return True
+                    if color[neighbour] == WHITE and _dfs(neighbour):
+                        return True
+                color[node] = BLACK
+                return False
+
+            for idx in step_index_set:
+                if color[idx] == WHITE:
+                    if _dfs(idx):
+                        errors.append(
+                            "Workflow DAG contains a cycle; workflows must be acyclic"
+                        )
+                        break  # one cycle error is enough
+
+        return errors
+
+    @staticmethod
     def _sync_steps_from_template(db: Session, workflow: Workflow, template: Dict[str, Any]):
         """Convert JSON definition to WorkflowStep rows."""
         db.query(WorkflowStep).filter(WorkflowStep.workflow_id == workflow.id).delete()

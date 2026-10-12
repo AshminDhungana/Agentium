@@ -40,6 +40,13 @@ def create_workflow(payload: Dict[str, Any], db: Session = Depends(get_db)):
     if not name or not template:
         raise BadRequestError(error="name and template_json required", code="NAME_AND_TEMPLATEJSON_REQUIRED")
 
+    dag_errors = WorkflowEngine.validate_dag(template)
+    if dag_errors:
+        raise BadRequestError(
+            error="Invalid workflow DAG: " + "; ".join(dag_errors),
+            code="INVALID_WORKFLOW_DAG",
+        )
+
     wf = WorkflowEngine.create_workflow(db, name, template, agent_id, cron)
     db.commit()
     return wf.to_dict()
@@ -103,6 +110,14 @@ def update_workflow(workflow_id: str, payload: Dict[str, Any], db: Session = Dep
     template = payload.get("template_json")
     if not template:
         raise BadRequestError(error="template_json required", code="TEMPLATEJSON_REQUIRED")
+
+    dag_errors = WorkflowEngine.validate_dag(template)
+    if dag_errors:
+        raise BadRequestError(
+            error="Invalid workflow DAG: " + "; ".join(dag_errors),
+            code="INVALID_WORKFLOW_DAG",
+        )
+
     try:
         wf = WorkflowEngine.update_workflow(db, workflow_id, template)
         db.commit()
