@@ -4,17 +4,12 @@ from typing import List, Dict, Any
 from sqlalchemy.orm import Session
 from datetime import datetime
 
-from backend.models.database import get_db_context
+from backend.models.database import get_db
 from backend.models.entities.workflow import Workflow, WorkflowExecution
 from backend.services.workflow_engine import WorkflowEngine
 from backend.api.schemas.examples import ErrorResponseExample, SuccessResponseExample
 
 router = APIRouter(prefix="/workflows", tags=["Workflows"])
-
-# Dependency
-def get_db():
-    with get_db_context() as db:
-        yield db
 
 @router.post(
     "/", response_model=Dict[str, Any],
