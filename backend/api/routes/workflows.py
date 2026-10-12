@@ -34,7 +34,7 @@ def create_workflow(payload: Dict[str, Any], db: Session = Depends(get_db)):
     """Create a new automation workflow."""
     name = payload.get("name")
     template = payload.get("template_json")
-    agent_id = payload.get("agent_id", "A0001")
+    agent_id = payload.get("agent_id")
     cron = payload.get("schedule_cron")
 
     if not name or not template:

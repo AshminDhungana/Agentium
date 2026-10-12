@@ -28,7 +28,7 @@ class WorkflowEngine:
     """
     
     @staticmethod
-    def create_workflow(db: Session, name: str, template_json: Dict[str, Any], agent_id: str, cron: str = None) -> Workflow:
+    def create_workflow(db: Session, name: str, template_json: Dict[str, Any], agent_id: Optional[str] = None, cron: str = None) -> Workflow:
         """Create a new workflow and its initial version."""
         workflow = Workflow(
             name=name,
