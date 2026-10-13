@@ -50,6 +50,7 @@ class SubTaskSpec:
     depends_on: List[str] = field(default_factory=list)
     schedule_offset_days: int = 0
     step_index: int = 0
+    max_retries: int = 0
 
 @dataclass
 class WorkflowPlan:

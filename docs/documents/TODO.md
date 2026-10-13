@@ -848,12 +848,19 @@
 
   > **Verified:** 32 tests in `backend/tests/integration/test_workflow_crud_18_1.py` (19 pure DAG-unit tests pass without infrastructure; 13 HTTP integration tests verified in CI with the Docker stack). **18.1.1** — `POST /api/v1/workflows/` persists `Workflow` row + `WorkflowStep` rows, stores `schedule_cron`, returns full `to_dict()` with `version=1`; 400 for missing `name`/`template_json`. **18.1.2** — `GET /api/v1/workflows/` returns 200 list of active workflows; `is_active=False` rows are excluded; every entry has `id`, `name`, `version`. **18.1.3** — `GET /api/v1/workflows/{id}` returns 200 with complete body incl. `template_json`; unknown UUID → 404. **18.1.4** — `WorkflowEngine.validate_dag(template_json)` added to `workflow_engine.py`: three-pass validation (per-step field checks, cross-reference checks, DFS cycle detection); wired into both `POST` and `PUT` routes, returning `400 INVALID_WORKFLOW_DAG` on failure. Validates: missing `steps` key, empty steps list, missing/invalid `step_index` or `type`, duplicate `step_index`, dangling `on_success_step`/`on_failure_step` references, self-loops, 2-step cycles, 3-step cycles, cycles through failure branches; valid single-step, linear chains, forks, diamond shapes, null refs, and all six step types all accepted.
 
-- [ ] **18.2 — Workflow Execution**
-  - [ ] 18.2.1 — `WorkflowExecutor` runs DAG steps in correct order
-  - [ ] 18.2.2 — Parallel branches execute concurrently
-  - [ ] 18.2.3 — Step dependencies are respected
-  - [ ] 18.2.4 — Workflow failure at one step handles rollback/retry
-  - [ ] 18.2.5 — Celery `workflow_tasks.py` processes workflows asynchronously
+- [x] **18.2 — Workflow Execution**
+  - [x] 18.2.1 — `WorkflowExecutor` runs DAG steps in correct order
+  - [x] 18.2.2 — Parallel branches execute concurrently
+  - [x] 18.2.3 — Step dependencies are respected
+  - [x] 18.2.4 — Workflow failure at one step handles rollback/retry
+  - [x] 18.2.5 — Celery `workflow_tasks.py` processes workflows asynchronously
+
+  > **Verified:** 23 integration tests in `backend/tests/integration/test_workflow_execution_18_2.py` passing 100% in Docker container backend environment (+ 42 passing in companion workflow suites `test_workflow_engine.py` and `test_workflow_crud_18_1.py`).
+  > - **18.2.1**: `WorkflowExecutor.execute` cleans up session leaks (uses `with get_db_context()`), eliminates debug print clutter, runs topological DAG levels iteratively with context propagation across downstream tasks, persists `WorkflowSubTask` records, and updates `WorkflowExecution` to `completed`.
+  > - **18.2.2**: Independent tasks without unresolved dependencies execute concurrently via `asyncio.gather(*wave)`. Fork-join patterns verified with wall-clock timing checks proving concurrent non-blocking execution.
+  > - **18.2.3**: Multi-level and diamond-shaped DAG dependencies are strictly respected. Downstream tasks only execute after upstream prerequisites succeed. Cascade-skipping correctly skips child tasks when prerequisites fail or are skipped.
+  > - **18.2.4**: Added `max_retries` support (with exponential backoff `0.5s * 2^attempt`) to `SubTaskSpec` and `WorkflowExecutor._execute_one`. Workflows retry transient tool errors up to `max_retries` before marking tasks failed. Failure handling in `WorkflowEngine` verified to follow `on_failure_step` branches.
+  > - **18.2.5**: Celery async tasks (`execute_deferred_subtask`, `fire_reminder`, `workflow_step_runner`) verified with deferred scheduling countdowns, DB subtask updates, context reflection, channel notifications, and step advancement.
 
 - [ ] **18.3 — Workflow Frontend**
   - [ ] 18.3.1 — `WorkflowsPage.tsx` lists created workflows
