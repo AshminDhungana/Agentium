@@ -18,6 +18,7 @@ from backend.models.entities.workflow import (
 from backend.models.entities.task import Task, TaskStatus, TaskPriority, TaskType
 from backend.models.database import get_db_context
 
+from backend.api.routes.websocket import manager
 from backend.services.structured_logging import get_structured_logger
 logger = get_structured_logger(__name__)
 class WorkflowEngine:
@@ -261,6 +262,21 @@ class WorkflowEngine:
         db.commit()
         db.refresh(execution)
 
+        # Emit workflow started event
+        import asyncio
+        try:
+            asyncio.run(manager.emit_workflow_execution(
+                execution_id=str(execution.id),
+                workflow_id=str(workflow.id),
+                workflow_name=workflow.name,
+                status="started",
+                current_step=0,
+                progress=0,
+            ))
+        except Exception:
+            # Don't fail execution if WebSocket broadcast fails
+            logger.warning("Failed to emit workflow_execution started event", exc_info=True)
+
         # Enqueue first step asynchronously
         workflow_step_runner.delay(execution.id)
         return execution
@@ -272,17 +288,54 @@ class WorkflowEngine:
         if not execution or execution.status != WorkflowExecutionStatus.RUNNING:
             return
 
+        # Get workflow for name
+        workflow = db.query(Workflow).filter(Workflow.id == execution.workflow_id).first()
+        workflow_name = workflow.name if workflow else "Unknown Workflow"
+
         step = db.query(WorkflowStep).filter(
             WorkflowStep.workflow_id == execution.workflow_id,
             WorkflowStep.step_index == execution.current_step_index
         ).first()
+
+        # Calculate progress percentage
+        total_steps = db.query(WorkflowStep).filter(WorkflowStep.workflow_id == execution.workflow_id).count()
+        progress = int((execution.current_step_index / max(total_steps, 1)) * 100) if total_steps > 0 else 0
 
         if not step:
             # Reached end naturally
             execution.status = WorkflowExecutionStatus.COMPLETED
             execution.completed_at = datetime.utcnow()
             db.commit()
+            # Emit completion event
+            import asyncio
+            try:
+                asyncio.run(manager.emit_workflow_execution(
+                    execution_id=str(execution.id),
+                    workflow_id=str(execution.workflow_id),
+                    workflow_name=workflow_name,
+                    status="completed",
+                    current_step=execution.current_step_index,
+                    progress=100,
+                    result_summary="Workflow completed successfully",
+                ))
+            except Exception:
+                logger.warning("Failed to emit workflow_execution completed event", exc_info=True)
             return
+
+        # Emit step changed event
+        import asyncio
+        try:
+            asyncio.run(manager.emit_workflow_execution(
+                execution_id=str(execution.id),
+                workflow_id=str(execution.workflow_id),
+                workflow_name=workflow_name,
+                status="step_changed",
+                current_step=execution.current_step_index,
+                step_name=step.step_type.value,
+                progress=progress,
+            ))
+        except Exception:
+            logger.warning("Failed to emit workflow_execution step_changed event", exc_info=True)
 
         try:
             success = False
@@ -295,18 +348,60 @@ class WorkflowEngine:
             elif step.step_type == WorkflowStepType.WAIT_POLL:
                 # Suspend; WaitPollService will re-enqueue this execution on resolution
                 WorkflowEngine._execute_wait_step(db, execution, step)
+                # Emit paused event
+                try:
+                    asyncio.run(manager.emit_workflow_execution(
+                        execution_id=str(execution.id),
+                        workflow_id=str(execution.workflow_id),
+                        workflow_name=workflow_name,
+                        status="paused",
+                        current_step=execution.current_step_index,
+                        step_name=step.step_type.value,
+                        progress=progress,
+                        result_summary="Waiting for condition",
+                    ))
+                except Exception:
+                    logger.warning("Failed to emit workflow_execution paused event", exc_info=True)
                 return  # break loop — resumed by WaitPollService callback
             elif step.step_type == WorkflowStepType.DELAY:
                 # Delay is handled by enqueuing a celery task with countdown
                 delay_sec = step.config.get("delay_seconds", 60)
                 WorkflowEngine._advance_step(db, execution, step.on_success_step)
                 workflow_step_runner.apply_async(args=[execution.id], countdown=delay_sec)
+                # Emit paused event for delay
+                try:
+                    asyncio.run(manager.emit_workflow_execution(
+                        execution_id=str(execution.id),
+                        workflow_id=str(execution.workflow_id),
+                        workflow_name=workflow_name,
+                        status="paused",
+                        current_step=execution.current_step_index,
+                        step_name=step.step_type.value,
+                        progress=progress,
+                        result_summary=f"Delaying for {delay_sec}s",
+                    ))
+                except Exception:
+                    logger.warning("Failed to emit workflow_execution paused event", exc_info=True)
                 return  # break loop here, let celery resume it
             elif step.step_type == WorkflowStepType.HUMAN_APPROVAL:
                 execution.status = WorkflowExecutionStatus.PAUSED
                 db.commit()
+                # Emit paused event
+                try:
+                    asyncio.run(manager.emit_workflow_execution(
+                        execution_id=str(execution.id),
+                        workflow_id=str(execution.workflow_id),
+                        workflow_name=workflow_name,
+                        status="paused",
+                        current_step=execution.current_step_index,
+                        step_name=step.step_type.value,
+                        progress=progress,
+                        result_summary="Awaiting human approval",
+                    ))
+                except Exception:
+                    logger.warning("Failed to emit workflow_execution paused event", exc_info=True)
                 return  # awaits manual resume
-            
+
             # Transition
             next_step_idx = step.on_success_step if success else step.on_failure_step
             if next_step_idx is not None:
@@ -318,6 +413,20 @@ class WorkflowEngine:
                 execution.status = WorkflowExecutionStatus.COMPLETED if success else WorkflowExecutionStatus.FAILED
                 execution.completed_at = datetime.utcnow()
                 db.commit()
+                # Emit final event
+                try:
+                    asyncio.run(manager.emit_workflow_execution(
+                        execution_id=str(execution.id),
+                        workflow_id=str(execution.workflow_id),
+                        workflow_name=workflow_name,
+                        status="completed" if success else "failed",
+                        current_step=execution.current_step_index,
+                        progress=100,
+                        result_summary="Workflow completed successfully" if success else "Workflow failed",
+                        error=None if success else "Step execution failed",
+                    ))
+                except Exception:
+                    logger.warning("Failed to emit workflow_execution final event", exc_info=True)
 
         except Exception as e:
             logger.error(f"Error in step {step.step_index} execution: {e}")
@@ -325,6 +434,21 @@ class WorkflowEngine:
             execution.completed_at = datetime.utcnow()
             execution.context_data["error"] = str(e)
             db.commit()
+            # Emit failed event
+            try:
+                asyncio.run(manager.emit_workflow_execution(
+                    execution_id=str(execution.id),
+                    workflow_id=str(execution.workflow_id),
+                    workflow_name=workflow_name,
+                    status="failed",
+                    current_step=execution.current_step_index,
+                    step_name=step.step_type.value,
+                    progress=progress,
+                    result_summary="Workflow execution failed",
+                    error=str(e),
+                ))
+            except Exception:
+                logger.warning("Failed to emit workflow_execution failed event", exc_info=True)
 
     @staticmethod
     def _advance_step(db: Session, execution: WorkflowExecution, next_idx: int):
@@ -533,6 +657,10 @@ class WorkflowEngine:
             logger.warning(f"resume_after_wait: execution {execution_id} not found")
             return
 
+        # Get workflow for name
+        workflow = db.query(Workflow).filter(Workflow.id == execution.workflow_id).first()
+        workflow_name = workflow.name if workflow else "Unknown Workflow"
+
         ctx            = execution.context_data or {}
         next_step_idx  = ctx.get(f"step_{step_index}_on_success_step")
 
@@ -540,10 +668,37 @@ class WorkflowEngine:
             execution.status = WorkflowExecutionStatus.RUNNING
             WorkflowEngine._advance_step(db, execution, next_step_idx)
             workflow_step_runner.delay(execution.id)
+            # Emit running event on resume
+            import asyncio
+            try:
+                asyncio.run(manager.emit_workflow_execution(
+                    execution_id=str(execution.id),
+                    workflow_id=str(execution.workflow_id),
+                    workflow_name=workflow_name,
+                    status="running",
+                    current_step=execution.current_step_index,
+                    result_summary="Resumed after wait condition",
+                ))
+            except Exception:
+                logger.warning("Failed to emit workflow_execution running event", exc_info=True)
         else:
             execution.status       = WorkflowExecutionStatus.COMPLETED
             execution.completed_at = datetime.utcnow()
             db.commit()
+            # Emit completion event
+            import asyncio
+            try:
+                asyncio.run(manager.emit_workflow_execution(
+                    execution_id=str(execution.id),
+                    workflow_id=str(execution.workflow_id),
+                    workflow_name=workflow_name,
+                    status="completed",
+                    current_step=execution.current_step_index,
+                    progress=100,
+                    result_summary="Workflow completed successfully",
+                ))
+            except Exception:
+                logger.warning("Failed to emit workflow_execution completed event", exc_info=True)
 
     @staticmethod
     def register_cron_schedules():

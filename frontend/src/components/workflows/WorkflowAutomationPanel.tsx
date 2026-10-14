@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Plus, Play, CheckCircle, Clock, XCircle, Power } from 'lucide-react';
 import { showToast } from '@/hooks/useToast';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { useWebSocketStore } from '@/store/websocketStore';
 
 /**
  * @description Panel for managing and executing automation workflows.
@@ -24,6 +25,26 @@ export const WorkflowAutomationPanel: React.FC = () => {
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | null>(null);
   const [executionId, setExecutionId]           = useState<string | null>(null);
   const [executionStatus, setExecutionStatus]   = useState<any>(null);
+
+  // Real-time workflow execution updates via WebSocket (TODO 18.3.4)
+  const lastWorkflowExecution = useWebSocketStore(s => s.lastWorkflowExecution);
+
+  // Sync WebSocket updates to local state when they match our execution
+  useEffect(() => {
+    if (lastWorkflowExecution && executionId && lastWorkflowExecution.execution_id === executionId) {
+      setExecutionStatus({
+        id: lastWorkflowExecution.execution_id,
+        workflow_id: lastWorkflowExecution.workflow_id,
+        status: lastWorkflowExecution.status.toUpperCase(),
+        current_step_index: lastWorkflowExecution.current_step ?? 0,
+        context_data: {},
+        started_at: lastWorkflowExecution.timestamp,
+        completed_at: ['completed', 'failed'].includes(lastWorkflowExecution.status)
+          ? lastWorkflowExecution.timestamp
+          : null,
+      });
+    }
+  }, [lastWorkflowExecution, executionId]);
 
   useEffect(() => {
     let interval: ReturnType<typeof setInterval> | undefined;

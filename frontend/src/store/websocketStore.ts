@@ -95,6 +95,24 @@ export interface WorkspaceReadyEvent {
     artifact_count?: number;
 }
 
+/**
+ * Payload of the backend `workflow_execution` broadcast — emitted when a
+ * workflow execution status changes (started, running, step_changed, paused,
+ * completed, failed).
+ */
+export interface WorkflowExecutionEvent {
+    execution_id: string;
+    workflow_id: string;
+    workflow_name: string;
+    status: 'started' | 'running' | 'step_changed' | 'paused' | 'completed' | 'failed';
+    current_step?: number;
+    step_name?: string;
+    progress?: number;
+    result_summary?: string;
+    error?: string;
+    timestamp: string;
+}
+
 interface WebSocketState {
     // Public state
     /** Single source of truth for connection/genesis status. */
@@ -118,6 +136,8 @@ interface WebSocketState {
      * must see the files created in his workspace").
      */
     lastWorkspace: WorkspaceReadyEvent | null;
+    /** Most recent workflow execution status event for real-time updates (TODO 18.3.4). */
+    lastWorkflowExecution: WorkflowExecutionEvent | null;
     /** True while genesis is paused waiting for the user to name their nation. */
     genesisAwaitingName: boolean;
     /** Prompt text surfaced with the awaiting-name request. */
@@ -206,6 +226,10 @@ interface WebSocketState {
      */
     setWorkspaceReady: (event: WorkspaceReadyEvent) => void;
     /**
+     * Record a `workflow_execution` event for real-time status updates.
+     */
+    setWorkflowExecution: (event: WorkflowExecutionEvent) => void;
+    /**
      * Call this after the user saves their first API key on the Models page.
      * It kicks the WebSocket out of the silent "no API key yet" state and
      * immediately attempts to reconnect — so chat activates without a page reload.
@@ -292,6 +316,7 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
     unreadCount: 0,
     messageHistory: [],
     lastWorkspace: null,
+    lastWorkflowExecution: null,
     apiKeyAddedAt: null,
 
     genesisAwaitingName: false,
@@ -384,6 +409,8 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
     clearError: () => set({ error: null }),
 
     setWorkspaceReady: (event) => set({ lastWorkspace: event }),
+
+    setWorkflowExecution: (event) => set({ lastWorkflowExecution: event }),
 
     notifyApiKeyAdded: () => {
         // Leave the silent "waiting_for_key" state and immediately try to connect.
@@ -849,6 +876,23 @@ export const useWebSocketStore = create<WebSocketState>()((set, get) => ({
                         showToast.success(
                             `✅ Task ${summary} saved to your workspace: ${path}`,
                         );
+                        return;
+                    }
+
+                    // ── Workflow execution status (TODO 18.3.4) ──────────────────
+                    if (data.type === 'workflow_execution') {
+                        get().setWorkflowExecution({
+                            execution_id: String(data.execution_id ?? ''),
+                            workflow_id: String(data.workflow_id ?? ''),
+                            workflow_name: String(data.workflow_name ?? ''),
+                            status: data.status as WorkflowExecutionEvent['status'],
+                            current_step: data.current_step as number | undefined,
+                            step_name: data.step_name as string | undefined,
+                            progress: data.progress as number | undefined,
+                            result_summary: data.result_summary as string | undefined,
+                            error: data.error as string | undefined,
+                            timestamp: String(data.timestamp ?? ''),
+                        });
                         return;
                     }
 

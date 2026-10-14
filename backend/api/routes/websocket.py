@@ -659,6 +659,48 @@ class ConnectionManager:
             "timestamp":   datetime.utcnow().isoformat(),
         })
 
+    # ── Phase 18.3.4: Workflow execution status broadcast ──────────────────────
+
+    async def emit_workflow_execution(
+        self,
+        execution_id: str,
+        workflow_id: str,
+        workflow_name: str,
+        status: str,
+        current_step: Optional[int] = None,
+        step_name: Optional[str] = None,
+        progress: Optional[int] = None,
+        result_summary: Optional[str] = None,
+        error: Optional[str] = None,
+    ) -> None:
+        """
+        Broadcast workflow execution status update in real-time (TODO 18.3.4).
+
+        Args:
+            execution_id: The workflow execution ID
+            workflow_id: The workflow ID
+            workflow_name: Human-readable workflow name
+            status: One of "started", "running", "step_changed", "paused", "completed", "failed"
+            current_step: Current step index (0-based)
+            step_name: Human-readable name of current step
+            progress: Percentage progress (0-100)
+            result_summary: Brief summary of result or error
+            error: Error message if failed
+        """
+        await self.broadcast({
+            "type":            "workflow_execution",
+            "execution_id":    execution_id,
+            "workflow_id":     workflow_id,
+            "workflow_name":   workflow_name,
+            "status":          status,
+            "current_step":    current_step,
+            "step_name":       step_name,
+            "progress":        progress,
+            "result_summary":  result_summary,
+            "error":           error,
+            "timestamp":       datetime.utcnow().isoformat(),
+        })
+
 
     # ── Phase 15.2: MCP stats broadcast ──────────────────────────────────────
 
