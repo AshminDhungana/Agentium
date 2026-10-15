@@ -35,10 +35,21 @@ const mockWorkflow = {
   schedule_cron: '0 0 * * *',
 };
 
+const mockVersions = [
+  { version: 3, template_json: { steps: [] }, created_at: new Date().toISOString() },
+  { version: 2, template_json: { steps: [] }, created_at: new Date(Date.now() - 86400000).toISOString() },
+  { version: 1, template_json: { steps: [] }, created_at: new Date(Date.now() - 172800000).toISOString() },
+];
+
 describe('WorkflowDesignerPage - New Workflow Mode', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    (api.get as any).mockResolvedValue({ data: mockWorkflow });
+    (api.get as any).mockImplementation((url: string) => {
+      if (url.includes('/versions')) {
+        return Promise.resolve({ data: mockVersions });
+      }
+      return Promise.resolve({ data: mockWorkflow });
+    });
     (api.put as any).mockResolvedValue({});
     (api.post as any).mockResolvedValue({ data: { id: 'wf-new', name: 'New Workflow', version: 1 } });
   });
@@ -80,7 +91,12 @@ describe('WorkflowDesignerPage - New Workflow Mode', () => {
   });
 
   it('shows "View Executions" button in header for existing workflows', async () => {
-    (api.get as any).mockResolvedValue({ data: mockWorkflow });
+    (api.get as any).mockImplementation((url: string) => {
+      if (url.includes('/versions')) {
+        return Promise.resolve({ data: mockVersions });
+      }
+      return Promise.resolve({ data: mockWorkflow });
+    });
 
     render(
       <MemoryRouter initialEntries={['/workflows/wf-1']}>

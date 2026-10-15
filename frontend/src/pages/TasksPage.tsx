@@ -68,7 +68,7 @@ import { SlideOver } from '@/components/ui/SlideOver';
 import { CheckpointTimeline } from '../components/checkpoints/CheckpointTimeline';
 import { BranchDiffView } from '../components/checkpoints/BranchDiffView';
 import { AutoDelegationPanel } from '../components/tasks/AutoDelegationPanel';
-import { WorkflowAutomationPanel } from '../components/workflows/WorkflowAutomationPanel';
+import { useNavigate } from 'react-router-dom';
 import { BrowserSessionsList } from '../components/tasks/BrowserSessionsList';
 import { BrowserTaskViewer } from '../components/tasks/BrowserTaskViewer';
 
@@ -2111,6 +2111,8 @@ export const TasksPage: React.FC = () => {
     const [showLiveViewerTask, setShowLiveViewerTask] = useState<string | null>(null);
     const [selectedTaskDetails, setSelectedTaskDetails] = useState<Task | null>(null);
 
+    const navigate = useNavigate();
+
     useEffect(() => { loadTasks(); }, [filterStatus, myTasksOnly, hideSystem]);
 
     const loadTasks = useCallback(async (silent = false) => {
@@ -2506,7 +2508,20 @@ export const TasksPage: React.FC = () => {
                     <div className="p-6">
                         {/* FIX 14: error boundary */}
                         <TabErrorBoundary tabName="Workflows">
-                            <WorkflowAutomationPanel />
+                            <div className="text-center py-12">
+                                <Network className="w-16 h-16 text-indigo-600 dark:text-indigo-400 mx-auto mb-4 opacity-50" />
+                                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Workflows</h3>
+                                <p className="text-gray-600 dark:text-gray-400 mb-6 max-w-md mx-auto">
+                                    Workflow management has moved to a dedicated page with list view, visual designer, and execution monitoring.
+                                </p>
+                                <button
+                                    onClick={() => navigate('/workflows')}
+                                    className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors"
+                                >
+                                    <Network className="w-4 h-4" />
+                                    Open Workflows Page
+                                </button>
+                            </div>
                         </TabErrorBoundary>
                     </div>
                 )}

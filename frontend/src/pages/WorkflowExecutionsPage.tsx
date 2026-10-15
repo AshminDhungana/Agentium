@@ -128,8 +128,8 @@ export const WorkflowExecutionsPage: React.FC = () => {
 
   if (!workflow) return null;
 
-  const isLive = liveExecution && ['RUNNING', 'PENDING'].includes(liveExecution.status);
-  const isDone = liveExecution && ['COMPLETED', 'FAILED'].includes(liveExecution.status);
+  const isLive = !!liveExecution && ['RUNNING', 'PENDING'].includes(liveExecution.status);
+  const isDone = !!liveExecution && ['COMPLETED', 'FAILED'].includes(liveExecution.status);
 
   return (
     <div className="space-y-6">

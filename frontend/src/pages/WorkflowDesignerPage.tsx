@@ -397,6 +397,25 @@ function DesignerInner() {
   // ── Phone → read-only view ────────────────────────────────────────────────
 
   if (isPhone) {
+    // New workflows don't have data to display on phone - show message
+    if (isNewWorkflow || !workflow) {
+      return (
+        <div className="flex items-center justify-center h-full min-h-[400px] p-8 text-center">
+          <div className="max-w-xs">
+            <History className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+              {isNewWorkflow ? 'Create on Desktop' : 'Loading…'}
+            </h3>
+            <p className="text-gray-600 dark:text-gray-400 text-sm">
+              {isNewWorkflow
+                ? 'Workflow designer is best experienced on tablet or desktop. Please use a larger screen to create your workflow.'
+                : 'Loading workflow data…'}
+            </p>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <MobileWorkflowViewer
         workflowName={workflow.name}

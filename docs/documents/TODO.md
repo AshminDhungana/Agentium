@@ -862,11 +862,11 @@
   > - **18.2.4**: Added `max_retries` support (with exponential backoff `0.5s * 2^attempt`) to `SubTaskSpec` and `WorkflowExecutor._execute_one`. Workflows retry transient tool errors up to `max_retries` before marking tasks failed. Failure handling in `WorkflowEngine` verified to follow `on_failure_step` branches.
   > - **18.2.5**: Celery async tasks (`execute_deferred_subtask`, `fire_reminder`, `workflow_step_runner`) verified with deferred scheduling countdowns, DB subtask updates, context reflection, channel notifications, and step advancement.
 
-- [ ] **18.3 — Workflow Frontend**
-  - [ ] 18.3.1 — `WorkflowsPage.tsx` lists created workflows
-  - [ ] 18.3.2 — `WorkflowDesignerPage.tsx` provides visual DAG editor
-  - [ ] 18.3.3 — Drag-and-drop workflow building works
-  - [ ] 18.3.4 — Workflow execution status updates in real-time
+- [x] **18.3 — Workflow Frontend**
+  - [x] 18.3.1 — `WorkflowsPage.tsx` lists created workflows
+  - [x] 18.3.2 — `WorkflowDesignerPage.tsx` provides visual DAG editor
+  - [x] 18.3.3 — Drag-and-drop workflow building works
+  - [x] 18.3.4 — Workflow execution status updates in real-time
 
 ---
 
