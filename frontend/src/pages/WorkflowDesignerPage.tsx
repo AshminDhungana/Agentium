@@ -158,6 +158,9 @@ function DesignerInner() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
+  // Detect new workflow mode
+  const isNewWorkflow = id === 'new';
+
   // Responsive detection
   const isTabletUp = useMediaQuery(BREAKPOINTS.sm);   // ≥ 640px
   const isDesktop  = useMediaQuery(BREAKPOINTS.lg);    // ≥ 1024px
@@ -197,6 +200,19 @@ function DesignerInner() {
 
   useEffect(() => {
     if (!id) return;
+
+    // New workflow mode - start with empty canvas
+    if (isNewWorkflow) {
+      setWorkflow(null);
+      const { nodes: n, edges: e } = stepsToNodesAndEdges([]);
+      setNodes(n);
+      setEdges(e);
+      nextStepIndexRef.current = 0;
+      setLoading(false);
+      return;
+    }
+
+    // Existing workflow - load from API
     setLoading(true);
 
     api.get(`/api/v1/workflows/${id}`)
@@ -219,7 +235,7 @@ function DesignerInner() {
         navigate('/tasks');
       })
       .finally(() => setLoading(false));
-  }, [id, setNodes, setEdges, navigate]);
+  }, [id, isNewWorkflow, setNodes, setEdges, navigate]);
 
   // ── Auto-open version sidebar on desktop ──────────────────────────────────
 
@@ -332,22 +348,30 @@ function DesignerInner() {
   // ── Save workflow ─────────────────────────────────────────────────────────
 
   const handleSave = useCallback(async () => {
-    if (!workflow || !id) return;
+    if (!id) return;
     setSaving(true);
     try {
       const steps = nodesToSteps(nodes, edges);
-      await api.put(`/api/v1/workflows/${id}`, {
-        name: workflow.name,
+      const payload = {
+        name: workflow?.name || 'Untitled Workflow',
         template_json: { steps },
-      });
-      setWorkflow(prev => prev ? { ...prev, version: prev.version + 1 } : prev);
-      showToast.success('Workflow saved');
+      };
+
+      if (isNewWorkflow) {
+        const res = await api.post('/api/v1/workflows/', payload);
+        showToast.success('Workflow created');
+        navigate(`/workflows/${res.data.id}`);
+      } else {
+        await api.put(`/api/v1/workflows/${id}`, payload);
+        setWorkflow(prev => prev ? { ...prev, version: prev.version + 1 } : prev);
+        showToast.success('Workflow saved');
+      }
     } catch {
       showToast.error('Failed to save workflow');
     } finally {
       setSaving(false);
     }
-  }, [workflow, id, nodes, edges]);
+  }, [workflow, id, isNewWorkflow, nodes, edges, navigate]);
 
   // ── All step indexes (for config drawer dropdowns) ────────────────────────
 
@@ -366,7 +390,9 @@ function DesignerInner() {
     );
   }
 
-  if (!workflow) return null;
+  // For new workflows, workflow is null but we still render the canvas
+  // For existing workflows, workflow should be loaded by now
+  if (!workflow && !isNewWorkflow) return null;
 
   // ── Phone → read-only view ────────────────────────────────────────────────
 
@@ -401,15 +427,19 @@ function DesignerInner() {
           </button>
           <div className="min-w-0">
             <h1 className="text-base font-bold text-gray-900 dark:text-white truncate">
-              {workflow.name}
+              {isNewWorkflow ? 'New Workflow' : workflow?.name}
             </h1>
             <div className="flex items-center gap-2 mt-0.5">
-              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 dark:bg-[#1e2535] dark:text-gray-400">
-                v{workflow.version}
-              </span>
-              <span className="text-xs text-gray-600 dark:text-gray-500">
-                {nodes.length} steps
-              </span>
+              {!isNewWorkflow && (
+                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 dark:bg-[#1e2535] dark:text-gray-400">
+                  v{workflow?.version}
+                </span>
+              )}
+              {!isNewWorkflow && (
+                <span className="text-xs text-gray-600 dark:text-gray-500">
+                  {nodes.length} steps
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -429,6 +459,20 @@ function DesignerInner() {
               `}
             >
               <History className="w-4 h-4" />
+            </button>
+          )}
+
+          {/* View Executions button - only for existing workflows */}
+          {!isNewWorkflow && (
+            <button
+              onClick={() => navigate(`/workflows/${id}/executions`)}
+              aria-label="View executions"
+              className="p-2 rounded-lg text-gray-600 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#1e2535] transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
             </button>
           )}
 
@@ -524,11 +568,11 @@ function DesignerInner() {
           )}
         </div>
 
-        {/* Version history sidebar */}
-        {versionSidebarOpen && (
+        {/* Version history sidebar - only for existing workflows */}
+        {!isNewWorkflow && versionSidebarOpen && (
           <VersionHistorySidebar
             workflowId={id!}
-            currentVersion={workflow.version}
+            currentVersion={workflow!.version}
             onRollback={() => {
               // Reload workflow after rollback
               api.get(`/api/v1/workflows/${id}`)
