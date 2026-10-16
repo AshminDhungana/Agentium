@@ -874,11 +874,11 @@
 
 > **Files**: `backend/core/security/`, `backend/core/security_checks.py`, `backend/core/security_middleware.py`, `backend/core/constitutional_guard.py`, `backend/core/uncertainty_detector.py`, `backend/core/response_validator.py`, `backend/services/rbac_service.py`
 
-- [ ] **19.1 — Constitutional Guard & Ethos Enforcement**
-  - [ ] 19.1.1 — Constitutional guardrails block prohibited actions
-  - [ ] 19.1.2 — Ethos enforcement adapts agent behavior
-  - [ ] 19.1.3 — Amendment service correctly modifies active rules
-  - [ ] 19.1.4 — Constitution persona guides communication style
+- [x] **19.1 — Constitutional Guard & Ethos Enforcement**
+  - [x] 19.1.1 — Constitutional guardrails block prohibited actions
+  - [x] 19.1.2 — Ethos enforcement adapts agent behavior
+  - [x] 19.1.3 — Amendment service correctly modifies active rules
+  - [x] 19.1.4 — Constitution persona guides communication style
 
 - [ ] **19.2 — Prompt Injection Resistance**
   - [ ] 19.2.1 — User-uploaded documents are sanitized

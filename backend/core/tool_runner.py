@@ -53,6 +53,7 @@ async def run_tool_async(
     called_by: str = "system",
     task_id: Optional[str] = None,
     db: Any = None,
+    agent_id: Optional[str] = None,
     use_service: bool = True,
     run_id: Optional[str] = None,
 ) -> Dict[str, Any]:
@@ -86,7 +87,17 @@ async def run_tool_async(
             fn = tool_registry.get_tool_function(name)
         if fn is None:
             return {"status": "error", "error": f"Tool '{name}' not found"}
-        if inspect.iscoroutinefunction(fn):
+
+        # Inject db and agent_id for tools that declare them in their signature
+        # (similar to ToolCreationService.execute_tool)
+        import inspect as _inspect
+        _sig = _inspect.signature(fn)
+        if "db" in _sig.parameters:
+            kwargs["db"] = db
+        if "agent_id" in _sig.parameters and "agent_id" not in kwargs:
+            kwargs["agent_id"] = agent_id or called_by
+
+        if _inspect.iscoroutinefunction(fn):
             return await fn(**kwargs)
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, lambda: fn(**kwargs))

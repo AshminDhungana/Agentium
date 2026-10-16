@@ -29,10 +29,23 @@ from httpx import ASGITransport
 
 # Set environment variables for the test session
 # This ensures that imported modules pick up the test configuration.
-# Only set defaults when not already provided — CI (GitHub Actions)
-# sets these to localhost because tests run on the runner host, not
-# inside the Docker network where "postgres"/"redis"/"chromadb" resolve.
-os.environ.setdefault("DATABASE_URL", "postgresql://agentium:agentium@localhost:5432/agentium_test")
+# Force test database (agentium_test) to avoid polluting main database.
+# CI (GitHub Actions) runs on localhost; Docker network uses service names.
+# We detect the host from existing DATABASE_URL if present, otherwise default.
+import urllib.parse as _urlparse
+_existing_db_url = os.environ.get("DATABASE_URL", "")
+if _existing_db_url:
+    # Extract host/port from existing URL, but force database name to agentium_test
+    _parsed = _urlparse.urlparse(_existing_db_url)
+    _test_db_url = _urlparse.urlunparse((
+        _parsed.scheme, _parsed.netloc, "/agentium_test", "", "", ""
+    ))
+else:
+    # Default: localhost for CI, postgres for Docker
+    _host = "postgres" if os.path.exists("/.dockerenv") else "localhost"
+    _test_db_url = f"postgresql://agentium:agentium@{_host}:5432/agentium_test"
+
+os.environ["DATABASE_URL"] = _test_db_url
 os.environ.setdefault("REDIS_URL", "redis://localhost:6379/1")
 os.environ.setdefault("CHROMA_HOST", "localhost")
 os.environ.setdefault("CHROMA_PORT", "8001")

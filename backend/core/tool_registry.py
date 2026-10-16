@@ -2126,11 +2126,14 @@ class ToolRegistry:
     async def execute_tool_async(self, name: str, **kwargs) -> Dict[str, Any]:
         """Async execution with a timeout, preserving the legacy return shape.
 
-        Delegates to run_tool_async (no service layer, no DB needed here) so a
-        hung tool cannot block forever. The timeout resolves to the tool's
-        per-tool override (if any) or the global TOOL_TIMEOUT_DEFAULT. On
-        success returns the raw tool result; on failure/timeout returns
-        {"status": "error", "error": ...}.
+        Delegates to run_tool_async so a hung tool cannot block forever.
+        The timeout resolves to the tool's per-tool override (if any) or the
+        global TOOL_TIMEOUT_DEFAULT. On success returns the raw tool result;
+        on failure/timeout returns {"status": "error", "error": ...}.
+
+        Internal injection parameters (db, agent_id) are extracted before
+        schema validation and passed to run_tool_async for signature-based
+        injection into the tool function.
         """
         from backend.core.tool_runner import run_tool_async
         from pydantic import ValidationError
@@ -2138,6 +2141,11 @@ class ToolRegistry:
         tool = self.get_tool(name)
         if not tool:
             return {"status": "error", "error": f"Tool '{name}' not found"}
+
+        # Extract internal injection parameters before validation
+        # These are not part of the tool's public schema
+        db = kwargs.pop("db", None)
+        agent_id = kwargs.pop("agent_id", None)
 
         # NEW: Validate parameters against Pydantic model
         model = tool.get("pydantic_model")
@@ -2160,8 +2168,8 @@ class ToolRegistry:
                 }
             }
 
-        # Existing execution logic
-        structured = await run_tool_async(name, kwargs, use_service=False)
+        # Execute with db and agent_id for signature-based injection
+        structured = await run_tool_async(name, kwargs, use_service=False, db=db, agent_id=agent_id)
         if structured["status"] == "success":
             return structured.get("result", structured)
         return {"status": "error", "error": structured.get("error", "unknown error")}
