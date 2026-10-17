@@ -373,7 +373,15 @@ class Agent(BaseEntity):
     def get_system_prompt(self, db=None, channel: str = "text") -> str:
         """Effective system prompt — persona is built from the Constitution."""
         if self.system_prompt_override:
-            return self.system_prompt_override
+            from backend.core.prompt_injection_sanitizer import detect_prompt_injection
+            det = detect_prompt_injection(self.system_prompt_override)
+            if det.detected and det.confidence >= 0.5:
+                logger.warning(
+                    "Prompt injection pattern detected in system_prompt_override for agent %s. Ignoring override.",
+                    getattr(self, "agentium_id", "unknown"),
+                )
+            else:
+                return self.system_prompt_override
 
         from backend.core.persona import (
             get_active_constitution_dict,

@@ -252,10 +252,12 @@ async def upload_files(
                 )
 
         elif category == "code" or mime_type.startswith("text/"):
-            # Text-based files: decode and include directly (already safe as text)
+            # Text-based files: decode and sanitize for prompt injection
             try:
                 text_content = content.decode("utf-8", errors="replace")
                 if text_content.strip():
+                    from backend.core.prompt_injection_sanitizer import sanitize_prompt_injection
+                    text_content = sanitize_prompt_injection(text_content, strip=True)
                     # Cap at 20K chars for code files
                     cap = 20_000
                     if len(text_content) > cap:

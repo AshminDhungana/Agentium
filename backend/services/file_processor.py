@@ -28,6 +28,7 @@ from pathlib import Path
 from typing import Optional
 
 from backend.services.structured_logging import get_structured_logger
+from backend.core.prompt_injection_sanitizer import sanitize_prompt_injection
 logger = get_structured_logger(__name__)
 # ---------------------------------------------------------------------------
 # Constants
@@ -171,7 +172,10 @@ def extract_pdf_text(content: bytes, max_chars: int = DEFAULT_MAX_PDF_CHARS) -> 
         if len(result) > max_chars:
             result = result[:max_chars] + f"\n\n[... truncated at {max_chars} characters]"
 
-        return result.strip() or None
+        # Sanitize for prompt injection before returning
+        result = sanitize_prompt_injection(result.strip() or "", strip=True)
+
+        return result or None
 
     except Exception as exc:
         logger.warning("[file_processor] PDF extraction failed: %s", exc)
@@ -260,6 +264,8 @@ def build_file_context_for_ai(
         header = f"📎 Attached File: {name} ({mime}, {size_str})"
 
         if text:
+            # Sanitize extracted text for prompt injection
+            text = sanitize_prompt_injection(text, strip=True)
             if len(text) > budget_per_file:
                 truncated_text = text[:budget_per_file]
                 omitted = len(text) - budget_per_file

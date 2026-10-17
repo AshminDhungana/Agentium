@@ -5,6 +5,10 @@ from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
 from backend.core.config import settings
+from backend.core.prompt_injection_sanitizer import (
+    prompt_injection_sanitizer,
+    sanitize_prompt_injection,
+)
 
 
 @dataclass
@@ -144,8 +148,16 @@ async def run_tool_async(
             }
 
         result = call_task.result()  # raises if _call raised -> caught below
+
+        # Deep-sanitize tool output for prompt injection
+        if isinstance(result, dict):
+            result = prompt_injection_sanitizer.sanitize_dict(result)
+        elif isinstance(result, str):
+            result = sanitize_prompt_injection(result, strip=True)
+
         if isinstance(result, dict) and "status" in result:
             return {**result, "elapsed_ms": elapsed_ms(), "tool_name": name}
+
         return {
             "status": "success",
             "result": result,
@@ -153,9 +165,10 @@ async def run_tool_async(
             "tool_name": name,
         }
     except Exception as exc:  # noqa: BLE001 - normalize all tool failures
+        error_msg = sanitize_prompt_injection(str(exc), strip=True)
         return {
             "status": "error",
-            "error": str(exc),
+            "error": error_msg,
             "elapsed_ms": elapsed_ms(),
             "tool_name": name,
         }

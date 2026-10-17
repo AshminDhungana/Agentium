@@ -16,6 +16,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from backend.services.structured_logging import get_structured_logger
+from backend.core.prompt_injection_sanitizer import sanitize_prompt_injection
 logger = get_structured_logger(__name__)
 from backend.tools.web_search_tool import web_search_tool  # noqa: E402
 
@@ -94,6 +95,10 @@ def _synthesize_web_doc(query: str, results: List[Dict[str, Any]], k: int = 3,
         title = r.get("title") or "(untitled)"
         url = r.get("url") or ""
         snippet = r.get("snippet") or ""
+        # Sanitize each field for prompt injection
+        title = sanitize_prompt_injection(title, strip=True)
+        url = sanitize_prompt_injection(url, strip=True)
+        snippet = sanitize_prompt_injection(snippet, strip=True)
         lines.append(f"{i}. {title} ({url})\n   {snippet}")
     return "\n".join(lines)
 
@@ -107,6 +112,8 @@ def _format_context(chroma: Optional[Dict[str, Any]]) -> str:
             break
         doc = docs[i] if docs else ""
         if doc:
+            # Sanitize retrieved documents for prompt injection
+            doc = sanitize_prompt_injection(doc, strip=True)
             out.append(doc)
     return "\n\n".join(out)
 

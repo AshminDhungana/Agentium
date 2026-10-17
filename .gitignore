@@ -57,3 +57,6 @@ coverage.xml
 # Legacy
 CLAUDE.md
 .claude/
+
+# Runtime Generated
+docs_ministry/

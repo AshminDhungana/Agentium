@@ -880,11 +880,11 @@
   - [x] 19.1.3 — Amendment service correctly modifies active rules
   - [x] 19.1.4 — Constitution persona guides communication style
 
-- [ ] **19.2 — Prompt Injection Resistance**
-  - [ ] 19.2.1 — User-uploaded documents are sanitized
-  - [ ] 19.2.2 — External search results are sanitized
-  - [ ] 19.2.3 — Tool output injection is prevented
-  - [ ] 19.2.4 — System prompt cannot be overridden by user input
+- [x] **19.2 — Prompt Injection Resistance**
+  - [x] 19.2.1 — User-uploaded documents are sanitized (`file_processor.py` PDF + context builder sanitization, `files.py` upload route raw text/code sanitization)
+  - [x] 19.2.2 — External search results are sanitized (`knowledge_assist.py` `_synthesize_web_doc` + `_format_context` ChromaDB retrieval sanitization)
+  - [x] 19.2.3 — Tool output injection is prevented (`tool_runner.py` deep recursive dict sanitization via `sanitize_dict` + tool exception/error sanitization)
+  - [x] 19.2.4 — System prompt cannot be overridden by user input (`model_provider.py` sandwich defense boundaries, `chat_service.py` detection & untrusted data framing, `agents.py` override guard, `response_guard.py` leakage redaction)
 
 - [ ] **19.3 — PII Scrubbing & Session Isolation**
   - [ ] 19.3.1 — PII detection identifies names, emails, phone numbers, SSNs
