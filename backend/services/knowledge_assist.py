@@ -17,6 +17,7 @@ from typing import Any, Dict, List, Optional
 
 from backend.services.structured_logging import get_structured_logger
 from backend.core.prompt_injection_sanitizer import sanitize_prompt_injection
+from backend.core.pii_scrubber import redact_pii, RedactionMode
 logger = get_structured_logger(__name__)
 from backend.tools.web_search_tool import web_search_tool  # noqa: E402
 
@@ -99,6 +100,12 @@ def _synthesize_web_doc(query: str, results: List[Dict[str, Any]], k: int = 3,
         title = sanitize_prompt_injection(title, strip=True)
         url = sanitize_prompt_injection(url, strip=True)
         snippet = sanitize_prompt_injection(snippet, strip=True)
+
+        # Defense in depth: Also redact PII from sanitized fields
+        title = redact_pii(title, mode=RedactionMode.FULL_REDACT)
+        url = redact_pii(url, mode=RedactionMode.FULL_REDACT)
+        snippet = redact_pii(snippet, mode=RedactionMode.FULL_REDACT)
+
         lines.append(f"{i}. {title} ({url})\n   {snippet}")
     return "\n".join(lines)
 
@@ -114,6 +121,10 @@ def _format_context(chroma: Optional[Dict[str, Any]]) -> str:
         if doc:
             # Sanitize retrieved documents for prompt injection
             doc = sanitize_prompt_injection(doc, strip=True)
+
+            # Defense in depth: Also redact PII from sanitized documents
+            doc = redact_pii(doc, mode=RedactionMode.FULL_REDACT)
+
             out.append(doc)
     return "\n\n".join(out)
 

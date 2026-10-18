@@ -84,14 +84,18 @@ class ChatContextBuilder:
         self.window_size = max(1, int(window_size))
         self.model_limit = int(model_limit)
 
-    def _load_raw(self, db: Session, user_id: str) -> List[Dict[str, str]]:
-        rows = (
+    def _load_raw(self, db: Session, user_id: str, session_id: Optional[str] = None) -> List[Dict[str, str]]:
+        query = (
             db.query(ChatMsg)
             .filter(ChatMsg.user_id == user_id, ChatMsg.is_deleted == "N")
             .filter(ChatMsg.role.in_(["sovereign", "head_of_council"]))
-            .order_by(ChatMsg.created_at.asc())
-            .all()
         )
+
+        # Session isolation (19.3.3): filter by session_id when provided
+        if session_id:
+            query = query.filter(ChatMsg.session_id == session_id)
+
+        rows = query.order_by(ChatMsg.created_at.asc()).all()
         out: List[Dict[str, str]] = []
         for r in rows:
             mapped = _ROLE_MAP.get(r.role)
@@ -104,6 +108,7 @@ class ChatContextBuilder:
         db: Session,
         user_id: str,
         summary: Optional[str] = None,
+        session_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Return a compacted history (excluding the current turn).
 
@@ -115,7 +120,7 @@ class ChatContextBuilder:
                                  the system prompt or current turn.
             raw_turn_count:      Total turns loaded from the DB (for benchmarking).
         """
-        raw = self._load_raw(db, user_id)
+        raw = self._load_raw(db, user_id, session_id)
         raw_turn_count = len(raw)
 
         compressed = bool(summary)
@@ -220,6 +225,7 @@ async def summarize_history(
     db: Session,
     user_id: str,
     model_config_id: Optional[str],
+    session_id: Optional[str] = None,
 ) -> Optional[str]:
     """Summarize the full chat history into a structured memo (async-safe).
 
@@ -229,6 +235,9 @@ async def summarize_history(
     Opens its own DB session from the caller's engine binding, because this is
     typically invoked as a fire-and-forget background task after the request
     session has been closed.
+
+    Session isolation (19.3.3): When session_id is provided, only messages
+    from that session are summarized to prevent cross-session leakage.
     """
     from sqlalchemy.orm import Session as OrmSession
     from backend.services.model_provider import ModelService
@@ -244,13 +253,17 @@ async def summarize_history(
         sdb = db
 
     try:
-        rows = (
+        query = (
             sdb.query(ChatMsg)
             .filter(ChatMsg.user_id == user_id, ChatMsg.is_deleted == "N")
             .filter(ChatMsg.role.in_(["sovereign", "head_of_council"]))
-            .order_by(ChatMsg.created_at.asc())
-            .all()
         )
+
+        # Session isolation (19.3.3): filter by session_id when provided
+        if session_id:
+            query = query.filter(ChatMsg.session_id == session_id)
+
+        rows = query.order_by(ChatMsg.created_at.asc()).all()
         if len(rows) < 6:
             return None
 

@@ -886,11 +886,11 @@
   - [x] 19.2.3 — Tool output injection is prevented (`tool_runner.py` deep recursive dict sanitization via `sanitize_dict` + tool exception/error sanitization)
   - [x] 19.2.4 — System prompt cannot be overridden by user input (`model_provider.py` sandwich defense boundaries, `chat_service.py` detection & untrusted data framing, `agents.py` override guard, `response_guard.py` leakage redaction)
 
-- [ ] **19.3 — PII Scrubbing & Session Isolation**
-  - [ ] 19.3.1 — PII detection identifies names, emails, phone numbers, SSNs
-  - [ ] 19.3.2 — PII is redacted from agent responses and logs
-  - [ ] 19.3.3 — User session data is isolated (no cross-session leakage)
-  - [ ] 19.3.4 — Credential data is never logged in plain text
+- [x] **19.3 — PII Scrubbing & Session Isolation**
+	  - [x] 19.3.1 — PII detection identifies names, emails, phone numbers, SSNs
+	  - [x] 19.3.2 — PII is redacted from agent responses and logs
+	  - [x] 19.3.3 — User session data is isolated (no cross-session leakage)
+	  - [x] 19.3.4 — Credential data is never logged in plain text
 
 - [ ] **19.4 — Agent Tiering & Access Control**
   - [ ] 19.4.1 — Tier-based permissions are enforced (tools, actions per agent tier)

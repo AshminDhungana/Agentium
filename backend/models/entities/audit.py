@@ -11,6 +11,9 @@ from .base import BaseEntity
 import enum
 import json
 
+# Import PII scrubber for defense-in-depth redaction
+from backend.core.pii_scrubber import sanitize_dict_pii, RedactionMode
+
 class AuditLevel(str, enum.Enum):
     """Severity/Importance levels for audit events."""
     DEBUG = "debug"           # Development only
@@ -133,6 +136,16 @@ class AuditLog(BaseEntity):
         import uuid as _uuid
         # Truncate actor_id defensively so it never exceeds the column width.
         safe_actor_id = str(actor_id)[:100] if actor_id else "unknown"
+
+        # Defense in depth: Redact PII from sensitive data fields before persistence
+        # Use FULL_REDACT mode for audit logs (complete replacement for maximum security)
+        if before_state:
+            before_state = sanitize_dict_pii(before_state, mode=RedactionMode.FULL_REDACT)
+        if after_state:
+            after_state = sanitize_dict_pii(after_state, mode=RedactionMode.FULL_REDACT)
+        if meta_data:
+            meta_data = sanitize_dict_pii(meta_data, mode=RedactionMode.FULL_REDACT)
+
         entry = cls(
             agentium_id=f"A{_uuid.uuid4().hex[:9]}",  # exactly 10 chars, fits String(10)
             level=level,

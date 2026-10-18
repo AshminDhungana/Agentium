@@ -48,6 +48,7 @@ class ChatService:
         db: Session,
         user_id: Optional[str],
         max_turns: int = 30,
+        session_id: Optional[str] = None,
     ) -> List[Dict[str, str]]:
         """
         Return prior conversation turns as OpenAI-style role/content dicts
@@ -58,17 +59,24 @@ class ChatService:
         head_of_council -> assistant).  System notices, errors, and reincarnation
         text are skipped to keep the prompt clean.  The most recent ``max_turns``
         messages are kept to bound prompt size.
+
+        Session isolation (19.3.3): When session_id is provided, only messages
+        from that session are returned to prevent cross-session leakage.
         """
         if not user_id:
             return []
 
-        rows = (
+        query = (
             db.query(ChatMsg)
             .filter(ChatMsg.user_id == user_id, ChatMsg.is_deleted == "N")
             .filter(ChatMsg.role.in_(["sovereign", "head_of_council"]))
-            .order_by(ChatMsg.created_at.asc())
-            .all()
         )
+
+        # Session isolation: filter by session_id when provided
+        if session_id:
+            query = query.filter(ChatMsg.session_id == session_id)
+
+        rows = query.order_by(ChatMsg.created_at.asc()).all()
 
         # Keep only the most recent turns to bound prompt size.
         rows = rows[-max_turns:]
@@ -82,7 +90,7 @@ class ChatService:
         return history
 
     @staticmethod
-    def send_structured_card(card: "_SIC", db: Session, user_id: str, conversation_id: Optional[str] = None) -> dict:
+    def send_structured_card(card: "_SIC", db: Session, user_id: str, conversation_id: Optional[str] = None, session_id: Optional[str] = None) -> dict:
         """Persist an agent-issued structured input card and broadcast it.
 
         Fire-and-forget: the WS broadcast is scheduled on the running loop so the
@@ -99,6 +107,7 @@ class ChatService:
             created_at=datetime.utcnow(),
             is_deleted="N",
             conversation_id=conversation_id,
+            session_id=session_id,
         )
         db.add(msg)
         db.commit()
@@ -118,19 +127,21 @@ class ChatService:
                 "message": msg.to_dict(),
                 "metadata": {"card": card.model_dump()},
                 "external_text": render_external_text(card),
+                "session_id": session_id,
             }))
         except Exception:
             logger.warning("Card broadcast scheduling failed", exc_info=True)
         return msg.to_dict()
 
     @staticmethod
-    async def process_message(head: HeadOfCouncil, message: str, db: Session, extra_metadata: Optional[dict] = None, on_delta: Optional[Callable[[str], Awaitable[None]]] = None, cancel_event: Optional[asyncio.Event] = None, on_tool_start: Optional[Callable[[List[Dict], int], Awaitable[None]]] = None, conversation_id: Optional[str] = None):
+    async def process_message(head: HeadOfCouncil, message: str, db: Session, extra_metadata: Optional[dict] = None, on_delta: Optional[Callable[[str], Awaitable[None]]] = None, cancel_event: Optional[asyncio.Event] = None, on_tool_start: Optional[Callable[[List[Dict], int], Awaitable[None]]] = None, conversation_id: Optional[str] = None, session_id: Optional[str] = None):
         """
         Process message with context management and potential reincarnation.
         Preserves task state across reincarnations.
-        
+
         Args:
             conversation_id: Optional conversation to associate messages with.
+            session_id: Optional session ID for session isolation (19.3.3).
         """
         # FIX: Extract config values immediately while session is active
         config = head.get_model_config(db)
@@ -225,8 +236,9 @@ class ChatService:
         context_compressed = False
         raw_turn_count = 0
         if sovereign_user:
+            # Session isolation (19.3.3): pass session_id to filter history
             built = ChatContextBuilder(window_size=window_size).build(
-                db, str(sovereign_user.id), summary=summary_json
+                db, str(sovereign_user.id), summary=summary_json, session_id=session_id
             )
             history = built["history"]
             context_compressed = built["context_compressed"]
@@ -240,6 +252,7 @@ class ChatService:
                     role="sovereign",
                     content=message,
                     conversation_id=conversation_id,
+                    session_id=session_id,
                     message_metadata={**{"source": "websocket"}, **(extra_metadata or {})},
                 ))
                 db.commit()
@@ -272,6 +285,7 @@ class ChatService:
                             user_id=str(sovereign_user.id),
                             role="head_of_council",
                             content=gov_result["content"],
+                            session_id=session_id,
                             message_metadata={
                                 "agent_id": head.agentium_id,
                                 "governance_action": gov_result["action"],
@@ -531,7 +545,7 @@ Address the Sovereign respectfully. If they issue a command that requires execut
                 import asyncio as _asyncio
 
                 _asyncio.create_task(
-                    summarize_history(db, str(sovereign_user.id), config_id)
+                    summarize_history(db, str(sovereign_user.id), config_id, session_id)
                 )
             except Exception as _summ_err:  # pragma: no cover - best-effort
                 logger.debug(f"Chat summarization schedule failed: {_summ_err}")
@@ -556,6 +570,7 @@ Address the Sovereign respectfully. If they issue a command that requires execut
                         result.get("model", model_name),
                         [],
                         conversation_id=conversation_id,
+                        session_id=session_id,
                         # NOTE: db session automatically closed after request in production.
                         # Tests override get_fresh_db to share a session — only there
                         # is the passed session still usable when the task runs.
@@ -609,6 +624,7 @@ Address the Sovereign respectfully. If they issue a command that requires execut
                         decision,
                         message,
                         str(sovereign_user.id) if sovereign_user else None,
+                        session_id=session_id,
                     )
                 )
             except Exception as exc:
@@ -865,6 +881,7 @@ Progress: {task_progress or 'N/A'}%"""
         decision,
         prompt: str,
         user_id: Optional[str],
+        session_id: Optional[str] = None,
     ) -> None:
         """
         Fire-and-forget: create + route the Task in its own DB session and announce
@@ -898,6 +915,7 @@ Progress: {task_progress or 'N/A'}%"""
                         "action": getattr(decision.action, "value", str(decision.action)),
                         "content": decision.task_brief or (prompt[:100] if prompt else ""),
                         "timestamp": datetime.utcnow().isoformat(),
+                        "session_id": session_id,
                     })
                 except Exception as exc:
                     logger.warning(f"[ChatService] task_created broadcast failed: {exc}")
@@ -910,6 +928,7 @@ Progress: {task_progress or 'N/A'}%"""
                     "type": "task_failed",
                     "content": f"Task creation failed: {exc}",
                     "timestamp": datetime.utcnow().isoformat(),
+                    "session_id": session_id,
                 })
             except Exception:
                 pass
@@ -922,6 +941,7 @@ Progress: {task_progress or 'N/A'}%"""
         model: str,
         media_urls: list,
         conversation_id: Optional[str] = None,
+        session_id: Optional[str] = None,
         db: Session = None,  # Passed from process_message; only usable in tests
     ) -> None:
         """
@@ -971,7 +991,7 @@ Progress: {task_progress or 'N/A'}%"""
             if not use_passed_db:
                 db.close()
         await ChatService._persist_head_turn_background(
-            user_id, content, agent_id, model, media_urls, conversation_id=conversation_id, db=db if use_passed_db else None
+            user_id, content, agent_id, model, media_urls, conversation_id=conversation_id, session_id=session_id, db=db if use_passed_db else None
         )
 
     @staticmethod
@@ -982,6 +1002,7 @@ Progress: {task_progress or 'N/A'}%"""
         model: str,
         media_urls: list,
         conversation_id: Optional[str] = None,
+        session_id: Optional[str] = None,
         db: Session = None,  # Passed from _media_and_persist_background if using shared session
     ) -> None:
         """Persist the Head-of-Council turn + media rewrite off the critical path."""
@@ -996,6 +1017,7 @@ Progress: {task_progress or 'N/A'}%"""
                 role="head_of_council",
                 content=content,
                 conversation_id=conversation_id,
+                session_id=session_id,
                 message_metadata={
                     "agent_id": agent_id,
                     "model": model,

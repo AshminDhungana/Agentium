@@ -49,6 +49,9 @@ class ChatMessage(Base):
     media_url = Column(Text, nullable=True)               # Canonical URL if media
     silent_delivery = Column(Boolean, default=False, nullable=True)  # True = do not push notification
     external_message_id = Column(String(100), nullable=True)         # ID from external system to prevent loops
+
+    # Session isolation (19.3.3)
+    session_id = Column(String(36), nullable=True, index=True)
     
     # Additional metadata
     message_metadata = Column(JSON, nullable=True)
@@ -90,6 +93,7 @@ class ChatMessage(Base):
             "media_url": self.media_url,
             "silent_delivery": self.silent_delivery,
             "external_message_id": self.external_message_id,
+            "session_id": self.session_id,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
@@ -105,7 +109,9 @@ class ChatMessage(Base):
         sender_channel: str = "web",
         message_type: str = "text",
         media_url: Optional[str] = None,
-        external_message_id: Optional[str] = None
+        external_message_id: Optional[str] = None,
+        # Session isolation (19.3.3)
+        session_id: Optional[str] = None
     ) -> "ChatMessage":
         """Factory method for user messages."""
         return cls(
@@ -118,7 +124,8 @@ class ChatMessage(Base):
             sender_channel=sender_channel,
             message_type=message_type,
             media_url=media_url,
-            external_message_id=external_message_id
+            external_message_id=external_message_id,
+            session_id=session_id
         )
     
     @classmethod
@@ -128,7 +135,9 @@ class ChatMessage(Base):
         content: str,
         agent_id: str,
         conversation_id: Optional[str] = None,
-        metadata: Optional[Dict] = None
+        metadata: Optional[Dict] = None,
+        # Session isolation (19.3.3)
+        session_id: Optional[str] = None
     ) -> "ChatMessage":
         """Factory method for agent messages."""
         return cls(
@@ -137,7 +146,8 @@ class ChatMessage(Base):
             content=content,
             agent_id=agent_id,
             conversation_id=conversation_id,
-            message_metadata=metadata
+            message_metadata=metadata,
+            session_id=session_id
         )
     
     @classmethod
@@ -145,7 +155,9 @@ class ChatMessage(Base):
         cls,
         user_id: str,
         content: str,
-        conversation_id: Optional[str] = None
+        conversation_id: Optional[str] = None,
+        # Session isolation (19.3.3)
+        session_id: Optional[str] = None
     ) -> "ChatMessage":
         """Factory method for system messages."""
         return cls(
@@ -153,7 +165,8 @@ class ChatMessage(Base):
             role="system",
             content=content,
             conversation_id=conversation_id,
-            message_metadata={"source": "system"}
+            message_metadata={"source": "system"},
+            session_id=session_id
         )
 
 
@@ -178,7 +191,10 @@ class Conversation(Base):
     
     # Unified Inbox status
     is_active = Column(Boolean, default=True, nullable=False)
-    
+
+    # Session isolation (19.3.3)
+    session_id = Column(String(36), nullable=True, index=True)
+
     # Soft delete
     is_deleted = Column(String(1), default='N')
     is_archived = Column(String(1), default='N')

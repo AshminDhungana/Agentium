@@ -29,6 +29,7 @@ from typing import Optional
 
 from backend.services.structured_logging import get_structured_logger
 from backend.core.prompt_injection_sanitizer import sanitize_prompt_injection
+from backend.core.pii_scrubber import redact_pii, RedactionMode
 logger = get_structured_logger(__name__)
 # ---------------------------------------------------------------------------
 # Constants
@@ -175,6 +176,9 @@ def extract_pdf_text(content: bytes, max_chars: int = DEFAULT_MAX_PDF_CHARS) -> 
         # Sanitize for prompt injection before returning
         result = sanitize_prompt_injection(result.strip() or "", strip=True)
 
+        # Defense in depth: Also redact PII from extracted text
+        result = redact_pii(result, mode=RedactionMode.FULL_REDACT)
+
         return result or None
 
     except Exception as exc:
@@ -266,6 +270,10 @@ def build_file_context_for_ai(
         if text:
             # Sanitize extracted text for prompt injection
             text = sanitize_prompt_injection(text, strip=True)
+
+            # Defense in depth: Also redact PII from extracted text
+            text = redact_pii(text, mode=RedactionMode.FULL_REDACT)
+
             if len(text) > budget_per_file:
                 truncated_text = text[:budget_per_file]
                 omitted = len(text) - budget_per_file

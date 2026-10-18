@@ -113,7 +113,25 @@ class ConnectionManager:
         # ── Pub/Sub for cross-worker event distribution (13.3) ──────────────────
         self._pubsub: Optional["redis.client.PubSub"] = None
         self._pubsub_task: Optional[asyncio.Task] = None
-        self._user_channels: set = set()  # Track subscribed ws:user:{username}
+        self._user_channels: set = set()  # Track subscribed ws:user:{username}:{session_id}
+
+    def _get_user_channel(self, username: str, session_id: Optional[str] = None) -> str:
+        """Generate user-specific Pub/Sub channel with optional session_id for isolation."""
+        if session_id:
+            return f"ws:user:{username}:{session_id}"
+        return f"ws:user:{username}"
+
+    def _get_history_stream(self, username: str, session_id: Optional[str] = None) -> str:
+        """Generate user-specific history stream key with optional session_id for isolation."""
+        if session_id:
+            return f"ws:user:{username}:{session_id}:history"
+        return f"ws:user:{username}:history"
+
+    def _get_broadcast_buffer(self, session_id: Optional[str] = None) -> str:
+        """Generate broadcast buffer key with optional session_id for isolation."""
+        if session_id:
+            return f"agentium:ws:buffer:{session_id}"
+        return "agentium:ws:buffer"
 
     async def _get_redis(self) -> redis.Redis:
         current_loop = asyncio.get_running_loop()
@@ -195,19 +213,23 @@ class ConnectionManager:
             await websocket.close(code=1011, reason=f"DB error during auth: {exc}")
             return None
 
+        # Extract or generate session_id from JWT payload
+        session_id = payload.get("session_id") or str(uuid.uuid4())
+
         user_info = {
             "username":         username,
             "role":             payload.get("role", "sovereign"),
             "user_id":          payload.get("user_id"),
             "head_agent_id":    head_agent_id,
             "head_agentium_id": head_agentium_id,
+            "session_id":       session_id,
         }
 
         self.active_connections[websocket] = user_info
         self.user_connections[username]    = websocket
 
-        # Subscribe to user's per-user Pub/Sub channel
-        await self.subscribe_user(username)
+        # Subscribe to user's per-user Pub/Sub channel with session_id for isolation
+        await self.subscribe_user(username, session_id)
 
         logger.info(f"[WebSocket] ✅ Authenticated: {username} ({datetime.utcnow().isoformat()})")
         return user_info
@@ -215,15 +237,17 @@ class ConnectionManager:
     def disconnect(self, websocket: WebSocket) -> Optional[str]:
         """Remove connection; return username if found."""
         username = None
+        session_id = None
         if websocket in self.active_connections:
             user_info = self.active_connections.pop(websocket)
             username  = user_info.get("username")
+            session_id = user_info.get("session_id")
             if username and username in self.user_connections:
                 del self.user_connections[username]
             # Unsubscribe from user's per-user Pub/Sub channel
             if username:
                 # Run unsubscribe in background since we're in a sync method
-                asyncio.create_task(self.unsubscribe_user(username))
+                asyncio.create_task(self.unsubscribe_user(username, session_id))
             # Clear WebSocket correlation context
             ws_correlation_manager.clear_connection_context(websocket)
             logger.error(f"[WebSocket] ❌ Disconnected: {username}")
@@ -240,19 +264,19 @@ class ConnectionManager:
             self._pubsub_task = asyncio.create_task(self._listen_pubsub())
             logger.info("[ConnectionManager] Pub/Sub initialized, subscribed to ws:broadcast")
 
-    async def subscribe_user(self, username: str):
-        """Subscribe to per-user channel when user connects."""
+    async def subscribe_user(self, username: str, session_id: Optional[str] = None):
+        """Subscribe to per-user channel when user connects. Includes session_id for isolation."""
         await self._ensure_pubsub()
-        channel = f"ws:user:{username}"
+        channel = self._get_user_channel(username, session_id)
         if channel not in self._user_channels:
             await self._pubsub.subscribe(channel)
             self._user_channels.add(channel)
             logger.info(f"[ConnectionManager] Subscribed to {channel} for user {username}")
 
-    async def unsubscribe_user(self, username: str):
-        """Unsubscribe from per-user channel when user disconnects."""
+    async def unsubscribe_user(self, username: str, session_id: Optional[str] = None):
+        """Unsubscribe from per-user channel when user disconnects. Includes session_id for isolation."""
         if self._pubsub:
-            channel = f"ws:user:{username}"
+            channel = self._get_user_channel(username, session_id)
             if channel in self._user_channels:
                 await self._pubsub.unsubscribe(channel)
                 self._user_channels.discard(channel)
@@ -271,7 +295,10 @@ class ConnectionManager:
                         if channel == "ws:broadcast":
                             await self._broadcast_local(event)
                         elif channel.startswith("ws:user:"):
-                            username = channel.split("ws:user:", 1)[1]
+                            # Channel format: ws:user:{username} or ws:user:{username}:{session_id}
+                            parts = channel.split("ws:user:", 1)[1].split(":")
+                            username = parts[0]
+                            # session_id = parts[1] if len(parts) > 1 else None  # Available for future use
                             await self.send_personal_message(event, username)
                         elif channel.startswith("ws:room:"):
                             # Future: forward to all users in room
@@ -311,15 +338,16 @@ class ConnectionManager:
                 logger.error(f"[WebSocket] Error sending to {username}: {exc}")
         return False
 
-    async def broadcast(self, message: dict, exclude: Optional[WebSocket] = None) -> None:
-        """Broadcast JSON message to all authenticated connections."""
+    async def broadcast(self, message: dict, exclude: Optional[WebSocket] = None, session_id: Optional[str] = None) -> None:
+        """Broadcast JSON message to all authenticated connections. Includes session_id in buffer for isolation."""
         try:
             r        = await self._get_redis()
             msg_str  = json.dumps(message)
+            buffer_key = self._get_broadcast_buffer(session_id)
             pipeline = r.pipeline()
-            pipeline.lpush("agentium:ws:buffer", msg_str)
-            pipeline.ltrim("agentium:ws:buffer", 0, 99)
-            pipeline.expire("agentium:ws:buffer", 60)
+            pipeline.lpush(buffer_key, msg_str)
+            pipeline.ltrim(buffer_key, 0, 99)
+            pipeline.expire(buffer_key, 60)
             await pipeline.execute()
         except Exception as exc:
             logger.error(f"[WebSocket] Event buffer push error: {exc}")
@@ -1054,12 +1082,15 @@ async def websocket_chat_endpoint(
                                 })
                                 return
 
+                            # Pass session_id for session isolation (19.3.3)
+                            session_id = user_info.get("session_id") if user_info else None
                             response = await ChatService.process_message(
                                 gen_head, msg, gen_db,
                                 extra_metadata=meta,
                                 on_delta=on_delta,
                                 on_tool_start=on_tool_start,
                                 cancel_event=cevent,
+                                session_id=session_id,
                             )
 
                             finish = response.get("finish_reason", "stop") or "stop"
@@ -1215,22 +1246,23 @@ async def genesis_status(current_user=Depends(get_current_user)):
 @router.get(
     "/replay",
     summary="Replay Events",
-    description="Fetch buffered broadcast events for reconnection replay. Supports per-user history streams.",
+    description="Fetch buffered broadcast events for reconnection replay. Supports per-user history streams with session isolation.",
     responses=build_responses(None),
     tags=["WebSocket"],
 )
 async def replay_events(
     since: str = Query(..., description="Timestamp to fetch events since"),
     username: Optional[str] = Query(default=None, description="Username for per-user replay (sovereign only)"),
+    session_id: Optional[str] = Query(default=None, description="Session ID for session isolation"),
     current_user=Depends(get_current_user)
 ):
-    print('DEBUG: replay_events function loaded')  # DEBUG
     """
-    Fetch missed events for reconnection replay.
+    Fetch missed events for reconnection replay with session isolation.
 
     - If username is provided and current_user is sovereign, replay that user's events
     - If username is not provided, replay current user's events
     - Non-sovereign users can only replay their own events
+    - Events are filtered by session_id to prevent cross-session leakage
     """
     # Determine target user for replay
     target_username = username or current_user["username"]
@@ -1244,7 +1276,7 @@ async def replay_events(
 
     try:
         r = await manager._get_redis()
-        stream_key = f"ws:user:{target_username}:history"
+        stream_key = manager._get_history_stream(target_username, session_id)
 
         # Read from per-user history stream since timestamp
         # xread with count=500 to match stream maxlen

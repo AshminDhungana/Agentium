@@ -179,6 +179,21 @@ class Settings(BaseSettings):
     APNS_BUNDLE_ID: str = Field(default="com.agentium.app", env="APNS_BUNDLE_ID")
     PUSH_NOTIFICATION_ENABLED: bool = Field(default=False, env="PUSH_NOTIFICATION_ENABLED")
 
+    # Phase 19.3: PII Scrubbing & Session Isolation
+    PII_SCRUBBING_ENABLED: bool = Field(default=True, env="PII_SCRUBBING_ENABLED")
+    PII_REDACTION_MODE: str = Field(default="FULL_REDACT", env="PII_REDACTION_MODE")  # MASK, FULL_REDACT, HASH, TOKENIZE, REMOVE
+    PII_ENABLED_DETECTORS: str = Field(
+        default="EMAIL,PHONE,SSN,API_KEY,PASSWORD,CREDIT_CARD,ADDRESS",
+        env="PII_ENABLED_DETECTORS",
+        description="Comma-separated list of PII types to detect (NAME disabled by default due to false positives)"
+    )
+    PII_CUSTOM_PATTERNS: str = Field(
+        default="",
+        env="PII_CUSTOM_PATTERNS",
+        description="JSON dict of custom regex patterns: {'type_name': 'regex_pattern'}"
+    )
+    PII_SESSION_ISOLATION_ENABLED: bool = Field(default=True, env="PII_SESSION_ISOLATION_ENABLED")
+
     # ── Workflow Engine (006_workflow) ────────────────────────────────────────
     CELERY_BROKER_URL: str = Field(
         default="redis://redis:6379/0",

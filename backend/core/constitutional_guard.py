@@ -202,13 +202,16 @@ class ConstitutionalGuard:
     # changes propagate immediately (spec §6.5).
     # ------------------------------------------------------------------
     @staticmethod
-    def invalidate_active_constitution_cache() -> None:
+    def invalidate_active_constitution_cache(session_id: Optional[str] = None) -> None:
         import os
         import redis as _redis
         url = os.getenv("REDIS_URL", "redis://redis:6379/0")
         try:
             r = _redis.from_url(url, decode_responses=True)
-            r.delete("constitutional_guard:active_constitution")
+            cache_key = "constitutional_guard:active_constitution"
+            if session_id:
+                cache_key = f"constitutional_guard:active_constitution:{session_id}"
+            r.delete(cache_key)
         except Exception as exc:  # pragma: no cover - best effort
             logger.warning(f"Could not invalidate active constitution cache: {exc}")
 
@@ -242,6 +245,7 @@ class ConstitutionalGuard:
         action: str,
         context: Optional[Dict[str, Any]] = None,
         affected_agent_ids: Optional[List[str]] = None,
+        session_id: Optional[str] = None,
     ) -> ConstitutionalDecision:
         """
         Run the full two-tier constitutional check.
@@ -251,6 +255,7 @@ class ConstitutionalGuard:
             action: The action being attempted (e.g. "execute_command").
             context: Optional dict of action-specific parameters.
             affected_agent_ids: IDs of agents impacted by this action.
+            session_id: Optional session ID for cache isolation.
 
         Returns:
             ConstitutionalDecision with verdict, citations, and severity.
@@ -266,7 +271,7 @@ class ConstitutionalGuard:
             return tier1
 
         # ----- TIER 2: Semantic check (ChromaDB) -----
-        tier2 = await self._tier2_check(agent_id, action, context)
+        tier2 = await self._tier2_check(agent_id, action, context, session_id)
 
         # Merge results – tier2 can only escalate, never downgrade
         decision = self._merge_tiers(tier1, tier2)
@@ -372,6 +377,7 @@ class ConstitutionalGuard:
         agent_id: str,
         action: str,
         context: Dict[str, Any],
+        session_id: Optional[str] = None,
     ) -> ConstitutionalDecision:
         """
         Semantic constitutional check via ChromaDB embeddings.
@@ -392,7 +398,7 @@ class ConstitutionalGuard:
 
         try:
             # Check embedding cache first
-            cached = await self._get_cached_embedding_result(action_description)
+            cached = await self._get_cached_embedding_result(action_description, session_id)
             if cached is not None:
                 return cached
 
@@ -453,7 +459,7 @@ class ConstitutionalGuard:
                 )
 
             # Cache result
-            await self._cache_embedding_result(action_description, decision)
+            await self._cache_embedding_result(action_description, decision, session_id)
             return decision
 
         except Exception as exc:
@@ -509,18 +515,23 @@ class ConstitutionalGuard:
             affected_agents=tier1.affected_agents + tier2.affected_agents,
         )
 
-    async def _get_active_constitution(self) -> Optional[Dict[str, Any]]:
+    async def _get_active_constitution(self, session_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """Load active constitution with Redis caching."""
+        # Build cache key with optional session_id
+        cache_key = f"constitutional_guard:active_constitution"
+        if session_id:
+            cache_key = f"constitutional_guard:active_constitution:{session_id}"
+
         # Try Redis cache
         if self._redis:
             try:
-                cached = await self._redis.get("constitutional_guard:active_constitution")
+                cached = await self._redis.get(cache_key)
                 if cached:
                     return json.loads(cached)
             except Exception:
                 pass
 
-        # Try in-memory cache
+        # Try in-memory cache (still global, not session-specific)
         if (
             self._constitution_cache
             and self._cache_timestamp
@@ -556,7 +567,7 @@ class ConstitutionalGuard:
             if self._redis:
                 try:
                     await self._redis.setex(
-                        "constitutional_guard:active_constitution",
+                        cache_key,
                         self.CONSTITUTION_CACHE_TTL,
                         json.dumps(data, default=str),
                     )
@@ -639,13 +650,13 @@ class ConstitutionalGuard:
     # ------------------------------------------------------------------
 
     async def _get_cached_embedding_result(
-        self, action_description: str
+        self, action_description: str, session_id: Optional[str] = None
     ) -> Optional[ConstitutionalDecision]:
         """Check Redis for a previously computed semantic result."""
         if not self._redis:
             return None
         try:
-            cache_key = self._embedding_cache_key(action_description)
+            cache_key = self._embedding_cache_key(action_description, session_id)
             cached = await self._redis.get(cache_key)
             if cached:
                 data = json.loads(cached)
@@ -662,13 +673,13 @@ class ConstitutionalGuard:
         return None
 
     async def _cache_embedding_result(
-        self, action_description: str, decision: ConstitutionalDecision
+        self, action_description: str, decision: ConstitutionalDecision, session_id: Optional[str] = None
     ):
         """Cache a semantic check result in Redis."""
         if not self._redis:
             return
         try:
-            cache_key = self._embedding_cache_key(action_description)
+            cache_key = self._embedding_cache_key(action_description, session_id)
             await self._redis.setex(
                 cache_key,
                 self.EMBEDDING_CACHE_TTL,
@@ -678,8 +689,10 @@ class ConstitutionalGuard:
             pass
 
     @staticmethod
-    def _embedding_cache_key(text: str) -> str:
+    def _embedding_cache_key(text: str, session_id: Optional[str] = None) -> str:
         digest = hashlib.sha256(text.encode()).hexdigest()[:16]
+        if session_id:
+            return f"constitutional_guard:semantic:{session_id}:{digest}"
         return f"constitutional_guard:semantic:{digest}"
 
     # ------------------------------------------------------------------
