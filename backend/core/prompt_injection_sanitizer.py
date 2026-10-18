@@ -20,6 +20,9 @@ from enum import Enum
 
 logger = logging.getLogger(__name__)
 
+# Import PII scrubber for defense-in-depth redaction
+from backend.core.pii_scrubber import sanitize_dict_pii, RedactionMode
+
 
 class InjectionType(str, Enum):
     """Categories of prompt injection patterns."""
@@ -336,6 +339,8 @@ class PromptInjectionSanitizer:
             else:
                 result[key] = value
 
+        # Defense in depth: Also redact PII from the already-sanitized dict
+        result = sanitize_dict_pii(result, keys, mode=RedactionMode.FULL_REDACT)
         return result
 
 
