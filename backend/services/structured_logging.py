@@ -18,12 +18,24 @@ request_id_var: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar("
 step_name_var: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar("step_name", default=None)
 agent_id_var: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar("agent_id", default=None)
 task_id_var: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar("task_id", default=None)
+session_id_var: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar("session_id", default=None)
 
 
 class StructuredFormatter(logging.Formatter):
-    """JSON formatter for structured logs."""
+    """JSON formatter for structured logs with PII redaction."""
 
     def format(self, record: logging.LogRecord) -> str:
+        # Redact PII from message
+        from backend.core.pii_scrubber import redact_pii, RedactionMode
+        record.msg = redact_pii(str(record.msg), mode=RedactionMode.MASK)
+
+        # Redact PII from extra fields
+        EXCLUDED_FIELDS = {"request_id", "step", "agent_id", "task_id", "session_id",
+                          "duration_ms", "tokens", "status", "level", "logger"}
+        for key, value in record.__dict__.items():
+            if isinstance(value, str) and key not in EXCLUDED_FIELDS and not key.startswith("_"):
+                record.__dict__[key] = redact_pii(value, mode=RedactionMode.MASK)
+
         log_data = {
             "timestamp": datetime.utcnow().isoformat() + "Z",
             "level": record.levelname,
@@ -47,6 +59,11 @@ class StructuredFormatter(logging.Formatter):
         task_id = task_id_var.get()
         if task_id:
             log_data["task_id"] = task_id
+
+        # Add session_id from context
+        session_id = session_id_var.get()
+        if session_id:
+            log_data["session_id"] = session_id
 
         # Add extra fields from record
         for key, value in record.__dict__.items():
@@ -90,6 +107,16 @@ def set_task_id(task_id: str) -> None:
     task_id_var.set(task_id)
 
 
+def set_session_id(session_id: str) -> None:
+    """Set the current session ID for structured logging."""
+    session_id_var.set(session_id)
+
+
+def get_session_id() -> Optional[str]:
+    """Get the current session ID from context."""
+    return session_id_var.get()
+
+
 def clear_context() -> None:
     """Clear all context variables."""
     request_id_var.set(None)
@@ -104,12 +131,14 @@ def structured_log_context(
     step: Optional[str] = None,
     agent_id: Optional[str] = None,
     task_id: Optional[str] = None,
+    session_id: Optional[str] = None,
 ):
     """Context manager for structured logging with correlation IDs."""
     old_request_id = request_id_var.get()
     old_step = step_name_var.get()
     old_agent_id = agent_id_var.get()
     old_task_id = task_id_var.get()
+    old_session_id = session_id_var.get()
 
     try:
         if request_id:
@@ -123,6 +152,8 @@ def structured_log_context(
             agent_id_var.set(agent_id)
         if task_id:
             task_id_var.set(task_id)
+        if session_id:
+            session_id_var.set(session_id)
 
         yield
     finally:
@@ -130,6 +161,7 @@ def structured_log_context(
         step_name_var.set(old_step)
         agent_id_var.set(old_agent_id)
         task_id_var.set(old_task_id)
+        session_id_var.set(old_session_id)
 
 
 def log_structured(
