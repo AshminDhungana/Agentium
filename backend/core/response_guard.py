@@ -11,6 +11,9 @@ from typing import Optional, List, Tuple
 
 logger = logging.getLogger(__name__)
 
+# Import PII scrubber for defense-in-depth redaction
+from backend.core.pii_scrubber import redact_pii, RedactionMode
+
 
 class ResponseGuard:
     """Detects and redacts system prompt leakage in model responses."""
@@ -94,6 +97,9 @@ class ResponseGuard:
 
         if detected:
             logger.warning("[ResponseGuard] System prompt leakage detected and redacted in response.")
+
+        # Defense in depth: Also redact PII from the response
+        cleaned = redact_pii(cleaned, mode=RedactionMode.MASK)
 
         return cleaned
 
