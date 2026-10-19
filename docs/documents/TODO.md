@@ -920,11 +920,17 @@
 
 > **Files**: `backend/celery_app.py`, `backend/services/tasks/task_executor.py`, `backend/services/tasks/workflow_tasks.py`, `backend/services/tasks/reindex_knowledge.py`, `backend/services/idle_tasks/`
 
-- [ ] **20.1 — Celery Configuration**
-  - [ ] 20.1.1 — Celery connects to Redis broker on startup
-  - [ ] 20.1.2 — All task modules in `include` list are importable
-  - [ ] 20.1.3 — Beat schedule contains all expected periodic tasks
-  - [ ] 20.1.4 — `BeatSessionLocal` DB session works for beat tasks
+- [x] **20.1 — Celery Configuration**
+  - [x] 20.1.1 — Celery connects to Redis broker on startup
+  - [x] 20.1.2 — All task modules in `include` list are importable
+  - [x] 20.1.3 — Beat schedule contains all expected periodic tasks
+  - [x] 20.1.4 — `BeatSessionLocal` DB session works for beat tasks
+
+  > **Verified:** 2026-10-19 — All 4 checks passed:
+  > - 20.1.1: Celery worker starts and connects to Redis broker (logs show "Celery worker ready for Agentium tasks" with Redis connection)
+  > - 20.1.2: All 8 modules in `celery_app.py` include list import successfully (`scripts/verify_celery_imports.py` passes)
+  > - 20.1.3: All 42 beat schedule entries reference valid `@celery_app.task` names (`scripts/verify_beat_schedule.py` passes, all 42 match)
+  > - 20.1.4: `BeatSessionLocal` uses NullPool with pool_pre_ping=True; all 7 custom beat tasks execute without DB session errors (`scripts/verify_beatsessionlocal.py` passes; live test confirms tasks use BeatSessionLocal correctly)
 
 - [ ] **20.2 — Periodic Tasks (Beat Schedule)**
   - [ ] 20.2.1 — `health-check-every-5-minutes` — channel health checks fire
