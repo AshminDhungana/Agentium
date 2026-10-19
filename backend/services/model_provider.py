@@ -888,17 +888,24 @@ class OpenAICompatibleProvider(BaseModelProvider):
         try:
             rpm = getattr(self.config, "requests_per_minute", 60) or 60
             await provider_rate_limiter.acquire(self.config.id, rpm)
-            stream = await client.chat.completions.create(
-                model=kwargs.get('model', self.config.default_model),
-                messages=[
+
+            # Build create kwargs, including response_format if provided
+            create_kwargs = {
+                "model": kwargs.get('model', self.config.default_model),
+                "messages": [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_message}
                 ],
-                stream=True,
-                max_tokens=kwargs.get('max_tokens', self.config.max_tokens),
-                temperature=kwargs.get('temperature', self.config.temperature),
+                "stream": True,
+                "max_tokens": kwargs.get('max_tokens', self.config.max_tokens),
+                "temperature": kwargs.get('temperature', self.config.temperature),
                 **self._thinking_kwargs(),
-            )
+            }
+            # Add response_format for structured outputs (if provided)
+            if "response_format" in kwargs:
+                create_kwargs["response_format"] = kwargs["response_format"]
+
+            stream = await client.chat.completions.create(**create_kwargs)
 
             await _record_provider_headers(self.config)
 

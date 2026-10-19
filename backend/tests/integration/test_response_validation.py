@@ -23,6 +23,10 @@ class MockAgent:
         self.agentium_id = agentium_id
         self.ethos = ethos
 
+    def get_system_prompt(self, db=None, channel: str = "text") -> str:
+        """Return a simple system prompt for testing."""
+        return "You are a test assistant. Output valid JSON only."
+
 
 class MockEthos:
     """Mock ethos for testing."""
@@ -414,7 +418,7 @@ async def test_streaming_with_response_format():
         yield MockChunk('{"title": "Stream', finish_reason=None)
         yield MockChunk('ed Task", "priority": "high"}', finish_reason="stop", usage=MagicMock(prompt_tokens=50, completion_tokens=50))
 
-    mock_client.chat.completions.create = AsyncMock(return_value=mock_stream())
+    mock_client.chat.completions.create = AsyncMock(side_effect=mock_stream)
 
     import backend.services.model_provider as mp
     cache_key = (str(config.id), provider.api_key, provider.base_url, False)
@@ -466,6 +470,7 @@ async def test_anthropic_structured_output():
     config.max_concurrent_requests = 10
     config.requests_per_minute = 60
     config.id = "test-anthropic-config"
+    config.effort = "none"
 
     provider = AnthropicProvider(config=config)
     provider.api_key = "test-key"
@@ -527,7 +532,7 @@ async def test_complex_nested_pydantic_model():
 
     # Test valid complex model
     provider = AsyncMock()
-    provider.generate = AsyncMock(return_value={
+    provider.generate_with_tools = AsyncMock(return_value={
         "content": '{"project_name": "Website Redesign", "tasks": [{"name": "Design", "completed": true}, {"name": "Develop", "completed": false}], "total_budget": 50000.0, "metadata": {"client": "Acme Corp"}}',
         "tokens_used": 200,
         "prompt_tokens": 100,

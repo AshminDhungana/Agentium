@@ -912,7 +912,7 @@
 - [x] **19.7 — Uncertainty Detection**
   - [x] 19.7.1 — `uncertainty_detector.py` identifies low-confidence responses (6 triggers: tool_error, empty_result, missing_expected_fields, hallucinated_tool, conflicting_results, all_tools_failed)
   - [x] 19.7.2 — Agent requests clarification instead of hallucinating (ClarificationHandler with Task→Lead→Council→Head→Sovereign escalation, MAX_CLARIFICATION_ROUNDS=2)
-  - [ ] 19.7.3 — `response_validator.py` checks output against schema
+  - [x] 19.7.3 — `response_validator.py` checks output against schema
 
 ---
 
