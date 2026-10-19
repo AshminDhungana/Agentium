@@ -1297,7 +1297,7 @@ export interface paths {
         };
         /**
          * Replay Events
-         * @description Fetch buffered broadcast events for reconnection replay. Supports per-user history streams.
+         * @description Fetch buffered broadcast events for reconnection replay. Supports per-user history streams with session isolation.
          */
         get: operations["replay_events_ws_replay_get"];
         put?: never;
@@ -18048,6 +18048,8 @@ export interface operations {
                 since: string;
                 /** @description Username for per-user replay (sovereign only) */
                 username?: string | null;
+                /** @description Session ID for session isolation */
+                session_id?: string | null;
             };
             header?: never;
             path?: never;
