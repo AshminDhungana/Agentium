@@ -1,0 +1,336 @@
+{
+  "summary": {
+    "passed": 41,
+    "failed": 0,
+    "skipped": 0,
+    "total": 41
+  },
+  "categories": {
+    "Channel Health": {
+      "passed": 5,
+      "failed": 0,
+      "skipped": 0,
+      "total": 5
+    },
+    "Constitution & Governance": {
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0,
+      "total": 3
+    },
+    "Task Execution": {
+      "passed": 7,
+      "failed": 0,
+      "skipped": 0,
+      "total": 7
+    },
+    "Self-Healing": {
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0,
+      "total": 4
+    },
+    "Predictive Scaling": {
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "total": 2
+    },
+    "Self-Improvement": {
+      "passed": 6,
+      "failed": 0,
+      "skipped": 0,
+      "total": 6
+    },
+    "Event Processing": {
+      "passed": 5,
+      "failed": 0,
+      "skipped": 0,
+      "total": 5
+    },
+    "Zero-Touch Operations": {
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "total": 2
+    },
+    "Federation": {
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "total": 2
+    },
+    "MCP": {
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "total": 2
+    },
+    "Security": {
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "total": 1
+    },
+    "Verification Tasks": {
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "total": 1
+    },
+    "Monitoring": {
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "total": 1
+    }
+  },
+  "tasks": [
+    {
+      "name": "health-check-every-5-minutes",
+      "status": "PASS",
+      "error": null,
+      "duration_ms": 148.779
+    },
+    {
+      "name": "cleanup-old-messages-daily",
+      "status": "PASS",
+      "error": null,
+      "duration_ms": 44.3
+    },
+    {
+      "name": "imap-receiver-check",
+      "status": "PASS",
+      "error": null,
+      "duration_ms": 27.776
+    },
+    {
+      "name": "channel-heartbeat",
+      "status": "PASS",
+      "error": null,
+      "duration_ms": 16.482
+    },
+    {
+      "name": "channel-health-broadcast",
+      "status": "PASS",
+      "error": null,
+      "duration_ms": 18.422
+    },
+    {
+      "name": "constitution-daily-review",
+      "status": "PASS",
+      "error": null,
+      "duration_ms": 0.5429999999999999
+    },
+    {
+      "name": "weekly-knowledge-reindex",
+      "status": "PASS",
+      "error": null,
+      "duration_ms": 987.1189999999999
+    },
+    {
+      "name": "idle-task-processor",
+      "status": "PASS",
+      "error": null,
+      "duration_ms": 0.5630000000000001
+    },
+    {
+      "name": "handle-task-escalation",
+      "status": "PASS",
+      "error": null,
+      "duration_ms": 29.62
+    },
+    {
+      "name": "chat-history-prune-daily",
+      "status": "PASS",
+      "error": null,
+      "duration_ms": 32.647000000000006
+    },
+    {
+      "name": "sovereign-data-retention",
+      "status": "PASS",
+      "error": null,
+      "duration_ms": 55.009
+    },
+    {
+      "name": "auto-scale-check",
+      "status": "PASS",
+      "error": null,
+      "duration_ms": 26.31
+    },
+    {
+      "name": "auto-escalation-timer",
+      "status": "PASS",
+      "error": null,
+      "duration_ms": 24.782
+    },
+    {
+      "name": "dependency-graph-processor",
+      "status": "PASS",
+      "error": null,
+      "duration_ms": 16.808
+    },
+    {
+      "name": "scheduled-task-dispatcher",
+      "status": "PASS",
+      "error": null,
+      "duration_ms": 43.405
+    },
+    {
+      "name": "agent-heartbeat",
+      "status": "PASS",
+      "error": null,
+      "duration_ms": 22.551000000000002
+    },
+    {
+      "name": "crash-detection",
+      "status": "PASS",
+      "error": null,
+      "duration_ms": 21.054
+    },
+    {
+      "name": "self-diagnostic-daily",
+      "status": "PASS",
+      "error": null,
+      "duration_ms": 2936.698
+    },
+    {
+      "name": "critical-path-guardian",
+      "status": "PASS",
+      "error": null,
+      "duration_ms": 20.685
+    },
+    {
+      "name": "load-metrics-snapshot",
+      "status": "PASS",
+      "error": null,
+      "duration_ms": 2771.9
+    },
+    {
+      "name": "predictive-scaling-check",
+      "status": "PASS",
+      "error": null,
+      "duration_ms": 2713.045
+    },
+    {
+      "name": "knowledge-consolidation-weekly",
+      "status": "PASS",
+      "error": null,
+      "duration_ms": 8.353
+    },
+    {
+      "name": "performance-optimization-weekly",
+      "status": "PASS",
+      "error": null,
+      "duration_ms": 21.794
+    },
+    {
+      "name": "generate-auto-tools-weekly",
+      "status": "PASS",
+      "error": null,
+      "duration_ms": 1606.588
+    },
+    {
+      "name": "decay-learnings",
+      "status": "PASS",
+      "error": null,
+      "duration_ms": 2.6879999999999997
+    },
+    {
+      "name": "update-citation-boosts",
+      "status": "PASS",
+      "error": null,
+      "duration_ms": 3.834
+    },
+    {
+      "name": "cleanup-citation-edges-weekly",
+      "status": "PASS",
+      "error": null,
+      "duration_ms": 29.446
+    },
+    {
+      "name": "threshold-event-check",
+      "status": "PASS",
+      "error": null,
+      "duration_ms": 42.480999999999995
+    },
+    {
+      "name": "external-api-poll",
+      "status": "PASS",
+      "error": null,
+      "duration_ms": 27.93
+    },
+    {
+      "name": "schedule-trigger-check",
+      "status": "PASS",
+      "error": null,
+      "duration_ms": 14.853
+    },
+    {
+      "name": "poll-wait-conditions",
+      "status": "PASS",
+      "error": null,
+      "duration_ms": 16.795
+    },
+    {
+      "name": "poll-execution-conditions",
+      "status": "PASS",
+      "error": null,
+      "duration_ms": 14.504
+    },
+    {
+      "name": "anomaly-detection",
+      "status": "PASS",
+      "error": null,
+      "duration_ms": 2715.332
+    },
+    {
+      "name": "sla-monitor",
+      "status": "PASS",
+      "error": null,
+      "duration_ms": 55.174
+    },
+    {
+      "name": "federation-heartbeat",
+      "status": "PASS",
+      "error": null,
+      "duration_ms": 0.622
+    },
+    {
+      "name": "federation-cleanup-stale",
+      "status": "PASS",
+      "error": null,
+      "duration_ms": 0.433
+    },
+    {
+      "name": "mcp-stats-broadcast",
+      "status": "PASS",
+      "error": null,
+      "duration_ms": 5.114
+    },
+    {
+      "name": "provider-metrics-broadcast",
+      "status": "PASS",
+      "error": null,
+      "duration_ms": 14.955
+    },
+    {
+      "name": "suspicious-pattern-detection",
+      "status": "PASS",
+      "error": null,
+      "duration_ms": 4.711
+    },
+    {
+      "name": "verify-agents-every-5-minutes",
+      "status": "PASS",
+      "error": null,
+      "duration_ms": 29.166
+    },
+    {
+      "name": "log-slow-query-summary-daily",
+      "status": "PASS",
+      "error": null,
+      "duration_ms": 34.389
+    }
+  ]
+}

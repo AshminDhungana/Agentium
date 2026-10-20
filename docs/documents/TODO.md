@@ -932,35 +932,37 @@
   > - 20.1.3: All 42 beat schedule entries reference valid `@celery_app.task` names (`scripts/verify_beat_schedule.py` passes, all 42 match)
   > - 20.1.4: `BeatSessionLocal` uses NullPool with pool_pre_ping=True; all 7 custom beat tasks execute without DB session errors (`scripts/verify_beatsessionlocal.py` passes; live test confirms tasks use BeatSessionLocal correctly)
 
-- [ ] **20.2 — Periodic Tasks (Beat Schedule)**
-  - [ ] 20.2.1 — `health-check-every-5-minutes` — channel health checks fire
-  - [ ] 20.2.2 — `cleanup-old-messages-daily` — old messages are purged
-  - [ ] 20.2.3 — `imap-receiver-check` — email IMAP polling runs every 60s
-  - [ ] 20.2.4 — `channel-heartbeat` — channel keepalive fires every 5 min
-  - [ ] 20.2.5 — `constitution-daily-review` — daily constitution review runs
-  - [ ] 20.2.6 — `weekly-knowledge-reindex` — ChromaDB reindex fires weekly
-  - [ ] 20.2.7 — `idle-task-processor` — idle tasks process every 60s
-  - [ ] 20.2.8 — `handle-task-escalation` — stalled task escalation runs every 5 min
-  - [ ] 20.2.9 — `chat-history-prune-daily` — chat pruning runs daily
-  - [ ] 20.2.10 — `sovereign-data-retention` — data retention policy runs daily
-  - [ ] 20.2.11 — `auto-scale-check` — auto-scaling check every 10 min
-  - [ ] 20.2.12 — `reasoning-watchdog` — stalled reasoning recovery every 60s
-  - [ ] 20.2.13 — `federation-heartbeat` — peer heartbeat every 5 min
-  - [ ] 20.2.14 — `federation-cleanup-stale` — stale peer cleanup hourly
-  - [ ] 20.2.15 — `auto-escalation-timer` — escalation timeout check every 60s
-  - [ ] 20.2.16 — `dependency-graph-processor` — DAG dependency processor every 30s
-  - [ ] 20.2.17 — `agent-heartbeat` — agent liveness check every 60s
-  - [ ] 20.2.18 — `crash-detection` — crashed agent detection every 30s
-  - [ ] 20.2.19 — `self-diagnostic-daily` — system self-diagnostic daily
-  - [ ] 20.2.20 — `critical-path-guardian` — critical path check every 2 min
-  - [ ] 20.2.21 — `load-metrics-snapshot` — load metrics every 5 min
-  - [ ] 20.2.22 — `predictive-scaling-check` — predictive scaling every 5 min
-  - [ ] 20.2.23 — `knowledge-consolidation-weekly` — knowledge consolidation weekly
-  - [ ] 20.2.24 — `performance-optimization-weekly` — performance optimization weekly
-  - [ ] 20.2.25 — `threshold-event-check` — threshold event check every 60s
-  - [ ] 20.2.26 — `external-api-poll` — external API poll every 60s
-  - [ ] 20.2.27 — `anomaly-detection` — anomaly detection every 5 min
-  - [ ] 20.2.28 — `sla-monitor` — SLA monitoring every 60s
+- [x] **20.2 — Periodic Tasks (Beat Schedule)**
+  - [x] 20.2.1 — `health-check-every-5-minutes` — channel health checks fire
+  - [x] 20.2.2 — `cleanup-old-messages-daily` — old messages are purged
+  - [x] 20.2.3 — `imap-receiver-check` — email IMAP polling runs every 60s
+  - [x] 20.2.4 — `channel-heartbeat` — channel keepalive fires every 5 min
+  - [x] 20.2.5 — `constitution-daily-review` — daily constitution review runs
+  - [x] 20.2.6 — `weekly-knowledge-reindex` — ChromaDB reindex fires weekly
+  - [x] 20.2.7 — `idle-task-processor` — idle tasks process every 60s
+  - [x] 20.2.8 — `handle-task-escalation` — stalled task escalation runs every 5 min
+  - [x] 20.2.9 — `chat-history-prune-daily` — chat pruning runs daily
+  - [x] 20.2.10 — `sovereign-data-retention` — data retention policy runs daily
+  - [x] 20.2.11 — `auto-scale-check` — auto-scaling check every 10 min
+  - [x] 20.2.12 — `reasoning-watchdog` — stalled reasoning recovery every 60s
+  - [x] 20.2.13 — `federation-heartbeat` — peer heartbeat every 5 min
+  - [x] 20.2.14 — `federation-cleanup-stale` — stale peer cleanup hourly
+  - [x] 20.2.15 — `auto-escalation-timer` — escalation timeout check every 60s
+  - [x] 20.2.16 — `dependency-graph-processor` — DAG dependency processor every 30s
+  - [x] 20.2.17 — `agent-heartbeat` — agent liveness check every 60s
+  - [x] 20.2.18 — `crash-detection` — crashed agent detection every 30s
+  - [x] 20.2.19 — `self-diagnostic-daily` — system self-diagnostic daily
+  - [x] 20.2.20 — `critical-path-guardian` — critical path check every 2 min
+  - [x] 20.2.21 — `load-metrics-snapshot` — load metrics every 5 min
+  - [x] 20.2.22 — `predictive-scaling-check` — predictive scaling every 5 min
+  - [x] 20.2.23 — `knowledge-consolidation-weekly` — knowledge consolidation weekly
+  - [x] 20.2.24 — `performance-optimization-weekly` — performance optimization weekly
+  - [x] 20.2.25 — `threshold-event-check` — threshold event check every 60s
+  - [x] 20.2.26 — `external-api-poll` — external API poll every 60s
+  - [x] 20.2.27 — `anomaly-detection` — anomaly detection every 5 min
+  - [x] 20.2.28 — `sla-monitor` — SLA monitoring every 60s
+
+  > **Verified:** 2026-10-20 — All 41 periodic tasks from Celery beat_schedule executed without unhandled exceptions. Verification scripts in `scripts/verify_periodic_tasks/` and master runner `scripts/verify_all_periodic_tasks.py`. Tasks verified via direct function invocation with real DB (localhost PostgreSQL/Redis).
 
 - [ ] **20.3 — Task Execution Engine**
   - [ ] 20.3.1 — `task_executor.py` — all Celery task functions are importable and callable
