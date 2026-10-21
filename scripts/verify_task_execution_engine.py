@@ -4,13 +4,13 @@ import argparse
 import sys
 import os
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'backend'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, os.path.dirname(__file__))
 
 from verification_utils import run_verification, aggregate_results, print_json_result, exit_from_summary
 
-# Import individual verification functions (will be added in later tasks)
-# from verify_task_executor_imports import verify_imports
+# Import individual verification functions
+from verify_task_executor_imports import verify_imports
 # from verify_task_results_redis import verify_redis_results
 # from verify_task_time_limits import verify_time_limits
 # from verify_task_retries import verify_retries
@@ -18,7 +18,7 @@ from verification_utils import run_verification, aggregate_results, print_json_r
 # from verify_reindex_knowledge import verify_reindex
 
 VERIFICATIONS = {
-    # "20.3.1": ("task_executor imports", verify_imports),
+    "20.3.1": ("task_executor imports", verify_imports),
     # "20.3.2": ("task results in Redis", verify_redis_results),
     # "20.3.3": ("task time limits", verify_time_limits),
     # "20.3.4": ("task retries with backoff", verify_retries),
