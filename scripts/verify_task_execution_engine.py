@@ -15,7 +15,7 @@ from verify_task_results_redis import verify_redis_results
 from verify_task_time_limits import verify_time_limits
 from verify_task_retries import verify_retries
 from verify_workflow_tasks import verify_workflow_tasks
-# from verify_reindex_knowledge import verify_reindex
+from verify_reindex_knowledge import verify_reindex
 
 VERIFICATIONS = {
     "20.3.1": ("task_executor imports", verify_imports),
@@ -23,7 +23,7 @@ VERIFICATIONS = {
     "20.3.3": ("task time limits", verify_time_limits),
     "20.3.4": ("task retries with backoff", verify_retries),
     "20.3.5": ("workflow tasks execution", verify_workflow_tasks),
-    # "20.3.6": ("reindex knowledge task", verify_reindex),
+    "20.3.6": ("reindex knowledge task", verify_reindex),
 }
 
 def main():
