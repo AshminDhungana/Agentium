@@ -46,6 +46,13 @@ class Settings(BaseSettings):
     # Tool execution — default per-call timeout for agent tool calls (seconds)
     TOOL_TIMEOUT_DEFAULT: float = Field(default=60.0, env="TOOL_TIMEOUT_DEFAULT")
 
+    # Loop & Runaway Detection (Phase 20.4)
+    LOOP_DETECTION_MAX_IDENTICAL_CALLS: int = Field(default=3, env="LOOP_DETECTION_MAX_IDENTICAL_CALLS")
+    LOOP_DETECTION_MAX_CALL_HISTORY: int = Field(default=50, env="LOOP_DETECTION_MAX_CALL_HISTORY")
+    LOOP_DETECTION_BUDGET_USD: Optional[float] = Field(default=None, env="LOOP_DETECTION_BUDGET_USD")
+    LOOP_DETECTION_BUDGET_TOKENS: Optional[int] = Field(default=None, env="LOOP_DETECTION_BUDGET_TOKENS")
+    LOOP_DETECTION_TRACK_PER_TOOL: bool = Field(default=True, env="LOOP_DETECTION_TRACK_PER_TOOL")
+
     # Vector Database (ChromaDB)
     CHROMA_PERSIST_DIR: str = "./chroma_data"
     CHROMA_HOST: Optional[str] = None  # For server mode, default None = embedded

@@ -28,6 +28,12 @@ try:
 except ImportError:
     settings = None  # type: ignore
 
+# Loop & Runaway Detection (Phase 20.4)
+try:
+    from backend.core.loop_detector import LoopDetector
+except ImportError:
+    LoopDetector = None  # type: ignore
+
 from backend.services.provider_rate_limiter import provider_rate_limiter
 from backend.core.tool_runner import (
     run_tool_async,
@@ -2123,6 +2129,17 @@ class ModelService:
 
         from backend.services.api_key_manager import api_key_manager
 
+        # Initialize LoopDetector with config settings (Phase 20.4)
+        loop_detector = None
+        if LoopDetector is not None and settings is not None:
+            loop_detector = LoopDetector(
+                max_identical_calls=settings.LOOP_DETECTION_MAX_IDENTICAL_CALLS,
+                max_call_history=settings.LOOP_DETECTION_MAX_CALL_HISTORY,
+                budget_usd=settings.LOOP_DETECTION_BUDGET_USD,
+                budget_tokens=settings.LOOP_DETECTION_BUDGET_TOKENS,
+                track_per_tool=settings.LOOP_DETECTION_TRACK_PER_TOOL,
+            )
+
         run_id = task_id or f"run_{uuid.uuid4().hex}"
         run_event = cancel_event or asyncio.Event()
         register_tool_run(
@@ -2133,6 +2150,10 @@ class ModelService:
                 agent_id=agent_id, task_id=task_id, db=db,
                 cancel_event=run_event, run_id=run_id,
             )
+            # Wrap tool executor with LoopDetector for runaway detection
+            if loop_detector is not None:
+                tool_executor = loop_detector.wrap_executor(tool_executor)
+
             result = await provider.generate_with_tools(
                 system_prompt=system_prompt,
                 messages=messages,
@@ -2151,6 +2172,12 @@ class ModelService:
             cost = result.get("cost_usd", 0.0)
             tokens = result.get("tokens_used", 0)
             api_key_manager.record_spend(provider.config.id, cost, tokens, db=db)
+
+            # Check budget after generation (Phase 20.4)
+            if loop_detector is not None:
+                prompt_tokens = result.get("prompt_tokens", 0)
+                completion_tokens = result.get("completion_tokens", 0)
+                loop_detector.check_budget(prompt_tokens, completion_tokens, cost)
 
             # -- NEW: Response schema validation --
             validation_retries = 0

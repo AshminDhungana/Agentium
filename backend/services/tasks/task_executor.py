@@ -16,6 +16,13 @@ from contextlib import contextmanager
 from tenacity import retry, stop_after_attempt, wait_fixed, retry_if_exception_type
 from sqlalchemy.exc import OperationalError
 
+# Loop & Runaway Detection exceptions (Phase 20.4)
+try:
+    from backend.core.exceptions import LoopDetectedError, BudgetExhaustedError
+except ImportError:
+    LoopDetectedError = None  # type: ignore
+    BudgetExhaustedError = None  # type: ignore
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy.pool import NullPool
@@ -324,6 +331,70 @@ def execute_task_async(self, task_id: str, agent_id: str):
                 logger.error(f"task_degraded broadcast failed for {task_id}: {ws_exc}")
 
             return {"status": "failed", "task_id": task_id, "reason": reason}
+
+        except LoopDetectedError as exc:
+            # Infinite tool-call loop detected - mark task as failed with specific reason
+            reason = "loop_detected"
+            logger.warning(f"Loop detected in task {task_id}: {exc}", task_id=task_id, agent_id=agent.agentium_id, tool_name=exc.tool_name, identical_count=exc.identical_count, max_allowed=exc.max_allowed)
+            try:
+                task.mark_failed(reason=reason, error_message=str(exc))
+                from backend.api.routes.websocket import manager as ws_mgr
+                asyncio.run(ws_mgr.emit_task_update(
+                    task_id=task_id,
+                    status="failed",
+                    progress=getattr(task, "progress", 0),
+                    title=getattr(task, "title", f"Task {task_id}"),
+                    result_summary=f"Failed: {reason} - {exc.tool_name} called {exc.identical_count} times",
+                ))
+            except Exception as mark_exc:
+                logger.error(f"mark_failed failed for {task_id}: {mark_exc}")
+            try:
+                entry = AuditLog.log(
+                    level=AuditLevel.WARNING,
+                    category=AuditCategory.SYSTEM,
+                    actor_type="system",
+                    actor_id="LOOP_DETECTOR",
+                    action="task_failed_loop_detected",
+                    description=f"Task {task_id} failed: loop detected in tool '{exc.tool_name}'",
+                    after_state={"reason": reason, "tool_name": exc.tool_name, "identical_count": exc.identical_count, "max_allowed": exc.max_allowed},
+                )
+                db.add(entry)
+            except Exception as audit_exc:
+                logger.error(f"AuditLog for loop detected task {task_id} failed: {audit_exc}")
+            db.commit()
+            return {"status": "failed", "task_id": task_id, "reason": reason, "detail": str(exc)}
+
+        except BudgetExhaustedError as exc:
+            # Budget exhaustion detected - mark task as failed with specific reason
+            reason = "budget_exhausted"
+            logger.warning(f"Budget exhausted in task {task_id}: {exc}", task_id=task_id, agent_id=agent.agentium_id, budget_type=exc.budget_type, actual=exc.actual, limit=exc.limit)
+            try:
+                task.mark_failed(reason=reason, error_message=str(exc))
+                from backend.api.routes.websocket import manager as ws_mgr
+                asyncio.run(ws_mgr.emit_task_update(
+                    task_id=task_id,
+                    status="failed",
+                    progress=getattr(task, "progress", 0),
+                    title=getattr(task, "title", f"Task {task_id}"),
+                    result_summary=f"Failed: {reason} - {exc.budget_type} limit exceeded",
+                ))
+            except Exception as mark_exc:
+                logger.error(f"mark_failed failed for {task_id}: {mark_exc}")
+            try:
+                entry = AuditLog.log(
+                    level=AuditLevel.WARNING,
+                    category=AuditCategory.SYSTEM,
+                    actor_type="system",
+                    actor_id="BUDGET_TRACKER",
+                    action="task_failed_budget_exhausted",
+                    description=f"Task {task_id} failed: {exc.budget_type} budget exhausted",
+                    after_state={"reason": reason, "budget_type": exc.budget_type, "actual": exc.actual, "limit": exc.limit},
+                )
+                db.add(entry)
+            except Exception as audit_exc:
+                logger.error(f"AuditLog for budget exhausted task {task_id} failed: {audit_exc}")
+            db.commit()
+            return {"status": "failed", "task_id": task_id, "reason": reason, "detail": str(exc)}
 
         except Exception as exc:
             logger.error(f"Task execution failed: {exc}", task_id=task_id, agent_id=agent.agentium_id, error=str(exc))
