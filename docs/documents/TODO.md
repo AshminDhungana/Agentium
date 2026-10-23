@@ -983,10 +983,10 @@
   > 
   > **Conclusion:** 2 passed, 2 warnings, 2 failed — all failures are environment issues (missing Docker infrastructure), not code defects. Verification scripts created in `scripts/verify_task_executor_imports.py`, `scripts/verify_task_results_redis.py`, `scripts/verify_task_time_limits.py`, `scripts/verify_task_retries.py`, `scripts/verify_workflow_tasks.py`, `scripts/verify_reindex_knowledge.py`.
 
-- [ ] **20.4 — Loop & Runaway Detection**
-  - [ ] 20.4.1 — Infinite tool-call loop detection triggers abort
-  - [ ] 20.4.2 — Repeating identical tool calls are detected
-  - [ ] 20.4.3 — Budget exhaustion during task execution terminates gracefully
+- [x] **20.4 — Loop & Runaway Detection**
+  - [x] 20.4.1 — Infinite tool-call loop detection triggers abort
+  - [x] 20.4.2 — Repeating identical tool calls are detected
+  - [x] 20.4.3 — Budget exhaustion during task execution terminates gracefully
 
 ---
 

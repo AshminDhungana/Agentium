@@ -7,8 +7,8 @@ from typing import Dict, Any, List, Optional
 from contextlib import contextmanager
 from datetime import datetime
 
-# Add backend to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'backend'))
+# Add project root to path for imports
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 def get_redis_client():
     """Get Redis client from celery_app config."""
