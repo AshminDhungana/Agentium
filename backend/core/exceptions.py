@@ -90,9 +90,42 @@ class ServerSTTUnavailable(ServiceUnavailableError):
 
 class ProviderUnavailableError(ServiceUnavailableError):
     """A specific provider (TTS, STT, etc.) is unavailable.
-    
+
     Used for multi-provider fallback logic. The caller should try the next
     available provider in the chain.
-    
+
     Rendered by the global handler as HTTP 503 with the specific provider error code.
     """
+
+
+class LoopDetectedError(Exception):
+    """Raised when identical tool calls exceed threshold.
+
+    Internal detection error — not an HTTP error. Caught by task executor
+    and converted to a task FAILED state with audit log.
+    """
+
+    def __init__(self, tool_name: str, identical_count: int, max_allowed: int):
+        self.tool_name = tool_name
+        self.identical_count = identical_count
+        self.max_allowed = max_allowed
+        super().__init__(
+            f"Loop detected: tool '{tool_name}' called identically "
+            f"{identical_count} times (max allowed: {max_allowed})"
+        )
+
+
+class BudgetExhaustedError(Exception):
+    """Raised when token or cost budget is exceeded during execution.
+
+    Internal detection error — not an HTTP error. Caught by task executor
+    and converted to a task FAILED state with audit log.
+    """
+
+    def __init__(self, budget_type: str, actual: float, limit: float):
+        self.budget_type = budget_type  # "cost" or "tokens"
+        self.actual = actual
+        self.limit = limit
+        super().__init__(
+            f"Budget exhausted: {budget_type}={actual:.2f} exceeds limit={limit:.2f}"
+        )
