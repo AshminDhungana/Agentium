@@ -30,6 +30,7 @@ from backend.services.api_manager import api_manager
 from backend.core.llm_client import LLMClient
 from backend.models.schemas.tool_creation import ToolCreationRequest
 from backend.services.decision_engine import DecisionEngine, DecisionAction
+from backend.services.critic_agents import critic_service
 
 # Tool execution imports
 from backend.services.host_access import HostAccessService

@@ -80,16 +80,18 @@ class TestExhaustionFailsCleanly:
         db_session.add(task)
         db_session.flush()
 
-        with patch(
-            "backend.services.skill_rag.LLMClient"
-        ) as MockLLM, patch(
+        # Patch LLMClient.generate directly (like TestTotalExhaustion does) to avoid
+        # session expiration issues when the mocked exception triggers a commit.
+        with patch.object(
+            LLMClient, "generate", AsyncMock(side_effect=RuntimeError(exc_message))
+        ), patch(
             "backend.services.tasks.task_executor.get_task_db", _fake_get_task_db
         ):
-            inst = MockLLM.return_value
-            inst.generate = AsyncMock(side_effect=RuntimeError(exc_message))
             result = execute_task_async.run(task.agentium_id, "10003")
 
-        db_session.refresh(task)
+        # Re-fetch the task instead of refreshing to avoid ObjectDeletedError
+        # caused by session expiration during the task_executor's commit.
+        task = db_session.query(Task).filter_by(agentium_id=task.agentium_id).first()
         return task, result
 
     def test_exhaustion_marks_task_failed_rate_limited(self, seeded_db: Session):
@@ -262,19 +264,19 @@ class TestExhaustionBroadcastsDegradation:
         db_session.add(task)
         db_session.flush()
 
-        with patch(
-            "backend.services.skill_rag.LLMClient"
-        ) as MockLLM, patch(
+        # Patch LLMClient.generate directly to avoid session expiration issues
+        with patch.object(
+            LLMClient, "generate", AsyncMock(side_effect=RuntimeError(exc_message))
+        ), patch(
             "backend.services.tasks.task_executor.get_task_db", _fake_get_task_db
         ), patch(
             "backend.api.routes.websocket.manager.broadcast",
             side_effect=lambda msg: broadcasts.append(msg),
         ):
-            inst = MockLLM.return_value
-            inst.generate = AsyncMock(side_effect=RuntimeError(exc_message))
             execute_task_async.run(task.agentium_id, "10003")
 
-        db_session.refresh(task)
+        # Re-fetch the task instead of refreshing to avoid ObjectDeletedError
+        task = db_session.query(Task).filter_by(agentium_id=task.agentium_id).first()
         return task
 
     def test_degradation_broadcast_sent(self, seeded_db: Session):

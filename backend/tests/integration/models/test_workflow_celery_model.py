@@ -115,13 +115,24 @@ def test_scheduled_task_persist_with_cron(db_session):
     assert next_run is not None
 
 
-def test_scheduled_task_cron_validation():
+def test_scheduled_task_cron_validation(db_session):
     """Verify cron_expression validator rejects invalid format."""
-    st = ScheduledTask()
+    # Create a valid ScheduledTask first (requires cron_expression or run_once+run_at)
+    st = ScheduledTask(
+        name="Test Schedule",
+        cron_expression="0 * * * *",  # valid 5-part cron
+        task_payload=json.dumps({"action": "test"}),
+        owner_agentium_id="00001",
+        status=ScheduledTaskStatus.ACTIVE,
+    )
+    db_session.add(st)
+    db_session.commit()
 
+    # Test 4-part cron (invalid)
     with pytest.raises(ValueError, match="Cron expression must have 5 parts"):
-        st.validate_cron("cron_expression", "0 * * *")  # 4 parts
+        st.validate_cron("cron_expression", "0 * * *")
 
+    # Test invalid special cron
     with pytest.raises(ValueError, match="Invalid special cron"):
         st.validate_cron("cron_expression", "@invalid_special")
 

@@ -21,6 +21,14 @@ async def test_head_create_dispatch_complete_task(seeded_db):
 
     lead = db.query(LeadAgent).filter(LeadAgent.status == "active").first()
     assert lead is not None, "test requires a seeded active Lead"
+
+    # Ensure a Task Agent exists under the Lead for dispatch to work.
+    # The dispatch_task tool requires a Task Agent to delegate to.
+    spawn = tool_registry.get_tool_function("spawn_agent")
+    spawn_res = spawn(agent_type="task", name="TestTaskAgent", description="For dispatch test",
+                      db=db, agent_id=lead.agentium_id)
+    assert spawn_res["success"] is True, f"Failed to spawn Task Agent: {spawn_res}"
+
     ct = tool_registry.get_tool_function("create_task")
     c_res = ct(title="T", description="D", db=db, agent_id="00001")
     assert c_res["success"] is True
@@ -28,7 +36,7 @@ async def test_head_create_dispatch_complete_task(seeded_db):
 
     dt = tool_registry.get_tool_function("dispatch_task")
     d_res = await dt(task_id=task_id, target_agentium_id=lead.agentium_id, db=db, agent_id="00001")
-    assert d_res["success"] is True
+    assert d_res["success"] is True, f"dispatch_task failed: {d_res}"
 
     # The governance tools create/dispatch the task, but the live execution
     # loop (a Task Agent consuming the delegated message bus message) is not
