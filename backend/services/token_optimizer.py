@@ -729,8 +729,9 @@ class TokenOptimizer:
         """
         # 1. Look up model config → get context_window
         model_key = self._model_key_from_config_id(model_config_id)
-        model = api_manager_module.api_manager.models.get(model_key)
-        context_window = model.context_window if model else 128_000
+        api_mgr = getattr(api_manager_module, "api_manager", None)
+        model = api_mgr.models.get(model_key) if api_mgr and getattr(api_mgr, "models", None) else None
+        context_window = model.context_window if model and hasattr(model, "context_window") else 128_000
         
         # 2. Calculate available tokens for messages
         system_tokens = estimate_tokens([], system_prompt)

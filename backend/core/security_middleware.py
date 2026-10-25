@@ -110,8 +110,8 @@ class IPBlocklistMiddleware(BaseHTTPMiddleware):
         self.redis = redis
 
     async def dispatch(self, request: Request, call_next):
-        # Skip blocklist for health check so load balancers are never locked out
-        if request.url.path in ("/api/health", "/health"):
+        # Skip blocklist for health checks so load balancers and probe agents are never locked out
+        if request.url.path in ("/api/health", "/health", "/healthz", "/ready", "/readyz"):
             return await call_next(request)
 
         ip = request.client.host if request.client else "unknown"

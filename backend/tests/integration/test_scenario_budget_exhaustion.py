@@ -11,6 +11,7 @@ import pytest
 import asyncio
 from backend.tests.harness.scenario_runner import ScenarioRunner
 from backend.services.token_optimizer import TokenOptimizer
+from backend.tests.harness.budget_tracker import BudgetTracker
 
 
 @pytest.mark.asyncio
@@ -40,13 +41,12 @@ async def test_budget_exhaustion_scenario():
 @pytest.mark.asyncio
 async def test_budget_warning_threshold():
     """Budget warning at 80% is tracked."""
-    optimizer = TokenOptimizer()
+    tracker = BudgetTracker(TokenOptimizer(), daily_budget_usd=10.0)
 
     # Add usage up to 80% of budget
-    budget_usd = 10.0
-    optimizer.add_usage(prompt_tokens=1000, completion_tokens=500, cost_usd=8.0)  # 80%
+    tracker.add_usage(prompt_tokens=1000, completion_tokens=500, cost_usd=8.0)  # 80%
 
-    status = optimizer.get_status()
+    status = tracker.get_status()
     assert status["percentage"] >= 80
     assert status["warning_triggered"] is True
     assert status["pause_triggered"] is False
@@ -55,13 +55,12 @@ async def test_budget_warning_threshold():
 @pytest.mark.asyncio
 async def test_budget_pause_threshold():
     """Budget pause at 100% is tracked."""
-    optimizer = TokenOptimizer()
+    tracker = BudgetTracker(TokenOptimizer(), daily_budget_usd=10.0)
 
     # Add usage exceeding budget
-    budget_usd = 10.0
-    optimizer.add_usage(prompt_tokens=1000, completion_tokens=500, cost_usd=11.0)  # 110%
+    tracker.add_usage(prompt_tokens=1000, completion_tokens=500, cost_usd=11.0)  # 110%
 
-    status = optimizer.get_status()
+    status = tracker.get_status()
     assert status["percentage"] >= 100
     assert status["warning_triggered"] is True
     assert status["pause_triggered"] is True

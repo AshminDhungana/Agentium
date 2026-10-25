@@ -25,8 +25,8 @@ from backend.api.routes.websocket import manager
 from backend.core.constitutional_guard import ConstitutionalGuard, Verdict, ViolationSeverity
 from backend.services.tool_creation_service import ToolCreationService
 from backend.services.tool_factory import ToolFactory
-from backend.services.critic_agents import critic_service, CriticType
 from backend.services import api_manager as api_manager_module
+from backend.services.api_manager import api_manager
 from backend.core.llm_client import LLMClient
 from backend.models.schemas.tool_creation import ToolCreationRequest
 from backend.services.decision_engine import DecisionEngine, DecisionAction
@@ -210,7 +210,8 @@ class AgentOrchestrator:
         agent.preferred_config = preferred_config
 
         model_key = f"{preferred_config.provider}:{preferred_config.default_model}"
-        model = api_manager_module.api_manager.models.get(model_key)
+        api_mgr = api_manager or api_manager_module.api_manager
+        model = api_mgr.models.get(model_key) if api_mgr else None
 
         # Build provider- and task-aware system prompt
         agent_tier_int = int(agent.agentium_id[0]) if agent.agentium_id[0].isdigit() else 3

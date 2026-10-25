@@ -49,6 +49,7 @@ class TaskStatus(str, enum.Enum):
     RETRYING = "retrying"      # NEW: Task is being retried after failure
     ESCALATED = "escalated"    # NEW: Max retries exceeded, escalated to Council
     STOPPED = "stopped"        # NEW: Task manually stopped or liquidated
+    PAUSED = "paused"          # NEW: Task paused by resource guard (e.g. daily budget limit)
     
     # Wait & Poll state (Phase 16)
     WAITING = "waiting"            # Task suspended until a WaitCondition resolves

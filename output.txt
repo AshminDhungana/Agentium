@@ -1,4 +1,0 @@
-📎 Attached File: document.pdf (application/pdf, 1000 B)
---- Content ---
-Contact john@example.com for details. SSN: 123-45-6789
---- End of document.pdf ---

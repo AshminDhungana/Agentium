@@ -129,9 +129,10 @@ def db_engine():
         conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_stat_statements"))
         conn.commit()
 
-    # Ensure waitstrategy enum has 'execution' value (Phase 19.2)
+    # Ensure waitstrategy enum has 'execution' value (Phase 19.2) and taskstatus has 'paused' (Phase 21.3)
     with engine_test.connect() as conn:
         conn.execute(text("ALTER TYPE waitstrategy ADD VALUE IF NOT EXISTS 'execution'"))
+        conn.execute(text("ALTER TYPE taskstatus ADD VALUE IF NOT EXISTS 'paused'"))
         conn.commit()
 
     yield engine_test

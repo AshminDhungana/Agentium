@@ -16,6 +16,9 @@ class BudgetStatus:
     pause_triggered: bool
     last_updated: str
 
+    def __getitem__(self, item: str) -> Any:
+        return getattr(self, item)
+
 
 class BudgetTracker:
     """Tracks token usage and budget consumption in real-time."""
@@ -32,6 +35,13 @@ class BudgetTracker:
 
         # Try to hook into token optimizer's record_usage
         self._hook_optimizer()
+
+    def add_usage(self, prompt_tokens: int = 0, completion_tokens: int = 0, cost_usd: float = 0.0):
+        """Record usage directly for testing/threshold simulation."""
+        self._spent_usd += cost_usd
+        percentage = (self._spent_usd / self._daily_budget_usd) * 100 if self._daily_budget_usd > 0 else 0
+        self._warning_triggered = percentage >= (self._warning_threshold * 100)
+        self._pause_triggered = percentage >= (self._pause_threshold * 100)
 
     def _hook_optimizer(self):
         """Hook into token optimizer to track usage automatically."""

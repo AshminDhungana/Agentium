@@ -208,6 +208,24 @@ def _ensure_api_key_resilience_columns(db: Session):
     logger.info(f"✅ Added {len(columns_to_add)} API Key Resilience columns to user_model_configs")
 
 
+def _ensure_taskstatus_enum_values(db: Session):
+    """Ensure newly added TaskStatus enum values exist in PostgreSQL."""
+    if db.get_bind().dialect.name == "postgresql":
+        try:
+            bind = db.get_bind()
+            engine_obj = getattr(bind, "engine", bind)
+            raw_conn = engine_obj.raw_connection()
+            raw_conn.autocommit = True
+            cursor = raw_conn.cursor()
+            cursor.execute("ALTER TYPE taskstatus ADD VALUE IF NOT EXISTS 'paused'")
+            cursor.close()
+            raw_conn.close()
+            logger.info("✅ Reconciled taskstatus enum ('paused' verified)")
+        except Exception as e:
+            if "already exists" not in str(e).lower():
+                logger.warning(f"Could not add 'paused' to taskstatus enum (non-fatal): {e}")
+
+
 def get_next_agentium_id(db: Session, prefix: str) -> str:
     """
     Generate next available ID for a given prefix.
@@ -323,6 +341,7 @@ def create_initial_data(db: Session):
     _ensure_system_settings(db)
     _ensure_tool_usage_log_columns(db)
     _ensure_api_key_resilience_columns(db)
+    _ensure_taskstatus_enum_values(db)
 
 
 def get_system_agent_id(db: Session) -> str:

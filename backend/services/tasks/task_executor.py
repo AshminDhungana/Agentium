@@ -120,6 +120,9 @@ def execute_task_async(self, task_id: str, agent_id: str):
     Execute task with skill-augmented RAG.
     """
     with get_task_db() as db:
+        start_time = time.time()
+        task = None
+        agent = None
         try:
             logger.info(f"Executing task {task_id} with agent {agent_id}", task_id=task_id, agent_id=agent_id, status="started")
 
@@ -261,6 +264,9 @@ def execute_task_async(self, task_id: str, agent_id: str):
             # Total provider exhaustion (all keys invalid / rate-limited /
             # unreachable) — fail cleanly. Do NOT re-queue forever via Celery
             # retry; the worker must move on to the next task.
+            elapsed_ms = round((time.time() - start_time) * 1000, 2)
+            input_summary = getattr(task, "description", "")[:200] if task else ""
+            execution_context = getattr(task, "execution_context", None)
             reason = "provider_unreachable"
             msg = str(exc).lower()
             if ("all_keys_invalid" in msg or "401" in msg or "403" in msg
@@ -270,6 +276,16 @@ def execute_task_async(self, task_id: str, agent_id: str):
             elif ("429" in msg or "ratelimit" in msg or "too many requests" in msg
                   or "rate_limit" in msg):
                 reason = "rate_limited"
+
+            logger.error(
+                f"Task {task_id} failed due to provider exhaustion: {exc}",
+                task_id=task_id,
+                agent_id=getattr(agent, "agentium_id", "unknown"),
+                reason=reason,
+                elapsed_ms=elapsed_ms,
+                input_summary=input_summary,
+                execution_context=execution_context,
+            )
 
             try:
                 task.mark_failed(reason=reason, error_message=str(exc))
@@ -334,8 +350,21 @@ def execute_task_async(self, task_id: str, agent_id: str):
 
         except LoopDetectedError as exc:
             # Infinite tool-call loop detected - mark task as failed with specific reason
+            elapsed_ms = round((time.time() - start_time) * 1000, 2)
+            input_summary = getattr(task, "description", "")[:200] if task else ""
+            execution_context = getattr(task, "execution_context", None)
             reason = "loop_detected"
-            logger.warning(f"Loop detected in task {task_id}: {exc}", task_id=task_id, agent_id=agent.agentium_id, tool_name=exc.tool_name, identical_count=exc.identical_count, max_allowed=exc.max_allowed)
+            logger.warning(
+                f"Loop detected in task {task_id}: {exc}",
+                task_id=task_id,
+                agent_id=getattr(agent, "agentium_id", "unknown"),
+                tool_name=exc.tool_name,
+                identical_count=exc.identical_count,
+                max_allowed=exc.max_allowed,
+                elapsed_ms=elapsed_ms,
+                input_summary=input_summary,
+                execution_context=execution_context,
+            )
             try:
                 task.mark_failed(reason=reason, error_message=str(exc))
                 from backend.api.routes.websocket import manager as ws_mgr
@@ -366,8 +395,21 @@ def execute_task_async(self, task_id: str, agent_id: str):
 
         except BudgetExhaustedError as exc:
             # Budget exhaustion detected - mark task as failed with specific reason
+            elapsed_ms = round((time.time() - start_time) * 1000, 2)
+            input_summary = getattr(task, "description", "")[:200] if task else ""
+            execution_context = getattr(task, "execution_context", None)
             reason = "budget_exhausted"
-            logger.warning(f"Budget exhausted in task {task_id}: {exc}", task_id=task_id, agent_id=agent.agentium_id, budget_type=exc.budget_type, actual=exc.actual, limit=exc.limit)
+            logger.warning(
+                f"Budget exhausted in task {task_id}: {exc}",
+                task_id=task_id,
+                agent_id=getattr(agent, "agentium_id", "unknown"),
+                budget_type=exc.budget_type,
+                actual=exc.actual,
+                limit=exc.limit,
+                elapsed_ms=elapsed_ms,
+                input_summary=input_summary,
+                execution_context=execution_context,
+            )
             try:
                 task.mark_failed(reason=reason, error_message=str(exc))
                 from backend.api.routes.websocket import manager as ws_mgr
@@ -397,7 +439,18 @@ def execute_task_async(self, task_id: str, agent_id: str):
             return {"status": "failed", "task_id": task_id, "reason": reason, "detail": str(exc)}
 
         except Exception as exc:
-            logger.error(f"Task execution failed: {exc}", task_id=task_id, agent_id=agent.agentium_id, error=str(exc))
+            elapsed_ms = round((time.time() - start_time) * 1000, 2)
+            input_summary = getattr(task, "description", "")[:200] if task else ""
+            execution_context = getattr(task, "execution_context", None)
+            logger.error(
+                f"Task execution failed: {exc}",
+                task_id=task_id,
+                agent_id=getattr(agent, "agentium_id", "unknown"),
+                error=str(exc),
+                elapsed_ms=elapsed_ms,
+                input_summary=input_summary,
+                execution_context=execution_context,
+            )
 
             # Phase 13.4: Anti-Pattern Early Warning
             try:

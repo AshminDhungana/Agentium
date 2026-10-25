@@ -35,6 +35,9 @@ _SKIP_TIMING = object()
 # is excluded from timing collection (keeps the buffer focused on useful traffic).
 _SKIP_PREFIXES = (
     "/health",
+    "/healthz",
+    "/ready",
+    "/readyz",
     "/api/health",
     "/api/v1/metrics",
     "/ws",

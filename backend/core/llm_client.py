@@ -25,7 +25,8 @@ from backend.services.model_provider import ModelService
 from backend.services.api_key_manager import api_key_manager
 from backend.services.provider_rate_limiter import provider_rate_limiter
 
-logger = logging.getLogger(__name__)
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
 
 
 class ErrorTier(str, Enum):
@@ -291,25 +292,35 @@ class LLMClient:
     ) -> Dict[str, Any]:
         """Generate a response from an LLM with retry, failover, and CB integration."""
         _max_retries = max_retries if max_retries is not None else self.max_retries
-        configs_to_try: List[Optional[str]] = [config_id] if config_id else []
+        if config_id:
+            primary_config = config_id
+        elif agent and getattr(agent, "preferred_config_id", None):
+            primary_config = agent.preferred_config_id
+        else:
+            primary_config = None
+
+        configs_to_try: List[Optional[str]] = [primary_config]
         if fallback_configs:
             for fb in fallback_configs:
                 if fb not in configs_to_try:
                     configs_to_try.append(fb)
-
-        if not configs_to_try:
-            if agent and getattr(agent, "preferred_config_id", None):
-                configs_to_try = [agent.preferred_config_id]
-            else:
-                configs_to_try = [None]
 
         # Bound the combined budget: 1 primary + up to MAX_FALLBACK_CONFIGS.
         configs_to_try = configs_to_try[:1 + LLMClient.MAX_FALLBACK_CONFIGS]
 
         last_error: Optional[Exception] = None
         agentium_id = getattr(agent, "agentium_id", "system")
+        attempted_configs: List[str] = []
+        errors_per_config: Dict[str, List[str]] = {}
+        total_attempts = 0
+        last_tier = ErrorTier.UNKNOWN
 
         for attempt_config_id in configs_to_try:
+            effective_config_id = attempt_config_id or "default"
+            if effective_config_id not in attempted_configs:
+                attempted_configs.append(effective_config_id)
+            errors_per_config.setdefault(effective_config_id, [])
+
             if attempt_config_id:
                 cb = self._get_cb(attempt_config_id)
                 if not cb.can_execute():
@@ -320,6 +331,7 @@ class LLMClient:
                     continue
 
             for attempt in range(_max_retries + 1):
+                total_attempts += 1
                 try:
                     result = await ModelService.generate_with_agent(
                         agent=agent,
@@ -329,7 +341,6 @@ class LLMClient:
                         system_prompt_override=system_prompt_override,
                         **kwargs,
                     )
-                    effective_config_id = attempt_config_id or "default"
                     cb = self._get_cb(effective_config_id)
                     cb.record_success()
                     await self._track_tokens_and_cost(result, effective_config_id, agentium_id)
@@ -338,8 +349,38 @@ class LLMClient:
 
                 except Exception as exc:
                     last_error = exc
-                    effective_config_id = attempt_config_id or "default"
+                    errors_per_config[effective_config_id].append(str(exc))
                     tier = self.classify_error(exc)
+
+                    # Query provider retry hints if available
+                    hints: Optional[ProviderRetryHints] = None
+                    try:
+                        p_call = ModelService.get_provider(user_id, attempt_config_id)
+                        if asyncio.iscoroutine(p_call) or hasattr(p_call, "__await__"):
+                            provider_inst = await p_call
+                        else:
+                            provider_inst = p_call
+                        if provider_inst and hasattr(provider_inst, "get_retry_hints"):
+                            hints = provider_inst.get_retry_hints(exc)
+                    except Exception:
+                        pass
+
+                    retry_after: Optional[float] = None
+                    should_retry: bool = False
+                    is_permanent: bool = False
+
+                    if hints:
+                        if hints.error_tier != ErrorTier.UNKNOWN:
+                            tier = hints.error_tier
+                        retry_after = hints.retry_after
+                        should_retry = hints.should_retry
+                        is_permanent = hints.is_permanent
+                    else:
+                        is_permanent = (tier is ErrorTier.PERMANENT_KEY_FAILURE)
+                        should_retry = (tier is ErrorTier.RATE_LIMITED or tier is ErrorTier.TRANSIENT)
+
+                    last_tier = tier
+
                     # Task 18: feed the per-provider 429 counter so the dashboard
                     # shows a live rate-limit rate per config.
                     if tier is ErrorTier.RATE_LIMITED:
@@ -348,13 +389,12 @@ class LLMClient:
                                 effective_config_id)
                         except Exception:
                             pass
-                    is_rl = tier is ErrorTier.RATE_LIMITED
                     logger.warning(
                         "LLMClient.generate: %s on config %s (attempt %d/%d): %s",
                         tier.value, attempt_config_id, attempt + 1, _max_retries + 1, exc,
                     )
                     # Permanent key failure: never retry a dead key — rotate now.
-                    if tier is ErrorTier.PERMANENT_KEY_FAILURE:
+                    if tier is ErrorTier.PERMANENT_KEY_FAILURE or is_permanent:
                         try:
                             api_key_manager.mark_key_failed(
                                 effective_config_id, str(exc), is_permanent=True, db=self.db)
@@ -365,17 +405,26 @@ class LLMClient:
                         break  # immediate rotation to next config, no delay
                     cb = self._get_cb(effective_config_id)
                     cb.record_failure()
-                    if attempt < _max_retries and (is_rl or tier is ErrorTier.TRANSIENT):
-                        await self._delay(attempt)
+                    if attempt < _max_retries and should_retry:
+                        await self._delay(attempt, retry_after)
                         continue
                     else:
                         break
 
         if last_error:
-            raise RuntimeError(
+            result_obj = ProviderErrorResult(
+                success=False,
+                error=str(last_error),
+                error_tier=last_tier,
+                attempted_configs=attempted_configs,
+                errors_per_config=errors_per_config,
+                total_attempts=total_attempts,
+            )
+            msg = (
                 f"LLMClient.generate exhausted all {len(configs_to_try)} provider(s) "
                 f"and {_max_retries} retries. Last error: {last_error}"
-            ) from last_error
+            )
+            raise ProviderExhaustedError(msg, result_obj) from last_error
         raise RuntimeError("LLMClient.generate: No providers available and no error captured")
 
     async def generate_with_tools(
@@ -399,25 +448,35 @@ class LLMClient:
     ) -> Dict[str, Any]:
         """Tool-aware generation with retry, failover, and CB integration."""
         _max_retries = max_retries if max_retries is not None else self.max_retries
-        configs_to_try: List[Optional[str]] = [config_id] if config_id else []
+        if config_id:
+            primary_config = config_id
+        elif agent and getattr(agent, "preferred_config_id", None):
+            primary_config = agent.preferred_config_id
+        else:
+            primary_config = None
+
+        configs_to_try: List[Optional[str]] = [primary_config]
         if fallback_configs:
             for fb in fallback_configs:
                 if fb not in configs_to_try:
                     configs_to_try.append(fb)
-
-        if not configs_to_try:
-            if agent and getattr(agent, "preferred_config_id", None):
-                configs_to_try = [agent.preferred_config_id]
-            else:
-                configs_to_try = [None]
 
         # Bound the combined budget: 1 primary + up to MAX_FALLBACK_CONFIGS.
         configs_to_try = configs_to_try[:1 + LLMClient.MAX_FALLBACK_CONFIGS]
 
         last_error: Optional[Exception] = None
         agentium_id = getattr(agent, "agentium_id", "system")
+        attempted_configs: List[str] = []
+        errors_per_config: Dict[str, List[str]] = {}
+        total_attempts = 0
+        last_tier = ErrorTier.UNKNOWN
 
         for attempt_config_id in configs_to_try:
+            effective_config_id = attempt_config_id or "default"
+            if effective_config_id not in attempted_configs:
+                attempted_configs.append(effective_config_id)
+            errors_per_config.setdefault(effective_config_id, [])
+
             if attempt_config_id:
                 cb = self._get_cb(attempt_config_id)
                 if not cb.can_execute():
@@ -428,6 +487,7 @@ class LLMClient:
                     continue
 
             for attempt in range(_max_retries + 1):
+                total_attempts += 1
                 try:
                     result = await ModelService.generate_with_agent_tools(
                         agent=agent,
@@ -445,7 +505,6 @@ class LLMClient:
                         channel="text",
                         **kwargs,
                     )
-                    effective_config_id = attempt_config_id or "default"
                     cb = self._get_cb(effective_config_id)
                     cb.record_success()
                     await self._track_tokens_and_cost(result, effective_config_id, agentium_id)
@@ -454,8 +513,38 @@ class LLMClient:
 
                 except Exception as exc:
                     last_error = exc
-                    effective_config_id = attempt_config_id or "default"
+                    errors_per_config[effective_config_id].append(str(exc))
                     tier = self.classify_error(exc)
+
+                    # Query provider retry hints if available
+                    hints: Optional[ProviderRetryHints] = None
+                    try:
+                        p_call = ModelService.get_provider("sovereign", attempt_config_id)
+                        if asyncio.iscoroutine(p_call) or hasattr(p_call, "__await__"):
+                            provider_inst = await p_call
+                        else:
+                            provider_inst = p_call
+                        if provider_inst and hasattr(provider_inst, "get_retry_hints"):
+                            hints = provider_inst.get_retry_hints(exc)
+                    except Exception:
+                        pass
+
+                    retry_after: Optional[float] = None
+                    should_retry: bool = False
+                    is_permanent: bool = False
+
+                    if hints:
+                        if hints.error_tier != ErrorTier.UNKNOWN:
+                            tier = hints.error_tier
+                        retry_after = hints.retry_after
+                        should_retry = hints.should_retry
+                        is_permanent = hints.is_permanent
+                    else:
+                        is_permanent = (tier is ErrorTier.PERMANENT_KEY_FAILURE)
+                        should_retry = (tier is ErrorTier.RATE_LIMITED or tier is ErrorTier.TRANSIENT)
+
+                    last_tier = tier
+
                     # Task 18: feed the per-provider 429 counter so the dashboard
                     # shows a live rate-limit rate per config.
                     if tier is ErrorTier.RATE_LIMITED:
@@ -464,13 +553,12 @@ class LLMClient:
                                 effective_config_id)
                         except Exception:
                             pass
-                    is_rl = tier is ErrorTier.RATE_LIMITED
                     logger.warning(
                         "LLMClient.generate_with_tools: %s on config %s (attempt %d/%d): %s",
                         tier.value, attempt_config_id, attempt + 1, _max_retries + 1, exc,
                     )
                     # Permanent key failure: never retry a dead key — rotate now.
-                    if tier is ErrorTier.PERMANENT_KEY_FAILURE:
+                    if tier is ErrorTier.PERMANENT_KEY_FAILURE or is_permanent:
                         try:
                             api_key_manager.mark_key_failed(
                                 effective_config_id, str(exc), is_permanent=True, db=self.db)
@@ -481,17 +569,26 @@ class LLMClient:
                         break  # immediate rotation to next config, no delay
                     cb = self._get_cb(effective_config_id)
                     cb.record_failure()
-                    if attempt < _max_retries and (is_rl or tier is ErrorTier.TRANSIENT):
-                        await self._delay(attempt)
+                    if attempt < _max_retries and should_retry:
+                        await self._delay(attempt, retry_after)
                         continue
                     else:
                         break
 
         if last_error:
-            raise RuntimeError(
+            result_obj = ProviderErrorResult(
+                success=False,
+                error=str(last_error),
+                error_tier=last_tier,
+                attempted_configs=attempted_configs,
+                errors_per_config=errors_per_config,
+                total_attempts=total_attempts,
+            )
+            msg = (
                 f"LLMClient.generate_with_tools exhausted all {len(configs_to_try)} provider(s) "
                 f"and {_max_retries} retries. Last error: {last_error}"
-            ) from last_error
+            )
+            raise ProviderExhaustedError(msg, result_obj) from last_error
         raise RuntimeError(
             "LLMClient.generate_with_tools: No providers available and no error captured"
         )

@@ -80,6 +80,9 @@ PLATFORM_RATE_LIMITS: dict[str, dict[str, int]] = {
 _EXEMPT_PATHS: set[str] = {
     "/api/health",
     "/health",
+    "/healthz",
+    "/ready",
+    "/readyz",
     "/docs",
     "/openapi.json",
 }

@@ -306,6 +306,11 @@ class PredictiveScalingService:
                 pass
                 
             logger.warning(f"PredictiveScaling: Token Budget Exceeded: ${used:.2f} / ${budget_limit:.2f}")
+            try:
+                redis_client.set("agentium:budget:exceeded", "true", ex=86400)
+            except Exception as r_err:
+                logger.warning(f"Failed to set budget:exceeded flag in Redis: {r_err}")
+
             # Pause non-critical tasks
             active_tasks = db.query(Task).filter(
                 Task.status.in_([TaskStatus.IN_PROGRESS, TaskStatus.PENDING]),
@@ -314,18 +319,72 @@ class PredictiveScalingService:
             
             for t in active_tasks:
                 t.status = TaskStatus.PAUSED
-                if t.execution_context is None:
-                    t.execution_context = {}
-                t.execution_context["pause_reason"] = "Token Budget Exceeded"
+                ctx = {}
+                if t.execution_context:
+                    try:
+                        ctx = json.loads(t.execution_context) if isinstance(t.execution_context, str) else dict(t.execution_context)
+                    except Exception:
+                        ctx = {}
+                ctx["pause_reason"] = "Token Budget Exceeded"
+                t.execution_context = json.dumps(ctx)
                 
             db.commit()
             
         elif used >= budget_limit * 0.8:
             logger.info(f"PredictiveScaling: Token Budget Warning: ${used:.2f} / ${budget_limit:.2f}")
             # The model allocator should see this via its own logic or we inject a variable.
-            # In Phase 13.3 we just note the warning and maybe set a redis flag
-            redis_client.set("agentium:budget:warning", "true", ex=86400)
+            try:
+                redis_client.set("agentium:budget:warning", "true", ex=86400)
+                redis_client.delete("agentium:budget:exceeded")
+            except Exception as r_err:
+                logger.warning(f"Failed to set budget:warning in Redis: {r_err}")
         else:
-            redis_client.delete("agentium:budget:warning")
+            try:
+                redis_client.delete("agentium:budget:warning")
+                redis_client.delete("agentium:budget:exceeded")
+            except Exception as r_err:
+                logger.warning(f"Failed to clear budget flags in Redis: {r_err}")
+
+    @staticmethod
+    def resume_paused_tasks_if_budget_available(db: Session) -> int:
+        """
+        Resume tasks paused due to budget exhaustion if current spend is below limit.
+        Returns number of tasks resumed.
+        """
+        budget_limit = float(os.getenv("DAILY_TOKEN_BUDGET_USD", "10.00"))
+        try:
+            status = token_optimizer.get_status()
+            used = float(status.get('budget_status', {}).get('cost_used_today_usd', 0.0))
+        except Exception:
+            used = 0.0
+
+        if used < budget_limit:
+            paused_tasks = db.query(Task).filter(
+                Task.status == TaskStatus.PAUSED
+            ).all()
+
+            resumed_count = 0
+            for t in paused_tasks:
+                ctx = {}
+                if t.execution_context:
+                    try:
+                        ctx = json.loads(t.execution_context) if isinstance(t.execution_context, str) else dict(t.execution_context)
+                    except Exception:
+                        ctx = {}
+                if ctx.get("pause_reason") == "Token Budget Exceeded":
+                    t.status = TaskStatus.PENDING
+                    ctx.pop("pause_reason", None)
+                    t.execution_context = json.dumps(ctx) if ctx else None
+                    resumed_count += 1
+
+            if resumed_count > 0:
+                db.commit()
+                logger.info(f"PredictiveScaling: Resumed {resumed_count} tasks paused by budget exhaustion.")
+                try:
+                    redis_client.delete("agentium:budget:exceeded")
+                except Exception:
+                    pass
+            return resumed_count
+        return 0
 
 predictive_scaling_service = PredictiveScalingService()

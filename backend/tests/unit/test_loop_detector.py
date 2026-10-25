@@ -106,3 +106,49 @@ class TestStats:
         assert stats["total_calls"] == 3
         assert stats["unique_signatures"] == 2
         assert stats["max_consecutive_identical"] == 2
+
+
+class TestAsyncLoopDetection:
+    @pytest.mark.asyncio
+    async def test_async_allows_first_call(self):
+        detector = LoopDetector(max_identical_calls=3)
+
+        async def async_tool(name, args):
+            return f"result_{name}"
+
+        wrapped = detector.wrap_executor(async_tool)
+        result = await wrapped("search", {"query": "hello"})
+        assert result == "result_search"
+
+    @pytest.mark.asyncio
+    async def test_async_blocks_consecutive_identical_calls(self):
+        detector = LoopDetector(max_identical_calls=2)
+
+        async def async_tool(name, args):
+            return "ok"
+
+        wrapped = detector.wrap_executor(async_tool)
+        # Call 1 and 2 succeed
+        assert await wrapped("crawl", {"url": "https://example.com"}) == "ok"
+        assert await wrapped("crawl", {"url": "https://example.com"}) == "ok"
+
+        # Call 3 triggers LoopDetectedError
+        with pytest.raises(LoopDetectedError) as exc_info:
+            await wrapped("crawl", {"url": "https://example.com"})
+
+        assert exc_info.value.tool_name == "crawl"
+        assert exc_info.value.identical_count == 3
+        assert exc_info.value.max_allowed == 2
+
+    @pytest.mark.asyncio
+    async def test_async_allows_different_args(self):
+        detector = LoopDetector(max_identical_calls=2)
+
+        async def async_tool(name, args):
+            return f"searched_{args['q']}"
+
+        wrapped = detector.wrap_executor(async_tool)
+        assert await wrapped("search", {"q": "term_1"}) == "searched_term_1"
+        assert await wrapped("search", {"q": "term_2"}) == "searched_term_2"
+        assert await wrapped("search", {"q": "term_3"}) == "searched_term_3"
+        assert await wrapped("search", {"q": "term_4"}) == "searched_term_4"

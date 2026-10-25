@@ -2479,6 +2479,7 @@ def upgrade() -> None:
         DO $$ BEGIN
             IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'taskstatus') THEN
                 ALTER TYPE taskstatus ADD VALUE IF NOT EXISTS 'waiting';
+                ALTER TYPE taskstatus ADD VALUE IF NOT EXISTS 'paused';
             END IF;
         END $$;
     """)

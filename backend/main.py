@@ -9,8 +9,10 @@ import json
 import logging
 import uvicorn
 from backend.api import host_access
+import shutil
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, Request
+from fastapi.responses import JSONResponse
 from backend.core.exceptions import BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, TooLargeError, RateLimitError, InternalServerError, ServiceUnavailableError
 from backend.core.config import settings
 from fastapi.middleware.cors import CORSMiddleware
@@ -703,7 +705,93 @@ app.include_router(knowledge_routes.router,          prefix="/api/v1")
 # INLINE ENDPOINTS
 # ══════════════════════════════════════════════════════════════════════════════
 
-# ── Health Check ──────────────────────────────────────────────────────────────
+# ── Health & Kubernetes Probe Endpoints ──────────────────────────────────────
+
+@app.get(
+    "/healthz",
+    summary="Kubernetes Liveness Probe",
+    description="Lightweight liveness probe that verifies the process is alive.",
+    responses=build_responses(None),
+    tags=["System"],
+)
+@app.get("/health", include_in_schema=False)
+async def liveness_probe():
+    """Liveness probe: returns 200 immediately while process is running."""
+    return {
+        "status": "ok",
+        "timestamp": datetime.utcnow().isoformat()
+    }
+
+
+@app.get(
+    "/ready",
+    summary="Kubernetes Readiness Probe",
+    description="Deep readiness probe checking database connectivity, Redis ping, and disk capacity.",
+    responses=build_responses(None),
+    tags=["System"],
+)
+@app.get("/readyz", include_in_schema=False)
+async def readiness_probe():
+    """
+    Readiness probe: validates critical dependencies before routing traffic.
+    Returns HTTP 200 if all services are operational, HTTP 503 if any check fails.
+    """
+    import asyncio
+    checks: Dict[str, Any] = {}
+    is_ready = True
+
+    # 1. Database connection check
+    try:
+        db_status = await asyncio.wait_for(asyncio.to_thread(check_health), timeout=3.0)
+        checks["database"] = db_status
+        if db_status.get("status") != "healthy":
+            is_ready = False
+    except Exception as exc:
+        checks["database"] = {"status": "unhealthy", "error": str(exc)}
+        is_ready = False
+
+    # 2. Redis connectivity check
+    try:
+        from backend.core.redis import get_redis_client
+        redis_client = get_redis_client()
+        try:
+            pong = await asyncio.wait_for(redis_client.ping(), timeout=2.0)
+            checks["redis"] = {"status": "healthy" if pong else "unhealthy"}
+            if not pong:
+                is_ready = False
+        finally:
+            await redis_client.aclose()
+    except Exception as exc:
+        checks["redis"] = {"status": "unhealthy", "error": str(exc)}
+        is_ready = False
+
+    # 3. Disk space check (require at least 500 MB free)
+    try:
+        usage = shutil.disk_usage(os.getcwd())
+        free_mb = round(usage.free / (1024 * 1024), 2)
+        total_mb = round(usage.total / (1024 * 1024), 2)
+        disk_healthy = free_mb >= 500.0
+        checks["disk"] = {
+            "status": "healthy" if disk_healthy else "unhealthy",
+            "free_mb": free_mb,
+            "total_mb": total_mb,
+            "threshold_mb": 500.0,
+        }
+        if not disk_healthy:
+            is_ready = False
+    except Exception as exc:
+        checks["disk"] = {"status": "unhealthy", "error": str(exc)}
+        is_ready = False
+
+    return JSONResponse(
+        status_code=200 if is_ready else 503,
+        content={
+            "status": "ready" if is_ready else "not_ready",
+            "checks": checks,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    )
+
 
 @app.get(
     "/api/health",
