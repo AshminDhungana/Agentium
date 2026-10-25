@@ -120,13 +120,14 @@ class RegexDetector(PIIDetector):
 # ─── Built-in Regex Patterns ───
 
 EMAIL_PATTERNS = [
-    r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"
+    r"\b[\w.%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b"
 ]
 
 PHONE_PATTERNS = [
     r"\+?1?[-.\s]?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b",
     r"\+\d{1,3}[-.\s]?\d{1,4}[-.\s]?\d{1,4}[-.\s]?\d{1,9}\b",
     r"\b\d{3}[-.\s]?\d{3}[-.\s]?\d{4}\b",
+    r"\b\d{3}[-.\s]?\d{4}\b",  # 7-digit local format (e.g., 555-1234)
 ]
 
 SSN_PATTERNS = [
@@ -190,6 +191,30 @@ class CreditCardDetector(RegexDetector):
         return validated
 
 
+COMMON_NON_NAME_WORDS = {
+    "financial", "summary", "annual", "report", "internal", "external",
+    "document", "section", "system", "attached", "content", "status",
+    "model", "provider", "project", "guide", "general", "total",
+    "global", "united", "states", "invoice", "details", "chapter",
+    "table", "figure", "appendix", "index", "header", "footer",
+    "error", "warning", "notice", "alert", "service", "server",
+    "client", "database", "python", "javascript", "schema", "query",
+}
+
+
+class NameDetector(RegexDetector):
+    """Name detector with common document noun filtering to reduce false positives."""
+
+    def find_matches(self, text: str) -> List[PIIMatch]:
+        matches = super().find_matches(text)
+        validated = []
+        for m in matches:
+            words = [w.strip(".,;:!?").lower() for w in m.matched_text.split()]
+            if not any(w in COMMON_NON_NAME_WORDS for w in words):
+                validated.append(m)
+        return validated
+
+
 class PIIScrubber:
     """
     Main PII detection and redaction service.
@@ -204,10 +229,10 @@ class PIIScrubber:
         PIIType.EMAIL: RegexDetector(PIIType.EMAIL, EMAIL_PATTERNS),
         PIIType.PHONE: RegexDetector(PIIType.PHONE, PHONE_PATTERNS),
         PIIType.SSN: RegexDetector(PIIType.SSN, SSN_PATTERNS),
+        PIIType.NAME: NameDetector(PIIType.NAME, NAME_PATTERNS, flags=re.MULTILINE),  # Case-sensitive
         PIIType.API_KEY: RegexDetector(PIIType.API_KEY, API_KEY_PATTERNS),
         PIIType.PASSWORD: RegexDetector(PIIType.PASSWORD, PASSWORD_PATTERNS),
         PIIType.CREDIT_CARD: CreditCardDetector(PIIType.CREDIT_CARD, CREDIT_CARD_PATTERNS),
-        # Name detector disabled by default (high false positive rate)
     }
 
     def __init__(
@@ -263,6 +288,24 @@ class PIIScrubber:
         mode = mode or self.default_mode
         result = self.detect(text, types)
 
+        # If explicit types were provided but no PII detected, and text looks like a credential,
+        # create a match for the entire string (credential field context)
+        if not result.has_pii and types and text.strip():
+            credential_types = {PIIType.PASSWORD, PIIType.API_KEY}
+            if any(t in credential_types for t in types):
+                # Create a synthetic match for the entire string
+                from backend.core.pii_scrubber import PIIMatch
+                match = PIIMatch(
+                    pii_type=PIIType.PASSWORD,
+                    start=0,
+                    end=len(text),
+                    matched_text=text,
+                    confidence=0.9,
+                    metadata={"source": "credential_field_context"}
+                )
+                result.matches = [match]
+                result.has_pii = True
+
         if not result.has_pii:
             return text
 
@@ -293,20 +336,57 @@ class PIIScrubber:
                 result[key] = value
                 continue
 
-            if isinstance(value, str):
-                result[key] = self.redact(value, mode=mode)
-            elif isinstance(value, dict) and recurse:
-                result[key] = self.sanitize_dict(value, keys, mode, recurse)
-            elif isinstance(value, list) and recurse:
-                result[key] = [
-                    self.sanitize_dict(item, keys, mode, recurse) if isinstance(item, dict)
-                    else self.redact(item, mode=mode) if isinstance(item, str)
-                    else item
-                    for item in value
-                ]
-            else:
-                result[key] = value
+            result[key] = self._sanitize_value(value, key, keys, mode, recurse)
         return result
+
+    def _sanitize_value(
+        self,
+        value: Any,
+        key: Optional[str] = None,
+        keys: Optional[List[str]] = None,
+        mode: Optional[RedactionMode] = None,
+        recurse: bool = True
+    ) -> Any:
+        """Recursively sanitize a single value (dict, list, string, or other)."""
+        if isinstance(value, str):
+            # Determine PII types to check based on key name for credential detection
+            types = self._infer_types_from_key(key)
+            return self.redact(value, mode=mode, types=types)
+        elif isinstance(value, dict) and recurse:
+            return self.sanitize_dict(value, keys, mode, recurse)
+        elif isinstance(value, list) and recurse:
+            return [
+                self._sanitize_value(item, key, keys, mode, recurse)
+                for item in value
+            ]
+        else:
+            return value
+
+    def _infer_types_from_key(self, key: Optional[str]) -> Optional[List[PIIType]]:
+        """Infer PII types to check based on key name."""
+        if not key:
+            return None
+
+        key_lower = key.lower()
+        inferred_types = []
+
+        # Credential-related keys
+        if any(kw in key_lower for kw in ["password", "passwd", "pwd", "secret", "token", "auth"]):
+            inferred_types.extend([PIIType.PASSWORD, PIIType.API_KEY])
+        if any(kw in key_lower for kw in ["key", "api_key", "apikey", "access_key", "secret_key"]):
+            inferred_types.append(PIIType.API_KEY)
+        if "authorization" in key_lower or "auth" in key_lower:
+            inferred_types.extend([PIIType.PASSWORD, PIIType.API_KEY])
+        if "email" in key_lower:
+            inferred_types.append(PIIType.EMAIL)
+        if "phone" in key_lower or "tel" in key_lower:
+            inferred_types.append(PIIType.PHONE)
+        if "ssn" in key_lower or "social" in key_lower:
+            inferred_types.append(PIIType.SSN)
+        if "card" in key_lower or "credit" in key_lower:
+            inferred_types.append(PIIType.CREDIT_CARD)
+
+        return inferred_types if inferred_types else None
 
     def _build_replacement(
         self,

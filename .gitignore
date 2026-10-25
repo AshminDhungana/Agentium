@@ -60,3 +60,5 @@ CLAUDE.md
 
 # Runtime Generated
 docs_ministry/
+chroma_data/
+**/chroma_data/

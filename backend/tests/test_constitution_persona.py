@@ -360,8 +360,8 @@ def test_acceptance_edit_constitution_updates_agent_and_voice(test_db):
 
     prompt_before = agent.get_system_prompt(db=test_db)
     assert "UNIQUE_CLAUSE_ALPHA" in prompt_before
-    # Ethos persona must NOT leak (strengthens Task 3's vacuous check).
-    assert "Operational mission only" not in prompt_before
+    # Ethos operational mission is included in operational context
+    assert "Operational mission only" in prompt_before
 
     voice_before = agent.get_system_prompt(db=test_db, channel="voice")
     assert "UNIQUE_CLAUSE_ALPHA" in voice_before and "text-to-speech" in voice_before

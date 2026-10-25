@@ -141,8 +141,8 @@ def _run_guard(vs, monkeypatch, version, action, context):
     captured = {}
     orig_t2 = guard._tier2_check
 
-    async def _wrap(aid, act, ctx):
-        decision = await orig_t2(aid, act, ctx)
+    async def _wrap(aid, act, ctx, session_id=None):
+        decision = await orig_t2(aid, act, ctx, session_id)
         captured["sim"] = decision.tier_results.get("max_similarity")
         return decision
 

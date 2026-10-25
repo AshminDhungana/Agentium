@@ -3,7 +3,7 @@
 Persona is composed ENTIRELY from the active Constitution. No hardcoded
 persona strings live here — see spec §3, §5.
 """
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple, List
 
 FALLBACK_PERSONA = (
     "You are an AI agent operating within the Agentium governance system, "
@@ -198,3 +198,37 @@ def build_persona_directive(
 
     parts.append(f"<!-- persona built from Constitution {version} ({agentium_id}) -->")
     return "\n\n".join(parts)
+
+
+def build_system_prompt(
+    agent: Any,
+    db: Any = None,
+    channel: str = "text",
+    conversation_history: Optional[List[Dict[str, Any]]] = None,
+    task_context: Optional[Dict[str, Any]] = None,
+) -> Tuple[str, List[Dict[str, Any]], Dict[str, Any]]:
+    """Build a composite system prompt including persona, ethos, conversation history, and task context."""
+    base_prompt = agent.get_system_prompt(db=db, channel=channel)
+    parts = [base_prompt]
+
+    if conversation_history:
+        history_lines = ["# Conversation Context"]
+        for msg in conversation_history:
+            role = msg.get("role", "unknown")
+            content = msg.get("content", "")
+            if content:
+                history_lines.append(f"{role.capitalize()}: {content}")
+            for tc in msg.get("tool_calls", []):
+                history_lines.append(f"Tool Call ({tc.get('name')}): {tc.get('arguments')}")
+            if msg.get("tool_call_id") and role == "tool":
+                history_lines.append(f"Tool Result ({msg.get('tool_call_id')}): {content}")
+        parts.append("\n".join(history_lines))
+
+    if task_context:
+        ctx_lines = ["# Task Context"]
+        for k, v in task_context.items():
+            ctx_lines.append(f"- {k}: {v}")
+        parts.append("\n".join(ctx_lines))
+
+    full_prompt = "\n\n".join(parts)
+    return full_prompt, conversation_history or [], task_context or {}

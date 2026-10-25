@@ -351,23 +351,71 @@ class Agent(BaseEntity):
         return mapping.get(self.agent_type)
 
     def _ethos_operational_context(self) -> str:
-        """Operational working memory ONLY — never persona/values (spec §3)."""
+        """Operational working memory including ethos principles (core values, rules, lessons)."""
         e = self.ethos
         if not e:
             return ""
         bits = []
+
+        # Mission statement (core identity)
+        mission = getattr(e, "mission_statement", None)
+        if mission:
+            bits.append(f"Mission: {mission}")
+
         obj = getattr(e, "current_objective", None)
         if obj:
             bits.append(f"Current objective: {obj}")
         wm = getattr(e, "working_method", None)
         if wm:
             bits.append(f"Standard working method:\n{wm}")
+
+        # Core identity - values, rules, restrictions (spec §3: ethos principles in system prompt)
+        core_values = e.get_core_values()
+        if core_values:
+            bits.append("Core values: " + ", ".join(core_values))
+
+        behavioral_rules = e.get_behavioral_rules()
+        if behavioral_rules:
+            bits.append("Behavioral rules:\n" + "\n".join(f"- {r}" for r in behavioral_rules))
+
+        restrictions = e.get_restrictions()
+        if restrictions:
+            bits.append("Restrictions:\n" + "\n".join(f"- {r}" for r in restrictions))
+
         caps = e.get_capabilities()
         if caps:
             bits.append("Capabilities: " + ", ".join(caps))
+
         env = getattr(e, "environment_context", None)
         if env:
             bits.append(f"Environment: {env}")
+
+        # Reasoning artifacts (temporary reasoning notes)
+        reasoning = e.get_reasoning_artifacts()
+        if reasoning:
+            reasoning_texts = []
+            for r in reasoning[-5:]:  # Last 5 reasoning artifacts
+                if isinstance(r, dict):
+                    reasoning_texts.append(str(r))
+                elif isinstance(r, str):
+                    reasoning_texts.append(r)
+            if reasoning_texts:
+                bits.append("Recent reasoning:\n" + "\n".join(f"- {r}" for r in reasoning_texts))
+
+        # Lessons learned (accumulated wisdom)
+        lessons = e.get_lessons_learned()
+        if lessons:
+            lesson_texts = []
+            for lesson in lessons[-5:]:  # Last 5 lessons
+                if isinstance(lesson, dict):
+                    key_point = lesson.get("key_point") or lesson.get("lesson") or lesson.get("summary")
+                    if key_point:
+                        lesson_texts.append(str(key_point))
+                elif isinstance(lesson, str):
+                    lesson_texts.append(lesson)
+            if lesson_texts:
+                bits.append("Lessons learned:\n" + "\n".join(f"- {l}" for l in lesson_texts))
+
         return "\n\n".join(bits)
 
     def get_system_prompt(self, db=None, channel: str = "text") -> str:

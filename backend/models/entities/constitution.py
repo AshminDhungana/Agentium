@@ -146,6 +146,8 @@ class Constitution(BaseEntity):
             return json.loads(self.prohibited_actions) if self.prohibited_actions else []
         except json.JSONDecodeError:
             return []
+
+    get_prohibited_actions = get_prohibited_actions_list
     
     def get_sovereign_preferences(self) -> Dict[str, Any]:
         """Parse sovereign preferences to dictionary."""

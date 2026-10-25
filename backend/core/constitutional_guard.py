@@ -293,6 +293,9 @@ class ConstitutionalGuard:
 
         decision.tier_results["tier1"] = tier1.tier_results.get("tier1", "passed")
         decision.tier_results["tier2"] = tier2.tier_results.get("tier2", "skipped")
+        # Propagate max_similarity from tier2 for test visibility
+        if "max_similarity" in tier2.tier_results:
+            decision.tier_results["max_similarity"] = tier2.tier_results["max_similarity"]
 
         await self._log_decision(agent_id, action, decision)
         return decision
@@ -513,6 +516,15 @@ class ConstitutionalGuard:
                 or tier2.requires_vote
             ),
             affected_agents=tier1.affected_agents + tier2.affected_agents,
+        )
+
+    def get_active_constitution(self) -> Optional[Any]:
+        """Synchronously return the active Constitution entity from the database."""
+        from backend.models.entities.constitution import Constitution
+        return (
+            self.db.query(Constitution)
+            .filter(Constitution.is_active == True)
+            .first()
         )
 
     async def _get_active_constitution(self, session_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
