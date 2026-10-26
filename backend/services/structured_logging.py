@@ -125,6 +125,27 @@ def clear_context() -> None:
     task_id_var.set(None)
 
 
+import traceback
+from typing import Optional, Dict, Any
+
+def log_exception(
+    logger: "StructuredLogger",
+    message: str,
+    error: Exception,
+    context: Optional[Dict[str, Any]] = None,
+    **kwargs
+) -> None:
+    """Log exception with full diagnostic context."""
+    extra = {
+        "error_type": type(error).__name__,
+        "error_message": str(error),
+        "traceback": traceback.format_exc(),
+        "context": context or {},
+        **kwargs
+    }
+    log_structured(logger.logger, logging.ERROR, message, **extra)
+
+
 @contextmanager
 def structured_log_context(
     request_id: Optional[str] = None,
