@@ -288,7 +288,11 @@ def timed_step(logger: StructuredLogger, step: str, **kwargs):
 
 
 def structured_task(logger_name: Optional[str] = None):
-    """Decorator for Celery tasks to add structured logging with request_id propagation."""
+    """Decorator for Celery tasks to add structured logging with request_id propagation.
+
+    Preserves Celery task attributes (.delay, .apply_async, .s, etc.) by delegating
+    attribute access to the wrapped Celery task object.
+    """
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -311,6 +315,24 @@ def structured_task(logger_name: Optional[str] = None):
                     duration_ms = (time.perf_counter() - start) * 1000
                     logger.error(f"Task failed: {func.__name__}: {e}", step=func.__name__, duration_ms=duration_ms, status="failed", error=str(e))
                     raise
+
+        # Preserve Celery task attributes by delegating to the wrapped function
+        # This ensures .delay(), .apply_async(), .s(), etc. work on the decorated task
+        if hasattr(func, 'delay'):
+            wrapper.delay = func.delay
+        if hasattr(func, 'apply_async'):
+            wrapper.apply_async = func.apply_async
+        if hasattr(func, 's'):
+            wrapper.s = func.s
+        if hasattr(func, 'si'):
+            wrapper.si = func.si
+        if hasattr(func, 'retry'):
+            wrapper.retry = func.retry
+        if hasattr(func, 'apply'):
+            wrapper.apply = func.apply
+        if hasattr(func, 'AsyncResult'):
+            wrapper.AsyncResult = func.AsyncResult
+
         return wrapper
     return decorator
 
