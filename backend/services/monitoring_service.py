@@ -420,29 +420,30 @@ class MonitoringService:
         Background task: Every 5 minutes, checks all active agents for excessive violations
         or degraded health and escalates to the alert manager.
         """
-        from backend.services.alert_manager import AlertManager
-        
-        while True:
-            try:
-                with get_db_context() as db:
-                    alert_manager = AlertManager(db)
-                    
+        with timed_step(logger, "monitoring_constitutional_patrol"):
+            from backend.services.alert_manager import AlertManager
+
+            while True:
+                try:
+                    with get_db_context() as db:
+                        alert_manager = AlertManager(db)
+
                     # 1. Find agents with multiple open violations
                     critical_agents = db.query(Agent).filter(
                         Agent.status == "active"
                     ).all()
-                    
+
                     for agent in critical_agents:
                         open_violations = db.query(ViolationReport).filter_by(
                             violator_agent_id=agent.id,
                             status="open"
                         ).count()
-                        
+
                         if open_violations >= 3:
                             # Auto-suspend and alert
                             agent.status = "suspended"
                             db.commit()
-                            
+
                             alert = MonitoringAlert(
                                 alert_type="constitutional_patrol_suspension",
                                 severity=ViolationSeverity.CRITICAL,
@@ -453,11 +454,11 @@ class MonitoringService:
                             db.add(alert)
                             db.commit()
                             await alert_manager.dispatch_alert(alert)
-                            
-            except Exception as e:
-                logger.error(f"Error in constitutional_patrol loop: {e}")
-                
-            await asyncio.sleep(300)  # Every 5 minutes
+
+                except Exception as e:
+                    logger.error(f"Error in constitutional_patrol loop: {e}")
+
+                await asyncio.sleep(300)  # Every 5 minutes
 
     @staticmethod
     async def stale_task_detector():

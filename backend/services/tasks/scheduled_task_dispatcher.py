@@ -33,12 +33,13 @@ from backend.models.entities.scheduled_task import (
 from backend.models.entities.task import Task, TaskPriority, TaskStatus, TaskType
 from backend.services.scheduling.cron_due import utc_now
 
-from backend.services.structured_logging import get_structured_logger
+from backend.services.structured_logging import get_structured_logger, get_request_id, timed_step
 logger = get_structured_logger(__name__)
 def _claim(row, db) -> bool:
     """Optimistic CAS claim: only the worker whose conditional UPDATE matches
     (rowcount == 1) wins the row; an already-RUNNING row is never double-fired."""
-    stmt = (
+    with timed_step(logger, "scheduler_claim_task", scheduled_task_id=row.id):
+        stmt = (
         update(ScheduledTask)
         .where(
             ScheduledTask.id == row.id,
@@ -51,9 +52,10 @@ def _claim(row, db) -> bool:
 def _allocate_task_id(db) -> str:
     """Allocate the next T##### id using the PASSED session (Postgres regex).
     Tests monkeypatch this to a fixed id so no second DB connection is opened."""
-    from sqlalchemy import text
+    with timed_step(logger, "scheduler_allocate_task_id"):
+        from sqlalchemy import text
 
-    row = db.execute(text(
+        row = db.execute(text(
         "SELECT agentium_id FROM tasks WHERE agentium_id ~ '^T[0-9]+$' "
         "ORDER BY CAST(SUBSTRING(agentium_id FROM 2) AS INTEGER) DESC LIMIT 1"
     )).scalar()
@@ -61,9 +63,10 @@ def _allocate_task_id(db) -> str:
 
 def _submit_execution(task_id: str, agent_id: str) -> None:
     """Enqueue the task for the TaskExecutor worker. Monkeypatchable in tests."""
-    from backend.services.tasks.task_executor import execute_task_async
+    with timed_step(logger, "scheduler_submit_execution", task_id=task_id, agent_id=agent_id):
+        from backend.services.tasks.task_executor import execute_task_async
 
-    execute_task_async.delay(task_id, agent_id)
+        execute_task_async.delay(task_id, agent_id, _request_id=get_request_id())
 
 def create_and_dispatch_task(
     db,
@@ -77,7 +80,8 @@ def create_and_dispatch_task(
     agent_id: str = "",
 ) -> Task:
     """Build a Task, route it through the legal state machine, enqueue it."""
-    task_type = task_type or TaskType.EXECUTION
+    with timed_step(logger, "scheduler_create_and_dispatch_task", agent_id=agent_id, note_fragment=note_fragment):
+        task_type = task_type or TaskType.EXECUTION
     priority = priority or TaskPriority.NORMAL
     # execution_context is a Text column; the codebase-wide convention is to
     # store a JSON string (see federation_service / e2e task tests), never a
@@ -106,9 +110,10 @@ def create_and_dispatch_task(
     return task
 
 def _record_execution(db, row, success: bool, task_id: str = None, error: str = None) -> None:
-    import uuid
+    with timed_step(logger, "scheduler_record_execution", scheduled_task_id=row.id, success=success):
+        import uuid
 
-    record = ScheduledTaskExecution(
+        record = ScheduledTaskExecution(
         # agentium_id is NOT NULL on BaseEntity and not auto-populated here.
         agentium_id=f"SE{uuid.uuid4().int & 0xFFFFFF:06X}",
         scheduled_task_id=row.id,
@@ -123,7 +128,8 @@ def _record_execution(db, row, success: bool, task_id: str = None, error: str = 
     db.add(record)
 
 def _audit(db, row, *, action: str, level, description: str, after_state: dict) -> None:
-    entry = AuditLog.log(
+    with timed_step(logger, "scheduler_audit", action=action, level=level.value if hasattr(level, 'value') else str(level)):
+        entry = AuditLog.log(
         level=level,
         category=AuditCategory.TASK,
         actor_type="system",
@@ -138,7 +144,8 @@ def _audit(db, row, *, action: str, level, description: str, after_state: dict) 
 
 def _dispatch_one(db, row) -> None:
     """Claim-and-dispatch a single due row. Raises RuntimeError on enqueue failure."""
-    if not _claim(row, db):
+    with timed_step(logger, "scheduler_dispatch_one", scheduled_task_id=row.id, scheduled_task_agentium_id=row.agentium_id):
+        if not _claim(row, db):
         return
 
     payload = row.get_task_payload() or {}
@@ -189,7 +196,8 @@ def _dispatch_one(db, row) -> None:
 
 def _sweep(db) -> dict:
     """Sweep all due ACTIVE rows and dispatch each. Callable from tests without a broker."""
-    now = utc_now()
+    with timed_step(logger, "scheduler_sweep_due_tasks"):
+        now = utc_now()
     cron_due = and_(
         ScheduledTask.run_once.is_(False),
         ScheduledTask.next_execution_at.isnot(None),
@@ -221,9 +229,10 @@ def _sweep(db) -> dict:
 @celery_app.task(name="agentium.tasks.task_executor.dispatch_due_scheduled_tasks")
 def dispatch_due_scheduled_tasks():
     """Beat entry (every 15s): dispatch all due scheduled tasks exactly once."""
-    from backend.services.tasks.task_executor import get_task_db
+    with timed_step(logger, "scheduler_dispatch_due_tasks"):
+        from backend.services.tasks.task_executor import get_task_db
 
-    with get_task_db() as db:
+        with get_task_db() as db:
         try:
             return _sweep(db)
         except Exception as exc:

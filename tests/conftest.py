@@ -3,6 +3,20 @@ import subprocess
 import time
 import sys
 import os
+
+# ─── CRITICAL: Set test environment variables BEFORE any backend imports ───
+# This prevents backend.models.database from creating an engine with the default
+# production DATABASE_URL (postgresql://agentium:agentium@postgres:5432/agentium)
+# during test collection, before fixtures run.
+os.environ["DATABASE_URL"] = "postgresql://agentium:agentium@localhost:5432/agentium_test"
+os.environ["MINIO_ROOT_USER"] = "testuser"
+os.environ["MINIO_ROOT_PASSWORD"] = "testpassword"
+os.environ["REDIS_URL"] = "redis://localhost:6379/0"
+os.environ["CELERY_BROKER_URL"] = "redis://localhost:6379/0"
+os.environ["CELERY_RESULT_BACKEND"] = "redis://localhost:6379/0"
+os.environ["CHROMA_HOST"] = "localhost"
+os.environ["CHROMA_PORT"] = "8001"
+
 import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session
@@ -23,7 +37,7 @@ from backend.models.entities import Base
 def docker_services():
     """Start postgres, redis, minio, chromadb via docker-compose.test.yml"""
     subprocess.run(
-        ["docker", "compose", "-f", "docker-compose.test.yml", "up", "-d"],
+        ["docker", "compose", "-f", "docker-compose.test.yml", "-p", "agentium-test", "up", "-d"],
         check=True,
         capture_output=True,
     )
@@ -31,7 +45,7 @@ def docker_services():
     _wait_for_healthchecks()
     yield
     subprocess.run(
-        ["docker", "compose", "-f", "docker-compose.test.yml", "down", "-v"],
+        ["docker", "compose", "-f", "docker-compose.test.yml", "-p", "agentium-test", "down", "-v"],
         check=True,
         capture_output=True,
     )
@@ -39,12 +53,12 @@ def docker_services():
 
 def _wait_for_healthchecks(timeout: int = 60):
     """Wait for all docker-compose.test.yml services to report healthy."""
-    # Only check the 4 test services defined in docker-compose.test.yml
-    required_services = {"postgres", "redis", "chromadb", "minio"}
+    # Only check the 3 test services defined in docker-compose.test.yml (minio intentionally omitted)
+    required_services = {"postgres", "redis", "chromadb"}
     start = time.time()
     while time.time() - start < timeout:
         result = subprocess.run(
-            ["docker", "compose", "-f", "docker-compose.test.yml", "ps", "--format", "json"],
+            ["docker", "compose", "-f", "docker-compose.test.yml", "-p", "agentium-test", "ps", "--format", "json"],
             capture_output=True,
             text=True,
         )
@@ -69,6 +83,7 @@ def db_engine(docker_services):
     # Run Alembic migrations to create schema
     alembic_cfg = Config(os.path.join(PROJECT_ROOT, "backend", "alembic.ini"))
     alembic_cfg.set_main_option("sqlalchemy.url", database_url)
+    alembic_cfg.set_main_option("script_location", os.path.join(PROJECT_ROOT, "backend", "alembic"))
     command.upgrade(alembic_cfg, "head")
     
     yield engine

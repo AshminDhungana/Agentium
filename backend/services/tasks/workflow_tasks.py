@@ -94,15 +94,20 @@ def fire_reminder(self, message: str, workflow_id: str = None):
     name="agentium.tasks.workflow_tasks.execute_deferred_subtask",
 )
 def execute_deferred_subtask(
-    self, workflow_id: str, intent: str, params: dict
+    self, workflow_id: str, intent: str, params: dict, _request_id: str = None
 ):
     """
     Execute a workflow sub-task that was deferred (e.g. 2-week follow-up).
     Runs the tool synchronously in a fresh event loop inside the worker,
     then updates the WorkflowSubTask record.
     """
+    from backend.services.structured_logging import set_request_id
     from datetime import datetime
     import backend.services.workflow_tools as workflow_tools
+
+    # Set correlation ID for structured logging
+    if _request_id:
+        set_request_id(_request_id)
 
     logger.info(
         f"[execute_deferred_subtask] Running '{intent}' "

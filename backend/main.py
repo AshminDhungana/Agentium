@@ -109,6 +109,7 @@ from backend.core.security_middleware import (
 from backend.core.middleware import RateLimitMiddleware
 from backend.core.observer_middleware import ObserverReadOnlyMiddleware
 from backend.core.timing_middleware import TimingMiddleware
+from backend.core.request_logging_middleware import RequestLoggingMiddleware
 from backend.services.structured_logging import setup_structured_logging
 from backend.core.correlation_middleware import CorrelationIdMiddleware
 
@@ -603,7 +604,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Correlation ID middleware - must be early to wrap entire request lifecycle
+# Request logging middleware - logs requests with correlation IDs
+app.add_middleware(RequestLoggingMiddleware)
+
+# Correlation ID middleware - must be added LAST to run FIRST on request (set contextvar early)
 app.add_middleware(CorrelationIdMiddleware)
 
 try:

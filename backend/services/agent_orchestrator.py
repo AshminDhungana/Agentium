@@ -38,7 +38,7 @@ from backend.services.clarification_service import ClarificationService
 from backend.tools.browser_router import should_use_stealth_browser_with_runtime, register_stealth_domain
 from backend.services.prompt_template_manager import prompt_template_manager
 
-from backend.services.structured_logging import get_structured_logger, timed_step, set_agent_id, set_task_id
+from backend.services.structured_logging import get_structured_logger, timed_step, structured_log_context
 
 logger = get_structured_logger(__name__)
 
@@ -114,73 +114,75 @@ class AgentOrchestrator:
         a "resume from checkpoint" system prompt (max 3 attempts, tracked in
         task.execution_context["stalled_resume_count"]).
         """
-        # ── Resolve resume-attempt counter from task context ──────────────────
-        exec_ctx_raw = getattr(task, "execution_context", None)
-        if isinstance(exec_ctx_raw, str):
-            try:
-                exec_ctx = json.loads(exec_ctx_raw)
-            except json.JSONDecodeError:
-                exec_ctx = {}
-        elif isinstance(exec_ctx_raw, dict):
-            exec_ctx = exec_ctx_raw
-        else:
-            exec_ctx = {}
-        resume_count = exec_ctx.get("stalled_resume_count", 0)
-
-        max_retries = 3
-        for attempt in range(resume_count, max_retries):
-            try:
-                return await self._execute_task_inner(
-                    task, agent, db,
-                    resume_hint=(
-                        f"RESUME FROM CHECKPOINT (attempt {attempt + 1}/{max_retries}): "
-                        "Your previous reasoning trace stalled. Summarise what was completed so far, "
-                        "identify the next required step, and continue execution from there."
-                    ) if attempt > 0 else None,
-                )
-            except StalledReasoningError as stall_exc:
-                logger.warning(
-                    f"execute_task: StalledReasoningError for task={getattr(task, 'agentium_id', '?')} agent={agent.agentium_id} (attempt {attempt + 1}/{max_retries}): {stall_exc}",
-                    task_id=getattr(task, "agentium_id", "?"), agent_id=agent.agentium_id,
-                    attempt=attempt + 1, max_retries=max_retries, status="stalled",
-                )
-
-                # Persist updated resume count before re-attempting or giving up
-                exec_ctx["stalled_resume_count"] = attempt + 1
-                try:
-                    task.execution_context = json.dumps(exec_ctx)
-                    db.commit()
-                except Exception:
-                    pass
-
-                if attempt >= max_retries - 1:
-                    logger.error(
-                        f"execute_task: max stall retries ({max_retries}) reached for task={getattr(task, 'agentium_id', '?')} — giving up.",
-                        task_id=getattr(task, "agentium_id", "?"), agent_id=agent.agentium_id,
-                        status="max_retries_exceeded",
-                    )
-                    # Compress ethos one last time before giving up
+        with structured_log_context(step="execute_task", agent_id=agent.agentium_id, task_id=getattr(task, "agentium_id", "?")):
+            with timed_step(logger, "execute_task", agent_id=agent.agentium_id, task_id=getattr(task, "agentium_id", "?")):
+                # ── Resolve resume-attempt counter from task context ──────────────────
+                exec_ctx_raw = getattr(task, "execution_context", None)
+                if isinstance(exec_ctx_raw, str):
                     try:
-                        agent.compress_ethos(db)
-                    except Exception as compress_exc:
-                        logger.warning(f"execute_task: ethos compression failed: {compress_exc}", error=str(compress_exc))
-                    raise
+                        exec_ctx = json.loads(exec_ctx_raw)
+                    except json.JSONDecodeError:
+                        exec_ctx = {}
+                elif isinstance(exec_ctx_raw, dict):
+                    exec_ctx = exec_ctx_raw
+                else:
+                    exec_ctx = {}
+                resume_count = exec_ctx.get("stalled_resume_count", 0)
 
-                # Compress ethos to shed bloat accumulated before the stall
-                try:
-                    agent.compress_ethos(db)
-                except Exception as compress_exc:
-                    logger.warning(f"execute_task: ethos compression failed: {compress_exc}", error=str(compress_exc))
+                max_retries = 3
+                for attempt in range(resume_count, max_retries):
+                    try:
+                        return await self._execute_task_inner(
+                            task, agent, db,
+                            resume_hint=(
+                                f"RESUME FROM CHECKPOINT (attempt {attempt + 1}/{max_retries}): "
+                                "Your previous reasoning trace stalled. Summarise what was completed so far, "
+                                "identify the next required step, and continue execution from there."
+                            ) if attempt > 0 else None,
+                        )
+                    except StalledReasoningError as stall_exc:
+                        logger.warning(
+                            f"execute_task: StalledReasoningError for task={getattr(task, 'agentium_id', '?')} agent={agent.agentium_id} (attempt {attempt + 1}/{max_retries}): {stall_exc}",
+                            task_id=getattr(task, "agentium_id", "?"), agent_id=agent.agentium_id,
+                            attempt=attempt + 1, max_retries=max_retries, status="stalled",
+                        )
 
-                logger.info(
-                    f"execute_task: resuming task={getattr(task, 'agentium_id', '?')} (attempt {attempt + 1}/{max_retries}) from checkpoint.",
-                    task_id=getattr(task, "agentium_id", "?"), agent_id=agent.agentium_id,
-                    attempt=attempt + 1, max_retries=max_retries, status="resuming",
-                )
-                # Loop continues to next attempt
+                        # Persist updated resume count before re-attempting or giving up
+                        exec_ctx["stalled_resume_count"] = attempt + 1
+                        try:
+                            task.execution_context = json.dumps(exec_ctx)
+                            db.commit()
+                        except Exception:
+                            pass
 
-        # Should never reach here
-        raise StalledReasoningError("Max retries exceeded")
+                        if attempt >= max_retries - 1:
+                            logger.error(
+                                f"execute_task: max stall retries ({max_retries}) reached for task={getattr(task, 'agentium_id', '?')} — giving up.",
+                                task_id=getattr(task, "agentium_id", "?"), agent_id=agent.agentium_id,
+                                status="max_retries_exceeded",
+                            )
+                            # Compress ethos one last time before giving up
+                            try:
+                                agent.compress_ethos(db)
+                            except Exception as compress_exc:
+                                logger.warning(f"execute_task: ethos compression failed: {compress_exc}", error=str(compress_exc))
+                            raise
+
+                        # Compress ethos to shed bloat accumulated before the stall
+                        try:
+                            agent.compress_ethos(db)
+                        except Exception as compress_exc:
+                            logger.warning(f"execute_task: ethos compression failed: {compress_exc}", error=str(compress_exc))
+
+                        logger.info(
+                            f"execute_task: resuming task={getattr(task, 'agentium_id', '?')} (attempt {attempt + 1}/{max_retries}) from checkpoint.",
+                            task_id=getattr(task, "agentium_id", "?"), agent_id=agent.agentium_id,
+                            attempt=attempt + 1, max_retries=max_retries, status="resuming",
+                        )
+                        # Loop continues to next attempt
+
+                # Should never reach here
+                raise StalledReasoningError("Max retries exceeded")
 
     async def _execute_task_inner(
         self,
@@ -291,164 +293,166 @@ class AgentOrchestrator:
         Process intent and route to appropriate agent.
         Includes tool detection, metrics recording, and circuit breaker checks.
         """
-        start = datetime.utcnow()
-        start_mono = time.monotonic()
+        with structured_log_context(step="process_intent", agent_id=source_id):
+            with timed_step(logger, "process_intent", agent_id=source_id):
+                start = datetime.utcnow()
+                start_mono = time.monotonic()
 
-        # CRITICAL: Wake from idle on any user activity
-        token_optimizer.record_activity()
+                # CRITICAL: Wake from idle on any user activity
+                token_optimizer.record_activity()
 
-        # Validate source
-        source = self._get_agent(source_id)
-        if not source:
-            self._record_metric(source_id, success=False)
-            return RouteResult(success=False, message_id="", error=f"Agent {source_id} not found")
+                # Validate source
+                source = self._get_agent(source_id)
+                if not source:
+                    self._record_metric(source_id, success=False)
+                    return RouteResult(success=False, message_id="", error=f"Agent {source_id} not found")
 
-        # --- Circuit breaker check ---
-        recipient = target_id or self._get_parent_id(source_id)
-        cb_result = self._check_circuit_breaker(recipient)
-        if cb_result is not None:
-            self._record_metric(source_id, success=False)
-            return cb_result
+                # --- Circuit breaker check ---
+                recipient = target_id or self._get_parent_id(source_id)
+                cb_result = self._check_circuit_breaker(recipient)
+                if cb_result is not None:
+                    self._record_metric(source_id, success=False)
+                    return cb_result
 
-        # --- Constitutional Guard Check ---
-        decision = await self.guard.check_action(
-            agent_id=source_id,
-            action="process_intent",
-            context={"raw_input": raw_input, "target_id": target_id}
-        )
+                # --- Constitutional Guard Check ---
+                decision = await self.guard.check_action(
+                    agent_id=source_id,
+                    action="process_intent",
+                    context={"raw_input": raw_input, "target_id": target_id}
+                )
 
-        if decision.verdict == Verdict.BLOCK:
-            await self._log(
-                source_id,
-                "constitutional_violation",
-                f"Blocked action: {decision.explanation}",
-                AuditLevel.CRITICAL
-            )
-            self._record_metric(source_id, success=False)
-            return RouteResult(
-                success=False,
-                message_id="",
-                error=f"Constitutional Violation: {decision.explanation}"
-            )
+                if decision.verdict == Verdict.BLOCK:
+                    await self._log(
+                        source_id,
+                        "constitutional_violation",
+                        f"Blocked action: {decision.explanation}",
+                        AuditLevel.CRITICAL
+                    )
+                    self._record_metric(source_id, success=False)
+                    return RouteResult(
+                        success=False,
+                        message_id="",
+                        error=f"Constitutional Violation: {decision.explanation}"
+                    )
 
-        elif decision.verdict == Verdict.VOTE_REQUIRED:
-            await self._log(
-                source_id,
-                "constitutional_vote_required",
-                f"Vote required: {decision.explanation}",
-                AuditLevel.WARNING
-            )
-            return RouteResult(
-                success=False,
-                message_id="",
-                error=f"Action requires Council Vote: {decision.explanation}"
-            )
+                elif decision.verdict == Verdict.VOTE_REQUIRED:
+                    await self._log(
+                        source_id,
+                        "constitutional_vote_required",
+                        f"Vote required: {decision.explanation}",
+                        AuditLevel.WARNING
+                    )
+                    return RouteResult(
+                        success=False,
+                        message_id="",
+                        error=f"Action requires Council Vote: {decision.explanation}"
+                    )
 
-        # ── Unified decision layer (all tiers) ───────────────────────────────
-        try:
-            decision = await DecisionEngine().decide(source, raw_input, self.db)
-        except Exception as exc:
-            logger.warning(f"DecisionEngine failed in process_intent: {exc}", error=str(exc), source_id=source_id)
-            decision = None
-        if decision is not None and decision.action in (
-            DecisionAction.CREATE_TASK, DecisionAction.SPAWN_AGENT,
-            DecisionAction.DISPATCH_TASK, DecisionAction.VOTE, DecisionAction.DELEGATE,
-        ):
-            return await self._execute_decision(decision, source, raw_input, start)
+                # ── Unified decision layer (all tiers) ───────────────────────────────
+                try:
+                    decision = await DecisionEngine().decide(source, raw_input, self.db)
+                except Exception as exc:
+                    logger.warning(f"DecisionEngine failed in process_intent: {exc}", error=str(exc), source_id=source_id)
+                    decision = None
+                if decision is not None and decision.action in (
+                    DecisionAction.CREATE_TASK, DecisionAction.SPAWN_AGENT,
+                    DecisionAction.DISPATCH_TASK, DecisionAction.VOTE, DecisionAction.DELEGATE,
+                ):
+                    return await self._execute_decision(decision, source, raw_input, start)
 
-        # Check if message is a tool execution command
-        tool_detection = self._detect_tool_intent(raw_input, source_id)
-        if tool_detection["is_tool_command"]:
-            return await self._execute_tool_directly(tool_detection, source_id, start)
+                # Check if message is a tool execution command
+                tool_detection = self._detect_tool_intent(raw_input, source_id)
+                if tool_detection["is_tool_command"]:
+                    return await self._execute_tool_directly(tool_detection, source_id, start)
 
-        # Check if message is a tool creation request (meta-tool)
-        if self._detect_tool_creation_intent(raw_input, source_id):
-            return await self._handle_tool_creation_request(raw_input, source_id, start)
+                # Check if message is a tool creation request (meta-tool)
+                if self._detect_tool_creation_intent(raw_input, source_id):
+                    return await self._handle_tool_creation_request(raw_input, source_id, start)
 
-        # ── Governance command fast-path (all tiers) ───────────────────────────
-        # Explicit provisioning directives are executed by the *issuing* agent
-        # according to its own authority. On no authority we fall through to
-        # normal hierarchical routing so the message is not silently dropped.
-        # Critics (7/8/9) are infrastructure, not governance actors: never treat
-        # their review output as a directive. For other tiers the directive must
-        # START the message (require_prefix) so prose like "recommend we create a
-        # task ..." inside a task output / critic review is NOT mis-executed.
-        source_tier = source_id[0] if (source_id and source_id[0].isdigit()) else ""
-        if source_tier not in ("7", "8", "9"):
-            from backend.services.governance_command_service import GovernanceCommandService
-            gov_command = GovernanceCommandService.detect_command(raw_input, require_prefix=True)
-            if gov_command:
-                source_agent = self._get_agent(source_id)
-                if source_agent is not None:
-                    try:
-                        gov_result = GovernanceCommandService.execute(
-                            gov_command, source_agent, self.db
-                        )
-                        await self._log(
-                            actor=source_id,
-                            action=gov_result["action"],
-                            desc=f"Governance command executed: "
-                                 f"{gov_result.get('agentium_id') or gov_result.get('task_id')}",
-                            level=AuditLevel.INFO,
-                        )
-                        return RouteResult(
-                            success=True,
-                            message_id=f"gov_{gov_result['action']}_{datetime.utcnow().timestamp()}",
-                            path_taken=[source_id],
-                            constitutional_basis=[f"Governance command by {source_id}"],
-                            metadata=gov_result,
-                        )
-                    except PermissionError as pe:
-                        logger.warning(f"Governance command rejected (no authority): {pe}", error=str(pe), source_id=source_id, action="governance_command")
-                        # Fall through to normal routing below.
+                # ── Governance command fast-path (all tiers) ───────────────────────────
+                # Explicit provisioning directives are executed by the *issuing* agent
+                # according to its own authority. On no authority we fall through to
+                # normal hierarchical routing so the message is not silently dropped.
+                # Critics (7/8/9) are infrastructure, not governance actors: never treat
+                # their review output as a directive. For other tiers the directive must
+                # START the message (require_prefix) so prose like "recommend we create a
+                # task ..." inside a task output / critic review is NOT mis-executed.
+                source_tier = source_id[0] if (source_id and source_id[0].isdigit()) else ""
+                if source_tier not in ("7", "8", "9"):
+                    from backend.services.governance_command_service import GovernanceCommandService
+                    gov_command = GovernanceCommandService.detect_command(raw_input, require_prefix=True)
+                    if gov_command:
+                        source_agent = self._get_agent(source_id)
+                        if source_agent is not None:
+                            try:
+                                gov_result = GovernanceCommandService.execute(
+                                    gov_command, source_agent, self.db
+                                )
+                                await self._log(
+                                    actor=source_id,
+                                    action=gov_result["action"],
+                                    desc=f"Governance command executed: "
+                                         f"{gov_result.get('agentium_id') or gov_result.get('task_id')}",
+                                    level=AuditLevel.INFO,
+                                )
+                                return RouteResult(
+                                    success=True,
+                                    message_id=f"gov_{gov_result['action']}_{datetime.utcnow().timestamp()}",
+                                    path_taken=[source_id],
+                                    constitutional_basis=[f"Governance command by {source_id}"],
+                                    metadata=gov_result,
+                                )
+                            except PermissionError as pe:
+                                logger.warning(f"Governance command rejected (no authority): {pe}", error=str(pe), source_id=source_id, action="governance_command")
+                                # Fall through to normal routing below.
 
-        # Determine target
-        if not recipient:
-            self._record_metric(source_id, success=False)
-            return RouteResult(
-                success=False,
-                message_id="",
-                error=f"Cannot route: no recipient resolved for {source_id}",
-            )
-        direction = self._get_direction(source_id, recipient)
+                # Determine target
+                if not recipient:
+                    self._record_metric(source_id, success=False)
+                    return RouteResult(
+                        success=False,
+                        message_id="",
+                        error=f"Cannot route: no recipient resolved for {source_id}",
+                    )
+                direction = self._get_direction(source_id, recipient)
 
-        # Create message
-        msg = AgentMessage(
-            sender_id=source_id,
-            recipient_id=recipient,
-            content=raw_input,
-            message_type="intent",
-            route_direction=direction
-        )
+                # Create message
+                msg = AgentMessage(
+                    sender_id=source_id,
+                    recipient_id=recipient,
+                    content=raw_input,
+                    message_type="intent",
+                    route_direction=direction
+                )
 
-        # Validate hierarchy
-        if not HierarchyValidator.can_route(source_id, recipient, direction):
-            await self._log(source_id, "routing_violation", f"Attempted {direction} to {recipient}", AuditLevel.WARNING)
-            self._record_metric(source_id, success=False)
-            return RouteResult(success=False, message_id=msg.message_id, error="Hierarchy violation")
+                # Validate hierarchy
+                if not HierarchyValidator.can_route(source_id, recipient, direction):
+                    await self._log(source_id, "routing_violation", f"Attempted {direction} to {recipient}", AuditLevel.WARNING)
+                    self._record_metric(source_id, success=False)
+                    return RouteResult(success=False, message_id=msg.message_id, error="Hierarchy violation")
 
-        # Enrich and route
-        msg = await self.enrich_with_context(msg)
+                # Enrich and route
+                msg = await self.enrich_with_context(msg)
 
-        if direction == "up":
-            result = await self._route_up_with_tools(msg)
-        elif direction == "down":
-            result = await self._route_down_with_tools(msg)
-        else:
-            result = await self.message_bus.publish(msg) if self.message_bus else RouteResult(
-                success=False, message_id=msg.message_id,
-                error="MessageBus not configured",
-            )
+                if direction == "up":
+                    result = await self._route_up_with_tools(msg)
+                elif direction == "down":
+                    result = await self._route_down_with_tools(msg)
+                else:
+                    result = await self.message_bus.publish(msg) if self.message_bus else RouteResult(
+                        success=False, message_id=msg.message_id,
+                        error="MessageBus not configured",
+                    )
 
-        latency_ms = (time.monotonic() - start_mono) * 1000
-        result.latency_ms = latency_ms
+                latency_ms = (time.monotonic() - start_mono) * 1000
+                result.latency_ms = latency_ms
 
-        self._record_metric(source_id, success=result.success, latency_ms=latency_ms)
-        self._update_circuit_breaker(recipient, success=result.success)
+                self._record_metric(source_id, success=result.success, latency_ms=latency_ms)
+                self._update_circuit_breaker(recipient, success=result.success)
 
-        await self._broadcast_orchestration_event(msg, result)
+                await self._broadcast_orchestration_event(msg, result)
 
-        return result
+                return result
 
     async def _execute_decision(self, decision, source_agent, raw_input: str, start):
         from backend.services.governance_command_service import GovernanceCommandService
@@ -853,150 +857,152 @@ class AgentOrchestrator:
         5. REJECT  → retry (critics persist — same instances review the retry).
         6. ESCALATE → terminate critics, escalate to Council.
         """
-        token_optimizer.record_activity()
+        with structured_log_context(step="delegate_to_task", agent_id=lead_id, task_id=task.get("id", "?")):
+            with timed_step(logger, "delegate_to_task", agent_id=lead_id, task_id=task.get("id", "?")):
+                token_optimizer.record_activity()
 
-        if not task_id:
-            task_id = target_task_agent_id or await self._find_available_task(lead_id)
+                if not task_id:
+                    task_id = target_task_agent_id or await self._find_available_task(lead_id)
 
-        if not task_id:
-            # No Task Agent is a direct subordinate of this Lead. This is the
-            # classic "sync gap": a capable Task Agent (e.g. an auto-scaled one
-            # parented to the Head, or a freshly spawned agent) exists in the
-            # roster but is not bound to this Lead's subordinate pool, so the
-            # dispatcher reports "No Task Agent available". Recover instead of
-            # failing: reuse any active Task Agent in the system, and only spawn
-            # a new one if the system genuinely has none.
-            task_id = await self._ensure_task_agent(lead_id)
+                if not task_id:
+                    # No Task Agent is a direct subordinate of this Lead. This is the
+                    # classic "sync gap": a capable Task Agent (e.g. an auto-scaled one
+                    # parented to the Head, or a freshly spawned agent) exists in the
+                    # roster but is not bound to this Lead's subordinate pool, so the
+                    # dispatcher reports "No Task Agent available". Recover instead of
+                    # failing: reuse any active Task Agent in the system, and only spawn
+                    # a new one if the system genuinely has none.
+                    task_id = await self._ensure_task_agent(lead_id)
 
-        if not task_id:
-            return RouteResult(success=False, message_id="", error="No Task Agent available")
+                if not task_id:
+                    return RouteResult(success=False, message_id="", error="No Task Agent available")
 
-        db_task_id = task.get("id") or task_id
-        task_type_str = (task.get("task_type") or task.get("type") or "general")
+                db_task_id = task.get("id") or task_id
+                task_type_str = (task.get("task_type") or task.get("type") or "general")
 
-        # Step 1: Spawn critics on the first attempt (retry_count == 0).
-        # On retries the critics already exist (tracked by current_task_id).
-        if retry_count == 0:
-            spawned = await critic_service.spawn_critics_for_task(
-                db=self.db,
-                task_id=db_task_id,
-                task_type=task_type_str,
-                parent_agent_id=lead_id,
-            )
-            if spawned:
-                logger.info(
-                    f"Spawned critics for task {db_task_id}: {spawned}",
-                    task_id=db_task_id, lead_id=lead_id, spawned_critics=spawned, status="critics_spawned"
-                )
-            else:
-                logger.warning(
-                    f"No critics spawned for task {db_task_id} (type={task_type_str}) — review will auto-pass",
-                    task_id=db_task_id, task_type=task_type_str, status="no_critics"
-                )
-
-        # Step 2: Build and route the message to the Task Agent
-        msg = AgentMessage(
-            sender_id=lead_id,
-            recipient_id=task_id,
-            message_type="delegation",
-            content=task.get("description", ""),
-            payload=task,
-            route_direction="down",
-        )
-
-        if self.vector_store:
-            patterns = self.vector_store.get_collection("task_patterns").query(
-                query_texts=[task.get("description", "")],
-                n_results=3,
-            )
-            msg.rag_context = {"patterns": patterns}
-
-        result = await self.message_bus.route_down(msg)
-
-        await self._log(
-            actor=lead_id,
-            action="task_delegation",
-            desc=f"Assigned task to {task_id} with tools: {task.get('allowed_tools', 'default')}",
-            target=task_id,
-        )
-
-        # Step 3: Extract output and run all critics
-        output_content = ""
-        if result.success:
-            _meta = getattr(result, "metadata", None) or {}
-            output_content = (
-                _meta.get("output")
-                or _meta.get("result")
-                or ""
-            )
-
-        if result.success and output_content:
-            review = await critic_service.review_with_all_task_critics(
-                db=self.db,
-                task_id=db_task_id,
-                output_content=output_content,
-                task_type=task_type_str,
-                retry_count=retry_count,
-            )
-
-            verdict = review.get("verdict")
-            blocking_type = review.get("blocking_critic_type", "output")
-
-            await self._log(
-                actor=lead_id,
-                action=f"critic_review_{verdict}",
-                desc=(
-                    f"Critic ({blocking_type}) verdict for task {db_task_id}: {verdict}"
-                    + (
-                        f" — {review.get('rejection_reason', '')[:150]}"
-                        if verdict != "pass"
-                        else ""
+                # Step 1: Spawn critics on the first attempt (retry_count == 0).
+                # On retries the critics already exist (tracked by current_task_id).
+                if retry_count == 0:
+                    spawned = await critic_service.spawn_critics_for_task(
+                        db=self.db,
+                        task_id=db_task_id,
+                        task_type=task_type_str,
+                        parent_agent_id=lead_id,
                     )
-                ),
-                level=AuditLevel.INFO if verdict == "pass" else AuditLevel.WARNING,
-                target=task_id,
-            )
+                    if spawned:
+                        logger.info(
+                            f"Spawned critics for task {db_task_id}: {spawned}",
+                            task_id=db_task_id, lead_id=lead_id, spawned_critics=spawned, status="critics_spawned"
+                        )
+                    else:
+                        logger.warning(
+                            f"No critics spawned for task {db_task_id} (type={task_type_str}) — review will auto-pass",
+                            task_id=db_task_id, task_type=task_type_str, status="no_critics"
+                        )
 
-            if verdict == "reject":
-                logger.warning(
-                    f"Critic REJECTED output for task {db_task_id} (attempt {retry_count + 1}/{critic_service.DEFAULT_MAX_RETRIES}). Retrying…",
-                    task_id=db_task_id, attempt=retry_count + 1, max_retries=critic_service.DEFAULT_MAX_RETRIES,
-                    status="critic_rejected", blocking_type=blocking_type
-                )
-                # Critics survive — same instances review the retry
-                return await self.delegate_to_task(
-                    task=task,
-                    lead_id=lead_id,
-                    task_id=None,
-                    retry_count=retry_count + 1,
-                )
-
-            elif verdict == "escalate":
-                logger.error(
-                    f"Critic ESCALATING task {db_task_id} to Council after {retry_count} failed retries.",
-                    task_id=db_task_id, retry_count=retry_count, blocking_type=blocking_type,
-                    status="critic_escalated"
-                )
-                # Terminate critics before escalating
-                await critic_service.terminate_critics_for_task(
-                    self.db, db_task_id, reason="escalated"
-                )
-                return await self.escalate_to_council(
-                    issue=(
-                        f"Task {db_task_id} failed critic review after {retry_count} retries. "
-                        f"Critic type: {blocking_type}. "
-                        f"Reason: {review.get('rejection_reason', 'unknown')}"
-                    ),
-                    reporter_id=lead_id,
+                # Step 2: Build and route the message to the Task Agent
+                msg = AgentMessage(
+                    sender_id=lead_id,
+                    recipient_id=task_id,
+                    message_type="delegation",
+                    content=task.get("description", ""),
+                    payload=task,
+                    route_direction="down",
                 )
 
-            else:
-                # PASS — terminate critics, task is done
-                await critic_service.terminate_critics_for_task(
-                    self.db, db_task_id, reason="task_passed"
+                if self.vector_store:
+                    patterns = self.vector_store.get_collection("task_patterns").query(
+                        query_texts=[task.get("description", "")],
+                        n_results=3,
+                    )
+                    msg.rag_context = {"patterns": patterns}
+
+                result = await self.message_bus.route_down(msg)
+
+                await self._log(
+                    actor=lead_id,
+                    action="task_delegation",
+                    desc=f"Assigned task to {task_id} with tools: {task.get('allowed_tools', 'default')}",
+                    target=task_id,
                 )
 
-        return result
+                # Step 3: Extract output and run all critics
+                output_content = ""
+                if result.success:
+                    _meta = getattr(result, "metadata", None) or {}
+                    output_content = (
+                        _meta.get("output")
+                        or _meta.get("result")
+                        or ""
+                    )
+
+                if result.success and output_content:
+                    review = await critic_service.review_with_all_task_critics(
+                        db=self.db,
+                        task_id=db_task_id,
+                        output_content=output_content,
+                        task_type=task_type_str,
+                        retry_count=retry_count,
+                    )
+
+                    verdict = review.get("verdict")
+                    blocking_type = review.get("blocking_critic_type", "output")
+
+                    await self._log(
+                        actor=lead_id,
+                        action=f"critic_review_{verdict}",
+                        desc=(
+                            f"Critic ({blocking_type}) verdict for task {db_task_id}: {verdict}"
+                            + (
+                                f" — {review.get('rejection_reason', '')[:150]}"
+                                if verdict != "pass"
+                                else ""
+                            )
+                        ),
+                        level=AuditLevel.INFO if verdict == "pass" else AuditLevel.WARNING,
+                        target=task_id,
+                    )
+
+                    if verdict == "reject":
+                        logger.warning(
+                            f"Critic REJECTED output for task {db_task_id} (attempt {retry_count + 1}/{critic_service.DEFAULT_MAX_RETRIES}). Retrying…",
+                            task_id=db_task_id, attempt=retry_count + 1, max_retries=critic_service.DEFAULT_MAX_RETRIES,
+                            status="critic_rejected", blocking_type=blocking_type
+                        )
+                        # Critics survive — same instances review the retry
+                        return await self.delegate_to_task(
+                            task=task,
+                            lead_id=lead_id,
+                            task_id=None,
+                            retry_count=retry_count + 1,
+                        )
+
+                    elif verdict == "escalate":
+                        logger.error(
+                            f"Critic ESCALATING task {db_task_id} to Council after {retry_count} failed retries.",
+                            task_id=db_task_id, retry_count=retry_count, blocking_type=blocking_type,
+                            status="critic_escalated"
+                        )
+                        # Terminate critics before escalating
+                        await critic_service.terminate_critics_for_task(
+                            self.db, db_task_id, reason="escalated"
+                        )
+                        return await self.escalate_to_council(
+                            issue=(
+                                f"Task {db_task_id} failed critic review after {retry_count} retries. "
+                                f"Critic type: {blocking_type}. "
+                                f"Reason: {review.get('rejection_reason', 'unknown')}"
+                            ),
+                            reporter_id=lead_id,
+                        )
+
+                    else:
+                        # PASS — terminate critics, task is done
+                        await critic_service.terminate_critics_for_task(
+                            self.db, db_task_id, reason="task_passed"
+                        )
+
+                return result
 
     def _resolve_critic_type(self, task: Dict) -> "CriticType":
         """
