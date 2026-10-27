@@ -39,7 +39,7 @@ from backend.services.reincarnation_service import ReincarnationService
 from backend.services.knowledge_assist import checkpoint_write
 from backend.services.chat_prune_service import run_chat_prune_task
 
-from backend.services.structured_logging import get_structured_logger, timed_step, set_task_id, set_agent_id
+from backend.services.structured_logging import get_structured_logger, timed_step, set_task_id, set_agent_id, structured_task
 
 logger = get_structured_logger(__name__)
 
@@ -114,247 +114,255 @@ def _extract_workspace(result: dict) -> tuple:
         return None, []
     return result.get("workspace_path"), result.get("artifacts") or []
 
+@structured_task(logger_name=__name__)
 @celery_app.task(name="agentium.tasks.task_executor.execute_task_async", bind=True, max_retries=1)
 def execute_task_async(self, task_id: str, agent_id: str):
     """
     Execute task with skill-augmented RAG.
     """
-    with get_task_db() as db:
-        start_time = time.time()
-        task = None
-        agent = None
-        try:
-            logger.info(f"Executing task {task_id} with agent {agent_id}", task_id=task_id, agent_id=agent_id, status="started")
-
-            # Load task and agent
-            task = db.query(Task).filter_by(agentium_id=task_id).first()
-
-            if not task:
-                raise ValueError(f"Task {task_id} not found")
-
+    with timed_step(logger, "execute_task_async", task_id=task_id, agent_id=agent_id):
+        with get_task_db() as db:
+            start_time = time.time()
+            task = None
             agent = None
-            if agent_id:
-                agent = db.query(Agent).filter_by(agentium_id=agent_id).first()
-
-            if not agent:
-                agent = db.query(Agent).filter(Agent.status == 'active').first()
-
-            if not agent:
-                raise ValueError(f"No active agent found for task {task_id}")
-
-            # Set context for structured logging
-            set_task_id(task_id)
-            set_agent_id(agent.agentium_id)
-
-            # 8.4: received checkpoint — query Chroma + web-search + write-back
             try:
-                asyncio.run(checkpoint_write("received", task, agent, db))
-            except Exception as cp_exc:  # noqa: BLE001
-                logger.warning(f"received checkpoint failed for {task_id}: {cp_exc}", task_id=task_id, agent_id=agent.agentium_id, error=str(cp_exc))
+                logger.info(f"Executing task {task_id} with agent {agent_id}", task_id=task_id, agent_id=agent_id, status="started")
 
-            # Execute with skill RAG
-            result = agent.execute_with_skill_rag(task, db)
+                # Load task and agent
+                task = db.query(Task).filter_by(agentium_id=task_id).first()
 
-            # Update task with result
-            ws_path, arts = _extract_workspace(result)
-            result_data = {
-                "full_output": result["content"],
-                "skills_used": result.get("skills_used", []),
-                "model": result.get("model"),
-                "tokens_used": result.get("tokens_used")
-            }
-            if ws_path:
-                result_data["workspace_path"] = ws_path
-                result_data["artifacts"] = arts
-                try:
-                    from backend.api.routes.websocket import manager
-                    asyncio.run(manager.broadcast({
-                        "type": "workspace_ready",
-                        "agent_id": agent_id,
-                        "task_id": task_id,
-                        "workspace_path": ws_path,
-                        "artifact_count": len(arts or []),
-                    }))
-                except Exception as ws_err:  # pragma: no cover - broadcast is best-effort
-                    logger.warning(f"workspace_ready broadcast failed: {ws_err}", task_id=task_id, agent_id=agent.agentium_id, error=str(ws_err))
-            task.complete(
-                result_summary=result["content"][:500],
-                result_data=result_data
-            )
-            # Phase 16.3: report the result to the delegating peer
-            # (no-op for non-federated tasks; never raises)
-            try:
-                from backend.services.federation_service import FederationService
-                FederationService.notify_federation_result(db, task, "completed")
-            except Exception as fed_exc:  # pragma: no cover - import safety
-                logger.warning(f"Federation result callback failed for {task_id}: {fed_exc}")
+                if not task:
+                    raise ValueError(f"Task {task_id} not found")
 
-            try:
-                from backend.api.routes.websocket import manager as ws_mgr
-                asyncio.run(ws_mgr.emit_task_update(
-                    task_id=task_id,
-                    status="completed",
-                    progress=100,
-                    title=task.title,
+                agent = None
+                if agent_id:
+                    agent = db.query(Agent).filter_by(agentium_id=agent_id).first()
+
+                if not agent:
+                    agent = db.query(Agent).filter(Agent.status == 'active').first()
+
+                if not agent:
+                    raise ValueError(f"No active agent found for task {task_id}")
+
+                # Set context for structured logging
+                set_task_id(task_id)
+                set_agent_id(agent.agentium_id)
+
+                # Capture agent_id for use in exception handlers (avoids ObjectDeletedError
+                # if session rolls back and expires the agent object)
+                resolved_agent_id = agent.agentium_id
+
+                # 8.4: received checkpoint — query Chroma + web-search + write-back
+                with timed_step(logger, "checkpoint_received", task_id=task_id, agent_id=agent.agentium_id):
+                    try:
+                        asyncio.run(checkpoint_write("received", task, agent, db))
+                    except Exception as cp_exc:  # noqa: BLE001
+                        logger.warning(f"received checkpoint failed for {task_id}: {cp_exc}", task_id=task_id, agent_id=agent.agentium_id, error=str(cp_exc))
+
+                # Execute with skill RAG
+                with timed_step(logger, "execute_with_skill_rag", task_id=task_id, agent_id=agent.agentium_id):
+                    result = agent.execute_with_skill_rag(task, db)
+
+                # Update task with result
+                ws_path, arts = _extract_workspace(result)
+                result_data = {
+                    "full_output": result["content"],
+                    "skills_used": result.get("skills_used", []),
+                    "model": result.get("model"),
+                    "tokens_used": result.get("tokens_used")
+                }
+                if ws_path:
+                    result_data["workspace_path"] = ws_path
+                    result_data["artifacts"] = arts
+                    try:
+                        from backend.api.routes.websocket import manager
+                        asyncio.run(manager.broadcast({
+                            "type": "workspace_ready",
+                            "agent_id": agent_id,
+                            "task_id": task_id,
+                            "workspace_path": ws_path,
+                            "artifact_count": len(arts or []),
+                        }))
+                    except Exception as ws_err:  # pragma: no cover - broadcast is best-effort
+                        logger.warning(f"workspace_ready broadcast failed: {ws_err}", task_id=task_id, agent_id=agent.agentium_id, error=str(ws_err))
+                task.complete(
                     result_summary=result["content"][:500],
-                ))
-            except Exception as ws_err:
-                logger.warning(f"task_update completed broadcast failed: {ws_err}", task_id=task_id, agent_id=agent.agentium_id, error=str(ws_err))
+                    result_data=result_data
+                )
+                # Phase 16.3: report the result to the delegating peer
+                # (no-op for non-federated tasks; never raises)
+                try:
+                    from backend.services.federation_service import FederationService
+                    FederationService.notify_federation_result(db, task, "completed")
+                except Exception as fed_exc:  # pragma: no cover - import safety
+                    logger.warning(f"Federation result callback failed for {task_id}: {fed_exc}")
+
+                try:
+                    from backend.api.routes.websocket import manager as ws_mgr
+                    asyncio.run(ws_mgr.emit_task_update(
+                        task_id=task_id,
+                        status="completed",
+                        progress=100,
+                        title=task.title,
+                        result_summary=result["content"][:500],
+                    ))
+                except Exception as ws_err:
+                    logger.warning(f"task_update completed broadcast failed: {ws_err}", task_id=task_id, agent_id=agent.agentium_id, error=str(ws_err))
 
             # 8.4: completed checkpoint — query Chroma + web-search + write-back
-            try:
-                asyncio.run(checkpoint_write("completed", task, agent, db))
-            except Exception as cp_exc:  # noqa: BLE001
-                logger.warning(f"completed checkpoint failed for {task_id}: {cp_exc}", task_id=task_id, agent_id=agent.agentium_id, error=str(cp_exc))
-
-            # 8.4: mid checkpoint — only when the agent self-signaled a gap
-            if isinstance(result, dict) and result.get("knowledge_needed"):
                 try:
-                    asyncio.run(checkpoint_write(
-                        "mid", task, agent, db,
-                        query=result.get("knowledge_query"),
-                    ))
+                    asyncio.run(checkpoint_write("completed", task, agent, db))
                 except Exception as cp_exc:  # noqa: BLE001
-                    logger.warning(f"mid checkpoint failed for {task_id}: {cp_exc}", task_id=task_id, agent_id=agent.agentium_id, error=str(cp_exc))
+                    logger.warning(f"completed checkpoint failed for {task_id}: {cp_exc}", task_id=task_id, agent_id=agent.agentium_id, error=str(cp_exc))
 
-            # Record success for used skills
-            for skill in result.get("skills_used", []):
-                from backend.services.skill_manager import skill_manager
-                skill_manager.record_skill_usage(
-                    skill_id=skill["skill_id"],
-                    success=True,
-                    db=db
-                )
-            
-            # Phase 13.4: Real-Time Learning Write
-            try:
-                from backend.services.autonomous_learning import get_learning_engine
-                engine = get_learning_engine()
-                learning_stats = engine.analyze_outcomes(db)
-                logger.info(f"Real-Time Learning executed for task {task_id}: {learning_stats}", task_id=task_id, agent_id=agent.agentium_id, learning_stats=str(learning_stats))
-            except Exception as learning_exc:
-                logger.error(f"Real-Time Learning extraction failed for task {task_id}: {learning_exc}", task_id=task_id, agent_id=agent.agentium_id, error=str(learning_exc))
+                # 8.4: mid checkpoint — only when the agent self-signaled a gap
+                if isinstance(result, dict) and result.get("knowledge_needed"):
+                    try:
+                        asyncio.run(checkpoint_write(
+                            "mid", task, agent, db,
+                            query=result.get("knowledge_query"),
+                        ))
+                    except Exception as cp_exc:  # noqa: BLE001
+                        logger.warning(f"mid checkpoint failed for {task_id}: {cp_exc}", task_id=task_id, agent_id=agent.agentium_id, error=str(cp_exc))
 
-            # Phase 16.2: Validation Boost
-            try:
-                retrieved_ids = (
-                    (task.execution_context or {}).get("retrieved_learning_ids")
-                    or result.get("retrieved_learning_ids")
-                    or []
-                )
-                if retrieved_ids:
-                    from backend.services.knowledge_service import get_knowledge_service
-                    ks = get_knowledge_service()
-                    boost_result = ks.boost_retrieved_learnings(retrieved_ids)
-                    logger.info(
-                        f"Phase 16.2: Validation boost for task {task_id}: "
-                        f"boosted {boost_result.get('boosted', 0)} entries",
-                        task_id=task_id, agent_id=agent.agentium_id, boosted=boost_result.get('boosted', 0)
+                # Record success for used skills
+                for skill in result.get("skills_used", []):
+                    from backend.services.skill_manager import skill_manager
+                    skill_manager.record_skill_usage(
+                        skill_id=skill["skill_id"],
+                        success=True,
+                        db=db
                     )
-            except Exception as boost_exc:
-                logger.debug(f"Validation boost skipped for task {task_id}: {boost_exc}", task_id=task_id, agent_id=agent.agentium_id, error=str(boost_exc))
 
-            return {
-                "status": "completed",
-                "task_id": task_id,
-                "skills_used": len(result.get("skills_used", []))
-            }
+                # Phase 13.4: Real-Time Learning Write
+                try:
+                    from backend.services.autonomous_learning import get_learning_engine
+                    engine = get_learning_engine()
+                    learning_stats = engine.analyze_outcomes(db)
+                    logger.info(f"Real-Time Learning executed for task {task_id}: {learning_stats}", task_id=task_id, agent_id=agent.agentium_id, learning_stats=str(learning_stats))
+                except Exception as learning_exc:
+                    logger.error(f"Real-Time Learning extraction failed for task {task_id}: {learning_exc}", task_id=task_id, agent_id=agent.agentium_id, error=str(learning_exc))
 
-        except RuntimeError as exc:
-            # Total provider exhaustion (all keys invalid / rate-limited /
-            # unreachable) — fail cleanly. Do NOT re-queue forever via Celery
-            # retry; the worker must move on to the next task.
-            elapsed_ms = round((time.time() - start_time) * 1000, 2)
-            input_summary = getattr(task, "description", "")[:200] if task else ""
-            execution_context = getattr(task, "execution_context", None)
-            reason = "provider_unreachable"
-            msg = str(exc).lower()
-            if ("all_keys_invalid" in msg or "401" in msg or "403" in msg
-                    or "invalid api key" in msg or "authentication" in msg
-                    or "insufficient_quota" in msg):
-                reason = "all_keys_invalid"
-            elif ("429" in msg or "ratelimit" in msg or "too many requests" in msg
-                  or "rate_limit" in msg):
-                reason = "rate_limited"
+                # Phase 16.2: Validation Boost
+                try:
+                    retrieved_ids = (
+                        (task.execution_context or {}).get("retrieved_learning_ids")
+                        or result.get("retrieved_learning_ids")
+                        or []
+                    )
+                    if retrieved_ids:
+                        from backend.services.knowledge_service import get_knowledge_service
+                        ks = get_knowledge_service()
+                        boost_result = ks.boost_retrieved_learnings(retrieved_ids)
+                        logger.info(
+                            f"Phase 16.2: Validation boost for task {task_id}: "
+                            f"boosted {boost_result.get('boosted', 0)} entries",
+                            task_id=task_id, agent_id=agent.agentium_id, boosted=boost_result.get('boosted', 0)
+                        )
+                except Exception as boost_exc:
+                    logger.debug(f"Validation boost skipped for task {task_id}: {boost_exc}", task_id=task_id, agent_id=agent.agentium_id, error=str(boost_exc))
 
-            logger.error(
-                f"Task {task_id} failed due to provider exhaustion: {exc}",
-                task_id=task_id,
-                agent_id=getattr(agent, "agentium_id", "unknown"),
-                reason=reason,
-                elapsed_ms=elapsed_ms,
-                input_summary=input_summary,
-                execution_context=execution_context,
-            )
-
-            try:
-                task.mark_failed(reason=reason, error_message=str(exc))
-                from backend.api.routes.websocket import manager as ws_mgr
-                asyncio.run(ws_mgr.emit_task_update(
-                    task_id=task_id,
-                    status="failed",
-                    progress=getattr(task, "progress", 0),
-                    title=getattr(task, "title", f"Task {task_id}"),
-                    result_summary=f"Failed: {reason}",
-                ))
-            except Exception as mark_exc:
-                logger.error(f"mark_failed failed for {task_id}: {mark_exc}")
-            try:
-                # AuditLog.log is a factory (does NOT persist) — add + commit.
-                entry = AuditLog.log(
-                    level=AuditLevel.CRITICAL,
-                    category=AuditCategory.SYSTEM,
-                    actor_type="system",
-                    actor_id="SYSTEM",
-                    action="task_failed_exhaustion",
-                    description=f"Task {task_id} failed: {reason}",
-                    after_state={"reason": reason},
-                )
-                db.add(entry)
-            except Exception as audit_exc:
-                logger.error(
-                    f"AuditLog for failed task {task_id} failed: "
-                    f"{type(audit_exc).__name__}: {audit_exc}",
-                    exc_info=True,
-                )
-            db.commit()
-
-            # Phase 16.3: report failure to the delegating peer
-            try:
-                from backend.services.federation_service import FederationService
-                FederationService.notify_federation_result(
-                    db, task, "failed", result_summary=f"Failed: {reason}",
-                )
-            except Exception as fed_exc:  # pragma: no cover - import safety
-                logger.warning(f"Federation result callback failed for {task_id}: {fed_exc}")
-
-            # Phase 19.3 (Task 15): surface a friendly degradation message to the
-            # user instead of a stack trace. The task is already terminal; this
-            # just tells any connected dashboard that the provider is exhausted.
-            try:
-                from backend.api.routes.websocket import manager
-                friendly = (
-                    "The AI provider is temporarily unavailable or rate-limited; "
-                    "this task has been queued for retry"
-                )
-                asyncio.run(manager.broadcast({
-                    "type": "task_degraded",
+                return {
+                    "status": "completed",
                     "task_id": task_id,
-                    "reason": reason,
-                    "message": friendly,
-                }))
-            except Exception as ws_exc:
-                logger.error(f"task_degraded broadcast failed for {task_id}: {ws_exc}")
+                    "skills_used": len(result.get("skills_used", []))
+                }
 
-            return {"status": "failed", "task_id": task_id, "reason": reason}
+            except RuntimeError as exc:
+                # Total provider exhaustion (all keys invalid / rate-limited /
+                # unreachable) — fail cleanly. Do NOT re-queue forever via Celery
+                # retry; the worker must move on to the next task.
+                elapsed_ms = round((time.time() - start_time) * 1000, 2)
+                input_summary = getattr(task, "description", "")[:200] if task else ""
+                execution_context = getattr(task, "execution_context", None)
+                reason = "provider_unreachable"
+                msg = str(exc).lower()
+                if ("all_keys_invalid" in msg or "401" in msg or "403" in msg
+                        or "invalid api key" in msg or "authentication" in msg
+                        or "insufficient_quota" in msg):
+                    reason = "all_keys_invalid"
+                elif ("429" in msg or "ratelimit" in msg or "too many requests" in msg
+                      or "rate_limit" in msg):
+                    reason = "rate_limited"
 
-        except LoopDetectedError as exc:
-            # Infinite tool-call loop detected - mark task as failed with specific reason
-            elapsed_ms = round((time.time() - start_time) * 1000, 2)
-            input_summary = getattr(task, "description", "")[:200] if task else ""
-            execution_context = getattr(task, "execution_context", None)
-            reason = "loop_detected"
-            logger.warning(
+                logger.error(
+                    f"Task {task_id} failed due to provider exhaustion: {exc}",
+                    task_id=task_id,
+                    agent_id=resolved_agent_id,
+                    reason=reason,
+                    elapsed_ms=elapsed_ms,
+                    input_summary=input_summary,
+                    execution_context=execution_context,
+                )
+
+                try:
+                    task.mark_failed(reason=reason, error_message=str(exc))
+                    from backend.api.routes.websocket import manager as ws_mgr
+                    asyncio.run(ws_mgr.emit_task_update(
+                        task_id=task_id,
+                        status="failed",
+                        progress=getattr(task, "progress", 0),
+                        title=getattr(task, "title", f"Task {task_id}"),
+                        result_summary=f"Failed: {reason}",
+                    ))
+                except Exception as mark_exc:
+                    logger.error(f"mark_failed failed for {task_id}: {mark_exc}")
+                try:
+                    # AuditLog.log is a factory (does NOT persist) — add + commit.
+                    entry = AuditLog.log(
+                        level=AuditLevel.CRITICAL,
+                        category=AuditCategory.SYSTEM,
+                        actor_type="system",
+                        actor_id="SYSTEM",
+                        action="task_failed_exhaustion",
+                        description=f"Task {task_id} failed: {reason}",
+                        after_state={"reason": reason},
+                    )
+                    db.add(entry)
+                except Exception as audit_exc:
+                    logger.error(
+                        f"AuditLog for failed task {task_id} failed: "
+                        f"{type(audit_exc).__name__}: {audit_exc}",
+                        exc_info=True,
+                    )
+                db.commit()
+
+                # Phase 16.3: report failure to the delegating peer
+                try:
+                    from backend.services.federation_service import FederationService
+                    FederationService.notify_federation_result(
+                        db, task, "failed", result_summary=f"Failed: {reason}",
+                    )
+                except Exception as fed_exc:  # pragma: no cover - import safety
+                    logger.warning(f"Federation result callback failed for {task_id}: {fed_exc}")
+
+                # Phase 19.3 (Task 15): surface a friendly degradation message to the
+                # user instead of a stack trace. The task is already terminal; this
+                # just tells any connected dashboard that the provider is exhausted.
+                try:
+                    from backend.api.routes.websocket import manager
+                    friendly = (
+                        "The AI provider is temporarily unavailable or rate-limited; "
+                        "this task has been queued for retry"
+                    )
+                    asyncio.run(manager.broadcast({
+                        "type": "task_degraded",
+                        "task_id": task_id,
+                        "reason": reason,
+                        "message": friendly,
+                    }))
+                except Exception as ws_exc:
+                    logger.error(f"task_degraded broadcast failed for {task_id}: {ws_exc}")
+
+                return {"status": "failed", "task_id": task_id, "reason": reason}
+
+            except LoopDetectedError as exc:
+                # Infinite tool-call loop detected - mark task as failed with specific reason
+                elapsed_ms = round((time.time() - start_time) * 1000, 2)
+                input_summary = getattr(task, "description", "")[:200] if task else ""
+                execution_context = getattr(task, "execution_context", None)
+                reason = "loop_detected"
+                logger.warning(
                 f"Loop detected in task {task_id}: {exc}",
                 task_id=task_id,
                 agent_id=getattr(agent, "agentium_id", "unknown"),
@@ -364,21 +372,21 @@ def execute_task_async(self, task_id: str, agent_id: str):
                 elapsed_ms=elapsed_ms,
                 input_summary=input_summary,
                 execution_context=execution_context,
-            )
-            try:
-                task.mark_failed(reason=reason, error_message=str(exc))
-                from backend.api.routes.websocket import manager as ws_mgr
-                asyncio.run(ws_mgr.emit_task_update(
+                )
+                try:
+                    task.mark_failed(reason=reason, error_message=str(exc))
+                    from backend.api.routes.websocket import manager as ws_mgr
+                    asyncio.run(ws_mgr.emit_task_update(
                     task_id=task_id,
                     status="failed",
                     progress=getattr(task, "progress", 0),
                     title=getattr(task, "title", f"Task {task_id}"),
                     result_summary=f"Failed: {reason} - {exc.tool_name} called {exc.identical_count} times",
-                ))
-            except Exception as mark_exc:
-                logger.error(f"mark_failed failed for {task_id}: {mark_exc}")
-            try:
-                entry = AuditLog.log(
+                    ))
+                except Exception as mark_exc:
+                    logger.error(f"mark_failed failed for {task_id}: {mark_exc}")
+                try:
+                    entry = AuditLog.log(
                     level=AuditLevel.WARNING,
                     category=AuditCategory.SYSTEM,
                     actor_type="system",
@@ -387,19 +395,19 @@ def execute_task_async(self, task_id: str, agent_id: str):
                     description=f"Task {task_id} failed: loop detected in tool '{exc.tool_name}'",
                     after_state={"reason": reason, "tool_name": exc.tool_name, "identical_count": exc.identical_count, "max_allowed": exc.max_allowed},
                 )
-                db.add(entry)
-            except Exception as audit_exc:
-                logger.error(f"AuditLog for loop detected task {task_id} failed: {audit_exc}")
-            db.commit()
-            return {"status": "failed", "task_id": task_id, "reason": reason, "detail": str(exc)}
+                    db.add(entry)
+                except Exception as audit_exc:
+                    logger.error(f"AuditLog for loop detected task {task_id} failed: {audit_exc}")
+                db.commit()
+                return {"status": "failed", "task_id": task_id, "reason": reason, "detail": str(exc)}
 
-        except BudgetExhaustedError as exc:
-            # Budget exhaustion detected - mark task as failed with specific reason
-            elapsed_ms = round((time.time() - start_time) * 1000, 2)
-            input_summary = getattr(task, "description", "")[:200] if task else ""
-            execution_context = getattr(task, "execution_context", None)
-            reason = "budget_exhausted"
-            logger.warning(
+            except BudgetExhaustedError as exc:
+                # Budget exhaustion detected - mark task as failed with specific reason
+                elapsed_ms = round((time.time() - start_time) * 1000, 2)
+                input_summary = getattr(task, "description", "")[:200] if task else ""
+                execution_context = getattr(task, "execution_context", None)
+                reason = "budget_exhausted"
+                logger.warning(
                 f"Budget exhausted in task {task_id}: {exc}",
                 task_id=task_id,
                 agent_id=getattr(agent, "agentium_id", "unknown"),
@@ -409,7 +417,7 @@ def execute_task_async(self, task_id: str, agent_id: str):
                 elapsed_ms=elapsed_ms,
                 input_summary=input_summary,
                 execution_context=execution_context,
-            )
+                )
             try:
                 task.mark_failed(reason=reason, error_message=str(exc))
                 from backend.api.routes.websocket import manager as ws_mgr
@@ -435,14 +443,14 @@ def execute_task_async(self, task_id: str, agent_id: str):
                 db.add(entry)
             except Exception as audit_exc:
                 logger.error(f"AuditLog for budget exhausted task {task_id} failed: {audit_exc}")
-            db.commit()
-            return {"status": "failed", "task_id": task_id, "reason": reason, "detail": str(exc)}
+                db.commit()
+                return {"status": "failed", "task_id": task_id, "reason": reason, "detail": str(exc)}
 
-        except Exception as exc:
-            elapsed_ms = round((time.time() - start_time) * 1000, 2)
-            input_summary = getattr(task, "description", "")[:200] if task else ""
-            execution_context = getattr(task, "execution_context", None)
-            logger.error(
+            except Exception as exc:
+                elapsed_ms = round((time.time() - start_time) * 1000, 2)
+                input_summary = getattr(task, "description", "")[:200] if task else ""
+                execution_context = getattr(task, "execution_context", None)
+                logger.error(
                 f"Task execution failed: {exc}",
                 task_id=task_id,
                 agent_id=getattr(agent, "agentium_id", "unknown"),
@@ -450,9 +458,9 @@ def execute_task_async(self, task_id: str, agent_id: str):
                 elapsed_ms=elapsed_ms,
                 input_summary=input_summary,
                 execution_context=execution_context,
-            )
+                )
 
-            # Phase 13.4: Anti-Pattern Early Warning
+                # Phase 13.4: Anti-Pattern Early Warning
             try:
                 from backend.core.vector_store import get_vector_store
                 from backend.api.routes.websocket import manager

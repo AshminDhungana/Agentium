@@ -317,7 +317,7 @@ def structured_task(logger_name: Optional[str] = None):
                     raise
 
         # Preserve Celery task attributes by delegating to the wrapped function
-        # This ensures .delay(), .apply_async(), .s(), etc. work on the decorated task
+        # This ensures .delay(), .apply_async(), .s(), .run(), etc. work on the decorated task
         if hasattr(func, 'delay'):
             wrapper.delay = func.delay
         if hasattr(func, 'apply_async'):
@@ -332,6 +332,8 @@ def structured_task(logger_name: Optional[str] = None):
             wrapper.apply = func.apply
         if hasattr(func, 'AsyncResult'):
             wrapper.AsyncResult = func.AsyncResult
+        if hasattr(func, 'run'):
+            wrapper.run = func.run
 
         return wrapper
     return decorator
