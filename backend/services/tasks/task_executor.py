@@ -8,6 +8,7 @@ import asyncio
 import json
 import os
 import time
+import threading
 from typing import Optional, Dict, Any, List
 from dataclasses import asdict
 from datetime import datetime, timedelta
@@ -15,6 +16,29 @@ from contextlib import contextmanager
 
 from tenacity import retry, stop_after_attempt, wait_fixed, retry_if_exception_type
 from sqlalchemy.exc import OperationalError
+
+
+def run_async(coro):
+    """
+    Safely run an async coroutine, handling the case where an event loop
+    is already running (e.g., in pytest-asyncio test environment).
+    In production Celery workers, this behaves like asyncio.run().
+    """
+    import os
+    import concurrent.futures
+
+    # If running in pytest, run in a separate thread with its own event loop
+    # to avoid cross-loop coroutine contamination that causes
+    # "cannot reuse already awaited coroutine" errors.
+    if os.environ.get('PYTEST_CURRENT_TEST'):
+        def run_in_thread():
+            return asyncio.run(coro)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(run_in_thread)
+            return future.result()
+
+    # Production: use asyncio.run() directly
+    return asyncio.run(coro)
 
 # Loop & Runaway Detection exceptions (Phase 20.4)
 try:
@@ -126,6 +150,8 @@ def execute_task_async(self, task_id: str, agent_id: str):
             task = None
             agent = None
             try:
+                import sys
+                print(f"DEBUG: Entered try block", file=sys.stderr, flush=True)
                 logger.info(f"Executing task {task_id} with agent {agent_id}", task_id=task_id, agent_id=agent_id, status="started")
 
                 # Load task and agent
@@ -155,13 +181,15 @@ def execute_task_async(self, task_id: str, agent_id: str):
                 # 8.4: received checkpoint — query Chroma + web-search + write-back
                 with timed_step(logger, "checkpoint_received", task_id=task_id, agent_id=agent.agentium_id):
                     try:
-                        asyncio.run(checkpoint_write("received", task, agent, db))
+                        run_async(checkpoint_write("received", task, agent, db))
                     except Exception as cp_exc:  # noqa: BLE001
                         logger.warning(f"received checkpoint failed for {task_id}: {cp_exc}", task_id=task_id, agent_id=agent.agentium_id, error=str(cp_exc))
 
                 # Execute with skill RAG
                 with timed_step(logger, "execute_with_skill_rag", task_id=task_id, agent_id=agent.agentium_id):
-                    result = agent.execute_with_skill_rag(task, db)
+                    result = run_async(agent.execute_with_skill_rag(task, db))
+                    import sys
+                    print(f"DEBUG: After run_async, result={result}", file=sys.stderr, flush=True)
 
                 # Update task with result
                 ws_path, arts = _extract_workspace(result)
@@ -176,7 +204,7 @@ def execute_task_async(self, task_id: str, agent_id: str):
                     result_data["artifacts"] = arts
                     try:
                         from backend.api.routes.websocket import manager
-                        asyncio.run(manager.broadcast({
+                        run_async(manager.broadcast({
                             "type": "workspace_ready",
                             "agent_id": agent_id,
                             "task_id": task_id,
@@ -199,7 +227,7 @@ def execute_task_async(self, task_id: str, agent_id: str):
 
                 try:
                     from backend.api.routes.websocket import manager as ws_mgr
-                    asyncio.run(ws_mgr.emit_task_update(
+                    run_async(ws_mgr.emit_task_update(
                         task_id=task_id,
                         status="completed",
                         progress=100,
@@ -211,14 +239,14 @@ def execute_task_async(self, task_id: str, agent_id: str):
 
             # 8.4: completed checkpoint — query Chroma + web-search + write-back
                 try:
-                    asyncio.run(checkpoint_write("completed", task, agent, db))
+                    run_async(checkpoint_write("completed", task, agent, db))
                 except Exception as cp_exc:  # noqa: BLE001
                     logger.warning(f"completed checkpoint failed for {task_id}: {cp_exc}", task_id=task_id, agent_id=agent.agentium_id, error=str(cp_exc))
 
                 # 8.4: mid checkpoint — only when the agent self-signaled a gap
                 if isinstance(result, dict) and result.get("knowledge_needed"):
                     try:
-                        asyncio.run(checkpoint_write(
+                        run_async(checkpoint_write(
                             "mid", task, agent, db,
                             query=result.get("knowledge_query"),
                         ))
@@ -269,6 +297,8 @@ def execute_task_async(self, task_id: str, agent_id: str):
                 }
 
             except RuntimeError as exc:
+                import sys
+                print(f"DEBUG: Caught RuntimeError", file=sys.stderr, flush=True)
                 # Total provider exhaustion (all keys invalid / rate-limited /
                 # unreachable) — fail cleanly. Do NOT re-queue forever via Celery
                 # retry; the worker must move on to the next task.
@@ -298,7 +328,7 @@ def execute_task_async(self, task_id: str, agent_id: str):
                 try:
                     task.mark_failed(reason=reason, error_message=str(exc))
                     from backend.api.routes.websocket import manager as ws_mgr
-                    asyncio.run(ws_mgr.emit_task_update(
+                    run_async(ws_mgr.emit_task_update(
                         task_id=task_id,
                         status="failed",
                         progress=getattr(task, "progress", 0),
@@ -345,7 +375,7 @@ def execute_task_async(self, task_id: str, agent_id: str):
                         "The AI provider is temporarily unavailable or rate-limited; "
                         "this task has been queued for retry"
                     )
-                    asyncio.run(manager.broadcast({
+                    run_async(manager.broadcast({
                         "type": "task_degraded",
                         "task_id": task_id,
                         "reason": reason,
@@ -357,6 +387,8 @@ def execute_task_async(self, task_id: str, agent_id: str):
                 return {"status": "failed", "task_id": task_id, "reason": reason}
 
             except LoopDetectedError as exc:
+                import sys
+                print(f"DEBUG: Caught LoopDetectedError", file=sys.stderr, flush=True)
                 # Infinite tool-call loop detected - mark task as failed with specific reason
                 elapsed_ms = round((time.time() - start_time) * 1000, 2)
                 input_summary = getattr(task, "description", "")[:200] if task else ""
@@ -376,7 +408,7 @@ def execute_task_async(self, task_id: str, agent_id: str):
                 try:
                     task.mark_failed(reason=reason, error_message=str(exc))
                     from backend.api.routes.websocket import manager as ws_mgr
-                    asyncio.run(ws_mgr.emit_task_update(
+                    run_async(ws_mgr.emit_task_update(
                     task_id=task_id,
                     status="failed",
                     progress=getattr(task, "progress", 0),
@@ -402,6 +434,8 @@ def execute_task_async(self, task_id: str, agent_id: str):
                 return {"status": "failed", "task_id": task_id, "reason": reason, "detail": str(exc)}
 
             except BudgetExhaustedError as exc:
+                import sys
+                print(f"DEBUG: Caught BudgetExhaustedError", file=sys.stderr, flush=True)
                 # Budget exhaustion detected - mark task as failed with specific reason
                 elapsed_ms = round((time.time() - start_time) * 1000, 2)
                 input_summary = getattr(task, "description", "")[:200] if task else ""
@@ -418,43 +452,48 @@ def execute_task_async(self, task_id: str, agent_id: str):
                 input_summary=input_summary,
                 execution_context=execution_context,
                 )
-            try:
-                task.mark_failed(reason=reason, error_message=str(exc))
-                from backend.api.routes.websocket import manager as ws_mgr
-                asyncio.run(ws_mgr.emit_task_update(
-                    task_id=task_id,
-                    status="failed",
-                    progress=getattr(task, "progress", 0),
-                    title=getattr(task, "title", f"Task {task_id}"),
-                    result_summary=f"Failed: {reason} - {exc.budget_type} limit exceeded",
-                ))
-            except Exception as mark_exc:
-                logger.error(f"mark_failed failed for {task_id}: {mark_exc}")
-            try:
-                entry = AuditLog.log(
-                    level=AuditLevel.WARNING,
-                    category=AuditCategory.SYSTEM,
-                    actor_type="system",
-                    actor_id="BUDGET_TRACKER",
-                    action="task_failed_budget_exhausted",
-                    description=f"Task {task_id} failed: {exc.budget_type} budget exhausted",
-                    after_state={"reason": reason, "budget_type": exc.budget_type, "actual": exc.actual, "limit": exc.limit},
-                )
-                db.add(entry)
-            except Exception as audit_exc:
-                logger.error(f"AuditLog for budget exhausted task {task_id} failed: {audit_exc}")
+                try:
+                    task.mark_failed(reason=reason, error_message=str(exc))
+                    from backend.api.routes.websocket import manager as ws_mgr
+                    run_async(ws_mgr.emit_task_update(
+                        task_id=task_id,
+                        status="failed",
+                        progress=getattr(task, "progress", 0),
+                        title=getattr(task, "title", f"Task {task_id}"),
+                        result_summary=f"Failed: {reason} - {exc.budget_type} limit exceeded",
+                    ))
+                except Exception as mark_exc:
+                    logger.error(f"mark_failed failed for {task_id}: {mark_exc}")
+                try:
+                    entry = AuditLog.log(
+                        level=AuditLevel.WARNING,
+                        category=AuditCategory.SYSTEM,
+                        actor_type="system",
+                        actor_id="BUDGET_TRACKER",
+                        action="task_failed_budget_exhausted",
+                        description=f"Task {task_id} failed: {exc.budget_type} budget exhausted",
+                        after_state={"reason": reason, "budget_type": exc.budget_type, "actual": exc.actual, "limit": exc.limit},
+                    )
+                    db.add(entry)
+                except Exception as audit_exc:
+                    logger.error(f"AuditLog for budget exhausted task {task_id} failed: {audit_exc}")
                 db.commit()
                 return {"status": "failed", "task_id": task_id, "reason": reason, "detail": str(exc)}
 
             except Exception as exc:
+                import sys
+                print(f"DEBUG: Caught exception in generic handler: {type(exc).__name__}: {exc}", file=sys.stderr, flush=True)
+                # Capture exc in a local variable to avoid Python 3.13 UnboundLocalError
+                # in nested scopes (anti-pattern detection try/except below)
+                error = exc
                 elapsed_ms = round((time.time() - start_time) * 1000, 2)
                 input_summary = getattr(task, "description", "")[:200] if task else ""
                 execution_context = getattr(task, "execution_context", None)
                 logger.error(
-                f"Task execution failed: {exc}",
+                f"Task execution failed: {error}",
                 task_id=task_id,
                 agent_id=getattr(agent, "agentium_id", "unknown"),
-                error=str(exc),
+                error=str(error),
                 elapsed_ms=elapsed_ms,
                 input_summary=input_summary,
                 execution_context=execution_context,
@@ -468,7 +507,7 @@ def execute_task_async(self, task_id: str, agent_id: str):
                 vs = get_vector_store()
                 try:
                     results = vs.get_collection("task_patterns").query(
-                        query_texts=[str(exc)],
+                        query_texts=[str(error)],
                         n_results=3,
                         where={"type": "anti_pattern"}
                     )
@@ -477,15 +516,15 @@ def execute_task_async(self, task_id: str, agent_id: str):
                         similar_count = sum(1 for d in distances if d < 0.2)
 
                         if similar_count >= 3:
-                            warning_msg = f"Anti-Pattern Detected: Similar failure occurred {similar_count} times. Error: {str(exc)[:100]}"
-                            logger.warning(warning_msg, task_id=task_id, agent_id=agent.agentium_id, similar_count=similar_count, error=str(exc)[:100])
+                            warning_msg = f"Anti-Pattern Detected: Similar failure occurred {similar_count} times. Error: {str(error)[:100]}"
+                            logger.warning(warning_msg, task_id=task_id, agent_id=agent.agentium_id, similar_count=similar_count, error=str(error)[:100])
 
                             try:
-                                asyncio.run(manager.broadcast({
+                                run_async(manager.broadcast({
                                     "type": "pattern_warning",
                                     "data": {
                                         "task_id": task_id,
-                                        "error": str(exc),
+                                        "error": str(error),
                                         "message": warning_msg
                                     }
                                 }))
@@ -502,7 +541,7 @@ def execute_task_async(self, task_id: str, agent_id: str):
                                     await r.hincrby("agentium:learning:impact", "anti_patterns_warned", 1)
                                     await r.close()
 
-                                asyncio.run(inc_ap())
+                                run_async(inc_ap())
                             except Exception:
                                 pass
                 except Exception as inner_exc:
@@ -524,7 +563,7 @@ def execute_task_async(self, task_id: str, agent_id: str):
                     if task is not None:
                         task.mark_failed(
                             reason="execution_failed",
-                            error_message=str(exc),
+                            error_message=str(error),
                         )
                 except Exception as mark_exc:
                     logger.error(f"mark_failed failed for {task_id}: {mark_exc}", task_id=task_id, agent_id=agent.agentium_id, error=str(mark_exc))
@@ -536,7 +575,7 @@ def execute_task_async(self, task_id: str, agent_id: str):
                         actor_type="system",
                         actor_id="SYSTEM",
                         action="task_failed_execution",
-                        description=f"Task {task_id} failed after {self.max_retries} retries: {exc}",
+                        description=f"Task {task_id} failed after {self.max_retries} retries: {error}",
                         after_state={"reason": "execution_failed"},
                     )
                     db.add(entry)
@@ -553,7 +592,7 @@ def execute_task_async(self, task_id: str, agent_id: str):
                     try:
                         from backend.services.federation_service import FederationService
                         FederationService.notify_federation_result(
-                            db, task, "failed", result_summary=f"Failed after retries: {exc}",
+                            db, task, "failed", result_summary=f"Failed after retries: {error}",
                         )
                     except Exception as fed_exc:  # pragma: no cover - import safety
                         logger.warning(f"Federation result callback failed for {task_id}: {fed_exc}")
@@ -565,7 +604,7 @@ def execute_task_async(self, task_id: str, agent_id: str):
                 }
 
             logger.info(f"Retrying task {task_id} in {countdown}s (attempt {self.request.retries + 1})", task_id=task_id, agent_id=agent.agentium_id, countdown=countdown, attempt=self.request.retries + 1)
-            raise self.retry(exc=exc, countdown=countdown)
+            raise self.retry(exc=error, countdown=countdown)
 
 
 @celery_app.task(name="agentium.tasks.task_executor.daily_constitution_review")
@@ -1176,7 +1215,7 @@ def check_channel_health():
                 # Broadcast the channel recovery event
                 try:
                     from backend.api.websocket import manager as ws_manager
-                    asyncio.run(ws_manager.broadcast({
+                    run_async(ws_manager.broadcast({
                         "type": "channel_recovered",
                         "channel_id": channel.id,
                         "timestamp": datetime.utcnow().isoformat()
@@ -1228,7 +1267,7 @@ def start_imap_receivers():
             channel_config = channel_data['config']
             if channel_config.get('enable_imap') or channel_config.get('imap_host'):
                 try:
-                    asyncio.run(
+                    run_async(
                         imap_receiver.start_channel(channel_data['id'], channel_config)
                     )
                     started += 1

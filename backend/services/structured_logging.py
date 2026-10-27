@@ -317,7 +317,7 @@ def structured_task(logger_name: Optional[str] = None):
                     raise
 
         # Preserve Celery task attributes by delegating to the wrapped function
-        # This ensures .delay(), .apply_async(), .s(), .run(), etc. work on the decorated task
+        # This ensures .delay(), .apply_async(), .s(), .run(), .push_request(), .pop_request(), etc. work on the decorated task
         if hasattr(func, 'delay'):
             wrapper.delay = func.delay
         if hasattr(func, 'apply_async'):
@@ -334,6 +334,23 @@ def structured_task(logger_name: Optional[str] = None):
             wrapper.AsyncResult = func.AsyncResult
         if hasattr(func, 'run'):
             wrapper.run = func.run
+        if hasattr(func, 'push_request'):
+            # Wrap push_request to also copy the request attribute after calling
+            original_push_request = func.push_request
+            def wrapped_push_request(*args, **kwargs):
+                result = original_push_request(*args, **kwargs)
+                # Copy request attribute from func to wrapper after push_request sets it
+                if hasattr(func, 'request'):
+                    wrapper.request = func.request
+                return result
+            wrapper.push_request = wrapped_push_request
+        if hasattr(func, 'pop_request'):
+            wrapper.pop_request = func.pop_request
+        if hasattr(func, 'max_retries'):
+            wrapper.max_retries = func.max_retries
+        # Also copy request attribute if it exists at decoration time
+        if hasattr(func, 'request'):
+            wrapper.request = func.request
 
         return wrapper
     return decorator

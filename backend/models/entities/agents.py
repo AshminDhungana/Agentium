@@ -14,6 +14,10 @@ from .constitution import Ethos
 import enum
 from .user_config import ConnectionStatus
 
+# Structured logging for observability
+from backend.services.structured_logging import get_structured_logger
+logger = get_structured_logger(__name__)
+
 class AgentType(str, enum.Enum):
     """Agent tiers: 4 governance + 3 critic types."""
     HEAD_OF_COUNCIL = "head_of_council"      # 0xxxx - Prime Minister
@@ -294,7 +298,7 @@ class Agent(BaseEntity):
         
         return skill.skill_id
     
-    def execute_with_skill_rag(
+    async def execute_with_skill_rag(
         self,
         task: "Task",
         db: Session
@@ -304,26 +308,25 @@ class Agent(BaseEntity):
         Main execution method that augments LLM with retrieved skills.
         """
         from backend.services.skill_rag import skill_rag
-        import asyncio
-        
+
         # Run RAG pipeline
-        result = asyncio.run(skill_rag.execute_with_skills(
+        result = await skill_rag.execute_with_skills(
             task_description=task.description,
             agent=self,
             db=db,
             model_config_id=self.get_model_config(db).id if self.get_model_config(db) else None
-        ))
-        
+        )
+
         # Check if we should create new skill from this execution
         if result.get("skills_used") and len(result["skills_used"]) == 0:
             # No existing skills used - potential new skill
-            suggestion = asyncio.run(skill_rag.suggest_skill_creation(
+            suggestion = await skill_rag.suggest_skill_creation(
                 task_description=task.description,
                 execution_result=result,
                 agent=self,
                 db=db
-            ))
-            
+            )
+
             if suggestion:
                 # Auto-submit for review
                 new_skill_id = self.submit_skill(
@@ -332,10 +335,22 @@ class Agent(BaseEntity):
                     db=db
                 )
                 result["suggested_new_skill"] = new_skill_id
-        
+
         result["knowledge_needed"] = bool(result.get("knowledge_needed"))
         result["knowledge_query"] = result.get("knowledge_query")
         return result
+
+    def execute_with_skill_rag_sync(
+        self,
+        task: "Task",
+        db: Session
+    ) -> Dict[str, Any]:
+        """
+        Synchronous wrapper for execute_with_skill_rag.
+        Use this when calling from synchronous contexts (e.g., Celery tasks).
+        """
+        from backend.services.tasks.task_executor import run_async
+        return run_async(self.execute_with_skill_rag(task, db))
 
     def _tier_from_type(self) -> Optional[int]:
         from .agents import AgentType
@@ -426,7 +441,8 @@ class Agent(BaseEntity):
             if det.detected and det.confidence >= 0.5:
                 logger.warning(
                     "Prompt injection pattern detected in system_prompt_override for agent %s. Ignoring override.",
-                    getattr(self, "agentium_id", "unknown"),
+                    agent_id=getattr(self, "agentium_id", "unknown"),
+                    confidence=det.confidence,
                 )
             else:
                 return self.system_prompt_override
@@ -542,7 +558,11 @@ class Agent(BaseEntity):
             return True
         
         except Exception as db_exception:
-            logger.error(f"[Graceful Degradation] DB/Vector Store failed during constitution alignment: {db_exception}")
+            logger.error(
+                "[Graceful Degradation] DB/Vector Store failed during constitution alignment",
+                agent_id=self.agentium_id,
+                error=str(db_exception),
+            )
             # ── GRACEFUL FALLBACK TO TEXT FILE ──
             fallback_path = os.path.join(
                 os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))),
@@ -573,7 +593,11 @@ class Agent(BaseEntity):
                 return True
                 
             except Exception as fallback_exc:
-                logger.error(f"[FATAL] Constitution fallback also failed: {fallback_exc}")
+                logger.error(
+                    "[FATAL] Constitution fallback also failed",
+                    agent_id=self.agentium_id,
+                    error=str(fallback_exc),
+                )
                 # Degrade gracefully: record no references rather than failing
                 # alignment. Persona is Constitution-driven at prompt time anyway.
                 try:
@@ -759,8 +783,9 @@ class Agent(BaseEntity):
             compressed = json.loads(raw_text.strip())
             if not isinstance(compressed, dict):
                 logger.warning(
-                    f"[{self.agentium_id}] Ethos LLM compression returned {type(compressed).__name__} "
-                    f"instead of dict. Falling back to Python heuristic."
+                    "Ethos LLM compression returned non-dict type, falling back to Python heuristic",
+                    agent_id=self.agentium_id,
+                    returned_type=type(compressed).__name__,
                 )
                 ethos.prune_obsolete_content(completed_steps=completed_steps)
                 db.flush()
@@ -1166,10 +1191,9 @@ class Agent(BaseEntity):
             # against the live Constitution. Fail LOUDLY (not silently) so the
             # drift is observable in logs + audit, rather than drifting unnoticed.
             logger.error(
-                "CRITICAL: no active Constitution found while agent %s attempted "
-                "constitutional recalibration — structural self-model cannot be "
-                "re-synced against the live Constitution.",
-                self.agentium_id,
+                "CRITICAL: no active Constitution found while agent attempted constitutional recalibration",
+                agent_id=self.agentium_id,
+                error="no_active_constitution",
             )
             try:
                 from .audit import (

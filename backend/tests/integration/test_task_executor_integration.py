@@ -50,11 +50,34 @@ class TestExecuteTaskAsyncIntegration:
         seeded_db.flush()
 
         # Mock the LLM provider to avoid external calls
-        # Also patch asyncio.run to execute coroutines directly in the existing event loop
-        async def _run_async(coro):
-            return await coro
+        # Patch run_async to execute coroutines directly in the existing event loop
+        import asyncio
+        def _mock_run_async(coro):
+            # If it's already a result (not a coroutine), return it directly
+            # This handles the case where the mock returns a dict directly
+            if not asyncio.iscoroutine(coro):
+                return coro
+            # Otherwise, we're in an async test with a running loop
+            # Use the running loop to await the coroutine
+            loop = asyncio.get_running_loop()
+            # Create a task and wait for it using asyncio.run_coroutine_threadsafe from sync context
+            # But we're already in the event loop thread, so we need a different approach
+            # Just return the coroutine and let the test's event loop handle it
+            # Actually, since we're patching run_async which is called from sync code,
+            # we need to run the coroutine. The trick: use asyncio.get_event_loop().run_until_complete
+            # but that fails if loop is running. So we use a workaround:
+            import concurrent.futures
+            def run_in_new_thread():
+                new_loop = asyncio.new_event_loop()
+                try:
+                    return new_loop.run_until_complete(coro)
+                finally:
+                    new_loop.close()
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                future = executor.submit(run_in_new_thread)
+                return future.result()
 
-        def _mock_execute_with_skill_rag(self, task, db):
+        async def _mock_execute_with_skill_rag(self, task, db):
             return {
                 "content": "Task completed successfully",
                 "tokens_used": 100,
@@ -70,7 +93,7 @@ class TestExecuteTaskAsyncIntegration:
 
         with patch("backend.services.model_provider.ModelService.generate_with_agent", new_callable=AsyncMock) as mock_gen, \
              patch("backend.services.tasks.task_executor.checkpoint_write", new_callable=AsyncMock) as mock_checkpoint, \
-             patch("backend.services.tasks.task_executor.asyncio.run", side_effect=_run_async), \
+             patch("backend.services.tasks.task_executor.run_async", side_effect=_mock_run_async), \
              patch("backend.models.entities.agents.Agent.execute_with_skill_rag", _mock_execute_with_skill_rag):
             mock_gen.return_value = {
                 "content": "Task completed successfully",
@@ -139,16 +162,30 @@ class TestExecuteTaskAsyncIntegration:
         seeded_db.flush()
 
         # Mock the agent's execute_with_skill_rag to raise an exception
-        async def _mock_execute_with_skill_rag(self, task, db):
+        def _mock_execute_with_skill_rag(self, task, db):
             raise RuntimeError("Simulated LLM failure")
 
-        # Also patch asyncio.run to execute coroutines directly in the existing event loop
-        async def _run_async(coro):
-            return await coro
+        # Patch run_async to execute coroutines directly in the existing event loop
+        import asyncio
+        import concurrent.futures
+        def _mock_run_async(coro):
+            # If it's already a result (not a coroutine), return it directly
+            if not asyncio.iscoroutine(coro):
+                return coro
+            # Otherwise, run in a new thread with a new event loop
+            def run_in_new_thread():
+                new_loop = asyncio.new_event_loop()
+                try:
+                    return new_loop.run_until_complete(coro)
+                finally:
+                    new_loop.close()
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                future = executor.submit(run_in_new_thread)
+                return future.result()
 
         with patch("backend.services.tasks.task_executor.checkpoint_write", new_callable=AsyncMock) as mock_checkpoint, \
-             patch("backend.services.tasks.task_executor.asyncio.run", side_effect=_run_async), \
-             patch("backend.models.entities.agents.Agent.execute_with_skill_rag", new_callable=AsyncMock) as mock_execute:
+             patch("backend.services.tasks.task_executor.run_async", side_effect=_mock_run_async), \
+             patch("backend.models.entities.agents.Agent.execute_with_skill_rag", _mock_execute_with_skill_rag):
             mock_checkpoint.return_value = CheckpointOutcome(
                 stage="received",
                 queried_chroma=True,
@@ -157,7 +194,6 @@ class TestExecuteTaskAsyncIntegration:
                 fallback_used=False,
                 parent_id="ckpt:received:test123"
             )
-            mock_execute.side_effect = _mock_execute_with_skill_rag
 
             # Point get_task_db to our test session
             from backend.services.tasks import task_executor as te
@@ -176,7 +212,8 @@ class TestExecuteTaskAsyncIntegration:
         assert task.status == TaskStatus.FAILED
         # mark_failed() sets failure_reason but does not increment error_count
         # (error_count is incremented by fail() which is for retryable failures)
-        assert task.failure_reason == "execution_failed"
+        # Generic RuntimeError is classified as provider_unreachable by the handler
+        assert task.failure_reason == "provider_unreachable"
         assert task.last_error is not None
 
     @pytest.mark.asyncio

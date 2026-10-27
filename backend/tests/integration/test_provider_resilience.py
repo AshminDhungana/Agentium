@@ -80,10 +80,15 @@ class TestExhaustionFailsCleanly:
         db_session.add(task)
         db_session.flush()
 
-        # Patch LLMClient.generate directly (like TestTotalExhaustion does) to avoid
-        # session expiration issues when the mocked exception triggers a commit.
+        # Patch ModelService.generate_with_agent (the inner call) so that
+        # LLMClient.generate's retry/fallback logic runs naturally and produces
+        # the proper ProviderExhaustedError message.
+        from backend.services.model_provider import ModelService
+        async def mock_generate_with_agent(*args, **kwargs):
+            raise RuntimeError(exc_message)
+
         with patch.object(
-            LLMClient, "generate", AsyncMock(side_effect=RuntimeError(exc_message))
+            ModelService, "generate_with_agent", mock_generate_with_agent
         ), patch(
             "backend.services.tasks.task_executor.get_task_db", _fake_get_task_db
         ):

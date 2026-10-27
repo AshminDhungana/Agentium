@@ -1,148 +1,103 @@
-"""
-Correlation ID Middleware for Agentium - Section 14.6
-Generates and propagates request_id across HTTP → Celery → WebSocket for distributed tracing.
-"""
-
+# backend/core/correlation_middleware.py
 import uuid
-import logging
+import contextvars
 from contextlib import contextmanager
-from typing import Optional
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
-from starlette.types import ASGIApp
+from starlette.websockets import WebSocket
 
-from backend.services.structured_logging import (
-    request_id_var,
-    set_request_id,
-    get_request_id,
-    clear_context,
-)
-
-logger = logging.getLogger(__name__)
-
-# Header name for correlation ID
-CORRELATION_HEADER = "X-Request-ID"
-CORRELATION_HEADER_ALT = "X-Correlation-ID"
+from backend.services.structured_logging import set_request_id, get_request_id, request_id_var
 
 
 class CorrelationIdMiddleware(BaseHTTPMiddleware):
-    """
-    Middleware that generates or extracts a correlation ID (request_id) for each request
-    and makes it available via contextvars for structured logging.
+    """Extract or generate request_id, propagate via contextvar and response header."""
 
-    The request_id is:
-    1. Extracted from incoming headers (X-Request-ID or X-Correlation-ID)
-    2. Generated if not present
-    3. Added to response headers for client-side tracing
-    4. Available in contextvars for structured logging throughout the request lifecycle
-    """
-
-    def __init__(
-        self,
-        app: ASGIApp,
-        header_name: str = CORRELATION_HEADER,
-        generator: callable = None,
-    ):
-        super().__init__(app)
-        self.header_name = header_name
-        self.generator = generator or (lambda: str(uuid.uuid4())[:12])
+    HEADER_NAME = "X-Request-ID"
+    FALLBACK_HEADER = "X-Correlation-ID"
 
     async def dispatch(self, request: Request, call_next):
-        # Extract or generate request_id
-        request_id = request.headers.get(self.header_name) or request.headers.get(CORRELATION_HEADER_ALT)
+        # Extract or generate: X-Request-ID first, then X-Correlation-ID, then generate
+        request_id = (
+            request.headers.get(self.HEADER_NAME)
+            or request.headers.get(self.FALLBACK_HEADER)
+            or str(uuid.uuid4())[:12]
+        )
 
-        if not request_id:
-            request_id = self.generator()
+        # Set contextvar for structured logging
+        set_request_id(request_id)
 
-        # Set in contextvar for this request's lifecycle
-        token = request_id_var.set(request_id)
+        # Process request
+        response = await call_next(request)
 
-        try:
-            # Process request
-            response = await call_next(request)
-
-            # Add correlation ID to response headers
-            response.headers[self.header_name] = request_id
-
-            return response
-        finally:
-            # Clean up contextvar
-            request_id_var.reset(token)
+        # Echo back in response
+        response.headers[self.HEADER_NAME] = request_id
+        return response
 
 
-def get_correlation_id() -> str:
-    """Get the current correlation ID, generating one if needed."""
-    return get_request_id()
+# WebSocket correlation ID manager for propagating request_id across WebSocket messages
+class WSCorrelationManager:
+    """Manage correlation IDs for WebSocket connections."""
 
+    # Store request_id per WebSocket connection
+    _connection_context: dict = {}
 
-def set_correlation_id(correlation_id: str) -> None:
-    """Set the correlation ID for the current context."""
-    set_request_id(correlation_id)
+    def set_connection_context(self, websocket: WebSocket, request_id: str | None):
+        """Set the correlation ID for a WebSocket connection."""
+        if request_id:
+            self._connection_context[id(websocket)] = request_id
+            set_request_id(request_id)
 
+    def clear_connection_context(self, websocket: WebSocket):
+        """Clear the correlation ID for a WebSocket connection."""
+        ws_id = id(websocket)
+        if ws_id in self._connection_context:
+            del self._connection_context[ws_id]
 
-class WebSocketCorrelationManager:
-    """
-    Manages correlation IDs for WebSocket connections.
-    WebSocket connections can be long-lived, so we need to track
-    correlation IDs per connection and per message.
-    """
-
-    def __init__(self):
-        self._connection_contexts: dict = {}  # websocket -> request_id
-
-    def set_connection_context(self, websocket, request_id: str):
-        """Set the correlation context for a WebSocket connection."""
-        self._connection_contexts[id(websocket)] = request_id
-
-    def get_connection_context(self, websocket) -> Optional[str]:
+    def get_connection_context(self, websocket: WebSocket) -> str | None:
         """Get the correlation ID for a WebSocket connection."""
-        return self._connection_contexts.get(id(websocket))
-
-    def clear_connection_context(self, websocket):
-        """Clear the correlation context for a WebSocket connection."""
-        self._connection_contexts.pop(id(websocket), None)
+        return self._connection_context.get(id(websocket))
 
     @contextmanager
-    def message_context(self, websocket, message_request_id: Optional[str] = None):
-        """
-        Context manager for handling a WebSocket message with correlation.
-        Uses the message's request_id if provided, otherwise falls back to connection's.
-        """
-        connection_request_id = self.get_connection_context(websocket)
-        request_id = message_request_id or connection_request_id or get_correlation_id()
+    def message_context(self, websocket: WebSocket, message_request_id: str | None = None):
+        """Context manager for handling a single WebSocket message with correlation ID."""
+        # Use message-provided request_id, fallback to connection context, fallback to new
+        request_id = message_request_id or self.get_connection_context(websocket)
+        if not request_id:
+            request_id = str(uuid.uuid4())[:12]
 
-        token = request_id_var.set(request_id)
+        # Save old context
+        old_request_id = request_id_var.get()
+
         try:
+            # Set new context
+            set_request_id(request_id)
+            # Update connection context so subsequent messages in this connection use it
+            self._connection_context[id(websocket)] = request_id
             yield request_id
         finally:
-            request_id_var.reset(token)
+            # Restore old context
+            set_request_id(old_request_id) if old_request_id else request_id_var.set(None)
 
 
 # Global instance for WebSocket correlation management
-ws_correlation_manager = WebSocketCorrelationManager()
+ws_correlation_manager = WSCorrelationManager()
 
 
 # Celery task correlation helpers
-def extract_correlation_from_task_kwargs(kwargs: dict) -> tuple:
-    """
-    Extract correlation IDs from Celery task kwargs.
-    Returns (request_id, task_id, agent_id)
-    """
-    request_id = kwargs.pop("_request_id", None)
-    task_id = kwargs.pop("_task_id", None)
-    agent_id = kwargs.pop("_agent_id", None)
-    return request_id, task_id, agent_id
-
-
 def inject_correlation_into_task_kwargs(
     kwargs: dict,
-    request_id: Optional[str] = None,
-    task_id: Optional[str] = None,
-    agent_id: Optional[str] = None,
-) -> dict:
-    """
-    Inject correlation IDs into Celery task kwargs for propagation.
+    request_id: str | None = None,
+    task_id: str | None = None,
+    agent_id: str | None = None,
+) -> None:
+    """Inject correlation IDs into Celery task kwargs for propagation.
+
+    Args:
+        kwargs: The task kwargs dict to modify (in-place).
+        request_id: Request correlation ID to propagate.
+        task_id: Task ID for tracking.
+        agent_id: Agent ID for tracking.
     """
     if request_id:
         kwargs["_request_id"] = request_id
@@ -150,4 +105,18 @@ def inject_correlation_into_task_kwargs(
         kwargs["_task_id"] = task_id
     if agent_id:
         kwargs["_agent_id"] = agent_id
-    return kwargs
+
+
+def extract_correlation_from_task_kwargs(kwargs: dict) -> tuple[str | None, str | None, str | None]:
+    """Extract correlation IDs from Celery task kwargs.
+
+    Args:
+        kwargs: The task kwargs dict (can be a copy to avoid mutation).
+
+    Returns:
+        Tuple of (request_id, task_id, agent_id).
+    """
+    request_id = kwargs.get("_request_id")
+    task_id = kwargs.get("_task_id")
+    agent_id = kwargs.get("_agent_id")
+    return request_id, task_id, agent_id
