@@ -1,0 +1,1 @@
+# Agentium model schemas package
