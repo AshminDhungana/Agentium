@@ -315,7 +315,12 @@ class LLMClient:
         configs_to_try = configs_to_try[:1 + LLMClient.MAX_FALLBACK_CONFIGS]
 
         last_error: Optional[Exception] = None
-        agentium_id = getattr(agent, "agentium_id", "system")
+        try:
+            agentium_id = getattr(agent, "agentium_id", "system")
+        except (ObjectDeletedError, DetachedInstanceError):
+            # Agent was deleted or detached (e.g., in tests with patched sessions);
+            # fall back to "system" identifier
+            agentium_id = "system"
         attempted_configs: List[str] = []
         errors_per_config: Dict[str, List[str]] = {}
         total_attempts = 0
@@ -456,8 +461,13 @@ class LLMClient:
         _max_retries = max_retries if max_retries is not None else self.max_retries
         if config_id:
             primary_config = config_id
-        elif agent and getattr(agent, "preferred_config_id", None):
-            primary_config = agent.preferred_config_id
+        elif agent:
+            try:
+                primary_config = getattr(agent, "preferred_config_id", None)
+            except (ObjectDeletedError, DetachedInstanceError):
+                # Agent was deleted or detached (e.g., in tests with patched sessions);
+                # fall back to no primary config
+                primary_config = None
         else:
             primary_config = None
 
@@ -471,7 +481,12 @@ class LLMClient:
         configs_to_try = configs_to_try[:1 + LLMClient.MAX_FALLBACK_CONFIGS]
 
         last_error: Optional[Exception] = None
-        agentium_id = getattr(agent, "agentium_id", "system")
+        try:
+            agentium_id = getattr(agent, "agentium_id", "system")
+        except (ObjectDeletedError, DetachedInstanceError):
+            # Agent was deleted or detached (e.g., in tests with patched sessions);
+            # fall back to "system" identifier
+            agentium_id = "system"
         attempted_configs: List[str] = []
         errors_per_config: Dict[str, List[str]] = {}
         total_attempts = 0

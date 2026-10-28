@@ -77,7 +77,7 @@ class TestExecuteTaskAsyncIntegration:
                 future = executor.submit(run_in_new_thread)
                 return future.result()
 
-        async def _mock_execute_with_skill_rag(self, task, db):
+        async def _mock_execute_with_skill_rag(self, task, db, preferred_config_id=None):
             return {
                 "content": "Task completed successfully",
                 "tokens_used": 100,
@@ -162,7 +162,7 @@ class TestExecuteTaskAsyncIntegration:
         seeded_db.flush()
 
         # Mock the agent's execute_with_skill_rag to raise an exception
-        def _mock_execute_with_skill_rag(self, task, db):
+        def _mock_execute_with_skill_rag(self, task, db, preferred_config_id=None):
             raise RuntimeError("Simulated LLM failure")
 
         # Patch run_async to execute coroutines directly in the existing event loop
@@ -239,7 +239,7 @@ class TestExecuteTaskAsyncIntegration:
         seeded_db.flush()
 
         # Mock the agent's execute_with_skill_rag to raise a rate-limited RuntimeError
-        def _mock_execute_with_skill_rag(self, task, db):
+        def _mock_execute_with_skill_rag(self, task, db, preferred_config_id=None):
             raise RuntimeError(
                 "LLMClient.generate exhausted all 1 provider(s) and 2 retries. "
                 "Last error: openai.RateLimitError: 429 Too Many Requests"
@@ -306,7 +306,7 @@ class TestExecuteTaskAsyncIntegration:
         seeded_db.flush()
 
         # Mock the agent's execute_with_skill_rag to raise an invalid-keys RuntimeError
-        def _mock_execute_with_skill_rag(self, task, db):
+        def _mock_execute_with_skill_rag(self, task, db, preferred_config_id=None):
             raise RuntimeError(
                 "LLMClient.generate exhausted all 1 provider(s) and 2 retries. "
                 "Last error: anthropic.AuthenticationError: 401 invalid api key"
@@ -368,7 +368,7 @@ class TestExecuteTaskAsyncIntegration:
         seeded_db.flush()
 
         # Mock the agent's execute_with_skill_rag to raise a connection error
-        def _mock_execute_with_skill_rag(self, task, db):
+        def _mock_execute_with_skill_rag(self, task, db, preferred_config_id=None):
             raise RuntimeError(
                 "LLMClient.generate exhausted all 1 provider(s) and 2 retries. "
                 "Last error: httpx.ConnectError: [Errno 111] Connection refused"
