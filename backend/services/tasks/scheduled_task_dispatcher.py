@@ -134,7 +134,7 @@ def _record_execution(db, row, success: bool, task_id: str = None, error: str = 
 
 
 def _audit(db, row, *, action: str, level, description: str, after_state: dict) -> None:
-    with timed_step(logger, "scheduler_audit", action=action, level=level.value if hasattr(level, 'value') else str(level)):
+    with timed_step(logger, "scheduler_audit", action=action, audit_level=level.value if hasattr(level, 'value') else str(level)):
         entry = AuditLog.log(
             level=level,
             category=AuditCategory.TASK,

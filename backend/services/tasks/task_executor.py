@@ -174,9 +174,10 @@ def execute_task_async(self, task_id: str, agent_id: str):
                 set_task_id(task_id)
                 set_agent_id(agent.agentium_id)
 
-                # Capture agent_id for use in exception handlers (avoids ObjectDeletedError
-                # if session rolls back and expires the agent object)
+                # Capture agent_id and preferred_config_id for use in exception handlers
+                # (avoids ObjectDeletedError if session rolls back and expires the agent object)
                 resolved_agent_id = agent.agentium_id
+                resolved_preferred_config_id = getattr(agent, "preferred_config_id", None)
 
                 # 8.4: received checkpoint — query Chroma + web-search + write-back
                 with timed_step(logger, "checkpoint_received", task_id=task_id, agent_id=agent.agentium_id):
@@ -187,7 +188,7 @@ def execute_task_async(self, task_id: str, agent_id: str):
 
                 # Execute with skill RAG
                 with timed_step(logger, "execute_with_skill_rag", task_id=task_id, agent_id=agent.agentium_id):
-                    result = run_async(agent.execute_with_skill_rag(task, db))
+                    result = run_async(agent.execute_with_skill_rag(task, db, preferred_config_id=resolved_preferred_config_id))
                     import sys
                     print(f"DEBUG: After run_async, result={result}", file=sys.stderr, flush=True)
 

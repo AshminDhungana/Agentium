@@ -289,7 +289,7 @@ class WorkflowExecutor:
         db_session=None,
     ):
         """Update a single WorkflowSubTask row in the database."""
-        with timed_step(logger, "workflow_update_subtask", workflow_id=workflow_id, intent=intent, status=status):
+        with timed_step(logger, "workflow_update_subtask", workflow_id=workflow_id, intent=intent, subtask_status=status):
             if db_session is not None:
                 self._update_subtask_inner(
                     db_session, workflow_id, intent, status, result, error, flush_only=True,
@@ -304,7 +304,7 @@ class WorkflowExecutor:
         self, db, workflow_id, intent, status, result, error, flush_only,
     ):
         """Inner implementation of _update_subtask."""
-        with timed_step(logger, "workflow_update_subtask_inner", workflow_id=workflow_id, intent=intent, status=status):
+        with timed_step(logger, "workflow_update_subtask_inner", workflow_id=workflow_id, intent=intent, subtask_status=status):
             sub = db.query(WorkflowSubTask).filter_by(
                 workflow_id=workflow_id, intent=intent
             ).first()

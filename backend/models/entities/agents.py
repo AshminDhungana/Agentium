@@ -301,7 +301,8 @@ class Agent(BaseEntity):
     async def execute_with_skill_rag(
         self,
         task: "Task",
-        db: Session
+        db: Session,
+        preferred_config_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Execute task using RAG with skills from knowledge library.
@@ -314,7 +315,7 @@ class Agent(BaseEntity):
             task_description=task.description,
             agent=self,
             db=db,
-            model_config_id=self.get_model_config(db).id if self.get_model_config(db) else None
+            model_config_id=preferred_config_id or (self.get_model_config(db).id if self.get_model_config(db) else None)
         )
 
         # Check if we should create new skill from this execution
@@ -343,14 +344,15 @@ class Agent(BaseEntity):
     def execute_with_skill_rag_sync(
         self,
         task: "Task",
-        db: Session
+        db: Session,
+        preferred_config_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Synchronous wrapper for execute_with_skill_rag.
         Use this when calling from synchronous contexts (e.g., Celery tasks).
         """
         from backend.services.tasks.task_executor import run_async
-        return run_async(self.execute_with_skill_rag(task, db))
+        return run_async(self.execute_with_skill_rag(task, db, preferred_config_id=preferred_config_id))
 
     def _tier_from_type(self) -> Optional[int]:
         from .agents import AgentType

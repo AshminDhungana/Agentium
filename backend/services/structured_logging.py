@@ -153,6 +153,7 @@ def structured_log_context(
     agent_id: Optional[str] = None,
     task_id: Optional[str] = None,
     session_id: Optional[str] = None,
+    workflow_id: Optional[str] = None,
 ):
     """Context manager for structured logging with correlation IDs."""
     old_request_id = request_id_var.get()
