@@ -244,6 +244,8 @@ class StructuredLogger:
         # Handle standard logging positional args (e.g., "msg %s", arg)
         if args:
             message = message % args
+        # Prevent "multiple values for argument 'level'" if caller passes level in kwargs
+        kwargs.pop("level", None)
         log_structured(self.logger, level, message, **kwargs)
 
     def debug(self, message: str, *args, **kwargs):

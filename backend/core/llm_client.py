@@ -26,6 +26,7 @@ from backend.services.api_key_manager import api_key_manager
 from backend.services.provider_rate_limiter import provider_rate_limiter
 
 from backend.services.structured_logging import get_structured_logger
+from sqlalchemy.orm.exc import ObjectDeletedError, DetachedInstanceError
 logger = get_structured_logger(__name__)
 
 
@@ -294,8 +295,13 @@ class LLMClient:
         _max_retries = max_retries if max_retries is not None else self.max_retries
         if config_id:
             primary_config = config_id
-        elif agent and getattr(agent, "preferred_config_id", None):
-            primary_config = agent.preferred_config_id
+        elif agent:
+            try:
+                primary_config = getattr(agent, "preferred_config_id", None)
+            except (ObjectDeletedError, DetachedInstanceError):
+                # Agent was deleted or detached (e.g., in tests with patched sessions);
+                # fall back to no primary config
+                primary_config = None
         else:
             primary_config = None
 
