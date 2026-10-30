@@ -36,11 +36,25 @@ from backend.models.entities import Base
 @pytest.fixture(scope="session")
 def docker_services():
     """Start postgres, redis, minio, chromadb via docker-compose.test.yml"""
+    # Clean up any existing containers first to avoid port conflicts
     subprocess.run(
-        ["docker", "compose", "-f", "docker-compose.test.yml", "-p", "agentium-test", "up", "-d"],
-        check=True,
+        ["docker", "compose", "-f", "docker-compose.test.yml", "-p", "agentium-test", "down", "-v"],
         capture_output=True,
     )
+    # Retry up with increasing delays to handle port release timing
+    max_retries = 5
+    for attempt in range(max_retries):
+        result = subprocess.run(
+            ["docker", "compose", "-f", "docker-compose.test.yml", "-p", "agentium-test", "up", "-d"],
+            capture_output=True,
+        )
+        if result.returncode == 0:
+            break
+        # Wait longer between retries
+        time.sleep(5 * (attempt + 1))
+    else:
+        # All retries failed
+        raise RuntimeError(f"docker compose up failed after {max_retries} attempts: {result.stderr}")
     # Wait for healthchecks to pass
     _wait_for_healthchecks()
     yield
@@ -178,5 +192,75 @@ def app_testing_mode(cleanup_db, db_engine, monkeypatch):
     import backend.main
     importlib.reload(backend.main)
     from backend.main import app as reloaded_app
-    
+
     yield reloaded_app
+
+
+@pytest.fixture(scope="function")
+def client(app_testing_mode):
+    """HTTP client for testing FastAPI app in TESTING mode (bypasses auth)."""
+    from fastapi.testclient import TestClient
+    with TestClient(app_testing_mode) as tc:
+        yield tc
+
+
+@pytest.fixture(scope="function")
+def auth_headers():
+    """Authentication headers for API tests with valid JWT token."""
+    import sys
+    sys.path.insert(0, r"E:\Ongoing Projects\Agentium")
+    from backend.core.auth import create_access_token
+    from backend.core.config import settings
+
+    # Create a valid test token
+    token = create_access_token({
+        "sub": "test-user",
+        "user_id": "test-user",
+        "is_admin": True,
+        "is_active": True,
+        "role": "admin",
+        "tier": "0xxxx",  # Head of Council tier
+        "agentium_id": "test-user"
+    })
+    return {"Authorization": f"Bearer {token}"}
+
+
+# ─── Failure Injection Fixtures (Task 1: Graceful Degradation) ───
+
+@pytest.fixture
+def failure_simulator():
+    from tests.utils.failure_simulator import FailureSimulator
+    return FailureSimulator()
+
+
+@pytest.fixture
+def circuit_breaker_inspector():
+    from tests.utils.failure_simulator import CircuitBreakerInspector
+    inspector = CircuitBreakerInspector()
+    # Auto-register known breakers from llm_client
+    try:
+        from backend.core.llm_client import llm_client
+        for name, breaker in llm_client._circuit_breakers.items():
+            inspector.register(name, breaker)
+    except Exception:
+        pass  # llm_client may not be initialized in all test contexts
+    return inspector
+
+
+@pytest.fixture
+def ws_capture():
+    from tests.utils.failure_simulator import WebSocketEventCapture
+    capture = WebSocketEventCapture()
+    capture.start()
+    yield capture
+    capture.stop()
+    capture.clear()
+
+
+@pytest.fixture
+def health_client():
+    from tests.utils.failure_simulator import HealthEndpointClient
+    import sys
+    print("Creating HealthEndpointClient", file=sys.stderr)
+    # Just return the client directly, let tests use it with async with
+    return HealthEndpointClient()
