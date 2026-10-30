@@ -94,7 +94,7 @@ class CircuitBreakerInspector:
         breaker = self._breakers.get(provider_name)
         if not breaker:
             raise KeyError(f"No circuit breaker registered for {provider_name}")
-        return breaker.failure_count
+        return breaker.consecutive_failures
 
     def get_last_failure(self, provider_name: str) -> Optional[float]:
         breaker = self._breakers.get(provider_name)
