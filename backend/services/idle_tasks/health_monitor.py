@@ -35,19 +35,26 @@ async def _broadcast_event(event_type: str, data: Dict[str, Any]):
     Uses same lazy import pattern as SelfHealingService.
     """
     try:
+        logger.warning(f"[DEBUG _broadcast_event] START event_type={event_type}")
         from backend.api.routes.websocket import manager as websocket_manager
+        logger.warning(f"[DEBUG _broadcast_event] IMPORTED manager")
         payload = {"type": event_type, **data}
         loop = None
         try:
             loop = asyncio.get_running_loop()
         except RuntimeError:
             pass
+        logger.warning(f"[DEBUG _broadcast_event] LOOP loop={loop}, loop_running={loop.is_running() if loop else None}")
         if loop and loop.is_running():
+            logger.warning(f"[DEBUG _broadcast_event] SCHEDULING broadcast, manager.broadcast={websocket_manager.broadcast}")
             asyncio.ensure_future(websocket_manager.broadcast(payload))
+            logger.warning(f"[DEBUG _broadcast_event] SCHEDULED broadcast")
         else:
             logger.debug(f"No running event loop for broadcast: {event_type}")
+        logger.warning(f"[DEBUG _broadcast_event] END")
     except Exception as e:
         logger.debug(f"WebSocket broadcast skipped: {e}")
+        logger.warning(f"[DEBUG _broadcast_event] EXCEPTION: {e}")
 
 async def _send_channel_health_check(channel_name: str, payload: Dict[str, Any], timeout: int = 5) -> Dict[str, Any]:
     """Send health check to channel - placeholder for actual bridge implementation."""
@@ -72,7 +79,10 @@ async def agent_health_scan(db: Session, agent: Agent) -> Dict[str, Any]:
     critical_threshold = now - timedelta(minutes=10)
     
     agents = db.query(Agent).filter(
-        Agent.status.in_([AgentStatus.ACTIVE, AgentStatus.IDLE_WORKING])
+        and_(
+            Agent.status.in_([AgentStatus.ACTIVE, AgentStatus.IDLE_WORKING]),
+            Agent.id != agent.id  # Exclude the monitor agent itself
+        )
     ).all()
     
     stalled = []
@@ -90,17 +100,23 @@ async def agent_health_scan(db: Session, agent: Agent) -> Dict[str, Any]:
     for c in crashed:
         a = db.query(Agent).filter_by(agentium_id=c['agentium_id']).first()
         if a:
+            # Query tasks where the crashed agent is in assigned_task_agent_ids
             orphaned = db.query(Task).filter(
                 and_(
-                    Task.assigned_agent_id == a.agentium_id,
+                    Task.assigned_task_agent_ids.contains([a.agentium_id]),
                     Task.status.in_([TaskStatus.IN_PROGRESS, TaskStatus.ASSIGNED])
                 )
             ).all()
             for task in orphaned:
                 task.status = TaskStatus.PENDING
-                task.assigned_agent_id = None
+                # Remove the crashed agent from the assigned_task_agent_ids array
+                # Replace entire list to trigger SQLAlchemy JSONB change detection
+                if task.assigned_task_agent_ids and a.agentium_id in task.assigned_task_agent_ids:
+                    task.assigned_task_agent_ids = [
+                        aid for aid in task.assigned_task_agent_ids if aid != a.agentium_id
+                    ]
                 logger.warning(f"Reassigned orphaned task {task.id} from crashed agent {a.agentium_id}")
-            
+
             a.status = AgentStatus.OFFLINE
             recovered.append(a.agentium_id)
     
@@ -109,7 +125,7 @@ async def agent_health_scan(db: Session, agent: Agent) -> Dict[str, Any]:
     if stalled or crashed:
         logger.warning(f"Health scan: {len(stalled)} stalled, {len(crashed)} crashed agents")
         await _broadcast_event('system_alert', {
-            'type': 'agent_health',
+            'alert_type': 'agent_health',
             'stalled': stalled,
             'crashed': crashed,
             'recovered': recovered,
@@ -141,7 +157,7 @@ async def system_resource_check(db: Session, agent: Agent) -> Dict[str, Any]:
     
     db_pool = {'size': 0, 'checked_out': 0, 'overflow': 0}
     try:
-        from backend.core.database import engine
+        from backend.models.database import engine
         pool = engine.pool
         db_pool = {
             'size': pool.size(),
@@ -184,7 +200,7 @@ async def system_resource_check(db: Session, agent: Agent) -> Dict[str, Any]:
     if warnings:
         logger.warning(f"Resource check warnings: {', '.join(warnings)}")
         await _broadcast_event('system_alert', {
-            'type': 'resource_warning',
+            'alert_type': 'resource_warning',
             'warnings': warnings,
             'metrics': result,
             'timestamp': datetime.utcnow().isoformat()
@@ -240,7 +256,7 @@ async def channel_deep_health(db: Session, agent: Agent) -> Dict[str, Any]:
     
     if unhealthy:
         await _broadcast_event('system_alert', {
-            'type': 'channel_unhealthy',
+            'alert_type': 'channel_unhealthy',
             'channels': unhealthy,
             'timestamp': datetime.utcnow().isoformat()
         })
@@ -269,33 +285,36 @@ async def anomaly_correlation(db: Session, agent: Agent) -> Dict[str, Any]:
     
     since = datetime.utcnow() - timedelta(hours=2)
     tasks = db.query(Task).filter(Task.created_at >= since).all()
-    
+
     if len(tasks) < 10:
         return {'status': 'completed', 'anomalies': [], 'note': 'insufficient_data'}
-    
+
     X = []
     task_refs = []
     for t in tasks:
         duration = (t.completed_at - t.created_at).total_seconds() if t.completed_at else 0
         tokens = t.tokens_used or 0
-        agent_hash = hash(t.assigned_agent_id or '') % 1000
+        # Use first assigned task agent ID if available
+        first_agent_id = t.assigned_task_agent_ids[0] if t.assigned_task_agent_ids else ''
+        agent_hash = hash(first_agent_id) % 1000
         type_hash = hash(t.task_type.value if t.task_type else '') % 100
         X.append([duration, tokens, agent_hash, type_hash])
         task_refs.append(t.id)
-    
+
     X = np.array(X)
     iso_forest = IsolationForest(contamination=0.1, random_state=42)
     predictions = iso_forest.fit_predict(X)
-    
+
     anomalies = []
     for i, pred in enumerate(predictions):
         if pred == -1:
             t = db.query(Task).filter_by(id=task_refs[i]).first()
             if t:
+                first_agent_id = t.assigned_task_agent_ids[0] if t.assigned_task_agent_ids else None
                 anomalies.append({
                     'task_id': t.id,
                     'task_type': t.task_type.value if t.task_type else 'unknown',
-                    'agent_id': t.assigned_agent_id,
+                    'agent_id': first_agent_id,
                     'duration': X[i][0],
                     'tokens': X[i][1]
                 })
@@ -303,7 +322,7 @@ async def anomaly_correlation(db: Session, agent: Agent) -> Dict[str, Any]:
     if anomalies:
         logger.warning(f"Anomaly correlation found {len(anomalies)} anomalies")
         await _broadcast_event('system_alert', {
-            'type': 'anomaly_detected',
+            'alert_type': 'anomaly_detected',
             'anomalies': anomalies[:10],
             'timestamp': datetime.utcnow().isoformat()
         })
@@ -342,7 +361,7 @@ async def auto_recovery_action(db: Session, agent: Agent) -> Dict[str, Any]:
         if r.llen('celery') > 500:
             actions.append('overflow_review_triggered')
             await _broadcast_event('system_alert', {
-                'type': 'overflow_review_needed',
+                'alert_type': 'overflow_review_needed',
                 'queue_depth': r.llen('celery'),
                 'timestamp': datetime.utcnow().isoformat()
             })

@@ -3,6 +3,7 @@ import subprocess
 import time
 import sys
 import os
+from typing import Generator
 
 # ─── CRITICAL: Set test environment variables BEFORE any backend imports ───
 # This prevents backend.models.database from creating an engine with the default
@@ -107,18 +108,46 @@ def db_engine(docker_services):
 
 @pytest.fixture(scope="function")
 def cleanup_db(db_engine):
-    """Truncate all tables after each test to isolate lifespan side effects."""
+    """Truncate all tables before and after each test to isolate lifespan side effects."""
+    def _cleanup():
+        with db_engine.connect() as conn:
+            conn.execute(text("SET session_replication_role = 'replica'"))
+            for table in reversed(Base.metadata.sorted_tables):
+                try:
+                    conn.execute(text(f"DELETE FROM {table.name}"))
+                    conn.commit()
+                except Exception:
+                    conn.rollback()  # Reset transaction state
+                    pass
+            conn.execute(text("SET session_replication_role = 'origin'"))
+            conn.commit()
+
+    # Pre-test cleanup
+    _cleanup()
+
     yield
-    # Post-test cleanup: delete from tables (faster than TRUNCATE with CASCADE on 74 tables)
-    with db_engine.connect() as conn:
-        conn.execute(text("SET session_replication_role = 'replica'"))
-        for table in reversed(Base.metadata.sorted_tables):
-            try:
-                conn.execute(text(f"DELETE FROM {table.name}"))
-            except Exception:
-                pass  # Ignore errors for tables that don't exist or are empty
-        conn.execute(text("SET session_replication_role = 'origin'"))
-        conn.commit()
+
+    # Post-test cleanup
+    _cleanup()
+
+
+@pytest.fixture(scope="function")
+def db_session(db_engine, cleanup_db) -> Generator[Session, None, None]:
+    """Provide a transactional scope around a series of operations."""
+    from sqlalchemy.orm import Session
+    connection = db_engine.connect()
+    # Begin a non-ORM transaction
+    transaction = connection.begin()
+
+    # Bind an individual Session to the connection
+    session = Session(bind=connection, join_transaction_mode="create_savepoint")
+
+    yield session
+
+    # Rollback everything that happened with the Session above
+    session.close()
+    transaction.rollback()
+    connection.close()
 
 
 @pytest.fixture(scope="function")

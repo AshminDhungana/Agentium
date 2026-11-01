@@ -119,19 +119,27 @@ class WebSocketEventCapture:
     def start(self):
         from backend.api.routes.websocket import manager
         self._original_broadcast = manager.broadcast
-        manager.broadcast = self._capture_broadcast
+        # Use a closure to capture self, since assigning instance method directly
+        # doesn't bind self when called as manager.broadcast(payload)
+        async def capture_broadcast(payload: dict):
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"[DEBUG capture_broadcast] CALLED payload={payload}")
+            self.captured_events.append(payload)
+            logger.warning(f"[DEBUG capture_broadcast] APPENDED, captured_events={len(self.captured_events)}")
+            # Don't call original broadcast in tests - it may fail without WebSocket connections
+            # if self._original_broadcast:
+            #     await self._original_broadcast(payload)
+        self._capture_broadcast = capture_broadcast
+        manager.broadcast = capture_broadcast
 
     def stop(self):
         if self._original_broadcast:
             from backend.api.routes.websocket import manager
             manager.broadcast = self._original_broadcast
 
-    async def _capture_broadcast(self, payload: dict):
-        self.captured_events.append(payload)
-        if self._original_broadcast:
-            await self._original_broadcast(payload)
-
     def wait_for_event(self, event_type: str, timeout: float = 5.0) -> dict:
+        """Synchronous version - only use outside async context."""
         import asyncio
         async def _wait():
             import time
@@ -142,7 +150,24 @@ class WebSocketEventCapture:
                         return event
                 await asyncio.sleep(0.05)
             raise TimeoutError(f"Event {event_type} not captured within {timeout}s")
-        return asyncio.run(_wait())
+        try:
+            # If we're already in an event loop, this will fail
+            return asyncio.run(_wait())
+        except RuntimeError:
+            # We're in an async context, need to use the async version
+            raise RuntimeError("wait_for_event() cannot be called from async context. Use await wait_for_event_async() instead.")
+
+    async def wait_for_event_async(self, event_type: str, timeout: float = 5.0) -> dict:
+        """Async version - use inside async tests."""
+        import asyncio
+        import time
+        start = time.time()
+        while time.time() - start < timeout:
+            for event in self.captured_events:
+                if event.get("type") == event_type:
+                    return event
+            await asyncio.sleep(0.05)
+        raise TimeoutError(f"Event {event_type} not captured within {timeout}s")
 
     def clear(self):
         self.captured_events.clear()

@@ -98,6 +98,7 @@ from backend.api.routes import workflows as workflows_routes
 from backend.api.routes import scaling as scaling_routes                       
 from backend.api.routes import wait_poll as wait_poll_routes                   # Phase 16
 from backend.api.routes import knowledge as knowledge_routes                   # Phase 16.3
+from backend.api.routes import health as health_routes                          # Phase 21.5
 
 from backend.core.security_middleware import (
     SessionLimitMiddleware,
@@ -702,7 +703,8 @@ app.include_router(scaling_routes.router,            prefix="/api/v1")
 app.include_router(improvements_routes.router,       prefix="/api/v1") 
 app.include_router(events_routes.router,             prefix="/api/v1")  
 app.include_router(wait_poll_routes.router,          prefix="/api/v1") 
-app.include_router(knowledge_routes.router,          prefix="/api/v1")  
+app.include_router(knowledge_routes.router,          prefix="/api/v1")
+app.include_router(health_routes.router)              # /api/v1/health/...  
 
 
 # ══════════════════════════════════════════════════════════════════════════════

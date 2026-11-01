@@ -129,6 +129,7 @@ class AgentStatus(str, enum.Enum):
     IDLE_WORKING = "idle_working"    # Processing idle task (low-token mode)
     IDLE_PAUSED = "idle_paused"
     SUSPENDED = "suspended"          # Violation detected, under review
+    OFFLINE = "offline"              # Heartbeat lost, unreachable
     TERMINATED = "terminated"        # Permanently deactivated
 
 class PersistentAgentRole(str, enum.Enum):

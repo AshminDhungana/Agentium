@@ -46,7 +46,7 @@ def _make_task(
 ) -> Task:
     """Build an unsaved Task row with sane defaults for resilience tests."""
     return Task(
-        agentium_id=f"T{uuid.uuid4().hex[:8].upper()}",
+        agentium_id=f"1{uuid.uuid4().hex[:7]}",  # Valid format: 8 digits starting with 1
         title="Resilience test task",
         description=description,
         task_type=TaskType.EXECUTION,
@@ -226,8 +226,9 @@ class TestRateLimitsRespected:
                 for i in range(4):
                     # generate_with_agent reads agent.ethos; a fresh unique
                     # agentium_id per call avoids the ModelUsageLog unique key.
+                    # Valid format: 8 digits starting with 2 (2xxxxxxx)
                     agent = types.SimpleNamespace(
-                        ethos=None, agentium_id=f"rl-{cfg.id}-{i}")
+                        ethos=None, agentium_id=f"2{i}{cfg.id.hex[-6:]}")
                     # db=None (not the long-lived seeded_db fixture session):
                     # record_spend/update_token_count run inside LLMClient and
                     # reopen their own committed get_db_context() sessions, so
@@ -609,7 +610,7 @@ class Test429Burst:
             primaries = [make_fake_config(always_429.base_url, engine=db_engine) for _ in range(N)]
             created_ids.extend(str(p.id) for p in primaries)
             agents = [
-                types.SimpleNamespace(ethos=None, agentium_id=f"task-{i}")
+                types.SimpleNamespace(ethos=None, agentium_id=f"3{i:07d}")  # Valid: 8 digits starting with 3
                 for i in range(N)
             ]
 
@@ -669,7 +670,7 @@ class TestInvalidKey:
             created_ids.append(str(primary.id))
             fb = make_fake_config(always_200.base_url, engine=db_engine)
             created_ids.append(str(fb.id))
-            agent = types.SimpleNamespace(ethos=None, agentium_id="task-22")
+            agent = types.SimpleNamespace(ethos=None, agentium_id="40000022")  # Valid: 8 digits starting with 4
 
             # A single task: the 401 primary must be hit exactly once (no retry),
             # then rotate to the 200 fallback (hit exactly once) and complete.
