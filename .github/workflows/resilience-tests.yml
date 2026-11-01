@@ -105,7 +105,7 @@ jobs:
       - name: Run Circuit Breaker Tests (Task 1, 2, 3, 8)
         working-directory: ./backend
         run: |
-          pytest tests/integration/test_circuit_breaker*.py -v -o addopts="" --no-cov -k "${{ github.event.inputs.test_filter }}"
+          pytest tests/integration/test_llm_circuit_breaker.py -v -o addopts="" --no-cov -k "${{ github.event.inputs.test_filter }}"
         env:
           HF_HUB_OFFLINE: "1"
           DATABASE_URL: postgresql://agentium:agentium@localhost:5432/agentium_test
@@ -124,7 +124,7 @@ jobs:
       - name: Run LLM Failover Chain Tests (Task 4)
         working-directory: ./backend
         run: |
-          pytest tests/integration/test_llm_failover*.py -v -o addopts="" --no-cov -k "${{ github.event.inputs.test_filter }}"
+          pytest tests/integration/test_llm_failover.py -v -o addopts="" --no-cov -k "${{ github.event.inputs.test_filter }}"
         env:
           HF_HUB_OFFLINE: "1"
           DATABASE_URL: postgresql://agentium:agentium@localhost:5432/agentium_test
@@ -143,7 +143,7 @@ jobs:
       - name: Run LLM Retry-After Header Parsing Tests (Task 5)
         working-directory: ./backend
         run: |
-          pytest tests/integration/test_llm_retry_after*.py -v -o addopts="" --no-cov -k "${{ github.event.inputs.test_filter }}"
+          pytest tests/integration/test_retry_after_header.py -v -o addopts="" --no-cov -k "${{ github.event.inputs.test_filter }}"
         env:
           HF_HUB_OFFLINE: "1"
           DATABASE_URL: postgresql://agentium:agentium@localhost:5432/agentium_test
