@@ -103,7 +103,7 @@ jobs:
       # ─── Resilience Test Suite (Tasks 1-10 from Graceful Degradation plan) ─────
 
       - name: Run Circuit Breaker Tests (Task 1, 2, 3, 8)
-        working-directory: ./backend
+        working-directory: .
         run: |
           pytest tests/integration/test_llm_circuit_breaker.py -v -o addopts="" --no-cov -k "${{ github.event.inputs.test_filter }}"
         env:
@@ -122,7 +122,7 @@ jobs:
           PYTHONPATH: ${{ github.workspace }}
 
       - name: Run LLM Failover Chain Tests (Task 4)
-        working-directory: ./backend
+        working-directory: .
         run: |
           pytest tests/integration/test_llm_failover.py -v -o addopts="" --no-cov -k "${{ github.event.inputs.test_filter }}"
         env:
@@ -141,7 +141,7 @@ jobs:
           PYTHONPATH: ${{ github.workspace }}
 
       - name: Run LLM Retry-After Header Parsing Tests (Task 5)
-        working-directory: ./backend
+        working-directory: .
         run: |
           pytest tests/integration/test_retry_after_header.py -v -o addopts="" --no-cov -k "${{ github.event.inputs.test_filter }}"
         env:
@@ -160,7 +160,7 @@ jobs:
           PYTHONPATH: ${{ github.workspace }}
 
       - name: Run Storage Fallback Tests (Task 6)
-        working-directory: ./backend
+        working-directory: .
         run: |
           pytest tests/integration/test_storage_fallback.py -v -o addopts="" --no-cov -k "${{ github.event.inputs.test_filter }}"
         env:
@@ -179,7 +179,7 @@ jobs:
           PYTHONPATH: ${{ github.workspace }}
 
       - name: Run Vector Store Fallback Tests (Task 7)
-        working-directory: ./backend
+        working-directory: .
         run: |
           pytest tests/integration/test_vector_store_fallback.py -v -o addopts="" --no-cov -k "${{ github.event.inputs.test_filter }}"
         env:
@@ -198,7 +198,7 @@ jobs:
           PYTHONPATH: ${{ github.workspace }}
 
       - name: Run DB Pool Exhaustion Tests (Task 8)
-        working-directory: ./backend
+        working-directory: .
         run: |
           pytest tests/integration/test_db_pool_exhaustion.py -v -o addopts="" --no-cov -k "${{ github.event.inputs.test_filter }}"
         env:
@@ -217,7 +217,7 @@ jobs:
           PYTHONPATH: ${{ github.workspace }}
 
       - name: Run Health Monitor Alert Tests (Task 9)
-        working-directory: ./backend
+        working-directory: .
         run: |
           pytest tests/integration/test_health_monitor_alerts.py -v -o addopts="" --no-cov -k "${{ github.event.inputs.test_filter }}"
         env:
@@ -236,7 +236,7 @@ jobs:
           PYTHONPATH: ${{ github.workspace }}
 
       - name: Run Correlation ID Propagation Tests (Task 9)
-        working-directory: ./backend
+        working-directory: .
         run: |
           pytest tests/integration/test_correlation_id_propagation.py -v -o addopts="" --no-cov -k "${{ github.event.inputs.test_filter }}"
         env:
@@ -255,7 +255,7 @@ jobs:
           PYTHONPATH: ${{ github.workspace }}
 
       - name: Run Structured Logging Tests (Task 9)
-        working-directory: ./backend
+        working-directory: .
         run: |
           pytest tests/integration/test_structured_logging_21_4.py -v -o addopts="" --no-cov -k "${{ github.event.inputs.test_filter }}"
         env:
@@ -274,7 +274,7 @@ jobs:
           PYTHONPATH: ${{ github.workspace }}
 
       - name: Run Task Degraded Broadcast Tests (Task 9)
-        working-directory: ./backend
+        working-directory: .
         run: |
           pytest tests/integration/test_task_degraded_broadcast.py -v -o addopts="" --no-cov -k "${{ github.event.inputs.test_filter }}"
         env:
@@ -293,7 +293,7 @@ jobs:
           PYTHONPATH: ${{ github.workspace }}
 
       - name: Run Resilience Verification Tests (Task 10)
-        working-directory: ./backend
+        working-directory: .
         run: |
           pytest tests/integration/test_correlation_id_propagation.py tests/integration/test_db_pool_exhaustion.py tests/integration/test_health_monitor_alerts.py tests/integration/test_storage_fallback.py tests/integration/test_structured_logging_21_4.py tests/integration/test_task_degraded_broadcast.py tests/integration/test_vector_store_fallback.py -v -o addopts="" --no-cov -k "${{ github.event.inputs.test_filter }}"
         env:
