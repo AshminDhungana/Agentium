@@ -37,11 +37,21 @@ from backend.models.entities import Base
 @pytest.fixture(scope="session")
 def docker_services():
     """Start postgres, redis, minio, chromadb via docker-compose.test.yml"""
-    # Clean up any existing containers first to avoid port conflicts
+    # Force-remove any existing containers with our names to avoid conflicts
+    # This handles cases where previous runs left orphaned containers
+    container_names = ["agentium-test-postgres", "agentium-test-redis", "agentium-test-chroma"]
+    for name in container_names:
+        subprocess.run(
+            ["docker", "rm", "-f", name],
+            capture_output=True,
+        )
+
+    # Also run compose down to clean up networks/volumes
     subprocess.run(
         ["docker", "compose", "-f", "docker-compose.test.yml", "-p", "agentium-test", "down", "-v"],
         capture_output=True,
     )
+
     # Retry up with increasing delays to handle port release timing
     max_retries = 5
     for attempt in range(max_retries):
@@ -59,9 +69,14 @@ def docker_services():
     # Wait for healthchecks to pass
     _wait_for_healthchecks()
     yield
+    # Cleanup: force-remove containers and compose down
+    for name in container_names:
+        subprocess.run(
+            ["docker", "rm", "-f", name],
+            capture_output=True,
+        )
     subprocess.run(
         ["docker", "compose", "-f", "docker-compose.test.yml", "-p", "agentium-test", "down", "-v"],
-        check=True,
         capture_output=True,
     )
 
