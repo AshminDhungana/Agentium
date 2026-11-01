@@ -227,8 +227,9 @@ class TestRateLimitsRespected:
                     # generate_with_agent reads agent.ethos; a fresh unique
                     # agentium_id per call avoids the ModelUsageLog unique key.
                     # Valid format: 8 digits starting with 2 (2xxxxxxx)
+                    # cfg.id is already a string (not a UUID object), so use it directly
                     agent = types.SimpleNamespace(
-                        ethos=None, agentium_id=f"2{i}{cfg.id.hex[-6:]}")
+                        ethos=None, agentium_id=f"2{i}{str(cfg.id)[-6:]}")
                     # db=None (not the long-lived seeded_db fixture session):
                     # record_spend/update_token_count run inside LLMClient and
                     # reopen their own committed get_db_context() sessions, so
