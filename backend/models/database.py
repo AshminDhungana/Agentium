@@ -138,12 +138,14 @@ def _ensure_tool_usage_log_columns(db: Session):
 
     for alter_stmt in columns_to_add:
         try:
+            if db.get_bind().dialect.name == "postgresql":
+                db.execute(text("SET lock_timeout = '3s'"))
             db.execute(text(f"ALTER TABLE tool_usage_logs {alter_stmt}"))
             db.commit()
         except Exception as e:
             db.rollback()
             if "already exists" not in str(e).lower() and "duplicate" not in str(e).lower():
-                raise
+                logger.warning(f"Could not alter tool_usage_logs ({alter_stmt}): {e}")
 
     logger.info(f"✅ Reconciled tool_usage_logs columns ({len(columns_to_add)} added)")
 
@@ -198,12 +200,14 @@ def _ensure_api_key_resilience_columns(db: Session):
 
     for alter_stmt in columns_to_add:
         try:
+            if db.get_bind().dialect.name == "postgresql":
+                db.execute(text("SET lock_timeout = '3s'"))
             db.execute(text(f"ALTER TABLE user_model_configs {alter_stmt}"))
             db.commit()
         except Exception as e:
             db.rollback()
             if "already exists" not in str(e).lower() and "duplicate" not in str(e).lower():
-                raise
+                logger.warning(f"Could not alter user_model_configs ({alter_stmt}): {e}")
 
     logger.info(f"✅ Added {len(columns_to_add)} API Key Resilience columns to user_model_configs")
 
@@ -217,6 +221,7 @@ def _ensure_taskstatus_enum_values(db: Session):
             raw_conn = engine_obj.raw_connection()
             raw_conn.autocommit = True
             cursor = raw_conn.cursor()
+            cursor.execute("SET lock_timeout = '3s'")
             cursor.execute("ALTER TYPE taskstatus ADD VALUE IF NOT EXISTS 'paused'")
             cursor.close()
             raw_conn.close()

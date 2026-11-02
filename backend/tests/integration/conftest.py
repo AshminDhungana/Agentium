@@ -59,6 +59,9 @@ os.environ.setdefault("EMBEDDING_ACTIVE_VERSION", "v2")
 os.environ.setdefault("BROWSER_ENABLED", "false")
 os.environ["TESTING"] = "true"
 
+from backend.core import config
+config.settings.BROWSER_ENABLED = False
+
 
 from backend.main import app
 from backend.models.database import Base, get_db
@@ -425,12 +428,16 @@ def client(db_session, redis_client, vector_store, celery_eager):
     original_get_vector_store = backend.core.vector_store.get_vector_store
     backend.core.vector_store.get_vector_store = lambda: vector_store
     
-    with TestClient(app) as test_client:
+    # Create TestClient WITHOUT the context manager to avoid triggering the
+    # full lifespan startup/shutdown (which can hang on DDL lock contention,
+    # background tasks, or browser service).
+    test_client = TestClient(app)
+    try:
         yield test_client
-        
-    # Restore override
-    backend.core.vector_store.get_vector_store = original_get_vector_store
-    app.dependency_overrides.clear()
+    finally:
+        # Restore override
+        backend.core.vector_store.get_vector_store = original_get_vector_store
+        app.dependency_overrides.clear()
 
 
 @pytest.fixture(scope="function")

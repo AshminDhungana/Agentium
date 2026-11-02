@@ -163,6 +163,7 @@ jobs:
           EMBEDDING_DIM: "768"
           EMBEDDING_ACTIVE_VERSION: v2
           TESTING: true
+          BROWSER_ENABLED: "false"
           PYTHONPATH: ${{ github.workspace }}
 
       - name: Run connection pool load test
@@ -182,6 +183,7 @@ jobs:
           EMBEDDING_DIM: "768"
           EMBEDDING_ACTIVE_VERSION: v2
           TESTING: true
+          BROWSER_ENABLED: "false"
           PYTHONPATH: ${{ github.workspace }}
 
       - name: Run integration tests with coverage
@@ -200,6 +202,7 @@ jobs:
           EMBEDDING_DIM: "768"
           EMBEDDING_ACTIVE_VERSION: v2
           TESTING: true
+          BROWSER_ENABLED: "false"
           PYTHONPATH: ${{ github.workspace }}
 
       - name: Upload coverage report

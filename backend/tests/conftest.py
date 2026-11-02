@@ -1,6 +1,8 @@
 # tests/conftest.py
 import os
 os.environ["ENCRYPTION_KEY"] = "ZmDfcTF7_60GrrY167zsiPd67pEvs0aGOv2oasOM1Pg="
+os.environ.setdefault("BROWSER_ENABLED", "false")
+os.environ.setdefault("TESTING", "true")
 
 import pytest
 import pytest_asyncio
