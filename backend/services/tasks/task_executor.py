@@ -2185,7 +2185,7 @@ def generate_auto_tools():
 # Celery Throughput Performance Gate No-op Task
 # ──────────────────────────────────────────────────────────────────────────────
 
-@celery_app.task(name="agentium.tasks.task_executor.execute_task_async")
-def execute_task_async_noop(*args, **kwargs):
-    """No-op task for Celery throughput performance benchmark."""
+@celery_app.task(name="agentium.tasks.noop_perf_task")
+def execute_task_noop_perf(*args, **kwargs):
+    """Dedicated no-op task for Celery throughput performance benchmark."""
     return {"noop": True}

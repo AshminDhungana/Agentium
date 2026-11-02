@@ -441,6 +441,12 @@ if _HAS_LOCUST:
                     resp.failure(f"Unexpected provider status: {resp.status_code}")
                     return
 
+    # Phase 21.5.2: WebSocket 2x load testing user
+    try:
+        from backend.tests.load.websocket_user import WebSocketUser
+    except Exception:
+        pass
+
 
 # =============================================================================
 # Reporting

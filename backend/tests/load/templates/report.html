@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Agentium 2× Peak Load & Stress Test Report</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 24px; background: #0f172a; color: #f8fafc; }
+    .container { max-width: 1200px; margin: 0 auto; }
+    h1 { font-size: 28px; margin-bottom: 8px; color: #38bdf8; }
+    .subtitle { color: #94a3b8; margin-bottom: 24px; font-size: 14px; }
+    .verdict-banner { padding: 18px 24px; border-radius: 8px; margin-bottom: 24px; font-weight: bold; font-size: 20px; display: flex; align-items: center; justify-content: space-between; }
+    .verdict-pass { background: #064e3b; border: 1px solid #10b981; color: #34d399; }
+    .verdict-fail { background: #7f1d1d; border: 1px solid #ef4444; color: #f87171; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-bottom: 24px; }
+    .card { background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 20px; }
+    .card-title { font-size: 14px; color: #94a3b8; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .card-value { font-size: 26px; font-weight: bold; color: #f8fafc; }
+    .badge { display: inline-block; padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: bold; }
+    .badge-pass { background: #064e3b; color: #34d399; }
+    .badge-fail { background: #7f1d1d; color: #f87171; }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 14px; }
+    th, td { text-align: left; padding: 12px 14px; border-bottom: 1px solid #334155; }
+    th { color: #94a3b8; background: #1e293b; font-weight: 600; }
+    tr:hover { background: #1e293b80; }
+    .chart-container { background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 20px; margin-bottom: 24px; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>Agentium 2× Peak Load & Stress Test Report</h1>
+  <div class="subtitle">Generated: {{ report.generated_at }} | Mode: <strong>{{ report.mode | upper }}</strong> | Duration: {{ report.duration_sec }}s</div>
+
+  <div class="verdict-banner {{ 'verdict-pass' if report.overall_pass else 'verdict-fail' }}">
+    <span>Overall Status: {{ 'PASS (All 2× Targets Met)' if report.overall_pass else 'FAIL (Threshold Breached)' }}</span>
+    <span class="badge {{ 'badge-pass' if report.overall_pass else 'badge-fail' }}">{{ 'PASSED' if report.overall_pass else 'FAILED' }}</span>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <div class="card-title">API Throughput</div>
+      <div class="card-value">{{ report.metrics.api_rps }} RPS</div>
+      <div style="margin-top: 8px; font-size: 13px; color: #94a3b8;">Target: &ge; {{ report.targets.min_rps }} RPS | p95: {{ report.metrics.api_p95_ms }}ms</div>
+    </div>
+    <div class="card">
+      <div class="card-title">DB Pool Peak Utilization</div>
+      <div class="card-value">{{ report.metrics.db_pool_peak_pct }}%</div>
+      <div style="margin-top: 8px; font-size: 13px; color: #94a3b8;">Capacity: 30 connections | Limit: &lt; 95%</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Celery Task Throughput</div>
+      <div class="card-value">{{ report.metrics.celery_tasks_per_hr }} /hr</div>
+      <div style="margin-top: 8px; font-size: 13px; color: #94a3b8;">Target: &ge; {{ report.targets.min_tasks_per_hr }} tasks/hr</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Memory Growth Rate</div>
+      <div class="card-value">{{ report.metrics.memory_growth_rate_mb_per_min }} MB/min</div>
+      <div style="margin-top: 8px; font-size: 13px; color: #94a3b8;">Threshold: &lt; 50 MB/min (Peak: {{ report.metrics.rss_peak_mb }}MB)</div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom: 24px;">
+    <h3 style="margin-top:0; color:#38bdf8;">Component Gate Verdicts</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Component</th>
+          <th>Criteria</th>
+          <th>Measured</th>
+          <th>Verdict</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for name, comp in report.components.items() %}
+        <tr>
+          <td style="font-weight: 600;">{{ name | upper }}</td>
+          <td>{{ comp.criteria }}</td>
+          <td>{{ comp.measured }}</td>
+          <td>
+            <span class="badge {{ 'badge-pass' if comp.passed else 'badge-fail' }}">
+              {{ 'PASS' if comp.passed else 'FAIL' }}
+            </span>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="chart-container">
+    <h3 style="margin-top:0; color:#38bdf8;">Process RSS Memory & DB Pool Utilization Time-Series</h3>
+    <canvas id="metricsChart" height="90"></canvas>
+  </div>
+</div>
+
+<script>
+  const timeLabels = {{ report.charts.labels | tojson }};
+  const rssData = {{ report.charts.rss_mb | tojson }};
+  const poolData = {{ report.charts.pool_util | tojson }};
+
+  const ctx = document.getElementById('metricsChart').getContext('2d');
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: timeLabels,
+      datasets: [
+        {
+          label: 'Process RSS (MB)',
+          data: rssData,
+          borderColor: '#38bdf8',
+          backgroundColor: '#38bdf820',
+          yAxisID: 'y1',
+          tension: 0.2
+        },
+        {
+          label: 'DB Pool Utilization (%)',
+          data: poolData,
+          borderColor: '#10b981',
+          backgroundColor: '#10b98120',
+          yAxisID: 'y2',
+          tension: 0.2
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      scales: {
+        x: { grid: { color: '#334155' }, ticks: { color: '#94a3b8' } },
+        y1: { type: 'linear', position: 'left', grid: { color: '#334155' }, ticks: { color: '#38bdf8' } },
+        y2: { type: 'linear', position: 'right', min: 0, max: 100, grid: { drawOnChartArea: false }, ticks: { color: '#10b981' } }
+      },
+      plugins: {
+        legend: { labels: { color: '#f8fafc' } }
+      }
+    }
+  });
+</script>
+</body>
+</html>
+

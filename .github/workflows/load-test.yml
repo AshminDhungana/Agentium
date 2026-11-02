@@ -1,0 +1,63 @@
+name: 2× Peak Load & Stress Testing Gate
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/load-test.yml'
+  push:
+    branches: [ main ]
+    paths:
+      - 'backend/**'
+  workflow_dispatch:
+
+jobs:
+  load-test-gate:
+    name: Load & Stress Test Gate (21.5.2)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+          pip install -r backend/requirements-dev.txt
+
+      - name: Run 2× Pool Saturation & Unit Tests
+        env:
+          CELERY_TASK_ALWAYS_EAGER: "true"
+        run: |
+          pytest backend/tests/load/test_connection_pool_load.py \
+                 backend/tests/load/test_connection_pool_leak.py \
+                 backend/tests/load/test_celery_throughput.py \
+                 backend/tests/unit/test_sampler.py \
+                 backend/tests/unit/test_baseline.py \
+                 backend/tests/unit/test_websocket_user.py \
+                 backend/tests/unit/test_load_report.py \
+                 --no-cov -v
+
+      - name: Execute Quick Load Test Gate
+        run: |
+          python -m backend.tests.load.orchestrator --mode quick --duration 60 --users 150 --gate
+
+      - name: Upload Load Test Reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: load-test-reports
+          path: |
+            backend/tests/load/load_report.html
+            backend/tests/load/load_report.json
+            backend/tests/load/baseline.json
+

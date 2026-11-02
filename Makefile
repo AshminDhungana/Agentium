@@ -102,10 +102,20 @@ benchmark:
 	  PYTHONPATH=. \
 	  pytest tests/benchmarks/test_chroma_query.py -m benchmark --benchmark-only --benchmark-save=baseline
 
-# Run Locust load-test suite against ephemeral infra or staging
-load-test:
-	@echo "Running Locust load-test suite..."
-	@echo "Target: $(STAGING_HOST) | Users: $(or $(LOCUST_USERS),1000) | Duration: $(or $(LOCUST_RUN_TIME),5m)"
+# Quick mode (CI): 5 min, 75% of 2x (1.5x baseline)
+load-test-quick:
+	@python -m backend.tests.load.orchestrator --mode quick --gate
+
+# Full mode (release): 15 min, 100% of 2x (2x baseline)
+load-test-full:
+	@python -m backend.tests.load.orchestrator --mode full --gate
+
+# Soak mode (manual): 60 min, 100% of 2x
+load-test-soak:
+	@python -m backend.tests.load.orchestrator --mode soak
+
+# Legacy direct Locust run (backward compat)
+load-test-legacy:
 	@cd backend/tests/load && \
 	  locust \
 	    --host $(STAGING_HOST) \
@@ -114,6 +124,9 @@ load-test:
 	    --run-time $(or $(LOCUST_RUN_TIME),5m) \
 	    --headless \
 	    --html locust_report.html
+
+# Default alias
+load-test: load-test-quick
 
 # Run all performance gates (benchmark + load-test)
 perf-gate: benchmark load-test

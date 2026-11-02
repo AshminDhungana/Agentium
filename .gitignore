@@ -62,3 +62,8 @@ CLAUDE.md
 docs_ministry/
 chroma_data/
 **/chroma_data/
+
+# Load test outputs
+**/baseline.json
+**/load_report.html
+**/load_report.json
