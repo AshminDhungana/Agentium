@@ -96,6 +96,7 @@ jobs:
         working-directory: ./backend
         run: |
           pip install --upgrade pip setuptools wheel
+          pip install --no-cache-dir torch torchaudio --index-url https://download.pytorch.org/whl/cpu
           pip install --no-cache-dir -r requirements.txt -r requirements-dev.txt
 
       # ── Secret Config Git-Guard (todo.md:879) ───────────────────────────────
@@ -236,6 +237,7 @@ jobs:
         working-directory: ./backend
         run: |
           pip install --upgrade pip setuptools wheel
+          pip install --no-cache-dir torch torchaudio --index-url https://download.pytorch.org/whl/cpu
           pip install --no-cache-dir -r requirements.txt -r requirements-dev.txt
 
       - name: Install performance testing tools

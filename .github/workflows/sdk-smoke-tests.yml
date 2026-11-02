@@ -44,6 +44,15 @@ jobs:
       fail-fast: false
 
     steps:
+      - name: Free disk space
+        run: |
+          echo "=== Freeing runner disk space ==="
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          df -h
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -89,7 +98,8 @@ jobs:
         working-directory: ./backend
         run: |
           pip install --upgrade pip setuptools wheel
-          pip install -r requirements.txt
+          pip install --no-cache-dir torch torchaudio --index-url https://download.pytorch.org/whl/cpu
+          pip install --no-cache-dir -r requirements.txt
 
       - name: Start backend server
         run: |

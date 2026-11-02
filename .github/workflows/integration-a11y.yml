@@ -90,6 +90,7 @@ jobs:
             psql -U agentium -d agentium_test -c "CREATE EXTENSION IF NOT EXISTS vector;"
           cd backend
           pip install --upgrade pip setuptools wheel
+          pip install --no-cache-dir torch torchaudio --index-url https://download.pytorch.org/whl/cpu
           pip install --no-cache-dir -r requirements.txt -r requirements-dev.txt
           alembic upgrade head
         env:
