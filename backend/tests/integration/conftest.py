@@ -266,7 +266,12 @@ def redis_client():
     """Provide a flushed Redis database for the test."""
     # Use localhost in CI, 'redis' in Docker network
     redis_url = os.environ.get("REDIS_URL", "redis://localhost:6379/1")
-    client = sync_redis.Redis.from_url(redis_url, decode_responses=False)
+    client = sync_redis.Redis.from_url(
+        redis_url,
+        decode_responses=False,
+        socket_connect_timeout=2.0,
+        socket_timeout=2.0,
+    )
 
     # Verify connection
     try:
