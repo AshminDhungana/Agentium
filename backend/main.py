@@ -215,12 +215,12 @@ async def lifespan(app: FastAPI):
     # 1. Initialize Database
     # ─────────────────────────────────────────────────────────────
     try:
-        init_db()
-        logger.info("✅ Database initialized")
-
         if os.environ.get("TESTING") == "true":
-            logger.info("⏭️ TESTING mode — skipping admin bootstrap and pricing cache load")
+            logger.info("⏭️ TESTING mode — skipping DB init, admin bootstrap and pricing cache load")
         else:
+            init_db()
+            logger.info("✅ Database initialized")
+
             db = next(get_db())
             try:
                 # In tests, seeded_db fixture creates admin inside the savepoint

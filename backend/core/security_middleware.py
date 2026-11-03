@@ -12,6 +12,7 @@ Phase 17.1 (added):
 - ErrorCounterMiddleware: Weighted 4xx sliding-window counter via atomic Lua script
 """
 
+import os
 import re
 import time
 import logging
@@ -105,11 +106,16 @@ class IPBlocklistMiddleware(BaseHTTPMiddleware):
     legitimate clients know when to try again.
     """
 
-    def __init__(self, app, redis):
+    def __init__(self, app, redis, enforce_in_testing: bool = False):
         super().__init__(app)
         self.redis = redis
+        self.enforce_in_testing = enforce_in_testing
 
     async def dispatch(self, request: Request, call_next):
+        # In CI/testing, skip blocklist check unless explicitly enforced
+        if (os.environ.get("TESTING") == "true" or os.environ.get("CI") == "true") and not self.enforce_in_testing:
+            return await call_next(request)
+
         # Skip blocklist for health checks so load balancers and probe agents are never locked out
         if request.url.path in ("/api/health", "/health", "/healthz", "/ready", "/readyz"):
             return await call_next(request)
@@ -185,10 +191,11 @@ class ErrorCounterMiddleware(BaseHTTPMiddleware):
     never affect the response delivered to the client.
     """
 
-    def __init__(self, app, redis, window_seconds: int = 300):
+    def __init__(self, app, redis, window_seconds: int = 300, enforce_in_testing: bool = False):
         super().__init__(app)
         self.redis = redis
         self.window = window_seconds
+        self.enforce_in_testing = enforce_in_testing
         self._sha: str | None = None   # cached EVALSHA — loaded once on first use
 
     async def _get_sha(self) -> str:
@@ -198,6 +205,11 @@ class ErrorCounterMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next):
         response = await call_next(request)
+
+        # In CI/testing, skip error counter unless explicitly enforced
+        if (os.environ.get("TESTING") == "true" or os.environ.get("CI") == "true") and not self.enforce_in_testing:
+            return response
+
         status = response.status_code
 
         if 400 <= status < 500 and status != 429:
