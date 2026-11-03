@@ -422,24 +422,31 @@ def mock_ai_provider(monkeypatch):
 
 @pytest.fixture(scope="function")
 def client(db_session, redis_client, vector_store, celery_eager):
-    """FastAPI TestClient with dependency overrides."""
+    """FastAPI test client with dependency overrides.
+
+    Uses httpx.Client with ASGITransport (same-thread execution) instead of
+    TestClient to avoid thread-safety issues with shared SQLAlchemy sessions.
+    """
     def override_get_db():
         yield db_session
 
     app.dependency_overrides[get_db] = override_get_db
-    
+
     # Also patch the global get_vector_store to return our test instance
     import backend.core.vector_store
     original_get_vector_store = backend.core.vector_store.get_vector_store
     backend.core.vector_store.get_vector_store = lambda: vector_store
-    
-    # Create TestClient WITHOUT the context manager to avoid triggering the
-    # full lifespan startup/shutdown (which can hang on DDL lock contention,
-    # background tasks, or browser service).
-    test_client = TestClient(app)
+
+    # Use httpx.Client with ASGITransport for same-thread execution.
+    # This avoids the thread-safety issues of TestClient (which runs in a
+    # background thread) when sharing a SQLAlchemy session across the test
+    # and the request handler.
+    transport = ASGITransport(app=app)
+    test_client = httpx.Client(transport=transport, base_url="http://test")
     try:
         yield test_client
     finally:
+        test_client.close()
         # Restore override
         backend.core.vector_store.get_vector_store = original_get_vector_store
         app.dependency_overrides.clear()
