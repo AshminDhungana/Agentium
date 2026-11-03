@@ -134,7 +134,15 @@ class ConstitutionUpdateRequest(BaseModel):
 
 
 def create_default_admin(db: Session):
-    """Create default admin user if not exists."""
+    """Create default admin user if not exists.
+
+    In TESTING mode, uses flush() instead of commit() to avoid breaking
+    the savepoint-based transaction isolation used by integration test fixtures.
+    The caller (lifespan or test) is responsible for committing the transaction.
+    """
+    import os
+    is_testing = os.environ.get("TESTING") == "true"
+
     admin = db.query(User).filter(User.username == "admin").first()
     if not admin:
         admin = User(
@@ -146,7 +154,10 @@ def create_default_admin(db: Session):
             is_admin=True
         )
         db.add(admin)
-        db.commit()
+        if is_testing:
+            db.flush()
+        else:
+            db.commit()
         db.refresh(admin)
         logger.info(f"✅ Default admin user created (ID: {admin.id})")
         return True
@@ -156,7 +167,10 @@ def create_default_admin(db: Session):
             admin.is_active = True
             admin.is_pending = False
             admin.is_admin = True
-            db.commit()
+            if is_testing:
+                db.flush()
+            else:
+                db.commit()
             logger.info("✅ Admin user permissions updated")
         return False
 

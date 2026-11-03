@@ -176,16 +176,16 @@ class VectorStore:
         surface promptly instead of blocking the caller forever.
         """
         httpx = self._get_httpx()
-        session: httpx.Client = getattr(self._client, '_session', None)  # type: ignore[attr-defined]
-        if session is None:
-            return
-        base_url = session.base_url
-        self._client._session = httpx.Client(  # type: ignore[attr-defined]
-            base_url=str(base_url) if base_url else f"http://{self._host}:{self._port}",
-            timeout=httpx.Timeout(30.0, connect=10.0, read=30.0, write=30.0, pool=10.0),
-            limits=session._limits,
-            headers=dict(session.headers),
-        )
+        timeout = httpx.Timeout(10.0, connect=3.0, read=10.0, write=10.0, pool=5.0)
+
+        # ChromaDB 0.4.x+ / 1.x stores _session under self._client._server
+        server = getattr(self._client, "_server", None)
+        if server and hasattr(server, "_session") and hasattr(server._session, "timeout"):
+            server._session.timeout = timeout
+
+        # Some variants store _session directly on self._client
+        if hasattr(self._client, "_session") and hasattr(self._client._session, "timeout"):
+            self._client._session.timeout = timeout
 
     def initialize(self) -> "chromadb.ClientAPI":
         """

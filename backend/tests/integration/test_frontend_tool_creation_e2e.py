@@ -5,6 +5,7 @@ Covers planning task §3.4 (P2): confirm UI-created tools actually persist on
 the backend and are not lost to a stale registry / cache.
 """
 import pytest
+import pytest_asyncio
 
 from sqlalchemy import select
 
@@ -90,10 +91,11 @@ def test_direct_service_tool_persists_and_is_invocable(seeded_db):
 
 
 @pytest.mark.integration
-def test_http_propose_route_registers_and_exports_tool(client, seeded_db, head_auth_headers):
+@pytest.mark.asyncio
+async def test_http_propose_route_registers_and_exports_tool(client, seeded_db, head_auth_headers):
     name = f"e2e_probe_{uuid4().hex[:8]}"
     body = _make_request(name).model_dump()
-    resp = client.post(
+    resp = await client.post(
         "/api/v1/tool-management/propose",
         json=body,
         headers=head_auth_headers,

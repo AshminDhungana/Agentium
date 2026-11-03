@@ -91,14 +91,15 @@ async def test_mock_ai_provider(mock_ai_provider):
     assert mock_ai_provider.call_count == 2
 
 
-def test_client_and_auth(client, auth_headers):
+@pytest.mark.asyncio
+async def test_client_and_auth(client, auth_headers):
     """Verify FastAPI TestClient and auth_headers work."""
     # Unauthenticated health check
-    resp = client.get("/api/health")
+    resp = await client.get("/api/health")
     assert resp.status_code == 200
     assert resp.json()["status"] == "healthy"
-    
+
     # Authenticated request
-    resp2 = client.get("/api/v1/auth/verify-session", headers=auth_headers)
+    resp2 = await client.get("/api/v1/auth/verify-session", headers=auth_headers)
     assert resp2.status_code == 200
     assert resp2.json()["user"]["username"] == "admin"

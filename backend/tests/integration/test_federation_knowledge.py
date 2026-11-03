@@ -16,6 +16,7 @@ from types import SimpleNamespace
 
 import httpx
 import pytest
+import pytest_asyncio
 
 from backend.core.config import settings
 
@@ -78,15 +79,6 @@ def _make_user(db, username: str, is_admin: bool):
     return user
 
 
-def _login(client, username: str):
-    resp = client.post(
-        "/api/v1/auth/login",
-        json={"username": username, "password": "password123"},
-    )
-    assert resp.status_code == 200, f"login failed for {username}: {resp.text}"
-    return {"Authorization": f"Bearer {resp.json()['access_token']}"}
-
-
 @pytest.fixture
 def fed_enabled(monkeypatch):
     monkeypatch.setattr(settings, "FEDERATION_ENABLED", True)
@@ -108,14 +100,16 @@ class TestKnowledgeShareWebhook:
             "metadatas": [{"origin": "test"} for _ in docs],
         }).encode()
 
-    def test_share_requires_peer_auth(self, client, fed_enabled, peer):
-        resp = client.post(
+    @pytest.mark.asyncio
+    async def test_share_requires_peer_auth(self, client, fed_enabled, peer):
+        resp = await client.post(
             "/api/v1/federation/knowledge-share",
             content=self._body(),
         )
         assert resp.status_code == 401
 
-    def test_share_ingests_with_federated_metadata(
+    @pytest.mark.asyncio
+    async def test_share_ingests_with_federated_metadata(
         self, client, seeded_db, fed_enabled, peer, monkeypatch,
     ):
         stored = []
@@ -132,7 +126,7 @@ class TestKnowledgeShareWebhook:
                             lambda: _FakeKS())
 
         body = self._body()
-        resp = client.post(
+        resp = await client.post(
             "/api/v1/federation/knowledge-share",
             content=body,
             headers=_hmac_headers(PEER_URL, SECRET, body),
@@ -148,8 +142,9 @@ class TestKnowledgeShareWebhook:
         assert stored[0]["metadata"]["origin"] == "test"
         assert stored[0]["doc_id"].startswith("fed_share_")
 
-    def test_share_bad_json_rejected(self, client, fed_enabled, peer):
-        resp = client.post(
+    @pytest.mark.asyncio
+    async def test_share_bad_json_rejected(self, client, fed_enabled, peer):
+        resp = await client.post(
             "/api/v1/federation/knowledge-share",
             content=b"not json at all",
             headers=_hmac_headers(PEER_URL, SECRET, b"not json at all"),
@@ -160,16 +155,18 @@ class TestKnowledgeShareWebhook:
 class TestKnowledgeSyncRoute:
     """POST /api/v1/federation/knowledge/sync/{peer_id} — constitution pull."""
 
-    def test_sync_requires_admin(self, client, seeded_db, fed_enabled, peer):
+    @pytest.mark.asyncio
+    async def test_sync_requires_admin(self, client, seeded_db, fed_enabled, peer):
         _make_user(seeded_db, "plainuser", is_admin=False)
-        plain = _login(client, "plainuser")
-        resp = client.post(
+        plain = await _login_async(client, "plainuser")
+        resp = await client.post(
             f"/api/v1/federation/knowledge/sync/{peer.id}",
             headers=plain,
         )
         assert resp.status_code == 403
 
-    def test_sync_success_upserts_articles(
+    @pytest.mark.asyncio
+    async def test_sync_success_upserts_articles(
         self, client, seeded_db, fed_enabled, peer, auth_headers, monkeypatch,
     ):
         upserts = []
@@ -197,7 +194,7 @@ class TestKnowledgeSyncRoute:
         import backend.core.vector_store as vs_mod
         monkeypatch.setattr(vs_mod, "VectorStore", _FakeStore)
 
-        resp = client.post(
+        resp = await client.post(
             f"/api/v1/federation/knowledge/sync/{peer.id}",
             headers=auth_headers,
         )
@@ -208,7 +205,8 @@ class TestKnowledgeSyncRoute:
         assert upserts[0]["metadatas"][0]["source"] == "federation"
         assert "Peer Alpha" in upserts[0]["documents"][0]
 
-    def test_sync_peer_unreachable_returns_500(
+    @pytest.mark.asyncio
+    async def test_sync_peer_unreachable_returns_500(
         self, client, seeded_db, fed_enabled, peer, auth_headers, monkeypatch,
     ):
         def fake_get(url, **kwargs):
@@ -216,9 +214,18 @@ class TestKnowledgeSyncRoute:
 
         monkeypatch.setattr(httpx, "get", fake_get)
 
-        resp = client.post(
+        resp = await client.post(
             f"/api/v1/federation/knowledge/sync/{peer.id}",
             headers=auth_headers,
         )
         assert resp.status_code == 500
         assert resp.json()["code"] == "FAILED_TO_SYNC_KNOWLEDGE_FROM"
+
+
+async def _login_async(client, username: str):
+    resp = await client.post(
+        "/api/v1/auth/login",
+        json={"username": username, "password": "password123"},
+    )
+    assert resp.status_code == 200, f"login failed for {username}: {resp.text}"
+    return {"Authorization": f"Bearer {resp.json()['access_token']}"}

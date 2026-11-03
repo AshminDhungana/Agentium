@@ -9,7 +9,7 @@ from backend.core.config import settings
 pytestmark = pytest.mark.integration
 
 
-def _create_active_user(client, is_admin=False) -> User:
+async def _create_active_user(client, is_admin=False) -> User:
     """Helper to create an active, approved user in the DB."""
     from backend.models.database import get_db
     from backend.main import app
@@ -30,11 +30,11 @@ def _create_active_user(client, is_admin=False) -> User:
     return user
 
 
-def test_2_2_1_login_returns_valid_jwt_token(client):
+async def test_2_2_1_login_returns_valid_jwt_token(client):
     """2.2.1 — POST /api/v1/auth/login returns valid JWT token"""
-    user = _create_active_user(client)
+    user = await _create_active_user(client)
 
-    response = client.post("/api/v1/auth/login", json={
+    response = await client.post("/api/v1/auth/login", json={
         "username": user.username,
         "password": "ValidPassword123!"
     })
@@ -47,11 +47,11 @@ def test_2_2_1_login_returns_valid_jwt_token(client):
     assert data["user"]["username"] == user.username
 
 
-def test_2_2_2_token_contains_correct_claims(client):
+async def test_2_2_2_token_contains_correct_claims(client):
     """2.2.2 — Token contains correct claims (user_id, username, is_admin, exp)"""
-    user = _create_active_user(client, is_admin=True)
+    user = await _create_active_user(client, is_admin=True)
 
-    response = client.post("/api/v1/auth/login", json={
+    response = await client.post("/api/v1/auth/login", json={
         "username": user.username,
         "password": "ValidPassword123!"
     })
@@ -67,19 +67,19 @@ def test_2_2_2_token_contains_correct_claims(client):
     assert "exp" in payload
 
 
-def test_2_2_3_token_refresh_mechanism_works(client):
+async def test_2_2_3_token_refresh_mechanism_works(client):
     """2.2.3 — Token refresh mechanism works"""
-    user = _create_active_user(client)
+    user = await _create_active_user(client)
 
     # First login to get refresh token
-    login_resp = client.post("/api/v1/auth/login", json={
+    login_resp = await client.post("/api/v1/auth/login", json={
         "username": user.username,
         "password": "ValidPassword123!"
     })
     refresh_token = login_resp.json()["refresh_token"]
 
     # Call /refresh with refresh_token
-    refresh_resp = client.post("/api/v1/auth/refresh", json={
+    refresh_resp = await client.post("/api/v1/auth/refresh", json={
         "refresh_token": refresh_token
     })
 
@@ -90,14 +90,14 @@ def test_2_2_3_token_refresh_mechanism_works(client):
     assert refreshed_data["user"]["username"] == user.username
 
 
-def test_2_2_4_expired_token_returns_401(client):
+async def test_2_2_4_expired_token_returns_401(client):
     """2.2.4 — Expired token returns 401 Unauthorized"""
     expired_token = create_access_token(
         data={"sub": "someuser", "user_id": "fake-id"},
         expires_delta=timedelta(seconds=-10)
     )
 
-    response = client.get(
+    response = await client.get(
         "/api/v1/auth/verify-session",
         headers={"Authorization": f"Bearer {expired_token}"}
     )

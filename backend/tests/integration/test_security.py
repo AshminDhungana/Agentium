@@ -11,6 +11,7 @@ Integration tests for core security controls:
 """
 
 import pytest
+import pytest_asyncio
 import hmac
 import hashlib
 import json
@@ -56,13 +57,14 @@ def _make_observer_user() -> User:
 class TestJWTSecurity:
     """Expired and malformed token handling."""
 
-    def test_expired_jwt_returns_401(self, client):
+    @pytest.mark.asyncio
+    async def test_expired_jwt_returns_401(self, client):
         """A token with a past expiry date must be rejected with 401."""
         expired_token = create_access_token(
             data={"sub": "admin", "user_id": "test-user-id"},
             expires_delta=timedelta(minutes=-1)
         )
-        response = client.get(
+        response = await client.get(
             "/api/v1/auth/verify-session",
             headers={"Authorization": f"Bearer {expired_token}"}
         )
@@ -75,7 +77,8 @@ class TestJWTSecurity:
 class TestObserverRole:
     """Observer read-only enforcement via ObserverReadOnlyMiddleware."""
 
-    def test_observer_cannot_create_task(self, client):
+    @pytest.mark.asyncio
+    async def test_observer_cannot_create_task(self, client):
         """Observer POSTing to /tasks should receive 403."""
         observer = _make_observer_user()
 
@@ -89,11 +92,12 @@ class TestObserverRole:
             "description": "This should be blocked"
         }
 
-        response = client.post("/api/v1/tasks", json=payload, headers=headers)
+        response = await client.post("/api/v1/tasks", json=payload, headers=headers)
         assert response.status_code == 403
         assert "read-only" in response.json()["error"].lower()
 
-    def test_observer_cannot_mutate_existing_resource(self, client):
+    @pytest.mark.asyncio
+    async def test_observer_cannot_mutate_existing_resource(self, client):
         """Observer DELETE on any protected endpoint should be blocked."""
         observer = _make_observer_user()
 
@@ -103,11 +107,12 @@ class TestObserverRole:
         headers = {"Authorization": f"Bearer {token}"}
 
         # Any state-changing method to any protected route should be blocked
-        response = client.delete("/api/v1/tasks/00000000-0000-0000-0000-000000000000", headers=headers)
+        response = await client.delete("/api/v1/tasks/00000000-0000-0000-0000-000000000000", headers=headers)
         assert response.status_code == 403
         assert "read-only" in response.json()["error"].lower()
 
-    def test_observer_can_read(self, client):
+    @pytest.mark.asyncio
+    async def test_observer_can_read(self, client):
         """Observer GET requests should succeed (not blocked by middleware)."""
         observer = _make_observer_user()
 
@@ -116,7 +121,7 @@ class TestObserverRole:
         )
         headers = {"Authorization": f"Bearer {token}"}
 
-        response = client.get("/api/v1/tasks", headers=headers)
+        response = await client.get("/api/v1/tasks", headers=headers)
         # Should not be 403; could be 200 or 404 depending on data, but never 403
         assert response.status_code != 403
 
@@ -214,7 +219,8 @@ class TestRateLimiting:
 class TestWebhookHMAC:
     """HMAC-SHA256 validation on the public webhook receiver."""
 
-    def test_hmac_rejects_tampered_payload(self, client, seeded_db):
+    @pytest.mark.asyncio
+    async def test_hmac_rejects_tampered_payload(self, client, seeded_db):
         """Webhook with mismatched signature should be rejected with 400."""
         secret = "test_webhook_secret"
 
@@ -237,7 +243,7 @@ class TestWebhookHMAC:
         # Tamper the payload but keep the original signature
         tampered_body = b'{"event":"test","data":"tampered"}'
 
-        response = client.post(
+        response = await client.post(
             f"/api/v1/events/webhook/{trigger.id}",
             data=tampered_body,
             headers={"Content-Type": "application/json", "X-Agentium-Signature": valid_sig}
@@ -246,7 +252,8 @@ class TestWebhookHMAC:
         assert response.status_code == 400
         assert "Invalid HMAC" in response.json().get("error", "")
 
-    def test_hmac_accepts_valid_payload(self, client, seeded_db):
+    @pytest.mark.asyncio
+    async def test_hmac_accepts_valid_payload(self, client, seeded_db):
         """A correctly signed payload should be accepted (200)."""
         secret = "another_secret"
         trigger = EventTrigger(
@@ -262,7 +269,7 @@ class TestWebhookHMAC:
         body = b'{"event":"test","data":"valid"}'
         sig = "sha256=" + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
 
-        response = client.post(
+        response = await client.post(
             f"/api/v1/events/webhook/{trigger.id}",
             data=body,
             headers={"Content-Type": "application/json", "X-Agentium-Signature": sig}
@@ -271,7 +278,8 @@ class TestWebhookHMAC:
         assert response.status_code == 200
         assert response.json()["status"] == "accepted"
 
-    def test_hmac_rejects_missing_signature_when_secret_configured(self, client, seeded_db):
+    @pytest.mark.asyncio
+    async def test_hmac_rejects_missing_signature_when_secret_configured(self, client, seeded_db):
         """Trigger with a secret but no signature header should be rejected."""
         trigger = EventTrigger(
             name="Secret Webhook",
@@ -284,7 +292,7 @@ class TestWebhookHMAC:
         seeded_db.refresh(trigger)
 
         body = b'{"event":"test"}'
-        response = client.post(
+        response = await client.post(
             f"/api/v1/events/webhook/{trigger.id}",
             data=body,
             headers={"Content-Type": "application/json"}
@@ -298,7 +306,8 @@ class TestWebhookHMAC:
 class TestXSSSanitization:
     """Dangerous patterns are stripped by InputSanitizationMiddleware."""
 
-    def test_task_description_xss_stripped(self, client, auth_headers, seeded_db):
+    @pytest.mark.asyncio
+    async def test_task_description_xss_stripped(self, client, auth_headers, seeded_db):
         """<script> tags in task description are removed before storage."""
         raw_description = "Normal text <script>alert('xss')</script> more text"
 
@@ -309,7 +318,7 @@ class TestXSSSanitization:
             "task_type": "execution"
         }
 
-        response = client.post("/api/v1/tasks/", json=payload, headers=auth_headers)
+        response = await client.post("/api/v1/tasks/", json=payload, headers=auth_headers)
         assert response.status_code == 201
         data = response.json()
         assert "<script" not in data["description"]
@@ -317,7 +326,8 @@ class TestXSSSanitization:
         # The script block should be completely stripped
         assert "more text" in data["description"]
 
-    def test_javascript_protocol_stripped(self, client, auth_headers, seeded_db):
+    @pytest.mark.asyncio
+    async def test_javascript_protocol_stripped(self, client, auth_headers, seeded_db):
         """javascript: URIs are removed from JSON bodies."""
         payload = {
             "title": "JS Protocol Test",
@@ -326,13 +336,14 @@ class TestXSSSanitization:
             "task_type": "execution"
         }
 
-        response = client.post("/api/v1/tasks/", json=payload, headers=auth_headers)
+        response = await client.post("/api/v1/tasks/", json=payload, headers=auth_headers)
         assert response.status_code == 201
         data = response.json()
         # The middleware strips 'javascript:' entirely
         assert "javascript:" not in data["description"].lower()
 
-    def test_on_event_handlers_stripped(self, client, auth_headers, seeded_db):
+    @pytest.mark.asyncio
+    async def test_on_event_handlers_stripped(self, client, auth_headers, seeded_db):
         """onerror=, onclick=, etc., are removed from JSON bodies."""
         payload = {
             "title": "Event Handler Test",
@@ -341,7 +352,7 @@ class TestXSSSanitization:
             "task_type": "execution"
         }
 
-        response = client.post("/api/v1/tasks/", json=payload, headers=auth_headers)
+        response = await client.post("/api/v1/tasks/", json=payload, headers=auth_headers)
         assert response.status_code == 201
         data = response.json()
         assert "onerror=" not in data["description"].lower()

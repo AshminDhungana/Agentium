@@ -64,13 +64,13 @@ def test_create_default_admin_idempotent(fresh_db):
     assert admin.is_admin is True
 
 
-def test_default_admin_credentials_work(client, fresh_db):
+async def test_default_admin_credentials_work(client, fresh_db):
     """2.3.2 — Default admin credentials work (username: admin, password: admin)."""
     # First, create the admin via the bootstrap function
     create_default_admin(fresh_db)
 
     # Attempt login via API
-    response = client.post("/api/v1/auth/login", json={
+    response = await client.post("/api/v1/auth/login", json={
         "username": "admin",
         "password": "admin"
     })

@@ -86,7 +86,15 @@ DEFAULT_URL = TEST_DB_URL.rsplit("/", 1)[0] + "/postgres"
 @pytest.fixture(scope="session")
 def db_engine():
     """Create the test database and all tables, tear down at the end."""
-    engine_default = create_engine(DEFAULT_URL, isolation_level="AUTOCOMMIT")
+    # Use pool_pre_ping to handle stale connections and increase pool size
+    engine_default = create_engine(
+        DEFAULT_URL,
+        isolation_level="AUTOCOMMIT",
+        pool_size=10,
+        max_overflow=20,
+        pool_pre_ping=True,
+        pool_recycle=300,
+    )
     with engine_default.connect() as conn:
         # Always start with a clean test database to avoid stale data
         # from a previous run whose tear-down failed (e.g. missing
@@ -103,7 +111,13 @@ def db_engine():
     engine_default.dispose()
 
     # Create all tables in the test database via alembic
-    engine_test = create_engine(TEST_DB_URL)
+    engine_test = create_engine(
+        TEST_DB_URL,
+        pool_size=10,
+        max_overflow=20,
+        pool_pre_ping=True,
+        pool_recycle=300,
+    )
 
     # Run alembic upgrade head to apply all migrations
     # alembic.ini is in the backend directory (project root for tests)
@@ -420,29 +434,34 @@ def mock_ai_provider(monkeypatch):
     yield mock
 
 
-@pytest.fixture(scope="function")
-def client(db_session, redis_client, vector_store, celery_eager):
-    """FastAPI TestClient with dependency overrides."""
+@pytest_asyncio.fixture(scope="function")
+async def client(db_session, redis_client, vector_store, celery_eager):
+    """FastAPI test client with dependency overrides.
+
+    Uses httpx.AsyncClient with ASGITransport (same-thread execution) instead of
+    TestClient to avoid thread-safety issues with shared SQLAlchemy sessions.
+    """
     def override_get_db():
         yield db_session
 
     app.dependency_overrides[get_db] = override_get_db
-    
+
     # Also patch the global get_vector_store to return our test instance
     import backend.core.vector_store
     original_get_vector_store = backend.core.vector_store.get_vector_store
     backend.core.vector_store.get_vector_store = lambda: vector_store
-    
-    # Create TestClient WITHOUT the context manager to avoid triggering the
-    # full lifespan startup/shutdown (which can hang on DDL lock contention,
-    # background tasks, or browser service).
-    test_client = TestClient(app)
-    try:
+
+    # Use httpx.AsyncClient with ASGITransport for same-thread execution.
+    # This avoids the thread-safety issues of TestClient (which runs in a
+    # background thread) when sharing a SQLAlchemy session across the test
+    # and the request handler.
+    transport = ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as test_client:
         yield test_client
-    finally:
-        # Restore override
-        backend.core.vector_store.get_vector_store = original_get_vector_store
-        app.dependency_overrides.clear()
+
+    # Restore override
+    backend.core.vector_store.get_vector_store = original_get_vector_store
+    app.dependency_overrides.clear()
 
 
 @pytest.fixture(scope="function")
@@ -512,11 +531,11 @@ async def async_client(db_session, redis_client, vector_store, celery_eager):
     app.dependency_overrides.clear()
 
 
-@pytest.fixture(scope="function")
-def auth_headers(client, seeded_db):
+@pytest_asyncio.fixture(scope="function")
+async def auth_headers(client, seeded_db):
     """Return authorization headers for the default admin user."""
     # Login to get JWT token
-    response = client.post(
+    response = await client.post(
         "/api/v1/auth/login",
         json={"username": "admin", "password": "admin"}
     )

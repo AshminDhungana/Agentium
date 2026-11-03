@@ -39,6 +39,7 @@ BUG-GOV-003 (api/routes/voting.py POST /amendments ~L140):
 """
 
 import pytest
+import pytest_asyncio
 import uuid
 from datetime import datetime, timedelta
 from typing import Any
@@ -779,18 +780,20 @@ class TestVotingAPI:
     # Amendment endpoints
     # -----------------------------------------------------------------------
 
-    def test_list_amendments_empty(self, client, auth_headers, seeded_db: Session):
+    @pytest.mark.asyncio
+    async def test_list_amendments_empty(self, client, auth_headers, seeded_db: Session):
         """GET /api/v1/voting/amendments returns empty list when none exist."""
         # Clear existing seeded amendment voting rows and their referencing votes
         seeded_db.query(IndividualVote).delete()
         seeded_db.query(AmendmentVoting).delete()
         seeded_db.flush()
 
-        resp = client.get("/api/v1/voting/amendments", headers=auth_headers)
+        resp = await client.get("/api/v1/voting/amendments", headers=auth_headers)
         assert resp.status_code == 200
         assert resp.json() == []
 
-    def test_list_amendments_returns_existing(
+    @pytest.mark.asyncio
+    async def test_list_amendments_returns_existing(
         self, client, auth_headers, seeded_db: Session
     ):
         """After inserting a row directly, the list endpoint returns it."""
@@ -818,13 +821,14 @@ class TestVotingAPI:
         seeded_db.add(av)
         seeded_db.flush()
 
-        resp = client.get("/api/v1/voting/amendments", headers=auth_headers)
+        resp = await client.get("/api/v1/voting/amendments", headers=auth_headers)
         assert resp.status_code == 200
         data = resp.json()
         assert len(data) == 1
         assert data[0]["status"] == AmendmentStatus.PROPOSED.value
 
-    def test_propose_amendment_permission_denied_for_web_user(
+    @pytest.mark.asyncio
+    async def test_propose_amendment_permission_denied_for_web_user(
         self, client, auth_headers, seeded_db: Session
     ):
         """
@@ -836,7 +840,7 @@ class TestVotingAPI:
         This test documents the bug. Fix: route should resolve agentium_id
         from the user's linked agent record instead of using the JWT sub.
         """
-        resp = client.post(
+        resp = await client.post(
             "/api/v1/voting/amendments",
             json={
                 "title": "Test from web",
@@ -849,7 +853,8 @@ class TestVotingAPI:
         assert resp.status_code == 403
         assert "unauthorized" in resp.json()["error"].lower()
 
-    def test_cast_amendment_vote_accepted(
+    @pytest.mark.asyncio
+    async def test_cast_amendment_vote_accepted(
         self, client, auth_headers, seeded_db: Session
     ):
         """POST /voting/amendments/{id}/vote with valid data returns 200 + tally."""
@@ -868,7 +873,7 @@ class TestVotingAPI:
         seeded_db.add(av)
         seeded_db.flush()
 
-        resp = client.post(
+        resp = await client.post(
             f"/api/v1/voting/amendments/{av.id}/vote",
             json={"vote": "for"},
             headers=auth_headers,
@@ -878,7 +883,8 @@ class TestVotingAPI:
         assert body["tally"]["for"] == 1
         assert body["tally"]["against"] == 0
 
-    def test_cast_amendment_vote_rejected_wrong_status(
+    @pytest.mark.asyncio
+    async def test_cast_amendment_vote_rejected_wrong_status(
         self, client, auth_headers, seeded_db: Session
     ):
         """Voting on a PROPOSED amendment returns 400."""
@@ -896,7 +902,7 @@ class TestVotingAPI:
         seeded_db.add(av)
         seeded_db.flush()
 
-        resp = client.post(
+        resp = await client.post(
             f"/api/v1/voting/amendments/{av.id}/vote",
             json={"vote": "for"},
             headers=auth_headers,
@@ -904,7 +910,8 @@ class TestVotingAPI:
         assert resp.status_code == 400
         assert "VOTING" in resp.json()["error"].upper()
 
-    def test_cast_amendment_vote_rejected_not_eligible(
+    @pytest.mark.asyncio
+    async def test_cast_amendment_vote_rejected_not_eligible(
         self, client, auth_headers, seeded_db: Session
     ):
         """Voter not in eligible_voters gets 403."""
@@ -923,18 +930,19 @@ class TestVotingAPI:
         seeded_db.add(av)
         seeded_db.flush()
 
-        resp = client.post(
+        resp = await client.post(
             f"/api/v1/voting/amendments/{av.id}/vote",
             json={"vote": "for"},
             headers=auth_headers,
         )
         assert resp.status_code == 403
 
-    def test_get_amendment_returns_404_for_unknown(
+    @pytest.mark.asyncio
+    async def test_get_amendment_returns_404_for_unknown(
         self, client, auth_headers
     ):
         """GET /voting/amendments/{bad_id} returns 404."""
-        resp = client.get(
+        resp = await client.get(
             "/api/v1/voting/amendments/00000000-0000-0000-0000-000000000000",
             headers=auth_headers,
         )
@@ -944,13 +952,15 @@ class TestVotingAPI:
     # Deliberation endpoints
     # -----------------------------------------------------------------------
 
-    def test_list_deliberations_empty(self, client, auth_headers, seeded_db: Session):
+    @pytest.mark.asyncio
+    async def test_list_deliberations_empty(self, client, auth_headers, seeded_db: Session):
         """GET /api/v1/voting/deliberations returns empty list initially."""
-        resp = client.get("/api/v1/voting/deliberations", headers=auth_headers)
+        resp = await client.get("/api/v1/voting/deliberations", headers=auth_headers)
         assert resp.status_code == 200
         assert resp.json() == []
 
-    def test_deliberation_vote_accepted_in_quorum_reached_state(
+    @pytest.mark.asyncio
+    async def test_deliberation_vote_accepted_in_quorum_reached_state(
         self, client, auth_headers, seeded_db: Session
     ):
         """
@@ -985,7 +995,7 @@ class TestVotingAPI:
         seeded_db.add(delib)
         seeded_db.flush()
 
-        resp = client.post(
+        resp = await client.post(
             f"/api/v1/voting/deliberations/{delib.id}/vote",
             json={"vote": "for"},
             headers=auth_headers,
@@ -994,7 +1004,8 @@ class TestVotingAPI:
         body = resp.json()
         assert body["tally"]["for"] == 1
 
-    def test_deliberation_vote_rejected_when_concluded(
+    @pytest.mark.asyncio
+    async def test_deliberation_vote_rejected_when_concluded(
         self, client, auth_headers, seeded_db: Session
     ):
         """A CONCLUDED deliberation must reject new votes with 400."""
@@ -1026,7 +1037,7 @@ class TestVotingAPI:
         seeded_db.add(delib)
         seeded_db.flush()
 
-        resp = client.post(
+        resp = await client.post(
             f"/api/v1/voting/deliberations/{delib.id}/vote",
             json={"vote": "for"},
             headers=auth_headers,
@@ -1034,7 +1045,8 @@ class TestVotingAPI:
         assert resp.status_code == 400
         assert "not currently accepting votes" in resp.json()["error"].lower()
 
-    def test_list_deliberations_returns_existing(
+    @pytest.mark.asyncio
+    async def test_list_deliberations_returns_existing(
         self, client, auth_headers, seeded_db: Session
     ):
         """After inserting a deliberation the list endpoint returns it."""
@@ -1064,7 +1076,7 @@ class TestVotingAPI:
         seeded_db.add(delib)
         seeded_db.flush()
 
-        resp = client.get("/api/v1/voting/deliberations", headers=auth_headers)
+        resp = await client.get("/api/v1/voting/deliberations", headers=auth_headers)
         assert resp.status_code == 200
         data = resp.json()
         assert len(data) == 1
