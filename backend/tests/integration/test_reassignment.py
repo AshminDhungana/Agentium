@@ -1,7 +1,7 @@
 """Integration tests for drag-and-drop agent reassignment."""
 
 import pytest
-from fastapi.testclient import TestClient
+import pytest_asyncio
 from sqlalchemy.orm import Session
 
 from unittest.mock import AsyncMock
@@ -23,7 +23,8 @@ def _bypass_auth():
         "is_active": True,
     }
 
-def test_reassign_agent_allow(client, seeded_db):
+@pytest.mark.asyncio
+async def test_reassign_agent_allow(client, seeded_db):
     """Test ALLOW: valid reassignment of a task agent to a new Lead."""
     _bypass_auth()
     db_session = seeded_db
@@ -59,7 +60,7 @@ def test_reassign_agent_allow(client, seeded_db):
     db_session.add_all([lead_a, lead_b, task])
     db_session.commit()
 
-    response = client.patch(
+    response = await client.patch(
         "/api/v1/agents/30101/parent",
         json={"new_parent_id": "20002", "reason": "Test reassignment"},
     )
@@ -87,7 +88,8 @@ def test_reassign_agent_allow(client, seeded_db):
     assert audit.category == AuditCategory.AGENT_LIFECYCLE
 
 
-def test_reassign_agent_block(client, db_session):
+@pytest.mark.asyncio
+async def test_reassign_agent_block(client, db_session):
     """Test BLOCK: reassignment that violates hierarchy (e.g., Council under Task)."""
     _bypass_auth()
 
@@ -135,7 +137,7 @@ def test_reassign_agent_block(client, db_session):
         mock_guard.check_action = mock_check
 
         # Attempt: Move Council under Lead (lower tier → higher tier is illegal)
-        response = client.patch(
+        response = await client.patch(
             "/api/v1/agents/10999/parent",
             json={"new_parent_id": "20999", "reason": "Test block"},
         )
@@ -162,7 +164,8 @@ def test_reassign_agent_block(client, db_session):
     assert audit.category == AuditCategory.CONSTITUTION
 
 
-def test_reassign_guard_vote_required(client, db_session):
+@pytest.mark.asyncio
+async def test_reassign_guard_vote_required(client, db_session):
     """Test VOTE_REQUIRED: simulated scenario by mocking guard."""
     _bypass_auth()
 
@@ -218,7 +221,7 @@ def test_reassign_guard_vote_required(client, db_session):
 
         mock_guard.check_action = mock_check
 
-        response = client.patch(
+        response = await client.patch(
             "/api/v1/agents/30101/parent",
             json={"new_parent_id": "20997", "reason": "Test vote required"},
         )

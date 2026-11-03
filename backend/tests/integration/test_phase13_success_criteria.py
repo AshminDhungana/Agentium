@@ -12,6 +12,7 @@ import time
 import json
 import uuid
 import pytest
+import pytest_asyncio
 import redis as sync_redis
 from datetime import datetime, timedelta
 from unittest.mock import patch
@@ -176,7 +177,7 @@ class TestCriterion01AutoDelegation:
 
 # ═════════════════════════════════════════════════════════════
 # Criterion 2: Crash Detection & Reincarnation
-# ═════════════════════════════════════════════
+# ═════════════════════════════════════════════════════════════
 # Simulated agent crash detected, reincarnated from checkpoint,
 # interrupted task resumed within 3 minutes.
 
@@ -383,9 +384,9 @@ class TestCriterion03PredictiveScaling:
             assert after == before
 
 
-# ════════════════════════════════════════════════════════════
+# ═════════════════════════════════════════════════════════════
 # Criterion 4: Success Rate Improvement
-# ════════════════════════════════════════════════════════════
+# ═════════════════════════════════════════════════════════════
 # Task success rate improvement >= 5% measurable in GET /improvements/impact
 # after 7 days.
 
@@ -437,9 +438,9 @@ class TestCriterion04SuccessRateImprovement:
         assert success_rate >= 0.0
 
 
-# ════════════════════════════════════════════════════════════
+# ═════════════════════════════════════════════════════════════
 # Criterion 5: 5-Step Workflow
-# ════════════════════════════════════════════════════════════
+# ═════════════════════════════════════════════════════════════
 # 5-step workflow with conditional branching and one human-
 # approval gate executes end-to-end from cron trigger.
 
@@ -544,9 +545,9 @@ class TestCriterion05Workflow:
         assert updated_workflow.version == 2
 
 
-# ════════════════════════════════════════════════════════════
+# ═════════════════════════════════════════════════════════════
 # Criterion 6: Webhook to Task Dispatch (< 10s)
-# ════════════════════════════════════════════════════════════
+# ═════════════════════════════════════════════════════════════
 # External webhook fires -> task created and dispatched within 10 seconds.
 
 class TestCriterion06WebhookToTask:
@@ -557,7 +558,8 @@ class TestCriterion06WebhookToTask:
       3. EventLog row has status=processed
     """
 
-    def test_webhook_creates_task_within_10_seconds(self, client, seeded_db: Session, auth_headers):
+    @pytest.mark.asyncio
+    async def test_webhook_creates_task_within_10_seconds(self, client, seeded_db: Session, auth_headers):
         """Webhook fires -> EventTrigger creates a task within 10s."""
         # Create a webhook trigger
         trigger = EventTrigger(
@@ -572,7 +574,7 @@ class TestCriterion06WebhookToTask:
         seeded_db.flush()
 
         # Fire the webhook
-        response = client.post(
+        response = await client.post(
             f"/api/v1/events/webhook/{trigger.id}",
             json={"event_type": "test", "payload": {"data": "hello"}},
             headers=auth_headers,
@@ -607,9 +609,9 @@ class TestCriterion06WebhookToTask:
         assert event_log.status == "processed"
 
 
-# ════════════════════════════════════════════════════════════
+# ═════════════════════════════════════════════════════════════
 # Criterion 7: Zero-Touch Dashboard (5 Health Rings Green)
-# ════════════════════════════════════════════════════════════
+# ═════════════════════════════════════════════════════════════
 # Zero-Touch Dashboard shows all 5 health rings green under
 # normal operating conditions.
 
@@ -619,7 +621,8 @@ class TestCriterion07HealthRings:
     with score >= 90 (green) when the system is in a clean state.
     """
 
-    def test_five_health_rings_all_green(self, client, seeded_db: Session, auth_headers):
+    @pytest.mark.asyncio
+    async def test_five_health_rings_all_green(self, client, seeded_db: Session, auth_headers):
         """Under clean conditions, all 5 health rings should be green (>= 90)."""
         head = _get_head_of_council(seeded_db)
         _spawn_task_agent(seeded_db, head, "Healthy-Agent-1")
@@ -641,7 +644,7 @@ class TestCriterion07HealthRings:
             seeded_db.add(task)
         seeded_db.commit()
 
-        response = client.get(
+        response = await client.get(
             "/api/v1/monitoring/aggregated",
             headers=auth_headers,
         )
@@ -656,17 +659,18 @@ class TestCriterion07HealthRings:
         assert data["events"]["health_pct"] >= 90
         assert data["budget"]["health_pct"] >= 90
 
-    def test_anomalies_endpoint_empty_under_normal(self, client, auth_headers):
+    @pytest.mark.asyncio
+    async def test_anomalies_endpoint_empty_under_normal(self, client, auth_headers):
         """When no anomalies, /monitoring/anomalies returns empty list."""
-        response = client.get("/api/v1/monitoring/anomalies", headers=auth_headers)
+        response = await client.get("/api/v1/monitoring/anomalies", headers=auth_headers)
         assert response.status_code == 200
         data = response.json()
         assert isinstance(data, list)
 
 
-# ════════════════════════════════════════════════════════════
+# ═════════════════════════════════════════════════════════════
 # Criterion 8: Token Budget Guard
-# ════════════════════════════════════════════════════════════
+# ═════════════════════════════════════════════════════════════
 # Daily token budget guard prevents overspend: CRITICAL tasks
 # continue, normal tasks pause.
 

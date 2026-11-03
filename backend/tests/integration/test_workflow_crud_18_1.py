@@ -16,6 +16,7 @@ and therefore do *not* need a DB connection.
 
 import uuid
 import pytest
+import pytest_asyncio
 from unittest.mock import patch, MagicMock
 
 from backend.services.workflow_engine import WorkflowEngine
@@ -74,9 +75,10 @@ class TestCreateWorkflow:
             mock.apply_async = MagicMock()
             yield
 
-    def test_creates_workflow_returns_200(self, client):
+    @pytest.mark.asyncio
+    async def test_creates_workflow_returns_200(self, client):
         """POST with valid name + template_json returns 200 and the new workflow dict."""
-        resp = client.post(
+        resp = await client.post(
             "/api/v1/workflows/",
             json={"name": _unique("wf"), "template_json": _minimal_template()},
         )
@@ -87,10 +89,11 @@ class TestCreateWorkflow:
         assert "template_json" in body
         assert body["version"] == 1
 
-    def test_creates_workflow_persists_to_db(self, client, db_session):
+    @pytest.mark.asyncio
+    async def test_creates_workflow_persists_to_db(self, client, db_session):
         """The created workflow must be visible in the DB."""
         name = _unique("persist")
-        resp = client.post(
+        resp = await client.post(
             "/api/v1/workflows/",
             json={"name": name, "template_json": _minimal_template()},
         )
@@ -101,10 +104,11 @@ class TestCreateWorkflow:
         assert wf is not None
         assert wf.name == name
 
-    def test_creates_workflow_stores_steps(self, client, db_session):
+    @pytest.mark.asyncio
+    async def test_creates_workflow_stores_steps(self, client, db_session):
         """Steps from template_json must be written to workflow_steps table."""
         name = _unique("steps")
-        resp = client.post(
+        resp = await client.post(
             "/api/v1/workflows/",
             json={"name": name, "template_json": _linear_template(3)},
         )
@@ -120,9 +124,10 @@ class TestCreateWorkflow:
         assert len(steps) == 3
         assert [s.step_index for s in steps] == [0, 1, 2]
 
-    def test_creates_workflow_with_cron(self, client):
+    @pytest.mark.asyncio
+    async def test_creates_workflow_with_cron(self, client):
         """schedule_cron field is stored when provided."""
-        resp = client.post(
+        resp = await client.post(
             "/api/v1/workflows/",
             json={
                 "name": _unique("cron"),
@@ -133,23 +138,26 @@ class TestCreateWorkflow:
         assert resp.status_code == 200, resp.text
         assert resp.json()["schedule_cron"] == "0 6 * * *"
 
-    def test_missing_name_returns_400(self, client):
+    @pytest.mark.asyncio
+    async def test_missing_name_returns_400(self, client):
         """Omitting 'name' returns 400."""
-        resp = client.post(
+        resp = await client.post(
             "/api/v1/workflows/",
             json={"template_json": _minimal_template()},
         )
         assert resp.status_code == 400
 
-    def test_missing_template_json_returns_400(self, client):
+    @pytest.mark.asyncio
+    async def test_missing_template_json_returns_400(self, client):
         """Omitting 'template_json' returns 400."""
-        resp = client.post(
+        resp = await client.post(
             "/api/v1/workflows/",
             json={"name": _unique("notemplate")},
         )
         assert resp.status_code == 400
 
-    def test_cyclic_dag_returns_400(self, client):
+    @pytest.mark.asyncio
+    async def test_cyclic_dag_returns_400(self, client):
         """A cyclic template is rejected with 400 INVALID_WORKFLOW_DAG."""
         cyclic = {
             "steps": [
@@ -157,7 +165,7 @@ class TestCreateWorkflow:
                 {"step_index": 1, "type": "task", "config": {}, "on_success_step": 0, "on_failure_step": None},
             ]
         }
-        resp = client.post(
+        resp = await client.post(
             "/api/v1/workflows/",
             json={"name": _unique("cyclic"), "template_json": cyclic},
         )
@@ -177,28 +185,31 @@ class TestListWorkflows:
             mock.apply_async = MagicMock()
             yield
 
-    def test_list_returns_200(self, client):
+    @pytest.mark.asyncio
+    async def test_list_returns_200(self, client):
         """GET /api/v1/workflows returns 200 with a list."""
-        resp = client.get("/api/v1/workflows/")
+        resp = await client.get("/api/v1/workflows/")
         assert resp.status_code == 200
         assert isinstance(resp.json(), list)
 
-    def test_list_includes_created_workflow(self, client):
+    @pytest.mark.asyncio
+    async def test_list_includes_created_workflow(self, client):
         """A freshly created workflow appears in the list."""
         name = _unique("listed")
-        client.post(
+        await client.post(
             "/api/v1/workflows/",
             json={"name": name, "template_json": _minimal_template()},
         )
-        resp = client.get("/api/v1/workflows/")
+        resp = await client.get("/api/v1/workflows/")
         assert resp.status_code == 200
         names = [w["name"] for w in resp.json()]
         assert name in names
 
-    def test_list_omits_inactive_workflows(self, client, db_session):
+    @pytest.mark.asyncio
+    async def test_list_omits_inactive_workflows(self, client, db_session):
         """is_active=False workflows must not appear in the list."""
         name = _unique("inactive")
-        post_resp = client.post(
+        post_resp = await client.post(
             "/api/v1/workflows/",
             json={"name": name, "template_json": _minimal_template()},
         )
@@ -210,18 +221,19 @@ class TestListWorkflows:
         wf.is_active = False
         db_session.commit()
 
-        resp = client.get("/api/v1/workflows/")
+        resp = await client.get("/api/v1/workflows/")
         ids = [w["id"] for w in resp.json()]
         assert wf_id not in ids
 
-    def test_list_returns_list_shape(self, client):
+    @pytest.mark.asyncio
+    async def test_list_returns_list_shape(self, client):
         """Each entry in the list must contain at least id, name, version."""
         # Create at least one so the list is non-empty
-        client.post(
+        await client.post(
             "/api/v1/workflows/",
             json={"name": _unique("shape"), "template_json": _minimal_template()},
         )
-        resp = client.get("/api/v1/workflows/")
+        resp = await client.get("/api/v1/workflows/")
         assert resp.status_code == 200
         for wf in resp.json():
             assert "id" in wf
@@ -241,48 +253,52 @@ class TestGetWorkflow:
             mock.apply_async = MagicMock()
             yield
 
-    def test_get_existing_workflow_returns_200(self, client):
+    @pytest.mark.asyncio
+    async def test_get_existing_workflow_returns_200(self, client):
         """GET by valid ID returns 200 with correct data."""
         name = _unique("detail")
-        post = client.post(
+        post = await client.post(
             "/api/v1/workflows/",
             json={"name": name, "template_json": _minimal_template()},
         )
         assert post.status_code == 200
         wf_id = post.json()["id"]
 
-        resp = client.get(f"/api/v1/workflows/{wf_id}")
+        resp = await client.get(f"/api/v1/workflows/{wf_id}")
         assert resp.status_code == 200
         body = resp.json()
         assert body["id"] == wf_id
         assert body["name"] == name
 
-    def test_get_workflow_returns_template_json(self, client):
+    @pytest.mark.asyncio
+    async def test_get_workflow_returns_template_json(self, client):
         """The response includes the full template_json."""
         template = _linear_template(2)
-        post = client.post(
+        post = await client.post(
             "/api/v1/workflows/",
             json={"name": _unique("tmpl"), "template_json": template},
         )
         wf_id = post.json()["id"]
 
-        resp = client.get(f"/api/v1/workflows/{wf_id}")
+        resp = await client.get(f"/api/v1/workflows/{wf_id}")
         assert resp.status_code == 200
         assert resp.json()["template_json"] == template
 
-    def test_get_nonexistent_workflow_returns_404(self, client):
+    @pytest.mark.asyncio
+    async def test_get_nonexistent_workflow_returns_404(self, client):
         """GET with an unknown ID returns 404."""
-        resp = client.get(f"/api/v1/workflows/{uuid.uuid4()}")
+        resp = await client.get(f"/api/v1/workflows/{uuid.uuid4()}")
         assert resp.status_code == 404
 
-    def test_get_workflow_returns_version(self, client):
+    @pytest.mark.asyncio
+    async def test_get_workflow_returns_version(self, client):
         """Version field starts at 1."""
-        post = client.post(
+        post = await client.post(
             "/api/v1/workflows/",
             json={"name": _unique("ver"), "template_json": _minimal_template()},
         )
         wf_id = post.json()["id"]
-        resp = client.get(f"/api/v1/workflows/{wf_id}")
+        resp = await client.get(f"/api/v1/workflows/{wf_id}")
         assert resp.json()["version"] == 1
 
 
@@ -469,14 +485,15 @@ class TestDAGValidation:
 
     # ── PUT /api/v1/workflows/{id} also validates ────────────────────────────
 
-    def test_update_route_rejects_cyclic_dag(self, client):
+    @pytest.mark.asyncio
+    async def test_update_route_rejects_cyclic_dag(self, client):
         """PUT /api/v1/workflows/{id} also runs DAG validation and returns 400 for cycles."""
         with patch("backend.services.workflow_engine.workflow_step_runner") as mock:
             mock.delay = MagicMock()
             mock.apply_async = MagicMock()
 
             # First create a valid workflow
-            post = client.post(
+            post = await client.post(
                 "/api/v1/workflows/",
                 json={"name": _unique("update_cyclic"), "template_json": _minimal_template()},
             )
@@ -490,7 +507,7 @@ class TestDAGValidation:
                 {"step_index": 1, "type": "task", "config": {}, "on_success_step": 0},
             ]
         }
-        resp = client.put(
+        resp = await client.put(
             f"/api/v1/workflows/{wf_id}",
             json={"template_json": cyclic},
         )

@@ -1,24 +1,28 @@
 import time
+import pytest
+import pytest_asyncio
 
 from models.schemas.structured_input import CardOption, CardQuestion, StructuredInputCard
 from backend.models.entities.chat_message import ChatMessage
 
 
-def test_post_card_creates_input_card_message(client, db_session, auth_headers):
+@pytest.mark.asyncio
+async def test_post_card_creates_input_card_message(client, db_session, auth_headers):
     payload = StructuredInputCard(
         card_id="card-1",
         questions=[CardQuestion(id="q1", question="Where to?",
                                 input_type="single_select", required=True,
                                 options=[CardOption(id="a", label="Tokyo", value="tokyo")])],
     ).model_dump()
-    resp = client.post("/api/v1/chat/card", json=payload, headers=auth_headers)
+    resp = await client.post("/api/v1/chat/card", json=payload, headers=auth_headers)
     assert resp.status_code == 200, resp.text
     body = resp.json()
     assert body["message"]["message_type"] == "input_card"
     assert body["message"]["metadata"]["card"]["card_id"] == "card-1"
 
 
-def test_ws_card_response_persisted(client, db_session, auth_headers, ws_client, mock_ai_provider):
+@pytest.mark.asyncio
+async def test_ws_card_response_persisted(client, db_session, auth_headers, ws_client, mock_ai_provider):
     ws_client.send_json({"type": "auth", "token": auth_headers["Authorization"].split(" ")[1]})
     # receive welcome/system
     ws_client.receive_json()
@@ -49,7 +53,8 @@ def test_ws_card_response_persisted(client, db_session, auth_headers, ws_client,
     assert found, "card_response was not persisted within the timeout"
 
 
-def test_tool_path_posts_and_persists_card(client, db_session, auth_headers):
+@pytest.mark.asyncio
+async def test_tool_path_posts_and_persists_card(client, db_session, auth_headers):
     from backend.core.tool_registry import tool_registry
     fn = tool_registry.get_tool_function("request_user_clarification")
     out = fn(
@@ -66,6 +71,3 @@ def test_tool_path_posts_and_persists_card(client, db_session, auth_headers):
         r.message_metadata.get("card", {}).get("questions", [{}])[0].get("question") == "Q?"
         for r in rows
     ), "tool did not persist an input_card message"
-
-
-

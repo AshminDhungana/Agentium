@@ -11,6 +11,7 @@ Uses existing fixtures: client, redis_client, db_session.
 """
 
 import pytest
+import pytest_asyncio
 import time
 
 from backend.models.entities.user import User
@@ -29,9 +30,9 @@ class TestMCPSubSecondRevocation:
 
     # ---- Helpers -----------------------------------------------------------------
 
-    def _propose_tool(self, client, auth_headers, name: str, server_url: str) -> str:
+    async def _propose_tool(self, client, auth_headers, name: str, server_url: str) -> str:
         """Propose a new MCP tool and return its id."""
-        r = client.post(
+        r = await client.post(
             "/api/v1/mcp-tools",
             json={
                 "name": name,
@@ -45,16 +46,16 @@ class TestMCPSubSecondRevocation:
         assert r.status_code == 201, f"Propose failed: {r.text}"
         return r.json()["id"]
 
-    def _approve_tool(self, client, auth_headers, tool_id: str):
-        r = client.post(
+    async def _approve_tool(self, client, auth_headers, tool_id: str):
+        r = await client.post(
             f"/api/v1/mcp-tools/{tool_id}/approve",
             json={"approved_by": "admin"},
             headers=auth_headers,
         )
         assert r.status_code == 200, f"Approve failed: {r.text}"
 
-    def _revoke_tool(self, client, auth_headers, tool_id: str):
-        r = client.post(
+    async def _revoke_tool(self, client, auth_headers, tool_id: str):
+        r = await client.post(
             f"/api/v1/mcp-tools/{tool_id}/revoke",
             json={"revoked_by": "admin", "reason": f"Revocation test for {tool_id}"},
             headers=auth_headers,
@@ -64,16 +65,17 @@ class TestMCPSubSecondRevocation:
 
     # ---- Task 1: Sub-Second Redis Propagation -----------------------------------
 
-    def test_revoke_endpoint_adds_tool_to_redis_set(self, client, redis_client, db_session, auth_headers):
+    @pytest.mark.asyncio
+    async def test_revoke_endpoint_adds_tool_to_redis_set(self, client, redis_client, db_session, auth_headers):
         """
         After POST /api/v1/mcp-tools/{id}/revoke, the tool_id must appear
         in the Redis SET 'agentium:mcp:revoked' within one second.
         """
-        tool_id = self._propose_tool(client, auth_headers, "test-revoke-1", "http://localhost:9999/test-mcp-1")
-        self._approve_tool(client, auth_headers, tool_id)
+        tool_id = await self._propose_tool(client, auth_headers, "test-revoke-1", "http://localhost:9999/test-mcp-1")
+        await self._approve_tool(client, auth_headers, tool_id)
 
         start = time.monotonic()
-        self._revoke_tool(client, auth_headers, tool_id)
+        await self._revoke_tool(client, auth_headers, tool_id)
         duration = time.monotonic() - start
 
         assert duration < 1.0, f"Revocation round-trip took {duration:.4f}s, must be <1s"
@@ -82,18 +84,19 @@ class TestMCPSubSecondRevocation:
         )
 
     # ---- Task 2: Execution Blocked After Revocation -----------------------------
-    def test_execution_blocked_after_revocation(self, client, redis_client, db_session, auth_headers):
+    @pytest.mark.asyncio
+    async def test_execution_blocked_after_revocation(self, client, redis_client, db_session, auth_headers):
         """
         Invoking a revoked tool via POST /api/v1/mcp-tools/{id}/execute must
         return success=False with a revocation/block message.
         """
-        tool_id = self._propose_tool(client, auth_headers, "test-revoke-2", "http://localhost:9999/test-mcp-2")
-        self._approve_tool(client, auth_headers, tool_id)
-        self._revoke_tool(client, auth_headers, tool_id)
+        tool_id = await self._propose_tool(client, auth_headers, "test-revoke-2", "http://localhost:9999/test-mcp-2")
+        await self._approve_tool(client, auth_headers, tool_id)
+        await self._revoke_tool(client, auth_headers, tool_id)
 
         assert redis_client.sismember("agentium:mcp:revoked", tool_id)
 
-        r = client.post(
+        r = await client.post(
             f"/api/v1/mcp-tools/{tool_id}/execute",
             json={"agent_id": "30001", "agent_tier": "3xxxx", "params": {}},
             headers=auth_headers,
@@ -107,30 +110,32 @@ class TestMCPSubSecondRevocation:
         )
 
     # ---- Task 3: Re-Approval Clears Redis Revocation ---------------------------
-    def test_re_approval_clears_redis_revocation(self, client, redis_client, db_session, auth_headers):
+    @pytest.mark.asyncio
+    async def test_re_approval_clears_redis_revocation(self, client, redis_client, db_session, auth_headers):
         """
         When approve_mcp_server is called it internally calls
         mcp_stats_service.remove_from_revoked, clearing the Redis SET.
         """
-        tool_id = self._propose_tool(client, auth_headers, "test-revoke-3", "http://localhost:9999/test-mcp-3")
+        tool_id = await self._propose_tool(client, auth_headers, "test-revoke-3", "http://localhost:9999/test-mcp-3")
 
         redis_client.sadd("agentium:mcp:revoked", tool_id)
         assert redis_client.sismember("agentium:mcp:revoked", tool_id)
 
-        self._approve_tool(client, auth_headers, tool_id)
+        await self._approve_tool(client, auth_headers, tool_id)
 
         assert not redis_client.sismember("agentium:mcp:revoked", tool_id), (
             "Approval did not remove the tool from the Redis revocation SET"
         )
 
     # ---- Task 4: Revoked Tools Endpoint -----------------------------------------
-    def test_revoked_tools_endpoint(self, client, redis_client, db_session, auth_headers):
+    @pytest.mark.asyncio
+    async def test_revoked_tools_endpoint(self, client, redis_client, db_session, auth_headers):
         """GET /api/v1/mcp-tools/revoked must list all tool IDs in the Redis SET."""
-        tool_id = self._propose_tool(client, auth_headers, "test-revoke-4", "http://localhost:9999/test-mcp-4")
-        self._approve_tool(client, auth_headers, tool_id)
-        self._revoke_tool(client, auth_headers, tool_id)
+        tool_id = await self._propose_tool(client, auth_headers, "test-revoke-4", "http://localhost:9999/test-mcp-4")
+        await self._approve_tool(client, auth_headers, tool_id)
+        await self._revoke_tool(client, auth_headers, tool_id)
 
-        r = client.get("/api/v1/mcp-tools/revoked", headers=auth_headers)
+        r = await client.get("/api/v1/mcp-tools/revoked", headers=auth_headers)
         assert r.status_code == 200
         data = r.json()
         assert tool_id in data["revoked_tool_ids"], (
@@ -138,20 +143,21 @@ class TestMCPSubSecondRevocation:
         )
 
     # ---- Task 4: WebSocket Broadcast on Revoke --------------------------------
-    def test_revoke_broadcasts_websocket_event(self, client, redis_client, db_session, auth_headers):
+    @pytest.mark.asyncio
+    async def test_revoke_broadcasts_websocket_event(self, client, redis_client, db_session, auth_headers):
         """
         Revoking a tool should emit mcp_tool_revoked WebSocket event.
         Note: This tests the broadcast call, not WebSocket delivery (requires separate WS test infrastructure).
         """
         from unittest.mock import AsyncMock, patch
 
-        tool_id = self._propose_tool(client, auth_headers, "test-revoke-ws", "http://localhost:9999/test-mcp-ws")
-        self._approve_tool(client, auth_headers, tool_id)
+        tool_id = await self._propose_tool(client, auth_headers, "test-revoke-ws", "http://localhost:9999/test-mcp-ws")
+        await self._approve_tool(client, auth_headers, tool_id)
 
         with patch("backend.api.routes.websocket.manager") as mock_manager:
             mock_manager.emit_mcp_tool_revoked = AsyncMock()
 
-            self._revoke_tool(client, auth_headers, tool_id)
+            await self._revoke_tool(client, auth_headers, tool_id)
 
             mock_manager.emit_mcp_tool_revoked.assert_called_once()
             call_kwargs = mock_manager.emit_mcp_tool_revoked.call_args.kwargs

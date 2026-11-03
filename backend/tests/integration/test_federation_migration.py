@@ -15,6 +15,7 @@ from types import SimpleNamespace
 
 import httpx
 import pytest
+import pytest_asyncio
 
 from backend.core.config import settings
 from backend.models.entities.agents import Agent, AgentType, AgentStatus
@@ -81,8 +82,8 @@ def _make_user(db, username: str, is_admin: bool):
     return user
 
 
-def _login(client, username: str):
-    resp = client.post(
+async def _login_async(client, username: str):
+    resp = await client.post(
         "/api/v1/auth/login",
         json={"username": username, "password": "password123"},
     )
@@ -133,15 +134,17 @@ def peer(seeded_db):
 class TestReceiveMigratedAgentWebhook:
     """POST /webhooks/agents/receive recreates the agent locally."""
 
-    def test_receive_requires_peer_auth(self, client, fed_enabled, peer):
-        resp = client.post(RECEIVE_URL, json=_snapshot())
+    @pytest.mark.asyncio
+    async def test_receive_requires_peer_auth(self, client, fed_enabled, peer):
+        resp = await client.post(RECEIVE_URL, json=_snapshot())
         assert resp.status_code == 401
 
-    def test_receive_creates_agent_and_ethos(
+    @pytest.mark.asyncio
+    async def test_receive_creates_agent_and_ethos(
         self, client, seeded_db, fed_enabled, peer,
     ):
         body = json.dumps(_snapshot()).encode()
-        resp = client.post(
+        resp = await client.post(
             RECEIVE_URL, content=body,
             headers=_hmac_headers(PEER_URL, SECRET, body),
         )
@@ -168,7 +171,8 @@ class TestReceiveMigratedAgentWebhook:
         assert ethos.current_objective is None
         assert ethos.active_plan is None
 
-    def test_receive_resolves_model_config_by_name(
+    @pytest.mark.asyncio
+    async def test_receive_resolves_model_config_by_name(
         self, client, seeded_db, fed_enabled, peer,
     ):
         from backend.models.entities.user_config import UserModelConfig, ProviderType
@@ -181,7 +185,7 @@ class TestReceiveMigratedAgentWebhook:
         seeded_db.flush()
 
         body = json.dumps(_snapshot()).encode()
-        resp = client.post(
+        resp = await client.post(
             RECEIVE_URL, content=body,
             headers=_hmac_headers(PEER_URL, SECRET, body),
         )
@@ -190,13 +194,14 @@ class TestReceiveMigratedAgentWebhook:
             Agent.id == resp.json()["id"]).one()
         assert agent.preferred_config_id == cfg.id
 
-    def test_receive_unmatched_model_config_name_leaves_null(
+    @pytest.mark.asyncio
+    async def test_receive_unmatched_model_config_name_leaves_null(
         self, client, seeded_db, fed_enabled, peer,
     ):
         body = json.dumps(
             _snapshot(overrides={"preferred_model_config_name": "no-such-config"})
         ).encode()
-        resp = client.post(
+        resp = await client.post(
             RECEIVE_URL, content=body,
             headers=_hmac_headers(PEER_URL, SECRET, body),
         )
@@ -205,21 +210,23 @@ class TestReceiveMigratedAgentWebhook:
             Agent.id == resp.json()["id"]).one()
         assert agent.preferred_config_id is None
 
-    def test_receive_bad_schema_tag_rejected(self, client, fed_enabled, peer):
+    @pytest.mark.asyncio
+    async def test_receive_bad_schema_tag_rejected(self, client, fed_enabled, peer):
         body = json.dumps(
             _snapshot(overrides={"schema": "agentium/agent-definition/v2"})
         ).encode()
-        resp = client.post(
+        resp = await client.post(
             RECEIVE_URL, content=body,
             headers=_hmac_headers(PEER_URL, SECRET, body),
         )
         assert resp.status_code == 400
 
-    def test_receive_without_ethos_still_creates_agent(
+    @pytest.mark.asyncio
+    async def test_receive_without_ethos_still_creates_agent(
         self, client, seeded_db, fed_enabled, peer,
     ):
         body = json.dumps(_snapshot(overrides={"ethos": None})).encode()
-        resp = client.post(
+        resp = await client.post(
             RECEIVE_URL, content=body,
             headers=_hmac_headers(PEER_URL, SECRET, body),
         )
@@ -272,7 +279,8 @@ def _make_agent(db, name="Local Agent", agentium_id="30123",
 class TestBuildAgentSnapshot:
     """FederationService.build_agent_snapshot — portable definition dict."""
 
-    def test_snapshot_carries_identity_not_memory(
+    @pytest.mark.asyncio
+    async def test_snapshot_carries_identity_not_memory(
         self, seeded_db, fed_enabled, peer,
     ):
         agent = _make_agent(seeded_db, system_prompt_override="Be terse.")
@@ -290,7 +298,8 @@ class TestBuildAgentSnapshot:
         assert "current_objective" not in snap["ethos"]
         assert "active_plan" not in snap["ethos"]
 
-    def test_snapshot_resolves_model_config_name(
+    @pytest.mark.asyncio
+    async def test_snapshot_resolves_model_config_name(
         self, seeded_db, fed_enabled, peer,
     ):
         from backend.models.entities.user_config import UserModelConfig, ProviderType
@@ -306,7 +315,8 @@ class TestBuildAgentSnapshot:
         snap = FederationService.build_agent_snapshot(seeded_db, agent)
         assert snap["preferred_model_config_name"] == "local-openai"
 
-    def test_snapshot_without_config_and_ethos(
+    @pytest.mark.asyncio
+    async def test_snapshot_without_config_and_ethos(
         self, seeded_db, fed_enabled, peer,
     ):
         agent = _make_agent(seeded_db, with_ethos=False)
@@ -334,13 +344,14 @@ class TestMigrateAgentRoute:
         monkeypatch.setattr(httpx, "post", fake_post)
         return captured
 
-    def test_migrate_success_terminates_local_agent(
+    @pytest.mark.asyncio
+    async def test_migrate_success_terminates_local_agent(
         self, client, seeded_db, fed_enabled, peer, auth_headers, monkeypatch,
     ):
         agent = _make_agent(seeded_db)
         captured = self._mock_peer_accept(monkeypatch)
 
-        resp = client.post(
+        resp = await client.post(
             f"/api/v1/federation/agents/{agent.id}/migrate",
             headers=auth_headers,
             json={"target_peer_id": peer.id},
@@ -362,31 +373,34 @@ class TestMigrateAgentRoute:
         assert agent.terminated_at is not None
         assert agent.termination_reason == f"migrated_to:{peer.id}"
 
-    def test_migrate_requires_admin(
+    @pytest.mark.asyncio
+    async def test_migrate_requires_admin(
         self, client, seeded_db, fed_enabled, peer,
     ):
         _make_user(seeded_db, "plainuser", is_admin=False)
-        plain = _login(client, "plainuser")
+        plain = await _login_async(client, "plainuser")
         agent = _make_agent(seeded_db, agentium_id="30150")
 
-        resp = client.post(
+        resp = await client.post(
             f"/api/v1/federation/agents/{agent.id}/migrate",
             headers=plain,
             json={"target_peer_id": peer.id},
         )
         assert resp.status_code == 403
 
-    def test_migrate_unknown_agent_404(
+    @pytest.mark.asyncio
+    async def test_migrate_unknown_agent_404(
         self, client, seeded_db, fed_enabled, peer, auth_headers,
     ):
-        resp = client.post(
+        resp = await client.post(
             f"/api/v1/federation/agents/{uuid.uuid4()}/migrate",
             headers=auth_headers,
             json={"target_peer_id": peer.id},
         )
         assert resp.status_code == 404
 
-    def test_migrate_inactive_peer_400(
+    @pytest.mark.asyncio
+    async def test_migrate_inactive_peer_400(
         self, client, seeded_db, fed_enabled, auth_headers, monkeypatch,
     ):
         suspended = _make_peer(seeded_db, "Suspended", "http://susp-mig.local",
@@ -394,14 +408,15 @@ class TestMigrateAgentRoute:
         agent = _make_agent(seeded_db, agentium_id="30160")
         self._mock_peer_accept(monkeypatch)
 
-        resp = client.post(
+        resp = await client.post(
             f"/api/v1/federation/agents/{agent.id}/migrate",
             headers=auth_headers,
             json={"target_peer_id": suspended.id},
         )
         assert resp.status_code == 400
 
-    def test_migrate_peer_unreachable_leaves_agent_untouched(
+    @pytest.mark.asyncio
+    async def test_migrate_peer_unreachable_leaves_agent_untouched(
         self, client, seeded_db, fed_enabled, peer, auth_headers, monkeypatch,
     ):
         agent = _make_agent(seeded_db, agentium_id="30170")
@@ -411,7 +426,7 @@ class TestMigrateAgentRoute:
 
         monkeypatch.setattr(httpx, "post", fake_post)
 
-        resp = client.post(
+        resp = await client.post(
             f"/api/v1/federation/agents/{agent.id}/migrate",
             headers=auth_headers,
             json={"target_peer_id": peer.id},
@@ -422,7 +437,8 @@ class TestMigrateAgentRoute:
         assert agent.terminated_at is None
         assert agent.termination_reason is None
 
-    def test_migrate_peer_non_200_leaves_agent_untouched(
+    @pytest.mark.asyncio
+    async def test_migrate_peer_non_200_leaves_agent_untouched(
         self, client, seeded_db, fed_enabled, peer, auth_headers, monkeypatch,
     ):
         agent = _make_agent(seeded_db, agentium_id="30180")
@@ -432,7 +448,7 @@ class TestMigrateAgentRoute:
 
         monkeypatch.setattr(httpx, "post", fake_post)
 
-        resp = client.post(
+        resp = await client.post(
             f"/api/v1/federation/agents/{agent.id}/migrate",
             headers=auth_headers,
             json={"target_peer_id": peer.id},

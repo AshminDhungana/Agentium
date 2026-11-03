@@ -8,6 +8,7 @@ Covers:
 
 import uuid
 import pytest
+import pytest_asyncio
 from sqlalchemy.orm import Session
 
 from backend.services.checkpoint_service import CheckpointService
@@ -49,7 +50,8 @@ class TestCheckpointDiffEndpoint:
     GET /api/v1/checkpoints/{id}/diff?compare_to={id2}
     """
 
-    def test_unified_diff_returns_json_and_metadata(self, client, seeded_db: Session):
+    @pytest.mark.asyncio
+    async def test_unified_diff_returns_json_and_metadata(self, client, seeded_db: Session):
         """
         Comparing two snapshots with different task_state_snapshot values
         should produce: pretty-printed JSON for both sides, a unified diff
@@ -86,7 +88,7 @@ class TestCheckpointDiffEndpoint:
         }
         seeded_db.commit()
 
-        response = client.get(f"/api/v1/checkpoints/{cp_a.id}/diff", params={"compare_to": cp_b.id})
+        response = await client.get(f"/api/v1/checkpoints/{cp_a.id}/diff", params={"compare_to": cp_b.id})
         assert response.status_code == 200, response.text
 
         body = response.json()
@@ -108,7 +110,8 @@ class TestCheckpointDiffEndpoint:
         # Unified diff should contain metadata filenames and changes
         assert "@@" in body["unified_diff"] or "---" in body["unified_diff"]
 
-    def test_identical_snapshots_produces_no_diff_lines(self, client, seeded_db: Session):
+    @pytest.mark.asyncio
+    async def test_identical_snapshots_produces_no_diff_lines(self, client, seeded_db: Session):
         """
         When both snapshots are identical the unified diff should still be
         returned but contain no change markers.
@@ -132,7 +135,7 @@ class TestCheckpointDiffEndpoint:
         cp_b.task_state_snapshot = {"status": "done"}
         seeded_db.commit()
 
-        response = client.get(f"/api/v1/checkpoints/{cp_a.id}/diff", params={"compare_to": cp_b.id})
+        response = await client.get(f"/api/v1/checkpoints/{cp_a.id}/diff", params={"compare_to": cp_b.id})
         assert response.status_code == 200
 
         body = response.json()
@@ -145,7 +148,8 @@ class TestCheckpointDiffEndpoint:
 # Group 2 — Error cases
 # ===========================================================================
 
-    def test_self_compare_returns_400(self, client, seeded_db: Session):
+    @pytest.mark.asyncio
+    async def test_self_compare_returns_400(self, client, seeded_db: Session):
         """Comparing a checkpoint to itself is not allowed."""
         task = _create_task(seeded_db, "Self Compare")
         cp = CheckpointService.create_checkpoint(
@@ -156,11 +160,12 @@ class TestCheckpointDiffEndpoint:
         )
         seeded_db.commit()
 
-        response = client.get(f"/api/v1/checkpoints/{cp.id}/diff", params={"compare_to": cp.id})
+        response = await client.get(f"/api/v1/checkpoints/{cp.id}/diff", params={"compare_to": cp.id})
         assert response.status_code == 400
         assert "itself" in response.json()["error"].lower() or "cannot" in response.json()["error"].lower()
 
-    def test_missing_checkpoint_returns_404(self, client, seeded_db: Session):
+    @pytest.mark.asyncio
+    async def test_missing_checkpoint_returns_404(self, client, seeded_db: Session):
         """When either checkpoint does not exist, 404 is returned."""
         fake_id = str(uuid.uuid4())
         task = _create_task(seeded_db, "Missing Check")
@@ -172,7 +177,7 @@ class TestCheckpointDiffEndpoint:
         )
         seeded_db.commit()
 
-        response = client.get(f"/api/v1/checkpoints/{cp.id}/diff", params={"compare_to": fake_id})
+        response = await client.get(f"/api/v1/checkpoints/{cp.id}/diff", params={"compare_to": fake_id})
         assert response.status_code == 404
 
 
@@ -186,7 +191,8 @@ class TestBranchCompareEndpoint:
     Structured, field-level diff of two branches' latest checkpoints.
     """
 
-    def test_compare_branches_returns_structured_diff(self, client, seeded_db: Session):
+    @pytest.mark.asyncio
+    async def test_compare_branches_returns_structured_diff(self, client, seeded_db: Session):
         task = _create_task(seeded_db, "Branch Compare")
         cp_a = CheckpointService.create_checkpoint(
             db=seeded_db, task_id=task.id,
@@ -204,7 +210,7 @@ class TestBranchCompareEndpoint:
         cp_b.task_state_snapshot = {"status": "done", "score": 2}
         seeded_db.commit()
 
-        response = client.get(
+        response = await client.get(
             "/api/v1/checkpoints/compare",
             params={"left_branch": "main", "right_branch": "feature"},
         )
@@ -217,7 +223,8 @@ class TestBranchCompareEndpoint:
         assert score["status"] == "changed"
         assert score["left"] == 1 and score["right"] == 2
 
-    def test_compare_branches_nested_diff_has_children(self, client, seeded_db: Session):
+    @pytest.mark.asyncio
+    async def test_compare_branches_nested_diff_has_children(self, client, seeded_db: Session):
         task = _create_task(seeded_db, "Nested Diff")
         cp_a = CheckpointService.create_checkpoint(
             db=seeded_db, task_id=task.id,
@@ -235,7 +242,7 @@ class TestBranchCompareEndpoint:
         cp_b.task_state_snapshot = {"nested": {"a": 1, "b": 99}}
         seeded_db.commit()
 
-        response = client.get(
+        response = await client.get(
             "/api/v1/checkpoints/compare",
             params={"left_branch": "main", "right_branch": "feature"},
         )

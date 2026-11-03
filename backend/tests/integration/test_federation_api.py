@@ -22,6 +22,7 @@ from types import SimpleNamespace
 
 import httpx
 import pytest
+import pytest_asyncio
 from sqlalchemy.orm import sessionmaker
 
 import backend.celery_app as celery_module
@@ -90,10 +91,10 @@ def _make_peer(
     return peer
 
 
-def _register_peer_via_api(client, auth_headers, name="Peer Alpha",
+async def _register_peer_via_api(client, auth_headers, name="Peer Alpha",
                            base_url=PEER_URL, secret=SECRET,
                            trust_level="limited", capabilities=None):
-    return client.post(
+    return await client.post(
         "/api/v1/federation/peers",
         headers=auth_headers,
         json={
@@ -106,7 +107,7 @@ def _register_peer_via_api(client, auth_headers, name="Peer Alpha",
     )
 
 
-def _make_user(db, username: str, is_admin: bool):
+async def _make_user(db, username: str, is_admin: bool):
     from backend.models.entities.user import User
     user = User(
         username=username,
@@ -121,8 +122,8 @@ def _make_user(db, username: str, is_admin: bool):
     return user
 
 
-def _login(client, username: str):
-    resp = client.post(
+async def _login(client, username: str):
+    resp = await client.post(
         "/api/v1/auth/login",
         json={"username": username, "password": "password123"},
     )
@@ -172,8 +173,9 @@ def peer(seeded_db):
 class TestPeerRegistration:
     """POST /api/v1/federation/peers registers a peer instance."""
 
-    def test_register_peer_returns_201(self, client, auth_headers, seeded_db, fed_enabled):
-        resp = _register_peer_via_api(client, auth_headers, base_url="http://reg-a.local")
+    @pytest.mark.asyncio
+    async def test_register_peer_returns_201(self, client, auth_headers, seeded_db, fed_enabled):
+        resp = await _register_peer_via_api(client, auth_headers, base_url="http://reg-a.local")
         assert resp.status_code == 201, resp.text
         body = resp.json()
         assert body["name"] == "Peer Alpha"
@@ -187,24 +189,28 @@ class TestPeerRegistration:
         assert row.shared_secret_hash == hashlib.sha256(SECRET.encode()).hexdigest()
         assert row.signing_key == _derive_signing_key(SECRET)
 
-    def test_register_peer_normalizes_trailing_slash(self, client, auth_headers, seeded_db, fed_enabled):
-        resp = _register_peer_via_api(client, auth_headers, base_url="http://reg-b.local/")
+    @pytest.mark.asyncio
+    async def test_register_peer_normalizes_trailing_slash(self, client, auth_headers, seeded_db, fed_enabled):
+        resp = await _register_peer_via_api(client, auth_headers, base_url="http://reg-b.local/")
         assert resp.status_code == 201
         assert resp.json()["base_url"] == "http://reg-b.local"
 
-    def test_duplicate_base_url_rejected(self, client, auth_headers, seeded_db, fed_enabled):
-        assert _register_peer_via_api(client, auth_headers, base_url="http://dup.local").status_code == 201
-        resp = _register_peer_via_api(client, auth_headers, name="Second", base_url="http://dup.local")
+    @pytest.mark.asyncio
+    async def test_duplicate_base_url_rejected(self, client, auth_headers, seeded_db, fed_enabled):
+        assert (await _register_peer_via_api(client, auth_headers, base_url="http://dup.local")).status_code == 201
+        resp = await _register_peer_via_api(client, auth_headers, name="Second", base_url="http://dup.local")
         assert resp.status_code == 400
 
-    def test_registration_requires_admin(self, client, auth_headers, seeded_db, fed_enabled):
-        _make_user(seeded_db, "plainuser", is_admin=False)
-        plain_headers = _login(client, "plainuser")
-        resp = _register_peer_via_api(client, plain_headers, base_url="http://noadmin.local")
+    @pytest.mark.asyncio
+    async def test_registration_requires_admin(self, client, auth_headers, seeded_db, fed_enabled):
+        await _make_user(seeded_db, "plainuser", is_admin=False)
+        plain_headers = await _login(client, "plainuser")
+        resp = await _register_peer_via_api(client, plain_headers, base_url="http://noadmin.local")
         assert resp.status_code == 403
 
-    def test_registration_requires_auth(self, client, fed_enabled):
-        resp = client.post(
+    @pytest.mark.asyncio
+    async def test_registration_requires_auth(self, client, fed_enabled):
+        resp = await client.post(
             "/api/v1/federation/peers",
             json={"name": "X", "base_url": "http://x.local", "shared_secret": "s"},
         )
@@ -214,10 +220,11 @@ class TestPeerRegistration:
 class TestPeerListing:
     """GET /api/v1/federation/peers lists connected peers."""
 
-    def test_list_peers_includes_registered_peer(self, client, auth_headers, seeded_db, fed_enabled):
-        _register_peer_via_api(client, auth_headers, name="Listed Peer",
+    @pytest.mark.asyncio
+    async def test_list_peers_includes_registered_peer(self, client, auth_headers, seeded_db, fed_enabled):
+        await _register_peer_via_api(client, auth_headers, name="Listed Peer",
                                base_url="http://list-a.local")
-        resp = client.get("/api/v1/federation/peers", headers=auth_headers)
+        resp = await client.get("/api/v1/federation/peers", headers=auth_headers)
         assert resp.status_code == 200
         peers = resp.json()
         matching = [p for p in peers if p["base_url"] == "http://list-a.local"]
@@ -227,40 +234,46 @@ class TestPeerListing:
         assert "last_heartbeat_at" in matching[0]
         assert "registered_at" in matching[0]
 
-    def test_list_peers_pagination(self, client, auth_headers, seeded_db, fed_enabled):
+    @pytest.mark.asyncio
+    async def test_list_peers_pagination(self, client, auth_headers, seeded_db, fed_enabled):
         for i in range(3):
-            _register_peer_via_api(client, auth_headers, name=f"P{i}",
+            await _register_peer_via_api(client, auth_headers, name=f"P{i}",
                                    base_url=f"http://page-{i}.local")
-        all_peers = client.get("/api/v1/federation/peers", headers=auth_headers).json()
-        page = client.get("/api/v1/federation/peers?skip=1&limit=1", headers=auth_headers).json()
+        all_peers = (await client.get("/api/v1/federation/peers", headers=auth_headers)).json()
+        page = (await client.get("/api/v1/federation/peers?skip=1&limit=1", headers=auth_headers)).json()
         assert len(page) == 1
         # Newest-first ordering means skip=1 returns the second-newest row
         assert page[0]["base_url"] == all_peers[1]["base_url"]
 
-    def test_list_peers_requires_auth(self, client, fed_enabled):
-        assert client.get("/api/v1/federation/peers").status_code == 401
+    @pytest.mark.asyncio
+    async def test_list_peers_requires_auth(self, client, fed_enabled):
+        assert (await client.get("/api/v1/federation/peers")).status_code == 401
 
 
 class TestPeerManagement:
     """DELETE /peers/{id} and PATCH /peers/{id}/trust."""
 
-    def test_delete_peer(self, client, auth_headers, seeded_db, fed_enabled, peer):
-        resp = client.delete(f"/api/v1/federation/peers/{peer.id}", headers=auth_headers)
+    @pytest.mark.asyncio
+    async def test_delete_peer(self, client, auth_headers, seeded_db, fed_enabled, peer):
+        resp = await client.delete(f"/api/v1/federation/peers/{peer.id}", headers=auth_headers)
         assert resp.status_code == 204
         assert seeded_db.query(FederatedInstance).filter_by(id=peer.id).count() == 0
 
-    def test_delete_missing_peer_404(self, client, auth_headers, fed_enabled):
-        resp = client.delete(f"/api/v1/federation/peers/{uuid.uuid4()}", headers=auth_headers)
+    @pytest.mark.asyncio
+    async def test_delete_missing_peer_404(self, client, auth_headers, fed_enabled):
+        resp = await client.delete(f"/api/v1/federation/peers/{uuid.uuid4()}", headers=auth_headers)
         assert resp.status_code == 404
 
-    def test_delete_requires_admin(self, client, auth_headers, seeded_db, fed_enabled, peer):
-        _make_user(seeded_db, "plainuser", is_admin=False)
-        plain_headers = _login(client, "plainuser")
-        resp = client.delete(f"/api/v1/federation/peers/{peer.id}", headers=plain_headers)
+    @pytest.mark.asyncio
+    async def test_delete_requires_admin(self, client, auth_headers, seeded_db, fed_enabled, peer):
+        await _make_user(seeded_db, "plainuser", is_admin=False)
+        plain_headers = await _login(client, "plainuser")
+        resp = await client.delete(f"/api/v1/federation/peers/{peer.id}", headers=plain_headers)
         assert resp.status_code == 403
 
-    def test_update_trust_level(self, client, auth_headers, seeded_db, fed_enabled, peer):
-        resp = client.patch(
+    @pytest.mark.asyncio
+    async def test_update_trust_level(self, client, auth_headers, seeded_db, fed_enabled, peer):
+        resp = await client.patch(
             f"/api/v1/federation/peers/{peer.id}/trust",
             headers=auth_headers,
             json={"trust_level": "full"},
@@ -270,8 +283,9 @@ class TestPeerManagement:
         seeded_db.refresh(peer)
         assert peer.trust_level == "full"
 
-    def test_update_trust_rejects_invalid_value(self, client, auth_headers, fed_enabled, peer):
-        resp = client.patch(
+    @pytest.mark.asyncio
+    async def test_update_trust_rejects_invalid_value(self, client, auth_headers, fed_enabled, peer):
+        resp = await client.patch(
             f"/api/v1/federation/peers/{peer.id}/trust",
             headers=auth_headers,
             json={"trust_level": "bogus"},
@@ -286,9 +300,10 @@ class TestPeerManagement:
 class TestWebhookAuthentication:
     """Dual-mode peer auth on /webhooks/* endpoints."""
 
-    def test_heartbeat_with_valid_hmac(self, client, seeded_db, fed_enabled, peer):
+    @pytest.mark.asyncio
+    async def test_heartbeat_with_valid_hmac(self, client, seeded_db, fed_enabled, peer):
         body = b"{}"
-        resp = client.post(
+        resp = await client.post(
             "/api/v1/federation/webhooks/heartbeat",
             content=body,
             headers=_hmac_headers(PEER_URL, SECRET, body),
@@ -298,27 +313,30 @@ class TestWebhookAuthentication:
         seeded_db.refresh(peer)
         assert peer.last_heartbeat_at is not None
 
-    def test_heartbeat_with_wrong_secret(self, client, fed_enabled, peer):
+    @pytest.mark.asyncio
+    async def test_heartbeat_with_wrong_secret(self, client, fed_enabled, peer):
         body = b"{}"
-        resp = client.post(
+        resp = await client.post(
             "/api/v1/federation/webhooks/heartbeat",
             content=body,
             headers=_hmac_headers(PEER_URL, "wrong-secret", body),
         )
         assert resp.status_code == 401
 
-    def test_heartbeat_rejects_stale_timestamp(self, client, fed_enabled, peer):
+    @pytest.mark.asyncio
+    async def test_heartbeat_rejects_stale_timestamp(self, client, fed_enabled, peer):
         body = b"{}"
         stale_ts = int(time.time()) - 600  # beyond the 300s replay window
-        resp = client.post(
+        resp = await client.post(
             "/api/v1/federation/webhooks/heartbeat",
             content=body,
             headers=_hmac_headers(PEER_URL, SECRET, body, timestamp=stale_ts),
         )
         assert resp.status_code == 401
 
-    def test_heartbeat_with_legacy_secret(self, client, seeded_db, fed_enabled, peer):
-        resp = client.post(
+    @pytest.mark.asyncio
+    async def test_heartbeat_with_legacy_secret(self, client, seeded_db, fed_enabled, peer):
+        resp = await client.post(
             "/api/v1/federation/webhooks/heartbeat",
             content=b"{}",
             headers={
@@ -331,23 +349,26 @@ class TestWebhookAuthentication:
         seeded_db.refresh(peer)
         assert peer.last_heartbeat_at is not None
 
-    def test_heartbeat_missing_peer_url_header(self, client, fed_enabled, peer):
-        resp = client.post("/api/v1/federation/webhooks/heartbeat", content=b"{}")
+    @pytest.mark.asyncio
+    async def test_heartbeat_missing_peer_url_header(self, client, fed_enabled, peer):
+        resp = await client.post("/api/v1/federation/webhooks/heartbeat", content=b"{}")
         assert resp.status_code == 401
 
-    def test_heartbeat_unregistered_peer(self, client, fed_enabled, peer):
+    @pytest.mark.asyncio
+    async def test_heartbeat_unregistered_peer(self, client, fed_enabled, peer):
         body = b"{}"
-        resp = client.post(
+        resp = await client.post(
             "/api/v1/federation/webhooks/heartbeat",
             content=body,
             headers=_hmac_headers("http://unknown.local", SECRET, body),
         )
         assert resp.status_code == 401
 
-    def test_heartbeat_suspended_peer_forbidden(self, client, seeded_db, fed_enabled):
+    @pytest.mark.asyncio
+    async def test_heartbeat_suspended_peer_forbidden(self, client, seeded_db, fed_enabled):
         peer = _make_peer(seeded_db, "Suspended Peer", "http://susp.local", status="suspended")
         body = b"{}"
-        resp = client.post(
+        resp = await client.post(
             "/api/v1/federation/webhooks/heartbeat",
             content=body,
             headers=_hmac_headers("http://susp.local", SECRET, body),
@@ -362,7 +383,8 @@ class TestWebhookAuthentication:
 class TestTaskReceiveWebhook:
     """POST /webhooks/tasks/receive creates a real local Task."""
 
-    def test_receive_delegated_task(self, client, seeded_db, fed_enabled, peer):
+    @pytest.mark.asyncio
+    async def test_receive_delegated_task(self, client, seeded_db, fed_enabled, peer):
         body = json.dumps({
             "original_task_id": "T0001",
             "payload": {
@@ -372,7 +394,7 @@ class TestTaskReceiveWebhook:
             },
         }).encode()
 
-        resp = client.post(
+        resp = await client.post(
             "/api/v1/federation/webhooks/tasks/receive",
             content=body,
             headers=_hmac_headers(PEER_URL, SECRET, body),
@@ -401,13 +423,14 @@ class TestTaskReceiveWebhook:
         assert fed_task.local_task_id == data["local_task_id"]
         assert fed_task.local_task_id == str(local_task.id)
 
-    def test_read_only_peer_cannot_delegate_tasks(self, client, seeded_db, fed_enabled):
+    @pytest.mark.asyncio
+    async def test_read_only_peer_cannot_delegate_tasks(self, client, seeded_db, fed_enabled):
         _make_peer(seeded_db, "Reader Peer", "http://reader.local", trust_level="read_only")
         body = json.dumps({
             "original_task_id": "T0002",
             "payload": {"title": "Should be rejected"},
         }).encode()
-        resp = client.post(
+        resp = await client.post(
             "/api/v1/federation/webhooks/tasks/receive",
             content=body,
             headers=_hmac_headers("http://reader.local", SECRET, body),
@@ -435,7 +458,8 @@ class TestTaskResultWebhook:
         db.flush()
         return orig_task, fed_task
 
-    def test_receive_task_result(self, client, seeded_db, fed_enabled, peer):
+    @pytest.mark.asyncio
+    async def test_receive_task_result(self, client, seeded_db, fed_enabled, peer):
         orig_task, fed_task = self._seed_outgoing_task(seeded_db, peer)
 
         body = json.dumps({
@@ -445,7 +469,7 @@ class TestTaskResultWebhook:
             "result_summary": "Peer finished the work",
         }).encode()
 
-        resp = client.post(
+        resp = await client.post(
             "/api/v1/federation/webhooks/tasks/result",
             content=body,
             headers=_hmac_headers(PEER_URL, SECRET, body),
@@ -461,21 +485,23 @@ class TestTaskResultWebhook:
         assert orig_task.status == TaskStatus.COMPLETED
         assert orig_task.result_summary == "Peer finished the work"
 
-    def test_result_for_unknown_task_404(self, client, fed_enabled, peer):
+    @pytest.mark.asyncio
+    async def test_result_for_unknown_task_404(self, client, fed_enabled, peer):
         body = json.dumps({
             "original_task_id": "T-nope",
             "local_task_id": "T1",
             "status": "completed",
         }).encode()
-        resp = client.post(
+        resp = await client.post(
             "/api/v1/federation/webhooks/tasks/result",
             content=body,
             headers=_hmac_headers(PEER_URL, SECRET, body),
         )
         assert resp.status_code == 404
 
-    def test_result_webhook_requires_peer_auth(self, client, fed_enabled, peer):
-        resp = client.post(
+    @pytest.mark.asyncio
+    async def test_result_webhook_requires_peer_auth(self, client, fed_enabled, peer):
+        resp = await client.post(
             "/api/v1/federation/webhooks/tasks/result",
             content=b"{}",
         )
