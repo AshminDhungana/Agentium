@@ -145,7 +145,8 @@ class TestRateLimiting:
     the test stays fast and deterministic.
     """
 
-    def test_rate_limit_returns_429_after_threshold(self, monkeypatch):
+    @pytest.mark.asyncio
+    async def test_rate_limit_returns_429_after_threshold(self, monkeypatch):
         # Shrink the GENERAL tier limit (the route below isn't under
         # /api/v1/auth or /api/v1/tasks, so it maps to GENERAL).
         monkeypatch.setitem(
@@ -163,19 +164,20 @@ class TestRateLimiting:
         def read():
             return {"status": "ok"}
 
-        test_client = TestClient(app)
+        # Use AsyncClient with ASGITransport instead of TestClient
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            # Consume the allowed requests
+            await client.get("/test")
+            await client.get("/test")
 
-        # Consume the allowed requests
-        test_client.get("/test")
-        test_client.get("/test")
-
-        # Third request should be rate-limited
-        response = test_client.get("/test")
-        assert response.status_code == 429
-        # detail is a dict, check for specific sub-fields
-        detail = response.json()["detail"]
-        assert detail.get("rate_limit") == 2
-        assert detail.get("tier") == "general"
+            # Third request should be rate-limited
+            response = await client.get("/test")
+            assert response.status_code == 429
+            # detail is a dict, check for specific sub-fields
+            detail = response.json()["detail"]
+            assert detail.get("rate_limit") == 2
+            assert detail.get("tier") == "general"
 
     def test_rate_limit_resets_after_window(self, monkeypatch):
         """Once the sliding window has elapsed, requests are allowed again."""
