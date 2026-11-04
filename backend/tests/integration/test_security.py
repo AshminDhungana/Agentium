@@ -206,7 +206,8 @@ class TestRateLimiting:
             await asyncio.sleep(1.1)
             assert (await client.get("/test")).status_code == 200
 
-    def test_rate_limit_fails_open_when_redis_unavailable(self):
+    @pytest.mark.asyncio
+    async def test_rate_limit_fails_open_when_redis_unavailable(self):
         """If Redis is None, the middleware must allow traffic through (fail open)."""
         app = FastAPI()
         app.add_middleware(RateLimitMiddleware, redis=None)
@@ -215,9 +216,10 @@ class TestRateLimiting:
         def read():
             return {"status": "ok"}
 
-        test_client = TestClient(app)
-        for _ in range(10):
-            assert test_client.get("/test").status_code == 200
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            for _ in range(10):
+                assert (await client.get("/test")).status_code == 200
 
 
 # ── Group 4 — Webhook HMAC Integrity ───────────────────────────────────
