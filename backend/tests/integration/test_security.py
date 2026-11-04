@@ -179,7 +179,8 @@ class TestRateLimiting:
             assert detail.get("rate_limit") == 2
             assert detail.get("tier") == "general"
 
-    def test_rate_limit_resets_after_window(self, monkeypatch):
+    @pytest.mark.asyncio
+    async def test_rate_limit_resets_after_window(self, monkeypatch):
         """Once the sliding window has elapsed, requests are allowed again."""
         monkeypatch.setitem(
             rate_limit_module._IP_RULES,
@@ -196,13 +197,14 @@ class TestRateLimiting:
         def read():
             return {"status": "ok"}
 
-        test_client = TestClient(app)
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            assert (await client.get("/test")).status_code == 200
+            assert (await client.get("/test")).status_code == 429
 
-        assert test_client.get("/test").status_code == 200
-        assert test_client.get("/test").status_code == 429
-
-        time.sleep(1.1)
-        assert test_client.get("/test").status_code == 200
+            # Use async sleep to avoid blocking the event loop
+            await asyncio.sleep(1.1)
+            assert (await client.get("/test")).status_code == 200
 
     def test_rate_limit_fails_open_when_redis_unavailable(self):
         """If Redis is None, the middleware must allow traffic through (fail open)."""
