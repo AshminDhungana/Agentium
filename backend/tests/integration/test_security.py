@@ -17,9 +17,11 @@ import hashlib
 import json
 import time
 import uuid
+import asyncio  # Added for async sleep
 from datetime import timedelta, timezone
 from fastapi.testclient import TestClient
 from fastapi import FastAPI
+from httpx import AsyncClient, ASGITransport  # Added for async rate limit tests
 
 import fakeredis.aioredis
 
