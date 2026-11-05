@@ -4,6 +4,7 @@ import time
 import sys
 import os
 from typing import Generator
+from contextlib import contextmanager
 
 # ─── CRITICAL: Set test environment variables BEFORE any backend imports ───
 # This prevents backend.models.database from creating an engine with the default
@@ -308,3 +309,14 @@ def health_client():
     print("Creating HealthEndpointClient", file=sys.stderr)
     # Just return the client directly, let tests use it with async with
     return HealthEndpointClient()
+
+
+@contextmanager
+def assert_completes_under(seconds: float):
+    """Assert the wrapped block completes within time limit."""
+    start = time.perf_counter()
+    try:
+        yield
+    finally:
+        elapsed = time.perf_counter() - start
+        assert elapsed < seconds, f"Operation took {elapsed:.2f}s, expected < {seconds}s"
