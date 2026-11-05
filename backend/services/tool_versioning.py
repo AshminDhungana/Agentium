@@ -305,8 +305,9 @@ class ToolVersioningService:
         # Reload in registry
         load_result = self.factory.load_tool(tool_name)
         if load_result["loaded"]:
+            tool_instance = load_result["tool_instance"]
             tool_registry.update_tool_function(
-                tool_name, load_result["tool_instance"].execute
+                tool_name, tool_instance.execute
             )
 
         self.db.commit()
@@ -423,7 +424,7 @@ class ToolVersioningService:
     def _audit(self, action: str, tool_name: str, actor: str, details: dict):
         """Audit."""
 
-        audit = AuditLog(
+        audit = AuditLog.log(
             level=AuditLevel.INFO,
             category=AuditCategory.SYSTEM,
             actor_type="agent",
@@ -433,8 +434,6 @@ class ToolVersioningService:
             target_id=tool_name,
             description=f"{action} on '{tool_name}'",
             after_state=details,
-            is_active=True,
-            created_at=datetime.utcnow(),
         )
         self.db.add(audit)
         self.db.commit()

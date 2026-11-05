@@ -714,91 +714,107 @@ async def restore_config_snapshot(
     db: Session = Depends(get_db),
 ):
     from backend.services.config_versioning import ConfigVersioningService
+
+    # Validate entity type first
+    supported_entity_types = ["channel", "model_config", "plugin", "constitution_article"]
+    if entity_type not in supported_entity_types:
+        raise BadRequestError(
+            error=f"Unsupported entity type for restore: {entity_type}",
+            code="UNSUPPORTED_ENTITY_TYPE_FOR_RESTORE"
+        )
+
+    # Check if entity exists in database
+    entity = None
+    if entity_type == "channel":
+        from backend.models.entities.channels import ExternalChannel
+        entity = db.query(ExternalChannel).filter(ExternalChannel.id == entity_id).first()
+        if not entity:
+            raise NotFoundError(error="Channel not found", code="CHANNEL_NOT_FOUND")
+    elif entity_type == "model_config":
+        from backend.models.entities.user_config import UserModelConfig
+        entity = db.query(UserModelConfig).filter(UserModelConfig.id == entity_id).first()
+        if not entity:
+            raise NotFoundError(error="Model config not found", code="MODEL_CONFIG_NOT_FOUND")
+    elif entity_type == "plugin":
+        from backend.models.entities.plugin import PluginInstallation
+        entity = db.query(PluginInstallation).filter(PluginInstallation.id == entity_id).first()
+        if not entity:
+            raise NotFoundError(error="Plugin installation not found", code="PLUGIN_INSTALLATION_NOT_FOUND")
+    elif entity_type == "constitution_article":
+        from backend.models.entities.constitution import ConstitutionArticle
+        entity = db.query(ConstitutionArticle).filter(ConstitutionArticle.id == entity_id).first()
+        if not entity:
+            raise NotFoundError(error="Constitution Article not found", code="CONSTITUTION_ARTICLE_NOT_FOUND")
+
+    # Now restore the snapshot
     try:
         snapshot = ConfigVersioningService.restore_snapshot(entity_type, entity_id, commit)
     except ValueError as e:
-                raise BadRequestError(error=str(e), code="STRE")
-        
+        error_msg = str(e)
+        if "not found in commit" in error_msg:
+            raise NotFoundError(error=error_msg, code="SNAPSHOT_NOT_FOUND")
+        elif "not found in repository" in error_msg:
+            raise BadRequestError(error=error_msg, code="COMMIT_NOT_FOUND")
+        else:
+            raise BadRequestError(error=error_msg, code="RESTORE_FAILED")
+
+    # Apply snapshot to entity
     if entity_type == "channel":
         from backend.models.entities.channels import ExternalChannel
-        channel = db.query(ExternalChannel).filter(ExternalChannel.id == entity_id).first()
-        if not channel:
-            raise NotFoundError(error="Channel not found", code="CHANNEL_NOT_FOUND")
-        for key in ["name", "config", "default_agent_id", "auto_create_tasks", "require_approval", "status"]:
+        # Top-level fields
+        for key in ["name", "config", "status"]:
             if key in snapshot:
-                setattr(channel, key, snapshot[key])
-        
+                setattr(entity, key, snapshot[key])
+        # Routing fields (nested under "routing" key in snapshot)
+        if "routing" in snapshot:
+            routing = snapshot["routing"]
+            for key in ["default_agent_id", "auto_create_tasks", "require_approval"]:
+                if key in routing:
+                    setattr(entity, key, routing[key])
+
     elif entity_type == "model_config":
         from backend.models.entities.user_config import UserModelConfig
-        config = db.query(UserModelConfig).filter(UserModelConfig.id == entity_id).first()
-        if not config:
-            raise NotFoundError(error="Model config not found", code="MODEL_CONFIG_NOT_FOUND")
         for key in ["provider_name", "config_name", "api_base_url", "local_server_url", "default_model", "available_models", "is_default", "max_tokens", "temperature", "top_p", "timeout_seconds", "status"]:
             if key in snapshot:
-                setattr(config, key, snapshot[key])
+                setattr(entity, key, snapshot[key])
         _skipped_key_fields = [k for k in ("api_key_encrypted", "api_key_masked") if k in snapshot]
         if _skipped_key_fields:
             import logging as _log
             _log.getLogger(__name__).warning(
                 "config-restore: skipped restoring sensitive field(s) %s for "
-                "model_config %s — re-enter the API key manually if needed.",
+                "model_config %s - re-enter the API key manually if needed.",
                 _skipped_key_fields,
                 entity_id,
             )
 
     elif entity_type == "plugin":
         from backend.models.entities.plugin import PluginInstallation
-        inst = db.query(PluginInstallation).filter(PluginInstallation.id == entity_id).first()
-        if not inst:
-            raise NotFoundError(error="Plugin installation not found", code="PLUGIN_INSTALLATION_NOT_FOUND")
         if "config" in snapshot:
-            inst.config = snapshot["config"]
-        
+            entity.config = snapshot["config"]
+
     elif entity_type == "constitution_article":
         from backend.models.entities.constitution import ConstitutionArticle
-        article = db.query(ConstitutionArticle).filter(ConstitutionArticle.id == entity_id).first()
-        if not article:
-            raise NotFoundError(error="Constitution Article not found", code="CONSTITUTION_ARTICLE_NOT_FOUND")
         for key in ["text", "commentary", "tier"]:
             if key in snapshot:
-                setattr(article, key, snapshot[key])
-    else:
-        raise BadRequestError(error=f"Unsupported entity type for restore: {entity_type}", code="UNSUPPORTED_ENTITY_TYPE_FOR_RESTORE")
-        
+                setattr(entity, key, snapshot[key])
+
     try:
         db.commit()
     except Exception as e:
         db.rollback()
         raise InternalServerError(error=f"Database update failed: {str(e)}", code="DATABASE_UPDATE_FAILED")
-        
+
     return {
         "success": True,
         "message": f"{entity_type} {entity_id} restored to {commit}",
         "warnings": (
-            ["API key fields were not restored — re-enter the key manually if needed."]
+            ["API key fields were not restored - re-enter the key manually if needed."]
             if entity_type == "model_config" and any(
                 k in snapshot for k in ("api_key_encrypted", "api_key_masked")
             )
             else []
         ),
     }
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Phase 17.1 — DDoS Blocklist Management
-# ──────────────────────────────────────────────────────────────────────────────
-
-def _get_redis_sync():
-    """
-    Return a synchronous Redis client for admin endpoints.
-    Uses the same REDIS_URL as the rest of the application.
-    """
-    import os
-    import redis as redis_lib
-    redis_url = os.getenv("REDIS_URL", "redis://redis:6379/0")
-    return redis_lib.from_url(redis_url, decode_responses=True)
-
-
 @router.get(
     "/admin/blocked-ips",
     response_model=List[BlockedIPResponse],

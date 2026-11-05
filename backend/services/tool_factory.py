@@ -5,6 +5,7 @@ import importlib.util
 import json
 import os
 import sys
+import time
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 import docker
@@ -167,24 +168,39 @@ tool_instance = {tool_file_name.title()}Tool()
         return '\n'.join('            ' + line for line in lines)
     
     def load_tool(self, tool_name: str) -> Dict[str, Any]:
-        """Dynamically load a generated tool."""
+        """Dynamically load a generated tool by executing the file directly.
+
+        This bypasses Python's import system entirely to avoid bytecode caching
+        issues that can occur during rollback operations.
+        """
         tool_file_name = tool_name.replace('-', '_').replace(' ', '_').lower()
         file_path = self.tools_directory / f"{tool_file_name}.py"
-        
+
         if not file_path.exists():
             return {"loaded": False, "error": f"Tool file not found: {file_path}"}
-        
+
         try:
-            # Load module dynamically
-            spec = importlib.util.spec_from_file_location(tool_file_name, file_path)
-            module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(module)
-            
-            return {
-                "loaded": True,
-                "tool_instance": module.tool_instance,
-                "error": None
+            # Read the source code directly
+            source_code = file_path.read_text(encoding="utf-8")
+
+            # Create a fresh namespace for execution
+            namespace = {
+                "__name__": f"{tool_file_name}_dynamic",
+                "__file__": str(file_path),
+                "Dict": Dict,
+                "Any": Any,
             }
+
+            # Execute the code in the fresh namespace
+            exec(compile(source_code, str(file_path), "exec"), namespace)
+
+            if 'tool_instance' in namespace:
+                return {
+                    "loaded": True,
+                    "tool_instance": namespace["tool_instance"],
+                    "error": None
+                }
+            return {"loaded": False, "error": "No tool_instance found in module"}
         except Exception as e:
             return {"loaded": False, "error": str(e)}
     
