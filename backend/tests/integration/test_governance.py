@@ -682,14 +682,15 @@ class TestConstitutionImmutability:
     through any API or ORM surface.
     """
 
-    def test_constitution_cannot_be_deleted_via_api(
+    @pytest.mark.asyncio
+    async def test_constitution_cannot_be_deleted_via_api(
         self, client, auth_headers, seeded_db: Session
     ):
         """No HTTP DELETE endpoint exists for constitutions — must 404 or 405."""
         constitution = seeded_db.query(Constitution).filter_by(is_active=True).first()
         assert constitution is not None
 
-        resp = client.delete(
+        resp = await client.delete(
             f"/api/v1/constitutions/{constitution.id}",
             headers=auth_headers,
         )

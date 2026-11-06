@@ -183,7 +183,8 @@ async def test_api_manager_dynamic_cost(db_session):
     assert manager.models[config.id].cost_per_1k_tokens == pytest.approx(0.005)
 
 
-def test_sync_admin_endpoint(client, auth_headers):
+@pytest.mark.asyncio
+async def test_sync_admin_endpoint(client, auth_headers):
     """Verify that admin POST /admin/pricing/sync route successfully triggers synchronization."""
     mock_sync_result = {
         "success": True,
@@ -193,7 +194,7 @@ def test_sync_admin_endpoint(client, auth_headers):
     }
     
     with patch("backend.services.pricing_sync_service.PricingSyncService.sync_prices", return_value=mock_sync_result):
-        resp = client.post("/api/v1/admin/pricing/sync", headers=auth_headers)
+        resp = await client.post("/api/v1/admin/pricing/sync", headers=auth_headers)
         
     assert resp.status_code == 200
     data = resp.json()
@@ -344,13 +345,13 @@ async def test_get_config_pricing_paid_and_free(client, db_session):
     db_session.refresh(free)
     PricingSyncService.load_cache_from_db(db_session)
 
-    paid_resp = client.get(f"/api/v1/models/configs/{paid.id}/pricing")
+    paid_resp = await client.get(f"/api/v1/models/configs/{paid.id}/pricing")
     assert paid_resp.status_code == 200
     paid_data = paid_resp.json()
     assert paid_data["pricing"]["input_rate_per_1m"] == 5.0
     assert paid_data["pricing"]["output_rate_per_1m"] == 15.0
 
     # Free model has no pricing row -> null (UI suppresses).
-    free_resp = client.get(f"/api/v1/models/configs/{free.id}/pricing")
+    free_resp = await client.get(f"/api/v1/models/configs/{free.id}/pricing")
     assert free_resp.status_code == 200
     assert free_resp.json()["pricing"] is None

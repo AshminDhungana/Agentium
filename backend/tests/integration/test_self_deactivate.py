@@ -20,10 +20,11 @@ def _create_active_user(db, is_admin=False) -> User:
 
 
 @pytest.mark.integration
-def test_admin_cannot_deactivate_self(client, seeded_db):
+@pytest.mark.asyncio
+async def test_admin_cannot_deactivate_self(client, seeded_db):
     """Test that admin cannot deactivate their own account."""
     # Login as admin
-    login_resp = client.post("/api/v1/auth/login", json={
+    login_resp = await client.post("/api/v1/auth/login", json={
         "username": "admin",
         "password": "admin"
     })
@@ -36,7 +37,7 @@ def test_admin_cannot_deactivate_self(client, seeded_db):
     assert admin_user is not None
     
     # Try to deactivate self - should fail
-    resp = client.patch(
+    resp = await client.patch(
         f"/api/v1/admin/users/{admin_user.id}/status",
         json={"is_active": False},
         headers=headers
