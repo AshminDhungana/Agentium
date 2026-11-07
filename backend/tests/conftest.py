@@ -116,3 +116,29 @@ def model_config_factory(db_session):
         db_session.refresh(config)
         return config
     return _create
+
+
+def pytest_sessionfinish(session, exitstatus):
+    """Store the session exitstatus for the final unconfigure hook."""
+    session.config._agentium_exitstatus = exitstatus
+
+
+@pytest.hookimpl(trylast=True)
+def pytest_unconfigure(config):
+    """Ensure process terminates cleanly after test reporting without interpreter deadlock.
+
+    Background threads, threadpools, C-extensions, or asyncio loops left running
+    can deadlock Python's standard `threading._shutdown()` at process exit.
+    Since all reports (terminal summary, HTML coverage, etc.) are already written
+    by the time `pytest_unconfigure` executes, we flush standard streams and call
+    os._exit() with the stored exit code.
+    """
+    status = getattr(config, "_agentium_exitstatus", 0)
+    import sys
+    try:
+        sys.stdout.flush()
+        sys.stderr.flush()
+    except Exception:
+        pass
+    import os
+    os._exit(status)

@@ -15,6 +15,7 @@ on:
 jobs:
   integration-tests:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - name: Checkout repository
@@ -189,7 +190,7 @@ jobs:
 
       - name: Run integration tests with coverage
         working-directory: ./backend
-        run: pytest -m "integration and not requires_docker and not requires_redis and not requires_alembic_head" --cov=services --cov-fail-under=20
+        run: pytest -p no:locust -m "integration and not requires_docker and not requires_redis and not requires_alembic_head" --cov=services --cov-fail-under=20
         env:
           HF_HUB_OFFLINE: "1"
           DATABASE_URL: postgresql://agentium:agentium@localhost:5432/agentium_test
@@ -223,6 +224,7 @@ jobs:
   performance-tests:
     needs: integration-tests
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - name: Checkout repository
