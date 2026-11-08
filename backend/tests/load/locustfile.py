@@ -320,8 +320,19 @@ if _HAS_LOCUST:
         def reassign_agent(self):
             if len(self._agent_ids) < 2:
                 return
-            agent_id = self._agent_ids[0]
-            new_parent_id = self._agent_ids[1]
+            # Filter for agents with "reassign_agent" capability (Tier 0, 1, 2)
+            # Tier 0: Head (agentium_id starts with "0")
+            # Tier 1: Council (agentium_id starts with "1")
+            # Tier 2: Lead (agentium_id starts with "2")
+            # Tier 3: Task (agentium_id starts with "3") - NOT allowed
+            eligible_agents = [
+                aid for aid in self._agent_ids
+                if aid and aid[0] in ("0", "1", "2")
+            ]
+            if len(eligible_agents) < 2:
+                return
+            agent_id = eligible_agents[0]
+            new_parent_id = eligible_agents[1]
             with self.client.patch(
                 f"/api/v1/agents/{agent_id}/parent",
                 json={"new_parent_id": new_parent_id, "reason": "Load-test"},
@@ -442,10 +453,7 @@ if _HAS_LOCUST:
                     return
 
     # Phase 21.5.2: WebSocket 2x load testing user
-    try:
-        from backend.tests.load.websocket_user import WebSocketUser
-    except Exception:
-        pass
+    from backend.tests.load.websocket_user import WebSocketUser
 
 
 # =============================================================================

@@ -43,6 +43,9 @@ logger = logging.getLogger(__name__)
 _TEST_USER = "admin"
 _TEST_PASS = "admin"
 
+# Use the same SECRET_KEY as the TESTING mode backend
+_TEST_SECRET_KEY = "test-secret-key-for-ci"
+
 
 class WebSocketUser(User):
     """
@@ -63,14 +66,15 @@ class WebSocketUser(User):
     def _get_auth_token(self) -> str:
         """Obtain JWT token from auth endpoint or generate valid HMAC token."""
         try:
-            from backend.core.config import settings
             from jose import jwt
+            # Use the same SECRET_KEY as the TESTING mode backend
+            secret_key = _TEST_SECRET_KEY
             payload = {
                 "sub": _TEST_USER,
                 "role": "sovereign",
                 "exp": time.time() + 3600,
             }
-            return jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
+            return jwt.encode(payload, secret_key, algorithm="HS256")
         except Exception:
             return "mock-token"
 

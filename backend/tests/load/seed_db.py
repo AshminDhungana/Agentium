@@ -25,12 +25,12 @@ async def create_genesis_agents(db: Session) -> dict:
     Create minimal genesis agents for testing (CI load tests).
 
     Creates: Head 00001, Council 10001/10002, Lead 20001.
-    Only runs when TESTING=true. Idempotent.
+    Only runs when TESTING=true. Idempotent - activates existing inactive agents.
     """
     result = {"head": None, "council": [], "lead": None}
 
     # ── Head 00001 ──────────────────────────────────────────────
-    head = db.query(HeadOfCouncil).filter_by(agentium_id="00001", is_active=True).first()
+    head = db.query(HeadOfCouncil).filter_by(agentium_id="00001").first()
     if not head:
         head = HeadOfCouncil(
             agentium_id="00001",
@@ -63,16 +63,19 @@ async def create_genesis_agents(db: Session) -> dict:
         db.flush()
         head.ethos_id = head_ethos.id
         db.flush()
-
-        result["head"] = head
     else:
-        result["head"] = head
+        # Activate if inactive
+        head.is_active = True
+        head.status = AgentStatus.ACTIVE
+        db.flush()
+
+    result["head"] = head
 
     # ── Council Members 10001, 10002 ───────────────────────────
     specializations = ["Constitutional Law", "System Security"]
     for i in range(2):
         agentium_id = f"1{i+1:04d}"  # 10001, 10002
-        member = db.query(CouncilMember).filter_by(agentium_id=agentium_id, is_active=True).first()
+        member = db.query(CouncilMember).filter_by(agentium_id=agentium_id).first()
         if not member:
             member = CouncilMember(
                 agentium_id=agentium_id,
@@ -104,11 +107,17 @@ async def create_genesis_agents(db: Session) -> dict:
             db.flush()
             member.ethos_id = member_ethos.id
             db.flush()
+        else:
+            # Activate if inactive
+            member.is_active = True
+            member.status = AgentStatus.ACTIVE
+            member.parent_id = head.id
+            db.flush()
 
         result["council"].append(member)
 
     # ── Lead Agent 20001 ────────────────────────────────────────
-    lead = db.query(LeadAgent).filter_by(agentium_id="20001", is_active=True).first()
+    lead = db.query(LeadAgent).filter_by(agentium_id="20001").first()
     if not lead:
         lead = reincarnation_service.spawn_lead_agent(
             parent=head,
@@ -120,9 +129,13 @@ async def create_genesis_agents(db: Session) -> dict:
         if lead.agentium_id != "20001":
             lead.agentium_id = "20001"
         db.flush()
-        result["lead"] = lead
     else:
-        result["lead"] = lead
+        # Activate if inactive
+        lead.is_active = True
+        lead.status = AgentStatus.ACTIVE
+        db.flush()
+
+    result["lead"] = lead
 
     # Commit so agents are visible to other DB sessions (WebSocket handler)
     db.commit()

@@ -61,12 +61,15 @@ def _decode_token(token: str) -> Optional[Dict[str, Any]]:
     Decode and validate a JWT.  Returns the payload dict on success,
     or None on any failure.
     """
+    # INFO: Log the SECRET_KEY being used (first 8 chars only for security)
+    logger.info(f"[WebSocket] _decode_token using SECRET_KEY: {settings.SECRET_KEY[:8]}...")
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
         if not payload.get("sub"):
             return None
         return payload
-    except JWTError:
+    except JWTError as e:
+        logger.info(f"[WebSocket] JWT decode failed: {e}")
         return None
 
 
@@ -156,8 +159,10 @@ class ConnectionManager:
         Validate JWT and resolve the Head of Council identity.
         Returns user_info dict on success, None on failure.
         """
+        logger.info(f"[WebSocket] authenticate called with token (first 20 chars): {token[:20]}...")
         payload = _decode_token(token)
         if not payload:
+            logger.info("[WebSocket] _decode_token returned None - closing connection with code 4001")
             await websocket.close(code=4001, reason="Invalid or expired token")
             return None
 
@@ -259,7 +264,7 @@ class ConnectionManager:
         """Lazy-init Pub/Sub subscription to ws:broadcast."""
         if self._pubsub is None:
             r = await self._get_redis()
-            self._pubsub = await r.pubsub()
+            self._pubsub = r.pubsub()
             await self._pubsub.subscribe("ws:broadcast")
             self._pubsub_task = asyncio.create_task(self._listen_pubsub())
             logger.info("[ConnectionManager] Pub/Sub initialized, subscribed to ws:broadcast")
@@ -847,330 +852,347 @@ async def websocket_chat_endpoint(
 
     Phase 15.2: also receives 'mcp_stats_update' broadcasts pushed by Celery.
     """
-    await websocket.accept()
-
-    # Extract correlation ID from headers for distributed tracing
-    request_id = websocket.headers.get("x-request-id") or websocket.headers.get("x-correlation-id")
-    ws_correlation_manager.set_connection_context(websocket, request_id)
-
-    user_info: Optional[Dict[str, Any]] = None
-
-    # Per-connection registry of in-flight streams so a later `cancel` message
-    # can signal an ongoing generation via its asyncio.Event.
-    active_streams: Dict[str, asyncio.Event] = {}
-    pending_tasks: Dict[str, asyncio.Task] = {}
-
-    if token:
-        user_info = await manager.authenticate(websocket, token)
-        if not user_info:
-            return
-
-        await websocket.send_json({
-            "type":      "system",
-            "role":      "system",
-            "content":   (
-                f"Welcome {user_info['username']}. "
-                f"Connected to Head of Council ({user_info['head_agentium_id']}). "
-                f"[Note: token-in-URL is deprecated; switch to auth-message flow]"
-            ),
-            "timestamp": datetime.utcnow().isoformat(),
-        })
-        # If genesis is currently awaiting the country name, push the prompt
-        # directly to this newly-connected client.  The original broadcast
-        # was sent before this socket existed (Head 00001 was early-committed
-        # but the WS hadn't reconnected yet), so the client never saw it.
-        await _send_genesis_prompt_if_awaiting(websocket)
-
+    # Wrap entire function in try/except to catch and log any early exceptions
+    # (e.g., during websocket.accept() or authentication) that would otherwise
+    # result in an unhelpful 1011 Internal Server Error.
     try:
-        while True:
-            raw = await websocket.receive_text()
+        logger.info(f"[WebSocket] New connection from {websocket.client}")
+        await websocket.accept()
 
-            try:
-                data = json.loads(raw)
-            except json.JSONDecodeError:
-                await websocket.send_json({"type": "error", "content": "Invalid JSON"})
-                continue
+        # Extract correlation ID from headers for distributed tracing
+        request_id = websocket.headers.get("x-request-id") or websocket.headers.get("x-correlation-id")
+        ws_correlation_manager.set_connection_context(websocket, request_id)
 
-            # Use message context for correlation ID propagation
-            message_request_id = data.get("request_id")
-            with ws_correlation_manager.message_context(websocket, message_request_id):
-                msg_type = data.get("type", "")
+        user_info: Optional[Dict[str, Any]] = None
 
-                # ── Auth message ──────────────────────────────────────────────────
-                if msg_type == "auth":
-                    if user_info is not None:
+        # Per-connection registry of in-flight streams so a later `cancel` message
+        # can signal an ongoing generation via its asyncio.Event.
+        active_streams: Dict[str, asyncio.Event] = {}
+        pending_tasks: Dict[str, asyncio.Task] = {}
+
+        if token:
+            user_info = await manager.authenticate(websocket, token)
+            if not user_info:
+                return
+
+            await websocket.send_json({
+                "type":      "system",
+                "role":      "system",
+                "content":   (
+                    f"Welcome {user_info['username']}. "
+                    f"Connected to Head of Council ({user_info['head_agentium_id']}). "
+                    f"[Note: token-in-URL is deprecated; switch to auth-message flow]"
+                ),
+                "timestamp": datetime.utcnow().isoformat(),
+            })
+            # If genesis is currently awaiting the country name, push the prompt
+            # directly to this newly-connected client.  The original broadcast
+            # was sent before this socket existed (Head 00001 was early-committed
+            # but the WS hadn't reconnected yet), so the client never saw it.
+            await _send_genesis_prompt_if_awaiting(websocket)
+
+        try:
+            while True:
+                raw = await websocket.receive_text()
+
+                try:
+                    data = json.loads(raw)
+                except json.JSONDecodeError:
+                    await websocket.send_json({"type": "error", "content": "Invalid JSON"})
+                    continue
+
+                # Use message context for correlation ID propagation
+                message_request_id = data.get("request_id")
+                with ws_correlation_manager.message_context(websocket, message_request_id):
+                    msg_type = data.get("type", "")
+
+                    # ── Auth message ──────────────────────────────────────────────────
+                    if msg_type == "auth":
+                        logger.info(f"[WebSocket] Received auth message, token length: {len(data.get('token', ''))}")
+                        if user_info is not None:
+                            await websocket.send_json({
+                                "type":      "system",
+                                "content":   "Already authenticated.",
+                                "timestamp": datetime.utcnow().isoformat(),
+                            })
+                            continue
+
+                        auth_token = data.get("token", "")
+                        logger.info(f"[WebSocket] Calling manager.authenticate with token (first 20 chars): {auth_token[:20]}...")
+                        user_info  = await manager.authenticate(websocket, auth_token)
+                        if not user_info:
+                            logger.info("[WebSocket] manager.authenticate returned None, closing connection")
+                            return
+
                         await websocket.send_json({
                             "type":      "system",
-                            "content":   "Already authenticated.",
+                            "role":      "system",
+                            "content":   (
+                                f"Welcome {user_info['username']}. "
+                                f"Connected to Head of Council ({user_info['head_agentium_id']})."
+                            ),
+                            "timestamp": datetime.utcnow().isoformat(),
+                        })
+                        # See comment above — push genesis prompt if awaiting.
+                        await _send_genesis_prompt_if_awaiting(websocket)
+                        continue
+
+                    # ── Require authentication ────────────────────────────────────────
+                    if user_info is None:
+                        await websocket.send_json({
+                            "type":      "auth_required",
+                            "content":   "Please send an auth message first.",
                             "timestamp": datetime.utcnow().isoformat(),
                         })
                         continue
 
-                    auth_token = data.get("token", "")
-                    user_info  = await manager.authenticate(websocket, auth_token)
-                    if not user_info:
-                        return
-
-                    await websocket.send_json({
-                        "type":      "system",
-                        "role":      "system",
-                        "content":   (
-                            f"Welcome {user_info['username']}. "
-                            f"Connected to Head of Council ({user_info['head_agentium_id']})."
-                        ),
-                        "timestamp": datetime.utcnow().isoformat(),
-                    })
-                    # See comment above — push genesis prompt if awaiting.
-                    await _send_genesis_prompt_if_awaiting(websocket)
-                    continue
-
-            # ── Require authentication ────────────────────────────────────────
-            if user_info is None:
-                await websocket.send_json({
-                    "type":      "auth_required",
-                    "content":   "Please send an auth message first.",
-                    "timestamp": datetime.utcnow().isoformat(),
-                })
-                continue
-
-            # ── Ping / heartbeat ──────────────────────────────────────────────
-            if msg_type == "ping":
-                await websocket.send_json({
-                    "type":      "pong",
-                    "timestamp": data.get("timestamp", datetime.utcnow().isoformat()),
-                })
-                continue
-
-            # ── Cancel an in-flight stream ───────────────────────────────────
-            if msg_type == "cancel":
-                sid = data.get("stream_id")
-                ev = active_streams.get(sid)
-                if ev:
-                    ev.set()
-                continue
-
-            # ── Chat message (supports 'message' and 'chat_message' - TODO 13.2.3) ──
-            if msg_type in ("message", "chat_message"):
-                content     = data.get("content", "").strip()
-                attachments: List[dict] = data.get("attachments") or []
-                card_response = data.get("card_response")
-
-                enriched_message = _build_enriched_message(content, attachments)
-
-                # A card answer carries no free-text content; don't drop it.
-                if not enriched_message and not card_response:
-                    continue
-
-                loop = asyncio.get_running_loop()
-
-                def _lookup_head_and_config():
-                    with get_fresh_db() as db_s:
-                        head = db_s.query(HeadOfCouncil).filter_by(agentium_id="00001").first()
-                        if not head:
-                            return None, False
-                        thinking_enabled = False
-                        if head.preferred_config_id:
-                            head_cfg = (
-                                db_s.query(UserModelConfig)
-                                .filter_by(id=head.preferred_config_id)
-                                .first()
-                            )
-                            if head_cfg and is_thinking_config(head_cfg):
-                                thinking_enabled = True
-                        return head.id, thinking_enabled
-
-                head_id, thinking_enabled = await loop.run_in_executor(None, _lookup_head_and_config)
-                if not head_id:
-                    await websocket.send_json({
-                        "type":      "error",
-                        "content":   "Head of Council is unavailable. Check system status.",
-                        "timestamp": datetime.utcnow().isoformat(),
-                    })
-                    continue
-
-                extra_metadata = {"card_response": card_response} if card_response else None
-
-                stream_id  = str(uuid.uuid4())
-                message_id = str(uuid.uuid4())
-                cancel_event = asyncio.Event()
-                active_streams[stream_id] = cancel_event
-
-                await websocket.send_json({
-                    "type":       "message_start",
-                    "stream_id":  stream_id,
-                    "role":       "head_of_council",
-                    "message_id": message_id,
-                    "thinking":   thinking_enabled,
-                    "timestamp":  datetime.utcnow().isoformat(),
-                })
-
-                # Run the (potentially long) generation in a background task
-                # instead of awaiting it inside the receive loop. Awaiting
-                # here would block the server from answering heartbeat pings
-                # while the model streams a reply, causing the client's
-                # pong-timeout to wrongly drop a healthy — but busy —
-                # connection ("Head of Council goes offline mid-chat").
-                # Defaults capture this iteration's values to avoid the
-                # Python late-binding closure pitfall across loop iterations.
-
-                async def on_delta(text: str, sid: str = stream_id) -> None:
-                    try:
-                        # Existing message_delta
+                    # ── Ping / heartbeat ──────────────────────────────────────────────
+                    if msg_type == "ping":
                         await websocket.send_json({
-                            "type":      "message_delta",
-                            "stream_id": sid,
-                            "delta":     text,
+                            "type":      "pong",
+                            "timestamp": data.get("timestamp", datetime.utcnow().isoformat()),
                         })
-                        # chat_stream event for TODO 13.2.4
-                        await websocket.send_json({
-                            "type":      "chat_stream",
-                            "stream_id": sid,
-                            "chunk":     text,
-                            "delta":     text,
-                            "timestamp": datetime.utcnow().isoformat(),
-                        })
-                    except Exception:
-                        pass  # socket may be closing; the task handles it
+                        continue
 
-                async def on_tool_start(
-                    tool_calls: List[Dict],
-                    cumulative: int,
-                    sid: str = stream_id,
-                ) -> None:
-                    try:
-                        tool_names = [
-                            tc.get("function", {}).get("name", "tool")
-                            if isinstance(tc, dict)
-                            else getattr(getattr(tc, "function", None), "name", "tool")
-                            for tc in tool_calls
-                        ]
-                        # tool_execution event for TODO 13.2.8
-                        await websocket.send_json({
-                            "type":        "tool_execution",
-                            "stream_id":   sid,
-                            "tool_names":  tool_names,
-                            "tool_name":   tool_names[0] if tool_names else "tool",
-                            "tool_count":  cumulative,
-                            "status":      "in_progress",
-                            "timestamp":   datetime.utcnow().isoformat(),
-                        })
-                        # tool_progress for backward compatibility
-                        await websocket.send_json({
-                            "type":       "tool_progress",
-                            "stream_id":  sid,
-                            "tool_count": cumulative,
-                            "tool_names": tool_names,
-                        })
-                    except Exception:
-                        pass
+                    # ── Cancel an in-flight stream ───────────────────────────────────
+                    if msg_type == "cancel":
+                        sid = data.get("stream_id")
+                        ev = active_streams.get(sid)
+                        if ev:
+                            ev.set()
+                        continue
 
-                async def _run_generation(
-                    sid: str = stream_id,
-                    msg: str = enriched_message,
-                    meta: Optional[dict] = extra_metadata,
-                    hid: Any = head_id,
-                    cevent: asyncio.Event = cancel_event,
-                ) -> None:
-                    try:
-                        with get_fresh_db() as gen_db:
-                            gen_head = gen_db.query(HeadOfCouncil).filter_by(id=hid).first()
-                            if not gen_head:
+                    # ── Chat message (supports 'message' and 'chat_message' - TODO 13.2.3) ──
+                    if msg_type in ("message", "chat_message"):
+                        content     = data.get("content", "").strip()
+                        attachments: List[dict] = data.get("attachments") or []
+                        card_response = data.get("card_response")
+
+                        enriched_message = _build_enriched_message(content, attachments)
+
+                        # A card answer carries no free-text content; don't drop it.
+                        if not enriched_message and not card_response:
+                            continue
+
+                        loop = asyncio.get_running_loop()
+
+                        def _lookup_head_and_config():
+                            with get_fresh_db() as db_s:
+                                head = db_s.query(HeadOfCouncil).filter_by(agentium_id="00001").first()
+                                if not head:
+                                    return None, False
+                                thinking_enabled = False
+                                if head.preferred_config_id:
+                                    head_cfg = (
+                                        db_s.query(UserModelConfig)
+                                        .filter_by(id=head.preferred_config_id)
+                                        .first()
+                                    )
+                                    if head_cfg and is_thinking_config(head_cfg):
+                                        thinking_enabled = True
+                                return head.id, thinking_enabled
+
+                        head_id, thinking_enabled = await loop.run_in_executor(None, _lookup_head_and_config)
+                        if not head_id:
+                            await websocket.send_json({
+                                "type":      "error",
+                                "content":   "Head of Council is unavailable. Check system status.",
+                                "timestamp": datetime.utcnow().isoformat(),
+                            })
+                            continue
+
+                        extra_metadata = {"card_response": card_response} if card_response else None
+
+                        stream_id  = str(uuid.uuid4())
+                        message_id = str(uuid.uuid4())
+                        cancel_event = asyncio.Event()
+                        active_streams[stream_id] = cancel_event
+
+                        await websocket.send_json({
+                            "type":       "message_start",
+                            "stream_id":  stream_id,
+                            "role":       "head_of_council",
+                            "message_id": message_id,
+                            "thinking":   thinking_enabled,
+                            "timestamp":  datetime.utcnow().isoformat(),
+                        })
+
+                        # Run the (potentially long) generation in a background task
+                        # instead of awaiting it inside the receive loop. Awaiting
+                        # here would block the server from answering heartbeat pings
+                        # while the model streams a reply, causing the client's
+                        # pong-timeout to wrongly drop a healthy — but busy —
+                        # connection ("Head of Council goes offline mid-chat").
+                        # Defaults capture this iteration's values to avoid the
+                        # Python late-binding closure pitfall across loop iterations.
+
+                        async def on_delta(text: str, sid: str = stream_id) -> None:
+                            try:
+                                # Existing message_delta
                                 await websocket.send_json({
-                                    "type":      "error",
-                                    "content":   "Head of Council is unavailable. Check system status.",
+                                    "type":      "message_delta",
+                                    "stream_id": sid,
+                                    "delta":     text,
+                                })
+                                # chat_stream event for TODO 13.2.4
+                                await websocket.send_json({
+                                    "type":      "chat_stream",
+                                    "stream_id": sid,
+                                    "chunk":     text,
+                                    "delta":     text,
                                     "timestamp": datetime.utcnow().isoformat(),
                                 })
-                                return
+                            except Exception:
+                                pass  # socket may be closing; the task handles it
 
-                            # Pass session_id for session isolation (19.3.3)
-                            session_id = user_info.get("session_id") if user_info else None
-                            response = await ChatService.process_message(
-                                gen_head, msg, gen_db,
-                                extra_metadata=meta,
-                                on_delta=on_delta,
-                                on_tool_start=on_tool_start,
-                                cancel_event=cevent,
-                                session_id=session_id,
-                            )
+                        async def on_tool_start(
+                            tool_calls: List[Dict],
+                            cumulative: int,
+                            sid: str = stream_id,
+                        ) -> None:
+                            try:
+                                tool_names = [
+                                    tc.get("function", {}).get("name", "tool")
+                                    if isinstance(tc, dict)
+                                    else getattr(getattr(tc, "function", None), "name", "tool")
+                                    for tc in tool_calls
+                                ]
+                                # tool_execution event for TODO 13.2.8
+                                await websocket.send_json({
+                                    "type":        "tool_execution",
+                                    "stream_id":   sid,
+                                    "tool_names":  tool_names,
+                                    "tool_name":   tool_names[0] if tool_names else "tool",
+                                    "tool_count":  cumulative,
+                                    "status":      "in_progress",
+                                    "timestamp":   datetime.utcnow().isoformat(),
+                                })
+                                # tool_progress for backward compatibility
+                                await websocket.send_json({
+                                    "type":       "tool_progress",
+                                    "stream_id":  sid,
+                                    "tool_count": cumulative,
+                                    "tool_names": tool_names,
+                                })
+                            except Exception:
+                                pass
 
-                            finish = response.get("finish_reason", "stop") or "stop"
-                            timestamp = datetime.utcnow().isoformat()
-                            metadata = {
-                                "model":        response.get("model"),
-                                "tokens_used":  response.get("tokens_used", 0),
-                                "task_created": response.get("task_created", False),
-                                "task_id":      response.get("task_id"),
-                                "agent_spawned": response.get("agent_spawned"),
-                                "context_compressed": response.get("context_compressed", False),
-                                "raw_turn_count": response.get("raw_turn_count", 0),
-                                "estimated_tokens": response.get("estimated_tokens", 0),
-                                "card": (response.get("metadata") or {}).get("card")
-                                if isinstance(response.get("metadata"), dict) else None,
-                                "media_urls": (response.get("metadata") or {}).get("media_urls", [])
-                                if isinstance(response.get("metadata"), dict) else [],
-                            }
-                            await websocket.send_json({
-                                "type":         "message_end",
-                                "stream_id":    sid,
-                                "content":      response.get("content", ""),
-                                "metadata":     metadata,
-                                "finish_reason": finish,
-                                "timestamp":    timestamp,
-                            })
-                            # Deliver chat_message event for TODO 13.2.3
-                            await websocket.send_json({
-                                "type":         "chat_message",
-                                "role":         "head_of_council",
-                                "content":      response.get("content", ""),
-                                "message_id":   message_id,
-                                "stream_id":    sid,
-                                "metadata":     metadata,
-                                "timestamp":    timestamp,
-                            })
-                    except asyncio.CancelledError:
-                        raise
-                    except Exception as exc:
-                        logger.error(f"[WebSocket] process_message failed: {exc}")
-                        try:
-                            await websocket.send_json({
-                                "type":         "message_end",
-                                "stream_id":    sid,
-                                "content":      f"⚠️ An error occurred while processing your message: {str(exc)[:300]}",
-                                "metadata":     {},
-                                "finish_reason": "error",
-                                "timestamp":    datetime.utcnow().isoformat(),
-                            })
-                        except Exception:
-                            pass  # socket already closing — error is logged above
-                    finally:
-                        active_streams.pop(sid, None)
-                        pending_tasks.pop(sid, None)
+                        async def _run_generation(
+                            sid: str = stream_id,
+                            msg: str = enriched_message,
+                            meta: Optional[dict] = extra_metadata,
+                            hid: Any = head_id,
+                            cevent: asyncio.Event = cancel_event,
+                        ) -> None:
+                            try:
+                                with get_fresh_db() as gen_db:
+                                    gen_head = gen_db.query(HeadOfCouncil).filter_by(id=hid).first()
+                                    if not gen_head:
+                                        await websocket.send_json({
+                                            "type":      "error",
+                                            "content":   "Head of Council is unavailable. Check system status.",
+                                            "timestamp": datetime.utcnow().isoformat(),
+                                        })
+                                        return
 
-                task = asyncio.create_task(_run_generation())
-                pending_tasks[stream_id] = task
-                continue
+                                    # Pass session_id for session isolation (19.3.3)
+                                    session_id = user_info.get("session_id") if user_info else None
+                                    response = await ChatService.process_message(
+                                        gen_head, msg, gen_db,
+                                        extra_metadata=meta,
+                                        on_delta=on_delta,
+                                        on_tool_start=on_tool_start,
+                                        cancel_event=cevent,
+                                        session_id=session_id,
+                                    )
 
-            # ── Unknown message type ──────────────────────────────────────────
-            await websocket.send_json({
-                "type":      "error",
-                "content":   f"Unknown message type: {msg_type!r}",
-                "timestamp": datetime.utcnow().isoformat(),
-            })
+                                    finish = response.get("finish_reason", "stop") or "stop"
+                                    timestamp = datetime.utcnow().isoformat()
+                                    metadata = {
+                                        "model":        response.get("model"),
+                                        "tokens_used":  response.get("tokens_used", 0),
+                                        "task_created": response.get("task_created", False),
+                                        "task_id":      response.get("task_id"),
+                                        "agent_spawned": response.get("agent_spawned"),
+                                        "context_compressed": response.get("context_compressed", False),
+                                        "raw_turn_count": response.get("raw_turn_count", 0),
+                                        "estimated_tokens": response.get("estimated_tokens", 0),
+                                        "card": (response.get("metadata") or {}).get("card")
+                                        if isinstance(response.get("metadata"), dict) else None,
+                                        "media_urls": (response.get("metadata") or {}).get("media_urls", [])
+                                        if isinstance(response.get("metadata"), dict) else [],
+                                    }
+                                    await websocket.send_json({
+                                        "type":         "message_end",
+                                        "stream_id":    sid,
+                                        "content":      response.get("content", ""),
+                                        "metadata":     metadata,
+                                        "finish_reason": finish,
+                                        "timestamp":    timestamp,
+                                    })
+                                    # Deliver chat_message event for TODO 13.2.3
+                                    await websocket.send_json({
+                                        "type":         "chat_message",
+                                        "role":         "head_of_council",
+                                        "content":      response.get("content", ""),
+                                        "message_id":   message_id,
+                                        "stream_id":    sid,
+                                        "metadata":     metadata,
+                                        "timestamp":    timestamp,
+                                    })
+                            except asyncio.CancelledError:
+                                raise
+                            except Exception as exc:
+                                logger.error(f"[WebSocket] process_message failed: {exc}")
+                                try:
+                                    await websocket.send_json({
+                                        "type":         "message_end",
+                                        "stream_id":    sid,
+                                        "content":      f"⚠️ An error occurred while processing your message: {str(exc)[:300]}",
+                                        "metadata":     {},
+                                        "finish_reason": "error",
+                                        "timestamp":    datetime.utcnow().isoformat(),
+                                    })
+                                except Exception:
+                                    pass  # socket already closing — error is logged above
+                            finally:
+                                active_streams.pop(sid, None)
+                                pending_tasks.pop(sid, None)
 
-    except WebSocketDisconnect:
-        # Don't cancel generation tasks — let them complete so the
-        # reply is persisted to DB. The client's send_json calls fail
-        # silently (handled by on_delta / message_end try/except).
-        # On reconnect, the frontend loads the persisted reply from
-        # chat history.
-        pending_tasks.clear()
-        manager.disconnect(websocket)
+                        task = asyncio.create_task(_run_generation())
+                        pending_tasks[stream_id] = task
+                        continue
+
+                    # ── Unknown message type ──────────────────────────────────────────
+                    await websocket.send_json({
+                        "type":      "error",
+                        "content":   f"Unknown message type: {msg_type!r}",
+                        "timestamp": datetime.utcnow().isoformat(),
+                    })
+
+        except WebSocketDisconnect:
+            # Don't cancel generation tasks — let them complete so the
+            # reply is persisted to DB. The client's send_json calls fail
+            # silently (handled by on_delta / message_end try/except).
+            # On reconnect, the frontend loads the persisted reply from
+            # chat history.
+            pending_tasks.clear()
+            manager.disconnect(websocket)
+        except Exception as exc:
+            logger.error(f"[WebSocket] Unexpected error in message loop: {exc}")
+            for t in pending_tasks.values():
+                t.cancel()
+            pending_tasks.clear()
+            manager.disconnect(websocket)
+            try:
+                await websocket.close(code=1011, reason="Internal server error")
+            except Exception:
+                pass
+
     except Exception as exc:
-        logger.error(f"[WebSocket] Unexpected error: {exc}")
-        for t in pending_tasks.values():
-            t.cancel()
-        pending_tasks.clear()
-        manager.disconnect(websocket)
+        # Outer catch-all for exceptions before the inner try block
+        # (e.g., during websocket.accept() or early authentication)
+        logger.error(f"[WebSocket] Fatal error during connection setup: {exc}")
         try:
             await websocket.close(code=1011, reason="Internal server error")
         except Exception:
