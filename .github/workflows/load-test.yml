@@ -16,7 +16,7 @@ jobs:
   load-test-gate:
     name: Load & Stress Test Gate (21.5.2)
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
 
     env:
       DATABASE_URL: postgresql://agentium:agentium@localhost:5432/agentium_test
@@ -65,7 +65,7 @@ jobs:
           echo "Using DB user: $PSQL_USER"
 
           for i in {1..30}; do
-            if docker compose -f docker-compose.test.yml exec -T postgres bash -lc "pg_isready -U '$PSQL_USER'" >/dev/null 2>&1; then
+            if docker compose -f docker-compose.test.yml exec -T postgres bash -lc "pg_isready -U '$PSQL_USER'" >/dev/null 2>&1; do
               echo "Postgres is ready."
               break
             fi
@@ -98,6 +98,59 @@ jobs:
           pip install --no-cache-dir -r backend/requirements.txt
           pip install --no-cache-dir -r backend/requirements-dev.txt
 
+      - name: Run database migrations
+        working-directory: ./backend
+        run: |
+          alembic upgrade head
+        env:
+          DATABASE_URL: postgresql://agentium:agentium@localhost:5432/agentium_test
+
+      - name: Seed database for load test (genesis agents)
+        working-directory: ./backend
+        run: |
+          python tests/load/seed_db.py
+        env:
+          DATABASE_URL: postgresql://agentium:agentium@localhost:5432/agentium_test
+          TESTING: "true"
+          PYTHONPATH: ${{ github.workspace }}
+
+      - name: Start backend server for load test
+        working-directory: ./backend
+        run: |
+          nohup python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 &> /tmp/backend.log &
+          echo $! > /tmp/backend.pid
+          echo "Backend PID: $(cat /tmp/backend.pid)"
+
+          # Wait for the server to respond
+          echo "Waiting for backend to be ready..."
+          for i in {1..30}; do
+            if curl -sf http://localhost:8000/api/health > /dev/null 2>&1; then
+              echo "Backend is ready!"
+              break
+            fi
+            echo "  attempt $i/30..."
+            sleep 2
+          done
+          # Show last few lines of server log for debugging
+          tail -20 /tmp/backend.log || true
+        env:
+          DATABASE_URL: postgresql://agentium:agentium@localhost:5432/agentium_test
+          REDIS_URL: redis://localhost:6379/1
+          CELERY_BROKER_URL: redis://localhost:6379/1
+          CELERY_RESULT_BACKEND: redis://localhost:6379/1
+          CHROMA_HOST: localhost
+          CHROMA_PORT: 8001
+          CELERY_TASK_ALWAYS_EAGER: "true"
+          TESTING: "true"
+          SECRET_KEY: test-secret-key-for-ci
+          PYTHONPATH: ${{ github.workspace }}
+
+      - name: Verify endpoints before load test
+        run: |
+          echo "=== Verifying key endpoints ==="
+          curl -sf http://localhost:8000/api/health || (echo "Health check failed" && exit 1)
+          echo "=== Endpoints verified, proceeding to load test ==="
+
       - name: Run 2× Pool Saturation & Unit Tests
         env:
           CELERY_TASK_ALWAYS_EAGER: "true"
@@ -114,6 +167,13 @@ jobs:
       - name: Execute Quick Load Test Gate
         run: |
           python -m backend.tests.load.orchestrator --mode quick --duration 60 --users 150 --gate
+
+      - name: Stop backend server
+        if: always()
+        run: |
+          if [ -f /tmp/backend.pid ]; then
+            kill "$(cat /tmp/backend.pid)" 2>/dev/null || true
+          fi
 
       - name: Upload Load Test Reports
         if: always()
