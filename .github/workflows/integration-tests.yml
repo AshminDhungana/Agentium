@@ -296,6 +296,8 @@ jobs:
           DATABASE_URL=postgresql://agentium:agentium@localhost:5432/agentium_test \
           PYTHONPATH=${{ github.workspace }} \
           python tests/load/seed_db.py
+        env:
+          TESTING: "true"
 
       - name: Start backend server for load test
         working-directory: ./backend
