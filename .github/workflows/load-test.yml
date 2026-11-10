@@ -65,7 +65,7 @@ jobs:
           echo "Using DB user: $PSQL_USER"
 
           for i in {1..30}; do
-            if docker compose -f docker-compose.test.yml exec -T postgres bash -lc "pg_isready -U '$PSQL_USER'" >/dev/null 2>&1; do
+            if docker compose -f docker-compose.test.yml exec -T postgres bash -lc "pg_isready -U '$PSQL_USER'" >/dev/null 2>&1; then
               echo "Postgres is ready."
               break
             fi
