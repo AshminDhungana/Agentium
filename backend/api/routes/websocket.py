@@ -951,6 +951,7 @@ async def websocket_chat_endpoint(
                         await websocket.send_json({
                             "type":      "pong",
                             "timestamp": data.get("timestamp", datetime.utcnow().isoformat()),
+                            "request_id": data.get("request_id"),  # Echo client's request_id
                         })
                         continue
 
