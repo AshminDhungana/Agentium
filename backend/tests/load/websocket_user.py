@@ -13,6 +13,7 @@ import json
 import logging
 import os
 import time
+import uuid
 from typing import Optional
 
 try:
@@ -134,30 +135,32 @@ class WebSocketUser(User):
 
     @task(3)
     def heartbeat(self):
-        """Send ping message and verify pong response."""
+        """Send ping message and verify pong response with request_id correlation."""
         if not self.ws or not self.connected:
             return
 
         start_time = time.perf_counter()
+        request_id = str(uuid.uuid4())
         try:
-            ping_payload = json.dumps({"type": "ping", "timestamp": time.time()})
+            ping_payload = json.dumps({"type": "ping", "timestamp": time.time(), "request_id": request_id})
             self.ws.send(ping_payload)
 
-            reply = self.ws.recv(timeout=2.0)
-            data = json.loads(reply)
-            duration_ms = (time.perf_counter() - start_time) * 1000.0
-
-            if data.get("type") == "pong":
-                if _HAS_LOCUST:
-                    events.request.fire(
-                        request_type="WebSocket",
-                        name="ws:heartbeat_ping",
-                        response_time=duration_ms,
-                        response_length=len(reply),
-                        exception=None,
-                    )
-            else:
-                raise ValueError(f"Expected pong, received {data.get('type')}")
+            # Loop until matching pong received (handles interleaved broadcasts)
+            while True:
+                reply = self.ws.recv(timeout=2.0)
+                data = json.loads(reply)
+                if data.get("type") == "pong" and data.get("request_id") == request_id:
+                    duration_ms = (time.perf_counter() - start_time) * 1000.0
+                    if _HAS_LOCUST:
+                        events.request.fire(
+                            request_type="WebSocket",
+                            name="ws:heartbeat_ping",
+                            response_time=duration_ms,
+                            response_length=len(reply),
+                            exception=None,
+                        )
+                    break
+                # Non-pong or mismatched request_id - continue waiting
         except Exception as exc:
             duration_ms = (time.perf_counter() - start_time) * 1000.0
             if _HAS_LOCUST:
