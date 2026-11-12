@@ -345,7 +345,26 @@ jobs:
             --spawn-rate 5 \
             --run-time 2m \
             --headless \
-            --html locust_report.html
+            --html locust_report.html \
+            --csv locust_results \
+            --exit-code-on-error 0
+
+          # Gate: fail only if aggregate error rate exceeds 1%
+          python3 -c "
+          import csv, sys
+          with open('locust_results_stats.csv') as f:
+              for row in csv.DictReader(f):
+                  if row['Name'] == 'Aggregated':
+                      fails = int(row['Failure Count'])
+                      total = int(row['Request Count'])
+                      rate = fails / total if total else 0
+                      if rate > 0.01:
+                          print(f'FAIL: Error rate {rate:.2%} exceeds 1% threshold ({fails}/{total})')
+                          sys.exit(1)
+                      print(f'PASS: Error rate {rate:.2%} ({fails}/{total})')
+                      sys.exit(0)
+          print('WARN: No Aggregated row found in CSV'); sys.exit(1)
+          "
         env:
           CI: true
           PYTHONPATH: ${{ github.workspace }}

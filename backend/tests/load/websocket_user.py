@@ -141,13 +141,15 @@ class WebSocketUser(User):
 
         start_time = time.perf_counter()
         request_id = str(uuid.uuid4())
+        deadline = time.perf_counter() + 5.0  # 5s total budget (was 2s — too tight under CI load)
         try:
             ping_payload = json.dumps({"type": "ping", "timestamp": time.time(), "request_id": request_id})
             self.ws.send(ping_payload)
 
             # Loop until matching pong received (handles interleaved broadcasts)
-            while True:
-                reply = self.ws.recv(timeout=2.0)
+            while time.perf_counter() < deadline:
+                remaining = max(0.1, deadline - time.perf_counter())
+                reply = self.ws.recv(timeout=remaining)
                 data = json.loads(reply)
                 if data.get("type") == "pong" and data.get("request_id") == request_id:
                     duration_ms = (time.perf_counter() - start_time) * 1000.0
@@ -159,8 +161,9 @@ class WebSocketUser(User):
                             response_length=len(reply),
                             exception=None,
                         )
-                    break
-                # Non-pong or mismatched request_id - continue waiting
+                    return
+                # Non-pong or mismatched request_id — keep draining until deadline
+            raise TimeoutError("Heartbeat pong not received within 5s deadline")
         except Exception as exc:
             duration_ms = (time.perf_counter() - start_time) * 1000.0
             if _HAS_LOCUST:
